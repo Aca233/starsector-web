@@ -18,3 +18,22 @@
   inset: 0;
   pointer-events: none;
 }
+
+/* Keep HUD density stable at the three target presentation classes. */
+@media (max-width: 1366px), (max-height: 800px) {
+  .hud-overlay {
+    transform: scale(0.9);
+    transform-origin: center bottom;
+    width: 111.111%;
+    height: 111.111%;
+  }
+}
+
+@media (min-width: 2400px) and (min-height: 1300px) {
+  .hud-overlay {
+    transform: scale(1.08);
+    transform-origin: center bottom;
+    width: 92.592%;
+    height: 92.592%;
+  }
+}

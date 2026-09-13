@@ -3,7 +3,7 @@ import { ArmorGrid } from './ArmorGrid';
 import { FluxTracker } from './FluxTracker';
 import { Shield } from './Shield';
 import { ShipSystem } from './ShipSystem';
-import { Projectile, Beam, WeaponMount, WeaponGroup, WEAPON_REGISTRY, MuzzleFlashSpec } from './Weapon';
+import { Projectile, Beam, WeaponMount, WeaponGroup, MuzzleFlashSpec } from './Weapon';
 import { ShipSpec } from '../modding/ModManager';
 import { sound } from '../audio/SoundManager';
 import { ShipWeaponControlSystem } from './systems/ShipWeaponControlSystem';

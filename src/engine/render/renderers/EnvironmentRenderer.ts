@@ -1,3 +1,4 @@
+import { visualRandom } from '../RenderDeterminism';
 import { Vector2 } from '../../math/Vector2';
 import { CombatEngine } from '../../simulation/CombatEngine';
 import { textureCache } from '../TextureCache';
@@ -26,19 +27,19 @@ export class EnvironmentRenderer {
 
     for (let i = 0; i < 400; i++) {
       const layer = i % 3;
-      const alpha = 0.2 + Math.random() * 0.8;
+      const alpha = 0.2 + visualRandom('renderers/EnvironmentRenderer.ts#1') * 0.8;
       const b = Math.min(3, Math.max(0, Math.floor((alpha - 0.2) / 0.2)));
       this.starBuckets[layer][b].push({
-        x: (Math.random() - 0.5) * 4400,
-        y: (Math.random() - 0.5) * 4400,
-        size: 1 + Math.random() * 2.2
+        x: (visualRandom('renderers/EnvironmentRenderer.ts#2') - 0.5) * 4400,
+        y: (visualRandom('renderers/EnvironmentRenderer.ts#3') - 0.5) * 4400,
+        size: 1 + visualRandom('renderers/EnvironmentRenderer.ts#4') * 2.2
       });
     }
   }
 
   public drawStarfield(ctx: CanvasRenderingContext2D, cameraPos: Vector2) {
     // 1. 绘制官方正统深空星云 (background1.jpg) 视差滚动
-    const bgImg = textureCache.getImage('/api/asset?path=graphics/backgrounds/background1.jpg');
+    const bgImg = textureCache.getImage('/game-assets/graphics/backgrounds/background1.jpg');
     if (bgImg.complete && bgImg.naturalWidth > 0) {
       ctx.save();
       const parallaxFactor = 0.05;

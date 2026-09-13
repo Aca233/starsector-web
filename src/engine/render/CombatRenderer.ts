@@ -1,3 +1,5 @@
+import { beginRenderFrame, endRenderFrame, visualRandom } from './RenderDeterminism';
+import type { RenderFrameContext } from './RenderFrameContext';
 import { CombatEngine } from '../simulation/CombatEngine';
 import { Vector2 } from '../math/Vector2';
 import { TextureCache, textureCache } from './TextureCache';
@@ -52,7 +54,9 @@ export class CombatRenderer {
    * @param cameraPos 摄像机世界中心
    * @param zoom 缩放级别
    */
-  public render(engine: CombatEngine, alpha: number, cameraPos: Vector2, zoom: number) {
+  public render(engine: CombatEngine, alpha: number, cameraPos: Vector2, zoom: number, frame: RenderFrameContext) {
+    beginRenderFrame(frame);
+    try {
     const ctx = this.ctx;
     const width = this.canvas.width;
     const height = this.canvas.height;
@@ -63,8 +67,8 @@ export class CombatRenderer {
 
     // 屏幕震颤计算
     const shake = engine.cameraShakeIntensity;
-    const shakeX = (Math.random() - 0.5) * 2 * shake;
-    const shakeY = (Math.random() - 0.5) * 2 * shake;
+    const shakeX = (visualRandom('CombatRenderer.ts#1') - 0.5) * 2 * shake;
+    const shakeY = (visualRandom('CombatRenderer.ts#2') - 0.5) * 2 * shake;
 
     ctx.save();
     // 摄像机视口变换 (包含震屏偏移)
@@ -73,23 +77,25 @@ export class CombatRenderer {
     ctx.translate(-cameraPos.x, -cameraPos.y);
 
     // 1. 绘制深空星云背景与视差星空
-    this.environmentRenderer.drawStarfield(ctx, cameraPos);
+    if (frame.layers.has('background')) this.environmentRenderer.drawStarfield(ctx, cameraPos);
 
     // 1.2 绘制真实深空星云尘埃 (Nebulae)
-    this.environmentRenderer.drawNebulae(ctx, engine);
+    if (frame.layers.has('nebula')) this.environmentRenderer.drawNebulae(ctx, engine);
 
     // 1.5 绘制漂移小行星带 (Asteroids)
-    this.environmentRenderer.drawAsteroids(ctx, engine);
+    if (frame.layers.has('background')) this.environmentRenderer.drawAsteroids(ctx, engine);
 
     // 2. 绘制导弹烟雾尾迹 (Contrails - 位于舰体下层空间)
-    this.fxRenderer.drawContrails(ctx, engine);
+    if (frame.layers.has('trail')) this.fxRenderer.drawContrails(ctx, engine);
 
     // 3. 绘制光束 (Beams)
-    this.fxRenderer.drawBeams(ctx, engine);
+    if (frame.layers.has('beam')) this.fxRenderer.drawBeams(ctx, engine);
 
     // 3.8 绘制相位潜航时空残影 (Phase Ghosts)
-    this.shipRenderer.drawPhaseGhosts(ctx, engine.enemyShip);
-    this.shipRenderer.drawPhaseGhosts(ctx, engine.playerShip);
+    if (frame.layers.has('hull')) {
+      this.shipRenderer.drawPhaseGhosts(ctx, engine.enemyShip);
+      this.shipRenderer.drawPhaseGhosts(ctx, engine.playerShip);
+    }
 
     // 4. 绘制舰船 (Ships: 攻势与典范与厄运)
     const enemyPos = Vector2.lerp(engine.enemyShip.prevPos, engine.enemyShip.pos, alpha);
@@ -104,12 +110,16 @@ export class CombatRenderer {
     while (dPlayerAngle < -Math.PI) dPlayerAngle += Math.PI * 2;
     const playerFacing = engine.playerShip.prevFacingRad + dPlayerAngle * alpha;
 
-    this.shipRenderer.drawShip(ctx, engine.enemyShip, alpha, enemyPos, enemyFacing);
-    this.shipRenderer.drawShip(ctx, engine.playerShip, alpha, playerPos, playerFacing);
+    if (frame.layers.has('hull')) {
+      this.shipRenderer.drawShip(ctx, engine.enemyShip, alpha, enemyPos, enemyFacing);
+      this.shipRenderer.drawShip(ctx, engine.playerShip, alpha, playerPos, playerFacing);
+    }
 
     // 4.1 绘制能量护盾与战术锁定括号 / 环形幅能仪表
-    this.shieldRenderer.drawShield(ctx, engine.enemyShip, enemyPos, enemyFacing);
-    this.shieldRenderer.drawShield(ctx, engine.playerShip, playerPos, playerFacing);
+    if (frame.layers.has('shield')) {
+      this.shieldRenderer.drawShield(ctx, engine.enemyShip, enemyPos, enemyFacing);
+      this.shieldRenderer.drawShield(ctx, engine.playerShip, playerPos, playerFacing);
+    }
 
     this.tacticalMapRenderer.drawTacticalTargetBracket(ctx, engine.enemyShip, enemyPos);
     this.shieldRenderer.drawInWorldRadialFluxArc(ctx, engine.playerShip, playerPos);
@@ -124,10 +134,10 @@ export class CombatRenderer {
     this.fxRenderer.drawMines(ctx, engine);
 
     // 5. 绘制枪口火光 (Muzzle Flashes)
-    this.fxRenderer.drawMuzzleFlashes(ctx, engine);
+    if (frame.layers.has('weapon')) this.fxRenderer.drawMuzzleFlashes(ctx, engine);
 
     // 6. 绘制投射物 (Projectiles)
-    this.fxRenderer.drawProjectiles(ctx, engine, alpha);
+    if (frame.layers.has('weapon')) this.fxRenderer.drawProjectiles(ctx, engine, alpha);
 
     // 7. 绘制提前量准星 (Lead Aim Pip)
     this.tacticalMapRenderer.drawAimLeadPip(ctx, engine);
@@ -142,7 +152,7 @@ export class CombatRenderer {
     this.fxRenderer.drawDebris(ctx, engine);
 
     // 10. 绘制原版官方爆炸翻页书动画与冲击波 (Explosions & Shockwaves)
-    this.fxRenderer.drawExplosions(ctx, engine);
+    if (frame.layers.has('explosion')) this.fxRenderer.drawExplosions(ctx, engine);
 
     // 10.5 绘制护盾能量冲击空间扩散环 (Shield Ripples)
     this.shieldRenderer.drawShieldRipples(ctx, engine);
@@ -156,5 +166,12 @@ export class CombatRenderer {
     }
 
     ctx.restore();
+    } finally {
+      endRenderFrame();
+    }
+  }
+
+  public dispose(): void {
+    // Canvas2D owns no explicit GPU resources. Tinted canvases remain reusable.
   }
 }

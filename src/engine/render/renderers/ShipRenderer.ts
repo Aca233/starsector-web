@@ -1,3 +1,4 @@
+import { visualRandom } from '../RenderDeterminism';
 import { Vector2 } from '../../math/Vector2';
 import { Ship } from '../../simulation/Ship';
 import { textureCache } from '../TextureCache';
@@ -25,7 +26,7 @@ export class ShipRenderer {
     const isPhased = ship.isPhased;
     if (isPhased) {
       ctx.globalAlpha = 0.45;
-      const auraGlow = textureCache.getTintedImage('/api/asset?path=graphics/fx/glow64.png', 80, 160, 255);
+      const auraGlow = textureCache.getTintedImage('/game-assets/graphics/fx/glow64.png', 80, 160, 255);
       if (auraGlow) {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
@@ -72,9 +73,9 @@ export class ShipRenderer {
     if (ship.flux.isOverloaded) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      const tintedGlow = textureCache.getTintedImage('/api/asset?path=graphics/fx/glow64.png', 80, 200, 255);
+      const tintedGlow = textureCache.getTintedImage('/game-assets/graphics/fx/glow64.png', 80, 200, 255);
       if (tintedGlow) {
-        ctx.globalAlpha = 0.35 + Math.random() * 0.45;
+        ctx.globalAlpha = 0.35 + visualRandom('renderers/ShipRenderer.ts#1') * 0.45;
         const gSize = ship.spec.collisionRadius * 2.2;
         ctx.drawImage(tintedGlow, -gSize / 2, -gSize / 2, gSize, gSize);
       }
@@ -111,8 +112,8 @@ export class ShipRenderer {
         ctx.translate(slot.x, slot.y);
         ctx.rotate((slot.angleDeg * Math.PI) / 180);
 
-        if (Math.random() < 0.28) {
-          const tintedFlame = textureCache.getTintedImage('/api/asset?path=graphics/fx/engineflame32.png', 255, 70, 20);
+        if (visualRandom('renderers/ShipRenderer.ts#2') < 0.28) {
+          const tintedFlame = textureCache.getTintedImage('/game-assets/graphics/fx/engineflame32.png', 255, 70, 20);
           if (tintedFlame) {
             ctx.globalAlpha = 0.55;
             ctx.save();
@@ -121,7 +122,7 @@ export class ShipRenderer {
             ctx.restore();
           }
         }
-        const hitGlow = textureCache.getTintedImage('/api/asset?path=graphics/fx/hit_glow.png', 60, 50, 45);
+        const hitGlow = textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow.png', 60, 50, 45);
         if (hitGlow) {
           ctx.globalAlpha = 0.6;
           const smokeSize = slot.width * 1.5;
@@ -132,7 +133,7 @@ export class ShipRenderer {
       }
 
       const throttleFactor = Math.max(0.18, ship.throttle > 0 ? ship.throttle : 0.12);
-      let plumeLength = slot.length * throttleFactor * (0.88 + Math.random() * 0.24);
+      let plumeLength = slot.length * throttleFactor * (0.88 + visualRandom('renderers/ShipRenderer.ts#3') * 0.24);
       let plumeWidth = slot.width;
 
       if (isBurnDrive) {
@@ -165,10 +166,10 @@ export class ShipRenderer {
         ? [255, 255, 230]
         : [255, 230, 160];
 
-      const tintedGlow = textureCache.getTintedImage('/api/asset?path=graphics/fx/engineglow32.png', glowColor[0], glowColor[1], glowColor[2]);
-      const tintedFlame = textureCache.getTintedImage('/api/asset?path=graphics/fx/engineflame32.png', flameColor[0], flameColor[1], flameColor[2]);
-      const tintedCoreFlame = textureCache.getTintedImage('/api/asset?path=graphics/fx/engineflame32.png', coreFlameColor[0], coreFlameColor[1], coreFlameColor[2]);
-      const hitGlow = textureCache.getTintedImage('/api/asset?path=graphics/fx/hit_glow.png', 255, 255, 255);
+      const tintedGlow = textureCache.getTintedImage('/game-assets/graphics/fx/engineglow32.png', glowColor[0], glowColor[1], glowColor[2]);
+      const tintedFlame = textureCache.getTintedImage('/game-assets/graphics/fx/engineflame32.png', flameColor[0], flameColor[1], flameColor[2]);
+      const tintedCoreFlame = textureCache.getTintedImage('/game-assets/graphics/fx/engineflame32.png', coreFlameColor[0], coreFlameColor[1], coreFlameColor[2]);
+      const hitGlow = textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow.png', 255, 255, 255);
 
       if (tintedGlow) {
         ctx.globalAlpha = isBurnDrive ? 0.95 : 0.75;
@@ -283,13 +284,13 @@ export class ShipRenderer {
 
       // 故障挂点冒电弧火花
       if (mount.isDisabled) {
-        if (Math.random() < 0.25) {
+        if (visualRandom('renderers/ShipRenderer.ts#4') < 0.25) {
           ctx.save();
-          ctx.strokeStyle = Math.random() < 0.5 ? 'rgba(100, 200, 255, 0.9)' : 'rgba(255, 180, 60, 0.9)';
+          ctx.strokeStyle = visualRandom('renderers/ShipRenderer.ts#5') < 0.5 ? 'rgba(100, 200, 255, 0.9)' : 'rgba(255, 180, 60, 0.9)';
           ctx.lineWidth = 1.5;
           ctx.beginPath();
           ctx.moveTo(0, 0);
-          ctx.lineTo((Math.random() - 0.5) * 16, (Math.random() - 0.5) * 16);
+          ctx.lineTo((visualRandom('renderers/ShipRenderer.ts#6') - 0.5) * 16, (visualRandom('renderers/ShipRenderer.ts#7') - 0.5) * 16);
           ctx.stroke();
           ctx.restore();
         }
@@ -329,8 +330,8 @@ export class ShipRenderer {
 
     if (!isTurningLeft && !isTurningRight && !isStrafingLeft && !isStrafingRight && !isBraking && !isAccelerating) return;
 
-    const tintedFlame = textureCache.getTintedImage('/api/asset?path=graphics/fx/engineflame32.png', 100, 200, 255);
-    const tintedGlow = textureCache.getTintedImage('/api/asset?path=graphics/fx/engineglow32.png', 60, 150, 255);
+    const tintedFlame = textureCache.getTintedImage('/game-assets/graphics/fx/engineflame32.png', 100, 200, 255);
+    const tintedGlow = textureCache.getTintedImage('/game-assets/graphics/fx/engineglow32.png', 60, 150, 255);
     if (!tintedFlame) return;
 
     const rcsSlots = [
@@ -369,7 +370,7 @@ export class ShipRenderer {
       ctx.rotate(puff.angle);
 
       const rcsWidth = 8;
-      const rcsLength = 20 * puff.power * (0.8 + Math.random() * 0.4);
+      const rcsLength = 20 * puff.power * (0.8 + visualRandom('renderers/ShipRenderer.ts#8') * 0.4);
 
       if (tintedGlow) {
         ctx.globalAlpha = 0.75 * puff.power;
@@ -444,7 +445,7 @@ export class ShipRenderer {
   public drawShipScorchMarks(ctx: CanvasRenderingContext2D, ship: Ship) {
     if (!ship.scorchMarks || ship.scorchMarks.length === 0) return;
 
-    const hitGlow = textureCache.getTintedImage('/api/asset?path=graphics/fx/hit_glow.png', 255, 120, 30);
+    const hitGlow = textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow.png', 255, 120, 30);
 
     for (const sm of ship.scorchMarks) {
       ctx.save();

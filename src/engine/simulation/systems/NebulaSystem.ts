@@ -19,8 +19,8 @@ export class NebulaSystem {
     for (let i = 0; i < configs.length; i++) {
       const c = configs[i];
       const spriteUrl = c.type === 'AMBER'
-        ? '/api/asset?path=graphics/terrain/nebula_amber.png'
-        : '/api/asset?path=graphics/terrain/nebula512_blue.png';
+        ? '/game-assets/graphics/terrain/nebula_amber.png'
+        : '/game-assets/graphics/terrain/nebula512_blue.png';
 
       this.nebulae.push({
         id: i,

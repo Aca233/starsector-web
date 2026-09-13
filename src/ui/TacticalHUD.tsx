@@ -50,14 +50,10 @@ export interface TacticalHUDProps {
 export const TacticalHUD: React.FC<TacticalHUDProps> = ({
   engine,
   scheduler,
-  onSwitchShip,
   onReset,
   onOpenModManager,
-  currentLocale,
-  onToggleLocale,
   isAutopilot,
   onToggleAutopilot,
-  onActivateSystem,
   cameraPosRef,
   zoomRef,
   canvasRef
@@ -195,9 +191,9 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
         </button>
       </div>
 
-      {/* 5. 底部右侧：性能指示 (原版极简 FPS 与 CPU Idle) */}
+      {/* 5. 底部右侧：浏览器帧与主线程工作占比（不是 CPU/GPU idle） */}
       <div className="pointer-events-none absolute bottom-1 right-3 text-[#94ff00]/40 font-mono text-[10px] select-none">
-        FPS: {scheduler.measuredFPS} | Idle: {scheduler.measuredIdlePercent}%
+        FPS: {scheduler.measuredFPS} | JS Work: {scheduler.measuredFrameBudgetPercent}%
       </div>
 
       {/* 6. [H] 战术指令帮助抽屉 (仅按 H 键呼出) */}

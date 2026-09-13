@@ -1,5 +1,4 @@
 import { Vector2 } from '../math/Vector2';
-import { intersectSegmentWithPolygon } from '../math/Geometry';
 import { Ship } from './Ship';
 import { Projectile, Beam, MuzzleFlashSpec } from './Weapon';
 import { CapitalShipAI } from '../ai/CapitalShipAI';
@@ -147,6 +146,11 @@ export class CombatEngine {
   }
 
   public switchPlayerShip(newPlayerShipId: string) {
+    this.battleResult = null;
+    this.statsTracker.reset();
+    this.combatTime = 0;
+    this.countermeasureCooldownTimer = 0;
+    this.enemyCountermeasureCooldownTimer = 0;
     const playerSpec = modManager.getShip(newPlayerShipId) || modManager.getShip('onslaught')!;
     let enemyShipId = 'paragon';
     if (newPlayerShipId === 'paragon') {
@@ -164,6 +168,7 @@ export class CombatEngine {
     this.fxSystem.clear();
     this.mineSystem.clear();
     this.commandSystem.clear();
+    this.contrailEngine.clear();
     this.cameraShakeIntensity = 0;
 
     this.initFighters();
@@ -188,10 +193,13 @@ export class CombatEngine {
     this.nebulaSystem.init();
   }
 
-  public resetBattle() {
+  public resetBattle(playerShipId = this.playerShip.spec.id) {
     this.battleResult = null;
     this.statsTracker.reset();
-    this.switchPlayerShip(this.playerShip.spec.id);
+    this.combatTime = 0;
+    this.countermeasureCooldownTimer = 0;
+    this.enemyCountermeasureCooldownTimer = 0;
+    this.switchPlayerShip(playerShipId);
   }
 
   public endBattle(isVictory: boolean) {

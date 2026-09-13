@@ -1,5 +1,3 @@
-import { DamageType } from './ArmorGrid';
-
 export interface FleetCombatStats {
   totalDamageDealt: number;
   kineticDamage: number;

@@ -1,3 +1,4 @@
+import { visualRandom } from '../../RenderDeterminism';
 import { CombatEngine } from '../../../simulation/CombatEngine';
 import { WebGLPassContext } from '../WebGLPassContext';
 import { Vector2 } from '../../../math/Vector2';
@@ -24,7 +25,7 @@ export class WebGLProjectilePass {
     // 1. 绘制导弹连续烟雾尾迹带 (1:1 ContrailEngine.java 三角形缎带光栅化)
     if (engine.contrailEngine) {
       batcher.flush();
-      const contrailTex = textures.getTexture('/api/asset?path=graphics/fx/contrail64b.png', true);
+      const contrailTex = textures.getTexture('/game-assets/graphics/fx/contrail64b.png', true);
       ribbonBatcher.begin(batcher.currentViewProj);
       for (const strip of engine.contrailEngine.getStrips()) {
         if (strip.points.length < 2) continue;
@@ -44,10 +45,10 @@ export class WebGLProjectilePass {
     // 绘制高能持续光束 (1:1 L.java & BeamWeaponRay.java)
     if (engine.beams.length > 0) {
       batcher.setBlendMode('ADDITIVE');
-      const roughFringe = textures.getTexture('/api/asset?path=graphics/fx/beam_rough2_fringe.png', true);
-      const smoothFringe = textures.getTexture('/api/asset?path=graphics/fx/beam_laser_fringe.png', true);
-      const roughCore = textures.getTexture('/api/asset?path=graphics/fx/beam_rough2_core.png', true);
-      const smoothCore = textures.getTexture('/api/asset?path=graphics/fx/beam_laser_core.png', true);
+      const roughFringe = textures.getTexture('/game-assets/graphics/fx/beam_rough2_fringe.png', true);
+      const smoothFringe = textures.getTexture('/game-assets/graphics/fx/beam_laser_fringe.png', true);
+      const roughCore = textures.getTexture('/game-assets/graphics/fx/beam_rough2_core.png', true);
+      const smoothCore = textures.getTexture('/game-assets/graphics/fx/beam_laser_core.png', true);
 
       for (const b of engine.beams) {
         const beamDir = b.endPos.clone().sub(b.startPos);
@@ -128,12 +129,12 @@ export class WebGLProjectilePass {
    * 绘制上图层投射物与枪口粒子 (位于舰体上方)
    */
   public renderProjectilesAndMuzzle(engine: CombatEngine, ctx: WebGLPassContext) {
-    const { batcher, textures, hitGlowTex, glowTex, whiteTex, alpha } = ctx;
+    const { batcher, textures, hitGlowTex, alpha } = ctx;
 
     // 3. 绘制枪口开火粒子与火光 (1:1 _class.java:29-54 & SmoothParticle.java)
     if (engine.muzzleParticles && engine.muzzleParticles.length > 0) {
       batcher.setBlendMode('ADDITIVE');
-      const muzzlePartTex = textures.getTexture('/api/asset?path=graphics/fx/particlealpha32sq.png');
+      const muzzlePartTex = textures.getTexture('/game-assets/graphics/fx/particlealpha32sq.png');
       for (const p of engine.muzzleParticles) {
         const brightness = Math.max(0, p.life / p.maxLife);
         const [r, g, b, a] = p.color;
@@ -143,7 +144,7 @@ export class WebGLProjectilePass {
     }
     if (engine.muzzleFlashes.length > 0) {
       batcher.setBlendMode('ADDITIVE');
-      const mFlashTex = textures.getTexture('/api/asset?path=graphics/fx/muzzleflash32.1.png');
+      const mFlashTex = textures.getTexture('/game-assets/graphics/fx/muzzleflash32.1.png');
       for (const flash of engine.muzzleFlashes) {
         const mAlpha = Math.max(0, flash.life / flash.maxLife);
         const [mr, mg, mb] = flash.color;
@@ -152,13 +153,13 @@ export class WebGLProjectilePass {
     }
 
     // 4. 绘制实弹与等离子投射物 (Projectiles: 1:1 N.java, BallisticProjectile.java, MovingRay.java, _if.java)
-    const roughFringe = textures.getTexture('/api/asset?path=graphics/fx/beam_rough2_fringe.png', true);
-    const smoothFringe = textures.getTexture('/api/asset?path=graphics/fx/beamfringe.png', true);
-    const roughCore = textures.getTexture('/api/asset?path=graphics/fx/beam_rough2_core.png', true);
-    const smoothCore = textures.getTexture('/api/asset?path=graphics/fx/beamcore.png', true);
-    const projTrailTex = textures.getTexture('/api/asset?path=graphics/fx/projtrail.png', true);
-    const projBodyTex = textures.getTexture('/api/asset?path=graphics/fx/projbody.png', true);
-    const rocketFlameTex = textures.getTexture('/api/asset?path=graphics/fx/engineflame32.png');
+    const roughFringe = textures.getTexture('/game-assets/graphics/fx/beam_rough2_fringe.png', true);
+    const smoothFringe = textures.getTexture('/game-assets/graphics/fx/beamfringe.png', true);
+    const roughCore = textures.getTexture('/game-assets/graphics/fx/beam_rough2_core.png', true);
+    const smoothCore = textures.getTexture('/game-assets/graphics/fx/beamcore.png', true);
+    const projTrailTex = textures.getTexture('/game-assets/graphics/fx/projtrail.png', true);
+    const projBodyTex = textures.getTexture('/game-assets/graphics/fx/projbody.png', true);
+    const rocketFlameTex = textures.getTexture('/game-assets/graphics/fx/engineflame32.png');
 
     for (const p of engine.projectiles) {
       const pPos = Vector2.lerp(p.prevPos, p.pos, alpha);
@@ -168,7 +169,7 @@ export class WebGLProjectilePass {
       // 4.1 诱饵热焰弹 (Decoy Flare)
       if (p.isFlare) {
         batcher.setBlendMode('ADDITIVE');
-        const flicker = 0.75 + Math.random() * 0.5;
+        const flicker = 0.75 + visualRandom('webgl/passes/WebGLProjectilePass.ts#1') * 0.5;
         batcher.drawSprite(hitGlowTex, pPos.x, pPos.y, 42 * flicker, 42 * flicker, 0, 0, 0, 1.0, 0.7, 0.28, Math.min(1.0, 0.85 * flicker));
         batcher.drawSprite(hitGlowTex, pPos.x, pPos.y, 14 * flicker, 14 * flicker, 0, 0, 0, 1.0, 0.98, 0.95, 0.95);
       }
@@ -235,7 +236,7 @@ export class WebGLProjectilePass {
 
         batcher.setBlendMode('ADDITIVE');
         const flameMult = p.specId === 'typhoon' ? 1.6 : 1.0;
-        const flameLen = (18 + Math.random() * 8) * flameMult;
+        const flameLen = (18 + visualRandom('webgl/passes/WebGLProjectilePass.ts#2') * 8) * flameMult;
         const flameWid = wid * 0.75;
         const flamePos = pPos.clone().addScaled(fwd, -len * 0.5);
         batcher.drawSprite(rocketFlameTex, flamePos.x, flamePos.y, flameLen, flameWid, pAngle + Math.PI, -0.5, 0, flameColor[0] / 255, flameColor[1] / 255, flameColor[2] / 255, 0.9);
@@ -246,7 +247,7 @@ export class WebGLProjectilePass {
         const coreStarSize = starSize * 0.45;
         batcher.drawSprite(hitGlowTex, flamePos.x, flamePos.y, coreStarSize, coreStarSize, 0, 0, 0, 1.0, 1.0, 1.0, 1.0);
 
-        const rocketTex = textures.getTexture(p.projSpriteUrl || '/api/asset?path=graphics/missiles/missile_harpoon.png');
+        const rocketTex = textures.getTexture(p.projSpriteUrl || '/game-assets/graphics/missiles/missile_harpoon.png');
         batcher.setBlendMode('NORMAL');
         batcher.drawSprite(rocketTex, pPos.x, pPos.y, wid, len, pAngle + Math.PI / 2, 0, 0, 1.0, 1.0, 1.0, 1.0);
       }

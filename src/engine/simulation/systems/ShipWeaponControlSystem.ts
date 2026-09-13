@@ -1,8 +1,9 @@
 import { Vector2 } from '../../math/Vector2';
-import { Projectile, Beam, WeaponMount, WeaponGroup, WEAPON_REGISTRY, MuzzleFlashSpec } from '../Weapon';
+import { Projectile, Beam, WeaponMount, WeaponGroup, MuzzleFlashSpec } from '../Weapon';
 import { ShipSpec } from '../../modding/ModManager';
 import { sound } from '../../audio/SoundManager';
 import type { Ship } from '../Ship';
+import { contentRegistry } from '../../content/ContentRegistry';
 
 /**
  * 战舰武器挂点、火控散布、交替射击与弹道发射控制子系统 (ShipWeaponControlSystem)
@@ -24,7 +25,7 @@ export class ShipWeaponControlSystem {
 
     // 装备挂点与武器
     for (const slot of spec.weaponSlots) {
-      const weaponSpec = slot.defaultWeaponId ? WEAPON_REGISTRY[slot.defaultWeaponId] : undefined;
+      const weaponSpec = slot.defaultWeaponId ? contentRegistry.getWeapon(slot.defaultWeaponId) : undefined;
       if (weaponSpec) {
         this.weapons.push({
           slotId: slot.slotId,

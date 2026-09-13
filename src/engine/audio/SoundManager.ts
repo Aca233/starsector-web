@@ -1,8 +1,9 @@
 /**
  * 远行星号原生音频引擎 (Web Audio API 原版音效直接流式解码)
- * 直接读取 starsector-core/sounds/ 下的官方 .ogg 音效，
+ * 从应用内置 /game-assets/sounds/ 资源包加载 .ogg 音效，
  * 还原 TPC 重炮轰鸣、速子长矛电弧裂解、冲刺推进喷射与能量护盾偏振音效。
  */
+import { assetResolver } from '../assets/AssetResolver';
 
 export class SoundManager {
   private static instance: SoundManager;
@@ -145,7 +146,7 @@ export class SoundManager {
     this.initContext();
     const loadPromises = Object.entries(this.SOUND_MAP).map(async ([key, relPath]) => {
       try {
-        const res = await fetch(`/api/asset?path=${relPath}`);
+        const res = await fetch(assetResolver.url(relPath));
         if (!res.ok) return;
         const arrayBuffer = await res.arrayBuffer();
         if (this.ctx) {
@@ -282,7 +283,7 @@ export class SoundManager {
     const relPath = this.SOUND_MAP[key];
     if (!relPath || !this.ctx) return;
     try {
-      const res = await fetch(`/api/asset?path=${relPath}`);
+      const res = await fetch(assetResolver.url(relPath));
       if (!res.ok) return;
       const arrayBuffer = await res.arrayBuffer();
       const buffer = await this.ctx.decodeAudioData(arrayBuffer);

@@ -1,6 +1,7 @@
 import { WebGLShaderUtil } from './WebGLShaderUtil';
 import { Vector2 } from '../../math/Vector2';
 import { Ship } from '../../simulation/Ship';
+import { SHIELD_VISUAL_PROFILES } from '../../visual/VisualProfiles';
 
 const SHIELD_VS = `#version 300 es
 precision highp float;
@@ -226,6 +227,7 @@ export class WebGLShieldShader {
 
     // 官方护盾色彩判定 (G.java / lowtech / hightech)
     const isFortress = ship.system.type === 'FORTRESS_SHIELD' && ship.system.isActive;
+    const profile = SHIELD_VISUAL_PROFILES[ship.spec.id === 'onslaught' ? 'lowTech' : 'highTech'];
     let innerColor: [number, number, number];
     let ringColor: [number, number, number];
 
@@ -233,14 +235,9 @@ export class WebGLShieldShader {
       // 堡垒护盾金白光芒
       innerColor = [1.0, 0.85, 0.45];
       ringColor = [1.0, 1.0, 0.95];
-    } else if (ship.spec.id === 'onslaught') {
-      // 1:1 hull_styles.json LOW_TECH: [255, 125, 125, 75] 柔和微暖半透光力场 + [255, 255, 255] 亮缘
-      innerColor = [1.0, 0.49, 0.49];
-      ringColor = [1.0, 1.0, 1.0];
     } else {
-      // 1:1 hull_styles.json HIGH_TECH: [125, 125, 255, 75] 澄澈湛蓝半透光力场 + [255, 255, 255] 亮缘
-      innerColor = [0.49, 0.49, 1.0];
-      ringColor = [1.0, 1.0, 1.0];
+      innerColor = profile.innerColor.map((v) => v / 255) as [number, number, number];
+      ringColor = profile.outerColor.map((v) => v / 255) as [number, number, number];
     }
 
     gl.uniform3f(this.uInnerColor, innerColor[0], innerColor[1], innerColor[2]);
@@ -270,5 +267,11 @@ export class WebGLShieldShader {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     gl.bindVertexArray(null);
+  }
+
+  public dispose() {
+    this.gl.deleteBuffer(this.quadVbo);
+    this.gl.deleteVertexArray(this.vao);
+    this.gl.deleteProgram(this.program);
   }
 }

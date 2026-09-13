@@ -3,10 +3,13 @@
  * 100% 还原 Starsector 原版 OpenGL glColor4ub / GL_MODULATE 贴图着色管线
  * 将官方灰度 Alpha 贴图 (如 engineflame32, glow64, beam_rough2_fringe, explosion0) 动态调制为真实 RGB 颜色
  */
+import { assetResolver } from '../assets/AssetResolver';
+
 export class TextureCache {
   private static instance: TextureCache;
   private textureCache: Map<string, HTMLImageElement> = new Map();
   private tintedCache: Map<string, HTMLCanvasElement> = new Map();
+  private imageStates: Map<string, 'loading' | 'decoded' | 'failed'> = new Map();
 
   public static getInstance(): TextureCache {
     if (!TextureCache.instance) {
@@ -17,43 +20,43 @@ export class TextureCache {
 
   public preloadEssentialTextures() {
     const essentialUrls = [
-      '/api/asset?path=graphics/fx/shields256.png',
-      '/api/asset?path=graphics/fx/shields256ringd.png',
-      '/api/asset?path=graphics/fx/engineflame32.png',
-      '/api/asset?path=graphics/fx/glow64.png',
-      '/api/asset?path=graphics/fx/beam_rough2_fringe.png',
-      '/api/asset?path=graphics/fx/beam_core_high.png',
-      '/api/asset?path=graphics/fx/beam_core_soft.png',
-      '/api/asset?path=graphics/fx/contrail64b.png',
-      '/api/asset?path=graphics/fx/explosion0.png',
-      '/api/asset?path=graphics/fx/explosion1.png',
-      '/api/asset?path=graphics/fx/explosion2.png',
-      '/api/asset?path=graphics/fx/explosion3.png',
-      '/api/asset?path=graphics/fx/explosion4.png',
-      '/api/asset?path=graphics/fx/explosion5.png',
-      '/api/asset?path=graphics/fx/explosion6.png',
-      '/api/asset?path=graphics/fx/emp_arc.png',
-      '/api/asset?path=graphics/fx/reticle2.png',
-      '/api/asset?path=graphics/hud/player_status_bg2.png',
-      '/api/asset?path=graphics/hud/target_status_bg.png',
-      '/api/asset?path=graphics/hud/weapon_status_bg.png',
-      '/api/asset?path=graphics/hud/bar_armor.png',
-      '/api/asset?path=graphics/hud/bar_energy.png',
-      '/api/asset?path=graphics/hud/weapons_bar_cooldown.png',
-      '/api/asset?path=graphics/ships/broadsword.png',
-      '/api/asset?path=graphics/ships/dagger_trp.png',
-      '/api/asset?path=graphics/missiles/missile_torpedo.png',
-      '/api/asset?path=graphics/asteroids/asteroid1.png',
-      '/api/asset?path=graphics/asteroids/asteroid2.png',
-      '/api/asset?path=graphics/asteroids/asteroid3.png',
-      '/api/asset?path=graphics/asteroids/asteroid_big00.png',
-      '/api/asset?path=graphics/icons/fleet0.png',
-      '/api/asset?path=graphics/icons/fleet1.png',
-      '/api/asset?path=graphics/icons/fleet2.png',
-      '/api/asset?path=graphics/icons/fleet3.png',
-      '/api/asset?path=graphics/icons/fleet_triangle.png',
-      '/api/asset?path=graphics/icons/radar_circle.png',
-      '/api/asset?path=graphics/missiles/shell_small.png'
+      '/game-assets/graphics/fx/shields256.png',
+      '/game-assets/graphics/fx/shields256ringd.png',
+      '/game-assets/graphics/fx/engineflame32.png',
+      '/game-assets/graphics/fx/glow64.png',
+      '/game-assets/graphics/fx/beam_rough2_fringe.png',
+      '/game-assets/graphics/fx/beam_rough2_core.png',
+      '/game-assets/graphics/fx/beam_laser_core.png',
+      '/game-assets/graphics/fx/contrail64b.png',
+      '/game-assets/graphics/fx/explosion0.png',
+      '/game-assets/graphics/fx/explosion1.png',
+      '/game-assets/graphics/fx/explosion2.png',
+      '/game-assets/graphics/fx/explosion3.png',
+      '/game-assets/graphics/fx/explosion4.png',
+      '/game-assets/graphics/fx/explosion5.png',
+      '/game-assets/graphics/fx/explosion6.png',
+      '/game-assets/graphics/fx/emp_arcs.png',
+      '/game-assets/graphics/fx/glow64.png',
+      '/game-assets/graphics/hud/player_status_bg2.png',
+      '/game-assets/graphics/hud/target_status_bg2.png',
+      '/game-assets/graphics/hud/weapon_status_bg.png',
+      '/game-assets/graphics/hud/bar_armor.png',
+      '/game-assets/graphics/hud/bar_energy.png',
+      '/game-assets/graphics/hud/weapons_bar_cooldown.png',
+      '/game-assets/graphics/ships/broadsword.png',
+      '/game-assets/graphics/ships/dagger_trp.png',
+      '/game-assets/graphics/missiles/missile_torpedo.png',
+      '/game-assets/graphics/asteroids/asteroid1.png',
+      '/game-assets/graphics/asteroids/asteroid2.png',
+      '/game-assets/graphics/asteroids/asteroid3.png',
+      '/game-assets/graphics/asteroids/asteroid_big00.png',
+      '/game-assets/graphics/icons/fleet0.png',
+      '/game-assets/graphics/icons/fleet1.png',
+      '/game-assets/graphics/icons/fleet2.png',
+      '/game-assets/graphics/icons/fleet3.png',
+      '/game-assets/graphics/icons/fleet_triangle.png',
+      '/game-assets/graphics/icons/radar_circle.png',
+      '/game-assets/graphics/missiles/shell_small.png'
     ];
     for (const url of essentialUrls) {
       this.getImage(url);
@@ -64,10 +67,21 @@ export class TextureCache {
     let img = this.textureCache.get(url);
     if (!img) {
       img = new Image();
-      img.src = url;
+      this.imageStates.set(url, 'loading');
+      img.addEventListener('load', () => this.imageStates.set(url, 'decoded'), { once: true });
+      img.addEventListener('error', () => this.imageStates.set(url, 'failed'), { once: true });
+      img.src = assetResolver.url(url);
       this.textureCache.set(url, img);
     }
     return img;
+  }
+
+  public getImageState(url: string): 'unrequested' | 'loading' | 'decoded' | 'failed' {
+    return this.imageStates.get(url) ?? 'unrequested';
+  }
+
+  public clearTintedCache(): void {
+    this.tintedCache.clear();
   }
 
   public getTintedImage(url: string, r: number, g: number, b: number): HTMLCanvasElement | null {

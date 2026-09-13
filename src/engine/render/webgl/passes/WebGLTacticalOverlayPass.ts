@@ -1,6 +1,5 @@
 import { CombatEngine } from '../../../simulation/CombatEngine';
 import { WebGLPassContext } from '../WebGLPassContext';
-import { Ship } from '../../../simulation/Ship';
 import { Vector2 } from '../../../math/Vector2';
 import { SpriteBatcher } from '../SpriteBatcher';
 
@@ -67,7 +66,7 @@ export class WebGLTacticalOverlayPass {
       const relVel = engine.enemyShip.vel.clone().sub(engine.playerShip.vel);
       const leadPos = engine.enemyShip.pos.clone().addScaled(relVel, flightTime);
 
-      const pipTex = textures.getTexture('/api/asset?path=graphics/hud/holo_target.png');
+      const pipTex = textures.getTexture('/game-assets/graphics/hud/holo_target.png');
       batcher.setBlendMode('ADDITIVE');
       batcher.drawSprite(pipTex, leadPos.x, leadPos.y, 24, 24, 0, 0, 0, 1.0, 0.35, 0.35, 0.9);
     }

@@ -1,8 +1,10 @@
+import { visualRandom } from '../../RenderDeterminism';
 import { CombatEngine } from '../../../simulation/CombatEngine';
 import { WebGLPassContext } from '../WebGLPassContext';
 import { Ship } from '../../../simulation/Ship';
 import { Vector2 } from '../../../math/Vector2';
 import { ShipVentingRenderer } from '../ShipVentingRenderer';
+import { ENGINE_VISUAL_PROFILES } from '../../../visual/VisualProfiles';
 
 /**
  * 战舰与挂点渲染通道 (WebGLShipPass)
@@ -68,6 +70,7 @@ export class WebGLShipPass {
 
         for (let slotIdx = 0; slotIdx < ship.spec.engineSlots.length; slotIdx++) {
           const slot = ship.spec.engineSlots[slotIdx];
+          const visualProfile = ENGINE_VISUAL_PROFILES[slot.style] ?? ENGINE_VISUAL_PROFILES.LOW_TECH;
           const engStatus = ship.engineStatuses[slotIdx];
           const slotAngleRad = (slot.angleDeg * Math.PI) / 180 + shipFacing;
           const slotOffset = new Vector2(slot.x, slot.y).rotate(shipFacing);
@@ -76,12 +79,12 @@ export class WebGLShipPass {
 
           if (engStatus?.isFlameout) {
             batcher.setBlendMode('NORMAL');
-            const smokeTex = textures.getTexture('/api/asset?path=graphics/fx/contrail64b.png');
+            const smokeTex = textures.getTexture('/game-assets/graphics/fx/contrail64b.png');
             const smokeSize = slot.width * 1.6;
             batcher.drawSprite(smokeTex, nozzleX, nozzleY, smokeSize, smokeSize, slotAngleRad, 0, 0, 0.15, 0.12, 0.12, 0.65);
-            if (Math.random() < 0.28) {
+            if (visualRandom('webgl/passes/WebGLShipPass.ts#1') < 0.28) {
               batcher.setBlendMode('ADDITIVE');
-              const flameTex = textures.getTexture('/api/asset?path=graphics/fx/engineflame32.png');
+              const flameTex = textures.getTexture('/game-assets/graphics/fx/engineflame32.png');
               batcher.drawSprite(flameTex, nozzleX, nozzleY, slot.length * 0.4, slot.width * 0.7, slotAngleRad, -0.5, 0, 1.0, 0.3, 0.1, 0.55);
             }
             continue;
@@ -93,9 +96,9 @@ export class WebGLShipPass {
             : (isBurnDrive ? 2.4 : (isMoving ? 1.0 : 0.0));
 
           const idleBreath = Math.sin(nowSec * 7.0 + slotIdx * 1.8) * 0.015;
-          const flicker = 0.95 + Math.random() * (0.05 + Math.min(1.0, thrust) * 0.06);
+          const flicker = 0.95 + visualRandom('webgl/passes/WebGLShipPass.ts#2') * (0.05 + Math.min(1.0, thrust) * 0.06);
 
-          const lenMult = 0.08 + Math.min(1.0, thrust) * 0.92 + Math.max(0, thrust - 1.0) * 1.0;
+          const lenMult = visualProfile.idleScale + Math.min(1.0, thrust) * (1 - visualProfile.idleScale) + Math.max(0, thrust - 1.0) * (visualProfile.boostScale - 1);
           const widMult = 0.42 + Math.min(1.0, thrust) * 0.58 + Math.max(0, thrust - 1.0) * 0.2;
           const alphaMult = 0.22 + Math.min(1.0, thrust) * 0.68 + Math.max(0, thrust - 1.0) * 0.1;
 
@@ -111,7 +114,7 @@ export class WebGLShipPass {
           const [cr, cg, cb] = isHighTech ? [0.85, 0.95, 1.0] : [1.0, 0.92, 0.75];
 
           batcher.setBlendMode('ADDITIVE');
-          const flameTex = textures.getTexture('/api/asset?path=graphics/fx/engineflame32.png');
+          const flameTex = textures.getTexture('/game-assets/graphics/fx/engineflame32.png');
 
           // 1. 发动机喷口无边界柔和圆形辉光
           const throatGlowSize = slot.width * (0.85 + Math.min(1.0, thrust) * 0.4 + Math.max(0, thrust - 1.0) * 0.35);
@@ -174,7 +177,7 @@ export class WebGLShipPass {
       // 相位潜航幽蓝光晕
       if (ship.isPhased) {
         batcher.setBlendMode('ADDITIVE');
-        const glowTex = textures.getTexture('/api/asset?path=graphics/fx/glow64.png');
+        const glowTex = textures.getTexture('/game-assets/graphics/fx/glow64.png');
         const gSize = ship.spec.collisionRadius * 2.3;
         batcher.drawSprite(glowTex, shipPos.x, shipPos.y, gSize, gSize, 0, 0, 0, 0.3, 0.6, 1.0, 0.65);
       }
@@ -182,9 +185,9 @@ export class WebGLShipPass {
       // 过载电浆辉光
       if (ship.flux.isOverloaded) {
         batcher.setBlendMode('ADDITIVE');
-        const glowTex = textures.getTexture('/api/asset?path=graphics/fx/glow64.png');
+        const glowTex = textures.getTexture('/game-assets/graphics/fx/glow64.png');
         const gSize = ship.spec.collisionRadius * 2.2;
-        batcher.drawSprite(glowTex, shipPos.x, shipPos.y, gSize, gSize, 0, 0, 0, 0.3, 0.8, 1.0, 0.4 + Math.random() * 0.4);
+        batcher.drawSprite(glowTex, shipPos.x, shipPos.y, gSize, gSize, 0, 0, 0, 0.3, 0.8, 1.0, 0.4 + visualRandom('webgl/passes/WebGLShipPass.ts#3') * 0.4);
       }
 
       // 2.3 旋转武器炮塔与挂点充能光晕 (Turrets & Hardpoints)
@@ -283,8 +286,8 @@ export class WebGLShipPass {
           const glowInfo = textures.getTextureInfo(glowImgUrl);
           const gw = glowInfo.width > 0 ? glowInfo.width : baseW;
           const gh = glowInfo.height > 0 ? glowInfo.height : baseH;
-          const jX = mount.glowAlpha >= 0.7 ? (Math.random() - 0.5) * 2.5 : 0;
-          const jY = mount.glowAlpha >= 0.7 ? (Math.random() - 0.5) * 2.5 : 0;
+          const jX = mount.glowAlpha >= 0.7 ? (visualRandom('webgl/passes/WebGLShipPass.ts#4') - 0.5) * 2.5 : 0;
+          const jY = mount.glowAlpha >= 0.7 ? (visualRandom('webgl/passes/WebGLShipPass.ts#5') - 0.5) * 2.5 : 0;
 
           batcher.setBlendMode('ADDITIVE');
           batcher.drawSprite(
@@ -337,9 +340,9 @@ export class WebGLShipPass {
     }
 
     // 4. 绘制舰载机群与轰炸机 (Fighters & Bombers)
-    const flameTex = textures.getTexture('/api/asset?path=graphics/fx/engineflame32.png');
-    const ftrTex = textures.getTexture('/api/asset?path=graphics/ships/broadsword.png');
-    const bmrTex = textures.getTexture('/api/asset?path=graphics/ships/dagger_trp.png');
+    const flameTex = textures.getTexture('/game-assets/graphics/fx/engineflame32.png');
+    const ftrTex = textures.getTexture('/game-assets/graphics/ships/broadsword.png');
+    const bmrTex = textures.getTexture('/game-assets/graphics/ships/dagger_trp.png');
 
     for (const ftr of engine.fighters) {
       if (ftr.isDead) continue;
@@ -357,7 +360,7 @@ export class WebGLShipPass {
         const nozzleX = ftrPos.x + slotOffset.x;
         const nozzleY = ftrPos.y + slotOffset.y;
         const slotAngleRad = (slot.angleDeg * Math.PI) / 180 + ftr.facingRad;
-        const fLen = slot.length * thrust * (0.85 + Math.random() * 0.3);
+        const fLen = slot.length * thrust * (0.85 + visualRandom('webgl/passes/WebGLShipPass.ts#6') * 0.3);
         const fWid = slot.width * (0.6 + thrust * 0.4);
 
         batcher.drawSprite(hitGlowTex, nozzleX, nozzleY, fWid * 1.1, fWid * 1.1, 0, 0, 0, fr, fg, fb, thrust * 0.7);
@@ -385,7 +388,7 @@ export class WebGLShipPass {
         const nozzleX = bmrPos.x + slotOffset.x;
         const nozzleY = bmrPos.y + slotOffset.y;
         const slotAngleRad = (slot.angleDeg * Math.PI) / 180 + bmr.facingRad;
-        const bLen = slot.length * thrust * (0.85 + Math.random() * 0.3);
+        const bLen = slot.length * thrust * (0.85 + visualRandom('webgl/passes/WebGLShipPass.ts#7') * 0.3);
         const bWid = slot.width * (0.6 + thrust * 0.4);
 
         batcher.drawSprite(hitGlowTex, nozzleX, nozzleY, bWid * 1.1, bWid * 1.1, 0, 0, 0, 0.4, 0.7, 1.0, thrust * 0.7);

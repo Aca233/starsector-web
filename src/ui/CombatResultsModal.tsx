@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { BattleResult } from '../engine/simulation/CombatStatistics';
-import { Trophy, Skull, RefreshCw, SlidersHorizontal, Eye, Shield, Zap, Target, Plane, Flame } from 'lucide-react';
+import { Trophy, Skull, RefreshCw, SlidersHorizontal, Eye, Shield, Zap, Target, Plane } from 'lucide-react';
 
 export interface CombatResultsModalProps {
   battleResult: BattleResult;
@@ -15,7 +15,7 @@ export const CombatResultsModal: React.FC<CombatResultsModalProps> = ({
   onOpenModManager,
   onClose
 }) => {
-  const { isVictory, rank, combatDuration, playerStats, enemyStats } = battleResult;
+  const { isVictory, rank, combatDuration, playerStats } = battleResult;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

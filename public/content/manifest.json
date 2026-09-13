@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "ships": [
+    "onslaught",
+    "paragon",
+    "doom",
+    "broadsword",
+    "dagger"
+  ],
+  "weapons": [
+    "tpc",
+    "tachyonlance",
+    "autopulse",
+    "mark9",
+    "heavymauler",
+    "hveldriver",
+    "annihilatorpod",
+    "gravitonbeam",
+    "taclaser",
+    "heavyblaster",
+    "typhoon",
+    "sabot",
+    "lightmg",
+    "pdburst",
+    "atropos_single",
+    "flak",
+    "dualflak"
+  ],
+  "locales": [
+    "zh_CN",
+    "en_US"
+  ],
+  "visualProfiles": [
+    "lowTech",
+    "highTech",
+    "LOW_TECH",
+    "HIGH_TECH",
+    "MIDLINE"
+  ]
+}

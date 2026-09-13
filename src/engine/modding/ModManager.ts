@@ -1,8 +1,9 @@
 import { ShieldType } from '../simulation/Shield';
 import { ShipSystemType } from '../simulation/ShipSystem';
-import { WeaponMountType, WeaponSlotSize, WeaponSpec, WEAPON_REGISTRY } from '../simulation/Weapon';
+import { WeaponMountType, WeaponSlotSize, WeaponSpec } from '../simulation/Weapon';
 import { i18n } from '../i18n/LocalizationManager';
 import { ONSLAUGHT_BOUNDS, PARAGON_BOUNDS, DOOM_BOUNDS } from '../data/hull_bounds';
+import { contentRegistry } from '../content/ContentRegistry';
 
 export interface WeaponMountSlotConfig {
   slotId: string;
@@ -115,15 +116,9 @@ export interface ModPackage {
  */
 export class ModManager {
   private static instance: ModManager;
-  private ships: Map<string, ShipSpec> = new Map();
-  private weapons: Map<string, WeaponSpec> = new Map();
   private loadedMods: Map<string, ModPackage> = new Map();
 
   private constructor() {
-    // 注册内置武器库
-    for (const [id, spec] of Object.entries(WEAPON_REGISTRY)) {
-      this.weapons.set(id, spec);
-    }
     // 注册基准战舰：攻势级与典范级
     this.registerBuiltInShips();
   }
@@ -136,7 +131,7 @@ export class ModManager {
   }
 
   public registerShip(spec: ShipSpec) {
-    this.ships.set(spec.id, spec);
+    contentRegistry.registerShip(spec);
     if (spec.i18n) {
       if (spec.i18n.zh_CN) i18n.registerStrings('zh_CN', spec.i18n.zh_CN);
       if (spec.i18n.en_US) i18n.registerStrings('en_US', spec.i18n.en_US);
@@ -144,19 +139,19 @@ export class ModManager {
   }
 
   public getShip(id: string): ShipSpec | undefined {
-    return this.ships.get(id);
+    return contentRegistry.getShip(id);
   }
 
   public getAllShips(): ShipSpec[] {
-    return Array.from(this.ships.values());
+    return contentRegistry.getAllShips();
   }
 
   public registerWeapon(spec: WeaponSpec) {
-    this.weapons.set(spec.id, spec);
+    contentRegistry.registerWeapon(spec);
   }
 
   public getWeapon(id: string): WeaponSpec | undefined {
-    return this.weapons.get(id);
+    return contentRegistry.getWeapon(id);
   }
 
   /**
@@ -186,7 +181,7 @@ export class ModManager {
       nameKey: 'ship.onslaught.name',
       descKey: 'ship.onslaught.desc',
       designationKey: 'ship.onslaught.designation',
-      spriteUrl: '/api/asset?path=graphics/ships/onslaught/onslaught_base.png',
+      spriteUrl: '/game-assets/graphics/ships/onslaught/onslaught_base.png',
       spriteWidth: 288,
       spriteHeight: 384,
       pivotX: 144, // 严格对齐 onslaught.ship: center [144, 140] (384 - 140 = 244)
@@ -258,7 +253,7 @@ export class ModManager {
       nameKey: 'ship.paragon.name',
       descKey: 'ship.paragon.desc',
       designationKey: 'ship.paragon.designation',
-      spriteUrl: '/api/asset?path=graphics/ships/paragon.png',
+      spriteUrl: '/game-assets/graphics/ships/paragon.png',
       spriteWidth: 330,
       spriteHeight: 364,
       pivotX: 164, // 严格对齐 paragon.ship: center [164, 190] (364 - 190 = 174)
@@ -322,7 +317,7 @@ export class ModManager {
       nameKey: 'ship.doom.name',
       descKey: 'ship.doom.desc',
       designationKey: 'ship.doom.designation',
-      spriteUrl: '/api/asset?path=graphics/ships/phase/phase_ca.png',
+      spriteUrl: '/game-assets/graphics/ships/phase/phase_ca.png',
       spriteWidth: 200,
       spriteHeight: 238,
       pivotX: 100, // 严格对齐 doom.ship: center [100, 105] (238 - 105 = 133)
@@ -391,7 +386,7 @@ export class ModManager {
       nameKey: 'ship.broadsword.name',
       descKey: 'ship.broadsword.desc',
       designationKey: 'ship.broadsword.designation',
-      spriteUrl: '/api/asset?path=graphics/ships/broadsword.png',
+      spriteUrl: '/game-assets/graphics/ships/broadsword.png',
       spriteWidth: 30,
       spriteHeight: 33,
       pivotX: 15,
@@ -439,7 +434,7 @@ export class ModManager {
       nameKey: 'ship.dagger.name',
       descKey: 'ship.dagger.desc',
       designationKey: 'ship.dagger.designation',
-      spriteUrl: '/api/asset?path=graphics/ships/dagger_trp.png',
+      spriteUrl: '/game-assets/graphics/ships/dagger_trp.png',
       spriteWidth: 26,
       spriteHeight: 34,
       pivotX: 15,

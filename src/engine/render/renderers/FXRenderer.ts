@@ -1,3 +1,4 @@
+import { visualRandom, visualNowMs } from '../RenderDeterminism';
 import { Vector2 } from '../../math/Vector2';
 import { CombatEngine } from '../../simulation/CombatEngine';
 import { textureCache } from '../TextureCache';
@@ -12,7 +13,7 @@ export class FXRenderer {
     ctx.globalCompositeOperation = 'lighter';
     for (const c of engine.contrails) {
       const [cr, cg, cb] = c.color || [220, 180, 140];
-      const tintedContrail = textureCache.getTintedImage('/api/asset?path=graphics/fx/contrail64b.png', cr, cg, cb);
+      const tintedContrail = textureCache.getTintedImage('/game-assets/graphics/fx/contrail64b.png', cr, cg, cb);
       if (tintedContrail) {
         ctx.globalAlpha = c.alpha * 0.75;
         const halfS = c.size * 0.5;
@@ -35,8 +36,8 @@ export class FXRenderer {
       if (p.isFlare) {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        const flicker = 0.75 + Math.random() * 0.5;
-        const tintedGlow = textureCache.getTintedImage('/api/asset?path=graphics/fx/hit_glow.png', 255, 180, 70);
+        const flicker = 0.75 + visualRandom('renderers/FXRenderer.ts#1') * 0.5;
+        const tintedGlow = textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow.png', 255, 180, 70);
         if (tintedGlow) {
           ctx.globalAlpha = Math.min(1.0, 0.85 * flicker);
           const gSize = 42 * flicker;
@@ -70,14 +71,14 @@ export class FXRenderer {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
 
-        const tintedGlow = textureCache.getTintedImage('/api/asset?path=graphics/fx/glow64.png', gr, gg, gb);
+        const tintedGlow = textureCache.getTintedImage('/game-assets/graphics/fx/glow64.png', gr, gg, gb);
         if (tintedGlow) {
           ctx.globalAlpha = 0.45;
           ctx.drawImage(tintedGlow, -len * 0.55, -wid * 0.9, len * 1.1, wid * 1.8);
         }
 
         const isRough = p.textureType === 'ROUGH' || p.specId === 'tpc';
-        const fringeUrl = isRough ? '/api/asset?path=graphics/fx/beam_rough2_fringe.png' : '/api/asset?path=graphics/fx/beamfringe.png';
+        const fringeUrl = isRough ? '/game-assets/graphics/fx/beam_rough2_fringe.png' : '/game-assets/graphics/fx/beamfringe.png';
         const tintedFringe = textureCache.getTintedImage(fringeUrl, fr, fg, fb);
         if (tintedFringe) {
           ctx.globalAlpha = 0.92;
@@ -93,7 +94,7 @@ export class FXRenderer {
           ctx.fill();
         }
 
-        const coreUrl = isRough ? '/api/asset?path=graphics/fx/beam_rough2_core.png' : '/api/asset?path=graphics/fx/beamcore.png';
+        const coreUrl = isRough ? '/game-assets/graphics/fx/beam_rough2_core.png' : '/game-assets/graphics/fx/beamcore.png';
         const tintedCore = textureCache.getTintedImage(coreUrl, cr, cg, cb);
         if (tintedCore) {
           ctx.globalAlpha = 1.0;
@@ -105,7 +106,7 @@ export class FXRenderer {
           ctx.fill();
         }
 
-        const tintedTip = textureCache.getTintedImage('/api/asset?path=graphics/fx/hit_glow.png', cr, cg, cb);
+        const tintedTip = textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow.png', cr, cg, cb);
         if (tintedTip) {
           ctx.globalAlpha = 0.95;
           const tipSize = wid * 1.1;
@@ -156,8 +157,8 @@ export class FXRenderer {
           ctx.fill();
         }
 
-        const tipImg = textureCache.getTintedImage('/api/asset?path=graphics/fx/hit_glow_small.png', cr, cg, cb)
-          || textureCache.getTintedImage('/api/asset?path=graphics/fx/hit_glow.png', cr, cg, cb);
+        const tipImg = textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow_small.png', cr, cg, cb)
+          || textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow.png', cr, cg, cb);
         if (tipImg) {
           ctx.save();
           ctx.globalCompositeOperation = 'lighter';
@@ -175,10 +176,10 @@ export class FXRenderer {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         const flameColor = p.engineFlameColor || [255, 140, 40];
-        const rocketFlame = textureCache.getTintedImage('/api/asset?path=graphics/fx/engineflame32.png', flameColor[0], flameColor[1], flameColor[2]);
+        const rocketFlame = textureCache.getTintedImage('/game-assets/graphics/fx/engineflame32.png', flameColor[0], flameColor[1], flameColor[2]);
         if (rocketFlame) {
           const flameMult = p.specId === 'typhoon' ? 1.8 : 1.0;
-          const flameLen = (18 + Math.random() * 8) * flameMult;
+          const flameLen = (18 + visualRandom('renderers/FXRenderer.ts#2') * 8) * flameMult;
           const flameWid = wid * 0.85;
           ctx.save();
           ctx.translate(-len / 2, 0);
@@ -186,7 +187,7 @@ export class FXRenderer {
           ctx.drawImage(rocketFlame, -flameWid / 2, 0, flameWid, flameLen);
           ctx.restore();
         }
-        const rocketGlow = textureCache.getTintedImage('/api/asset?path=graphics/fx/hit_glow.png', flameColor[0], flameColor[1], flameColor[2]);
+        const rocketGlow = textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow.png', flameColor[0], flameColor[1], flameColor[2]);
         if (rocketGlow) {
           const glowSize = p.specId === 'typhoon' ? 22 : 12;
           ctx.drawImage(rocketGlow, -len / 2 - glowSize * 0.5, -glowSize * 0.5, glowSize, glowSize);
@@ -249,7 +250,7 @@ export class FXRenderer {
       ctx.stroke();
 
       // 2. 纹理羽流层
-      const fringeUrl = isRough ? '/api/asset?path=graphics/fx/beam_rough2_fringe.png' : '/api/asset?path=graphics/fx/beam_laser_fringe.png';
+      const fringeUrl = isRough ? '/game-assets/graphics/fx/beam_rough2_fringe.png' : '/game-assets/graphics/fx/beam_laser_fringe.png';
       const tintedFringe = textureCache.getTintedImage(fringeUrl, fr, fg, fb);
       if (tintedFringe) {
         ctx.globalAlpha = 0.9 * alpha;
@@ -273,7 +274,7 @@ export class FXRenderer {
       }
 
       // 3. 核心亮纹
-      const coreUrl = isRough ? '/api/asset?path=graphics/fx/beam_rough2_core.png' : '/api/asset?path=graphics/fx/beam_laser_core.png';
+      const coreUrl = isRough ? '/game-assets/graphics/fx/beam_rough2_core.png' : '/game-assets/graphics/fx/beam_laser_core.png';
       const tintedCore = textureCache.getTintedImage(coreUrl, cr, cg, cb);
       const coreWidth = width * 0.4;
       if (tintedCore) {
@@ -298,7 +299,7 @@ export class FXRenderer {
       }
 
       // 4. 枪口发射耀斑
-      const tintedMuzzle = textureCache.getTintedImage('/api/asset?path=graphics/fx/hit_glow.png', gr, gg, gb);
+      const tintedMuzzle = textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow.png', gr, gg, gb);
       if (tintedMuzzle) {
         ctx.globalAlpha = 0.95 * alpha;
         const mSize = width * 2.5;
@@ -306,15 +307,15 @@ export class FXRenderer {
       }
 
       // 5. 目标受击灼烧爆鸣耀斑
-      const tintedImpactGlow = textureCache.getTintedImage('/api/asset?path=graphics/fx/glow64.png', gr, gg, gb);
+      const tintedImpactGlow = textureCache.getTintedImage('/game-assets/graphics/fx/glow64.png', gr, gg, gb);
       if (tintedImpactGlow) {
         ctx.globalAlpha = 0.65 * alpha;
         const impSize = width * 4.0;
         ctx.drawImage(tintedImpactGlow, beamLen - impSize / 2, -impSize / 2, impSize, impSize);
       }
-      const tintedImpactFlare = textureCache.getTintedImage('/api/asset?path=graphics/fx/hit_glow.png', cr, cg, cb);
+      const tintedImpactFlare = textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow.png', cr, cg, cb);
       if (tintedImpactFlare) {
-        ctx.globalAlpha = (0.8 + Math.random() * 0.2) * alpha;
+        ctx.globalAlpha = (0.8 + visualRandom('renderers/FXRenderer.ts#3') * 0.2) * alpha;
         const impSize = width * 2.8;
         ctx.drawImage(tintedImpactFlare, beamLen - impSize / 2, -impSize / 2, impSize, impSize);
       }
@@ -338,7 +339,7 @@ export class FXRenderer {
       if (progress < 0.35) {
         const flashAlpha = 1.0 - progress / 0.35;
         const flashSize = exp.maxRadius * 2.2;
-        const tintedFlash = textureCache.getTintedImage('/api/asset?path=graphics/fx/hit_glow.png', r, g, b);
+        const tintedFlash = textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow.png', r, g, b);
         if (tintedFlash) {
           ctx.save();
           ctx.globalCompositeOperation = 'lighter';
@@ -346,7 +347,7 @@ export class FXRenderer {
           ctx.drawImage(tintedFlash, -flashSize / 2, -flashSize / 2, flashSize, flashSize);
           ctx.restore();
         }
-        const whiteFlash = textureCache.getTintedImage('/api/asset?path=graphics/fx/hit_glow.png', 255, 255, 255);
+        const whiteFlash = textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow.png', 255, 255, 255);
         if (whiteFlash) {
           ctx.save();
           ctx.globalCompositeOperation = 'lighter';
@@ -361,7 +362,7 @@ export class FXRenderer {
       if (exp.hasShockwaveRing) {
         const ringAlpha = (1.0 - exp.shockwaveRadius / exp.maxShockwaveRadius) * 0.85;
         if (ringAlpha > 0.01) {
-          const tintedRing = textureCache.getTintedImage('/api/asset?path=graphics/fx/explosion_ring0.png', r, g, b);
+          const tintedRing = textureCache.getTintedImage('/game-assets/graphics/fx/explosion_ring0.png', r, g, b);
           if (tintedRing) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
@@ -375,7 +376,7 @@ export class FXRenderer {
 
       // 3. 官方 7 帧火球动画翻页书
       const frameIndex = Math.min(6, Math.max(0, exp.frame));
-      const tintedFrame = textureCache.getTintedImage(`/api/asset?path=graphics/fx/explosion${frameIndex}.png`, r, g, b);
+      const tintedFrame = textureCache.getTintedImage(`/game-assets/graphics/fx/explosion${frameIndex}.png`, r, g, b);
       if (tintedFrame) {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
@@ -384,7 +385,7 @@ export class FXRenderer {
         const expSize = exp.radius * 2.2;
         ctx.drawImage(tintedFrame, -expSize / 2, -expSize / 2, expSize, expSize);
 
-        const tintedCore = textureCache.getTintedImage(`/api/asset?path=graphics/fx/explosion${frameIndex}.png`, 255, 235, 170);
+        const tintedCore = textureCache.getTintedImage(`/game-assets/graphics/fx/explosion${frameIndex}.png`, 255, 235, 170);
         if (tintedCore && progress < 0.6) {
           ctx.globalAlpha = (1.0 - progress / 0.6) * 0.85;
           const coreSize = expSize * 0.6;
@@ -415,7 +416,7 @@ export class FXRenderer {
 
     for (const arc of engine.empArcs) {
       const progress = Math.max(0, Math.min(1.0, arc.life / (arc.maxLife || 0.22)));
-      const flicker = 0.72 + Math.random() * 0.28;
+      const flicker = 0.72 + visualRandom('renderers/FXRenderer.ts#4') * 0.28;
       const alpha = progress * flicker;
       const glow = arc.glowColor || [0, 225, 255];
       const core = arc.coreColor || [255, 255, 255];
@@ -540,7 +541,7 @@ export class FXRenderer {
       ctx.translate(flash.pos.x, flash.pos.y);
       ctx.rotate(flash.angleRad + Math.PI / 2);
 
-      const tintedFlash = textureCache.getTintedImage('/api/asset?path=graphics/fx/muzzleflash32.1.png', r, g, b);
+      const tintedFlash = textureCache.getTintedImage('/game-assets/graphics/fx/muzzleflash32.1.png', r, g, b);
       if (tintedFlash) {
         ctx.globalAlpha = alpha;
         ctx.drawImage(tintedFlash, -flash.size / 2, -flash.size / 2, flash.size, flash.size);
@@ -558,8 +559,8 @@ export class FXRenderer {
   public drawMines(ctx: CanvasRenderingContext2D, engine: CombatEngine) {
     if (engine.mines.length === 0) return;
 
-    const mineBase = textureCache.getImage('/api/asset?path=graphics/missiles/heavy_mine2.png');
-    const mineGlow = textureCache.getImage('/api/asset?path=graphics/missiles/heavy_mine2_glow.png');
+    const mineBase = textureCache.getImage('/game-assets/graphics/missiles/heavy_mine2.png');
+    const mineGlow = textureCache.getImage('/game-assets/graphics/missiles/heavy_mine2_glow.png');
 
     for (const m of engine.mines) {
       ctx.save();
@@ -579,8 +580,8 @@ export class FXRenderer {
       ctx.globalCompositeOperation = 'lighter';
       if (mineGlow.complete && mineGlow.naturalWidth > 0) {
         ctx.globalAlpha = m.isDetonating
-          ? 0.7 + Math.sin(performance.now() * 0.03) * 0.3
-          : 0.5 + Math.sin(performance.now() * 0.008) * 0.3;
+          ? 0.7 + Math.sin(visualNowMs() * 0.03) * 0.3
+          : 0.5 + Math.sin(visualNowMs() * 0.008) * 0.3;
         ctx.drawImage(mineGlow, -24, -24, 48, 48);
       }
       ctx.restore();
@@ -589,7 +590,7 @@ export class FXRenderer {
         ctx.save();
         ctx.beginPath();
         ctx.arc(0, 0, m.triggerRadius, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(255, 60, 60, ${0.4 + Math.sin(performance.now() * 0.04) * 0.3})`;
+        ctx.strokeStyle = `rgba(255, 60, 60, ${0.4 + Math.sin(visualNowMs() * 0.04) * 0.3})`;
         ctx.lineWidth = 2;
         ctx.setLineDash([8, 8]);
         ctx.stroke();

@@ -1,0 +1,2038 @@
+[
+  {
+    "id": "graphics/asteroids/asteroid_big00.png",
+    "path": "graphics/asteroids/asteroid_big00.png",
+    "type": "image",
+    "bytes": 294076,
+    "hash": "0eb99f97ca5bf4036882fbd7ba2d451c50a870ef46f77a26125d7d891030718d",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/asteroids/asteroid1.png",
+    "path": "graphics/asteroids/asteroid1.png",
+    "type": "image",
+    "bytes": 1380,
+    "hash": "705d76cb9a9b8e9f3d4f7b80ffedd0415c16528f448184205fb26ae9895abf82",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/asteroids/asteroid2.png",
+    "path": "graphics/asteroids/asteroid2.png",
+    "type": "image",
+    "bytes": 3459,
+    "hash": "777f9be3a23237c37f3a965ed7fe7574944eac37fddf41bec7cae356a380c066",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/asteroids/asteroid3.png",
+    "path": "graphics/asteroids/asteroid3.png",
+    "type": "image",
+    "bytes": 6724,
+    "hash": "748641a08f1775e553ee57f303e834397f2400c60f3d7a55b0601467547b9e02",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/backgrounds/background1.jpg",
+    "path": "graphics/backgrounds/background1.jpg",
+    "type": "image",
+    "bytes": 241081,
+    "hash": "275c3851207be1f4fae612893233e14f12d2551308b9eeb02ce14f6bc269fdb8",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/cursors/cursor_green.png",
+    "path": "graphics/cursors/cursor_green.png",
+    "type": "image",
+    "bytes": 1023,
+    "hash": "3d212aa66f753769d10887b796af50e236a7f0dfbe80c9f7581f4de342975f03",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/debris/debris_lrg0.png",
+    "path": "graphics/debris/debris_lrg0.png",
+    "type": "image",
+    "bytes": 621,
+    "hash": "97440e2e0c2ad0dd37766dfa4bd3133f941cc5bd2f4aa6208d095978b910acb9",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/debris/debris_lrg1.png",
+    "path": "graphics/debris/debris_lrg1.png",
+    "type": "image",
+    "bytes": 690,
+    "hash": "b30854fbbecc228ad529aa3d123985d5f2b68569ebf1f1d54ed88ebb1ec383f4",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/debris/debris_med0.png",
+    "path": "graphics/debris/debris_med0.png",
+    "type": "image",
+    "bytes": 493,
+    "hash": "108ea9bb2d5361ac18bf3fbe2a14ce8a703dcdda5438863caead863194ec45d9",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/debris/debris_med1.png",
+    "path": "graphics/debris/debris_med1.png",
+    "type": "image",
+    "bytes": 463,
+    "hash": "2f2364f6071f1977c7b8119764abf6474a2545b00906417921545ac4f45269a5",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/debris/debris_sml0.png",
+    "path": "graphics/debris/debris_sml0.png",
+    "type": "image",
+    "bytes": 263,
+    "hash": "b62c73450831103e938e8c14672b438726095d0e9f747cd0237c73a4b6b5da32",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/debris/debris_sml1.png",
+    "path": "graphics/debris/debris_sml1.png",
+    "type": "image",
+    "bytes": 255,
+    "hash": "25092a7467c8199d3cee91f1b882e23f0da3fa3837ab7837dbbdaf3aadf53ca1",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/debris/debris_sml2.png",
+    "path": "graphics/debris/debris_sml2.png",
+    "type": "image",
+    "bytes": 272,
+    "hash": "04af7574a4874d7582373a16960e2bf04fae74f8beee14ca44cb34b80cbe0b4a",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/debris/debris_sml3.png",
+    "path": "graphics/debris/debris_sml3.png",
+    "type": "image",
+    "bytes": 308,
+    "hash": "44022c09ed800b5f3d6cd745c8b10e906eec6e7b6ec4481dc501afa9842046a3",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/beam_laser_core.png",
+    "path": "graphics/fx/beam_laser_core.png",
+    "type": "image",
+    "bytes": 2225,
+    "hash": "c0a17854dc556ba2f38d76870cd202f93d82bced9d94f5992fad9c1a1e1b504f",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "repeat",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/beam_laser_fringe.png",
+    "path": "graphics/fx/beam_laser_fringe.png",
+    "type": "image",
+    "bytes": 5189,
+    "hash": "ce5ab82d500d344f522a231a2c7474295624cabaee75381f76cadeddad9291f2",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "repeat",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/beam_rough2_core.png",
+    "path": "graphics/fx/beam_rough2_core.png",
+    "type": "image",
+    "bytes": 2318,
+    "hash": "9f1e4d7bf4b0ff79d8f78e39ca5b9338b02f4b7dd164bdc1bac134b7daaed34b",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "repeat",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/beam_rough2_fringe.png",
+    "path": "graphics/fx/beam_rough2_fringe.png",
+    "type": "image",
+    "bytes": 4667,
+    "hash": "70017ab7e14ad070f7bf7d71e6ae12480c65959129142a6a45ff73d3bf31920e",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "repeat",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/beamcore.png",
+    "path": "graphics/fx/beamcore.png",
+    "type": "image",
+    "bytes": 1376,
+    "hash": "f86508bd5227ddd6d3c07946c2c4de846caabd7af96e0c92820223a359581ceb",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "repeat",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/beamfringe.png",
+    "path": "graphics/fx/beamfringe.png",
+    "type": "image",
+    "bytes": 3771,
+    "hash": "dee9a5e6ad952707f1fd14c07e9e647dcb517addde0c65fc4a145798a0e034de",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "repeat",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/contrail64b.png",
+    "path": "graphics/fx/contrail64b.png",
+    "type": "image",
+    "bytes": 4154,
+    "hash": "18ada369b2d131cbc1874d362afcdf5389b5059328d0700ddf7a792411f76152",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "repeat",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/emp_arcs.png",
+    "path": "graphics/fx/emp_arcs.png",
+    "type": "image",
+    "bytes": 86742,
+    "hash": "91dffb286c331874dd781456b0cdf93e8b71d8df91c4a93d7d69b6da626366d9",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/engineflame32.png",
+    "path": "graphics/fx/engineflame32.png",
+    "type": "image",
+    "bytes": 1149,
+    "hash": "d14fad9bafe29e91838ec724bd31c4b64423b002c0abc4d24e4df52e483baee4",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/engineglow32.png",
+    "path": "graphics/fx/engineglow32.png",
+    "type": "image",
+    "bytes": 1180,
+    "hash": "a1f3deb8f37e355d5406d1eb231f0cebef505e47feabb65d479641db71d206d6",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/explosion_ring0.png",
+    "path": "graphics/fx/explosion_ring0.png",
+    "type": "image",
+    "bytes": 12342,
+    "hash": "899612a3c10579a1d5049149eb766b1396d96247e7bb0778d089e852e2047127",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/explosion0.png",
+    "path": "graphics/fx/explosion0.png",
+    "type": "image",
+    "bytes": 9372,
+    "hash": "c4982eee4061f467cd97326f703878af2d401fa81b35d094fed4e6f301c045b9",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/explosion1.png",
+    "path": "graphics/fx/explosion1.png",
+    "type": "image",
+    "bytes": 12356,
+    "hash": "e22b77748d6ed3c3734152c7a8d38dd75043a79c12d7691111d9e52e6913eb5b",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/explosion2.png",
+    "path": "graphics/fx/explosion2.png",
+    "type": "image",
+    "bytes": 10318,
+    "hash": "4e2c7cfb28a60ce6f8f8bbbd6a9e49e764c92a4f65461a93e13cf51d264bb9fe",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/explosion3.png",
+    "path": "graphics/fx/explosion3.png",
+    "type": "image",
+    "bytes": 27105,
+    "hash": "d42805fe80129c6499b175d5bed95ea031c9de25eb32b2bf464dd488a0e43d99",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/explosion4.png",
+    "path": "graphics/fx/explosion4.png",
+    "type": "image",
+    "bytes": 19745,
+    "hash": "cdf61b2a1dede037ff1643e55006023edc3c4ff3d2121ef48a360e9d17bba414",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/explosion5.png",
+    "path": "graphics/fx/explosion5.png",
+    "type": "image",
+    "bytes": 20398,
+    "hash": "040c3ca4b9f83040121815d5ad2241bbc38278ac9e41e343c593572cf01dc5a7",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/explosion6.png",
+    "path": "graphics/fx/explosion6.png",
+    "type": "image",
+    "bytes": 31548,
+    "hash": "0aad222ecc6b5457b83d82c6df535198c66684f416bbb421cc9c830ff37a8e8d",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/glow64.png",
+    "path": "graphics/fx/glow64.png",
+    "type": "image",
+    "bytes": 3989,
+    "hash": "a981d16b1c5f6c5bbdc410cdbeaed8d81b80deab5d4101b43a04685ccfd1b70c",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/hit_glow_small.png",
+    "path": "graphics/fx/hit_glow_small.png",
+    "type": "image",
+    "bytes": 892,
+    "hash": "df1c1019e41c68817821aaeed751c5b0eeb6c6a87ad5377c881d295d1952fc08",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/hit_glow.png",
+    "path": "graphics/fx/hit_glow.png",
+    "type": "image",
+    "bytes": 1982,
+    "hash": "72a79b569d9c0f6ccbb561e53d0bc0cd459bf3a945d8b8d4b9bf0a1f75831781",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/muzzleflash32.1.png",
+    "path": "graphics/fx/muzzleflash32.1.png",
+    "type": "image",
+    "bytes": 972,
+    "hash": "710600ab3d2317a52ec3652d044818edd3be2579fbe7f1d786a73066612b3be5",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/nebula_colorless.png",
+    "path": "graphics/fx/nebula_colorless.png",
+    "type": "image",
+    "bytes": 169370,
+    "hash": "4c36d4171fc3f03f80ea1e5f976c41caa8b27538811d0feefae8f28b3be78bd1",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/particlealpha32sq.png",
+    "path": "graphics/fx/particlealpha32sq.png",
+    "type": "image",
+    "bytes": 678,
+    "hash": "3506469c901092c57fecfc0a1abf46c0eb6bd3f1f2a78d44af4c8b0e5ab1df95",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/projbody.png",
+    "path": "graphics/fx/projbody.png",
+    "type": "image",
+    "bytes": 636,
+    "hash": "fdb9748568f8e2ca57584d7b8172f4f8e8a7fc1fb2611e63dc05c3c1b445f09f",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/projtrail.png",
+    "path": "graphics/fx/projtrail.png",
+    "type": "image",
+    "bytes": 907,
+    "hash": "ef62cd052818d95c06a12246b9f77c55c0a714a0d174d691c560534dc46e1cc1",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/radial_fx.png",
+    "path": "graphics/fx/radial_fx.png",
+    "type": "image",
+    "bytes": 595364,
+    "hash": "b761fe617d4f33dc3a8e33cddc20b4264e055b5b361450416996acc10e6511b4",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/shields256.png",
+    "path": "graphics/fx/shields256.png",
+    "type": "image",
+    "bytes": 71691,
+    "hash": "fdeb751e2b5a191b90a6a905b9f9ec72ef24b1e723f6add61cd4f6042d0e5a22",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "repeat",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/shields256ringd.png",
+    "path": "graphics/fx/shields256ringd.png",
+    "type": "image",
+    "bytes": 9998,
+    "hash": "d84400bfe46df387f8bce681fb9cebf86ecb0fba8d6ae7a6f8d8be2fad36b215",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "repeat",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/hud/bar_armor.png",
+    "path": "graphics/hud/bar_armor.png",
+    "type": "image",
+    "bytes": 357,
+    "hash": "e7fa9c8a17a0329880f472924dcbd96040e51b54a4233db4d2a6fed17d54dcb5",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/hud/bar_energy.png",
+    "path": "graphics/hud/bar_energy.png",
+    "type": "image",
+    "bytes": 185,
+    "hash": "a3b38c75f9ec13dbf7dd53f7358c9dd86a04b3b9bef2dc28c43993ed58b1e66c",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/hud/holo_grid.png",
+    "path": "graphics/hud/holo_grid.png",
+    "type": "image",
+    "bytes": 1310,
+    "hash": "95ca64d6a176bfd74072d1d20fdde6f381e1b938123af361591672bac00c45fb",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/hud/holo_status.png",
+    "path": "graphics/hud/holo_status.png",
+    "type": "image",
+    "bytes": 7561,
+    "hash": "68dbcce0812428e822f3c91771f50ae6ea0714cdb4317a19f4a6c97cc4e03ac6",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/hud/holo_target.png",
+    "path": "graphics/hud/holo_target.png",
+    "type": "image",
+    "bytes": 6033,
+    "hash": "920c5a4ae6a27f6c07d593ecf0f7baeba9788417ebafb5ee41baaeeefaf63a20",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/hud/minimap_bg2.png",
+    "path": "graphics/hud/minimap_bg2.png",
+    "type": "image",
+    "bytes": 639,
+    "hash": "6f7d756a27b8303dd57327b725e137866bed724552ddf3923f650278d5fc385a",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/hud/player_status_bg2.png",
+    "path": "graphics/hud/player_status_bg2.png",
+    "type": "image",
+    "bytes": 1602,
+    "hash": "6e903e88beb6fadef2a1b98cf41347eee2f504d84901ceffd31ca9acf00b9ff9",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/hud/target_status_bg2.png",
+    "path": "graphics/hud/target_status_bg2.png",
+    "type": "image",
+    "bytes": 1422,
+    "hash": "72975750cd071d775e3b8dee078c40248c777b0eca13bbb4bcf8edde68fb6950",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/hud/weapon_status_bg.png",
+    "path": "graphics/hud/weapon_status_bg.png",
+    "type": "image",
+    "bytes": 2989,
+    "hash": "95d0508da20bdb8e2d9308809327987835f3827de66f24c86bbbee1772c9fd64",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/hud/weapons_bar_cooldown.png",
+    "path": "graphics/hud/weapons_bar_cooldown.png",
+    "type": "image",
+    "bytes": 744,
+    "hash": "eb3febdc5987a47c436721df6b154cbe2e225488d27fe17ff78015f376184caf",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/icons/fleet_triangle.png",
+    "path": "graphics/icons/fleet_triangle.png",
+    "type": "image",
+    "bytes": 316,
+    "hash": "4c2a60b81a5b5a00517ca853ff6d878b93ea5c7dcdfddbfb160943b3bd376cb7",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/icons/fleet0.png",
+    "path": "graphics/icons/fleet0.png",
+    "type": "image",
+    "bytes": 3274,
+    "hash": "3b897998bac5b599905a50e9e092ff85b2d772cdec38fb2b0c9227dfc1f05a03",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/icons/fleet1.png",
+    "path": "graphics/icons/fleet1.png",
+    "type": "image",
+    "bytes": 3495,
+    "hash": "731f3b07914c6199bd38df41f882c56989c476fb0351fc1253cbb25b07f65251",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/icons/fleet2.png",
+    "path": "graphics/icons/fleet2.png",
+    "type": "image",
+    "bytes": 3849,
+    "hash": "ff41e718d99c79bc62eccefb8e66bbc429958bf7c48473592cc19a3fac3a9648",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/icons/fleet3.png",
+    "path": "graphics/icons/fleet3.png",
+    "type": "image",
+    "bytes": 4127,
+    "hash": "6ab1fd7662144f7b3691b51d384d498564332f82d4d70db711c35425b3e2023d",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/icons/radar_circle.png",
+    "path": "graphics/icons/radar_circle.png",
+    "type": "image",
+    "bytes": 2656,
+    "hash": "7bc927b833211bc029e03c75611c909515aea1836f9f1ab039c79370d0586a6f",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/icons/tactical/cr_tactical3.png",
+    "path": "graphics/icons/tactical/cr_tactical3.png",
+    "type": "image",
+    "bytes": 3841,
+    "hash": "6b9d4fdba900ef50ccabb8fa0c3ddf4eca6476f1da0558643acfe992185dbb6a",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/icons/tactical/engine_boost2.png",
+    "path": "graphics/icons/tactical/engine_boost2.png",
+    "type": "image",
+    "bytes": 1561,
+    "hash": "d9df08ed9db21d830aa9372e34a843c36789fdba359d1a0d5e031a9b72e170b0",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/icons/tactical/engine_damage.png",
+    "path": "graphics/icons/tactical/engine_damage.png",
+    "type": "image",
+    "bytes": 2621,
+    "hash": "e8dc771f754ec1d22488ba2ed8f3d0b8472a75be67340f4860b48a5da6a3882f",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/icons/tactical/overloaded.png",
+    "path": "graphics/icons/tactical/overloaded.png",
+    "type": "image",
+    "bytes": 2486,
+    "hash": "d5e26ec04a5e8a6d1baa01af924051f7c0bd61a44034b16c7c424fe3efdc87fe",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/icons/tactical/venting_flux2.png",
+    "path": "graphics/icons/tactical/venting_flux2.png",
+    "type": "image",
+    "bytes": 7142,
+    "hash": "29b1a0ffbb4435317a4f0d75c65c98b09373226ef175d846099122a09bb514ed",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/missiles/heavy_mine2_glow.png",
+    "path": "graphics/missiles/heavy_mine2_glow.png",
+    "type": "image",
+    "bytes": 9601,
+    "hash": "d4ea529ef65ffe9f360e6bbb70a76b9b619312cf8eccea0da1a26ae654d6ec18",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/missiles/heavy_mine2.png",
+    "path": "graphics/missiles/heavy_mine2.png",
+    "type": "image",
+    "bytes": 18423,
+    "hash": "362f8b9e34310f06080ddf3bf2a5ea47f130fe683434c17c74d10de930aaf403",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/missiles/low_tech_torpedo.png",
+    "path": "graphics/missiles/low_tech_torpedo.png",
+    "type": "image",
+    "bytes": 718,
+    "hash": "c0b4c2bd2af3571f963cc50984341ddca147560f3e2f873b2ccf9ca507ea9d7b",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/missiles/missile_annihilator.png",
+    "path": "graphics/missiles/missile_annihilator.png",
+    "type": "image",
+    "bytes": 3378,
+    "hash": "76c88acb82a2c7cc125f928314d96b3f4ae618963f245c528beba8086852f480",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/missiles/missile_harpoon.png",
+    "path": "graphics/missiles/missile_harpoon.png",
+    "type": "image",
+    "bytes": 769,
+    "hash": "139da28987885e16ee2a3d472ef9fbe4485c43f45a5b3074375972c92a02d2c0",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/missiles/missile_sabot.png",
+    "path": "graphics/missiles/missile_sabot.png",
+    "type": "image",
+    "bytes": 536,
+    "hash": "1e4e87f7175bc4e3b6cb7f1df949103aee6d81fd668fdc617e855ef57ab4333c",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/missiles/missile_torpedo.png",
+    "path": "graphics/missiles/missile_torpedo.png",
+    "type": "image",
+    "bytes": 1114,
+    "hash": "9da64aaffa61a99b83e6d763d9294596c1fc83582bbf504c51eb2c7175cc08a6",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/missiles/shell_gauss_cannon.png",
+    "path": "graphics/missiles/shell_gauss_cannon.png",
+    "type": "image",
+    "bytes": 485,
+    "hash": "ddca59f9934b42000044cf7bf8a63fbcac7de45bd8b0b692cbd853d8591a95a6",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/missiles/shell_large_blue.png",
+    "path": "graphics/missiles/shell_large_blue.png",
+    "type": "image",
+    "bytes": 3059,
+    "hash": "92b136ee3edea5de1249fa9e38fe2153da36ae46706a287accb8833415b93e81",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/missiles/shell_large_green.png",
+    "path": "graphics/missiles/shell_large_green.png",
+    "type": "image",
+    "bytes": 3046,
+    "hash": "65edc724563fc4cbe37d52360f35365bcbbd08b5c7125856d71fc37dd729c9af",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/missiles/shell_large_yellow.png",
+    "path": "graphics/missiles/shell_large_yellow.png",
+    "type": "image",
+    "bytes": 470,
+    "hash": "4db9c10135ebcdd1a748821352101b956f90dcac00aae76c4df9917c982a7c54",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/missiles/shell_small.png",
+    "path": "graphics/missiles/shell_small.png",
+    "type": "image",
+    "bytes": 2906,
+    "hash": "4a06d3b478b8e78c8fd7a559416f36ccfe6b6ebbec92df362f59a73d816a272c",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/ships/broadsword.png",
+    "path": "graphics/ships/broadsword.png",
+    "type": "image",
+    "bytes": 16948,
+    "hash": "866eaf226d7b9f0ff8673882c304a0aeccb0f15569c8559120a06a64dae4aa01",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/ships/dagger_trp.png",
+    "path": "graphics/ships/dagger_trp.png",
+    "type": "image",
+    "bytes": 16398,
+    "hash": "3909eb7df8b61528bb86c7420bd678aa8dddb12013846569595452c26626d087",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/ships/onslaught/onslaught_base.png",
+    "path": "graphics/ships/onslaught/onslaught_base.png",
+    "type": "image",
+    "bytes": 191978,
+    "hash": "982665f67483c6e254825921fa0aa850d7f8bea736055f14b8161ac629d01903",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/ships/paragon.png",
+    "path": "graphics/ships/paragon.png",
+    "type": "image",
+    "bytes": 220666,
+    "hash": "de1e3e0f14fa204cb0cb5626ba2d06dffa8e498736e0a39018989673d1c080f5",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/ships/phase/phase_ca.png",
+    "path": "graphics/ships/phase/phase_ca.png",
+    "type": "image",
+    "bytes": 74811,
+    "hash": "0d81124152dec620feac0b11df8a234c1b502af2bc9d0f39aa54f4dc40a77a9d",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/terrain/nebula_amber.png",
+    "path": "graphics/terrain/nebula_amber.png",
+    "type": "image",
+    "bytes": 479228,
+    "hash": "e0dc1d966dd1d6d9be4d94566d45ee4a5dab81fa63d01dc059c89082bfdc53f3",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/terrain/nebula512_blue.png",
+    "path": "graphics/terrain/nebula512_blue.png",
+    "type": "image",
+    "bytes": 492566,
+    "hash": "d43faff000968e685286926fc4ec3f238a9e0725ccf3a41fb3fc39fefa44ed0f",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/assault_chaingun_turret_base.png",
+    "path": "graphics/weapons/assault_chaingun_turret_base.png",
+    "type": "image",
+    "bytes": 1772,
+    "hash": "ffb07639f396a8c6ae66b88a30c4b97b0efff04781172f04323eb09e3d60a842",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/assault_chaingun_turret_recoil.png",
+    "path": "graphics/weapons/assault_chaingun_turret_recoil.png",
+    "type": "image",
+    "bytes": 675,
+    "hash": "d6e02cd3f9f66846187c8f73568072c8566652eac4aea6f78deff48b523d1abe",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/autopulse_laser_hardpoint_base.png",
+    "path": "graphics/weapons/autopulse_laser_hardpoint_base.png",
+    "type": "image",
+    "bytes": 8709,
+    "hash": "82acd02db75f8d11744a04a1629842e71e86487f1ffc794dada02d3416aad8bb",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/autopulse_laser_hardpoint_glow.png",
+    "path": "graphics/weapons/autopulse_laser_hardpoint_glow.png",
+    "type": "image",
+    "bytes": 4267,
+    "hash": "24c333e6c4a5f8c521e7f6d90de9420160bd5fce13849b9fc587b30df5e0a584",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/autopulse_laser_turret_base.png",
+    "path": "graphics/weapons/autopulse_laser_turret_base.png",
+    "type": "image",
+    "bytes": 8275,
+    "hash": "71ae4ff66d1e60178f3a6d8a6c6bf791512f4cc50659f09daceaa7ddbc38c637",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/autopulse_laser_turret_glow.png",
+    "path": "graphics/weapons/autopulse_laser_turret_glow.png",
+    "type": "image",
+    "bytes": 1100,
+    "hash": "e3e17508c7d032393ce41f675b1b2777e860fb7715e0df5499b43106f2d1fe88",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/double_flak_cannon_turret_base.png",
+    "path": "graphics/weapons/double_flak_cannon_turret_base.png",
+    "type": "image",
+    "bytes": 2833,
+    "hash": "2b9a8e7400b9cb260a25dfa8b0f71a8da8e51f32eda28ef039a9d9feb2549f0b",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/double_flak_cannon_turret_recoil.png",
+    "path": "graphics/weapons/double_flak_cannon_turret_recoil.png",
+    "type": "image",
+    "bytes": 564,
+    "hash": "5eff645ebb10f1180965e8e79d848a09aeab13011c95fcdc3c5054c347fa6fa2",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/flak_cannon_turret_base.png",
+    "path": "graphics/weapons/flak_cannon_turret_base.png",
+    "type": "image",
+    "bytes": 2199,
+    "hash": "383a9855916f8786d14ea613344f81aa1b49e81d817d612a7b56cc72f82e9e4c",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/flak_cannon_turret_recoil.png",
+    "path": "graphics/weapons/flak_cannon_turret_recoil.png",
+    "type": "image",
+    "bytes": 483,
+    "hash": "4d006bedb737852deb960b9f746b10da8078e55c5dac825b3c4fd64001beea29",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/graviton_beam_turret_base.png",
+    "path": "graphics/weapons/graviton_beam_turret_base.png",
+    "type": "image",
+    "bytes": 3386,
+    "hash": "6daba6e480178bb0b7e654495586d58e74b407d6e2decb75d49cadf8343423c0",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "repeat",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/graviton_beam_turret_glow.png",
+    "path": "graphics/weapons/graviton_beam_turret_glow.png",
+    "type": "image",
+    "bytes": 854,
+    "hash": "918d393e19441ac6fd5e46c1cd8d0504001169a4bb9f2123bf54bb1f0a7eacc7",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "repeat",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/heavy_assault_cannon_hardpoint_base.png",
+    "path": "graphics/weapons/heavy_assault_cannon_hardpoint_base.png",
+    "type": "image",
+    "bytes": 19415,
+    "hash": "e761b4c0d2b600b12d96fc27b107839c46850b5ce292582fdc44278baece4252",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/heavy_assault_cannon_hardpoint_recoil.png",
+    "path": "graphics/weapons/heavy_assault_cannon_hardpoint_recoil.png",
+    "type": "image",
+    "bytes": 1844,
+    "hash": "5e420a06ef6054864c55b7c3d965983b9421330579974d0cd33bca967d5b9353",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/heavy_assault_cannon_turret_base.png",
+    "path": "graphics/weapons/heavy_assault_cannon_turret_base.png",
+    "type": "image",
+    "bytes": 19478,
+    "hash": "4671f98965d12608ca0d0a53109b7deed670bb1762a927950b2d31f8187d8393",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/heavy_assault_cannon_turret_recoil.png",
+    "path": "graphics/weapons/heavy_assault_cannon_turret_recoil.png",
+    "type": "image",
+    "bytes": 1998,
+    "hash": "26ebf76d5d6029b3dfbb2d7e87632be4edc3cb0a4d206475ff4ee13d0340bab9",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/hypervelocity_driver_turret_base.png",
+    "path": "graphics/weapons/hypervelocity_driver_turret_base.png",
+    "type": "image",
+    "bytes": 2640,
+    "hash": "a5a61913ed5ba77ca03d89ec586924e3e8bd5a26307bb98800e585c27d85d834",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/hypervelocity_driver_turret_recoil.png",
+    "path": "graphics/weapons/hypervelocity_driver_turret_recoil.png",
+    "type": "image",
+    "bytes": 2382,
+    "hash": "422f63f8b3f9afb25d6efb01de3e7e5db715e981ed04bba78f370121a32b2759",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/launcher_annihilator_turret_base.png",
+    "path": "graphics/weapons/launcher_annihilator_turret_base.png",
+    "type": "image",
+    "bytes": 1070,
+    "hash": "c1db78989f54488a90ca02619f5a2ec1c06944c864c49df9a9b82e71c030fb6e",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/onslaught_thermal_glow.png",
+    "path": "graphics/weapons/onslaught_thermal_glow.png",
+    "type": "image",
+    "bytes": 1807,
+    "hash": "09ed155fbb38d0cfefea374c032eb226b87d723ae241c143fb888341eb4d4997",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/onslaught_thermal_turret_base.png",
+    "path": "graphics/weapons/onslaught_thermal_turret_base.png",
+    "type": "image",
+    "bytes": 5067,
+    "hash": "ea884b6fa73bc03d599a129096d23afdeceab260a78ce9e83532f9df1183a035",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/tachyon_lance_hardpoint_base.png",
+    "path": "graphics/weapons/tachyon_lance_hardpoint_base.png",
+    "type": "image",
+    "bytes": 4293,
+    "hash": "cace8d27b5c5850eb7052f786eb3fc07ba84902d73d096a17f6858dbc8f7698f",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/tachyon_lance_hardpoint_glow.png",
+    "path": "graphics/weapons/tachyon_lance_hardpoint_glow.png",
+    "type": "image",
+    "bytes": 4079,
+    "hash": "1e254ebc07b9aaa5042d5787400b916ce8ea4c014002c559f83a8f4ac2892bc6",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/tachyon_lance_turret_base.png",
+    "path": "graphics/weapons/tachyon_lance_turret_base.png",
+    "type": "image",
+    "bytes": 7718,
+    "hash": "3df79f9e0d225c57b4aa676361419d48cde1147f575dc5d55c592090539b476b",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/tachyon_lance_turret_glow.png",
+    "path": "graphics/weapons/tachyon_lance_turret_glow.png",
+    "type": "image",
+    "bytes": 7091,
+    "hash": "5901598a28417d44c0585f686adb1e262c11fdaf6aee8224d7ec4437dc607df8",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/tactical_laser_turret_glow.png",
+    "path": "graphics/weapons/tactical_laser_turret_glow.png",
+    "type": "image",
+    "bytes": 1027,
+    "hash": "f55c07b433d087f90042fd1a9f18d6313d781f276e3987d7bcc76ad8d85e7dbd",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/tactical_laser_turret.png",
+    "path": "graphics/weapons/tactical_laser_turret.png",
+    "type": "image",
+    "bytes": 16084,
+    "hash": "0d671018339c929866a0fc9665250d2301696ffbb834ec574749ca908e79c51f",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "sounds/sfx_engines/engine_01_lotek_04_capital.ogg",
+    "path": "sounds/sfx_engines/engine_01_lotek_04_capital.ogg",
+    "type": "audio",
+    "bytes": 24997,
+    "hash": "1366e417a76989ac9904cbc427d1cefeabed534a23fa7d5ed6a70ed287d2bace",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_engines/engine_03_hitek_04_capital.ogg",
+    "path": "sounds/sfx_engines/engine_03_hitek_04_capital.ogg",
+    "type": "audio",
+    "bytes": 34422,
+    "hash": "5e75a16703f3a126b280e17992404effb1c959a9516c0f351eaafbbd7d2bb5e5",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_flux/flux_flush_loop.ogg",
+    "path": "sounds/sfx_flux/flux_flush_loop.ogg",
+    "type": "audio",
+    "bytes": 11653,
+    "hash": "8e49061456042c8170f3567ba97095c5c125952fde142794f4e420f05c4a524c",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_flux/flux_vent.ogg",
+    "path": "sounds/sfx_flux/flux_vent.ogg",
+    "type": "audio",
+    "bytes": 18899,
+    "hash": "6c26ae0edac896be8ef412577a8cc1eaf19c7f098a962c686f3cfd4681375542",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_impacts/beam_hit_01.ogg",
+    "path": "sounds/sfx_impacts/beam_hit_01.ogg",
+    "type": "audio",
+    "bytes": 20567,
+    "hash": "d3c3981183faf40e1c90ea9aa9e4fc2fd53c0a0bea1999be593ee30fc9e42695",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_impacts/collision_asteroid_vs_asteroid_01.ogg",
+    "path": "sounds/sfx_impacts/collision_asteroid_vs_asteroid_01.ogg",
+    "type": "audio",
+    "bytes": 9456,
+    "hash": "66b0e3c566501fcb6389ab61b32481e4345f4019010bb7ec05048a873ea794e7",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_impacts/collision_ship_vs_asteroid_01.ogg",
+    "path": "sounds/sfx_impacts/collision_ship_vs_asteroid_01.ogg",
+    "type": "audio",
+    "bytes": 26211,
+    "hash": "365ea54eb8417749e0b9ca34ed18f27581a0018612f1bd881de57550643dd086",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_impacts/collision_ship_vs_ship_01.ogg",
+    "path": "sounds/sfx_impacts/collision_ship_vs_ship_01.ogg",
+    "type": "audio",
+    "bytes": 25178,
+    "hash": "6c10d3273cb5b35838b5bfe86e7afb6bf4ba3ffa24f5b728f073eebb5156b285",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_impacts/explosion_01.ogg",
+    "path": "sounds/sfx_impacts/explosion_01.ogg",
+    "type": "audio",
+    "bytes": 45791,
+    "hash": "2c8b1ea043b08782e15db4aaa9a1832e772cc5cad54283a1bc4010a9d6e4f0ee",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_impacts/explosion_03_fighter.ogg",
+    "path": "sounds/sfx_impacts/explosion_03_fighter.ogg",
+    "type": "audio",
+    "bytes": 30167,
+    "hash": "9217ddef9a59b410529b3b9d870d2b9f41de45fbf3f61fa1bb37893cb791015f",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_impacts/explosion_missile_01.ogg",
+    "path": "sounds/sfx_impacts/explosion_missile_01.ogg",
+    "type": "audio",
+    "bytes": 29504,
+    "hash": "39ed8b0326301390943b9a8d7a2f3024e16b76c638a0d2db0cbd64a8a7695709",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_impacts/explosion_secondary_01.ogg",
+    "path": "sounds/sfx_impacts/explosion_secondary_01.ogg",
+    "type": "audio",
+    "bytes": 26558,
+    "hash": "41b3612d00e47c73d5ab9dc0e11bc95eb9726e5eb03aeec38a9e375603b78a5d",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_impacts/gun_hit_heavy_01.ogg",
+    "path": "sounds/sfx_impacts/gun_hit_heavy_01.ogg",
+    "type": "audio",
+    "bytes": 26965,
+    "hash": "4329847b6ecf0c477def5e8423e334bafcd757495fb23b74ab2c7418857358bd",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_impacts/gun_hit_light_01.ogg",
+    "path": "sounds/sfx_impacts/gun_hit_light_01.ogg",
+    "type": "audio",
+    "bytes": 20391,
+    "hash": "bbd6a8b9af91a613955680cbd0488af55b35adb56391a665b05528e27d30e25f",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_impacts/gun_hit_solid_01.ogg",
+    "path": "sounds/sfx_impacts/gun_hit_solid_01.ogg",
+    "type": "audio",
+    "bytes": 24774,
+    "hash": "c5af48aa6090a841b898166828050eee56df87bb1567d6d42af879902dbddaf8",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_impacts/shield_hit_heavy_01.ogg",
+    "path": "sounds/sfx_impacts/shield_hit_heavy_01.ogg",
+    "type": "audio",
+    "bytes": 15662,
+    "hash": "0f05a8c5cc7df5cc549191367c1ee2bb5adc20d04db6bed55b076a20b36560f0",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_impacts/voltaic_discharge_impact_01.ogg",
+    "path": "sounds/sfx_impacts/voltaic_discharge_impact_01.ogg",
+    "type": "audio",
+    "bytes": 12857,
+    "hash": "0aa98d45821f8910c7545cedc12885fbcbf2695dffa8345e017022d7f89fe746",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_interface/autofire_toggle_01.ogg",
+    "path": "sounds/sfx_interface/autofire_toggle_01.ogg",
+    "type": "audio",
+    "bytes": 10047,
+    "hash": "7503b7739ef02cb9316360ab0691580ff5ca7d709bd3b70f4cc9eac8be11163f",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_interface/combat_readiness_malfunctions_alarm_flagship_01.ogg",
+    "path": "sounds/sfx_interface/combat_readiness_malfunctions_alarm_flagship_01.ogg",
+    "type": "audio",
+    "bytes": 22544,
+    "hash": "68914dfb7c4ac19681802ed6e37b619f34a0afce1f356edf36456b69cb8dff2f",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_interface/fighter_recall_activate.ogg",
+    "path": "sounds/sfx_interface/fighter_recall_activate.ogg",
+    "type": "audio",
+    "bytes": 12490,
+    "hash": "16d1868fbe34332fe863d03d861a50b12f664023da671f86f74acb14144d809f",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_interface/fighter_recall_deactivate.ogg",
+    "path": "sounds/sfx_interface/fighter_recall_deactivate.ogg",
+    "type": "audio",
+    "bytes": 12365,
+    "hash": "1dcd12a9b0ef44a0bc902d7198fbd7a7a2225fe12ab8c3cef0063cebdc0f688b",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_interface/ui_button_pressed.ogg",
+    "path": "sounds/sfx_interface/ui_button_pressed.ogg",
+    "type": "audio",
+    "bytes": 37510,
+    "hash": "5bf6cea9273a747dacaa124bc7bdab165264fd7e8ccd817b4364c814a1e5965a",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_interface/ui_channel_comm_local_01.ogg",
+    "path": "sounds/sfx_interface/ui_channel_comm_local_01.ogg",
+    "type": "audio",
+    "bytes": 15198,
+    "hash": "44785ff0feaaf664eed50ffce8162ee43b12517713c0f6f0e4a4f396db4dc25c",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_interface/ui_command_create_waypoint.ogg",
+    "path": "sounds/sfx_interface/ui_command_create_waypoint.ogg",
+    "type": "audio",
+    "bytes": 18160,
+    "hash": "facaba3a0cdfe5610c38ac76707da50fbf8b16968f7a3aab46e59aa777d6679e",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_interface/ui_command_out_of_command_points.ogg",
+    "path": "sounds/sfx_interface/ui_command_out_of_command_points.ogg",
+    "type": "audio",
+    "bytes": 83352,
+    "hash": "ea2b6db42cd5ca573c62b8fe0e8695f48a06d4a02c26e37533174f886083d5f6",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_interface/ui_command_refund_command_point.ogg",
+    "path": "sounds/sfx_interface/ui_command_refund_command_point.ogg",
+    "type": "audio",
+    "bytes": 23895,
+    "hash": "1d35beb52c9f8170c7de3cf23e337b39f6719eb4ddc75cba0df95567208133cc",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_interface/ui_command_right_click_command_given.ogg",
+    "path": "sounds/sfx_interface/ui_command_right_click_command_given.ogg",
+    "type": "audio",
+    "bytes": 43212,
+    "hash": "858e5c00b37a12c48846c99c7f0bb9a112bfb1ebf478eabff6df7f1a238c62ec",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_interface/ui_command_select_command_ui_icon.ogg",
+    "path": "sounds/sfx_interface/ui_command_select_command_ui_icon.ogg",
+    "type": "audio",
+    "bytes": 79495,
+    "hash": "426a99882a8ff42db41c482cccada02eac5616d8da034f270383722b980204d4",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_interface/ui_command_selection_cleared.ogg",
+    "path": "sounds/sfx_interface/ui_command_selection_cleared.ogg",
+    "type": "audio",
+    "bytes": 71246,
+    "hash": "2c6fc5cf612f95d5f7021f230a60f34bc46ffd59e8dbceb0ccc42a427fbecefa",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_interface/ui_radar_detect_missile.ogg",
+    "path": "sounds/sfx_interface/ui_radar_detect_missile.ogg",
+    "type": "audio",
+    "bytes": 6931,
+    "hash": "77fc10c2c832242b8f708da193d734bbc4c3649f2367ae9d6e0275e172ad3688",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_interface/ui_radar_detect_vessel.ogg",
+    "path": "sounds/sfx_interface/ui_radar_detect_vessel.ogg",
+    "type": "audio",
+    "bytes": 12916,
+    "hash": "679fa4800d812783c7ae8f2fb284320a0959de8310d35742892f96f54d1e35de",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_interface/ui_static01.ogg",
+    "path": "sounds/sfx_interface/ui_static01.ogg",
+    "type": "audio",
+    "bytes": 54650,
+    "hash": "af7498ccee917577217dea8454ff194abc2a8b09cf222159d58594ce642ba635",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_shields/shields_burnout_oneshot.ogg",
+    "path": "sounds/sfx_shields/shields_burnout_oneshot.ogg",
+    "type": "audio",
+    "bytes": 13792,
+    "hash": "0ca8e799d715aa93fba04519e0db066f0a967410ae28490d4a65d780cab1f82c",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_shields/shields_down_large.ogg",
+    "path": "sounds/sfx_shields/shields_down_large.ogg",
+    "type": "audio",
+    "bytes": 33692,
+    "hash": "45c5548b2c18ad18f6f89bf8c840c1e28e459a2d9e7fc40002a965cf789a43a8",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_shields/shields_up_large.ogg",
+    "path": "sounds/sfx_shields/shields_up_large.ogg",
+    "type": "audio",
+    "bytes": 48835,
+    "hash": "dcc25b239a5955844224fb867dce94f4b39819477d79710e3b99229a048eedc1",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_systems/burn_drive_activate.ogg",
+    "path": "sounds/sfx_systems/burn_drive_activate.ogg",
+    "type": "audio",
+    "bytes": 26954,
+    "hash": "df91ec5906d46c9f441fe2d5770a5485ab79ba6659596ab1ece203c9e0bc5948",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_systems/burn_drive_deactivate.ogg",
+    "path": "sounds/sfx_systems/burn_drive_deactivate.ogg",
+    "type": "audio",
+    "bytes": 10579,
+    "hash": "54024fdcb3cbf94140d488b1cba945b9c9e94f7c64a421fd07b5ba3a80726e26",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_systems/burn_drive_loop.ogg",
+    "path": "sounds/sfx_systems/burn_drive_loop.ogg",
+    "type": "audio",
+    "bytes": 47664,
+    "hash": "fd94747d03ac0b2489891bc15bb0dce994371e26e3a7ba89e002ce42048df34b",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_systems/canister_flak_explosion_01.ogg",
+    "path": "sounds/sfx_systems/canister_flak_explosion_01.ogg",
+    "type": "audio",
+    "bytes": 14891,
+    "hash": "d5f2bf9366a50fd88119198458fff10f2db9726148b2e2fc948558d91ec5cf94",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_systems/combat_readiness_malfunctions_engine_01.ogg",
+    "path": "sounds/sfx_systems/combat_readiness_malfunctions_engine_01.ogg",
+    "type": "audio",
+    "bytes": 11673,
+    "hash": "9ef1143ea32db988eda61bffd51cd43062b83b9d9282be2eb2ae515f63c5a1d1",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_systems/combat_readiness_malfunctions_weapon_large_01.ogg",
+    "path": "sounds/sfx_systems/combat_readiness_malfunctions_weapon_large_01.ogg",
+    "type": "audio",
+    "bytes": 17317,
+    "hash": "9f5aac3772a66b5db3a4aad6f1f424e56488ac64f4acd117e10b0be0b0b9cf3a",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_systems/combat_readiness_malfunctions_weapon_medium_01.ogg",
+    "path": "sounds/sfx_systems/combat_readiness_malfunctions_weapon_medium_01.ogg",
+    "type": "audio",
+    "bytes": 16812,
+    "hash": "47207b28fd26128755c1a373d6645e758c001d29bb915c7ea7bb22a6cf896e2a",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_systems/combat_readiness_malfunctions_weapon_small_01.ogg",
+    "path": "sounds/sfx_systems/combat_readiness_malfunctions_weapon_small_01.ogg",
+    "type": "audio",
+    "bytes": 14805,
+    "hash": "2be145fad789c6a0d669f64975d76ead8cac9db23172d6de15cf0d608b601950",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_systems/disabled_large.ogg",
+    "path": "sounds/sfx_systems/disabled_large.ogg",
+    "type": "audio",
+    "bytes": 14453,
+    "hash": "b6d59949c20fdb19d49e4e24591c84023e8f9aa2c18a291aa1bdc595754245ac",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_systems/emp_emitter_impact_01.ogg",
+    "path": "sounds/sfx_systems/emp_emitter_impact_01.ogg",
+    "type": "audio",
+    "bytes": 25698,
+    "hash": "aa7f92ef126dc932a736a565f63f2b97edc989bcb073887b14fbdd79edff2093",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_systems/flare_launcher_active_triplet.ogg",
+    "path": "sounds/sfx_systems/flare_launcher_active_triplet.ogg",
+    "type": "audio",
+    "bytes": 26183,
+    "hash": "82b3f84cd55987e1baf510377872c8a224937adb50b2d5787632e3cf0f371798",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_systems/fortress_shield_loop.ogg",
+    "path": "sounds/sfx_systems/fortress_shield_loop.ogg",
+    "type": "audio",
+    "bytes": 95751,
+    "hash": "e56e847b8e65870ec43302badb240f8ffdba81f32c36ca818d8af8c954896e34",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_systems/mine_strike_explosion_01.ogg",
+    "path": "sounds/sfx_systems/mine_strike_explosion_01.ogg",
+    "type": "audio",
+    "bytes": 15337,
+    "hash": "68a02d3326891f2c782796c8be5f1bc7073bd0ba49701f718f56e3872e652e2a",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_systems/mine_strike_pinged_01.ogg",
+    "path": "sounds/sfx_systems/mine_strike_pinged_01.ogg",
+    "type": "audio",
+    "bytes": 16873,
+    "hash": "0b14216dbb1afc69fb6a17869c8be4b9c6502ef11e15791ff6aeda7b5dea69e1",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_systems/mine_strike_teleport_01.ogg",
+    "path": "sounds/sfx_systems/mine_strike_teleport_01.ogg",
+    "type": "audio",
+    "bytes": 18155,
+    "hash": "6be20f0f91b676c47ce833eb49616f72610a906ef41f568cf776d2683fb198c4",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_systems/mine_strike_windup_01.ogg",
+    "path": "sounds/sfx_systems/mine_strike_windup_01.ogg",
+    "type": "audio",
+    "bytes": 17157,
+    "hash": "b3f651c01d799266c0d82936f054a515b132140bbe422ac046e7491f58a18262",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_systems/phase_cloak_activate.ogg",
+    "path": "sounds/sfx_systems/phase_cloak_activate.ogg",
+    "type": "audio",
+    "bytes": 25892,
+    "hash": "5653768e3b19b3349f7d683f81879ffd283e1e7abe14f75e04b2db6cb122136a",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_systems/phase_cloak_deactivate.ogg",
+    "path": "sounds/sfx_systems/phase_cloak_deactivate.ogg",
+    "type": "audio",
+    "bytes": 7947,
+    "hash": "044aceb6a3ec9a33f4f312b865ef3268cb0fc345f9c0282647b90db8a7d2fff3",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_wpn_energy/autopulse_laser_fire_01.ogg",
+    "path": "sounds/sfx_wpn_energy/autopulse_laser_fire_01.ogg",
+    "type": "audio",
+    "bytes": 5838,
+    "hash": "75a80cc5e5c1a220111f83fa94b46b592c98f0056857554e99cf3cfdf6545f00",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_wpn_energy/tachyon_lance_fire_01.ogg",
+    "path": "sounds/sfx_wpn_energy/tachyon_lance_fire_01.ogg",
+    "type": "audio",
+    "bytes": 22883,
+    "hash": "ff84db090c5d8f4360cfbba22db9dfbdd150bb3595df90f096b88034ccf3b913",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_wpn_energy/thermal_pulse_cannon_fire_01.ogg",
+    "path": "sounds/sfx_wpn_energy/thermal_pulse_cannon_fire_01.ogg",
+    "type": "audio",
+    "bytes": 10838,
+    "hash": "e1b7adc8125f29c9b91a62ab5dc4470bed7267d72aff25be1f666cae33bbc322",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_wpn_guns/autocannon_fire_01.ogg",
+    "path": "sounds/sfx_wpn_guns/autocannon_fire_01.ogg",
+    "type": "audio",
+    "bytes": 9373,
+    "hash": "313d35d4346bd3ae66a0d75a4bb741ef52ec861d1c577d8559771ab56bb9fa6d",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_wpn_guns/flak_fire_01.ogg",
+    "path": "sounds/sfx_wpn_guns/flak_fire_01.ogg",
+    "type": "audio",
+    "bytes": 8411,
+    "hash": "ba9de42f04808b411530c30e9a4d060aaaa0b37e20719785d50e66497d31bb15",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_wpn_guns/hypervel_driver_fire_01.ogg",
+    "path": "sounds/sfx_wpn_guns/hypervel_driver_fire_01.ogg",
+    "type": "audio",
+    "bytes": 12741,
+    "hash": "437a302337003aff5a16236bc39ef4bd1594b55e04dc98c3e2aedd5d47cfbfca",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_wpn_guns/light_machinegun_fire_01.ogg",
+    "path": "sounds/sfx_wpn_guns/light_machinegun_fire_01.ogg",
+    "type": "audio",
+    "bytes": 6836,
+    "hash": "4c977c6c81c81dc03d75482d898b3be8729d5bceacfddb70b3b16dc1aeb16dfb",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_wpn_guns/mauler_fire_01.ogg",
+    "path": "sounds/sfx_wpn_guns/mauler_fire_01.ogg",
+    "type": "audio",
+    "bytes": 11503,
+    "hash": "47566ed70f936fdd8dd2575e76014bc543b3f9cb3ad13bc4a919ec8a2a2ca3cc",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_wpn_missiles/annihilator_fire_01.ogg",
+    "path": "sounds/sfx_wpn_missiles/annihilator_fire_01.ogg",
+    "type": "audio",
+    "bytes": 9802,
+    "hash": "d62c0b6c4540c996931e393370e8d40947a0bd3c17ea437999fb4d5ec569e272",
+    "group": "sounds"
+  }
+]

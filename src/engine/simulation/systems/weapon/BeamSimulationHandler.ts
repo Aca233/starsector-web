@@ -1,6 +1,5 @@
 import { Vector2 } from '../../../math/Vector2';
 import { intersectSegmentWithPolygon } from '../../../math/Geometry';
-import { Ship } from '../../Ship';
 import { Beam } from '../../Weapon';
 import { sound } from '../../../audio/SoundManager';
 import { i18n } from '../../../i18n/LocalizationManager';

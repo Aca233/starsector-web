@@ -26,7 +26,7 @@ export interface AuthenticTacticalConsoleProps {
  *   - 逐门武器就绪与冷却指示器
  *   - 航母机库甲板中队战备
  */
-export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> = ({ player, combatTime = 0, engine }) => {
+export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> = ({ player, engine }) => {
   const isZeroFlux = player.flux.totalFlux <= 0 && !player.shield.isActive && !player.flux.isOverloaded;
   const speed = player.vel.length().toFixed(1);
   const totalFlux = Math.round(player.flux.totalFlux);
@@ -107,9 +107,9 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
           {/* 幅能排空 (Active Venting) */}
           {player.flux.isVenting && (
             <div className="flex items-center gap-1.5 animate-pulse text-cyan-300">
-              <img 
-                src="/api/asset?path=graphics/icons/tactical/venting_flux2.png" 
-                alt="" 
+              <img
+                src="/game-assets/graphics/icons/tactical/venting_flux2.png"
+                alt=""
                 className="w-4 h-4 object-contain"
               />
               <span className="font-bold">幅能排空</span>
@@ -120,9 +120,9 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
           {/* 深度过载 (Overloaded) */}
           {player.flux.isOverloaded && (
             <div className="flex items-center gap-1.5 animate-pulse text-red-400">
-              <img 
-                src="/api/asset?path=graphics/icons/tactical/overloaded.png" 
-                alt="" 
+              <img
+                src="/game-assets/graphics/icons/tactical/overloaded.png"
+                alt=""
                 className="w-4 h-4 object-contain"
               />
               <span className="font-bold">深度过载</span>
@@ -133,9 +133,9 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
           {/* 零幅能加速 (Zero Flux Boost) */}
           {isZeroFlux && !player.flux.isVenting && !player.flux.isOverloaded && (
             <div className="flex items-center gap-1.5 text-amber-300">
-              <img 
-                src="/api/asset?path=graphics/icons/tactical/engine_boost2.png" 
-                alt="" 
+              <img
+                src="/game-assets/graphics/icons/tactical/engine_boost2.png"
+                alt=""
                 className="w-3.5 h-3.5 object-contain"
               />
               <span className="font-bold">零幅能加速</span>
@@ -146,9 +146,9 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
           {/* 引擎受损 (Engine Damage) */}
           {isFlameout && (
             <div className="flex items-center gap-1.5 text-orange-400">
-              <img 
-                src="/api/asset?path=graphics/icons/tactical/engine_damage.png" 
-                alt="" 
+              <img
+                src="/game-assets/graphics/icons/tactical/engine_damage.png"
+                alt=""
                 className="w-3.5 h-3.5 object-contain"
               />
               <span className="font-bold">引擎受损</span>
@@ -159,9 +159,9 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
           {/* 战备时钟衰减警告 (仅当开始扣除 PPT 或战备衰减时显示) */}
           {hasEnemiesInRange && remainingPPT <= 0 && (
             <div className="flex items-center gap-1.5 text-amber-400 animate-pulse">
-              <img 
-                src="/api/asset?path=graphics/icons/tactical/cr_tactical3.png" 
-                alt="" 
+              <img
+                src="/game-assets/graphics/icons/tactical/cr_tactical3.png"
+                alt=""
                 className="w-3.5 h-3.5 object-contain"
               />
               <span className="font-bold">战备衰减</span>
@@ -174,10 +174,10 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
         <div className="flex items-center justify-between h-[15px]">
           <span className="font-bold w-12 text-[#94ff00]">幅能&nbsp;:</span>
           <div className="relative flex-1 h-[8px] mx-2 bg-black/70 border border-[#94ff00]/60 overflow-hidden">
-            <div 
+            <div
               className={`h-full transition-all duration-75 ${
-                player.flux.isOverloaded 
-                  ? 'bg-red-500 animate-pulse' 
+                player.flux.isOverloaded
+                  ? 'bg-red-500 animate-pulse'
                   : 'bg-[#94ff00]'
               }`}
               style={{ width: `${fluxRatio * 100}%` }}
@@ -194,7 +194,7 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
         <div className="flex items-center justify-between h-[15px] mt-[1px]">
           <span className="font-bold w-12 text-[#94ff00]">结构&nbsp;:</span>
           <div className="relative flex-1 h-[8px] mx-2 bg-black/70 border border-[#94ff00]/60 overflow-hidden">
-            <div 
+            <div
               className="h-full bg-[#94ff00] transition-all duration-75"
               style={{ width: `${hullRatio * 100}%` }}
             />
@@ -242,12 +242,12 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
             const isAutofire = group.isAutofire;
 
             return (
-              <div 
+              <div
                 key={gIdx}
                 onClick={() => player.selectWeaponGroup(gIdx)}
                 className={`px-1.5 py-[1px] cursor-pointer transition select-none ${
-                  isSelected 
-                    ? 'text-white font-bold drop-shadow-[0_0_2px_#94ff00]' 
+                  isSelected
+                    ? 'text-white font-bold drop-shadow-[0_0_2px_#94ff00]'
                     : 'text-[#94ff00] hover:text-white'
                 }`}
               >
@@ -256,9 +256,9 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
                   <div className="flex items-center gap-1 flex-1 min-w-0">
                     <span className="font-bold text-[12px]">{gIdx + 1}.</span>
                     {first?.spec.turretSpriteUrl && (
-                      <img 
-                        src={first.spec.turretSpriteUrl} 
-                        alt="" 
+                      <img
+                        src={first.spec.turretSpriteUrl}
+                        alt=""
                         className="w-3.5 h-3.5 object-contain rotate-[-90deg] inline-block filter brightness-150"
                       />
                     )}
@@ -274,7 +274,7 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
                 {/* 第二行: 伤害类型 + 自动开火开关 */}
                 <div className="flex items-center justify-between pl-4 text-[10px] text-[#94ff00]/85">
                   <span>伤害类型:&nbsp;{dmgType}</span>
-                  <div 
+                  <div
                     onClick={(e) => {
                       e.stopPropagation();
                       player.toggleAutofire(gIdx);

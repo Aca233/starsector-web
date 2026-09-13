@@ -217,7 +217,6 @@ export class FighterSystem {
 
     // 2. 处理敌方母舰甲板联队
     for (const wing of this.enemyWings) {
-      const isBroadsword = wing.specId === 'broadsword';
       const aliveList = this.fighters.filter(f => !f.isPlayer && !f.isDead);
       const totalCrafts = aliveList.length + wing.rebuildQueue.length;
       let missing = wing.maxCrafts - totalCrafts;

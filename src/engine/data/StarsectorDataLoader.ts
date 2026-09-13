@@ -3,49 +3,17 @@ import { WeaponSpec } from '../simulation/Weapon';
 import { ShieldType } from '../simulation/Shield';
 import { ShipSystemType } from '../simulation/ShipSystem';
 import { DamageType } from '../simulation/ArmorGrid';
+import { assetResolver } from '../assets/AssetResolver';
+import { parseStarsectorCsv, parseStarsectorJson } from './StarsectorTextParsers';
+
+export { parseStarsectorCsv, parseStarsectorJson } from './StarsectorTextParsers';
+
+export type StarsectorSourceReader = (relativePath: string) => Promise<string>;
 
 /**
- * 宽松 JSON 解析器 (兼容原版 Starsector 的 # 注释、无引号枚举键及尾随逗号)
- */
-export function parseStarsectorJson(rawText: string): any {
-  // 1. 过滤 # 与 // 单行注释
-  let cleaned = rawText.replace(/#.*/g, '').replace(/\/\/.*/g, '');
-  
-  // 2. 补全未加引号的枚举标识符 (如 style: HIGH_TECH, textureType: ROUGH)
-  cleaned = cleaned.replace(/:\s*([A-Za-z_][A-Za-z0-9_]*)\s*([,}\]])/g, ': "$1"$2');
-  
-  // 3. 清除末尾多余的逗号
-  cleaned = cleaned.replace(/,\s*([,}\]])/g, '$1');
-
-  return JSON.parse(cleaned);
-}
-
-/**
- * 官方 CSV 解析器
- */
-export function parseStarsectorCsv(csvText: string): Record<string, string>[] {
-  const lines = csvText.split(/\r?\n/).filter(line => line.trim().length > 0);
-  if (lines.length < 2) return [];
-
-  const headers = lines[0].split(',').map(h => h.trim());
-  const rows: Record<string, string>[] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    // 简易 CSV 切分 (考虑逗号)
-    const cols = lines[i].split(',');
-    if (cols.length < headers.length) continue;
-    const row: Record<string, string> = {};
-    for (let j = 0; j < headers.length; j++) {
-      row[headers[j]] = cols[j]?.trim() || '';
-    }
-    rows.push(row);
-  }
-  return rows;
-}
-
-/**
- * 原版资产直读装载器 (StarsectorDataLoader)
- * 通过 /api/asset 原位直读官方本地 data/hulls, data/weapons, data/shipsystems 真实文件
+ * Offline/import converter for original Starsector text formats. A caller must
+ * explicitly provide a source reader (Node import scripts can read from disk);
+ * the browser runtime never reads the Starsector installation.
  */
 export class StarsectorDataLoader {
   private static instance: StarsectorDataLoader;
@@ -62,15 +30,11 @@ export class StarsectorDataLoader {
   /**
    * 从本地文件系统异步载入真实的 .ship 与 CSV 舰船规格
    */
-  public async loadShipFromSource(hullId: string): Promise<ShipSpec> {
-    // 1. 读取原版 .ship 文件
-    const shipRes = await fetch(`/api/asset?path=data/hulls/${hullId}.ship`);
-    if (!shipRes.ok) throw new Error(`Failed to load ${hullId}.ship`);
-    const shipJson = parseStarsectorJson(await shipRes.text());
+  public async loadShipFromSource(hullId: string, readText: StarsectorSourceReader): Promise<ShipSpec> {
+    const shipJson = parseStarsectorJson(await readText(`data/hulls/${hullId}.ship`)) as any;
 
     // 2. 读取 ship_data.csv 中对应条目的真实基础属性
-    const csvRes = await fetch(`/api/asset?path=data/hulls/ship_data.csv`);
-    const csvText = await csvRes.text();
+    const csvText = await readText('data/hulls/ship_data.csv');
     const rows = parseStarsectorCsv(csvText);
     const row = rows.find(r => r['id'] === hullId) || {};
 
@@ -147,7 +111,7 @@ export class StarsectorDataLoader {
       nameKey: `ship.${hullId}.name`,
       descKey: `ship.${hullId}.desc`,
       designationKey: `ship.${hullId}.designation`,
-      spriteUrl: `/api/asset?path=${spriteRel}`,
+      spriteUrl: assetResolver.url(spriteRel),
       spriteWidth,
       spriteHeight,
       pivotX,
@@ -182,13 +146,10 @@ export class StarsectorDataLoader {
   /**
    * 从本地文件系统异步载入真实的 .wpn 武器规格
    */
-  public async loadWeaponFromSource(weaponId: string): Promise<WeaponSpec> {
-    const wpnRes = await fetch(`/api/asset?path=data/weapons/${weaponId}.wpn`);
-    if (!wpnRes.ok) throw new Error(`Failed to load ${weaponId}.wpn`);
-    const wpnJson = parseStarsectorJson(await wpnRes.text());
+  public async loadWeaponFromSource(weaponId: string, readText: StarsectorSourceReader): Promise<WeaponSpec> {
+    const wpnJson = parseStarsectorJson(await readText(`data/weapons/${weaponId}.wpn`)) as any;
 
-    const csvRes = await fetch(`/api/asset?path=data/weapons/weapon_data.csv`);
-    const rows = parseStarsectorCsv(await csvRes.text());
+    const rows = parseStarsectorCsv(await readText('data/weapons/weapon_data.csv'));
     const row = rows.find(r => r['id'] === weaponId) || {};
 
     const damagePerShot = parseFloat(row['damage/shot'] || '0');
@@ -229,10 +190,10 @@ export class StarsectorDataLoader {
       burstDelay: parseFloat(row['burst delay'] || '0'),
       turretOffsets: wpnJson.turretOffsets,
       hardpointOffsets: wpnJson.hardpointOffsets,
-      turretSpriteUrl: wpnJson.turretSprite ? `/api/asset?path=${wpnJson.turretSprite}` : undefined,
-      hardpointSpriteUrl: wpnJson.hardpointSprite ? `/api/asset?path=${wpnJson.hardpointSprite}` : undefined,
-      glowSpriteUrl: wpnJson.turretGlowSprite ? `/api/asset?path=${wpnJson.turretGlowSprite}` : undefined,
-      hardpointGlowSpriteUrl: wpnJson.hardpointGlowSprite ? `/api/asset?path=${wpnJson.hardpointGlowSprite}` : undefined,
+      turretSpriteUrl: wpnJson.turretSprite ? assetResolver.url(wpnJson.turretSprite) : undefined,
+      hardpointSpriteUrl: wpnJson.hardpointSprite ? assetResolver.url(wpnJson.hardpointSprite) : undefined,
+      glowSpriteUrl: wpnJson.turretGlowSprite ? assetResolver.url(wpnJson.turretGlowSprite) : undefined,
+      hardpointGlowSpriteUrl: wpnJson.hardpointGlowSprite ? assetResolver.url(wpnJson.hardpointGlowSprite) : undefined,
       visualRecoil: wpnJson.visualRecoil,
       muzzleFlashSpec: wpnJson.muzzleFlashSpec,
       soundKey: wpnJson.fireSoundTwo || wpnJson.fireSoundOne

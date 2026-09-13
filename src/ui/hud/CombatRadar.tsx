@@ -133,7 +133,7 @@ export const CombatRadar: React.FC<CombatRadarProps> = ({ engine }) => {
     <div 
       className="relative w-[204px] h-[204px] select-none shadow-2xl"
       style={{
-        backgroundImage: 'url(/api/asset?path=graphics/hud/minimap_bg2.png)',
+        backgroundImage: 'url(/game-assets/graphics/hud/minimap_bg2.png)',
         backgroundSize: '204px 204px',
         backgroundRepeat: 'no-repeat'
       }}
@@ -142,7 +142,7 @@ export const CombatRadar: React.FC<CombatRadarProps> = ({ engine }) => {
       <div 
         className="absolute top-[3px] left-[3px] w-[198px] h-[198px] pointer-events-none opacity-40"
         style={{
-          backgroundImage: 'url(/api/asset?path=graphics/hud/holo_grid.png)',
+          backgroundImage: 'url(/game-assets/graphics/hud/holo_grid.png)',
           backgroundSize: '198px 198px',
           backgroundRepeat: 'no-repeat'
         }}

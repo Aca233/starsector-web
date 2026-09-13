@@ -22,11 +22,11 @@ export class AsteroidSystem {
   public init() {
     this.asteroids = [];
     const asteroidSprites = [
-      '/api/asset?path=graphics/asteroids/asteroid0.png',
-      '/api/asset?path=graphics/asteroids/asteroid1.png',
-      '/api/asset?path=graphics/asteroids/asteroid2.png',
-      '/api/asset?path=graphics/asteroids/asteroid3.png',
-      '/api/asset?path=graphics/asteroids/asteroid_big00.png'
+      '/game-assets/graphics/asteroids/asteroid1.png',
+      '/game-assets/graphics/asteroids/asteroid1.png',
+      '/game-assets/graphics/asteroids/asteroid2.png',
+      '/game-assets/graphics/asteroids/asteroid3.png',
+      '/game-assets/graphics/asteroids/asteroid_big00.png'
     ];
 
     const count = 18;
@@ -41,7 +41,7 @@ export class AsteroidSystem {
       const isMedium = i % 2 === 0 && !isBig;
       const radius = isBig ? (50 + Math.random() * 22) : isMedium ? (30 + Math.random() * 14) : (18 + Math.random() * 10);
       const spriteUrl = isBig
-        ? '/api/asset?path=graphics/asteroids/asteroid_big00.png'
+        ? '/game-assets/graphics/asteroids/asteroid_big00.png'
         : asteroidSprites[i % (asteroidSprites.length - 1)];
 
       const hp = isBig ? 1600 : isMedium ? 750 : 350;
@@ -220,7 +220,7 @@ export class AsteroidSystem {
           mass: newR * newR * 0.75,
           hp: 250,
           maxHp: 250,
-          spriteUrl: '/api/asset?path=graphics/asteroids/asteroid3.png'
+          spriteUrl: '/game-assets/graphics/asteroids/asteroid3.png'
         });
       }
     }

@@ -1,20 +1,20 @@
+import { visualNowMs } from '../RenderDeterminism';
 import { Vector2 } from '../../math/Vector2';
 import { Ship } from '../../simulation/Ship';
 import { CombatEngine } from '../../simulation/CombatEngine';
 import { textureCache } from '../TextureCache';
+import { SHIELD_VISUAL_PROFILES } from '../../visual/VisualProfiles';
 
 export class ShieldRenderer {
-  private shieldInnerAngle = 0;
-
   constructor() {}
 
   public drawShield(ctx: CanvasRenderingContext2D, ship: Ship, renderPos: Vector2, shipFacing: number) {
     const shield = ship.shield;
     if (!shield.isActive || shield.currentArcDeg <= 2 || shield.type === 'PHASE' || shield.type === 'NONE') return;
 
-    this.shieldInnerAngle += 0.008; // 缓慢旋转等离子结界 (对齐 G.java getInnerRotationRate)
-
     const isFortress = (ship.system.type === 'FORTRESS_SHIELD' && ship.system.isActive);
+    const profile = SHIELD_VISUAL_PROFILES[ship.spec.id === 'onslaught' ? 'lowTech' : 'highTech'];
+    const shieldInnerAngle = visualNowMs() * 0.001 * profile.textureRotationSpeed;
     const centerAngle = shield.type === 'FRONT' ? shipFacing : shield.facingAngleRad;
     const halfArcRad = (shield.currentArcDeg * Math.PI) / 360;
     const startAngle = centerAngle - halfArcRad;
@@ -26,9 +26,7 @@ export class ShieldRenderer {
     // 1. 获取阵营官方护盾色彩规范 (严格对齐 G.java 与 high_tech / low_tech 规范)
     const [sr, sg, sb] = isFortress
       ? [255, 255, 210]
-      : shield.type === 'OMNI'
-      ? [50, 175, 255]
-      : [255, 125, 30];
+      : profile.outerColor;
 
     // 2. 绘制内部纹理能量结界 (Inner Textured Shield Disc)
     ctx.save();
@@ -43,23 +41,23 @@ export class ShieldRenderer {
     ctx.fill();
 
     // 绘制旋转的 shields256.png
-    const shieldTexture = textureCache.getTintedImage('/api/asset?path=graphics/fx/shields256.png', sr, sg, sb);
+    const shieldTexture = textureCache.getTintedImage('/game-assets/graphics/fx/shields256.png', sr, sg, sb);
     if (shieldTexture) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      ctx.rotate(this.shieldInnerAngle);
-      ctx.globalAlpha = isFortress ? 0.75 : 0.55;
+      ctx.rotate(shieldInnerAngle);
+      ctx.globalAlpha = isFortress ? 0.75 : profile.opacity;
       const tSize = shield.radius * 2.1;
       ctx.drawImage(shieldTexture, -tSize / 2, -tSize / 2, tSize, tSize);
       ctx.restore();
     }
 
     // 绘制 shields256ringd.png 外围微扰环材质
-    const shieldRingTexture = textureCache.getTintedImage('/api/asset?path=graphics/fx/shields256ringd.png', Math.min(255, sr + 50), Math.min(255, sg + 50), Math.min(255, sb + 50));
+    const shieldRingTexture = textureCache.getTintedImage('/game-assets/graphics/fx/shields256ringd.png', Math.min(255, sr + 50), Math.min(255, sg + 50), Math.min(255, sb + 50));
     if (shieldRingTexture) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      ctx.rotate(-this.shieldInnerAngle * 0.7);
+      ctx.rotate(-shieldInnerAngle * 0.7);
       ctx.globalAlpha = isFortress ? 0.85 : 0.65;
       const tSize = shield.radius * 2.0;
       ctx.drawImage(shieldRingTexture, -tSize / 2, -tSize / 2, tSize, tSize);
@@ -83,7 +81,7 @@ export class ShieldRenderer {
     ctx.beginPath();
     const segments = Math.max(16, Math.floor(shield.currentArcDeg / 4));
     const stepRad = (shield.currentArcDeg * Math.PI / 180) / segments;
-    const now = performance.now() * 0.005;
+    const now = visualNowMs() * 0.005;
     const fluxWobble = (ship.flux.totalFlux / ship.spec.maxFlux) * 2.5;
     for (let i = 0; i <= segments; i++) {
       const a = startAngle + i * stepRad;
@@ -122,7 +120,7 @@ export class ShieldRenderer {
       ctx.restore();
 
       // C. 撞击点周围扩张光环与接触光晕
-      const ringTex = textureCache.getTintedImage('/api/asset?path=graphics/fx/shields256ringd.png', rip.color[0], rip.color[1], rip.color[2]);
+      const ringTex = textureCache.getTintedImage('/game-assets/graphics/fx/shields256ringd.png', rip.color[0], rip.color[1], rip.color[2]);
       if (ringTex) {
         ctx.save();
         const hx = Math.cos(rip.angle) * shield.radius;
@@ -134,7 +132,7 @@ export class ShieldRenderer {
         ctx.drawImage(ringTex, -rSize / 2, -rSize / 2, rSize, rSize);
 
         // 强接触闪光点 (Glow Bloom)
-        const glowTex = textureCache.getTintedImage('/api/asset?path=graphics/fx/glow64.png', 255, 255, 255);
+        const glowTex = textureCache.getTintedImage('/game-assets/graphics/fx/glow64.png', 255, 255, 255);
         if (glowTex && rip.intensity > 0.4) {
           ctx.globalAlpha = (rip.intensity - 0.4) * 1.4;
           const gSize = 25 * rip.intensity;
@@ -228,7 +226,7 @@ export class ShieldRenderer {
 
     for (const rip of engine.shieldRipples) {
       const alpha = Math.max(0, rip.life / rip.maxLife);
-      const tinted = textureCache.getTintedImage('/api/asset?path=graphics/fx/shields256ringd.png', rip.color[0], rip.color[1], rip.color[2]);
+      const tinted = textureCache.getTintedImage('/game-assets/graphics/fx/shields256ringd.png', rip.color[0], rip.color[1], rip.color[2]);
       if (tinted) {
         ctx.save();
         ctx.translate(rip.pos.x, rip.pos.y);

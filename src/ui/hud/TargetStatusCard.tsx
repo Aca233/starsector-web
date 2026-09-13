@@ -33,7 +33,7 @@ export const TargetStatusCard: React.FC<{ enemy: Ship; dist: number }> = ({ enem
       <div 
         className="relative w-[247px] h-[203px] select-none"
         style={{
-          backgroundImage: 'url(/api/asset?path=graphics/hud/target_status_bg2.png)',
+          backgroundImage: 'url(/game-assets/graphics/hud/target_status_bg2.png)',
           backgroundSize: '247px 203px',
           backgroundRepeat: 'no-repeat'
         }}
@@ -44,7 +44,7 @@ export const TargetStatusCard: React.FC<{ enemy: Ship; dist: number }> = ({ enem
             className="w-full transition-all duration-100"
             style={{
               height: `${Math.round(enemyHullRatio * 184)}px`,
-              backgroundImage: 'url(/api/asset?path=graphics/hud/bar_armor.png)',
+              backgroundImage: 'url(/game-assets/graphics/hud/bar_armor.png)',
               backgroundRepeat: 'repeat-y',
               backgroundPosition: 'bottom center',
               filter: 'hue-rotate(-90deg) saturate(1.8)'
@@ -58,7 +58,7 @@ export const TargetStatusCard: React.FC<{ enemy: Ship; dist: number }> = ({ enem
             className={`w-full transition-all duration-75 ${enemy.flux.isOverloaded ? 'animate-pulse' : ''}`}
             style={{
               height: `${Math.round(enemyFluxRatio * 184)}px`,
-              backgroundImage: 'url(/api/asset?path=graphics/hud/bar_energy.png)',
+              backgroundImage: 'url(/game-assets/graphics/hud/bar_energy.png)',
               backgroundRepeat: 'repeat-y',
               backgroundPosition: 'bottom center',
               filter: enemy.flux.isOverloaded ? 'hue-rotate(180deg) saturate(3)' : 'none'

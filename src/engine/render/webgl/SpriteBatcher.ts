@@ -73,6 +73,7 @@ export class SpriteBatcher {
   private gl: WebGL2RenderingContext;
   private program: WebGLProgram;
   private vao: WebGLVertexArrayObject;
+  private quadVBO: WebGLBuffer;
   private instanceVBO: WebGLBuffer;
 
   private uViewProjLoc: WebGLUniformLocation;
@@ -87,6 +88,7 @@ export class SpriteBatcher {
   private currentTexture: WebGLTexture | null = null;
   private currentBlendMode: 'NORMAL' | 'ADDITIVE' = 'NORMAL';
   public currentViewProj: Float32Array = new Float32Array(9);
+  public drawCalls = 0;
 
   constructor(gl: WebGL2RenderingContext) {
     this.gl = gl;
@@ -113,6 +115,8 @@ export class SpriteBatcher {
        0.5,  0.5
     ]);
     const quadVBO = gl.createBuffer();
+    if (!quadVBO) throw new Error('Failed to create quad VBO');
+    this.quadVBO = quadVBO;
     gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO);
     gl.bufferData(gl.ARRAY_BUFFER, quadCorners, gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0);
@@ -181,6 +185,7 @@ export class SpriteBatcher {
     this.setBlendMode('NORMAL');
     this.spriteCount = 0;
     this.currentTexture = null;
+    this.drawCalls = 0;
   }
 
   public resumeProgram() {
@@ -266,6 +271,7 @@ export class SpriteBatcher {
 
     // 核心调用：单次 GPU 实例化绘制所有精灵
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, this.spriteCount);
+    this.drawCalls++;
     this.spriteCount = 0;
   }
 
@@ -274,5 +280,12 @@ export class SpriteBatcher {
     const gl = this.gl;
     gl.bindVertexArray(null);
     gl.useProgram(null);
+  }
+
+  public dispose() {
+    this.gl.deleteBuffer(this.quadVBO);
+    this.gl.deleteBuffer(this.instanceVBO);
+    this.gl.deleteVertexArray(this.vao);
+    this.gl.deleteProgram(this.program);
   }
 }

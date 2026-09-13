@@ -89,7 +89,7 @@ export const WeaponsConsole: React.FC<{ player: Ship; isAutopilot?: boolean }> =
                   : 'border border-slate-700/70 hover:border-slate-500/80 opacity-90'
               }`}
               style={{
-                backgroundImage: 'url(/api/asset?path=graphics/hud/weapon_status_bg.png)',
+                backgroundImage: 'url(/game-assets/graphics/hud/weapon_status_bg.png)',
                 backgroundSize: '100% 100%',
                 backgroundColor: 'rgba(15, 23, 42, 0.85)'
               }}
@@ -142,7 +142,7 @@ export const WeaponsConsole: React.FC<{ player: Ship; isAutopilot?: boolean }> =
                       className="h-full bg-amber-400 transition-all duration-75"
                       style={{
                         width: `${(1 - cdRatio) * 100}%`,
-                        backgroundImage: 'url(/api/asset?path=graphics/hud/weapons_bar_cooldown.png)',
+                        backgroundImage: 'url(/game-assets/graphics/hud/weapons_bar_cooldown.png)',
                         backgroundSize: 'cover'
                       }}
                     />

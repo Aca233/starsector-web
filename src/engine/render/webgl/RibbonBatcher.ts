@@ -63,6 +63,7 @@ export class RibbonBatcher {
 
   private currentTexture: WebGLTexture | null = null;
   private currentBlendMode: 'NORMAL' | 'ADDITIVE' = 'NORMAL';
+  public drawCalls = 0;
 
   constructor(gl: WebGL2RenderingContext) {
     this.gl = gl;
@@ -109,6 +110,7 @@ export class RibbonBatcher {
     this.currentBlendMode = 'NORMAL';
     this.vertexCount = 0;
     this.currentTexture = null;
+    this.drawCalls = 0;
   }
 
   public setBlendMode(mode: 'NORMAL' | 'ADDITIVE') {
@@ -342,6 +344,7 @@ export class RibbonBatcher {
     );
 
     gl.drawArrays(gl.TRIANGLES, 0, this.vertexCount);
+    this.drawCalls++;
     this.vertexCount = 0;
   }
 
@@ -350,5 +353,11 @@ export class RibbonBatcher {
     const gl = this.gl;
     gl.bindVertexArray(null);
     gl.useProgram(null);
+  }
+
+  public dispose() {
+    this.gl.deleteBuffer(this.vbo);
+    this.gl.deleteVertexArray(this.vao);
+    this.gl.deleteProgram(this.program);
   }
 }

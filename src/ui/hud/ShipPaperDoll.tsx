@@ -103,7 +103,7 @@ export const ShipPaperDoll: React.FC<ShipPaperDollProps> = ({ ship, isEnemy = fa
         ctx.clearRect(0, 0, w, h);
 
         // 1. 绘制 holo_status.png 同心准星底图
-        const holoImg = getCachedImage('/api/asset?path=graphics/hud/holo_status.png');
+        const holoImg = getCachedImage('/game-assets/graphics/hud/holo_status.png');
         if (holoImg.complete && holoImg.naturalWidth > 0) {
           ctx.save();
           ctx.globalAlpha = 0.35;

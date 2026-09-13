@@ -151,12 +151,10 @@ export class ArmorGrid {
     }
     if (effectiveHitStr < 1.0) effectiveHitStr = 1.0;
 
-    // 官方减伤公式: computeDamageMultiplier(hitStrength, effectiveArmor)
-    // f4 = hitStrength / (hitStrength + effectiveArmor);
-    // if (f4 > maxArmorDamageReduction) f4 = maxArmorDamageReduction; (0.85)
-    // return 1.0 - f4; (最低承受 15% 伤害)
-    const dr = Math.min(0.85, effectiveHitStr / (effectiveHitStr + effectiveArmor));
-    const damageMult = 1.0 - dr;
+    // Damage multiplier is hitStrength/(hitStrength+armor), with an 85%
+    // maximum reduction (therefore a 15% minimum damage multiplier).
+    const rawDamageMult = effectiveHitStr / (effectiveHitStr + effectiveArmor);
+    const damageMult = Math.max(0.15, rawDamageMult);
     const damageAfterReduction = modifiedDamage * damageMult;
 
     // 3. 21 单元格装甲扣减与船体溢出穿透计算

@@ -1,3 +1,4 @@
+import { visualRandom, visualNowMs } from '../RenderDeterminism';
 import { Vector2 } from '../../math/Vector2';
 import { Ship } from '../../simulation/Ship';
 import { CombatEngine } from '../../simulation/CombatEngine';
@@ -129,8 +130,8 @@ export class TacticalMapRenderer {
   }
 
   public drawFighters(ctx: CanvasRenderingContext2D, engine: CombatEngine, alpha: number) {
-    const ftrImg = textureCache.getImage('/api/asset?path=graphics/ships/broadsword.png');
-    const flameImg = textureCache.getTintedImage('/api/asset?path=graphics/fx/engineflame32.png', 255, 140, 30);
+    const ftrImg = textureCache.getImage('/game-assets/graphics/ships/broadsword.png');
+    const flameImg = textureCache.getTintedImage('/game-assets/graphics/fx/engineflame32.png', 255, 140, 30);
 
     for (const ftr of engine.fighters) {
       if (ftr.isDead) continue;
@@ -149,7 +150,7 @@ export class TacticalMapRenderer {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         for (const slot of ftr.spec.engineSlots) {
-          const flameLen = 14 + Math.random() * 8;
+          const flameLen = 14 + visualRandom('renderers/TacticalMapRenderer.ts#1') * 8;
           ctx.save();
           ctx.translate(slot.x, slot.y);
           ctx.rotate(-Math.PI / 2);
@@ -185,8 +186,8 @@ export class TacticalMapRenderer {
       ctx.restore();
     }
 
-    const bmrImg = textureCache.getImage('/api/asset?path=graphics/ships/dagger_trp.png');
-    const bmrFlameImg = textureCache.getTintedImage('/api/asset?path=graphics/fx/engineflame32.png', 80, 180, 255);
+    const bmrImg = textureCache.getImage('/game-assets/graphics/ships/dagger_trp.png');
+    const bmrFlameImg = textureCache.getTintedImage('/game-assets/graphics/fx/engineflame32.png', 80, 180, 255);
 
     for (const bmr of engine.bombers) {
       if (bmr.isDead) continue;
@@ -205,7 +206,7 @@ export class TacticalMapRenderer {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         for (const slot of bmr.spec.engineSlots) {
-          const flameLen = 16 + Math.random() * 8;
+          const flameLen = 16 + visualRandom('renderers/TacticalMapRenderer.ts#2') * 8;
           ctx.save();
           ctx.translate(slot.x, slot.y);
           ctx.rotate(-Math.PI / 2);
@@ -286,7 +287,7 @@ export class TacticalMapRenderer {
     }
 
     // 3. 旗舰主雷达扫描圆环
-    const radarCircle = textureCache.getImage('/api/asset?path=graphics/icons/radar_circle.png');
+    const radarCircle = textureCache.getImage('/game-assets/graphics/icons/radar_circle.png');
     if (radarCircle.complete && radarCircle.naturalWidth > 0) {
       ctx.save();
       ctx.globalAlpha = 0.28;
@@ -351,10 +352,10 @@ export class TacticalMapRenderer {
       const isCruiser = ship.spec.collisionRadius > 80 && ship.spec.collisionRadius <= 140;
 
       const iconPath = isCapital
-        ? '/api/asset?path=graphics/icons/fleet3.png'
+        ? '/game-assets/graphics/icons/fleet3.png'
         : isCruiser
-        ? '/api/asset?path=graphics/icons/fleet2.png'
-        : '/api/asset?path=graphics/icons/fleet_triangle.png';
+        ? '/game-assets/graphics/icons/fleet2.png'
+        : '/game-assets/graphics/icons/fleet_triangle.png';
 
       const iconImg = textureCache.getImage(iconPath);
 
@@ -425,7 +426,7 @@ export class TacticalMapRenderer {
         ctx.stroke();
 
         ctx.save();
-        ctx.rotate(performance.now() * 0.001);
+        ctx.rotate(visualNowMs() * 0.001);
         ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
         ctx.setLineDash([5 / zoom, 5 / zoom]);
         ctx.beginPath();

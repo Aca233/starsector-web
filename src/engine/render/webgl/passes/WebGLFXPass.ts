@@ -1,7 +1,9 @@
+import { visualRandom } from '../../RenderDeterminism';
 import { CombatEngine } from '../../../simulation/CombatEngine';
 import { WebGLPassContext } from '../WebGLPassContext';
 import { Ship } from '../../../simulation/Ship';
 import { Vector2 } from '../../../math/Vector2';
+import { DEFAULT_EXPLOSION_PROFILE } from '../../../visual/VisualProfiles';
 
 /**
  * 特效与护盾渲染通道 (WebGLFXPass)
@@ -20,8 +22,8 @@ export class WebGLFXPass {
 
     // 1. 绘制折跃空间水雷 (Spatial Mines)
     if (engine.mines.length > 0) {
-      const mineBase = textures.getTexture('/api/asset?path=graphics/missiles/heavy_mine2.png');
-      const mineGlow = textures.getTexture('/api/asset?path=graphics/missiles/heavy_mine2_glow.png');
+      const mineBase = textures.getTexture('/game-assets/graphics/missiles/heavy_mine2.png');
+      const mineGlow = textures.getTexture('/game-assets/graphics/missiles/heavy_mine2_glow.png');
       for (const m of engine.mines) {
         batcher.setBlendMode('NORMAL');
         batcher.drawSprite(mineBase, m.pos.x, m.pos.y, 48, 48, m.rotation, 0, 0);
@@ -34,8 +36,8 @@ export class WebGLFXPass {
 
     // 2. 绘制能量护盾 (Shields: 专用 GPU 极坐标扇区剪裁 Shader)
     batcher.flush();
-    const mainShieldTex = textures.getTexture('/api/asset?path=graphics/fx/shields256.png');
-    const shieldRingTex = textures.getTexture('/api/asset?path=graphics/fx/shields256ringd.png');
+    const mainShieldTex = textures.getTexture('/game-assets/graphics/fx/shields256.png');
+    const shieldRingTex = textures.getTexture('/game-assets/graphics/fx/shields256ringd.png');
 
     const enemyShieldPos = engine.enemyShip.getShieldCenter(enemyPos, enemyFacing);
     const playerShieldPos = engine.playerShip.getShieldCenter(playerPos, playerFacing);
@@ -82,7 +84,7 @@ export class WebGLFXPass {
       batcher.setBlendMode('ADDITIVE');
       for (const arc of engine.empArcs) {
         const progress = Math.max(0, Math.min(1.0, arc.life / (arc.maxLife || 0.22)));
-        const flicker = 0.72 + Math.random() * 0.28;
+        const flicker = 0.72 + visualRandom('webgl/passes/WebGLFXPass.ts#1') * 0.28;
         const arcAlpha = progress * flicker;
         const glow = arc.glowColor || [0, 225, 255];
         const core = arc.coreColor || [255, 255, 255];
@@ -110,7 +112,7 @@ export class WebGLFXPass {
     // 6. 绘制粒子与火星 (1:1 SmoothParticle.java: 必须使用柔和高斯光晕贴图与加色混合，严禁使用硬边单色白方块)
     if (engine.particles && engine.particles.length > 0) {
       batcher.setBlendMode('ADDITIVE');
-      const sparkTex = textures.getTexture('/api/asset?path=graphics/fx/particlealpha32sq.png');
+      const sparkTex = textures.getTexture('/game-assets/graphics/fx/particlealpha32sq.png');
       for (const part of engine.particles) {
         const [r, g, b] = part.color;
         const pSize = part.size * 2.5;
@@ -120,7 +122,7 @@ export class WebGLFXPass {
 
     // 6.5 绘制战损青烟与尾迹扩散云团 (Contrails & Smoke Puffs: 1:1 contrail64b.png 柔和带旋转烟雾)
     if (engine.contrails && engine.contrails.length > 0) {
-      const smokeTex = textures.getTexture('/api/asset?path=graphics/fx/contrail64b.png');
+      const smokeTex = textures.getTexture('/game-assets/graphics/fx/contrail64b.png');
       for (const c of engine.contrails) {
         const progress = Math.min(1.0, c.life / c.maxLife);
         if (progress <= 0.01) continue;
@@ -146,14 +148,14 @@ export class WebGLFXPass {
     }
 
     // 7. 绘制原版官方爆炸翻页书火光、初始白热耀光与扩散冲击波 (Explosions & Shockwaves)
-    const expRingTex = textures.getTexture('/api/asset?path=graphics/fx/explosion_ring0.png');
+    const expRingTex = textures.getTexture('/game-assets/graphics/fx/explosion_ring0.png');
     for (const exp of engine.explosions) {
       const progress = Math.max(0, Math.min(1.0, 1.0 - exp.life / exp.maxLife));
       const [er, eg, eb] = exp.color;
 
       // 7.1 初始爆心剧烈白热耀光
       if (progress < 0.35) {
-        const flashAlpha = 1.0 - progress / 0.35;
+        const flashAlpha = (1.0 - progress / 0.35) * DEFAULT_EXPLOSION_PROFILE.flash;
         const flashSize = exp.maxRadius * 2.2;
         batcher.setBlendMode('ADDITIVE');
         batcher.drawSprite(hitGlowTex, exp.pos.x, exp.pos.y, flashSize, flashSize, 0, 0, 0, er / 255, eg / 255, eb / 255, flashAlpha);
@@ -162,7 +164,7 @@ export class WebGLFXPass {
 
       // 7.2 冲击波环
       if (exp.hasShockwaveRing) {
-        const ringAlpha = (1.0 - exp.shockwaveRadius / exp.maxShockwaveRadius) * 0.85;
+        const ringAlpha = (1.0 - exp.shockwaveRadius / exp.maxShockwaveRadius) * 0.85 * DEFAULT_EXPLOSION_PROFILE.shockwave;
         if (ringAlpha > 0.01) {
           const rSize = exp.shockwaveRadius * 2;
           batcher.setBlendMode('ADDITIVE');
@@ -172,9 +174,9 @@ export class WebGLFXPass {
 
       // 7.3 翻页书火球
       batcher.setBlendMode('ADDITIVE');
-      const expTex = textures.getTexture(`/api/asset?path=graphics/fx/explosion${exp.frame}.png`);
+      const expTex = textures.getTexture(`/game-assets/graphics/fx/explosion${exp.frame}.png`);
       const d = exp.radius * 2;
-      batcher.drawSprite(expTex, exp.pos.x, exp.pos.y, d, d, exp.rotation, 0, 0, er / 255, eg / 255, eb / 255, 0.95);
+      batcher.drawSprite(expTex, exp.pos.x, exp.pos.y, d, d, exp.rotation, 0, 0, er / 255, eg / 255, eb / 255, 0.95 * DEFAULT_EXPLOSION_PROFILE.fireball);
     }
 
     // 8. 绘制金属装甲战损碎片 (1:1 DebrisParticleSystem.java: 正方形真实金属破片贴图与熔融火光)
@@ -183,7 +185,7 @@ export class WebGLFXPass {
         const alphaVal = Math.min(1.0, Math.max(0, d.life / (d.maxLife * 0.35)));
         if (alphaVal <= 0.01) continue;
         const [dr, dg, db] = d.color || [140, 130, 120];
-        const texUrl = d.spriteUrl ? `/api/asset?path=${d.spriteUrl}` : '/api/asset?path=graphics/debris/debris_sml0.png';
+        const texUrl = d.spriteUrl ? `/game-assets/${d.spriteUrl}` : '/game-assets/graphics/debris/debris_sml0.png';
         const debrisTex = textures.getTexture(texUrl);
 
         if (d.isGlowing) {

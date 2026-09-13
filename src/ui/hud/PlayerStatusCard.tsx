@@ -35,7 +35,7 @@ export const PlayerStatusCard: React.FC<PlayerStatusCardProps> = ({
         {/* 幅能排空 */}
         {player.flux.isVenting && (
           <div className="flex items-center gap-1.5 bg-cyan-950/80 border border-cyan-400/80 px-2 py-0.5 rounded animate-pulse shadow-[0_0_10px_rgba(6,182,212,0.5)]">
-            <img src="/api/asset?path=graphics/icons/tactical/venting_flux2.png" alt="" className="w-4 h-4 object-contain" />
+            <img src="/game-assets/graphics/icons/tactical/venting_flux2.png" alt="" className="w-4 h-4 object-contain" />
             <span className="text-cyan-300 font-bold">幅能排散中 ({Math.ceil(player.flux.getTimeToVent())}s)</span>
           </div>
         )}
@@ -43,7 +43,7 @@ export const PlayerStatusCard: React.FC<PlayerStatusCardProps> = ({
         {/* 深度过载 */}
         {player.flux.isOverloaded && (
           <div className="flex items-center gap-1.5 bg-red-950/80 border border-red-500/80 px-2 py-0.5 rounded animate-pulse shadow-[0_0_12px_rgba(239,68,68,0.6)]">
-            <img src="/api/asset?path=graphics/icons/tactical/overloaded.png" alt="" className="w-4 h-4 object-contain" />
+            <img src="/game-assets/graphics/icons/tactical/overloaded.png" alt="" className="w-4 h-4 object-contain" />
             <span className="text-red-300 font-bold">过载中！ ({Math.ceil(player.flux.overloadTimer)}s)</span>
           </div>
         )}
@@ -51,7 +51,7 @@ export const PlayerStatusCard: React.FC<PlayerStatusCardProps> = ({
         {/* 零幅能引擎加力 */}
         {isZeroFluxBoost && (
           <div className="flex items-center gap-1.5 bg-emerald-950/60 border border-emerald-500/50 px-2 py-0.5 rounded text-[9px] text-emerald-300">
-            <img src="/api/asset?path=graphics/icons/tactical/engine_boost2.png" alt="" className="w-3.5 h-3.5 object-contain" />
+            <img src="/game-assets/graphics/icons/tactical/engine_boost2.png" alt="" className="w-3.5 h-3.5 object-contain" />
             <span>零幅能加速 +50 SU</span>
           </div>
         )}
@@ -59,7 +59,7 @@ export const PlayerStatusCard: React.FC<PlayerStatusCardProps> = ({
         {/* 峰值性能倒计时与战备值 */}
         {remainingPPT <= 60 && remainingPPT > 0 && (
           <div className="flex items-center gap-1.5 bg-amber-950/60 border border-amber-500/50 px-2 py-0.5 rounded text-[9px] text-amber-300 animate-pulse">
-            <img src="/api/asset?path=graphics/icons/tactical/cr_tactical3.png" alt="" className="w-3.5 h-3.5 object-contain" />
+            <img src="/game-assets/graphics/icons/tactical/cr_tactical3.png" alt="" className="w-3.5 h-3.5 object-contain" />
             <span>峰值性能剩余 {remainingPPT}s (CR {crPercent}%)</span>
           </div>
         )}
@@ -69,7 +69,7 @@ export const PlayerStatusCard: React.FC<PlayerStatusCardProps> = ({
       <div 
         className="relative w-[247px] h-[209px] select-none shadow-2xl"
         style={{
-          backgroundImage: 'url(/api/asset?path=graphics/hud/player_status_bg2.png)',
+          backgroundImage: 'url(/game-assets/graphics/hud/player_status_bg2.png)',
           backgroundSize: '247px 209px',
           backgroundRepeat: 'no-repeat'
         }}
@@ -85,7 +85,7 @@ export const PlayerStatusCard: React.FC<PlayerStatusCardProps> = ({
             className="w-full transition-all duration-100"
             style={{
               height: `${Math.round(hullRatio * 184)}px`,
-              backgroundImage: 'url(/api/asset?path=graphics/hud/bar_armor.png)',
+              backgroundImage: 'url(/game-assets/graphics/hud/bar_armor.png)',
               backgroundRepeat: 'repeat-y',
               backgroundPosition: 'bottom center',
               filter: hullRatio > 0.5 ? 'none' : hullRatio > 0.25 ? 'hue-rotate(-45deg)' : 'hue-rotate(-90deg) saturate(2)'
@@ -99,7 +99,7 @@ export const PlayerStatusCard: React.FC<PlayerStatusCardProps> = ({
             className={`w-full transition-all duration-75 ${player.flux.isOverloaded ? 'animate-pulse' : ''}`}
             style={{
               height: `${Math.round(totalFluxRatio * 184)}px`,
-              backgroundImage: 'url(/api/asset?path=graphics/hud/bar_energy.png)',
+              backgroundImage: 'url(/game-assets/graphics/hud/bar_energy.png)',
               backgroundRepeat: 'repeat-y',
               backgroundPosition: 'bottom center',
               filter: player.flux.isOverloaded 

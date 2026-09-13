@@ -1,3 +1,4 @@
+import { visualRandom } from '../../RenderDeterminism';
 import { CombatEngine } from '../../../simulation/CombatEngine';
 import { WebGLPassContext } from '../WebGLPassContext';
 import { Vector2 } from '../../../math/Vector2';
@@ -29,10 +30,10 @@ export class WebGLEnvironmentPass {
     this.starfield = [];
     for (let i = 0; i < 450; i++) {
       this.starfield.push({
-        x: (Math.random() - 0.5) * 4400,
-        y: (Math.random() - 0.5) * 4400,
-        size: 1.2 + Math.random() * 2.2,
-        alpha: 0.25 + Math.random() * 0.75,
+        x: (visualRandom('webgl/passes/WebGLEnvironmentPass.ts#1') - 0.5) * 4400,
+        y: (visualRandom('webgl/passes/WebGLEnvironmentPass.ts#2') - 0.5) * 4400,
+        size: 1.2 + visualRandom('webgl/passes/WebGLEnvironmentPass.ts#3') * 2.2,
+        alpha: 0.25 + visualRandom('webgl/passes/WebGLEnvironmentPass.ts#4') * 0.75,
         layer: i % 3
       });
     }
@@ -42,7 +43,7 @@ export class WebGLEnvironmentPass {
     const { batcher, textures, whiteTex } = ctx;
 
     // 1. 绘制官方深空星云视差背景 (background1.jpg)
-    const bgTex = textures.getTexture('/api/asset?path=graphics/backgrounds/background1.jpg');
+    const bgTex = textures.getTexture('/game-assets/graphics/backgrounds/background1.jpg');
     const pFactor = 0.05;
     const bgX = actualCam.x * (1 - pFactor);
     const bgY = actualCam.y * (1 - pFactor);
