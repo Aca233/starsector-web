@@ -1,168 +1,511 @@
 {
-  "generatedAt": "2026-09-13T09:37:11.168Z",
+  "generatedAt": "2026-09-13T14:15:44.494Z",
   "node": "v24.13.0",
-  "samples": 24,
+  "samples": 40,
+  "warmupSamples": 8,
+  "algorithm": "circle broadphase + rotated project hull polygon + shield geometry + nearest in-step hit",
+  "hullProfiles": [
+    {
+      "id": "onslaught",
+      "vertices": 50,
+      "collisionRadius": 275,
+      "shieldRadius": 240,
+      "shieldArcDeg": 180
+    },
+    {
+      "id": "paragon",
+      "vertices": 43,
+      "collisionRadius": 270,
+      "shieldRadius": 270,
+      "shieldArcDeg": 360
+    },
+    {
+      "id": "doom",
+      "vertices": 43,
+      "collisionRadius": 170,
+      "shieldRadius": 155,
+      "shieldArcDeg": 360
+    }
+  ],
   "wasm": {
-    "status": "unavailable",
-    "reason": "Local Runner has no rustc/cargo/rustup/wasm-bindgen toolchain; runtime build does not depend on Wasm.",
-    "adopted": false
+    "status": "measured",
+    "adopted": true,
+    "runtimeIntegrated": false,
+    "initialization": {
+      "moduleBytes": 1614418,
+      "fileReadMs": 3.123100000000001,
+      "compileMs": 15.365099999999998,
+      "instantiateMs": 0.18180000000000263,
+      "totalMs": 18.67,
+      "staticOutlineBytes": 2304,
+      "staticOutlineUploadMs": 0.012399999999999523
+    },
+    "decision": "adopt-for-runtime-integration",
+    "comparison": {
+      "mediumFastestTs": "optimizedTs",
+      "mediumWasmToFastestTsRatio": 0.6666487195832848,
+      "largeFastestTs": "optimizedTs",
+      "largeWasmToFastestTsRatio": 0.615353180569355,
+      "largeWasmP95Ms": 57.77760000000035,
+      "largeWasmOver16_67Ms": 40,
+      "threshold": {
+        "medium": 0.9,
+        "large": 0.8
+      }
+    },
+    "reason": "Pilot adoption threshold passed: end-to-end Wasm is 66.7% of the fastest TS path at medium load and 61.5% at large load. Runtime integration remains outside this isolated pilot; the large-load P95 is 57.78 ms, so spatial candidate reduction is still required for frame-budget safety."
   },
+  "correctnessCases": [
+    {
+      "name": "high-speed-crossing",
+      "passed": true,
+      "target": 0,
+      "t": 0.495,
+      "collisionType": 1
+    },
+    {
+      "name": "grazing-edge",
+      "passed": true,
+      "target": 0,
+      "t": 0.45,
+      "collisionType": 1
+    },
+    {
+      "name": "starts-overlapping",
+      "passed": true,
+      "target": 0,
+      "t": 0,
+      "collisionType": 1
+    },
+    {
+      "name": "overlapping-targets-nearest",
+      "passed": true,
+      "target": 0,
+      "t": 0.2,
+      "collisionType": 1
+    },
+    {
+      "name": "shield-before-hull",
+      "passed": true,
+      "target": 0,
+      "t": 0.35000000000000003,
+      "collisionType": 2
+    }
+  ],
   "scenarios": [
     {
       "name": "small",
       "ships": 10,
       "projectiles": 200,
-      "hits": 18,
+      "hits": 29,
       "baseline": {
         "preparation": {
-          "meanMs": 0.035829166666666655,
-          "p95Ms": 0.10010000000000119,
-          "p99Ms": 0.24660000000000082
+          "meanMs": 0,
+          "p95Ms": 0,
+          "p99Ms": 0,
+          "maxMs": 0,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
         },
         "boundaryTransfer": {
           "meanMs": 0,
           "p95Ms": 0,
-          "p99Ms": 0
+          "p99Ms": 0,
+          "maxMs": 0,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
         },
         "compute": {
-          "meanMs": 0.1406499999999998,
-          "p95Ms": 0.29339999999999833,
-          "p99Ms": 1.1625000000000014
+          "meanMs": 0.18678750000000086,
+          "p95Ms": 0.34539999999999793,
+          "p99Ms": 0.5027000000000044,
+          "maxMs": 0.5027000000000044,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
+        },
+        "resultRead": {
+          "meanMs": 0,
+          "p95Ms": 0,
+          "p99Ms": 0,
+          "maxMs": 0,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
         },
         "total": {
-          "meanMs": 0.17647916666666644,
-          "p95Ms": 0.31769999999999854,
-          "p99Ms": 1.4091000000000022
+          "meanMs": 0.18678750000000086,
+          "p95Ms": 0.34539999999999793,
+          "p99Ms": 0.5027000000000044,
+          "maxMs": 0.5027000000000044,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
         }
       },
       "optimizedTs": {
         "preparation": {
-          "meanMs": 0.015883333333333916,
-          "p95Ms": 0.045700000000000074,
-          "p99Ms": 0.12809999999999988
+          "meanMs": 0.01146749999999983,
+          "p95Ms": 0.02009999999999934,
+          "p99Ms": 0.06459999999999866,
+          "maxMs": 0.06459999999999866,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
         },
         "boundaryTransfer": {
           "meanMs": 0,
           "p95Ms": 0,
-          "p99Ms": 0
+          "p99Ms": 0,
+          "maxMs": 0,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
         },
         "compute": {
-          "meanMs": 0.054229166666666107,
-          "p95Ms": 0.15139999999999887,
-          "p99Ms": 0.7411999999999992
+          "meanMs": 0.23275499999999916,
+          "p95Ms": 0.3965000000000032,
+          "p99Ms": 1.1954999999999956,
+          "maxMs": 1.1954999999999956,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
+        },
+        "resultRead": {
+          "meanMs": 0,
+          "p95Ms": 0,
+          "p99Ms": 0,
+          "maxMs": 0,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
         },
         "total": {
-          "meanMs": 0.07011250000000002,
-          "p95Ms": 0.18969999999999843,
-          "p99Ms": 0.8692999999999991
+          "meanMs": 0.24422249999999898,
+          "p95Ms": 0.40800000000000125,
+          "p99Ms": 1.2066999999999979,
+          "maxMs": 1.2066999999999979,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
         }
       },
-      "wasm": null,
-      "memoryDeltaBytes": 719160
+      "wasm": {
+        "preparation": {
+          "meanMs": 0.014712499999998841,
+          "p95Ms": 0.029799999999994498,
+          "p99Ms": 0.08790000000000475,
+          "maxMs": 0.08790000000000475,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
+        },
+        "boundaryTransfer": {
+          "meanMs": 0.002192499999998887,
+          "p95Ms": 0.004200000000011528,
+          "p99Ms": 0.00549999999999784,
+          "maxMs": 0.00549999999999784,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
+        },
+        "compute": {
+          "meanMs": 0.061767500000001974,
+          "p95Ms": 0.098700000000008,
+          "p99Ms": 0.30570000000000164,
+          "maxMs": 0.30570000000000164,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
+        },
+        "resultRead": {
+          "meanMs": 0.005097499999998689,
+          "p95Ms": 0.010699999999999932,
+          "p99Ms": 0.024299999999996658,
+          "maxMs": 0.024299999999996658,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
+        },
+        "total": {
+          "meanMs": 0.08516249999999878,
+          "p95Ms": 0.1454000000000093,
+          "p99Ms": 0.3222999999999985,
+          "maxMs": 0.3222999999999985,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
+        },
+        "linearMemoryBytes": 1179648
+      },
+      "memory": {
+        "heapDeltaBytes": 822504,
+        "externalDeltaBytes": 161560,
+        "arrayBuffersDeltaBytes": 161520
+      }
     },
     {
       "name": "medium",
       "ships": 50,
       "projectiles": 2000,
-      "hits": 748,
+      "hits": 1100,
       "baseline": {
         "preparation": {
-          "meanMs": 0.17170833333333388,
-          "p95Ms": 0.4440000000000026,
-          "p99Ms": 0.4782999999999973
+          "meanMs": 0,
+          "p95Ms": 0,
+          "p99Ms": 0,
+          "maxMs": 0,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
         },
         "boundaryTransfer": {
           "meanMs": 0,
           "p95Ms": 0,
-          "p99Ms": 0
+          "p99Ms": 0,
+          "maxMs": 0,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
         },
         "compute": {
-          "meanMs": 0.8434874999999997,
-          "p95Ms": 0.8693000000000026,
-          "p99Ms": 0.9521999999999977
+          "meanMs": 4.244729999999996,
+          "p95Ms": 4.908500000000004,
+          "p99Ms": 5.335100000000011,
+          "maxMs": 5.335100000000011,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
+        },
+        "resultRead": {
+          "meanMs": 0,
+          "p95Ms": 0,
+          "p99Ms": 0,
+          "maxMs": 0,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
         },
         "total": {
-          "meanMs": 1.0151958333333335,
-          "p95Ms": 1.2794000000000025,
-          "p99Ms": 1.322499999999998
+          "meanMs": 4.244729999999996,
+          "p95Ms": 4.908500000000004,
+          "p99Ms": 5.335100000000011,
+          "maxMs": 5.335100000000011,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
         }
       },
       "optimizedTs": {
         "preparation": {
-          "meanMs": 0.04063333333333411,
-          "p95Ms": 0.05360000000000298,
-          "p99Ms": 0.09880000000000422
+          "meanMs": 0.10406999999999655,
+          "p95Ms": 0.17610000000001946,
+          "p99Ms": 0.20929999999998472,
+          "maxMs": 0.20929999999998472,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
         },
         "boundaryTransfer": {
           "meanMs": 0,
           "p95Ms": 0,
-          "p99Ms": 0
+          "p99Ms": 0,
+          "maxMs": 0,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
         },
         "compute": {
-          "meanMs": 0.5698124999999993,
-          "p95Ms": 0.6221999999999994,
-          "p99Ms": 0.718900000000005
+          "meanMs": 3.378390000000004,
+          "p95Ms": 4.016500000000008,
+          "p99Ms": 4.094999999999914,
+          "maxMs": 4.094999999999914,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
+        },
+        "resultRead": {
+          "meanMs": 0,
+          "p95Ms": 0,
+          "p99Ms": 0,
+          "maxMs": 0,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
         },
         "total": {
-          "meanMs": 0.6104458333333334,
-          "p95Ms": 0.7210000000000036,
-          "p99Ms": 0.764800000000001
+          "meanMs": 3.4824600000000006,
+          "p95Ms": 4.108600000000024,
+          "p99Ms": 4.271099999999933,
+          "maxMs": 4.271099999999933,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
         }
       },
-      "wasm": null,
-      "memoryDeltaBytes": 509296
+      "wasm": {
+        "preparation": {
+          "meanMs": 0.1085250000000066,
+          "p95Ms": 0.20770000000001687,
+          "p99Ms": 0.22140000000001692,
+          "maxMs": 0.22140000000001692,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
+        },
+        "boundaryTransfer": {
+          "meanMs": 0.013292500000007835,
+          "p95Ms": 0.023099999999999454,
+          "p99Ms": 0.025200000000012324,
+          "maxMs": 0.025200000000012324,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
+        },
+        "compute": {
+          "meanMs": 2.134984999999997,
+          "p95Ms": 2.4259999999999877,
+          "p99Ms": 2.5311000000000377,
+          "maxMs": 2.5311000000000377,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
+        },
+        "resultRead": {
+          "meanMs": 0.061802500000000295,
+          "p95Ms": 0.0963000000000136,
+          "p99Ms": 0.12569999999999482,
+          "maxMs": 0.12569999999999482,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
+        },
+        "total": {
+          "meanMs": 2.3215775000000063,
+          "p95Ms": 2.706200000000024,
+          "p99Ms": 2.752900000000011,
+          "maxMs": 2.752900000000011,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
+        },
+        "linearMemoryBytes": 1376256
+      },
+      "memory": {
+        "heapDeltaBytes": 559408,
+        "externalDeltaBytes": 15417008,
+        "arrayBuffersDeltaBytes": 15220400
+      }
     },
     {
       "name": "large",
       "ships": 100,
       "projectiles": 10000,
-      "hits": 7632,
+      "hits": 7629,
       "baseline": {
         "preparation": {
-          "meanMs": 0.6908291666666623,
-          "p95Ms": 1.3012999999999977,
-          "p99Ms": 1.3429999999999893
+          "meanMs": 0,
+          "p95Ms": 0,
+          "p99Ms": 0,
+          "maxMs": 0,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
         },
         "boundaryTransfer": {
           "meanMs": 0,
           "p95Ms": 0,
-          "p99Ms": 0
+          "p99Ms": 0,
+          "maxMs": 0,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
         },
         "compute": {
-          "meanMs": 7.7568000000000055,
-          "p95Ms": 8.2654,
-          "p99Ms": 8.5822
+          "meanMs": 70.48620999999996,
+          "p95Ms": 106.5640000000003,
+          "p99Ms": 153.92020000000048,
+          "maxMs": 153.92020000000048,
+          "over8_33Ms": 40,
+          "over16_67Ms": 40
+        },
+        "resultRead": {
+          "meanMs": 0,
+          "p95Ms": 0,
+          "p99Ms": 0,
+          "maxMs": 0,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
         },
         "total": {
-          "meanMs": 8.447629166666667,
-          "p95Ms": 9.079499999999996,
-          "p99Ms": 9.45259999999999
+          "meanMs": 70.48620999999996,
+          "p95Ms": 106.5640000000003,
+          "p99Ms": 153.92020000000048,
+          "maxMs": 153.92020000000048,
+          "over8_33Ms": 40,
+          "over16_67Ms": 40
         }
       },
       "optimizedTs": {
         "preparation": {
-          "meanMs": 0.2220666666666601,
-          "p95Ms": 0.27309999999999945,
-          "p99Ms": 0.3101000000000056
+          "meanMs": 0.474012499999975,
+          "p95Ms": 0.761199999999917,
+          "p99Ms": 2.29320000000007,
+          "maxMs": 2.29320000000007,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
         },
         "boundaryTransfer": {
           "meanMs": 0,
           "p95Ms": 0,
-          "p99Ms": 0
+          "p99Ms": 0,
+          "maxMs": 0,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
         },
         "compute": {
-          "meanMs": 5.150404166666672,
-          "p95Ms": 5.473300000000023,
-          "p99Ms": 5.522899999999993
+          "meanMs": 54.43203750000005,
+          "p95Ms": 87.01960000000054,
+          "p99Ms": 98.34510000000046,
+          "maxMs": 98.34510000000046,
+          "over8_33Ms": 40,
+          "over16_67Ms": 40
+        },
+        "resultRead": {
+          "meanMs": 0,
+          "p95Ms": 0,
+          "p99Ms": 0,
+          "maxMs": 0,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
         },
         "total": {
-          "meanMs": 5.372470833333331,
-          "p95Ms": 5.729199999999992,
-          "p99Ms": 5.777899999999988
+          "meanMs": 54.90605000000003,
+          "p95Ms": 87.64230000000043,
+          "p99Ms": 98.66200000000026,
+          "maxMs": 98.66200000000026,
+          "over8_33Ms": 40,
+          "over16_67Ms": 40
         }
       },
-      "wasm": null,
-      "memoryDeltaBytes": 2595576
+      "wasm": {
+        "preparation": {
+          "meanMs": 0.55015750000004,
+          "p95Ms": 1.4207000000001244,
+          "p99Ms": 1.914600000000064,
+          "maxMs": 1.914600000000064,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
+        },
+        "boundaryTransfer": {
+          "meanMs": 0.06405499999991662,
+          "p95Ms": 0.11769999999978609,
+          "p99Ms": 0.15489999999999782,
+          "maxMs": 0.15489999999999782,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
+        },
+        "compute": {
+          "meanMs": 32.88712250000011,
+          "p95Ms": 55.39559999999983,
+          "p99Ms": 65.51050000000032,
+          "maxMs": 65.51050000000032,
+          "over8_33Ms": 40,
+          "over16_67Ms": 40
+        },
+        "resultRead": {
+          "meanMs": 0.2761324999999772,
+          "p95Ms": 0.37919999999940046,
+          "p99Ms": 0.5100999999999658,
+          "maxMs": 0.5100999999999658,
+          "over8_33Ms": 0,
+          "over16_67Ms": 0
+        },
+        "total": {
+          "meanMs": 33.78661250000005,
+          "p95Ms": 57.77760000000035,
+          "p99Ms": 66.70830000000024,
+          "maxMs": 66.70830000000024,
+          "over8_33Ms": 40,
+          "over16_67Ms": 40
+        },
+        "linearMemoryBytes": 2162688
+      },
+      "memory": {
+        "heapDeltaBytes": -1499560,
+        "externalDeltaBytes": 13684476,
+        "arrayBuffersDeltaBytes": 12898044
+      }
     }
   ]
 }

@@ -126,15 +126,15 @@ Run:
 npm run benchmark:collision
 ```
 
-The benchmark compares the baseline object-oriented collision query and an optimized typed-array implementation at:
+The benchmark compares the object-oriented baseline, a packed typed-array TypeScript path, and (when a pilot binary is present) the isolated Rust/Wasm kernel at:
 
 - small: 10 ships / 200 projectiles
 - medium: 50 ships / 2,000 projectiles
 - large: 100 ships / 10,000 projectiles
 
-It records preparation, boundary-transfer, compute, total P95/P99 and memory delta in `benchmarks/collision-results.json`.
+The current pilot uses the real Onslaught, Paragon, and Doom hull polygons plus rotated hull intersection, shield geometry, circle broadphase filtering, and nearest in-step hit selection. It records preparation, JS↔Wasm boundary transfer, compute, result-read, total P95/P99/max, frame-budget exceed counts, initialization cost, and memory observations in `benchmarks/collision-results.json`.
 
-A minimal isolated Rust candidate is in `benchmarks/wasm-pilot/`. On the validated Runner, `rustc`, `cargo`, `rustup` and `wasm-bindgen` were unavailable, so no honest JS↔Wasm boundary or compute measurement could be made. Wasm is therefore **not adopted** and is not a build dependency. The measured optimized TypeScript-equivalent path already reduced the large benchmark mean total from about 8.45 ms to 5.37 ms on that Runner.
+The measured Node pilot cleared the local adoption threshold: end-to-end Wasm was 66.7% of the fastest TypeScript path at 50/2,000 and 61.5% at 100/10,000. The pilot decision is therefore **adopt for a future bounded runtime integration**, but `runtimeIntegrated` remains `false` and Rust/Wasm is still not an application build/runtime dependency. The large workload still measured 57.78 ms P95 in Wasm, so production integration must keep TypeScript authoritative and add spatial candidate reduction rather than relying on the O(projectiles × ships) kernel alone. See `benchmarks/wasm-pilot/README.md` for boundary details, build instructions, and caveats.
 
 ## Regression coverage
 
