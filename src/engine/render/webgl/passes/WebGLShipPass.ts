@@ -5,6 +5,7 @@ import { Ship } from '../../../simulation/Ship';
 import { Vector2 } from '../../../math/Vector2';
 import { ShipVentingRenderer } from '../ShipVentingRenderer';
 import { ENGINE_VISUAL_PROFILES } from '../../../visual/VisualProfiles';
+import type { VisualRandom } from '../../../runtime/VisualRandom';
 
 /**
  * 战舰与挂点渲染通道 (WebGLShipPass)
@@ -19,12 +20,19 @@ import { ENGINE_VISUAL_PROFILES } from '../../../visual/VisualProfiles';
 export class WebGLShipPass {
   private playerVentingRenderer = new ShipVentingRenderer();
   private enemyVentingRenderer = new ShipVentingRenderer();
-  private lastUpdateSec = 0;
+
+  public updateVisual(engine: CombatEngine, dt: number, random: VisualRandom): void {
+    this.playerVentingRenderer.update(dt, engine.playerShip, engine.playerShip.pos, engine.playerShip.facingRad, random);
+    this.enemyVentingRenderer.update(dt, engine.enemyShip, engine.enemyShip.pos, engine.enemyShip.facingRad, random);
+  }
+
+  public resetVisualState(): void {
+    this.playerVentingRenderer.reset();
+    this.enemyVentingRenderer.reset();
+  }
 
   public render(engine: CombatEngine, ctx: WebGLPassContext, nowSec: number) {
     const { batcher, textures, hitGlowTex, alpha } = ctx;
-    const dt = this.lastUpdateSec > 0 ? Math.min(0.1, Math.max(0.001, nowSec - this.lastUpdateSec)) : (1 / 60);
-    this.lastUpdateSec = nowSec;
 
     // 1. 相位潜航时空残影 (Phase Ghosts)
     const drawGhosts = (ship: Ship) => {
@@ -57,7 +65,6 @@ export class WebGLShipPass {
 
       // 2.1 幅能主动排散 1:1 底层放射状能量光晕环 (严格对齐 float.java: o00000 位于舰体下层)
       const ventRenderer = ship.isPlayer ? this.playerVentingRenderer : this.enemyVentingRenderer;
-      ventRenderer.update(dt, ship, shipPos, shipFacing);
       ventRenderer.renderRadialHalo(batcher, ctx.ribbonBatcher, textures, ship, shipPos, shipFacing);
 
       // 2.2 发动机引擎尾焰与失速故障黑烟

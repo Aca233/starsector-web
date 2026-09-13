@@ -8,6 +8,7 @@ import { Vector2 } from '../math/Vector2';
 import { VisualClock } from './VisualClock';
 import { VisualRandom } from './VisualRandom';
 import { PerformanceMetrics } from './PerformanceMetrics';
+import { CameraController } from './CameraController';
 
 export type CombatSessionState = 'created' | 'prepared' | 'running' | 'paused' | 'disposed';
 
@@ -22,6 +23,7 @@ export class CombatSession {
   public readonly visualClock = new VisualClock();
   public readonly visualRandom: VisualRandom;
   public readonly performance = new PerformanceMetrics();
+  public readonly cameraController = new CameraController();
   public readonly sessionId: string;
   public state: CombatSessionState = 'created';
   public readonly visualOptions = {
@@ -32,6 +34,7 @@ export class CombatSession {
   };
 
   private canvas: HTMLCanvasElement | null = null;
+  private assetPreparation: Promise<void> = Promise.resolve();
 
   constructor(playerShipId = 'onslaught', enemyShipId = 'paragon', seed = 0x51f15e) {
     this.sessionId = `combat-${nextSessionId++}`;
@@ -56,6 +59,7 @@ export class CombatSession {
       console.warn('[Starsector] WebGL2 unavailable, using Canvas2D:', error);
       this.renderer = new CombatRenderer(canvas);
     }
+    this.assetPreparation = this.renderer.prepareAssets();
     this.scheduler.reset();
     this.state = 'prepared';
   }
@@ -64,6 +68,10 @@ export class CombatSession {
     if (this.state === 'disposed') return;
     this.visualClock.setPaused(false);
     this.state = 'running';
+  }
+
+  public prepareVisualAssets(): Promise<void> {
+    return this.assetPreparation;
   }
 
   public pause(): void {
@@ -76,6 +84,7 @@ export class CombatSession {
     if (this.state === 'disposed') return;
     this.engine.fixedUpdate(dt);
     this.visualClock.seek(this.visualClock.time + dt);
+    this.updateVisualOnly(dt);
   }
 
   public fixedUpdate(dt: number): void {
@@ -107,8 +116,20 @@ export class CombatSession {
       }
     }
     this.performance.recordTiming('simulationMs', performance.now() - simStart);
-    const visualStart = performance.now();
     this.visualClock.advance(dt);
+    this.updateVisualOnly(dt);
+  }
+
+  /** Advances renderer-owned visual state without mutating combat simulation. */
+  public updateVisualOnly(dt: number): void {
+    if (this.state === 'disposed') return;
+    const visualStart = performance.now();
+    this.renderer?.updateVisual(this.engine, Math.max(0, dt), {
+      visualTime: this.visualClock.time,
+      random: this.visualRandom,
+      layers: this.visualOptions.layers,
+      damageEnabled: this.visualOptions.damage
+    });
     this.performance.recordTiming('visualUpdateMs', performance.now() - visualStart);
   }
 
@@ -146,6 +167,7 @@ export class CombatSession {
     this.playerAI = new CapitalShipAI(this.engine.playerShip, this.engine.enemyShip);
     this.scheduler.reset();
     this.visualClock.reset();
+    this.renderer?.resetVisualState();
     if (this.state !== 'disposed') this.state = 'running';
   }
 
@@ -154,6 +176,7 @@ export class CombatSession {
     this.playerAI = new CapitalShipAI(this.engine.playerShip, this.engine.enemyShip);
     this.scheduler.reset();
     this.visualClock.reset();
+    this.renderer?.resetVisualState();
     if (this.state !== 'disposed') this.state = 'running';
   }
 

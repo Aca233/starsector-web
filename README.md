@@ -37,6 +37,8 @@ The timing boundary is deliberate:
 
 - `requestAnimationFrame`: accumulator input, interpolation, camera presentation and drawing only.
 - fixed 60 Hz simulation ticks: AI, manual steering/throttle/strafe, movement, weapons, collision and damage.
+- camera presentation uses an exponential time-based follow controller, so 30/60/144 Hz render rates converge to the same camera response.
+- scheduler overload preserves a bounded backlog and reports any simulation time discarded by its safety cap.
 - `VisualClock`: visual animation time.
 - `VisualRandom`: seed/channel/time-derived visual noise so the same scene, seed and timestamp can be reproduced.
 
@@ -74,22 +76,26 @@ Open:
 ?view=visual-lab&scene=VIS-01&seed=1337
 ```
 
-The Visual Lab provides play, pause, replay, fixed-step, seek, seed, zoom, camera lock, AI, damage, motion and layer controls. Its scene catalog is:
+The Visual Lab provides play, pause, replay, fixed-step, deterministic seek, seed, zoom, camera lock, live-AI handoff, damage, motion and layer controls. In controlled mode it owns the fixed visual tick instead of letting live combat mutate the scene. Required benchmark textures are decoded and uploaded before Play/Step is enabled; load failures are shown in the panel rather than silently benchmarking missing layers.
 
-| Scene | Focus |
+The M2 acceptance-scene catalog follows the project plan exactly:
+
+| Scene | Controlled scenario |
 | --- | --- |
-| VIS-01 | Onslaught hull / hardpoints |
-| VIS-02 | Onslaught engine plume |
-| VIS-03 | Onslaught shield |
-| VIS-04 | TPC charge / muzzle / projectile |
-| VIS-05 | Ballistic weapon family |
-| VIS-06 | Paragon beams |
-| VIS-07 | Paragon fortress shield |
-| VIS-08 | Doom phase cloak |
-| VIS-09 | Missiles / contrails |
-| VIS-10 | Impact / vent / explosion |
-| VIS-11 | Broadsword / Dagger wings |
-| VIS-12 | Full layer integration |
+| VIS-01 | Onslaught static, four facings |
+| VIS-02 | Idle, thrust, release, strafe, burn drive |
+| VIS-03 | Shield deploy/close plus one hit |
+| VIS-04 | Repeated shield hits |
+| VIS-05 | Single TPC shot |
+| VIS-06 | Continuous ballistic firing |
+| VIS-07 | Beam charge, sustain and stop |
+| VIS-08 | Missile straight flight, turn and impact |
+| VIS-09 | Complete vent cycle |
+| VIS-10 | Small impact and ship explosion |
+| VIS-11 | Frozen HUD state |
+| VIS-12 | Two ships plus fighters/bombers integration |
+
+`VisualScenarioController` rebuilds a scenario from its seed and absolute timestamp, so seek/replay does not depend on the path taken to reach that frame. Renderer-owned evolving state such as vent particles and tactical-arc fades is advanced from `updateVisual()` and reset on restart/ship change; `render()` samples the current `VisualClock` without advancing those effects.
 
 Ship, engine, shield, weapon-family and explosion visual profiles are centralized under `src/engine/visual/VisualProfiles.ts`. The existing shield shader remains in place; its colors/animation now consume the profile layer rather than requiring a shader rewrite.
 

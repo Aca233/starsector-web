@@ -5,11 +5,51 @@
  */
 import { assetResolver } from '../assets/AssetResolver';
 
+export const ESSENTIAL_TEXTURE_URLS = [
+  '/game-assets/graphics/fx/shields256.png',
+  '/game-assets/graphics/fx/shields256ringd.png',
+  '/game-assets/graphics/fx/engineflame32.png',
+  '/game-assets/graphics/fx/glow64.png',
+  '/game-assets/graphics/fx/beam_rough2_fringe.png',
+  '/game-assets/graphics/fx/beam_rough2_core.png',
+  '/game-assets/graphics/fx/beam_laser_core.png',
+  '/game-assets/graphics/fx/contrail64b.png',
+  '/game-assets/graphics/fx/explosion0.png',
+  '/game-assets/graphics/fx/explosion1.png',
+  '/game-assets/graphics/fx/explosion2.png',
+  '/game-assets/graphics/fx/explosion3.png',
+  '/game-assets/graphics/fx/explosion4.png',
+  '/game-assets/graphics/fx/explosion5.png',
+  '/game-assets/graphics/fx/explosion6.png',
+  '/game-assets/graphics/fx/emp_arcs.png',
+  '/game-assets/graphics/hud/player_status_bg2.png',
+  '/game-assets/graphics/hud/target_status_bg2.png',
+  '/game-assets/graphics/hud/weapon_status_bg.png',
+  '/game-assets/graphics/hud/bar_armor.png',
+  '/game-assets/graphics/hud/bar_energy.png',
+  '/game-assets/graphics/hud/weapons_bar_cooldown.png',
+  '/game-assets/graphics/ships/broadsword.png',
+  '/game-assets/graphics/ships/dagger_trp.png',
+  '/game-assets/graphics/missiles/missile_torpedo.png',
+  '/game-assets/graphics/asteroids/asteroid1.png',
+  '/game-assets/graphics/asteroids/asteroid2.png',
+  '/game-assets/graphics/asteroids/asteroid3.png',
+  '/game-assets/graphics/asteroids/asteroid_big00.png',
+  '/game-assets/graphics/icons/fleet0.png',
+  '/game-assets/graphics/icons/fleet1.png',
+  '/game-assets/graphics/icons/fleet2.png',
+  '/game-assets/graphics/icons/fleet3.png',
+  '/game-assets/graphics/icons/fleet_triangle.png',
+  '/game-assets/graphics/icons/radar_circle.png',
+  '/game-assets/graphics/missiles/shell_small.png'
+] as const;
+
 export class TextureCache {
   private static instance: TextureCache;
   private textureCache: Map<string, HTMLImageElement> = new Map();
   private tintedCache: Map<string, HTMLCanvasElement> = new Map();
   private imageStates: Map<string, 'loading' | 'decoded' | 'failed'> = new Map();
+  private readiness = new Map<string, Promise<HTMLImageElement>>();
 
   public static getInstance(): TextureCache {
     if (!TextureCache.instance) {
@@ -18,49 +58,24 @@ export class TextureCache {
     return TextureCache.instance;
   }
 
-  public preloadEssentialTextures() {
-    const essentialUrls = [
-      '/game-assets/graphics/fx/shields256.png',
-      '/game-assets/graphics/fx/shields256ringd.png',
-      '/game-assets/graphics/fx/engineflame32.png',
-      '/game-assets/graphics/fx/glow64.png',
-      '/game-assets/graphics/fx/beam_rough2_fringe.png',
-      '/game-assets/graphics/fx/beam_rough2_core.png',
-      '/game-assets/graphics/fx/beam_laser_core.png',
-      '/game-assets/graphics/fx/contrail64b.png',
-      '/game-assets/graphics/fx/explosion0.png',
-      '/game-assets/graphics/fx/explosion1.png',
-      '/game-assets/graphics/fx/explosion2.png',
-      '/game-assets/graphics/fx/explosion3.png',
-      '/game-assets/graphics/fx/explosion4.png',
-      '/game-assets/graphics/fx/explosion5.png',
-      '/game-assets/graphics/fx/explosion6.png',
-      '/game-assets/graphics/fx/emp_arcs.png',
-      '/game-assets/graphics/fx/glow64.png',
-      '/game-assets/graphics/hud/player_status_bg2.png',
-      '/game-assets/graphics/hud/target_status_bg2.png',
-      '/game-assets/graphics/hud/weapon_status_bg.png',
-      '/game-assets/graphics/hud/bar_armor.png',
-      '/game-assets/graphics/hud/bar_energy.png',
-      '/game-assets/graphics/hud/weapons_bar_cooldown.png',
-      '/game-assets/graphics/ships/broadsword.png',
-      '/game-assets/graphics/ships/dagger_trp.png',
-      '/game-assets/graphics/missiles/missile_torpedo.png',
-      '/game-assets/graphics/asteroids/asteroid1.png',
-      '/game-assets/graphics/asteroids/asteroid2.png',
-      '/game-assets/graphics/asteroids/asteroid3.png',
-      '/game-assets/graphics/asteroids/asteroid_big00.png',
-      '/game-assets/graphics/icons/fleet0.png',
-      '/game-assets/graphics/icons/fleet1.png',
-      '/game-assets/graphics/icons/fleet2.png',
-      '/game-assets/graphics/icons/fleet3.png',
-      '/game-assets/graphics/icons/fleet_triangle.png',
-      '/game-assets/graphics/icons/radar_circle.png',
-      '/game-assets/graphics/missiles/shell_small.png'
-    ];
-    for (const url of essentialUrls) {
-      this.getImage(url);
-    }
+  public async preloadEssentialTextures(): Promise<void> {
+    await Promise.all(ESSENTIAL_TEXTURE_URLS.map((url) => this.waitForImage(url)));
+  }
+
+  public waitForImage(url: string): Promise<HTMLImageElement> {
+    const img = this.getImage(url);
+    const state = this.getImageState(url);
+    if (state === 'decoded' || (img.complete && img.naturalWidth > 0)) return Promise.resolve(img);
+    if (state === 'failed') return Promise.reject(new Error(`Texture failed to load: ${url}`));
+    const existing = this.readiness.get(url);
+    if (existing) return existing;
+
+    const promise = new Promise<HTMLImageElement>((resolve, reject) => {
+      img.addEventListener('load', () => resolve(img), { once: true });
+      img.addEventListener('error', () => reject(new Error(`Texture failed to load: ${url}`)), { once: true });
+    });
+    this.readiness.set(url, promise);
+    return promise;
   }
 
   public getImage(url: string): HTMLImageElement {

@@ -11,6 +11,7 @@ import { useCombatInput } from './hooks/useCombatInput';
 import { useCombatLoop } from './hooks/useCombatLoop';
 import { CombatSession } from './engine/runtime/CombatSession';
 import { VisualLabPanel } from './visual-lab/VisualLabPanel';
+import { VisualScenarioController } from './visual-lab/VisualScenarioController';
 
 i18n.registerStrings('zh_CN', zh_CN);
 i18n.registerStrings('en_US', en_US);
@@ -21,6 +22,8 @@ export const App: React.FC = () => {
   const initialEnemyId = initialShipId === 'paragon' ? 'onslaught' : 'paragon';
 
   const [session] = useState(() => new CombatSession(initialShipId, initialEnemyId));
+  const isVisualLab = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'visual-lab';
+  const [visualScenarioController] = useState(() => new VisualScenarioController(session));
   const stableSessionRef = useRef(session);
 
   const cameraPosRef = useRef<Vector2>(new Vector2(-300, 0));
@@ -38,6 +41,8 @@ export const App: React.FC = () => {
     const url = new URLSearchParams(window.location.search);
     return url.has('autopilot') || url.has('demo');
   });
+  const [visualAssetsReady, setVisualAssetsReady] = useState(!isVisualLab);
+  const [visualAssetsError, setVisualAssetsError] = useState<string | null>(null);
   const isAutopilotRef = useRef(false);
   const [, setTickState] = useState(0);
 
@@ -55,7 +60,15 @@ export const App: React.FC = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     session.prepare(canvas);
-    session.start();
+    if (isVisualLab) session.pause();
+    else session.start();
+    void session.prepareVisualAssets().then(() => {
+      setVisualAssetsReady(true);
+      setVisualAssetsError(null);
+    }).catch((error: unknown) => {
+      setVisualAssetsReady(false);
+      setVisualAssetsError(error instanceof Error ? error.message : String(error));
+    });
     (window as any).__combatSession = session;
     (window as any).__combatEngine = session.engine;
     (window as any).__combatRenderer = session.renderer;
@@ -73,7 +86,7 @@ export const App: React.FC = () => {
       delete (window as any).__combatEngine;
       delete (window as any).__combatRenderer;
     };
-  }, [session]);
+  }, [session, isVisualLab]);
 
   const stopTransientAudio = () => {
     sound.stopLoop('burn_drive_loop');
@@ -129,7 +142,8 @@ export const App: React.FC = () => {
     isAutopilotRef,
     keysPressed,
     mouseScreenPos,
-    setTickState
+    setTickState,
+    visualScenarioController: isVisualLab && !isAutopilot ? visualScenarioController : undefined
   });
 
   const handleToggleLocale = () => {
@@ -153,8 +167,6 @@ export const App: React.FC = () => {
     cameraPosRef.current.copy(session.engine.playerShip.pos);
     setTickState((tick) => tick + 1);
   };
-
-  const isVisualLab = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'visual-lab';
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-slate-950">
@@ -186,9 +198,11 @@ export const App: React.FC = () => {
       {isVisualLab && (
         <VisualLabPanel
           session={session}
+          controller={visualScenarioController}
+          assetsReady={visualAssetsReady}
+          assetsError={visualAssetsError}
           isAutopilot={isAutopilot}
           setIsAutopilot={setIsAutopilot}
-          onShipChange={handleSwitchShip}
           onZoomChange={(zoom) => { zoomRef.current = zoom; }}
           onCameraLockChange={(enabled) => {
             session.setCameraLocked(enabled);

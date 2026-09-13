@@ -12,6 +12,7 @@ export interface UseCombatLoopParams {
   keysPressed: React.MutableRefObject<{ [key: string]: boolean }>;
   mouseScreenPos: React.MutableRefObject<Vector2>;
   setTickState: React.Dispatch<React.SetStateAction<number>>;
+  visualScenarioController?: { tick: (dt: number) => boolean };
 }
 
 export function useCombatLoop({
@@ -22,7 +23,8 @@ export function useCombatLoop({
   isAutopilotRef,
   keysPressed,
   mouseScreenPos,
-  setTickState
+  setTickState,
+  visualScenarioController
 }: UseCombatLoopParams) {
   const prevSystemActiveRef = useRef<boolean>(false);
 
@@ -33,7 +35,7 @@ export function useCombatLoop({
     let animId = 0;
     let lastHudSyncTime = 0;
     const session = sessionRef.current;
-    session.start();
+    if (!visualScenarioController) session.start();
 
     const updatePlayerControls = (fixedDt: number) => {
       const engine = session.engine;
@@ -107,14 +109,16 @@ export function useCombatLoop({
       session.scheduler.update(
         nowSec,
         (fixedDt) => {
-          updatePlayerControls(fixedDt);
-          session.fixedUpdate(fixedDt);
+          const handledByVisualLab = visualScenarioController?.tick(fixedDt) ?? false;
+          if (!handledByVisualLab) {
+            updatePlayerControls(fixedDt);
+            session.fixedUpdate(fixedDt);
+          }
         },
         (alpha) => {
           const targetCam = Vector2.lerp(engine.playerShip.prevPos, engine.playerShip.pos, alpha);
           if (!session.visualOptions.cameraLocked) {
-            cameraPosRef.current.x += (targetCam.x - cameraPosRef.current.x) * 0.1;
-            cameraPosRef.current.y += (targetCam.y - cameraPosRef.current.y) * 0.1;
+            session.cameraController.follow(cameraPosRef.current, targetCam, session.scheduler.renderDeltaTime);
           }
           session.render(alpha, cameraPosRef.current, zoomRef.current);
         }
@@ -137,5 +141,5 @@ export function useCombatLoop({
 
     animId = requestAnimationFrame(gameLoop);
     return () => cancelAnimationFrame(animId);
-  }, [sessionRef, canvasRef, cameraPosRef, zoomRef, isAutopilotRef, keysPressed, mouseScreenPos, setTickState]);
+  }, [sessionRef, canvasRef, cameraPosRef, zoomRef, isAutopilotRef, keysPressed, mouseScreenPos, setTickState, visualScenarioController]);
 }

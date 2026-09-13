@@ -1,4 +1,5 @@
-import { visualRandom, visualNowMs } from '../RenderDeterminism';
+import { visualNowMs } from '../RenderDeterminism';
+import type { VisualRandom } from '../../runtime/VisualRandom';
 import { Vector2 } from '../../math/Vector2';
 import { Ship } from '../../simulation/Ship';
 import { SpriteBatcher } from './SpriteBatcher';
@@ -24,6 +25,7 @@ interface VentEmitter {
   angleDeg: number;
   interval: number;
   timer: number;
+  spawnIndex: number;
 }
 
 /**
@@ -52,7 +54,7 @@ export class ShipVentingRenderer {
   /**
    * 按舰级初始化环绕舰体周边的排散喷口 (严格对齐 oOoOOO..._cfr_46.java: n2)
    */
-  private initEmittersIfNeeded(ship: Ship) {
+  private initEmittersIfNeeded(ship: Ship, random: VisualRandom) {
     if (this.initializedForShipId === ship.id && this.emitters.length > 0) return;
     this.initializedForShipId = ship.id;
     this.emitters = [];
@@ -73,8 +75,9 @@ export class ShipVentingRenderer {
       const angleDeg = i * step;
       this.emitters.push({
         angleDeg,
-        interval: 0.08 + visualRandom('webgl/ShipVentingRenderer.ts#1') * 0.12,
-        timer: visualRandom('webgl/ShipVentingRenderer.ts#2') * 0.1
+        interval: 0.08 + random.sample(`${ship.id}:vent-interval`, i) * 0.12,
+        timer: random.sample(`${ship.id}:vent-phase`, i) * 0.1,
+        spawnIndex: 0
       });
     }
   }
@@ -84,14 +87,16 @@ export class ShipVentingRenderer {
    */
   public reset() {
     this.particles = [];
+    this.emitters = [];
+    this.initializedForShipId = null;
     this.faderIn = 0;
   }
 
   /**
    * 60Hz 步长更新喷涌粒子逻辑
    */
-  public update(dt: number, ship: Ship, shipPos: Vector2, shipFacing: number) {
-    this.initEmittersIfNeeded(ship);
+  public update(dt: number, ship: Ship, shipPos: Vector2, shipFacing: number, random: VisualRandom) {
+    this.initEmittersIfNeeded(ship, random);
 
     if (ship.flux.isVenting) {
       this.faderIn = Math.min(1.0, this.faderIn + dt * 3.3); // 0.3s 快速爆发
@@ -104,10 +109,12 @@ export class ShipVentingRenderer {
       const fluxLevel = ship.flux.fluxPercent;
       const colRad = ship.spec.collisionRadius;
 
-      for (const emitter of this.emitters) {
+      for (let emitterIndex = 0; emitterIndex < this.emitters.length; emitterIndex++) {
+        const emitter = this.emitters[emitterIndex];
         emitter.timer -= dt;
         if (emitter.timer <= 0) {
           emitter.timer = emitter.interval;
+          const sample = (channel: string) => random.sample(`${ship.id}:${channel}`, emitterIndex * 1_000_003 + emitter.spawnIndex);
 
           // 计算喷口在舰体表面的相对偏移与朝向
           const pointRad = (emitter.angleDeg * Math.PI) / 180;
@@ -121,23 +128,23 @@ export class ShipVentingRenderer {
           const spawnY = shipPos.y + Math.sin(normalRad) * dist;
 
           // 喷射初速度: 垂直于舰体法线向外爆发
-          const ventSpeed = (70 + visualRandom('webgl/ShipVentingRenderer.ts#3') * 80) * (0.65 + fluxLevel * 0.4);
-          const spreadAngle = normalRad + (visualRandom('webgl/ShipVentingRenderer.ts#4') - 0.5) * 0.35;
+          const ventSpeed = (70 + sample('vent-speed') * 80) * (0.65 + fluxLevel * 0.4);
+          const spreadAngle = normalRad + (sample('vent-spread') - 0.5) * 0.35;
           const velX = Math.cos(spreadAngle) * ventSpeed + ship.vel.x * 0.5;
           const velY = Math.sin(spreadAngle) * ventSpeed + ship.vel.y * 0.5;
 
           // 随机选取 4x4 nebula_colorless 粒子切片
-          const cellX = Math.floor(visualRandom('webgl/ShipVentingRenderer.ts#5') * 4);
-          const cellY = Math.floor(visualRandom('webgl/ShipVentingRenderer.ts#6') * 4);
+          const cellX = Math.floor(sample('vent-cell-x') * 4);
+          const cellY = Math.floor(sample('vent-cell-y') * 4);
           const u0 = cellX * 0.25;
           const v0 = cellY * 0.25;
           const u1 = (cellX + 1) * 0.25;
           const v1 = (cellY + 1) * 0.25;
 
           const baseSize = colRad * 0.2 + 14;
-          const initSize = baseSize * (0.65 + visualRandom('webgl/ShipVentingRenderer.ts#7') * 0.35);
-          const maxSize = baseSize * (1.7 + visualRandom('webgl/ShipVentingRenderer.ts#8') * 0.6);
-          const life = 0.7 + visualRandom('webgl/ShipVentingRenderer.ts#9') * 0.4;
+          const initSize = baseSize * (0.65 + sample('vent-size') * 0.35);
+          const maxSize = baseSize * (1.7 + sample('vent-max-size') * 0.6);
+          const life = 0.7 + sample('vent-life') * 0.4;
 
           this.particles.push({
             pos: new Vector2(spawnX, spawnY),
@@ -146,13 +153,14 @@ export class ShipVentingRenderer {
             maxLife: life,
             size: initSize,
             maxSize,
-            rotation: visualRandom('webgl/ShipVentingRenderer.ts#10') * Math.PI * 2,
-            spin: (visualRandom('webgl/ShipVentingRenderer.ts#11') - 0.5) * 1.8,
+            rotation: sample('vent-rotation') * Math.PI * 2,
+            spin: (sample('vent-spin') - 0.5) * 1.8,
             u0,
             v0,
             u1,
             v1
           });
+          emitter.spawnIndex++;
         }
       }
     }

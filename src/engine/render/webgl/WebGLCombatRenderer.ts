@@ -12,6 +12,7 @@ import { WebGLShipPass } from './passes/WebGLShipPass';
 import { WebGLProjectilePass } from './passes/WebGLProjectilePass';
 import { WebGLFXPass } from './passes/WebGLFXPass';
 import { WebGLTacticalOverlayPass } from './passes/WebGLTacticalOverlayPass';
+import { ESSENTIAL_TEXTURE_URLS } from '../TextureCache';
 
 /**
  * 远行星号 WebGL2 硬件级 GPU 实例化渲染中枢 (WebGLCombatRenderer)
@@ -38,7 +39,6 @@ export class WebGLCombatRenderer {
   private arcTargetGroupIndex = 0;
   private arcFadeState: 'FADING_IN' | 'FADING_OUT' | 'VISIBLE' | 'HIDDEN' = 'FADING_IN';
   private arcAnimProgress = 1.0;
-  private arcLastTimeSec = 0;
   private contextLost = false;
   private resourceRecreations = 0;
   private gpuTimerExt: any = null;
@@ -85,23 +85,20 @@ export class WebGLCombatRenderer {
     this.canvas.addEventListener('webglcontextrestored', this.onContextRestored);
   }
 
-  public render(engine: CombatEngine, alpha: number, cameraPos: Vector2, zoom: number, frame: RenderFrameContext) {
+  public prepareAssets(): Promise<void> {
+    return this.textures.preload(ESSENTIAL_TEXTURE_URLS);
+  }
+
+  public updateVisual(engine: CombatEngine, dt: number, frame: RenderFrameContext): void {
     if (this.contextLost) return;
-    beginRenderFrame(frame);
-    const gpuQuery = this.beginGpuTimer();
-    try {
-    const gl = this.gl;
-    const width = this.canvas.width;
-    const height = this.canvas.height;
-    const nowSec = visualNowMs() * 0.001;
+    this.shipPass.updateVisual(engine, dt, frame.random);
+    this.updateTacticalArc(engine, dt);
+  }
 
-    // 官方武器射界展开动画与编组状态管理 (1:1 _super.java: 编组常驻高亮显示，切换时平滑淡出旧组 -> 展开新组)
-    const dt = this.arcLastTimeSec > 0 ? Math.min(0.1, nowSec - this.arcLastTimeSec) : 0.016;
-    this.arcLastTimeSec = nowSec;
-
+  private updateTacticalArc(engine: CombatEngine, dt: number): void {
     const pShip = engine.playerShip;
-    const targetGroup = pShip && pShip.weaponGroups ? pShip.weaponGroups[pShip.selectedGroupIndex] : null;
-    const targetHasWeapons = !!(targetGroup && targetGroup.weaponSlotIds && targetGroup.weaponSlotIds.length > 0);
+    const targetGroup = pShip?.weaponGroups?.[pShip.selectedGroupIndex] ?? null;
+    const targetHasWeapons = !!(targetGroup?.weaponSlotIds?.length);
 
     if (pShip && pShip.selectedGroupIndex !== this.arcTargetGroupIndex) {
       this.arcTargetGroupIndex = pShip.selectedGroupIndex;
@@ -115,30 +112,43 @@ export class WebGLCombatRenderer {
 
     if (this.arcFadeState === 'FADING_OUT') {
       this.arcAnimProgress -= dt / 0.2;
-      if (this.arcAnimProgress <= 0.0) {
-        this.arcAnimProgress = 0.0;
+      if (this.arcAnimProgress <= 0) {
+        this.arcAnimProgress = 0;
         this.arcActiveGroupIndex = this.arcTargetGroupIndex;
-        const newGroup = pShip && pShip.weaponGroups ? pShip.weaponGroups[this.arcActiveGroupIndex] : null;
-        if (newGroup && newGroup.weaponSlotIds && newGroup.weaponSlotIds.length > 0 && !pShip.isDead) {
-          this.arcFadeState = 'FADING_IN';
-        } else {
-          this.arcFadeState = 'HIDDEN';
-        }
+        const newGroup = pShip?.weaponGroups?.[this.arcActiveGroupIndex] ?? null;
+        this.arcFadeState = newGroup?.weaponSlotIds?.length && !pShip.isDead ? 'FADING_IN' : 'HIDDEN';
       }
     } else if (this.arcFadeState === 'FADING_IN') {
       this.arcAnimProgress += dt / 0.25;
-      if (this.arcAnimProgress >= 1.0) {
-        this.arcAnimProgress = 1.0;
-        this.arcFadeState = 'VISIBLE'; // 原版规范: 常驻显示，绝不自动消失！
+      if (this.arcAnimProgress >= 1) {
+        this.arcAnimProgress = 1;
+        this.arcFadeState = 'VISIBLE';
       }
     } else if (this.arcFadeState === 'VISIBLE') {
-      this.arcAnimProgress = 1.0;
-      if (!pShip || pShip.isDead || !targetHasWeapons) {
-        this.arcFadeState = 'FADING_OUT';
-      }
+      this.arcAnimProgress = 1;
+      if (!pShip || pShip.isDead || !targetHasWeapons) this.arcFadeState = 'FADING_OUT';
     } else {
-      this.arcAnimProgress = 0.0;
+      this.arcAnimProgress = 0;
     }
+  }
+
+  public resetVisualState(): void {
+    this.shipPass.resetVisualState();
+    this.arcActiveGroupIndex = 0;
+    this.arcTargetGroupIndex = 0;
+    this.arcFadeState = 'FADING_IN';
+    this.arcAnimProgress = 1.0;
+  }
+
+  public render(engine: CombatEngine, alpha: number, cameraPos: Vector2, zoom: number, frame: RenderFrameContext) {
+    if (this.contextLost) return;
+    beginRenderFrame(frame);
+    const gpuQuery = this.beginGpuTimer();
+    try {
+    const gl = this.gl;
+    const width = this.canvas.width;
+    const height = this.canvas.height;
+    const nowSec = visualNowMs() * 0.001;
 
     // 1. 视口与背景清屏 (纯黑深空)
     gl.viewport(0, 0, width, height);

@@ -10,6 +10,10 @@ import { FixedTimestepScheduler } from '../src/engine/simulation/FixedTimestepSc
 import { VisualRandom } from '../src/engine/runtime/VisualRandom';
 import { CombatEngine } from '../src/engine/simulation/CombatEngine';
 import { AssetResolver } from '../src/engine/assets/AssetResolver';
+import { CameraController } from '../src/engine/runtime/CameraController';
+import { CombatSession } from '../src/engine/runtime/CombatSession';
+import { VISUAL_SCENARIOS, VisualScenarioController } from '../src/visual-lab/VisualScenarioController';
+import type { ICombatRenderer } from '../src/engine/render/ICombatRenderer';
 
 describe('Starsector text import', () => {
   it('preserves JSON primitives and // inside quoted URLs', () => {
@@ -95,7 +99,60 @@ describe('FixedTimestepScheduler', () => {
   });
 });
 
+describe('R02 timing and camera invariants', () => {
+  it('advances approximately 2 simulated seconds during one wall-clock second at 2x', () => {
+    const scheduler = new FixedTimestepScheduler(60);
+    scheduler.timeScale = 2;
+    let simulated = 0;
+    scheduler.update(20, () => {}, () => {});
+    for (let frame = 1; frame <= 60; frame++) {
+      scheduler.update(20 + frame / 60, (dt) => { simulated += dt; }, () => {});
+    }
+    expect(simulated).toBeCloseTo(2, 1);
+  });
+
+  it('reports bounded backlog and explicitly counts catastrophic dropped simulation time', () => {
+    const scheduler = new FixedTimestepScheduler(60);
+    scheduler.timeScale = 4;
+    scheduler.update(30, () => {}, () => {});
+    scheduler.update(30.1, () => {}, () => {});
+    expect(scheduler.backlogSeconds).toBeLessThanOrEqual((1 / 60) * 8 + 1e-8);
+    expect(scheduler.droppedSimulationSeconds).toBeGreaterThan(0);
+  });
+
+  it('camera smoothing is refresh-rate independent at 30/60/144 Hz', () => {
+    const simulateCamera = (hz: number) => {
+      const camera = new Vector2(0, 0);
+      const target = new Vector2(100, -50);
+      const controller = new CameraController();
+      for (let i = 0; i < hz; i++) controller.follow(camera, target, 1 / hz);
+      return camera;
+    };
+    const positions = [30, 60, 144].map(simulateCamera);
+    for (const pos of positions.slice(1)) {
+      expect(pos.x).toBeCloseTo(positions[0].x, 8);
+      expect(pos.y).toBeCloseTo(positions[0].y, 8);
+    }
+  });
+});
+
 describe('restart/switch lifecycle', () => {
+  it('resets renderer-owned visual state when restarting a session', () => {
+    const session = new CombatSession('onslaught', 'paragon');
+    let resets = 0;
+    const renderer: ICombatRenderer = {
+      prepareAssets: async () => {},
+      updateVisual: () => {},
+      render: () => {},
+      resetVisualState: () => { resets++; },
+      dispose: () => {}
+    };
+    session.renderer = renderer;
+    session.restart();
+    session.switchPlayerShip('paragon');
+    expect(resets).toBe(2);
+  });
+
   it('clears battle timing, cooldowns and settlement through repeated switches', () => {
     const engine = new CombatEngine('onslaught', 'paragon');
     for (let i = 0; i < 20; i++) {
@@ -109,6 +166,62 @@ describe('restart/switch lifecycle', () => {
       expect(engine.enemyCountermeasureCooldownTimer).toBe(0);
       expect(engine.battleResult).toBeNull();
     }
+  });
+});
+
+describe('V01 controlled Visual Lab scenarios', () => {
+  it('matches the twelve acceptance scenes from the M2 plan', () => {
+    expect(VISUAL_SCENARIOS.map((scene) => [scene.id, scene.title])).toEqual([
+      ['VIS-01', '攻势静止，四个朝向'],
+      ['VIS-02', '怠速、推进、松键、侧移、冲刺'],
+      ['VIS-03', '护盾开关与单次受击'],
+      ['VIS-04', '多次连续护盾命中'],
+      ['VIS-05', 'TPC 单发'],
+      ['VIS-06', '实弹炮连续开火'],
+      ['VIS-07', '光束充能、照射、停止'],
+      ['VIS-08', '导弹直飞、转弯、命中'],
+      ['VIS-09', '排散完整过程'],
+      ['VIS-10', '小命中与舰船爆炸'],
+      ['VIS-11', '固定状态 HUD'],
+      ['VIS-12', '双舰加舰载机实战']
+    ]);
+  });
+
+  it('constructs controlled shield, weapon, vent and HUD states at deterministic seek points', () => {
+    const session = new CombatSession('onslaught', 'paragon', 1337);
+    const lab = new VisualScenarioController(session);
+
+    lab.select('VIS-03', 1337);
+    lab.seek(1.8);
+    expect(session.engine.playerShip.shield.isActive).toBe(true);
+    expect(session.engine.playerShip.shield.ripples.length).toBeGreaterThan(0);
+
+    lab.select('VIS-05', 1337);
+    lab.seek(1.2);
+    expect(session.engine.projectiles.some((p) => p.specId === 'tpc')).toBe(true);
+
+    lab.select('VIS-09', 1337);
+    lab.seek(1.5);
+    expect(session.engine.playerShip.flux.isVenting).toBe(true);
+    expect(session.engine.playerShip.flux.ventProgress).toBeGreaterThan(0);
+
+    lab.select('VIS-11', 1337);
+    lab.seek(2);
+    expect(session.engine.playerShip.shield.isActive).toBe(true);
+    expect(session.engine.playerShip.hullHp).toBeCloseTo(session.engine.playerShip.spec.hitpoints * 0.72, 5);
+  });
+
+  it('rebuilds the same scene, seed and timestamp to the same scripted state', () => {
+    const session = new CombatSession('onslaught', 'paragon', 4242);
+    const lab = new VisualScenarioController(session);
+    lab.select('VIS-05', 4242);
+    lab.seek(1.4);
+    const first = session.engine.projectiles[0];
+    const snapshot = { x: first.pos.x, y: first.pos.y, elapsed: first.elapsedTime };
+    lab.seek(2.5);
+    lab.seek(1.4);
+    const replayed = session.engine.projectiles[0];
+    expect({ x: replayed.pos.x, y: replayed.pos.y, elapsed: replayed.elapsedTime }).toEqual(snapshot);
   });
 });
 

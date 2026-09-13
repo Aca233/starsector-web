@@ -25,6 +25,11 @@ export class WebGLTextureManager {
 
   public getWhiteTexture(): WebGLTexture { return this.whiteTexture; }
 
+  public async preload(urls: readonly string[]): Promise<void> {
+    await Promise.all(urls.map((url) => textureCache.waitForImage(url)));
+    for (const url of urls) this.getTexture(url);
+  }
+
   private textureKey(url: string, repeat: boolean, tint?: [number, number, number]): string {
     return `${url}|wrap=${repeat ? 'repeat' : 'clamp'}|filter=linear|mipmap=0${tint ? `|tint=${tint.join(',')}` : ''}`;
   }

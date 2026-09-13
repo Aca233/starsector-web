@@ -18,6 +18,9 @@ export class FixedTimestepScheduler {
   public measuredFPS = 60; // 实际渲染每秒执行次数
   public measuredFrameBudgetPercent = 0; // JS simulation/render work as a share of observed frame time
   public alpha = 0; // 亚帧插值系数 [0, 1)
+  public renderDeltaTime = 0; // clamped wall-clock seconds represented by the current render frame
+  public backlogSeconds = 0; // scaled simulation time waiting after bounded catch-up
+  public droppedSimulationSeconds = 0; // only catastrophic backlog trimmed by the safety cap
 
   private tpsCounter = 0;
   private fpsCounter = 0;
@@ -31,6 +34,9 @@ export class FixedTimestepScheduler {
   public reset(now = performance.now() / 1000) {
     this.lastTime = now;
     this.accumulator = 0;
+    this.renderDeltaTime = 0;
+    this.backlogSeconds = 0;
+    this.droppedSimulationSeconds = 0;
   }
 
   /**
@@ -56,6 +62,7 @@ export class FixedTimestepScheduler {
     if (frameTime > this.maxFrameTime) {
       frameTime = this.maxFrameTime;
     }
+    this.renderDeltaTime = Math.max(0, frameTime);
 
     // 统计 TPS / FPS 与真实 Idle 空闲率
     this.fpsCounter++;
@@ -88,9 +95,13 @@ export class FixedTimestepScheduler {
       steps++;
     }
 
-    // Clamp catastrophic backlog rather than dropping all accumulated time.
+    // Clamp catastrophic backlog rather than dropping all accumulated time, and expose any loss.
     const maxBacklog = this.fixedDeltaTime * maxSubSteps;
-    this.accumulator = Math.min(this.accumulator, maxBacklog);
+    if (this.accumulator > maxBacklog) {
+      this.droppedSimulationSeconds += this.accumulator - maxBacklog;
+      this.accumulator = maxBacklog;
+    }
+    this.backlogSeconds = this.accumulator;
 
     // 计算亚帧插值系数: alpha = 剩余累加量 / 固定步长
     this.alpha = Math.max(0, Math.min(1.0, this.accumulator / this.fixedDeltaTime));

@@ -33,9 +33,6 @@ export class CombatRenderer {
       throw new Error('Failed to get 2D context');
     }
     this.ctx = context;
-
-    // 预热核心高频特效与 UI 贴图
-    textureCache.preloadEssentialTextures();
   }
 
   // 向后兼容辅助方法
@@ -45,6 +42,18 @@ export class CombatRenderer {
 
   public getTintedImage(url: string, r: number, g: number, b: number): HTMLCanvasElement | null {
     return textureCache.getTintedImage(url, r, g, b);
+  }
+
+  public updateVisual(_engine: CombatEngine, _dt: number, _frame: RenderFrameContext): void {
+    // Canvas2D has no renderer-owned evolving visual state.
+  }
+
+  public prepareAssets(): Promise<void> {
+    return textureCache.preloadEssentialTextures();
+  }
+
+  public resetVisualState(): void {
+    // Canvas2D renderers are stateless between frames.
   }
 
   /**
