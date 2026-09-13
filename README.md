@@ -118,7 +118,7 @@ Performance telemetry distinguishes:
 
 JavaScript draw-submit time is **not** labelled GPU time. GPU time remains `unavailable` unless a real GPU timer query is available and measured.
 
-## Collision / Wasm pilot
+## Collision / bounded Wasm runtime
 
 Run:
 
@@ -126,15 +126,15 @@ Run:
 npm run benchmark:collision
 ```
 
-The benchmark compares the object-oriented baseline, a packed typed-array TypeScript path, and (when a pilot binary is present) the isolated Rust/Wasm kernel at:
+The benchmark compares the object-oriented baseline, a packed typed-array TypeScript path, the full-scan Rust/Wasm kernel, and the production-style uniform-grid + indexed Wasm path at:
 
 - small: 10 ships / 200 projectiles
 - medium: 50 ships / 2,000 projectiles
 - large: 100 ships / 10,000 projectiles
 
-The current pilot uses the real Onslaught, Paragon, and Doom hull polygons plus rotated hull intersection, shield geometry, circle broadphase filtering, and nearest in-step hit selection. It records preparation, JS↔Wasm boundary transfer, compute, result-read, total P95/P99/max, frame-budget exceed counts, initialization cost, and memory observations in `benchmarks/collision-results.json`.
+The kernel uses the real Onslaught, Paragon, and Doom hull polygons plus rotated hull intersection, shield geometry, circle broadphase filtering, and nearest in-step hit selection. The runtime rebuilds a conservative uniform-grid ship index once per projectile simulation step, batches only ordinary ballistic projectiles, and passes only per-projectile candidate indices into the bundled `public/runtime/collision_core.wasm`. Missiles, proximity fuses, flares, light-MG interception, small batches, unsupported hulls, and every Wasm load/runtime failure remain on the exact TypeScript path. TypeScript continues to own damage, armor, flux, entity lifetime, effects, audio, and all authoritative combat state.
 
-The measured Node pilot cleared the local adoption threshold: end-to-end Wasm was 66.7% of the fastest TypeScript path at 50/2,000 and 61.5% at 100/10,000. The pilot decision is therefore **adopt for a future bounded runtime integration**, but `runtimeIntegrated` remains `false` and Rust/Wasm is still not an application build/runtime dependency. The large workload still measured 57.78 ms P95 in Wasm, so production integration must keep TypeScript authoritative and add spatial candidate reduction rather than relying on the O(projectiles × ships) kernel alone. See `benchmarks/wasm-pilot/README.md` for boundary details, build instructions, and caveats.
+The latest measured run records `runtimeIntegrated: true` for this bounded path. Spatial pruning removed 91.3% of naive pairs at 50/2,000 and 92.0% at 100/10,000. Spatial+Wasm end-to-end measured 84.5% of the fastest TypeScript path at medium load and 74.6% at large load; large-load P95 was 63.52 ms versus 80.36 ms for the fastest TypeScript path. The 100/10,000 stress case is still outside a 16.67 ms frame budget, so this is intentionally a limited accelerator with a TypeScript fallback rather than a transfer of simulation ownership. The precompiled module is shipped with the web build, while compiling it from Rust remains optional for normal `npm` build/runtime use. See `benchmarks/wasm-pilot/README.md` for boundary details and raw measurements.
 
 ## Regression coverage
 
@@ -149,6 +149,8 @@ The measured Node pilot cleared the local adoption threshold: end-to-end Wasm wa
 - 20 repeated ship switches resetting timing/cooldowns/settlement
 - seeded visual random replay
 - asset-root traversal rejection
+- spatial-grid collision candidate pruning
+- swept hull collision and shield-before-hull fallback behavior
 
 ## Production verification checklist
 

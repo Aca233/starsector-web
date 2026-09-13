@@ -1,10 +1,15 @@
 import { Vector2 } from '../../../math/Vector2';
-import { intersectSegmentWithPolygon } from '../../../math/Geometry';
 import { Ship } from '../../Ship';
 import { Projectile } from '../../Weapon';
 import { sound } from '../../../audio/SoundManager';
 import { i18n } from '../../../i18n/LocalizationManager';
 import { WeaponSimContext } from './WeaponSimContext';
+import { SpatialShipIndex } from '../../collision/SpatialShipIndex';
+import {
+  RuntimeCollisionHit,
+  RuntimeCollisionKernel,
+  RuntimeCollisionQuery
+} from '../../collision/RuntimeCollisionKernel';
 
 /**
  * 弹道物理碰撞、近炸引信与装甲毁伤处理器 (ProjectileCollisionHandler)
@@ -18,6 +23,61 @@ import { WeaponSimContext } from './WeaponSimContext';
  * 7. 真实物理爆鸣声效、金属撕裂碎片、EMP 跳跃电弧与舰船击沉
  */
 export class ProjectileCollisionHandler {
+  private readonly spatialIndex = new SpatialShipIndex();
+  public readonly runtimeCollisionKernel = new RuntimeCollisionKernel();
+
+  public prepareShipCollisionFrame(allShips: Ship[]): void {
+    this.spatialIndex.rebuild(allShips);
+  }
+
+  public canBatchShipCollision(p: Projectile): boolean {
+    return !p.isRocket && !p.proximityFuse && p.specId !== 'lightmg' && !p.isFlare;
+  }
+
+  public checkShipCollisionsBatch(projectiles: Projectile[], allShips: Ship[], ctx: WeaponSimContext): Set<number> {
+    if (projectiles.length === 0) return new Set<number>();
+    if (!this.spatialIndex.isPrepared) this.prepareShipCollisionFrame(allShips);
+
+    const queries = projectiles.map((projectile) => this.createRuntimeQuery(projectile, allShips));
+    const hits = this.runtimeCollisionKernel.findHits(queries);
+    const consumed = new Set<number>();
+
+    for (let index = 0; index < queries.length; index++) {
+      let hit = hits[index];
+      if (!hit) continue;
+
+      // A previous projectile in this same fixed step may have destroyed the
+      // snapshotted target. Re-resolve only that rare query against surviving
+      // candidates so the authoritative TS state keeps the original ordering
+      // semantics without throwing away the whole batch.
+      if (hit.ship.isDead || hit.ship.isPhased) {
+        const surviving: RuntimeCollisionQuery = {
+          projectile: queries[index].projectile,
+          candidates: queries[index].candidates.filter((ship) => !ship.isDead && !ship.isPhased)
+        };
+        hit = this.runtimeCollisionKernel.findHitTypeScript(surviving);
+      }
+
+      if (hit && this.applyShipCollisionHit(hit, ctx)) consumed.add(hit.projectile.id);
+    }
+
+    return consumed;
+  }
+
+  private createRuntimeQuery(p: Projectile, allShips: Ship[]): RuntimeCollisionQuery {
+    const broadphaseCandidates = this.spatialIndex.isPrepared
+      ? this.spatialIndex.querySegment(p.prevPos, p.pos, Math.max(0, p.radius))
+      : allShips;
+    return {
+      projectile: p,
+      candidates: broadphaseCandidates.filter((ship) =>
+        ship.id !== p.sourceShipId &&
+        (p.isPlayer === undefined || ship.isPlayer !== p.isPlayer) &&
+        !ship.isDead &&
+        !ship.isPhased
+      )
+    };
+  }
   /**
    * 判定高射炮近炸引信与凌空殉爆 AOE 破片杀伤
    * @returns 弹丸是否发生近炸引信引爆
@@ -221,176 +281,126 @@ export class ProjectileCollisionHandler {
    * @returns 是否命中舰船 (护盾或舰体)
    */
   public checkShipCollision(p: Projectile, allShips: Ship[], ctx: WeaponSimContext): boolean {
-    for (const ship of allShips) {
-      if (
-        ship.id === p.sourceShipId ||
-        (p.isPlayer !== undefined && ship.isPlayer === p.isPlayer) ||
-        ship.isDead ||
-        ship.isPhased
-      ) {
-        continue;
+    if (!this.spatialIndex.isPrepared) this.prepareShipCollisionFrame(allShips);
+    const query = this.createRuntimeQuery(p, allShips);
+    const hit = this.runtimeCollisionKernel.findHits([query])[0];
+    return hit ? this.applyShipCollisionHit(hit, ctx) : false;
+  }
+
+  private applyShipCollisionHit(hit: RuntimeCollisionHit, ctx: WeaponSimContext): boolean {
+    const { projectile: p, ship } = hit;
+    if (ship.isDead || ship.isPhased) return false;
+    const impactWorld = hit.worldPoint;
+
+    if (hit.kind === 'SHIELD') {
+      const sCenter = ship.getShieldCenter(ship.pos, ship.facingRad);
+      const toShield = impactWorld.clone().sub(sCenter);
+      const shieldMult = ship.system.getShieldDamageMultiplier();
+      const absorbedDmg = p.damage * shieldMult;
+      const fluxGain = ship.shield.absorbDamage(absorbedDmg, p.damageType, toShield.heading());
+      if (ctx.statsTracker) {
+        ctx.statsTracker.recordDamageDealt(p.isPlayer ?? false, p.damageType, absorbedDmg, 'SHIELD');
       }
+      ship.flux.increaseFlux(fluxGain, true);
+      ctx.fx.addFloatingDamage(impactWorld, absorbedDmg, [80, 200, 255]);
+      sound.playAtPos('shield_hit', impactWorld, ctx.playerShip.pos, 0.45);
+      ctx.fx.spawnShieldRipple(impactWorld, p.damage > 200 ? 75 : 45, p.color);
 
-      const toShip = p.pos.clone().sub(ship.pos);
-      const distToShip = toShip.length();
-
-      // 1) 优先检测护盾阻挡 (严格对齐 Starsector 护盾几何球面判定，防止高速弹丸穿模)
-      if (ship.shield.isActive && ship.shield.currentArcDeg > 5 && ship.shield.type !== 'NONE' && ship.shield.type !== 'PHASE') {
-        const sCenter = ship.getShieldCenter(ship.pos, ship.facingRad);
-        const toShield = p.pos.clone().sub(sCenter);
-        const distToShield = toShield.length();
-        const prevDist = p.prevPos.distanceTo(sCenter);
-
-        if (distToShield <= ship.shield.radius || (prevDist > ship.shield.radius && distToShield <= ship.shield.radius + 35)) {
-          const hitPosOnShield = distToShield > 0
-            ? sCenter.clone().addScaled(toShield.clone().normalize(), ship.shield.radius)
-            : p.pos;
-
-          if (ship.shield.isHitBlocked(sCenter, hitPosOnShield, ship.facingRad)) {
-            const shieldMult = ship.system.getShieldDamageMultiplier();
-            const absorbedDmg = p.damage * shieldMult;
-            const fluxGain = ship.shield.absorbDamage(absorbedDmg, p.damageType, toShield.heading());
-            if (ctx.statsTracker) {
-              ctx.statsTracker.recordDamageDealt(p.isPlayer ?? false, p.damageType, absorbedDmg, 'SHIELD');
-            }
-            ship.flux.increaseFlux(fluxGain, true);
-            ctx.fx.addFloatingDamage(hitPosOnShield, absorbedDmg, [80, 200, 255]);
-
-            sound.playAtPos('shield_hit', hitPosOnShield, ctx.playerShip.pos, 0.45);
-            ctx.fx.spawnShieldRipple(hitPosOnShield, p.damage > 200 ? 75 : 45, p.color);
-
-            const hitRadius = p.hitGlowRadius || (p.damage > 200 ? 55 : 30);
-            if (p.isRocket || p.damage >= 200) {
-              ctx.fx.spawnAuthenticExplosion(hitPosOnShield, hitRadius, p.color, true, p.isRocket ? 'missile' : 'impact');
-            } else {
-              ctx.fx.spawnSparks(hitPosOnShield, 15, p.color);
-            }
-            ctx.addCameraShake(2, 0.1);
-            return true;
-          }
-        }
+      const hitRadius = p.hitGlowRadius || (p.damage > 200 ? 55 : 30);
+      if (p.isRocket || p.damage >= 200) {
+        ctx.fx.spawnAuthenticExplosion(impactWorld, hitRadius, p.color, true, p.isRocket ? 'missile' : 'impact');
+      } else {
+        ctx.fx.spawnSparks(impactWorld, 15, p.color);
       }
+      ctx.addCameraShake(2, 0.1);
+      return true;
+    }
 
-      // 2) 检测船体与装甲精确多边形碰撞
-      if (distToShip <= ship.spec.collisionRadius) {
-        let isHullHit = false;
-        let impactPoint = p.pos.clone().sub(ship.pos).rotate(-ship.facingRad);
+    const impactPoint = hit.localPoint;
+    const result = ship.armor.takeDamage(impactPoint, p.damage, p.damageType, p.damage, false);
+    if (ctx.statsTracker) {
+      if (result.armorDamage > 0) {
+        ctx.statsTracker.recordDamageDealt(
+          p.isPlayer ?? false,
+          p.damageType,
+          result.armorDamage,
+          'ARMOR',
+          p.empDamage || 0
+        );
+      }
+      if (result.hullDamage > 0) {
+        ctx.statsTracker.recordDamageDealt(p.isPlayer ?? false, p.damageType, result.hullDamage, 'HULL');
+      }
+    }
+    ship.hullHp = Math.max(0, ship.hullHp - result.hullDamage);
+    ship.addScorchMark(impactPoint, result.armorDamage || result.hullDamage);
 
-        if (ship.spec.bounds && ship.spec.bounds.length >= 3) {
-          const localPrev = p.prevPos.clone().sub(ship.pos).rotate(-ship.facingRad);
-          const polyResult = intersectSegmentWithPolygon(localPrev, impactPoint, ship.spec.bounds);
-          if (polyResult) {
-            isHullHit = true;
-            impactPoint = polyResult.point;
-          }
+    const disabledMount = ship.damageWeaponMount(impactPoint, p.damage + (p.empDamage || 0), !!p.empDamage);
+    if (disabledMount) {
+      ctx.fx.addFloatingText(impactWorld.clone(), `WEAPON DISABLED: ${disabledMount.slotId}`, [255, 140, 40], 14, 2.0);
+      ctx.fx.spawnSparks(impactWorld, 30, [100, 200, 255]);
+      const weaponName = i18n.t(disabledMount.spec.nameKey).split(' ')[0] || disabledMount.slotId;
+      if (ship.isPlayer) {
+        ctx.addRadioMessage('损管警报', 'PLAYER', `武器挂点 [${disabledMount.slotId} - ${weaponName}] 遭受过载短路，已强制下线！`, [255, 120, 60]);
+      } else {
+        ctx.addRadioMessage('战术火控', 'PLAYER', `成功瘫痪目标舰武器挂点 [${weaponName}]！`, [100, 255, 160]);
+      }
+    }
+
+    if (impactPoint.x < -ship.spec.collisionRadius * 0.25 && (p.damage >= 150 || (p.empDamage && p.empDamage > 120))) {
+      if (Math.random() < 0.55) {
+        ship.triggerEngineFlameout();
+        ctx.fx.addFloatingText(impactWorld.clone(), 'ENGINE FLAMEOUT', [255, 140, 40], 14, 1.8);
+        if (ship.isPlayer) {
+          ctx.addRadioMessage('损管警报', 'PLAYER', '主推进器受损熄火！机动性严重受阻！', [255, 100, 80]);
         } else {
-          isHullHit = true;
-        }
-
-        if (isHullHit) {
-          const result = ship.armor.takeDamage(impactPoint, p.damage, p.damageType, p.damage, false);
-          if (ctx.statsTracker) {
-            if (result.armorDamage > 0) {
-              ctx.statsTracker.recordDamageDealt(
-                p.isPlayer ?? false,
-                p.damageType,
-                result.armorDamage,
-                'ARMOR',
-                p.empDamage || 0
-              );
-            }
-            if (result.hullDamage > 0) {
-              ctx.statsTracker.recordDamageDealt(p.isPlayer ?? false, p.damageType, result.hullDamage, 'HULL');
-            }
-          }
-          ship.hullHp = Math.max(0, ship.hullHp - result.hullDamage);
-          ship.addScorchMark(impactPoint, result.armorDamage || result.hullDamage);
-
-          // 武器挂点损伤与故障短路判定
-          const disabledMount = ship.damageWeaponMount(impactPoint, p.damage + (p.empDamage || 0), !!p.empDamage);
-          if (disabledMount) {
-            ctx.fx.addFloatingText(p.pos.clone(), `WEAPON DISABLED: ${disabledMount.slotId}`, [255, 140, 40], 14, 2.0);
-            ctx.fx.spawnSparks(p.pos, 30, [100, 200, 255]);
-            const weaponName = i18n.t(disabledMount.spec.nameKey).split(' ')[0] || disabledMount.slotId;
-            if (ship.isPlayer) {
-              ctx.addRadioMessage('损管警报', 'PLAYER', `武器挂点 [${disabledMount.slotId} - ${weaponName}] 遭受过载短路，已强制下线！`, [255, 120, 60]);
-            } else {
-              ctx.addRadioMessage('战术火控', 'PLAYER', `成功瘫痪目标舰武器挂点 [${weaponName}]！`, [100, 255, 160]);
-            }
-          }
-
-          // 引擎后向击穿与 EMP 过载熄火判定
-          if (impactPoint.x < -ship.spec.collisionRadius * 0.25 && (p.damage >= 150 || (p.empDamage && p.empDamage > 120))) {
-            if (Math.random() < 0.55) {
-              ship.triggerEngineFlameout();
-              ctx.fx.addFloatingText(p.pos.clone(), 'ENGINE FLAMEOUT', [255, 140, 40], 14, 1.8);
-              if (ship.isPlayer) {
-                ctx.addRadioMessage('损管警报', 'PLAYER', '主推进器受损熄火！机动性严重受阻！', [255, 100, 80]);
-              } else {
-                ctx.addRadioMessage('战术火控', 'PLAYER', '敌舰推进引擎遭受重创，已过载熄火！', [120, 255, 150]);
-              }
-            }
-          }
-
-          // 真实金属装甲与舰体撞击爆鸣音效
-          if (p.damage >= 180) {
-            sound.playAtPos('armor_hit_heavy', p.pos, ctx.playerShip.pos, 0.7);
-          } else if (p.damage >= 80) {
-            sound.playAtPos('armor_hit_solid', p.pos, ctx.playerShip.pos, 0.6);
-          } else {
-            sound.playAtPos('armor_hit_light', p.pos, ctx.playerShip.pos, 0.45);
-          }
-
-          // 浮动伤害跳字
-          if (result.armorDamage > 0) {
-            ctx.fx.addFloatingDamage(p.pos, result.armorDamage, [255, 175, 40]);
-          }
-          if (result.hullDamage > 0) {
-            ctx.fx.addFloatingDamage(p.pos, result.hullDamage, [255, 55, 45]);
-          }
-
-          const hitRadius = p.hitGlowRadius || (p.damage > 200 ? 50 : 25);
-          if (p.isRocket || p.damage >= 200) {
-            ctx.fx.spawnAuthenticExplosion(p.pos, hitRadius, p.color, true, p.isRocket ? 'missile' : 'impact');
-          } else {
-            ctx.fx.spawnSparks(p.pos, 20, p.color);
-          }
-
-          // 金属撕裂碎片 (1:1 DebrisParticleSystem.java: 仅高伤穿甲或重型火炮抛出 1~2 片微量正方破片)
-          if (p.damage >= 150) {
-            const debrisColor: [number, number, number] =
-              ship.spec.id === 'onslaught' ? [125, 110, 95] : [100, 130, 160];
-            const count = p.damage >= 450 ? 3 : (p.damage >= 280 ? 2 : 1);
-            const sizeCat = p.damage >= 450 ? 'medium' : 'small';
-            ctx.fx.spawnDebris(p.pos, count, debrisColor, 100, sizeCat);
-          }
-
-          // EMP 电弧击穿跳跃
-          if (p.empDamage && p.empDamage > 0) {
-            for (let a = 0; a < 2; a++) {
-              const empEnd = ship.pos.clone().add(
-                new Vector2(
-                  (Math.random() - 0.5) * ship.spec.collisionRadius,
-                  (Math.random() - 0.5) * ship.spec.collisionRadius
-                ).rotate(ship.facingRad)
-              );
-              ctx.fx.spawnEmpArc(p.pos, empEnd);
-            }
-            sound.playAtPos('emp_discharge', p.pos, ctx.playerShip.pos, 0.55);
-            ctx.fx.addFloatingDamage(p.pos.clone().add(new Vector2(10, -10)), p.empDamage, [130, 220, 255]);
-          }
-
-          ctx.addCameraShake(Math.min(15, p.damage * 0.04), 0.15);
-
-          if (ship.hullHp <= 0) {
-            ctx.handleShipDestruction(ship);
-          }
-
-          return true;
+          ctx.addRadioMessage('战术火控', 'PLAYER', '敌舰推进引擎遭受重创，已过载熄火！', [120, 255, 150]);
         }
       }
     }
 
-    return false;
+    if (p.damage >= 180) {
+      sound.playAtPos('armor_hit_heavy', impactWorld, ctx.playerShip.pos, 0.7);
+    } else if (p.damage >= 80) {
+      sound.playAtPos('armor_hit_solid', impactWorld, ctx.playerShip.pos, 0.6);
+    } else {
+      sound.playAtPos('armor_hit_light', impactWorld, ctx.playerShip.pos, 0.45);
+    }
+
+    if (result.armorDamage > 0) ctx.fx.addFloatingDamage(impactWorld, result.armorDamage, [255, 175, 40]);
+    if (result.hullDamage > 0) ctx.fx.addFloatingDamage(impactWorld, result.hullDamage, [255, 55, 45]);
+
+    const hitRadius = p.hitGlowRadius || (p.damage > 200 ? 50 : 25);
+    if (p.isRocket || p.damage >= 200) {
+      ctx.fx.spawnAuthenticExplosion(impactWorld, hitRadius, p.color, true, p.isRocket ? 'missile' : 'impact');
+    } else {
+      ctx.fx.spawnSparks(impactWorld, 20, p.color);
+    }
+
+    if (p.damage >= 150) {
+      const debrisColor: [number, number, number] =
+        ship.spec.id === 'onslaught' ? [125, 110, 95] : [100, 130, 160];
+      const count = p.damage >= 450 ? 3 : (p.damage >= 280 ? 2 : 1);
+      const sizeCat = p.damage >= 450 ? 'medium' : 'small';
+      ctx.fx.spawnDebris(impactWorld, count, debrisColor, 100, sizeCat);
+    }
+
+    if (p.empDamage && p.empDamage > 0) {
+      for (let a = 0; a < 2; a++) {
+        const empEnd = ship.pos.clone().add(
+          new Vector2(
+            (Math.random() - 0.5) * ship.spec.collisionRadius,
+            (Math.random() - 0.5) * ship.spec.collisionRadius
+          ).rotate(ship.facingRad)
+        );
+        ctx.fx.spawnEmpArc(impactWorld, empEnd);
+      }
+      sound.playAtPos('emp_discharge', impactWorld, ctx.playerShip.pos, 0.55);
+      ctx.fx.addFloatingDamage(impactWorld.clone().add(new Vector2(10, -10)), p.empDamage, [130, 220, 255]);
+    }
+
+    ctx.addCameraShake(Math.min(15, p.damage * 0.04), 0.15);
+    if (ship.hullHp <= 0) ctx.handleShipDestruction(ship);
+    return true;
   }
 }

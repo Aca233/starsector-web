@@ -36,9 +36,29 @@ export class WeaponSimulationSystem {
 
   public updateProjectiles(dt: number, ctx: WeaponSimContext) {
     const allShips = [ctx.playerShip, ctx.enemyShip, ...ctx.fighters];
+    this.collisionHandler.prepareShipCollisionFrame(allShips);
+    const batchedCollisionProjectiles: Projectile[] = [];
+    const flushBatchedCollisions = () => {
+      if (batchedCollisionProjectiles.length === 0) return;
+      const consumedIds = this.collisionHandler.checkShipCollisionsBatch(
+        batchedCollisionProjectiles,
+        allShips,
+        ctx
+      );
+      batchedCollisionProjectiles.length = 0;
+      if (consumedIds.size === 0) return;
+
+      // Pending batches contain only already-visited (higher-index) projectiles,
+      // so removing them here preserves the descending iteration cursor while
+      // restoring the original collision/damage ordering before a special shot.
+      for (let j = this.projectiles.length - 1; j >= 0; j--) {
+        if (consumedIds.has(this.projectiles[j].id)) this.projectiles.splice(j, 1);
+      }
+    };
 
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i];
+      if (!this.collisionHandler.canBatchShipCollision(p)) flushBatchedCollisions();
       p.elapsedTime += dt;
       p.prevPos.copy(p.pos);
 
@@ -107,12 +127,21 @@ export class WeaponSimulationSystem {
       }
 
       // 5. 与敌对舰船碰撞判定 (护盾与装甲)
+      if (this.collisionHandler.canBatchShipCollision(p)) {
+        batchedCollisionProjectiles.push(p);
+        continue;
+      }
+
       const hit = this.collisionHandler.checkShipCollision(p, allShips, ctx);
       if (hit) {
         if (p.isRocket) ctx.contrailEngine?.detach(p.id);
         this.projectiles.splice(i, 1);
       }
     }
+
+    // Flush the final contiguous ordinary-ballistic run. Damage/effects are
+    // still applied in the same descending projectile order as the legacy loop.
+    flushBatchedCollisions();
   }
 
   public updateBeams(dt: number, ctx: WeaponSimContext) {

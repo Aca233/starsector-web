@@ -1,6 +1,6 @@
 # Rust/Wasm collision pilot
 
-This directory contains an isolated benchmark prototype for batched projectile-to-ship collision queries. It is **not** a runtime dependency: the browser combat runtime still owns authoritative state and still runs in TypeScript. The pilot answers only whether this collision kernel is worth a later, separately validated runtime integration.
+This directory contains the source and benchmark harness for the batched projectile-to-ship collision kernel. The validated kernel is now used by a **bounded** browser runtime path: TypeScript still owns authoritative combat state and applies every damage/armor/flux/effect result, while Wasm receives packed geometry only for eligible ordinary ballistic batches. Unsupported/special cases and any Wasm failure fall back to TypeScript.
 
 ## What is measured
 
@@ -21,7 +21,7 @@ Static input:
 - hull vertices: packed local-space `x, y` pairs;
 - hull metadata: packed `startVertex, vertexCount` pairs.
 
-Dynamic ship input uses 11 `f64` values per ship:
+Dynamic ship input uses 13 `f64` values per ship:
 
 - world `x, y`;
 - `facingCos, facingSin`;
@@ -29,9 +29,10 @@ Dynamic ship input uses 11 `f64` values per ship:
 - hull outline id;
 - shield radius squared and half-arc cosine;
 - shield-active flag;
-- shield local-center `x, y`.
+- shield local-center `x, y`;
+- shield-facing cosine/sine (separate from hull facing for omni shields).
 
-Projectile input uses `x0, y0, x1, y1`. Output uses five `f64` values per projectile: target index (`-1` for none), segment fraction `t`, world hit `x`, world hit `y`, and collision type (`0` none, `1` hull, `2` shield).
+Projectile input uses `x0, y0, x1, y1`. The indexed runtime export additionally receives a prefix-offset array plus flattened ship indices produced by the TypeScript uniform grid. Output uses five `f64` values per projectile: target index (`-1` for none), segment fraction `t`, world hit `x`, world hit `y`, and collision type (`0` none, `1` hull, `2` shield).
 
 TypeScript continues to own damage, armor, flux, effects, audio, rendering, entity lifetime, and the combat session. No JSON serialization crosses the Wasm boundary.
 
@@ -44,28 +45,28 @@ powershell -ExecutionPolicy Bypass -File scripts/build-wasm-pilot.ps1
 npm run benchmark:collision
 ```
 
-The build artifact is written to `artifacts/wasm-pilot/collision_core.wasm`, which is git-ignored. `WASM_PILOT_PATH` can point the benchmark at another compiled module. `scripts/build-wasm-pilot.ps1` also accepts `RUSTC_BIN` and `RUST_SYSROOT`, so CI or a temporary toolchain can run the pilot without changing the system PATH.
+The build artifact is written to `artifacts/wasm-pilot/collision_core.wasm`, which is git-ignored. The validated browser artifact is copied to and checked in as `public/runtime/collision_core.wasm`, so normal application installs/builds do not require Rust. `WASM_PILOT_PATH` can point the benchmark at another compiled module. `scripts/build-wasm-pilot.ps1` also accepts `RUSTC_BIN` and `RUST_SYSROOT`, so CI or a temporary toolchain can rebuild it without changing the system PATH.
 
 ## Correctness probes
 
-The benchmark asserts equivalence between the object baseline, packed TypeScript implementation, and Wasm output before accepting timing results. The covered cases are high-speed crossing, edge grazing, starting inside a hull, nearest selection across overlapping targets, and shield-before-hull interception. These assertions live inside the benchmark script; no project test file is added.
+The benchmark asserts equivalence between the object baseline, packed TypeScript implementation, full-scan Wasm output, and spatial/indexed Wasm output before accepting timing results. The covered cases are high-speed crossing, edge grazing, starting inside a hull, nearest selection across overlapping targets, and shield-before-hull interception. Project regression tests additionally cover the runtime spatial index and TypeScript fallback path.
 
 ## Latest measured result
 
 The checked-in `benchmarks/collision-results.json` is the authoritative raw record. The latest run used Node v24.13.0, 8 warmups and 40 measured samples per workload.
 
-| Workload | Fastest TS mean | Wasm mean | Wasm / TS | Fastest TS P95 | Wasm P95 |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| 10 ships / 200 projectiles | 0.187 ms | 0.085 ms | 45.6% | 0.345 ms | 0.145 ms |
-| 50 / 2,000 | 3.482 ms | 2.322 ms | 66.7% | 4.109 ms | 2.706 ms |
-| 100 / 10,000 | 54.906 ms | 33.787 ms | 61.5% | 87.642 ms | 57.778 ms |
+| Workload | Fastest TS mean | Spatial+Wasm mean | Spatial+Wasm / TS | Fastest TS P95 | Spatial+Wasm P95 | Candidate reduction |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 10 ships / 200 projectiles | see raw JSON | 0.156 ms | see raw JSON | see raw JSON | 0.370 ms | 90.8% |
+| 50 / 2,000 | 3.195 ms | 2.701 ms | 84.5% | 3.526 ms | 3.170 ms | 91.3% |
+| 100 / 10,000 | 55.970 ms | 41.751 ms | 74.6% | 80.358 ms | 63.524 ms | 92.0% |
 
-The Wasm module was 1,614,418 bytes. First file-read + compile + instantiate time in the recorded run was 18.67 ms; static outline upload was 2,304 bytes. Preparation, boundary-transfer, compute, result-read, total, P95, P99, max, frame-budget exceed counts, process-memory deltas, and Wasm linear-memory sizes are all retained in the JSON result.
+The Wasm module was 1,618,500 bytes in the recorded run. Preparation (including spatial candidate construction), boundary-transfer, compute, result-read, total, P95, P99, max, frame-budget exceed counts, candidate-pair counts, process-memory deltas, initialization cost, and Wasm linear-memory sizes are retained in the JSON result.
 
 ## Decision
 
-The local pilot threshold is end-to-end Wasm <= 90% of the fastest TypeScript path at the medium workload and <= 80% at the large workload. The measured ratios were 66.7% and 61.5%, so the pilot decision is **adopt for a future bounded runtime integration**.
+The integration gate requires both substantial spatial reduction and spatial+Wasm end-to-end <= 90% of the fastest TypeScript path at medium load and <= 80% at large load. The measured medium/large ratios are 84.5% and 74.6%, with 92.0% pair reduction at large load, so the checked-in result records `runtimeIntegrated: true`.
 
-`runtimeIntegrated` remains `false`: this pilot deliberately does not rewrite the production simulation or make Rust a build/runtime dependency. The 100/10,000 case also remains well outside a 16.67 ms frame budget even with Wasm (57.78 ms P95, 40/40 samples over 16.67 ms), so a real integration still needs spatial/candidate reduction rather than relying on an O(projectiles × ships) kernel alone.
+The integration is deliberately narrow: batches below eight projectiles, missiles, proximity-fuse projectiles, flares, light-MG interception, unsupported hull geometry, module-load errors, and runtime traps use the TypeScript exact path. Reusable Wasm buffers avoid per-step allocator churn; the precompiled module is a browser asset, not a Rust build dependency.
 
-These measurements were taken in Node on this Runner, not in the production browser/JIT environment. Browser-side integration must therefore be re-benchmarked before enabling a Wasm production path by default.
+The 100/10,000 case remains well outside a 16.67 ms frame budget even after candidate pruning (63.52 ms P95, 40/40 samples over 16.67 ms). These measurements were taken in Node on this Runner rather than a production browser/JIT, so browser telemetry remains the final authority for real gameplay performance.

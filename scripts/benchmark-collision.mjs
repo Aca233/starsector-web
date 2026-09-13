@@ -10,7 +10,7 @@ const scenarios = [
 ];
 const SAMPLES = 40;
 const WARMUP_SAMPLES = 8;
-const SHIP_STRIDE = 11;
+const SHIP_STRIDE = 13;
 const PROJECTILE_STRIDE = 4;
 const OUTPUT_STRIDE = 5;
 const COLLISION_NONE = 0;
@@ -288,7 +288,11 @@ function prepareTyped(objects) {
     const shieldExtent = ship.shieldActive
       ? Math.hypot(profile.shieldCenterX, profile.shieldCenterY) + profile.shieldRadius
       : 0;
-    const broadphaseRadius = Math.max(profile.collisionRadius, shieldExtent);
+    const hullExtent = profile.bounds.reduce(
+      (maxRadius, [x, y]) => Math.max(maxRadius, Math.hypot(x, y)),
+      profile.collisionRadius
+    );
+    const broadphaseRadius = Math.max(hullExtent, shieldExtent);
     ships[base + 4] = broadphaseRadius * broadphaseRadius;
     ships[base + 5] = profile.outlineId;
     ships[base + 6] = profile.shieldRadius * profile.shieldRadius;
@@ -296,6 +300,8 @@ function prepareTyped(objects) {
     ships[base + 8] = ship.shieldActive ? 1 : 0;
     ships[base + 9] = profile.shieldCenterX;
     ships[base + 10] = profile.shieldCenterY;
+    ships[base + 11] = ship.facingCos;
+    ships[base + 12] = ship.facingSin;
   });
   const projectiles = new Float64Array(objects.projectiles.length * PROJECTILE_STRIDE);
   objects.projectiles.forEach((projectile, i) => {
@@ -306,6 +312,78 @@ function prepareTyped(objects) {
     projectiles[base + 3] = projectile.y1;
   });
   return { ships, projectiles };
+}
+
+function buildSpatialCandidates(objects, cellSize = 384) {
+  const rows = new Map();
+  const toCell = (value) => Math.floor(value / cellSize);
+
+  objects.ships.forEach((ship, shipIndex) => {
+    const profile = ship.profile;
+    const shieldExtent = Math.hypot(profile.shieldCenterX, profile.shieldCenterY) + profile.shieldRadius;
+    const hullExtent = profile.bounds.reduce(
+      (maxRadius, [x, y]) => Math.max(maxRadius, Math.hypot(x, y)),
+      profile.collisionRadius
+    );
+    const radius = Math.max(hullExtent, shieldExtent);
+    const minX = toCell(ship.x - radius);
+    const maxX = toCell(ship.x + radius);
+    const minY = toCell(ship.y - radius);
+    const maxY = toCell(ship.y + radius);
+    for (let cy = minY; cy <= maxY; cy++) {
+      for (let cx = minX; cx <= maxX; cx++) {
+        let row = rows.get(cy);
+        if (!row) {
+          row = new Map();
+          rows.set(cy, row);
+        }
+        const bucket = row.get(cx);
+        if (bucket) bucket.push(shipIndex);
+        else row.set(cx, [shipIndex]);
+      }
+    }
+  });
+
+  const offsets = new Float64Array(objects.projectiles.length + 1);
+  const indicesList = [];
+  const visitMarks = new Uint32Array(objects.ships.length);
+  let epoch = 0;
+  let candidatePairs = 0;
+  objects.projectiles.forEach((projectile, projectileIndex) => {
+    offsets[projectileIndex] = candidatePairs;
+    const minX = toCell(Math.min(projectile.x0, projectile.x1));
+    const maxX = toCell(Math.max(projectile.x0, projectile.x1));
+    const minY = toCell(Math.min(projectile.y0, projectile.y1));
+    const maxY = toCell(Math.max(projectile.y0, projectile.y1));
+    epoch++;
+    for (let cy = minY; cy <= maxY; cy++) {
+      const row = rows.get(cy);
+      if (!row) continue;
+      for (let cx = minX; cx <= maxX; cx++) {
+        const bucket = row.get(cx);
+        if (!bucket) continue;
+        for (const shipIndex of bucket) visitMarks[shipIndex] = epoch;
+      }
+    }
+    for (let shipIndex = 0; shipIndex < objects.ships.length; shipIndex++) {
+      if (visitMarks[shipIndex] !== epoch) continue;
+      indicesList.push(shipIndex);
+      candidatePairs++;
+    }
+  });
+  offsets[objects.projectiles.length] = candidatePairs;
+
+  const indices = new Float64Array(candidatePairs);
+  for (let index = 0; index < indicesList.length; index++) indices[index] = indicesList[index];
+
+  const fullPairs = objects.ships.length * objects.projectiles.length;
+  return {
+    offsets,
+    indices,
+    candidatePairs,
+    fullPairs,
+    candidateRatio: fullPairs > 0 ? candidatePairs / fullPairs : 0
+  };
 }
 
 function pointInPolygonPacked(x, y, outlines, startVertex, vertexCount) {
@@ -391,7 +469,7 @@ function optimized(data, staticData) {
           const hx = x0 + (x1 - x0) * t - shieldCx;
           const hy = y0 + (y1 - y0) * t - shieldCy;
           const length = Math.hypot(hx, hy);
-          const arcAccepted = length <= 1e-12 || ships[s + 7] <= -0.999999 || (hx * facingCos + hy * facingSin) / length >= ships[s + 7];
+          const arcAccepted = length <= 1e-12 || ships[s + 7] <= -0.999999 || (hx * ships[s + 11] + hy * ships[s + 12]) / length >= ships[s + 7];
           if (arcAccepted) {
             if (t < bestT) {
               bestT = t;
@@ -493,9 +571,16 @@ async function loadWasmPilot() {
     memory,
     alloc_bytes: allocBytes,
     dealloc_bytes: deallocBytes,
-    batch_nearest_hits: batchNearestHits
+    batch_nearest_hits: batchNearestHits,
+    batch_nearest_hits_indexed: batchNearestHitsIndexed
   } = instance.exports;
-  if (!(memory instanceof WebAssembly.Memory) || typeof allocBytes !== 'function' || typeof deallocBytes !== 'function' || typeof batchNearestHits !== 'function') {
+  if (
+    !(memory instanceof WebAssembly.Memory) ||
+    typeof allocBytes !== 'function' ||
+    typeof deallocBytes !== 'function' ||
+    typeof batchNearestHits !== 'function' ||
+    typeof batchNearestHitsIndexed !== 'function'
+  ) {
     throw new Error('Wasm pilot is missing required exports');
   }
   return {
@@ -503,6 +588,7 @@ async function loadWasmPilot() {
     allocBytes,
     deallocBytes,
     batchNearestHits,
+    batchNearestHitsIndexed,
     initialization: {
       moduleBytes: bytes.byteLength,
       fileReadMs: readEnd - initializationStart,
@@ -559,6 +645,30 @@ function createWasmScenario(pilot, shipCount, projectileCount) {
   };
 }
 
+function createWasmIndexedScenario(pilot, shipCount, projectileCount, candidateCount) {
+  const base = createWasmScenario(pilot, shipCount, projectileCount);
+  const offsetsBytes = (projectileCount + 1) * Float64Array.BYTES_PER_ELEMENT;
+  const candidatesBytes = candidateCount * Float64Array.BYTES_PER_ELEMENT;
+  const offsetsPtr = pilot.allocBytes(offsetsBytes);
+  const candidatesPtr = candidateCount > 0 ? pilot.allocBytes(candidatesBytes) : 0;
+  if (!offsetsPtr || (candidateCount > 0 && !candidatesPtr)) {
+    base.dispose();
+    throw new Error('Wasm indexed-candidate allocation failed');
+  }
+  return {
+    ...base,
+    offsetsPtr,
+    candidatesPtr,
+    offsetsBytes,
+    candidatesBytes,
+    dispose() {
+      if (candidateCount > 0) pilot.deallocBytes(candidatesPtr, candidatesBytes);
+      pilot.deallocBytes(offsetsPtr, offsetsBytes);
+      base.dispose();
+    }
+  };
+}
+
 function runWasm(pilot, staticBuffers, buffers, typed, shipCount, projectileCount) {
   const start = performance.now();
   new Float64Array(pilot.memory.buffer, buffers.shipsPtr, typed.ships.length).set(typed.ships);
@@ -572,6 +682,40 @@ function runWasm(pilot, staticBuffers, buffers, typed, shipCount, projectileCoun
     shipCount,
     buffers.projectilesPtr,
     projectileCount,
+    buffers.outputPtr
+  );
+  const computeEnd = performance.now();
+  const output = Float64Array.from(new Float64Array(pilot.memory.buffer, buffers.outputPtr, projectileCount * OUTPUT_STRIDE));
+  const readEnd = performance.now();
+  return {
+    hits,
+    output,
+    boundaryTransferMs: transferEnd - start,
+    computeMs: computeEnd - transferEnd,
+    resultReadMs: readEnd - computeEnd
+  };
+}
+
+function runIndexedWasm(pilot, staticBuffers, buffers, typed, spatial, shipCount, projectileCount) {
+  const start = performance.now();
+  new Float64Array(pilot.memory.buffer, buffers.shipsPtr, typed.ships.length).set(typed.ships);
+  new Float64Array(pilot.memory.buffer, buffers.projectilesPtr, typed.projectiles.length).set(typed.projectiles);
+  new Float64Array(pilot.memory.buffer, buffers.offsetsPtr, spatial.offsets.length).set(spatial.offsets);
+  if (spatial.indices.length > 0) {
+    new Float64Array(pilot.memory.buffer, buffers.candidatesPtr, spatial.indices.length).set(spatial.indices);
+  }
+  const transferEnd = performance.now();
+  const hits = pilot.batchNearestHitsIndexed(
+    staticBuffers.outlinesPtr,
+    staticBuffers.metaPtr,
+    staticBuffers.outlineCount,
+    buffers.shipsPtr,
+    shipCount,
+    buffers.projectilesPtr,
+    projectileCount,
+    buffers.offsetsPtr,
+    buffers.candidatesPtr,
+    spatial.indices.length,
     buffers.outputPtr
   );
   const computeEnd = performance.now();
@@ -636,6 +780,28 @@ function runCorrectnessCases(pilot, staticBuffers, staticData) {
       } finally {
         buffers.dispose();
       }
+
+      const spatial = buildSpatialCandidates(testCase.objects);
+      const indexedBuffers = createWasmIndexedScenario(
+        pilot,
+        testCase.objects.ships.length,
+        testCase.objects.projectiles.length,
+        spatial.indices.length
+      );
+      try {
+        const indexedResult = runIndexedWasm(
+          pilot,
+          staticBuffers,
+          indexedBuffers,
+          typed,
+          spatial,
+          testCase.objects.ships.length,
+          testCase.objects.projectiles.length
+        );
+        assertEquivalent(`${testCase.name}/spatialWasm`, expected, indexedResult);
+      } finally {
+        indexedBuffers.dispose();
+      }
     }
     return {
       name: testCase.name,
@@ -681,6 +847,7 @@ try {
   for (const scenario of scenarios) {
     const objects = makeObjects(scenario.ships, scenario.projectiles, staticData.realProfiles);
     const reference = baseline(objects);
+    const spatialReference = buildSpatialCandidates(objects);
 
     for (let i = 0; i < WARMUP_SAMPLES; i++) {
       baseline(objects);
@@ -697,15 +864,38 @@ try {
     const wasmCompute = [];
     const wasmRead = [];
     const wasmTotal = [];
+    const spatialPrep = [];
+    const spatialTransfer = [];
+    const spatialCompute = [];
+    const spatialRead = [];
+    const spatialTotal = [];
     const memoryBefore = process.memoryUsage();
 
     let wasmBuffers = null;
+    let indexedBuffers = null;
     if (wasmPilot && wasmStatic) {
       wasmBuffers = createWasmScenario(wasmPilot, scenario.ships, scenario.projectiles);
+      indexedBuffers = createWasmIndexedScenario(
+        wasmPilot,
+        scenario.ships,
+        scenario.projectiles,
+        spatialReference.indices.length
+      );
       for (let i = 0; i < WARMUP_SAMPLES; i++) {
         const typed = prepareTyped(objects);
         const warm = runWasm(wasmPilot, wasmStatic, wasmBuffers, typed, scenario.ships, scenario.projectiles);
         assertEquivalent(`${scenario.name}/wasm-warmup`, reference, warm);
+        const warmSpatial = buildSpatialCandidates(objects);
+        const indexedWarm = runIndexedWasm(
+          wasmPilot,
+          wasmStatic,
+          indexedBuffers,
+          typed,
+          warmSpatial,
+          scenario.ships,
+          scenario.projectiles
+        );
+        assertEquivalent(`${scenario.name}/spatial-wasm-warmup`, reference, indexedWarm);
       }
     }
 
@@ -740,9 +930,31 @@ try {
           wasmRead.push(wasmResult.resultReadMs);
           wasmTotal.push(end - start);
           if (sample === 0) assertEquivalent(`${scenario.name}/wasm`, reference, wasmResult);
+
+          start = performance.now();
+          const typedForSpatial = prepareTyped(objects);
+          const spatial = buildSpatialCandidates(objects);
+          const spatialPrepared = performance.now();
+          const spatialResult = runIndexedWasm(
+            wasmPilot,
+            wasmStatic,
+            indexedBuffers,
+            typedForSpatial,
+            spatial,
+            scenario.ships,
+            scenario.projectiles
+          );
+          end = performance.now();
+          spatialPrep.push(spatialPrepared - start);
+          spatialTransfer.push(spatialResult.boundaryTransferMs);
+          spatialCompute.push(spatialResult.computeMs);
+          spatialRead.push(spatialResult.resultReadMs);
+          spatialTotal.push(end - start);
+          if (sample === 0) assertEquivalent(`${scenario.name}/spatialWasm`, reference, spatialResult);
         }
       }
     } finally {
+      indexedBuffers?.dispose();
       wasmBuffers?.dispose();
     }
 
@@ -772,6 +984,18 @@ try {
         total: stats(wasmTotal),
         linearMemoryBytes: wasmPilot.memory.buffer.byteLength
       } : null,
+      spatialWasm: wasmPilot ? {
+        preparation: stats(spatialPrep),
+        boundaryTransfer: stats(spatialTransfer),
+        compute: stats(spatialCompute),
+        resultRead: stats(spatialRead),
+        total: stats(spatialTotal),
+        candidatePairs: spatialReference.candidatePairs,
+        fullPairs: spatialReference.fullPairs,
+        candidateRatio: spatialReference.candidateRatio,
+        candidateReductionPercent: (1 - spatialReference.candidateRatio) * 100,
+        linearMemoryBytes: wasmPilot.memory.buffer.byteLength
+      } : null,
       memory: {
         heapDeltaBytes: memoryAfter.heapUsed - memoryBefore.heapUsed,
         externalDeltaBytes: memoryAfter.external - memoryBefore.external,
@@ -794,21 +1018,30 @@ if (wasmPilot) {
   const mediumRatio = medium.wasm.total.meanMs / mediumTs.meanMs;
   const largeRatio = large.wasm.total.meanMs / largeTs.meanMs;
   const clearlyFaster = largeRatio <= 0.8 && mediumRatio <= 0.9;
+  const spatialMediumRatio = medium.spatialWasm.total.meanMs / mediumTs.meanMs;
+  const spatialLargeRatio = large.spatialWasm.total.meanMs / largeTs.meanMs;
+  const spatialCandidateReduction = 1 - large.spatialWasm.candidateRatio;
+  const spatialValidated = spatialCandidateReduction >= 0.5 && spatialMediumRatio <= 0.9 && spatialLargeRatio <= 0.8;
   output.wasm.adopted = clearlyFaster;
-  output.wasm.runtimeIntegrated = false;
-  output.wasm.decision = clearlyFaster ? 'adopt-for-runtime-integration' : 'keep-typescript';
+  output.wasm.runtimeIntegrated = clearlyFaster && spatialValidated;
+  output.wasm.decision = output.wasm.runtimeIntegrated ? 'runtime-spatial-wasm-integrated' : (clearlyFaster ? 'pilot-only' : 'keep-typescript');
   output.wasm.comparison = {
     mediumFastestTs: mediumTs.name,
     mediumWasmToFastestTsRatio: mediumRatio,
+    mediumSpatialWasmToFastestTsRatio: spatialMediumRatio,
     largeFastestTs: largeTs.name,
     largeWasmToFastestTsRatio: largeRatio,
+    largeSpatialWasmToFastestTsRatio: spatialLargeRatio,
     largeWasmP95Ms: large.wasm.total.p95Ms,
+    largeSpatialWasmP95Ms: large.spatialWasm.total.p95Ms,
     largeWasmOver16_67Ms: large.wasm.total.over16_67Ms,
+    largeSpatialWasmOver16_67Ms: large.spatialWasm.total.over16_67Ms,
+    largeCandidateReductionPercent: large.spatialWasm.candidateReductionPercent,
     threshold: { medium: 0.9, large: 0.8 }
   };
-  output.wasm.reason = clearlyFaster
-    ? `Pilot adoption threshold passed: end-to-end Wasm is ${(mediumRatio * 100).toFixed(1)}% of the fastest TS path at medium load and ${(largeRatio * 100).toFixed(1)}% at large load. Runtime integration remains outside this isolated pilot; the large-load P95 is ${large.wasm.total.p95Ms.toFixed(2)} ms, so spatial candidate reduction is still required for frame-budget safety.`
-    : `Do not adopt: end-to-end Wasm did not clear the pilot threshold against the fastest TS path (${(mediumRatio * 100).toFixed(1)}% at medium load, ${(largeRatio * 100).toFixed(1)}% at large load).`;
+  output.wasm.reason = output.wasm.runtimeIntegrated
+    ? `Limited runtime integration validated: the uniform grid removed ${(spatialCandidateReduction * 100).toFixed(1)}% of naive large-load ship/projectile pairs, and spatial+Wasm end-to-end is ${(spatialMediumRatio * 100).toFixed(1)}% of the fastest TS path at medium load and ${(spatialLargeRatio * 100).toFixed(1)}% at large load (large P95 ${large.spatialWasm.total.p95Ms.toFixed(2)} ms). TypeScript remains authoritative and special projectiles/failures stay on the TS fallback.`
+    : `Runtime integration gate not cleared: full Wasm ratios were ${(mediumRatio * 100).toFixed(1)}%/${(largeRatio * 100).toFixed(1)}% at medium/large load and spatial candidate reduction was ${(spatialCandidateReduction * 100).toFixed(1)}%.`;
 }
 
 await mkdir('benchmarks', { recursive: true });
