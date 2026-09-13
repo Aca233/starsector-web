@@ -1,0 +1,278 @@
+import { Vector2 } from '../../math/Vector2';
+import { WebGLShaderUtil } from './WebGLShaderUtil';
+
+const VERTEX_SHADER_SOURCE = `#version 300 es
+precision highp float;
+
+// 静态四边形局部角点 [-0.5, 0.5]
+layout(location = 0) in vec2 a_corner;
+
+// 动态实例化属性
+layout(location = 1) in vec2 a_worldPos;
+layout(location = 2) in vec2 a_scale;
+layout(location = 3) in float a_rotation;
+layout(location = 4) in vec2 a_pivot;
+layout(location = 5) in vec4 a_uvRect; // u0, v0, u1, v1
+layout(location = 6) in vec4 a_color;  // r, g, b, a
+
+uniform mat3 u_viewProj;
+
+out vec2 v_uv;
+out vec4 v_color;
+
+void main() {
+  // 1. 局部锚点变换
+  vec2 local = (a_corner - a_pivot) * a_scale;
+
+  // 2. 旋转
+  float cosR = cos(a_rotation);
+  float sinR = sin(a_rotation);
+  vec2 rotated = vec2(
+    local.x * cosR - local.y * sinR,
+    local.x * sinR + local.y * cosR
+  );
+
+  // 3. 世界位置
+  vec2 world = rotated + a_worldPos;
+
+  // 4. 正交投影
+  vec3 clip = u_viewProj * vec3(world, 1.0);
+  gl_Position = vec4(clip.xy, 0.0, 1.0);
+
+  // 5. 纹理 UV 坐标映射
+  vec2 uvNorm = a_corner + vec2(0.5, 0.5);
+  v_uv = vec2(
+    mix(a_uvRect.x, a_uvRect.z, uvNorm.x),
+    mix(a_uvRect.y, a_uvRect.w, uvNorm.y)
+  );
+  v_color = a_color;
+}
+`;
+
+const FRAGMENT_SHADER_SOURCE = `#version 300 es
+precision mediump float;
+
+in vec2 v_uv;
+in vec4 v_color;
+
+uniform sampler2D u_texture;
+
+out vec4 fragColor;
+
+void main() {
+  vec4 texColor = texture(u_texture, v_uv);
+  fragColor = texColor * v_color;
+}
+`;
+
+/**
+ * 极速 GPU 实例化精灵合批器 (SpriteBatcher)
+ * 支持多达 4096 个精灵/粒子单次硬件 Draw Call 渲染
+ */
+export class SpriteBatcher {
+  private gl: WebGL2RenderingContext;
+  private program: WebGLProgram;
+  private vao: WebGLVertexArrayObject;
+  private instanceVBO: WebGLBuffer;
+
+  private uViewProjLoc: WebGLUniformLocation;
+  private uTextureLoc: WebGLUniformLocation;
+
+  private static readonly MAX_SPRITES = 4096;
+  // 每个实例包含 16 个 float: worldX, worldY, scaleX, scaleY, rot, pivotX, pivotY, u0, v0, u1, v1, r, g, b, a, pad
+  private static readonly FLOATS_PER_SPRITE = 16;
+  private instanceData: Float32Array;
+  private spriteCount = 0;
+
+  private currentTexture: WebGLTexture | null = null;
+  private currentBlendMode: 'NORMAL' | 'ADDITIVE' = 'NORMAL';
+  public currentViewProj: Float32Array = new Float32Array(9);
+
+  constructor(gl: WebGL2RenderingContext) {
+    this.gl = gl;
+    this.program = WebGLShaderUtil.createProgram(gl, VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
+
+    this.uViewProjLoc = gl.getUniformLocation(this.program, 'u_viewProj')!;
+    this.uTextureLoc = gl.getUniformLocation(this.program, 'u_texture')!;
+
+    this.instanceData = new Float32Array(SpriteBatcher.MAX_SPRITES * SpriteBatcher.FLOATS_PER_SPRITE);
+
+    // 1. 初始化 VAO
+    const vao = gl.createVertexArray();
+    if (!vao) throw new Error('Failed to create VAO');
+    this.vao = vao;
+    gl.bindVertexArray(this.vao);
+
+    // 2. 静态四边形角点 VBO (2 个三角形 6 个顶点)
+    const quadCorners = new Float32Array([
+      -0.5, -0.5,
+       0.5, -0.5,
+      -0.5,  0.5,
+      -0.5,  0.5,
+       0.5, -0.5,
+       0.5,  0.5
+    ]);
+    const quadVBO = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO);
+    gl.bufferData(gl.ARRAY_BUFFER, quadCorners, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+    // 3. 动态实例化 VBO
+    const instVBO = gl.createBuffer();
+    if (!instVBO) throw new Error('Failed to create instance VBO');
+    this.instanceVBO = instVBO;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceVBO);
+    gl.bufferData(gl.ARRAY_BUFFER, this.instanceData.byteLength, gl.DYNAMIC_DRAW);
+
+    const stride = SpriteBatcher.FLOATS_PER_SPRITE * 4;
+    // a_worldPos (vec2) -> loc 1
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 2, gl.FLOAT, false, stride, 0);
+    gl.vertexAttribDivisor(1, 1);
+
+    // a_scale (vec2) -> loc 2
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 2, gl.FLOAT, false, stride, 2 * 4);
+    gl.vertexAttribDivisor(2, 1);
+
+    // a_rotation (float) -> loc 3
+    gl.enableVertexAttribArray(3);
+    gl.vertexAttribPointer(3, 1, gl.FLOAT, false, stride, 4 * 4);
+    gl.vertexAttribDivisor(3, 1);
+
+    // a_pivot (vec2) -> loc 4
+    gl.enableVertexAttribArray(4);
+    gl.vertexAttribPointer(4, 2, gl.FLOAT, false, stride, 5 * 4);
+    gl.vertexAttribDivisor(4, 1);
+
+    // a_uvRect (vec4) -> loc 5
+    gl.enableVertexAttribArray(5);
+    gl.vertexAttribPointer(5, 4, gl.FLOAT, false, stride, 7 * 4);
+    gl.vertexAttribDivisor(5, 1);
+
+    // a_color (vec4) -> loc 6
+    gl.enableVertexAttribArray(6);
+    gl.vertexAttribPointer(6, 4, gl.FLOAT, false, stride, 11 * 4);
+    gl.vertexAttribDivisor(6, 1);
+
+    gl.bindVertexArray(null);
+  }
+
+  public begin(cameraPos: Vector2, zoom: number, canvasWidth: number, canvasHeight: number) {
+    const gl = this.gl;
+    gl.useProgram(this.program);
+    gl.bindVertexArray(this.vao);
+
+    // 构建正交投影矩阵 (World -> Clip Space)
+    const sx = (2 * zoom) / canvasWidth;
+    const sy = (-2 * zoom) / canvasHeight;
+    const tx = -cameraPos.x * sx;
+    const ty = -cameraPos.y * sy;
+    this.currentViewProj = new Float32Array([
+      sx,  0,   0,
+      0,   sy,  0,
+      tx,  ty,  1
+    ]);
+    gl.uniformMatrix3fv(this.uViewProjLoc, false, this.currentViewProj);
+    gl.uniform1i(this.uTextureLoc, 0);
+
+    gl.enable(gl.BLEND);
+    this.setBlendMode('NORMAL');
+    this.spriteCount = 0;
+    this.currentTexture = null;
+  }
+
+  public resumeProgram() {
+    const gl = this.gl;
+    gl.useProgram(this.program);
+    gl.bindVertexArray(this.vao);
+    gl.uniformMatrix3fv(this.uViewProjLoc, false, this.currentViewProj);
+    gl.uniform1i(this.uTextureLoc, 0);
+    gl.enable(gl.BLEND);
+    if (this.currentBlendMode === 'ADDITIVE') {
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    } else {
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    }
+  }
+
+  public setBlendMode(mode: 'NORMAL' | 'ADDITIVE') {
+    if (this.currentBlendMode === mode) return;
+    this.flush();
+    this.currentBlendMode = mode;
+    const gl = this.gl;
+    if (mode === 'ADDITIVE') {
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    } else {
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    }
+  }
+
+  public drawSprite(
+    texture: WebGLTexture,
+    worldX: number,
+    worldY: number,
+    scaleX: number,
+    scaleY: number,
+    rotation = 0,
+    pivotX = 0,
+    pivotY = 0,
+    r = 1.0,
+    g = 1.0,
+    b = 1.0,
+    a = 1.0,
+    u0 = 0.0,
+    v0 = 0.0,
+    u1 = 1.0,
+    v1 = 1.0
+  ) {
+    if (this.currentTexture !== texture || this.spriteCount >= SpriteBatcher.MAX_SPRITES) {
+      this.flush();
+      this.currentTexture = texture;
+    }
+
+    const offset = this.spriteCount * SpriteBatcher.FLOATS_PER_SPRITE;
+    const data = this.instanceData;
+    data[offset] = worldX;
+    data[offset + 1] = worldY;
+    data[offset + 2] = scaleX;
+    data[offset + 3] = scaleY;
+    data[offset + 4] = rotation;
+    data[offset + 5] = pivotX;
+    data[offset + 6] = pivotY;
+    data[offset + 7] = u0;
+    data[offset + 8] = v0;
+    data[offset + 9] = u1;
+    data[offset + 10] = v1;
+    data[offset + 11] = r;
+    data[offset + 12] = g;
+    data[offset + 13] = b;
+    data[offset + 14] = a;
+    data[offset + 15] = 0; // padding
+
+    this.spriteCount++;
+  }
+
+  public flush() {
+    if (this.spriteCount === 0 || !this.currentTexture) return;
+
+    const gl = this.gl;
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.currentTexture);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceVBO);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.instanceData.subarray(0, this.spriteCount * SpriteBatcher.FLOATS_PER_SPRITE));
+
+    // 核心调用：单次 GPU 实例化绘制所有精灵
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, this.spriteCount);
+    this.spriteCount = 0;
+  }
+
+  public end() {
+    this.flush();
+    const gl = this.gl;
+    gl.bindVertexArray(null);
+    gl.useProgram(null);
+  }
+}
