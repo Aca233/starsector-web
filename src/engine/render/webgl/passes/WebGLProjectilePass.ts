@@ -2,6 +2,7 @@ import { visualRandom } from '../../RenderDeterminism';
 import { CombatEngine } from '../../../simulation/CombatEngine';
 import { WebGLPassContext } from '../WebGLPassContext';
 import { Vector2 } from '../../../math/Vector2';
+import { getWeaponVisualProfile } from '../../../visual/VisualProfiles';
 
 /**
  * 弹药与光束渲染通道 (WebGLProjectilePass)
@@ -59,8 +60,9 @@ export class WebGLProjectilePass {
         const [fr, fg, fb] = b.fringeColor || b.color;
         const [cr, cg, cb] = b.coreColor || [255, 255, 255];
         const [gr, gg, gb] = b.glowColor || [fr, fg, fb];
-        const bAlpha = Math.min(1.0, b.duration / 0.1);
-        const width = b.width;
+        const visual = getWeaponVisualProfile(b.specId, 'BEAM', false, true);
+        const bAlpha = Math.min(1.0, b.duration / Math.max(visual.fadeSeconds, 0.01));
+        const width = b.width * visual.trailScale;
         const isRough = b.textureType === 'ROUGH' || b.specId === 'tachyonlance';
 
         // 1. 动态高速流动羽流层 (Fringe UV Scroll: 1:1 L.java:56, 377)
@@ -74,13 +76,13 @@ export class WebGLProjectilePass {
           b.startPos.x,
           b.startPos.y,
           beamLen,
-          width * (isRough ? 1.25 : 1.0),
+          width * (isRough ? 1.25 : 1.0) * visual.glowScale,
           angle,
           -0.5,
           0,
-          fr / 255,
-          fg / 255,
-          fb / 255,
+          Math.min(1, fr / 255 * visual.brightness),
+          Math.min(1, fg / 255 * visual.brightness),
+          Math.min(1, fb / 255 * visual.brightness),
           0.95 * bAlpha,
           -fringeScroll,
           0,
@@ -96,7 +98,7 @@ export class WebGLProjectilePass {
           b.startPos.x,
           b.startPos.y,
           beamLen,
-          width * 0.42,
+          width * visual.coreScale,
           angle,
           -0.5,
           0,
@@ -111,13 +113,13 @@ export class WebGLProjectilePass {
         );
 
         // 3. 炮口紧凑真实辉光 (1:1 BeamWeaponRay: 紧贴炮管口部，严禁百像素刺眼球体)
-        const muzzleGlowSize = Math.max(10, width * 1.2);
+        const muzzleGlowSize = Math.max(10, width * 1.2) * visual.muzzleScale;
         batcher.drawSprite(hitGlowTex, b.startPos.x, b.startPos.y, muzzleGlowSize, muzzleGlowSize, 0, 0, 0, gr / 255, gg / 255, gb / 255, 0.55 * bAlpha);
 
         // 4. 目标受击装甲/护盾灼烧光斑 (1:1 BeamWeaponRay.java:124-144)
         // 严格遵循原版机制：仅当光束实际命中目标时才在碰撞点绘制受击光晕
         if (b.isHitting) {
-          const hitRadius = b.hitGlowRadius || Math.max(14, width * 1.8);
+          const hitRadius = (b.hitGlowRadius || Math.max(14, width * 1.8)) * visual.impactScale;
           batcher.drawSprite(hitGlowTex, b.endPos.x, b.endPos.y, hitRadius * 2.0, hitRadius * 2.0, 0, 0, 0, fr / 255, fg / 255, fb / 255, 0.85 * bAlpha);
           batcher.drawSprite(hitGlowTex, b.endPos.x, b.endPos.y, hitRadius * 0.6, hitRadius * 0.6, 0, 0, 0, cr / 255, cg / 255, cb / 255, 1.0 * bAlpha);
         }
@@ -147,8 +149,10 @@ export class WebGLProjectilePass {
       const mFlashTex = textures.getTexture('/game-assets/graphics/fx/muzzleflash32.1.png');
       for (const flash of engine.muzzleFlashes) {
         const mAlpha = Math.max(0, flash.life / flash.maxLife);
+        const visual = getWeaponVisualProfile(flash.specId ?? '', undefined, false, false);
         const [mr, mg, mb] = flash.color;
-        batcher.drawSprite(mFlashTex, flash.pos.x, flash.pos.y, flash.size, flash.size, flash.angleRad + Math.PI / 2, 0, 0, mr / 255, mg / 255, mb / 255, mAlpha);
+        const muzzleSize = flash.size * visual.muzzleScale;
+        batcher.drawSprite(mFlashTex, flash.pos.x, flash.pos.y, muzzleSize, muzzleSize, flash.angleRad + Math.PI / 2, 0, 0, mr / 255, mg / 255, mb / 255, Math.min(1, mAlpha * visual.brightness));
       }
     }
 
@@ -165,6 +169,7 @@ export class WebGLProjectilePass {
       const pPos = Vector2.lerp(p.prevPos, p.pos, alpha);
       const pAngle = p.facingRad !== undefined ? p.facingRad : p.vel.heading();
       const fwd = Vector2.fromAngle(pAngle);
+      const visual = getWeaponVisualProfile(p.specId, p.spawnType, !!p.isRocket, false);
 
       // 4.1 诱饵热焰弹 (Decoy Flare)
       if (p.isFlare) {
@@ -176,8 +181,8 @@ export class WebGLProjectilePass {
       // 4.2 等离子束 / 脉冲类投射物 (BALLISTIC_AS_BEAM / TPC / Autopulse: 1:1 MovingRay.java & N.java & _if.java)
       else if (p.spawnType === 'BALLISTIC_AS_BEAM' || p.specId === 'tpc' || p.specId === 'autopulse') {
         const isRough = p.textureType === 'ROUGH' || p.specId === 'tpc';
-        const len = p.projLength || (p.specId === 'tpc' ? 100 : 50);
-        const wid = p.projWidth || (p.specId === 'tpc' ? 35 : 20);
+        const len = (p.projLength || (p.specId === 'tpc' ? 100 : 50)) * visual.trailScale;
+        const wid = (p.projWidth || (p.specId === 'tpc' ? 35 : 20)) * visual.glowScale;
         const [fr, fg, fb] = p.fringeColor || (p.specId === 'tpc' ? [255, 0, 0] : [0, 80, 255]);
         const [cr, cg, cb] = p.coreColor || [255, 255, 255];
         const [gr, gg, gb] = p.glowColor || (p.specId === 'tpc' ? [255, 60, 60] : [80, 140, 255]);
@@ -192,12 +197,12 @@ export class WebGLProjectilePass {
 
         const cTex = isRough ? roughCore : smoothCore;
         const coreScroll = scroll * 1.35;
-        const coreWid = wid * (p.coreWidthMult || 0.44);
+        const coreWid = wid * (p.coreWidthMult || visual.coreScale);
         batcher.drawSprite(cTex, pPos.x, pPos.y, len * 0.95, coreWid, pAngle, 0, 0, cr / 255, cg / 255, cb / 255, 1.0, -coreScroll, 0, -coreScroll + repeatCount, 1);
 
         // 尖端紧凑高能冲击微光 (1:1 _if.java: 紧贴弹头，严禁百像素大圆球)
         const tipPos = pPos.clone().addScaled(fwd, len * 0.42);
-        const tipGlowSize = Math.max(14, wid * 1.1);
+        const tipGlowSize = Math.max(14, wid * 1.1) * visual.impactScale;
         batcher.drawSprite(hitGlowTex, tipPos.x, tipPos.y, tipGlowSize, tipGlowSize, 0, 0, 0, gr / 255, gg / 255, gb / 255, 0.85);
         batcher.drawSprite(hitGlowTex, tipPos.x, tipPos.y, tipGlowSize * 0.45, tipGlowSize * 0.45, 0, 0, 0, 1.0, 1.0, 1.0, 0.95);
       }
@@ -207,11 +212,11 @@ export class WebGLProjectilePass {
         const wid = p.projWidth || 8;
         const [fr, fg, fb] = p.fringeColor || p.color || [235, 255, 215];
         const [cr, cg, cb] = p.coreColor || [225, 255, 205];
-        const tracerLen = len * 1.5;
+        const tracerLen = len * 1.5 * visual.trailScale;
 
         batcher.setBlendMode('ADDITIVE');
         const tracerCenter = pPos.clone().addScaled(fwd, -tracerLen * 0.5);
-        batcher.drawSprite(projTrailTex, tracerCenter.x, tracerCenter.y, tracerLen, wid * 1.3, pAngle, 0, 0, fr / 255, fg / 255, fb / 255, 0.85);
+        batcher.drawSprite(projTrailTex, tracerCenter.x, tracerCenter.y, tracerLen, wid * 1.3 * Math.max(0.82, visual.glowScale), pAngle, 0, 0, fr / 255, fg / 255, fb / 255, 0.85);
 
         const coreTracerLen = tracerLen * 0.75;
         const coreTracerCenter = pPos.clone().addScaled(fwd, -coreTracerLen * 0.5);
@@ -224,7 +229,7 @@ export class WebGLProjectilePass {
         // 弹头硬朗动能针状微光 (1:1 _if.java: 严禁百像素大圆球，还原原版高速金属弹头真实质感)
         batcher.setBlendMode('ADDITIVE');
         const tipPos = pPos.clone().addScaled(fwd, len * 0.4);
-        const glintSize = Math.max(8, Math.min(20, wid * 1.6));
+        const glintSize = Math.max(8, Math.min(24, wid * 1.6 * visual.impactScale));
         batcher.drawSprite(hitGlowTex, tipPos.x, tipPos.y, glintSize, glintSize, 0, 0, 0, fr / 255, fg / 255, fb / 255, 0.8);
         batcher.drawSprite(hitGlowTex, tipPos.x, tipPos.y, glintSize * 0.45, glintSize * 0.45, 0, 0, 0, 1.0, 1.0, 1.0, 0.95);
       }
@@ -236,13 +241,13 @@ export class WebGLProjectilePass {
 
         batcher.setBlendMode('ADDITIVE');
         const flameMult = p.specId === 'typhoon' ? 1.6 : 1.0;
-        const flameLen = (18 + visualRandom('webgl/passes/WebGLProjectilePass.ts#2') * 8) * flameMult;
-        const flameWid = wid * 0.75;
+        const flameLen = (18 + visualRandom('webgl/passes/WebGLProjectilePass.ts#2') * 8) * flameMult * visual.trailScale;
+        const flameWid = wid * 0.75 * visual.glowScale;
         const flamePos = pPos.clone().addScaled(fwd, -len * 0.5);
         batcher.drawSprite(rocketFlameTex, flamePos.x, flamePos.y, flameLen, flameWid, pAngle + Math.PI, -0.5, 0, flameColor[0] / 255, flameColor[1] / 255, flameColor[2] / 255, 0.9);
         batcher.drawSprite(rocketFlameTex, flamePos.x, flamePos.y, flameLen * 0.55, flameWid * 0.4, pAngle + Math.PI, -0.5, 0, 1.0, 1.0, 0.9, 0.95);
 
-        const starSize = (p.specId === 'typhoon' ? 48 : 36) * flameMult;
+        const starSize = (p.specId === 'typhoon' ? 48 : 36) * flameMult * visual.glowScale;
         batcher.drawSprite(hitGlowTex, flamePos.x, flamePos.y, starSize, starSize, 0, 0, 0, flameColor[0] / 255, flameColor[1] / 255, flameColor[2] / 255, 0.95);
         const coreStarSize = starSize * 0.45;
         batcher.drawSprite(hitGlowTex, flamePos.x, flamePos.y, coreStarSize, coreStarSize, 0, 0, 0, 1.0, 1.0, 1.0, 1.0);
@@ -255,8 +260,8 @@ export class WebGLProjectilePass {
       else {
         const [r, g, b] = p.color || [255, 200, 100];
         batcher.setBlendMode('ADDITIVE');
-        batcher.drawSprite(hitGlowTex, pPos.x, pPos.y, p.radius * 4, p.radius * 2, pAngle, 0, 0, r / 255, g / 255, b / 255, 0.9);
-        batcher.drawSprite(hitGlowTex, pPos.x, pPos.y, p.radius * 2, p.radius * 1.0, pAngle, 0, 0, 1.0, 1.0, 1.0, 0.95);
+        batcher.drawSprite(hitGlowTex, pPos.x, pPos.y, p.radius * 4 * visual.glowScale, p.radius * 2 * visual.glowScale, pAngle, 0, 0, r / 255, g / 255, b / 255, 0.9);
+        batcher.drawSprite(hitGlowTex, pPos.x, pPos.y, p.radius * 2 * visual.coreScale, p.radius * visual.coreScale, pAngle, 0, 0, 1.0, 1.0, 1.0, 0.95);
       }
     }
   }

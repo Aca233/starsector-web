@@ -24,6 +24,8 @@ export interface ContrailParticle {
 
 export interface ExplosionAnimation {
   id: number;
+  visualKind?: 'impact' | 'missile' | 'ship';
+  sourceShipId?: string;
   pos: Vector2;
   radius: number;
   maxRadius: number;
@@ -56,6 +58,7 @@ export interface EmpArc {
 
 export interface MuzzleFlash {
   id: number;
+  specId?: string;
   pos: Vector2;
   angleRad: number;
   size: number;

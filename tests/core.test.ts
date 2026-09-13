@@ -14,6 +14,16 @@ import { CameraController } from '../src/engine/runtime/CameraController';
 import { CombatSession } from '../src/engine/runtime/CombatSession';
 import { VISUAL_SCENARIOS, VisualScenarioController } from '../src/visual-lab/VisualScenarioController';
 import type { ICombatRenderer } from '../src/engine/render/ICombatRenderer';
+import { Shield } from '../src/engine/simulation/Shield';
+import {
+  ENGINE_VISUAL_PROFILES,
+  SHIELD_VISUAL_PROFILES,
+  getExplosionVisualProfile,
+  getShipVisualProfile,
+  getWeaponVisualFamily,
+  getWeaponVisualProfile
+} from '../src/engine/visual/VisualProfiles';
+import { getHudDensity, getHudLayoutProfile } from '../src/ui/hud/HudLayout';
 
 describe('Starsector text import', () => {
   it('preserves JSON primitives and // inside quoted URLs', () => {
@@ -222,6 +232,96 @@ describe('V01 controlled Visual Lab scenarios', () => {
     lab.seek(1.4);
     const replayed = session.engine.projectiles[0];
     expect({ x: replayed.pos.x, y: replayed.pos.y, elapsed: replayed.elapsedTime }).toEqual(snapshot);
+  });
+});
+
+describe('M3 reusable visual fidelity profiles', () => {
+  it('maps Onslaught, Paragon and Doom to distinct reusable hull/shield/vent profiles', () => {
+    const onslaught = getShipVisualProfile('onslaught');
+    const paragon = getShipVisualProfile('paragon');
+    const doom = getShipVisualProfile('doom');
+    expect(onslaught.shieldProfile).toBe('lowTech');
+    expect(paragon.shieldProfile).toBe('highTech');
+    expect(paragon.fortressShieldProfile).toBe('fortress');
+    expect(doom.phaseColor).not.toEqual(onslaught.phaseColor);
+    expect(onslaught.vent.fringeColor).not.toEqual(paragon.vent.fringeColor);
+    expect(SHIELD_VISUAL_PROFILES.fortress.brightness).toBeGreaterThan(SHIELD_VISUAL_PROFILES.highTech.brightness);
+    expect(ENGINE_VISUAL_PROFILES.LOW_TECH.flameColor).not.toEqual(ENGINE_VISUAL_PROFILES.HIGH_TECH.flameColor);
+  });
+
+  it('classifies all four M3 weapon visual families and gives them distinct treatment', () => {
+    expect(getWeaponVisualFamily('tpc', 'BALLISTIC_AS_BEAM')).toBe('TPC');
+    expect(getWeaponVisualFamily('mark9', 'BALLISTIC')).toBe('BALLISTIC');
+    expect(getWeaponVisualFamily('tachyonlance', 'BEAM', false, true)).toBe('BEAM');
+    expect(getWeaponVisualFamily('typhoon', 'MISSILE', true)).toBe('MISSILE');
+    const tpc = getWeaponVisualProfile('tpc', 'BALLISTIC_AS_BEAM');
+    const beam = getWeaponVisualProfile('tachyonlance', 'BEAM', false, true);
+    const missile = getWeaponVisualProfile('typhoon', 'MISSILE', true);
+    expect(tpc.glowScale).toBeGreaterThan(1);
+    expect(beam.coreScale).toBeLessThan(beam.trailScale);
+    expect(missile.impactScale).toBeGreaterThan(tpc.impactScale);
+  });
+
+  it('uses a layered capital explosion profile for sample-ship destruction', () => {
+    const small = getExplosionVisualProfile(60);
+    const capital = getExplosionVisualProfile(180);
+    expect(capital.flash).toBeGreaterThan(small.flash);
+    expect(capital.smoke).toBeGreaterThan(small.smoke);
+    expect(capital.debris).toBeGreaterThan(small.debris);
+  });
+
+  it('keeps ordinary, missile and ship-destruction explosion profiles distinct', () => {
+    const impact = getExplosionVisualProfile(60, 'impact');
+    const missile = getExplosionVisualProfile(60, 'missile');
+    const ship = getExplosionVisualProfile(180, 'ship', 'onslaught');
+    expect(missile.shockwave).toBeGreaterThan(impact.shockwave);
+    expect(ship.smoke).toBeGreaterThan(missile.smoke);
+    expect(ship.debris).toBeGreaterThan(missile.debris);
+  });
+
+  it('caps shield hit ripples to the four shader slots while merging nearby hits', () => {
+    const shield = new Shield('FRONT', 180, 250, 1, 0);
+    shield.absorbDamage(100, 'ENERGY', 0);
+    shield.absorbDamage(100, 'ENERGY', 0.05);
+    expect(shield.ripples).toHaveLength(1);
+    expect(shield.ripples[0].intensity).toBeGreaterThan(1);
+    for (const angle of [0.6, 1.2, 1.8, 2.4, 3.0, 3.6]) shield.absorbDamage(100, 'KINETIC', angle);
+    expect(shield.ripples).toHaveLength(4);
+  });
+
+  it('keeps every M3 capture checkpoint inside its deterministic VIS scene', () => {
+    for (const scene of VISUAL_SCENARIOS) {
+      expect(scene.checkpoints.length).toBeGreaterThan(0);
+      expect(scene.checkpoints).toEqual([...scene.checkpoints].sort((a, b) => a - b));
+      expect(scene.checkpoints.every((time) => time >= 0 && time <= scene.duration)).toBe(true);
+    }
+  });
+
+  it('reuses the same controlled hull scene across Onslaught, Paragon and Doom profiles', () => {
+    const session = new CombatSession('onslaught', 'paragon', 7331);
+    const lab = new VisualScenarioController(session);
+    lab.select('VIS-01', 7331);
+    lab.seek(1.25);
+    expect(session.engine.playerShip.spec.id).toBe('onslaught');
+    lab.setPreviewShip('paragon');
+    expect(session.engine.playerShip.spec.id).toBe('paragon');
+    expect(lab.time).toBeCloseTo(1.25, 5);
+    lab.setPreviewShip('doom');
+    expect(session.engine.playerShip.spec.id).toBe('doom');
+    expect(lab.time).toBeCloseTo(1.25, 5);
+    lab.setPreviewShip(null);
+    expect(session.engine.playerShip.spec.id).toBe('onslaught');
+  });
+});
+
+describe('V08 target-resolution HUD layout', () => {
+  it('selects compact, standard and expanded layouts at the three acceptance resolutions', () => {
+    expect(getHudDensity(1280, 720)).toBe('compact');
+    expect(getHudDensity(1920, 1080)).toBe('standard');
+    expect(getHudDensity(2560, 1440)).toBe('expanded');
+    expect(getHudLayoutProfile(1280, 720).panelScale).toBeLessThan(1);
+    expect(getHudLayoutProfile(1920, 1080).panelScale).toBe(1);
+    expect(getHudLayoutProfile(2560, 1440).panelScale).toBeGreaterThan(1);
   });
 });
 

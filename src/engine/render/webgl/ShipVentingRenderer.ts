@@ -5,6 +5,7 @@ import { Ship } from '../../simulation/Ship';
 import { SpriteBatcher } from './SpriteBatcher';
 import { RibbonBatcher } from './RibbonBatcher';
 import { WebGLTextureManager } from './WebGLTextureManager';
+import { getShipVisualProfile } from '../../visual/VisualProfiles';
 
 interface VentParticle {
   pos: Vector2;
@@ -97,6 +98,7 @@ export class ShipVentingRenderer {
    */
   public update(dt: number, ship: Ship, shipPos: Vector2, shipFacing: number, random: VisualRandom) {
     this.initEmittersIfNeeded(ship, random);
+    const ventVisual = getShipVisualProfile(ship.spec.id).vent;
 
     if (ship.flux.isVenting) {
       this.faderIn = Math.min(1.0, this.faderIn + dt * 3.3); // 0.3s 快速爆发
@@ -141,7 +143,7 @@ export class ShipVentingRenderer {
           const u1 = (cellX + 1) * 0.25;
           const v1 = (cellY + 1) * 0.25;
 
-          const baseSize = colRad * 0.2 + 14;
+          const baseSize = (colRad * 0.2 + 14) * ventVisual.particleScale;
           const initSize = baseSize * (0.65 + sample('vent-size') * 0.35);
           const maxSize = baseSize * (1.7 + sample('vent-max-size') * 0.6);
           const life = 0.7 + sample('vent-life') * 0.4;
@@ -200,6 +202,7 @@ export class ShipVentingRenderer {
 
     const fluxLevel = ship.flux.fluxPercent;
     const nowSec = visualNowMs() * 0.001;
+    const ventVisual = getShipVisualProfile(ship.spec.id).vent;
 
     batcher.flush();
     ribbonBatcher.begin(batcher.currentViewProj);
@@ -209,8 +212,8 @@ export class ShipVentingRenderer {
       radialTex,
       shipPos,
       shipFacing,
-      ship.spec.collisionRadius * (1.0 + Math.sin(nowSec * 9.0) * 0.05),
-      [135, 15, 185],
+      ship.spec.collisionRadius * ventVisual.haloScale * (1.0 + Math.sin(nowSec * 9.0) * 0.05),
+      ventVisual.fringeColor,
       haloAlpha,
       nowSec * 0.8
     );
@@ -220,8 +223,8 @@ export class ShipVentingRenderer {
       radialTex,
       shipPos,
       shipFacing,
-      ship.spec.collisionRadius * 0.85,
-      [220, 240, 255],
+      ship.spec.collisionRadius * 0.85 * ventVisual.haloScale,
+      ventVisual.coreColor,
       coreAlpha,
       -nowSec * 0.6
     );
@@ -245,10 +248,11 @@ export class ShipVentingRenderer {
 
     const fluxLevel = ship.flux.fluxPercent;
     batcher.setBlendMode('ADDITIVE');
+    const ventVisual = getShipVisualProfile(ship.spec.id).vent;
 
     for (const p of this.particles) {
       const progress = Math.max(0, Math.min(1.0, 1.0 - p.life / p.maxLife));
-      const curSize = p.size + (p.maxSize - p.size) * Math.sin(progress * Math.PI * 0.5);
+      const curSize = (p.size + (p.maxSize - p.size) * Math.sin(progress * Math.PI * 0.5)) * ventVisual.plumeScale;
 
       // 迅速淡入 (前 15%)，随后平滑散逸消逝 (后 85%)
       const fade = progress < 0.15 ? (progress / 0.15) : Math.max(0, (1.0 - progress) / 0.85);
@@ -265,9 +269,9 @@ export class ShipVentingRenderer {
         p.rotation,
         0,
         0,
-        135 / 255,
-        15 / 255,
-        175 / 255,
+        ventVisual.fringeColor[0] / 255,
+        ventVisual.fringeColor[1] / 255,
+        ventVisual.fringeColor[2] / 255,
         alphaMult * 0.72,
         p.u0,
         p.v0,
@@ -286,9 +290,9 @@ export class ShipVentingRenderer {
         p.rotation,
         0,
         0,
-        255 / 255,
-        255 / 255,
-        255 / 255,
+        ventVisual.coreColor[0] / 255,
+        ventVisual.coreColor[1] / 255,
+        ventVisual.coreColor[2] / 255,
         alphaMult * 0.88,
         p.u0,
         p.v0,

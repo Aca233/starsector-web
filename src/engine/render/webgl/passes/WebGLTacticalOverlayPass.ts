@@ -202,6 +202,52 @@ export class WebGLTacticalOverlayPass {
     }
   }
 
+  /** Visual-Lab-only geometry probes for V04 pivot, hardpoint, muzzle and nozzle validation. */
+  public renderDebugMarkers(
+    engine: CombatEngine,
+    ctx: WebGLPassContext,
+    enemyPos: Vector2,
+    playerPos: Vector2
+  ) {
+    const { batcher, whiteTex, hitGlowTex } = ctx;
+    const drawLine = (x: number, y: number, angle: number, length: number, width: number, color: [number, number, number], alpha = 0.95) => {
+      batcher.drawSprite(whiteTex, x, y, length, width, angle, -0.5, 0, color[0], color[1], color[2], alpha);
+    };
+    const drawShip = (ship: typeof engine.playerShip, pos: Vector2) => {
+      if (ship.isDead) return;
+      batcher.setBlendMode('ADDITIVE');
+      // Rotation/pivot center cross.
+      drawLine(pos.x - 11, pos.y, 0, 22, 1.5, [0.25, 1.0, 0.55]);
+      drawLine(pos.x, pos.y - 11, Math.PI / 2, 22, 1.5, [0.25, 1.0, 0.55]);
+      batcher.drawSprite(hitGlowTex, pos.x, pos.y, 12, 12, 0, 0, 0, 0.25, 1.0, 0.55, 0.55);
+
+      // Weapon mount center and current muzzle/facing vector.
+      for (const mount of ship.weapons) {
+        const offset = new Vector2(mount.relativePos.x, mount.relativePos.y).rotate(ship.facingRad);
+        const mx = pos.x + offset.x;
+        const my = pos.y + offset.y;
+        const hardpoint = mount.mountType === 'HARDPOINT';
+        const color: [number, number, number] = hardpoint ? [1.0, 0.78, 0.18] : [0.2, 0.85, 1.0];
+        batcher.drawSprite(hitGlowTex, mx, my, hardpoint ? 10 : 8, hardpoint ? 10 : 8, 0, 0, 0, color[0], color[1], color[2], 0.7);
+        drawLine(mx, my, mount.currentAngleRad, 30, hardpoint ? 2.0 : 1.4, color, 0.9);
+      }
+
+      // Engine nozzle center and exhaust direction.
+      for (const slot of ship.spec.engineSlots) {
+        const offset = new Vector2(slot.x, slot.y).rotate(ship.facingRad);
+        const nx = pos.x + offset.x;
+        const ny = pos.y + offset.y;
+        const angle = (slot.angleDeg * Math.PI) / 180 + ship.facingRad;
+        batcher.drawSprite(hitGlowTex, nx, ny, Math.max(7, slot.width * 0.45), Math.max(7, slot.width * 0.45), 0, 0, 0, 1.0, 0.35, 0.12, 0.72);
+        drawLine(nx, ny, angle, Math.max(24, slot.length * 0.45), 1.5, [1.0, 0.35, 0.12], 0.82);
+      }
+      batcher.setBlendMode('NORMAL');
+    };
+
+    drawShip(engine.enemyShip, enemyPos);
+    drawShip(engine.playerShip, playerPos);
+  }
+
   private drawOfficialArc(
     batcher: SpriteBatcher,
     whiteTex: WebGLTexture,

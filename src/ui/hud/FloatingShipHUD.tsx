@@ -116,7 +116,7 @@ export const FloatingShipHUD: React.FC<FloatingShipHUDProps> = ({
   return (
     <div
       ref={containerRef}
-      className="pointer-events-none absolute top-0 left-0 select-none font-mono text-[#94ff00] text-[11px] leading-tight tracking-tight z-20"
+      className="hud-floating-tag pointer-events-none absolute top-0 left-0 select-none font-mono text-[#94ff00] text-[11px] leading-tight tracking-tight z-20"
       style={{
         willChange: 'transform',
         textShadow: '0 0 2px rgba(148, 255, 0, 0.7)'

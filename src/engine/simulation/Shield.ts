@@ -122,12 +122,23 @@ export class Shield {
       existing.intensity = Math.min(1.4, existing.intensity + 0.25);
       existing.color = hitColor;
     } else {
-      this.ripples.push({
+      const ripple: ShieldHitRipple = {
         angle: hitAngleRad,
         intensity: 1.0,
         life: 0.4,
         color: hitColor
-      });
+      };
+      // The shader exposes four ripple slots. Keep that capacity deterministic and recycle
+      // the weakest/oldest slot rather than silently accumulating invisible hit state.
+      if (this.ripples.length >= 4) {
+        let replaceIndex = 0;
+        for (let i = 1; i < this.ripples.length; i++) {
+          if (this.ripples[i].intensity < this.ripples[replaceIndex].intensity) replaceIndex = i;
+        }
+        this.ripples[replaceIndex] = ripple;
+      } else {
+        this.ripples.push(ripple);
+      }
     }
 
     return fluxGenerated;

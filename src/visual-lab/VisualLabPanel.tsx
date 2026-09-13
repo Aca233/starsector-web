@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { CombatSession } from '../engine/runtime/CombatSession';
 import { VISUAL_SCENARIOS, type VisualScenarioController } from './VisualScenarioController';
+import { HudGlyphSample } from '../ui/hud/HudGlyphSample';
 
 interface Props {
   session: CombatSession;
@@ -17,7 +18,7 @@ interface Props {
   onRefresh: () => void;
 }
 
-const LAYERS = ['background', 'nebula', 'trail', 'hull', 'weapon', 'beam', 'shield', 'explosion'];
+const LAYERS = ['background', 'nebula', 'trail', 'hull', 'weapon', 'beam', 'shield', 'explosion', 'markers'];
 
 export const VisualLabPanel: React.FC<Props> = ({
   session,
@@ -36,14 +37,22 @@ export const VisualLabPanel: React.FC<Props> = ({
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const initial = useMemo(() => VISUAL_SCENARIOS.find((scene) => scene.id === params.get('scene')) ?? VISUAL_SCENARIOS[0], [params]);
   const initialSeed = useMemo(() => Number(params.get('seed') ?? 1337) || 1337, [params]);
+  const initialTime = useMemo(() => Math.max(0, Number(params.get('t') ?? 0) || 0), [params]);
+  const initialPreviewShip = useMemo(() => {
+    const value = params.get('profileShip');
+    return value === 'onslaught' || value === 'paragon' || value === 'doom' ? value : '';
+  }, [params]);
   const [sceneId, setSceneId] = useState(initial.id);
   const [seed, setSeed] = useState(initialSeed);
+  const [previewShip, setPreviewShip] = useState(initialPreviewShip);
   const [zoom, setZoom] = useState(0.65);
   const [, force] = useState(0);
 
   useEffect(() => {
+    controller.setPreviewShip(initialPreviewShip || null);
     controller.select(initial.id, initialSeed);
-  }, [controller, initial.id, initialSeed]);
+    if (initialTime > 0) controller.seek(initialTime);
+  }, [controller, initial.id, initialSeed, initialPreviewShip, initialTime]);
 
   const refresh = () => {
     force((value) => value + 1);
@@ -62,13 +71,31 @@ export const VisualLabPanel: React.FC<Props> = ({
     refresh();
   };
 
+  const applyPreviewShip = (shipId: string) => {
+    setPreviewShip(shipId);
+    controller.setPreviewShip(shipId || null);
+    const url = new URL(window.location.href);
+    if (shipId) url.searchParams.set('profileShip', shipId);
+    else url.searchParams.delete('profileShip');
+    history.replaceState(null, '', url);
+    refresh();
+  };
+
+  const seekTo = (time: number) => {
+    controller.seek(time);
+    const url = new URL(window.location.href);
+    url.searchParams.set('t', time.toFixed(2));
+    history.replaceState(null, '', url);
+    refresh();
+  };
+
   const activeScene = VISUAL_SCENARIOS.find((scene) => scene.id === sceneId) ?? VISUAL_SCENARIOS[0];
   const perf = session.performance.snapshot;
 
   return (
     <aside className="absolute top-3 left-3 z-[80] w-[390px] max-h-[94vh] overflow-auto rounded border border-cyan-400/50 bg-slate-950/95 p-3 font-mono text-[11px] text-slate-200 shadow-2xl pointer-events-auto">
       <div className="mb-2 flex items-center justify-between">
-        <strong className="text-cyan-300">Visual Lab · M2 controlled scenes</strong>
+        <strong className="text-cyan-300">Visual Lab · M3 fidelity scenes</strong>
         <span>{controller.time.toFixed(3)} / {activeScene.duration.toFixed(1)}s</span>
       </div>
 
@@ -76,6 +103,29 @@ export const VisualLabPanel: React.FC<Props> = ({
         {VISUAL_SCENARIOS.map((scene) => <option key={scene.id} value={scene.id}>{scene.id} · {scene.title}</option>)}
       </select>
       <div className="mt-1 min-h-8 text-[10px] leading-4 text-slate-400">{activeScene.description}</div>
+      <div className="mt-1 flex items-center gap-2 text-[10px]">
+        <span className="text-slate-400">Hull profile</span>
+        <select className="bg-slate-900 border border-slate-700 px-1 py-0.5" value={previewShip} onChange={(event) => applyPreviewShip(event.target.value)}>
+          <option value="">scene default ({activeScene.shipId})</option>
+          <option value="onslaught">Onslaught · low-tech</option>
+          <option value="paragon">Paragon · high-tech</option>
+          <option value="doom">Doom · phase/high-tech</option>
+        </select>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-1 text-[10px] text-slate-400">
+        <span>capture @</span>
+        {activeScene.checkpoints.map((time) => (
+          <button key={time} className="rounded border border-slate-700 bg-slate-900 px-1 text-cyan-200" onClick={() => seekTo(time)}>
+            {time.toFixed(2)}s
+          </button>
+        ))}
+      </div>
+      {sceneId === 'VIS-11' && (
+        <div className="mt-1 border-t border-slate-700 pt-1">
+          <div className="mb-1 text-[9px] uppercase tracking-wider text-slate-500">HUD glyph comparison strip</div>
+          <HudGlyphSample />
+        </div>
+      )}
       {!assetsReady && !assetsError && <div className="mt-1 text-amber-300">preparing required textures…</div>}
       {assetsError && <div className="mt-1 text-red-300">asset error: {assetsError}</div>}
 

@@ -17,6 +17,7 @@ import { CarrierDeckConsole } from './hud/CarrierDeckConsole';
 import { AuthenticTacticalConsole } from './hud/AuthenticTacticalConsole';
 import { FloatingShipHUD } from './hud/FloatingShipHUD';
 import { CombatRadar } from './hud/CombatRadar';
+import { getHudDensity } from './hud/HudLayout';
 
 // 导出子组件，保证对外模块与测试兼容性
 export { 
@@ -59,6 +60,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
   canvasRef
 }) => {
   const [showHelpDrawer, setShowHelpDrawer] = useState(false);
+  const [hudDensity, setHudDensity] = useState(() => getHudDensity(typeof window !== 'undefined' ? window.innerWidth : 1920, typeof window !== 'undefined' ? window.innerHeight : 1080));
 
   const player = engine.playerShip;
   const enemy = engine.enemyShip;
@@ -76,11 +78,18 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [onOpenModManager]);
 
+  useEffect(() => {
+    const updateDensity = () => setHudDensity(getHudDensity(window.innerWidth, window.innerHeight));
+    updateDensity();
+    window.addEventListener('resize', updateDensity);
+    return () => window.removeEventListener('resize', updateDensity);
+  }, []);
+
   return (
-    <div className="hud-overlay select-none pointer-events-none font-mono">
+    <div className="hud-overlay select-none pointer-events-none font-mono" data-hud-density={hudDensity}>
       {/* 1. 战术指挥地图全景模式 (仅在按 TAB 展开时显示) */}
       {engine.isTacticalMap && (
-        <div className="pointer-events-auto absolute top-12 left-1/2 -translate-x-1/2 bg-slate-950/95 border border-[#94ff00]/70 px-4 py-1.5 rounded flex items-center gap-3 text-xs font-mono shadow-[0_0_24px_rgba(148,255,0,0.4)] z-50 whitespace-nowrap text-[#94ff00]">
+        <div className="hud-tactical-bar pointer-events-auto absolute top-12 left-1/2 -translate-x-1/2 bg-slate-950/95 border border-[#94ff00]/70 px-4 py-1.5 rounded flex items-center gap-3 text-xs font-mono shadow-[0_0_24px_rgba(148,255,0,0.4)] z-50 whitespace-nowrap text-[#94ff00]">
           <div className="flex items-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full bg-[#94ff00] animate-ping" />
             <span className="font-bold tracking-wider">战术指挥雷达 (TAC-OPS)</span>
@@ -144,12 +153,12 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
       )}
 
       {/* 3. 左下角：1:1 原版战术武器控制台 (AuthenticTacticalConsole: media_1789200834134.png) */}
-      <div className="pointer-events-auto absolute bottom-3 left-4 z-20">
+      <div className="hud-console-anchor pointer-events-auto absolute z-20">
         <AuthenticTacticalConsole player={player} engine={engine} />
       </div>
 
       {/* 4. 极简不侵入式右上角快捷操作指示 (平时高度半透明，悬浮时呈现，不破坏纯正实机战斗沉浸感) */}
-      <div className="pointer-events-auto absolute top-2 right-3 flex items-center gap-1.5 font-mono text-[10px] opacity-25 hover:opacity-100 transition-opacity duration-300 select-none z-30 bg-[#0a141c]/60 border border-[#94ff00]/20 px-2 py-1 rounded backdrop-blur-sm">
+      <div className="hud-quickbar-anchor pointer-events-auto absolute flex items-center gap-1.5 font-mono text-[10px] opacity-25 hover:opacity-100 transition-opacity duration-300 select-none z-30 bg-[#0a141c]/60 border border-[#94ff00]/20 px-2 py-1 rounded backdrop-blur-sm">
         <button
           onClick={() => engine.toggleTacticalMap()}
           className="px-1.5 py-0.5 hover:bg-[#94ff00]/20 text-[#94ff00] rounded"
@@ -191,14 +200,19 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
         </button>
       </div>
 
+      {/* 5. 右下角原版风格战术雷达：固定像素内容，自身随 HUD density 缩放。 */}
+      <div className="hud-radar-anchor pointer-events-none absolute z-20">
+        <CombatRadar engine={engine} />
+      </div>
+
       {/* 5. 底部右侧：浏览器帧与主线程工作占比（不是 CPU/GPU idle） */}
-      <div className="pointer-events-none absolute bottom-1 right-3 text-[#94ff00]/40 font-mono text-[10px] select-none">
+      <div className="hud-perf-anchor pointer-events-none absolute text-[#94ff00]/40 font-mono text-[10px] select-none">
         FPS: {scheduler.measuredFPS} | JS Work: {scheduler.measuredFrameBudgetPercent}%
       </div>
 
-      {/* 6. [H] 战术指令帮助抽屉 (仅按 H 键呼出) */}
+      {/* 7. [H] 战术指令帮助抽屉 (仅按 H 键呼出) */}
       {showHelpDrawer && (
-        <div className="pointer-events-auto absolute top-14 left-5 w-84 bg-[#0a141c]/95 border border-[#94ff00]/50 p-4 rounded text-xs shadow-2xl backdrop-blur text-[#94ff00]">
+        <div className="hud-help-anchor pointer-events-auto absolute w-84 bg-[#0a141c]/95 border border-[#94ff00]/50 p-4 rounded text-xs shadow-2xl backdrop-blur text-[#94ff00]">
           <div className="flex items-center justify-between border-b border-[#94ff00]/30 pb-2 mb-3">
             <span className="font-bold text-sm text-white">战术操作与系统指南 [H]</span>
             <button

@@ -3,7 +3,7 @@ import { CombatEngine } from '../../../simulation/CombatEngine';
 import { WebGLPassContext } from '../WebGLPassContext';
 import { Ship } from '../../../simulation/Ship';
 import { Vector2 } from '../../../math/Vector2';
-import { DEFAULT_EXPLOSION_PROFILE } from '../../../visual/VisualProfiles';
+import { getExplosionVisualProfile, getShipVisualProfile, SHIELD_VISUAL_PROFILES } from '../../../visual/VisualProfiles';
 
 /**
  * 特效与护盾渲染通道 (WebGLFXPass)
@@ -37,13 +37,12 @@ export class WebGLFXPass {
     // 2. 绘制能量护盾 (Shields: 专用 GPU 极坐标扇区剪裁 Shader)
     batcher.flush();
     const mainShieldTex = textures.getTexture('/game-assets/graphics/fx/shields256.png');
-    const shieldRingTex = textures.getTexture('/game-assets/graphics/fx/shields256ringd.png');
 
     const enemyShieldPos = engine.enemyShip.getShieldCenter(enemyPos, enemyFacing);
     const playerShieldPos = engine.playerShip.getShieldCenter(playerPos, playerFacing);
 
-    shieldShader.renderShield(batcher.currentViewProj, engine.enemyShip, enemyShieldPos, enemyFacing, mainShieldTex, shieldRingTex, nowSec);
-    shieldShader.renderShield(batcher.currentViewProj, engine.playerShip, playerShieldPos, playerFacing, mainShieldTex, shieldRingTex, nowSec);
+    shieldShader.renderShield(batcher.currentViewProj, engine.enemyShip, enemyShieldPos, enemyFacing, mainShieldTex, nowSec);
+    shieldShader.renderShield(batcher.currentViewProj, engine.playerShip, playerShieldPos, playerFacing, mainShieldTex, nowSec);
 
     // 恢复 SpriteBatcher 程序与 VAO 状态
     batcher.resumeProgram();
@@ -52,12 +51,15 @@ export class WebGLFXPass {
     const renderShieldImpacts = (ship: Ship, sCenter: Vector2) => {
       const shield = ship.shield;
       if (!shield.isActive || shield.radius <= 0) return;
+      const shipVisual = getShipVisualProfile(ship.spec.id);
+      const isFortress = ship.system.type === 'FORTRESS_SHIELD' && ship.system.isActive;
+      const shieldVisual = SHIELD_VISUAL_PROFILES[isFortress ? (shipVisual.fortressShieldProfile ?? 'fortress') : shipVisual.shieldProfile];
       batcher.setBlendMode('ADDITIVE');
       for (const rip of shield.ripples) {
         const hx = sCenter.x + Math.cos(rip.angle) * shield.radius;
         const hy = sCenter.y + Math.sin(rip.angle) * shield.radius;
         const [rr, rg, rb] = rip.color || [255, 200, 100];
-        const gSize = 35 * (0.8 + rip.intensity * 0.6);
+        const gSize = 35 * shieldVisual.hitFlash * (0.8 + rip.intensity * 0.6);
 
         // 外层能量耀斑
         batcher.drawSprite(hitGlowTex, hx, hy, gSize * 1.5, gSize * 1.5, 0, 0, 0, rr / 255, rg / 255, rb / 255, rip.intensity * 0.85);
@@ -149,13 +151,15 @@ export class WebGLFXPass {
 
     // 7. 绘制原版官方爆炸翻页书火光、初始白热耀光与扩散冲击波 (Explosions & Shockwaves)
     const expRingTex = textures.getTexture('/game-assets/graphics/fx/explosion_ring0.png');
+    const expSmokeTex = textures.getTexture('/game-assets/graphics/fx/contrail64b.png');
     for (const exp of engine.explosions) {
       const progress = Math.max(0, Math.min(1.0, 1.0 - exp.life / exp.maxLife));
       const [er, eg, eb] = exp.color;
+      const explosionVisual = getExplosionVisualProfile(exp.maxRadius, exp.visualKind ?? 'impact', exp.sourceShipId);
 
       // 7.1 初始爆心剧烈白热耀光
       if (progress < 0.35) {
-        const flashAlpha = (1.0 - progress / 0.35) * DEFAULT_EXPLOSION_PROFILE.flash;
+        const flashAlpha = (1.0 - progress / 0.35) * explosionVisual.flash;
         const flashSize = exp.maxRadius * 2.2;
         batcher.setBlendMode('ADDITIVE');
         batcher.drawSprite(hitGlowTex, exp.pos.x, exp.pos.y, flashSize, flashSize, 0, 0, 0, er / 255, eg / 255, eb / 255, flashAlpha);
@@ -164,7 +168,7 @@ export class WebGLFXPass {
 
       // 7.2 冲击波环
       if (exp.hasShockwaveRing) {
-        const ringAlpha = (1.0 - exp.shockwaveRadius / exp.maxShockwaveRadius) * 0.85 * DEFAULT_EXPLOSION_PROFILE.shockwave;
+        const ringAlpha = (1.0 - exp.shockwaveRadius / exp.maxShockwaveRadius) * 0.85 * explosionVisual.shockwave;
         if (ringAlpha > 0.01) {
           const rSize = exp.shockwaveRadius * 2;
           batcher.setBlendMode('ADDITIVE');
@@ -172,11 +176,41 @@ export class WebGLFXPass {
         }
       }
 
+      // 7.25 大型爆炸烟云：纯采样当前爆炸进度，不在 render 中推进任何状态。
+      if (progress > 0.12 && explosionVisual.smoke > 0) {
+        const smokeEnvelope = Math.sin(Math.min(1, (progress - 0.12) / 0.88) * Math.PI) * 0.3 * explosionVisual.smoke;
+        if (smokeEnvelope > 0.01) {
+          batcher.setBlendMode('NORMAL');
+          for (let i = 0; i < 4; i++) {
+            const phase = exp.rotation + i * Math.PI * 0.5;
+            const wobble = 0.82 + visualRandom(`m3-explosion-smoke-${exp.id}-${i}`) * 0.36;
+            const offset = exp.maxRadius * (0.08 + progress * 0.18) * wobble;
+            const sx = exp.pos.x + Math.cos(phase) * offset;
+            const sy = exp.pos.y + Math.sin(phase) * offset;
+            const smokeSize = exp.maxRadius * (0.65 + progress * 0.72) * wobble;
+            batcher.drawSprite(expSmokeTex, sx, sy, smokeSize, smokeSize, phase + progress, 0, 0, 0.14, 0.12, 0.11, smokeEnvelope * 0.42);
+          }
+        }
+      }
+
+      // 7.27 早期抛射的白热碎片星点，仍由同一 seed/visual time 决定。
+      if (progress < 0.58 && explosionVisual.debris > 0) {
+        batcher.setBlendMode('ADDITIVE');
+        for (let i = 0; i < 6; i++) {
+          const phase = exp.rotation + i * Math.PI / 3 + visualRandom(`m3-explosion-debris-angle-${exp.id}-${i}`) * 0.35;
+          const travel = exp.maxRadius * progress * (0.45 + visualRandom(`m3-explosion-debris-speed-${exp.id}-${i}`) * 0.7);
+          const dx = exp.pos.x + Math.cos(phase) * travel;
+          const dy = exp.pos.y + Math.sin(phase) * travel;
+          const spark = 5 + exp.maxRadius * 0.025;
+          batcher.drawSprite(hitGlowTex, dx, dy, spark, spark, 0, 0, 0, 1.0, 0.7, 0.24, (1 - progress / 0.58) * 0.7 * explosionVisual.debris);
+        }
+      }
+
       // 7.3 翻页书火球
       batcher.setBlendMode('ADDITIVE');
       const expTex = textures.getTexture(`/game-assets/graphics/fx/explosion${exp.frame}.png`);
       const d = exp.radius * 2;
-      batcher.drawSprite(expTex, exp.pos.x, exp.pos.y, d, d, exp.rotation, 0, 0, er / 255, eg / 255, eb / 255, 0.95 * DEFAULT_EXPLOSION_PROFILE.fireball);
+      batcher.drawSprite(expTex, exp.pos.x, exp.pos.y, d, d, exp.rotation, 0, 0, er / 255, eg / 255, eb / 255, 0.95 * explosionVisual.fireball);
     }
 
     // 8. 绘制金属装甲战损碎片 (1:1 DebrisParticleSystem.java: 正方形真实金属破片贴图与熔融火光)

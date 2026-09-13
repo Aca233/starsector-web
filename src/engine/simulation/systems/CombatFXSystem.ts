@@ -306,10 +306,14 @@ export class CombatFXSystem {
     pos: Vector2,
     radius = 50,
     color: [number, number, number] = [255, 160, 50],
-    hasShockwave = true
+    hasShockwave = true,
+    visualKind: 'impact' | 'missile' | 'ship' = 'impact',
+    sourceShipId?: string
   ) {
     this.explosions.push({
       id: Math.random(),
+      visualKind,
+      sourceShipId,
       pos: pos.clone(),
       radius: radius * 0.4,
       maxRadius: radius,

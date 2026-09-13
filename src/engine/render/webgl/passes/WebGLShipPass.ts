@@ -4,7 +4,7 @@ import { WebGLPassContext } from '../WebGLPassContext';
 import { Ship } from '../../../simulation/Ship';
 import { Vector2 } from '../../../math/Vector2';
 import { ShipVentingRenderer } from '../ShipVentingRenderer';
-import { ENGINE_VISUAL_PROFILES } from '../../../visual/VisualProfiles';
+import { ENGINE_VISUAL_PROFILES, getShipVisualProfile, getWeaponVisualProfile } from '../../../visual/VisualProfiles';
 import type { VisualRandom } from '../../../runtime/VisualRandom';
 
 /**
@@ -37,7 +37,8 @@ export class WebGLShipPass {
     // 1. 相位潜航时空残影 (Phase Ghosts)
     const drawGhosts = (ship: Ship) => {
       if (!ship.phaseGhosts || ship.phaseGhosts.length === 0) return;
-      const ghostTex = textures.getTintedTexture(ship.spec.spriteUrl, 60, 160, 255);
+      const phaseColor = getShipVisualProfile(ship.spec.id).phaseColor;
+      const ghostTex = textures.getTintedTexture(ship.spec.spriteUrl, Math.round(phaseColor[0] * 255), Math.round(phaseColor[1] * 255), Math.round(phaseColor[2] * 255));
       batcher.setBlendMode('ADDITIVE');
       for (const g of ship.phaseGhosts) {
         batcher.drawSprite(
@@ -62,6 +63,7 @@ export class WebGLShipPass {
     // 2. 战舰与挂点渲染函数
     const renderShip = (ship: Ship, shipPos: Vector2, shipFacing: number) => {
       if (ship.isDead) return;
+      const shipVisual = getShipVisualProfile(ship.spec.id);
 
       // 2.1 幅能主动排散 1:1 底层放射状能量光晕环 (严格对齐 float.java: o00000 位于舰体下层)
       const ventRenderer = ship.isPlayer ? this.playerVentingRenderer : this.enemyVentingRenderer;
@@ -110,21 +112,18 @@ export class WebGLShipPass {
           const alphaMult = 0.22 + Math.min(1.0, thrust) * 0.68 + Math.max(0, thrust - 1.0) * 0.1;
 
           const plumeLength = slot.length * (lenMult + idleBreath) * flicker;
-          const plumeWidth = slot.width * widMult;
+          const plumeWidth = slot.width * widMult * visualProfile.widthScale;
           const flameAlpha = Math.min(1.0, alphaMult * flicker);
 
-          const isHighTech = slot.style === 'HIGH_TECH';
-          const isMidline = slot.style === 'MIDLINE';
-
-          const [fr, fg, fb] = isHighTech ? [0.35, 0.7, 1.0] : isMidline ? [1.0, 0.85, 0.4] : [1.0, 0.45, 0.12];
-          const [gr, gg, gb] = isHighTech ? [0.2, 0.55, 1.0] : isMidline ? [1.0, 0.7, 0.3] : [1.0, 0.38, 0.08];
-          const [cr, cg, cb] = isHighTech ? [0.85, 0.95, 1.0] : [1.0, 0.92, 0.75];
+          const [fr, fg, fb] = visualProfile.flameColor;
+          const [gr, gg, gb] = visualProfile.glowColor;
+          const [cr, cg, cb] = visualProfile.coreColor;
 
           batcher.setBlendMode('ADDITIVE');
           const flameTex = textures.getTexture('/game-assets/graphics/fx/engineflame32.png');
 
           // 1. 发动机喷口无边界柔和圆形辉光
-          const throatGlowSize = slot.width * (0.85 + Math.min(1.0, thrust) * 0.4 + Math.max(0, thrust - 1.0) * 0.35);
+          const throatGlowSize = slot.width * visualProfile.throatScale * (0.85 + Math.min(1.0, thrust) * 0.4 + Math.max(0, thrust - 1.0) * 0.35);
           const throatGlowAlpha = 0.5 + Math.min(1.0, thrust) * 0.35 + Math.max(0, thrust - 1.0) * 0.15;
           batcher.drawSprite(hitGlowTex, nozzleX, nozzleY, throatGlowSize, throatGlowSize, 0, 0, 0, gr, gg, gb, throatGlowAlpha);
 
@@ -157,9 +156,9 @@ export class WebGLShipPass {
         shipFacing + Math.PI / 2,
         pivotNormX,
         pivotNormY,
-        1.0,
-        1.0,
-        1.0,
+        shipVisual.hullTint[0],
+        shipVisual.hullTint[1],
+        shipVisual.hullTint[2],
         shipAlpha
       );
 
@@ -186,7 +185,7 @@ export class WebGLShipPass {
         batcher.setBlendMode('ADDITIVE');
         const glowTex = textures.getTexture('/game-assets/graphics/fx/glow64.png');
         const gSize = ship.spec.collisionRadius * 2.3;
-        batcher.drawSprite(glowTex, shipPos.x, shipPos.y, gSize, gSize, 0, 0, 0, 0.3, 0.6, 1.0, 0.65);
+        batcher.drawSprite(glowTex, shipPos.x, shipPos.y, gSize, gSize, 0, 0, 0, shipVisual.phaseColor[0], shipVisual.phaseColor[1], shipVisual.phaseColor[2], 0.68);
       }
 
       // 过载电浆辉光
@@ -194,7 +193,7 @@ export class WebGLShipPass {
         batcher.setBlendMode('ADDITIVE');
         const glowTex = textures.getTexture('/game-assets/graphics/fx/glow64.png');
         const gSize = ship.spec.collisionRadius * 2.2;
-        batcher.drawSprite(glowTex, shipPos.x, shipPos.y, gSize, gSize, 0, 0, 0, 0.3, 0.8, 1.0, 0.4 + visualRandom('webgl/passes/WebGLShipPass.ts#3') * 0.4);
+        batcher.drawSprite(glowTex, shipPos.x, shipPos.y, gSize, gSize, 0, 0, 0, shipVisual.overloadColor[0], shipVisual.overloadColor[1], shipVisual.overloadColor[2], 0.42 + visualRandom('webgl/passes/WebGLShipPass.ts#3') * 0.42);
       }
 
       // 2.3 旋转武器炮塔与挂点充能光晕 (Turrets & Hardpoints)
@@ -205,6 +204,7 @@ export class WebGLShipPass {
         const mountX = shipPos.x + mountOffset.x;
         const mountY = shipPos.y + mountOffset.y;
         const mountFacing = isHardpoint ? (mount.baseAngleDeg * Math.PI) / 180 + shipFacing : mount.currentAngleRad;
+        const weaponVisual = getWeaponVisualProfile(mount.spec.id, mount.spec.spawnType, mount.spec.isRocket, mount.spec.isBeam);
 
         const baseImgUrl = isHardpoint ? (mount.spec.hardpointSpriteUrl || mount.spec.turretSpriteUrl) : mount.spec.turretSpriteUrl;
         const gunImgUrl = isHardpoint ? (mount.spec.hardpointGunSpriteUrl || mount.spec.turretGunSpriteUrl) : mount.spec.turretGunSpriteUrl;
@@ -291,8 +291,11 @@ export class WebGLShipPass {
         if (glowImgUrl && mount.glowAlpha > 0.01 && !mount.isDisabled) {
           const [gr, gg, gb] = mount.spec.glowColor || [255, 100, 100];
           const glowInfo = textures.getTextureInfo(glowImgUrl);
-          const gw = glowInfo.width > 0 ? glowInfo.width : baseW;
-          const gh = glowInfo.height > 0 ? glowInfo.height : baseH;
+          const baseGlowW = glowInfo.width > 0 ? glowInfo.width : baseW;
+          const baseGlowH = glowInfo.height > 0 ? glowInfo.height : baseH;
+          const glowScale = 1 + (weaponVisual.glowScale - 1) * mount.glowAlpha;
+          const gw = baseGlowW * glowScale;
+          const gh = baseGlowH * glowScale;
           const jX = mount.glowAlpha >= 0.7 ? (visualRandom('webgl/passes/WebGLShipPass.ts#4') - 0.5) * 2.5 : 0;
           const jY = mount.glowAlpha >= 0.7 ? (visualRandom('webgl/passes/WebGLShipPass.ts#5') - 0.5) * 2.5 : 0;
 
@@ -309,8 +312,10 @@ export class WebGLShipPass {
             gr / 255,
             gg / 255,
             gb / 255,
-            mount.glowAlpha
+            Math.min(1, mount.glowAlpha * weaponVisual.brightness)
           );
+          const coronaSize = Math.max(gw, gh) * (0.5 + weaponVisual.glowScale * 0.24);
+          batcher.drawSprite(hitGlowTex, mountX + jX, mountY + jY, coronaSize, coronaSize, 0, 0, 0, gr / 255, gg / 255, gb / 255, Math.min(0.5, mount.glowAlpha * 0.34 * weaponVisual.brightness));
           batcher.setBlendMode('NORMAL');
         }
       }

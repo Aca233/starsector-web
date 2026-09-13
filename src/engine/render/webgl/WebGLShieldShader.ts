@@ -1,7 +1,7 @@
 import { WebGLShaderUtil } from './WebGLShaderUtil';
 import { Vector2 } from '../../math/Vector2';
 import { Ship } from '../../simulation/Ship';
-import { SHIELD_VISUAL_PROFILES } from '../../visual/VisualProfiles';
+import { SHIELD_VISUAL_PROFILES, getShipVisualProfile } from '../../visual/VisualProfiles';
 
 const SHIELD_VS = `#version 300 es
 precision highp float;
@@ -39,6 +39,9 @@ uniform vec3 u_ringColor;
 uniform float u_fluxWobble;
 uniform float u_time;
 uniform float u_brightness;
+uniform float u_opacity;
+uniform float u_rimWidth;
+uniform float u_hitFlash;
 
 // 4 组受击高光参数: x=angle, y=intensity, z=arcSpan, w=active(0/1)
 uniform vec4 u_ripples[4];
@@ -84,13 +87,14 @@ void main() {
   float tex2Alpha = texture(u_texShield, uv2).a;
 
   // 双层焦散叠加，经 vertexAlpha 与扇区端点 taper 调制 (极具通透感与层次感，彻底告别死板纯色方块)
-  vec3 innerCol = u_innerColor * ((tex1Alpha + tex2Alpha) * 0.5 * vertexAlpha * taper * 2.2);
+  vec3 innerCol = u_innerColor * ((tex1Alpha + tex2Alpha) * 0.5 * vertexAlpha * taper * 2.6 * u_opacity);
 
   // 4. 护盾边缘外环 (1:1 对齐 G.java:408-468: 5px line8x8.png 轮廓)
   float wobble = sin(angle * 10.0 + u_ringAngle * 10.0) * (0.35 + u_fluxWobble);
   float rimR = u_radius + wobble;
   float rimDist = abs(dist - rimR);
-  float rimFactor = smoothstep(2.8, 0.0, rimDist) * taper;
+  float rimPx = clamp(u_rimWidth * u_radius, 1.8, 7.0);
+  float rimFactor = smoothstep(rimPx, 0.0, rimDist) * taper;
   vec3 rimCol = u_ringColor * (rimFactor * 0.95);
 
   // 5. 受击瞬态高光闪烁 (Hit Ripple Glow)
@@ -107,7 +111,7 @@ void main() {
     if (absRDiff < rSpan) {
       float spanFade = 1.0 - absRDiff / rSpan;
       float rRim = smoothstep(6.0 * rIntensity, 0.0, abs(dist - u_radius));
-      ripCol += (u_ringColor + vec3(0.2)) * (spanFade * rRim * rIntensity * 1.5);
+      ripCol += (u_ringColor + vec3(0.2)) * (spanFade * rRim * rIntensity * 1.5 * u_hitFlash);
     }
   }
 
@@ -136,6 +140,9 @@ export class WebGLShieldShader {
   private uFluxWobble: WebGLUniformLocation;
   private uTime: WebGLUniformLocation;
   private uBrightness: WebGLUniformLocation;
+  private uOpacity: WebGLUniformLocation;
+  private uRimWidth: WebGLUniformLocation;
+  private uHitFlash: WebGLUniformLocation;
   private uRipplesLocs: WebGLUniformLocation[] = [];
   private uTexShield: WebGLUniformLocation;
 
@@ -156,6 +163,9 @@ export class WebGLShieldShader {
     this.uFluxWobble = gl.getUniformLocation(this.program, 'u_fluxWobble')!;
     this.uTime = gl.getUniformLocation(this.program, 'u_time')!;
     this.uBrightness = gl.getUniformLocation(this.program, 'u_brightness')!;
+    this.uOpacity = gl.getUniformLocation(this.program, 'u_opacity')!;
+    this.uRimWidth = gl.getUniformLocation(this.program, 'u_rimWidth')!;
+    this.uHitFlash = gl.getUniformLocation(this.program, 'u_hitFlash')!;
     this.uTexShield = gl.getUniformLocation(this.program, 'u_texShield')!;
 
     for (let i = 0; i < 4; i++) {
@@ -188,7 +198,6 @@ export class WebGLShieldShader {
     shipWorldPos: Vector2,
     shipFacingRad: number,
     texShield: WebGLTexture,
-    _texRingUnused: WebGLTexture,
     nowSec: number
   ) {
     const shield = ship.shield;
@@ -213,40 +222,36 @@ export class WebGLShieldShader {
     gl.uniform1f(this.uCenterAngle, centerAngle);
     gl.uniform1f(this.uHalfArc, halfArcRad);
 
-    // 官方精确旋转速率 (G.java:120-122)
-    // 内层: 0.3926991 rad/s
-    // 环层: sqrt(62.83185 / radius) rad/s
-    const innerAngle1 = (nowSec * 0.3926991) % (Math.PI * 2);
-    const innerAngle2 = (-nowSec * 0.3926991) % (Math.PI * 2);
-    const ringRate = Math.sqrt(62.831853 / Math.max(1.0, shield.radius));
+    // M3: all shield lookups come from reusable hull visual profiles rather than ship-id branches.
+    const shipVisual = getShipVisualProfile(ship.spec.id);
+    const isFortress = ship.system.type === 'FORTRESS_SHIELD' && ship.system.isActive;
+    const profileKey = isFortress ? (shipVisual.fortressShieldProfile ?? 'fortress') : shipVisual.shieldProfile;
+    const profile = SHIELD_VISUAL_PROFILES[profileKey];
+
+    // The profile keeps the original double counter-rotation structure while allowing technology-specific cadence.
+    const innerAngle1 = (nowSec * profile.textureRotationSpeed) % (Math.PI * 2);
+    const innerAngle2 = (-nowSec * profile.textureRotationSpeed) % (Math.PI * 2);
+    const ringRate = Math.sqrt(62.831853 / Math.max(1.0, shield.radius)) * profile.ringSpeedScale;
     const ringAngle = (nowSec * ringRate) % (Math.PI * 2);
 
     gl.uniform1f(this.uInnerAngle1, innerAngle1);
     gl.uniform1f(this.uInnerAngle2, innerAngle2);
     gl.uniform1f(this.uRingAngle, ringAngle);
 
-    // 官方护盾色彩判定 (G.java / lowtech / hightech)
-    const isFortress = ship.system.type === 'FORTRESS_SHIELD' && ship.system.isActive;
-    const profile = SHIELD_VISUAL_PROFILES[ship.spec.id === 'onslaught' ? 'lowTech' : 'highTech'];
-    let innerColor: [number, number, number];
-    let ringColor: [number, number, number];
-
-    if (isFortress) {
-      // 堡垒护盾金白光芒
-      innerColor = [1.0, 0.85, 0.45];
-      ringColor = [1.0, 1.0, 0.95];
-    } else {
-      innerColor = profile.innerColor.map((v) => v / 255) as [number, number, number];
-      ringColor = profile.outerColor.map((v) => v / 255) as [number, number, number];
-    }
-
+    const innerColor = profile.innerColor.map((v) => v / 255) as [number, number, number];
+    const ringColor = profile.outerColor.map((v) => v / 255) as [number, number, number];
     gl.uniform3f(this.uInnerColor, innerColor[0], innerColor[1], innerColor[2]);
     gl.uniform3f(this.uRingColor, ringColor[0], ringColor[1], ringColor[2]);
 
+    const deployRaw = Math.max(0, Math.min(1, shield.currentArcDeg / Math.max(1, shield.maxArcDeg)));
+    const deployFactor = profile.deployCurve === 'ease-out' ? 1 - Math.pow(1 - deployRaw, 2) : deployRaw;
     const fluxWobble = (ship.flux.totalFlux / ship.spec.maxFlux) * 1.8;
     gl.uniform1f(this.uFluxWobble, fluxWobble);
     gl.uniform1f(this.uTime, nowSec);
-    gl.uniform1f(this.uBrightness, isFortress ? 1.5 : 1.0);
+    gl.uniform1f(this.uBrightness, profile.brightness * (0.82 + deployFactor * 0.18));
+    gl.uniform1f(this.uOpacity, profile.opacity);
+    gl.uniform1f(this.uRimWidth, profile.rimWidth);
+    gl.uniform1f(this.uHitFlash, profile.hitFlash);
 
     // 受击涟漪参数 (最多 4 条)
     for (let i = 0; i < 4; i++) {
@@ -259,6 +264,8 @@ export class WebGLShieldShader {
       }
     }
 
+    // M3 decision: the old shields256ringd texture is intentionally not sampled.
+    // The rim is generated procedurally above so there is no redundant texture request/upload.
     // 绑定 shields256.png
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texShield);

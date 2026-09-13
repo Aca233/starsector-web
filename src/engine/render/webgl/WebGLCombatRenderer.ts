@@ -220,6 +220,9 @@ export class WebGLCombatRenderer {
 
     // 4.6 通道 6: 战术锁定方括号、前置瞄准点、武器射界与测距弧 (1:1 原版 _super.java & E.java)
     this.tacticalOverlayPass.render(engine, ctx, nowSec, enemyPos, playerPos, this.arcActiveGroupIndex, this.arcAnimProgress);
+    if (frame.layers.has('markers')) {
+      this.tacticalOverlayPass.renderDebugMarkers(engine, ctx, enemyPos, playerPos);
+    }
 
     // 5. 提交所有剩余 GPU 绘制调用
     this.batcher.end();

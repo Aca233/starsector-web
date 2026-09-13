@@ -14,26 +14,102 @@
 }
 
 .hud-overlay {
+  --hud-panel-scale: 1;
+  --hud-tag-scale: 1;
+  --hud-safe-inset: 14px;
   position: absolute;
   inset: 0;
   pointer-events: none;
+  color: #94ff00;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: none;
 }
 
-/* Keep HUD density stable at the three target presentation classes. */
-@media (max-width: 1366px), (max-height: 800px) {
-  .hud-overlay {
-    transform: scale(0.9);
-    transform-origin: center bottom;
-    width: 111.111%;
-    height: 111.111%;
-  }
+.hud-overlay[data-hud-density='compact'] {
+  --hud-panel-scale: 0.88;
+  --hud-tag-scale: 0.9;
+  --hud-safe-inset: 10px;
 }
 
-@media (min-width: 2400px) and (min-height: 1300px) {
-  .hud-overlay {
-    transform: scale(1.08);
-    transform-origin: center bottom;
-    width: 92.592%;
-    height: 92.592%;
-  }
+.hud-overlay[data-hud-density='expanded'] {
+  --hud-panel-scale: 1.08;
+  --hud-tag-scale: 1.06;
+  --hud-safe-inset: 18px;
+}
+
+.hud-console-anchor {
+  left: var(--hud-safe-inset);
+  bottom: var(--hud-safe-inset);
+  scale: var(--hud-panel-scale);
+  transform-origin: left bottom;
+  filter: drop-shadow(0 0 5px rgba(148, 255, 0, 0.12));
+}
+
+.hud-quickbar-anchor {
+  top: var(--hud-safe-inset);
+  right: var(--hud-safe-inset);
+  scale: var(--hud-panel-scale);
+  transform-origin: right top;
+}
+
+.hud-radar-anchor {
+  right: var(--hud-safe-inset);
+  bottom: calc(var(--hud-safe-inset) + 18px);
+  scale: var(--hud-panel-scale);
+  transform-origin: right bottom;
+  opacity: 0.88;
+  filter: drop-shadow(0 0 7px rgba(90, 220, 255, 0.16));
+}
+
+.hud-perf-anchor {
+  right: var(--hud-safe-inset);
+  bottom: calc(var(--hud-safe-inset) * 0.4);
+  scale: var(--hud-panel-scale);
+  transform-origin: right bottom;
+}
+
+.hud-help-anchor {
+  top: calc(var(--hud-safe-inset) + 46px);
+  left: var(--hud-safe-inset);
+  scale: var(--hud-panel-scale);
+  transform-origin: left top;
+}
+
+.hud-tactical-bar {
+  scale: var(--hud-panel-scale);
+  transform-origin: center top;
+}
+
+/* Floating labels keep their world-to-screen coordinates; only their own glyph footprint scales. */
+.hud-floating-tag {
+  scale: var(--hud-tag-scale);
+  transform-origin: 0 0;
+}
+
+.hud-glyph-sample {
+  display: grid;
+  grid-template-columns: repeat(16, 1.05em);
+  gap: 1px;
+  width: max-content;
+  padding: 3px;
+  color: #94ff00;
+  background: rgba(0, 10, 14, 0.9);
+  border: 1px solid rgba(148, 255, 0, 0.35);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 9px;
+  line-height: 1.05em;
+  text-align: center;
+}
+
+.hud-glyph-cell {
+  width: 1.05em;
+  height: 1.05em;
+  overflow: hidden;
+  border-right: 1px solid rgba(148, 255, 0, 0.06);
+}
+
+.hud-overlay button,
+.hud-overlay input,
+.hud-overlay select {
+  text-shadow: 0 0 3px rgba(148, 255, 0, 0.18);
 }

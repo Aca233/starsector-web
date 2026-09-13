@@ -330,9 +330,11 @@ export class CombatEngine {
     pos: Vector2,
     radius = 50,
     color: [number, number, number] = [255, 160, 50],
-    hasShockwave = true
+    hasShockwave = true,
+    visualKind: 'impact' | 'missile' | 'ship' = 'impact',
+    sourceShipId?: string
   ) {
-    this.fxSystem.spawnAuthenticExplosion(pos, radius, color, hasShockwave);
+    this.fxSystem.spawnAuthenticExplosion(pos, radius, color, hasShockwave, visualKind, sourceShipId);
   }
 
   public spawnEmpArc(
@@ -560,6 +562,14 @@ export class CombatEngine {
       sound.playAtPos('disabled_large', ship.pos, this.playerShip.pos, 1.0);
     }
     this.spawnExplosion(ship.pos, 120);
+    this.spawnAuthenticExplosion(
+      ship.pos,
+      Math.max(110, ship.spec.collisionRadius * 1.3),
+      [255, 150, 55],
+      true,
+      'ship',
+      ship.spec.id
+    );
 
     if (ship === this.playerShip) {
       this.addRadioMessage('损管中控', 'HQ', '警告！旗舰核心动力炉发生灾难性熔毁！全员弃舰！', [255, 50, 50]);

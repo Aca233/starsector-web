@@ -98,7 +98,7 @@ export class MissileGuidanceHandler {
         // 近距离冲撞诱饵弹发生殉爆
         if (distFlare < 26) {
           sound.playAtPos('missile_explosion', p.pos, ctx.playerShip.pos, 0.7);
-          ctx.fx.spawnAuthenticExplosion(p.pos, 45, [255, 160, 60], true);
+          ctx.fx.spawnAuthenticExplosion(p.pos, 45, [255, 160, 60], true, 'missile');
           ctx.fx.spawnSparks(p.pos, 25, [255, 200, 80]);
           ctx.fx.addFloatingText(p.pos.clone(), 'MISSILE SPOOFED', [255, 200, 80], 13, 1.2);
           if (nearbyFlare.sourceShipId === ctx.playerShip.id) {

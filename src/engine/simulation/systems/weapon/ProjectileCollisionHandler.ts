@@ -107,7 +107,7 @@ export class ProjectileCollisionHandler {
             if (targetM.isRocket) ctx.contrailEngine?.detach(targetM.id);
             allProjectiles.splice(mIdx, 1);
             sound.playAtPos('missile_explosion', targetM.pos, ctx.playerShip.pos, 0.55);
-            ctx.fx.spawnAuthenticExplosion(targetM.pos, 35, [255, 140, 40], true);
+            ctx.fx.spawnAuthenticExplosion(targetM.pos, 35, [255, 140, 40], true, 'missile');
             ctx.fx.addFloatingText(targetM.pos.clone(), 'BURST INTERCEPTED', [120, 255, 160], 12, 0.85);
             interceptedCount++;
           } else {
@@ -184,7 +184,7 @@ export class ProjectileCollisionHandler {
             allProjectiles.splice(mIdx, 1);
             if (ctx.statsTracker) ctx.statsTracker.recordMissileIntercepted(p.isPlayer ?? false);
             sound.playAtPos('missile_explosion', targetM.pos, ctx.playerShip.pos, 0.5);
-            ctx.fx.spawnAuthenticExplosion(targetM.pos, 35, [255, 160, 40], true);
+            ctx.fx.spawnAuthenticExplosion(targetM.pos, 35, [255, 160, 40], true, 'missile');
             ctx.fx.addFloatingText(targetM.pos.clone(), 'MG INTERCEPTED', [120, 255, 150], 12, 0.8);
             if (Math.random() < 0.45) {
               ctx.addRadioMessage('点防火控', 'PLAYER', '近防机枪已成功打爆一枚来袭重型导弹！', [140, 255, 180]);
@@ -261,7 +261,7 @@ export class ProjectileCollisionHandler {
 
             const hitRadius = p.hitGlowRadius || (p.damage > 200 ? 55 : 30);
             if (p.isRocket || p.damage >= 200) {
-              ctx.fx.spawnAuthenticExplosion(hitPosOnShield, hitRadius, p.color, true);
+              ctx.fx.spawnAuthenticExplosion(hitPosOnShield, hitRadius, p.color, true, p.isRocket ? 'missile' : 'impact');
             } else {
               ctx.fx.spawnSparks(hitPosOnShield, 15, p.color);
             }
@@ -351,7 +351,7 @@ export class ProjectileCollisionHandler {
 
           const hitRadius = p.hitGlowRadius || (p.damage > 200 ? 50 : 25);
           if (p.isRocket || p.damage >= 200) {
-            ctx.fx.spawnAuthenticExplosion(p.pos, hitRadius, p.color, true);
+            ctx.fx.spawnAuthenticExplosion(p.pos, hitRadius, p.color, true, p.isRocket ? 'missile' : 'impact');
           } else {
             ctx.fx.spawnSparks(p.pos, 20, p.color);
           }

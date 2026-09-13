@@ -10,22 +10,23 @@ export interface VisualScenarioDefinition {
   description: string;
   duration: number;
   shipId: string;
+  checkpoints: number[];
 }
 
 /** The acceptance-scene catalog from the M2 plan. */
 export const VISUAL_SCENARIOS: VisualScenarioDefinition[] = [
-  { id: 'VIS-01', title: '攻势静止，四个朝向', description: '固定镜头依次检查 0° / 90° / 180° / 270° 舰体与挂点。', duration: 4, shipId: 'onslaught' },
-  { id: 'VIS-02', title: '怠速、推进、松键、侧移、冲刺', description: '同一艘攻势按固定时间轴展示发动机状态。', duration: 6, shipId: 'onslaught' },
-  { id: 'VIS-03', title: '护盾开关与单次受击', description: '固定展开/保持/关闭，并在固定时刻注入一次护盾命中。', duration: 4.5, shipId: 'onslaught' },
-  { id: 'VIS-04', title: '多次连续护盾命中', description: '固定方位与节奏连续产生护盾受击涟漪。', duration: 4.5, shipId: 'onslaught' },
-  { id: 'VIS-05', title: 'TPC 单发', description: '单次 TPC 枪口闪光、弹体、尾迹时间轴。', duration: 3.2, shipId: 'onslaught' },
-  { id: 'VIS-06', title: '实弹炮连续开火', description: 'Mark IX 连续发射，固定发射间隔与弹道。', duration: 4.2, shipId: 'onslaught' },
-  { id: 'VIS-07', title: '光束充能、照射、停止', description: '典范主炮固定充能、持续照射和停止消退。', duration: 4.6, shipId: 'paragon' },
-  { id: 'VIS-08', title: '导弹直飞、转弯、命中', description: '固定导弹轨迹，包含直飞、转向与命中爆光。', duration: 4.6, shipId: 'onslaught' },
-  { id: 'VIS-09', title: '排散完整过程', description: '固定初始幅能，从排散启动到烟雾完全消退。', duration: 5.2, shipId: 'onslaught' },
-  { id: 'VIS-10', title: '小命中与舰船爆炸', description: '先展示局部小命中，再展示完整舰船毁灭爆炸层。', duration: 4.8, shipId: 'onslaught' },
-  { id: 'VIS-11', title: '固定状态 HUD', description: '冻结战斗状态，用于 HUD 布局与多分辨率截图。', duration: 10, shipId: 'onslaught' },
-  { id: 'VIS-12', title: '双舰加舰载机实战', description: '受控双舰、战机和轰炸机综合图层场景。', duration: 8, shipId: 'onslaught' }
+  { id: 'VIS-01', title: '攻势静止，四个朝向', description: '固定镜头依次检查 0° / 90° / 180° / 270° 舰体与挂点。', duration: 4, shipId: 'onslaught', checkpoints: [0.25, 1.25, 2.25, 3.25] },
+  { id: 'VIS-02', title: '怠速、推进、松键、侧移、冲刺', description: '同一艘攻势按固定时间轴展示发动机状态。', duration: 6, shipId: 'onslaught', checkpoints: [0.5, 1.6, 2.7, 3.6, 4.65, 5.55] },
+  { id: 'VIS-03', title: '护盾开关与单次受击', description: '固定展开/保持/关闭，并在固定时刻注入一次护盾命中。', duration: 4.5, shipId: 'onslaught', checkpoints: [0.6, 1.0, 1.8, 3.55] },
+  { id: 'VIS-04', title: '多次连续护盾命中', description: '固定方位与节奏连续产生护盾受击涟漪。', duration: 4.5, shipId: 'onslaught', checkpoints: [0.95, 1.65, 2.35] },
+  { id: 'VIS-05', title: 'TPC 单发', description: '单次 TPC 枪口闪光、弹体、尾迹时间轴。', duration: 3.2, shipId: 'onslaught', checkpoints: [0.82, 0.95, 1.18, 1.55] },
+  { id: 'VIS-06', title: '实弹炮连续开火', description: 'Mark IX 连续发射，固定发射间隔与弹道。', duration: 4.2, shipId: 'onslaught', checkpoints: [0.7, 1.4, 2.45, 3.4] },
+  { id: 'VIS-07', title: '光束充能、照射、停止', description: '典范主炮固定充能、持续照射和停止消退。', duration: 4.6, shipId: 'paragon', checkpoints: [0.8, 1.3, 2.2, 3.3, 3.55] },
+  { id: 'VIS-08', title: '导弹直飞、转弯、命中', description: '固定导弹轨迹，包含直飞、转向与命中爆光。', duration: 4.6, shipId: 'onslaught', checkpoints: [0.8, 1.5, 2.55, 3.5] },
+  { id: 'VIS-09', title: '排散完整过程', description: '固定初始幅能，从排散启动到烟雾完全消退。', duration: 5.2, shipId: 'onslaught', checkpoints: [0.5, 0.8, 2.0, 3.4, 4.2] },
+  { id: 'VIS-10', title: '小命中与舰船爆炸', description: '先展示局部小命中，再展示完整舰船毁灭爆炸层。', duration: 4.8, shipId: 'onslaught', checkpoints: [0.9, 2.4, 2.65, 3.05] },
+  { id: 'VIS-11', title: '固定状态 HUD', description: '冻结战斗状态，用于 HUD 布局与多分辨率截图。', duration: 10, shipId: 'onslaught', checkpoints: [2.0] },
+  { id: 'VIS-12', title: '双舰加舰载机实战', description: '受控双舰、战机和轰炸机综合图层场景。', duration: 8, shipId: 'onslaught', checkpoints: [1.5, 4.6, 6.2] }
 ];
 
 const EPSILON = 1e-9;
@@ -91,12 +92,20 @@ export class VisualScenarioController {
   private active: VisualScenarioDefinition | null = null;
   private timeSeconds = 0;
   private seed = 1337;
+  private previewShipId: string | null = null;
 
   constructor(public readonly session: CombatSession) {}
 
   public get scene(): VisualScenarioDefinition | null { return this.active; }
   public get time(): number { return this.timeSeconds; }
   public get currentSeed(): number { return this.seed; }
+  public get previewShip(): string | null { return this.previewShipId; }
+
+  public setPreviewShip(shipId: string | null): void {
+    const targetTime = this.timeSeconds;
+    this.previewShipId = shipId;
+    if (this.active) this.rebuild(targetTime);
+  }
 
   public select(sceneId: string, seed = this.seed): void {
     this.active = VISUAL_SCENARIOS.find((scene) => scene.id === sceneId) ?? VISUAL_SCENARIOS[0];
@@ -152,7 +161,7 @@ export class VisualScenarioController {
 
   private rebuild(targetTime: number): void {
     if (!this.active) return;
-    this.session.switchPlayerShip(this.active.shipId);
+    this.session.switchPlayerShip(this.previewShipId ?? this.active.shipId);
     this.session.setSeed(this.seed);
     this.session.pause();
     this.timeSeconds = 0;
@@ -414,7 +423,7 @@ export class VisualScenarioController {
               engine.contrailEngine.addPoint(8001, new Vector2(px, py), 2, 9, 1.8, 1);
             }
           }
-          if (t >= hitAt && t < hitAt + 0.36) this.addExplosion(engine.fxSystem.explosions, new Vector2(480, 100), 70, t - hitAt, 8002);
+          if (t >= hitAt && t < hitAt + 0.36) this.addExplosion(engine.fxSystem.explosions, new Vector2(480, 100), 70, t - hitAt, 8002, 'missile');
         }
         break;
       }
@@ -458,7 +467,7 @@ export class VisualScenarioController {
         const destroyAt = 2.35;
         const destroyAge = t - destroyAt;
         if (destroyAge >= 0 && destroyAge < 1.0) {
-          this.addExplosion(engine.fxSystem.explosions, enemy.pos.clone(), 190, destroyAge, 10001);
+          this.addExplosion(engine.fxSystem.explosions, enemy.pos.clone(), 190, destroyAge, 10001, 'ship', enemy.spec.id);
           engine.cameraShakeIntensity = Math.max(0, 18 * (1 - destroyAge));
           for (let i = 0; i < 8; i++) {
             const angle = i * Math.PI * 2 / 8;
@@ -558,16 +567,26 @@ export class VisualScenarioController {
   private addMuzzle(target: MuzzleFlash[], origin: Vector2, angle: number, spec: WeaponSpec, age: number, id: number): void {
     if (age < 0 || age > 0.12) return;
     const life = 0.12 - age;
-    target.push({ id, pos: origin.clone(), angleRad: angle, size: spec.muzzleFlashSize || 70, color: spec.muzzleFlashColor ? [...spec.muzzleFlashColor] : [...spec.color], life, maxLife: 0.12 });
+    target.push({ id, specId: spec.id, pos: origin.clone(), angleRad: angle, size: spec.muzzleFlashSize || 70, color: spec.muzzleFlashColor ? [...spec.muzzleFlashColor] : [...spec.color], life, maxLife: 0.12 });
   }
 
-  private addExplosion(target: ExplosionAnimation[], pos: Vector2, radius: number, age: number, id: number): void {
+  private addExplosion(
+    target: ExplosionAnimation[],
+    pos: Vector2,
+    radius: number,
+    age: number,
+    id: number,
+    visualKind: 'impact' | 'missile' | 'ship' = 'impact',
+    sourceShipId?: string
+  ): void {
     const maxLife = 0.95;
     if (age < 0 || age > maxLife) return;
     const progress = clamp01(age / maxLife);
     target.push({
       id,
       pos: pos.clone(),
+      visualKind,
+      sourceShipId,
       radius: radius * (0.3 + 0.7 * Math.sin(progress * Math.PI * 0.5)),
       maxRadius: radius,
       life: maxLife - age,
