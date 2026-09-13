@@ -13,6 +13,7 @@ import { WebGLProjectilePass } from './passes/WebGLProjectilePass';
 import { WebGLFXPass } from './passes/WebGLFXPass';
 import { WebGLTacticalOverlayPass } from './passes/WebGLTacticalOverlayPass';
 import { ESSENTIAL_TEXTURE_URLS } from '../TextureCache';
+import type { RendererResourceStats } from '../ICombatRenderer';
 
 /**
  * 远行星号 WebGL2 硬件级 GPU 实例化渲染中枢 (WebGLCombatRenderer)
@@ -192,10 +193,10 @@ export class WebGLCombatRenderer {
     // 4. 开启批处理器
     this.batcher.begin(actualCam, zoom, width, height);
 
-    // 4.1 通道 1: 深空背景、星空与星云小行星
-    if (frame.layers.has('background') || frame.layers.has('nebula')) {
-      this.environmentPass.render(engine, ctx, actualCam);
-    }
+    // 4.1 通道 1: 深空背景、远景/中景星云与小行星。V09 将三类环境层独立开关。
+    if (frame.layers.has('background')) this.environmentPass.renderBackground(ctx, actualCam);
+    if (frame.layers.has('nebula')) this.environmentPass.renderNebulae(engine, ctx, ['BACKGROUND', 'MIDGROUND']);
+    if (frame.layers.has('asteroid')) this.environmentPass.renderAsteroids(engine, ctx);
 
     // 4.2 通道 2: 导弹连续尾迹缎带 (严格对齐 Starsector 原版: LAYER_BELOW_SHIPS 位于战舰底层)
     if (frame.layers.has('trail')) this.projectilePass.renderContrails(engine, ctx);
@@ -217,6 +218,9 @@ export class WebGLCombatRenderer {
     if (frame.layers.has('shield') || frame.layers.has('explosion')) {
       this.fxPass.render(engine, ctx, nowSec, enemyPos, enemyFacing, playerPos, playerFacing);
     }
+
+    // 4.5.5 前景透明星云对世界对象产生柔和遮挡，但不盖住战术标记/HUD。
+    if (frame.layers.has('nebula')) this.environmentPass.renderNebulae(engine, ctx, ['FOREGROUND']);
 
     // 4.6 通道 6: 战术锁定方括号、前置瞄准点、武器射界与测距弧 (1:1 原版 _super.java & E.java)
     this.tacticalOverlayPass.render(engine, ctx, nowSec, enemyPos, playerPos, this.arcActiveGroupIndex, this.arcAnimProgress);
@@ -263,7 +267,7 @@ export class WebGLCombatRenderer {
     this.pendingGpuQueries.push(query);
   }
 
-  public getResourceStats() {
+  public getResourceStats(): RendererResourceStats {
     return {
       ...this.textures.getStats(),
       resourceRecreations: this.resourceRecreations,

@@ -10,10 +10,10 @@ export class NebulaSystem {
 
   public init() {
     this.nebulae = [];
-    const configs: { pos: Vector2; radius: number; type: 'AMBER' | 'BLUE' }[] = [
-      { pos: new Vector2(0, 750), radius: 650, type: 'AMBER' },
-      { pos: new Vector2(-150, -750), radius: 680, type: 'BLUE' },
-      { pos: new Vector2(500, 350), radius: 520, type: 'AMBER' }
+    const configs: { pos: Vector2; radius: number; type: 'AMBER' | 'BLUE'; depth: NebulaCloud['depth'] }[] = [
+      { pos: new Vector2(0, 750), radius: 650, type: 'AMBER', depth: 'BACKGROUND' },
+      { pos: new Vector2(-150, -750), radius: 680, type: 'BLUE', depth: 'MIDGROUND' },
+      { pos: new Vector2(500, 350), radius: 520, type: 'AMBER', depth: 'FOREGROUND' }
     ];
 
     for (let i = 0; i < configs.length; i++) {
@@ -27,6 +27,7 @@ export class NebulaSystem {
         pos: c.pos,
         radius: c.radius,
         type: c.type,
+        depth: c.depth,
         rotation: (i * Math.PI) / 3,
         angularVel: (i % 2 === 0 ? 1 : -1) * 0.012,
         scale: 1.6 + (i * 0.2),

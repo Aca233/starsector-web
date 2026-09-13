@@ -6,6 +6,9 @@
 import { assetResolver } from '../assets/AssetResolver';
 
 export const ESSENTIAL_TEXTURE_URLS = [
+  '/game-assets/graphics/backgrounds/background1.jpg',
+  '/game-assets/graphics/terrain/nebula_amber.png',
+  '/game-assets/graphics/terrain/nebula512_blue.png',
   '/game-assets/graphics/fx/shields256.png',
   '/game-assets/graphics/fx/shields256ringd.png',
   '/game-assets/graphics/fx/engineflame32.png',

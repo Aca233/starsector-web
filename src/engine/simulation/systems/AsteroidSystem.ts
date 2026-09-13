@@ -3,6 +3,7 @@ import { Asteroid } from '../CombatTypes';
 import { Ship } from '../Ship';
 import { Projectile } from '../Weapon';
 import { sound } from '../../audio/SoundManager';
+import { VisualRandom } from '../../runtime/VisualRandom';
 
 export interface AsteroidFXCallbacks {
   spawnShieldRipple: (pos: Vector2, maxRadius: number, color: [number, number, number]) => void;
@@ -21,6 +22,7 @@ export class AsteroidSystem {
 
   public init() {
     this.asteroids = [];
+    const random = new VisualRandom(0xa57e01d);
     const asteroidSprites = [
       '/game-assets/graphics/asteroids/asteroid1.png',
       '/game-assets/graphics/asteroids/asteroid1.png',
@@ -31,29 +33,30 @@ export class AsteroidSystem {
 
     const count = 18;
     for (let i = 0; i < count; i++) {
-      let x = (Math.random() - 0.5) * 3200;
-      let y = (Math.random() - 0.5) * 2200;
+      let x = (random.sample('asteroid-x', i) - 0.5) * 3200;
+      let y = (random.sample('asteroid-y', i) - 0.5) * 2200;
       if (Math.abs(x) < 400 && Math.abs(y) < 300) {
         x += (x >= 0 ? 450 : -450);
       }
 
       const isBig = i % 5 === 0;
       const isMedium = i % 2 === 0 && !isBig;
-      const radius = isBig ? (50 + Math.random() * 22) : isMedium ? (30 + Math.random() * 14) : (18 + Math.random() * 10);
+      const radiusSample = random.sample('asteroid-radius', i);
+      const radius = isBig ? (50 + radiusSample * 22) : isMedium ? (30 + radiusSample * 14) : (18 + radiusSample * 10);
       const spriteUrl = isBig
         ? '/game-assets/graphics/asteroids/asteroid_big00.png'
         : asteroidSprites[i % (asteroidSprites.length - 1)];
 
       const hp = isBig ? 1600 : isMedium ? 750 : 350;
-      const speed = 15 + Math.random() * 28;
-      const driftAngle = Math.random() * Math.PI * 2;
+      const speed = 15 + random.sample('asteroid-speed', i) * 28;
+      const driftAngle = random.sample('asteroid-drift-angle', i) * Math.PI * 2;
 
       this.asteroids.push({
-        id: Math.random(),
+        id: i + 1,
         pos: new Vector2(x, y),
         vel: new Vector2(Math.cos(driftAngle) * speed, Math.sin(driftAngle) * speed),
-        facingRad: Math.random() * Math.PI * 2,
-        angularVel: (Math.random() - 0.5) * 0.35,
+        facingRad: random.sample('asteroid-facing', i) * Math.PI * 2,
+        angularVel: random.signed('asteroid-angular-velocity', i) * 0.175,
         radius,
         mass: radius * radius * 0.75,
         hp,

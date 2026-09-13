@@ -72,6 +72,7 @@ export const App: React.FC = () => {
     (window as any).__combatSession = session;
     (window as any).__combatEngine = session.engine;
     (window as any).__combatRenderer = session.renderer;
+    (window as any).__combatPerformanceReport = () => session.getPerformanceReport();
 
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
@@ -85,6 +86,7 @@ export const App: React.FC = () => {
       delete (window as any).__combatSession;
       delete (window as any).__combatEngine;
       delete (window as any).__combatRenderer;
+      delete (window as any).__combatPerformanceReport;
     };
   }, [session, isVisualLab]);
 

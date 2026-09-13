@@ -165,6 +165,7 @@ export interface NebulaCloud {
   pos: Vector2;
   radius: number;
   type: 'AMBER' | 'BLUE';
+  depth: 'BACKGROUND' | 'MIDGROUND' | 'FOREGROUND';
   rotation: number;
   angularVel: number;
   scale: number;

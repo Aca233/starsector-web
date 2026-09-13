@@ -1,7 +1,8 @@
-import { visualRandom } from '../../RenderDeterminism';
 import { CombatEngine } from '../../../simulation/CombatEngine';
-import { WebGLPassContext } from '../WebGLPassContext';
+import type { NebulaCloud } from '../../../simulation/CombatTypes';
 import { Vector2 } from '../../../math/Vector2';
+import { VisualRandom } from '../../../runtime/VisualRandom';
+import { WebGLPassContext } from '../WebGLPassContext';
 
 interface StarParticle {
   x: number;
@@ -12,72 +13,95 @@ interface StarParticle {
 }
 
 /**
- * 环境与深空星象渲染通道 (WebGLEnvironmentPass)
- * 职责:
- * 1. 视差背景图 (graphics/backgrounds/background1.jpg)
- * 2. 多图层视差星空 (Starfield)
- * 3. 星云流体尘埃 (Nebulae)
- * 4. 漂移小行星带 (Asteroids)
+ * Deep-space environment pass. V09 explicitly separates opaque/far terrain from
+ * foreground translucent occlusion so layer toggles are meaningful and tactical
+ * overlays can remain readable above world-space haze.
  */
 export class WebGLEnvironmentPass {
-  private starfield: StarParticle[] = [];
+  private readonly starfield: StarParticle[] = [];
+  private static readonly PARALLAX_FACTORS = [0.02, 0.05, 0.08];
 
   constructor() {
-    this.initStarfield();
-  }
-
-  private initStarfield() {
-    this.starfield = [];
+    const random = new VisualRandom(0x0e9b71a);
     for (let i = 0; i < 450; i++) {
       this.starfield.push({
-        x: (visualRandom('webgl/passes/WebGLEnvironmentPass.ts#1') - 0.5) * 4400,
-        y: (visualRandom('webgl/passes/WebGLEnvironmentPass.ts#2') - 0.5) * 4400,
-        size: 1.2 + visualRandom('webgl/passes/WebGLEnvironmentPass.ts#3') * 2.2,
-        alpha: 0.25 + visualRandom('webgl/passes/WebGLEnvironmentPass.ts#4') * 0.75,
+        x: (random.sample('environment-star-x', i) - 0.5) * 5200,
+        y: (random.sample('environment-star-y', i) - 0.5) * 4200,
+        size: 0.9 + random.sample('environment-star-size', i) * 2.5,
+        alpha: 0.2 + random.sample('environment-star-alpha', i) * 0.8,
         layer: i % 3
       });
     }
   }
 
-  public render(engine: CombatEngine, ctx: WebGLPassContext, actualCam: Vector2) {
-    const { batcher, textures, whiteTex } = ctx;
-
-    // 1. 绘制官方深空星云视差背景 (background1.jpg)
+  public renderBackground(ctx: WebGLPassContext, actualCam: Vector2): void {
+    const { batcher, textures, whiteTex, viewport } = ctx;
     const bgTex = textures.getTexture('/game-assets/graphics/backgrounds/background1.jpg');
     const pFactor = 0.05;
     const bgX = actualCam.x * (1 - pFactor);
     const bgY = actualCam.y * (1 - pFactor);
+
     batcher.setBlendMode('NORMAL');
-    batcher.drawSprite(bgTex, bgX, bgY, 4800, 3600, 0, 0, 0, 0.95, 0.95, 0.95, 1.0);
+    batcher.drawSprite(bgTex, bgX, bgY, 4800, 3600, 0, 0, 0, 0.92, 0.94, 1.0, 1.0);
 
-    // 2. 绘制视差星空 (单次 GPU 实例化合批)
-    const pFactors = [0.02, 0.05, 0.08];
-    for (let i = 0; i < this.starfield.length; i++) {
-      const s = this.starfield[i];
-      const sx = s.x - actualCam.x * pFactors[s.layer];
-      const sy = s.y - actualCam.y * pFactors[s.layer];
-      batcher.drawSprite(whiteTex, sx, sy, s.size, s.size, 0, 0, 0, 1.0, 1.0, 1.0, s.alpha);
+    for (const star of this.starfield) {
+      const starParallax = WebGLEnvironmentPass.PARALLAX_FACTORS[star.layer];
+      // SpriteBatcher later subtracts the camera. Adding (1-p)*camera here leaves
+      // exactly p*camera movement on screen instead of double-subtracting it.
+      const sx = star.x + actualCam.x * (1 - starParallax);
+      const sy = star.y + actualCam.y * (1 - starParallax);
+      if (sx < viewport.left - 8 || sx > viewport.right + 8 || sy < viewport.bottom - 8 || sy > viewport.top + 8) continue;
+      batcher.drawSprite(whiteTex, sx, sy, star.size, star.size, 0, 0, 0, 1, 1, 1, star.alpha);
     }
+  }
 
-    // 3. 绘制真实深空星云尘埃 (Nebulae)
-    if (engine.nebulae && engine.nebulae.length > 0) {
+  public renderNebulae(engine: CombatEngine, ctx: WebGLPassContext, depths: readonly NebulaCloud['depth'][]): void {
+    if (engine.nebulae.length === 0) return;
+    const { batcher, textures } = ctx;
+    const depthSet = new Set(depths);
+
+    for (const neb of engine.nebulae) {
+      if (!depthSet.has(neb.depth)) continue;
+      const diameter = neb.radius * 2 * neb.scale;
+      if (!this.circleVisible(ctx, neb.pos, diameter * 0.55)) continue;
+
+      const nebTex = textures.getTexture(neb.spriteUrl);
+      const tint = neb.type === 'AMBER' ? [1.0, 0.72, 0.42] as const : [0.42, 0.68, 1.0] as const;
+      const baseAlpha = neb.depth === 'FOREGROUND'
+        ? (neb.type === 'AMBER' ? 0.13 : 0.15)
+        : neb.depth === 'MIDGROUND'
+          ? (neb.type === 'AMBER' ? 0.2 : 0.24)
+          : (neb.type === 'AMBER' ? 0.17 : 0.2);
+
+      // Source-over style pass provides actual translucent occlusion rather than
+      // making every cloud a purely additive light source.
+      batcher.setBlendMode('NORMAL');
+      batcher.drawSprite(nebTex, neb.pos.x, neb.pos.y, diameter, diameter, neb.rotation, 0, 0, tint[0], tint[1], tint[2], baseAlpha);
+
+      // A restrained glow preserves the ionized-cloud highlight without washing
+      // out silhouettes. Foreground haze intentionally gets the weakest glow.
       batcher.setBlendMode('ADDITIVE');
-      for (const neb of engine.nebulae) {
-        const nebTex = textures.getTexture(neb.spriteUrl);
-        const d = neb.radius * 2 * neb.scale;
-        const [nr, ng, nb] = neb.type === 'AMBER' ? [1.0, 0.65, 0.2] : [0.2, 0.55, 1.0];
-        const nAlpha = neb.type === 'AMBER' ? 0.38 : 0.45;
-        batcher.drawSprite(nebTex, neb.pos.x, neb.pos.y, d, d, neb.rotation, 0, 0, nr, ng, nb, nAlpha);
-      }
+      const glowAlpha = neb.depth === 'FOREGROUND' ? 0.025 : 0.055;
+      batcher.drawSprite(nebTex, neb.pos.x, neb.pos.y, diameter * 1.02, diameter * 1.02, -neb.rotation * 0.7, 0, 0, tint[0], tint[1], tint[2], glowAlpha);
     }
+  }
 
-    // 4. 绘制漂移小行星带 (Asteroids)
+  public renderAsteroids(engine: CombatEngine, ctx: WebGLPassContext): void {
+    const { batcher, textures } = ctx;
     batcher.setBlendMode('NORMAL');
-    for (const ast of engine.asteroids) {
-      if (ast.hp <= 0) continue;
-      const astTex = textures.getTexture(ast.spriteUrl);
-      const size = ast.radius * 2;
-      batcher.drawSprite(astTex, ast.pos.x, ast.pos.y, size, size, ast.facingRad, 0, 0);
+    for (const asteroid of engine.asteroids) {
+      if (asteroid.hp <= 0 || !this.circleVisible(ctx, asteroid.pos, asteroid.radius + 8)) continue;
+      const texture = textures.getTexture(asteroid.spriteUrl);
+      const size = asteroid.radius * 2;
+      batcher.drawSprite(texture, asteroid.pos.x, asteroid.pos.y, size, size, asteroid.facingRad, 0, 0);
     }
+  }
+
+  private circleVisible(ctx: WebGLPassContext, pos: Vector2, radius: number): boolean {
+    const { viewport } = ctx;
+    return pos.x + radius >= viewport.left
+      && pos.x - radius <= viewport.right
+      && pos.y + radius >= viewport.bottom
+      && pos.y - radius <= viewport.top;
   }
 }

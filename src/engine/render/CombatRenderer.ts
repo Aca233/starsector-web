@@ -8,6 +8,7 @@ import { ShipRenderer } from './renderers/ShipRenderer';
 import { ShieldRenderer } from './renderers/ShieldRenderer';
 import { FXRenderer } from './renderers/FXRenderer';
 import { TacticalMapRenderer } from './renderers/TacticalMapRenderer';
+import type { RendererResourceStats } from './ICombatRenderer';
 
 export { TextureCache, textureCache };
 
@@ -56,6 +57,19 @@ export class CombatRenderer {
     // Canvas2D renderers are stateless between frames.
   }
 
+  public getResourceStats(): RendererResourceStats {
+    return {
+      residentTextures: 0,
+      pendingUploads: 0,
+      uploads: 0,
+      invalidations: 0,
+      resourceRecreations: 0,
+      drawCalls: 0,
+      gpuTimerAvailable: false,
+      gpuTimeMs: null
+    };
+  }
+
   /**
    * 核心渲染帧入口：基于 alpha 系数进行亚帧插值
    * @param engine 战斗逻辑引擎
@@ -88,11 +102,11 @@ export class CombatRenderer {
     // 1. 绘制深空星云背景与视差星空
     if (frame.layers.has('background')) this.environmentRenderer.drawStarfield(ctx, cameraPos);
 
-    // 1.2 绘制真实深空星云尘埃 (Nebulae)
-    if (frame.layers.has('nebula')) this.environmentRenderer.drawNebulae(ctx, engine);
+    // 1.2 远景/中景星云；前景透明层在世界特效之后绘制。
+    if (frame.layers.has('nebula')) this.environmentRenderer.drawNebulae(ctx, engine, ['BACKGROUND', 'MIDGROUND']);
 
     // 1.5 绘制漂移小行星带 (Asteroids)
-    if (frame.layers.has('background')) this.environmentRenderer.drawAsteroids(ctx, engine);
+    if (frame.layers.has('asteroid')) this.environmentRenderer.drawAsteroids(ctx, engine);
 
     // 2. 绘制导弹烟雾尾迹 (Contrails - 位于舰体下层空间)
     if (frame.layers.has('trail')) this.fxRenderer.drawContrails(ctx, engine);
@@ -130,9 +144,6 @@ export class CombatRenderer {
       this.shieldRenderer.drawShield(ctx, engine.playerShip, playerPos, playerFacing);
     }
 
-    this.tacticalMapRenderer.drawTacticalTargetBracket(ctx, engine.enemyShip, enemyPos);
-    this.shieldRenderer.drawInWorldRadialFluxArc(ctx, engine.playerShip, playerPos);
-
     // 4.2 绘制战损断裂舰体残骸 (Hulk Fragments)
     this.fxRenderer.drawHulkFragments(ctx, engine, alpha);
 
@@ -148,9 +159,6 @@ export class CombatRenderer {
     // 6. 绘制投射物 (Projectiles)
     if (frame.layers.has('weapon')) this.fxRenderer.drawProjectiles(ctx, engine, alpha);
 
-    // 7. 绘制提前量准星 (Lead Aim Pip)
-    this.tacticalMapRenderer.drawAimLeadPip(ctx, engine);
-
     // 8. 绘制 EMP 电弧
     this.fxRenderer.drawEmpArcs(ctx, engine);
 
@@ -165,6 +173,14 @@ export class CombatRenderer {
 
     // 10.5 绘制护盾能量冲击空间扩散环 (Shield Ripples)
     this.shieldRenderer.drawShieldRipples(ctx, engine);
+
+    // 10.7 V09 前景透明星云：遮挡世界对象，但战术标记保持在其上方。
+    if (frame.layers.has('nebula')) this.environmentRenderer.drawNebulae(ctx, engine, ['FOREGROUND']);
+
+    // 10.8 战术信息层保持可读，不被前景星云遮蔽。
+    this.tacticalMapRenderer.drawTacticalTargetBracket(ctx, engine.enemyShip, enemyPos);
+    this.shieldRenderer.drawInWorldRadialFluxArc(ctx, engine.playerShip, playerPos);
+    this.tacticalMapRenderer.drawAimLeadPip(ctx, engine);
 
     // 11. 绘制空间悬浮战斗伤害数字与状态提醒
     this.tacticalMapRenderer.drawFloatingTexts(ctx, engine);

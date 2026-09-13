@@ -18,7 +18,7 @@ interface Props {
   onRefresh: () => void;
 }
 
-const LAYERS = ['background', 'nebula', 'trail', 'hull', 'weapon', 'beam', 'shield', 'explosion', 'markers'];
+const LAYERS = ['background', 'nebula', 'asteroid', 'trail', 'hull', 'weapon', 'beam', 'shield', 'explosion', 'markers'];
 
 export const VisualLabPanel: React.FC<Props> = ({
   session,
@@ -91,11 +91,12 @@ export const VisualLabPanel: React.FC<Props> = ({
 
   const activeScene = VISUAL_SCENARIOS.find((scene) => scene.id === sceneId) ?? VISUAL_SCENARIOS[0];
   const perf = session.performance.snapshot;
+  const perfReport = session.getPerformanceReport();
 
   return (
     <aside className="absolute top-3 left-3 z-[80] w-[390px] max-h-[94vh] overflow-auto rounded border border-cyan-400/50 bg-slate-950/95 p-3 font-mono text-[11px] text-slate-200 shadow-2xl pointer-events-auto">
       <div className="mb-2 flex items-center justify-between">
-        <strong className="text-cyan-300">Visual Lab · M3 fidelity scenes</strong>
+        <strong className="text-cyan-300">Visual Lab · M4 final validation</strong>
         <span>{controller.time.toFixed(3)} / {activeScene.duration.toFixed(1)}s</span>
       </div>
 
@@ -202,8 +203,11 @@ export const VisualLabPanel: React.FC<Props> = ({
         <div>prep {perf.renderPreparationMs.toFixed(3)} ms · submit {perf.drawSubmitMs.toFixed(2)} ms</div>
         <div>GPU {perf.gpuTimerAvailable && perf.gpuTimeMs != null ? `${perf.gpuTimeMs.toFixed(2)} ms` : 'timer unavailable'}</div>
         <div>draws {perf.drawCalls} · tex {perf.textureCount} · proj {perf.projectileCount} · particles {perf.particleCount}</div>
+        <div>samples {perfReport.sampleCount} · CPU P95 {perfReport.timings.frameCpuMs.p95.toFixed(2)} ms · P99 {perfReport.timings.frameCpuMs.p99.toFixed(2)} ms</div>
+        <div>tex pending {perf.pendingTextureUploads} · uploads {perf.textureUploads} · invalidations {perf.textureInvalidations}</div>
         <div>backlog {(session.scheduler.backlogSeconds * 1000).toFixed(1)} ms · dropped {session.scheduler.droppedSimulationSeconds.toFixed(4)} s</div>
         <div>resource recreations {perf.resourceRecreations}{perf.memoryBytes != null ? ` · heap ${(perf.memoryBytes / 1048576).toFixed(1)} MiB` : ''}</div>
+        <button className="mt-1 rounded border border-slate-700 bg-slate-900 px-1 text-cyan-200" onClick={() => { session.resetPerformanceWindow(); refresh(); }}>reset perf window</button>
       </div>
     </aside>
   );

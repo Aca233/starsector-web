@@ -7,7 +7,7 @@ import { FixedTimestepScheduler } from '../simulation/FixedTimestepScheduler';
 import { Vector2 } from '../math/Vector2';
 import { VisualClock } from './VisualClock';
 import { VisualRandom } from './VisualRandom';
-import { PerformanceMetrics } from './PerformanceMetrics';
+import { PerformanceMetrics, type PerformanceReport } from './PerformanceMetrics';
 import { CameraController } from './CameraController';
 
 export type CombatSessionState = 'created' | 'prepared' | 'running' | 'paused' | 'disposed';
@@ -27,7 +27,7 @@ export class CombatSession {
   public readonly sessionId: string;
   public state: CombatSessionState = 'created';
   public readonly visualOptions = {
-    layers: new Set(['background', 'nebula', 'trail', 'hull', 'weapon', 'beam', 'shield', 'explosion']),
+    layers: new Set(['background', 'nebula', 'asteroid', 'trail', 'hull', 'weapon', 'beam', 'shield', 'explosion']),
     damage: true,
     motion: true,
     cameraLocked: false
@@ -148,18 +148,38 @@ export class CombatSession {
       ...frame
     });
     this.performance.recordTiming('drawSubmitMs', performance.now() - submitStart);
-    this.performance.snapshot.projectileCount = this.engine.projectiles.length;
-    this.performance.snapshot.particleCount = this.engine.particles.length + this.engine.contrails.length + this.engine.debris.length;
-    const resourceStats = (this.renderer as any).getResourceStats?.();
-    if (resourceStats) {
-      this.performance.snapshot.textureCount = resourceStats.residentTextures ?? 0;
-      this.performance.snapshot.resourceRecreations = resourceStats.resourceRecreations ?? 0;
-      this.performance.snapshot.drawCalls = resourceStats.drawCalls ?? 0;
-      this.performance.snapshot.gpuTimerAvailable = resourceStats.gpuTimerAvailable ?? false;
-      this.performance.snapshot.gpuTimeMs = resourceStats.gpuTimeMs ?? null;
-    }
-    const memory = (performance as any).memory;
-    this.performance.snapshot.memoryBytes = typeof memory?.usedJSHeapSize === 'number' ? memory.usedJSHeapSize : null;
+    const resourceStats = this.renderer.getResourceStats();
+    const memory = (performance as Performance & { memory?: { usedJSHeapSize?: number } }).memory;
+    const particleCount = this.engine.particles.length
+      + this.engine.contrails.length
+      + this.engine.debris.length
+      + this.engine.explosions.length
+      + this.engine.empArcs.length
+      + this.engine.muzzleFlashes.length
+      + this.engine.muzzleParticles.length
+      + this.engine.shieldRipples.length
+      + this.engine.hulkFragments.length;
+    this.performance.finalizeFrame({
+      gpuTimeMs: resourceStats.gpuTimeMs,
+      gpuTimerAvailable: resourceStats.gpuTimerAvailable,
+      projectileCount: this.engine.projectiles.length,
+      particleCount,
+      textureCount: resourceStats.residentTextures,
+      pendingTextureUploads: resourceStats.pendingUploads,
+      textureUploads: resourceStats.uploads,
+      textureInvalidations: resourceStats.invalidations,
+      resourceRecreations: resourceStats.resourceRecreations,
+      drawCalls: resourceStats.drawCalls,
+      memoryBytes: typeof memory?.usedJSHeapSize === 'number' ? memory.usedJSHeapSize : null
+    });
+  }
+
+  public resetPerformanceWindow(): void {
+    this.performance.resetWindow();
+  }
+
+  public getPerformanceReport(): PerformanceReport {
+    return this.performance.getReport();
   }
 
   public restart(shipId = this.engine.playerShip.spec.id): void {

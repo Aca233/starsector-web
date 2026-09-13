@@ -1,10 +1,10 @@
-import { visualRandom } from '../RenderDeterminism';
 import { Vector2 } from '../../math/Vector2';
 import { CombatEngine } from '../../simulation/CombatEngine';
+import type { NebulaCloud } from '../../simulation/CombatTypes';
+import { VisualRandom } from '../../runtime/VisualRandom';
 import { textureCache } from '../TextureCache';
 
 export class EnvironmentRenderer {
-  // 按 [视差层 (0~2)][亮度桶 (0~3)] 预分桶存储，避免每帧 400 次 globalAlpha 频繁状态切换
   private starBuckets: { x: number; y: number; size: number }[][][] = [];
   private static readonly PARALLAX_FACTORS = [0.02, 0.05, 0.08];
   private static readonly STAR_COLORS = [
@@ -18,27 +18,27 @@ export class EnvironmentRenderer {
     this.initStarfield();
   }
 
-  private initStarfield() {
+  private initStarfield(): void {
     this.starBuckets = [
       [[], [], [], []],
       [[], [], [], []],
       [[], [], [], []]
     ];
+    const random = new VisualRandom(0x0e9b71a);
 
     for (let i = 0; i < 400; i++) {
       const layer = i % 3;
-      const alpha = 0.2 + visualRandom('renderers/EnvironmentRenderer.ts#1') * 0.8;
-      const b = Math.min(3, Math.max(0, Math.floor((alpha - 0.2) / 0.2)));
-      this.starBuckets[layer][b].push({
-        x: (visualRandom('renderers/EnvironmentRenderer.ts#2') - 0.5) * 4400,
-        y: (visualRandom('renderers/EnvironmentRenderer.ts#3') - 0.5) * 4400,
-        size: 1 + visualRandom('renderers/EnvironmentRenderer.ts#4') * 2.2
+      const alpha = 0.2 + random.sample('canvas-star-alpha', i) * 0.8;
+      const brightnessBucket = Math.min(3, Math.max(0, Math.floor((alpha - 0.2) / 0.2)));
+      this.starBuckets[layer][brightnessBucket].push({
+        x: (random.sample('canvas-star-x', i) - 0.5) * 5200,
+        y: (random.sample('canvas-star-y', i) - 0.5) * 4200,
+        size: 0.9 + random.sample('canvas-star-size', i) * 2.5
       });
     }
   }
 
-  public drawStarfield(ctx: CanvasRenderingContext2D, cameraPos: Vector2) {
-    // 1. 绘制官方正统深空星云 (background1.jpg) 视差滚动
+  public drawStarfield(ctx: CanvasRenderingContext2D, cameraPos: Vector2): void {
     const bgImg = textureCache.getImage('/game-assets/graphics/backgrounds/background1.jpg');
     if (bgImg.complete && bgImg.naturalWidth > 0) {
       ctx.save();
@@ -47,75 +47,79 @@ export class EnvironmentRenderer {
       const bgH = 3600;
       const bgX = cameraPos.x * (1 - parallaxFactor) - bgW / 2;
       const bgY = cameraPos.y * (1 - parallaxFactor) - bgH / 2;
+      ctx.globalAlpha = 0.96;
       ctx.drawImage(bgImg, bgX, bgY, bgW, bgH);
       ctx.restore();
     }
 
-    // 2. 官方三层视差星空 (批处理绘制，零 globalAlpha 切换)
     for (let layer = 0; layer < 3; layer++) {
-      const pFactor = EnvironmentRenderer.PARALLAX_FACTORS[layer];
-      const offsetX = cameraPos.x * pFactor;
-      const offsetY = cameraPos.y * pFactor;
+      const parallaxFactor = EnvironmentRenderer.PARALLAX_FACTORS[layer];
+      const retainedCameraX = cameraPos.x * (1 - parallaxFactor);
+      const retainedCameraY = cameraPos.y * (1 - parallaxFactor);
 
-      for (let b = 0; b < 4; b++) {
-        const stars = this.starBuckets[layer][b];
+      for (let bucket = 0; bucket < 4; bucket++) {
+        const stars = this.starBuckets[layer][bucket];
         if (stars.length === 0) continue;
-        ctx.fillStyle = EnvironmentRenderer.STAR_COLORS[b];
-        for (let i = 0; i < stars.length; i++) {
-          const star = stars[i];
-          ctx.fillRect(star.x - offsetX, star.y - offsetY, star.size, star.size);
+        ctx.fillStyle = EnvironmentRenderer.STAR_COLORS[bucket];
+        for (const star of stars) {
+          ctx.fillRect(star.x + retainedCameraX, star.y + retainedCameraY, star.size, star.size);
         }
       }
     }
-
-    // 战场作战边界参考网格
-    ctx.strokeStyle = 'rgba(40, 70, 110, 0.22)';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(-2000, -1500, 4000, 3000);
   }
 
-  public drawNebulae(ctx: CanvasRenderingContext2D, engine: CombatEngine) {
-    if (!engine.nebulae || engine.nebulae.length === 0) return;
-    ctx.save();
-    ctx.globalCompositeOperation = 'screen';
+  public drawNebulae(
+    ctx: CanvasRenderingContext2D,
+    engine: CombatEngine,
+    depths: readonly NebulaCloud['depth'][] = ['BACKGROUND', 'MIDGROUND', 'FOREGROUND']
+  ): void {
+    if (engine.nebulae.length === 0) return;
+    const depthSet = new Set(depths);
 
-    for (const neb of engine.nebulae) {
-      const img = textureCache.getImage(neb.spriteUrl);
-      if (img.complete && img.naturalWidth > 0) {
-        ctx.save();
-        ctx.translate(neb.pos.x, neb.pos.y);
-        ctx.rotate(neb.rotation);
-        ctx.globalAlpha = neb.type === 'AMBER' ? 0.38 : 0.45;
-        const d = neb.radius * 2 * neb.scale;
-        ctx.drawImage(img, -d / 2, -d / 2, d, d);
-        ctx.restore();
-      }
-    }
-    ctx.restore();
-  }
+    for (const nebula of engine.nebulae) {
+      if (!depthSet.has(nebula.depth)) continue;
+      const image = textureCache.getImage(nebula.spriteUrl);
+      if (!image.complete || image.naturalWidth <= 0) continue;
 
-  public drawAsteroids(ctx: CanvasRenderingContext2D, engine: CombatEngine) {
-    for (const ast of engine.asteroids) {
-      if (ast.hp <= 0) continue;
-      const img = textureCache.getImage(ast.spriteUrl);
+      const diameter = nebula.radius * 2 * nebula.scale;
+      const baseAlpha = nebula.depth === 'FOREGROUND'
+        ? (nebula.type === 'AMBER' ? 0.13 : 0.15)
+        : nebula.depth === 'MIDGROUND'
+          ? (nebula.type === 'AMBER' ? 0.2 : 0.24)
+          : (nebula.type === 'AMBER' ? 0.17 : 0.2);
 
       ctx.save();
-      ctx.translate(ast.pos.x, ast.pos.y);
-      ctx.rotate(ast.facingRad);
+      ctx.translate(nebula.pos.x, nebula.pos.y);
+      ctx.rotate(nebula.rotation);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = baseAlpha;
+      ctx.drawImage(image, -diameter / 2, -diameter / 2, diameter, diameter);
+      ctx.globalCompositeOperation = 'screen';
+      ctx.globalAlpha = nebula.depth === 'FOREGROUND' ? 0.025 : 0.055;
+      const glowDiameter = diameter * 1.02;
+      ctx.rotate(-nebula.rotation * 1.7);
+      ctx.drawImage(image, -glowDiameter / 2, -glowDiameter / 2, glowDiameter, glowDiameter);
+      ctx.restore();
+    }
+  }
 
-      const size = ast.radius * 2;
-      if (img.complete && img.naturalWidth > 0) {
-        ctx.drawImage(img, -ast.radius, -ast.radius, size, size);
+  public drawAsteroids(ctx: CanvasRenderingContext2D, engine: CombatEngine): void {
+    for (const asteroid of engine.asteroids) {
+      if (asteroid.hp <= 0) continue;
+      const image = textureCache.getImage(asteroid.spriteUrl);
+
+      ctx.save();
+      ctx.translate(asteroid.pos.x, asteroid.pos.y);
+      ctx.rotate(asteroid.facingRad);
+      const size = asteroid.radius * 2;
+      if (image.complete && image.naturalWidth > 0) {
+        ctx.drawImage(image, -asteroid.radius, -asteroid.radius, size, size);
       } else {
         ctx.fillStyle = '#6b5c4c';
         ctx.beginPath();
-        ctx.arc(0, 0, ast.radius, 0, Math.PI * 2);
+        ctx.arc(0, 0, asteroid.radius, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = '#4a3f35';
-        ctx.lineWidth = 2;
-        ctx.stroke();
       }
-
       ctx.restore();
     }
   }
