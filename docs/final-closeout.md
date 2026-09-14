@@ -19,13 +19,13 @@ The formal project plan defines M1-M4. The Wasm and Worker items are follow-up a
 
 A later source audit found repository-owned gaps that the earlier closeout wording had overstated. Those gaps are now handled in code:
 
-- ship/mod imports are validated for required structure, numeric ranges, enums, duplicate IDs/slot IDs, weapon-slot references, weapon size compatibility, weapon-group slot references, and bundled sprite references before registration;
+- ship/mod imports are validated for required structure, numeric ranges, enums, duplicate IDs/slot IDs, weapon-slot references, weapon size compatibility, weapon-group slot references, bundled sprite references, and optional nested weapon structures such as muzzle-flash/proximity-fuse definitions before registration;
 - the asset/content manifests are validated before renderer asset preparation is considered ready; the content manifest has `schemaVersion`, `contentVersion`, and one declared default-loadout record for every built-in ship;
 - pending WebGL image listeners are explicitly removed on invalidation/disposal, with a generation fence preventing stale load callbacks from uploading after lifecycle reset;
 - WebGL sampler wrap/filter/mipmap behavior comes from manifest metadata rather than filename heuristics;
 - Vite `BASE_URL` is the single public-runtime URL base for manifests, game assets, cursor and Wasm; a `/starsector/` production build/preview has been exercised successfully;
 - interactive HUD/UI elements block combat mouse/wheel handling through ancestor-aware target detection;
-- authoritative simulation randomness is owned by a deterministic `SimulationRandom` source; direct `Math.random()` remains only in the independent audio pitch-variation path;
+- authoritative combat randomness and cosmetic randomness use separate deterministic `SimulationRandom` streams. Weapon spread, failures, collision-affecting fragments and AI decisions stay on the combat stream, while particles, trails, cosmetic arc geometry, UI/radio IDs and similar presentation sampling use the cosmetic stream; direct `Math.random()` remains only in the independent audio pitch-variation path;
 - the former App-wide 100 ms HUD rerender tick has been removed; HUD refresh is localized to the HUD subtree.
 
 ## Clean-checkout production deployment validation

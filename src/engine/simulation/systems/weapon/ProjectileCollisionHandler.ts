@@ -140,17 +140,17 @@ export class ProjectileCollisionHandler {
 
     // 特色原版残渣黑烟团 (Airburst Dirty Smoke Clouds)
     for (let sIdx = 0; sIdx < 8; sIdx++) {
-      const smokeAngle = (sIdx / 8) * Math.PI * 2 + (ctx.random.next() - 0.5) * 0.4;
-      const smokeSpeed = 15 + ctx.random.next() * 35;
+      const smokeAngle = (sIdx / 8) * Math.PI * 2 + (ctx.visualRandom.next() - 0.5) * 0.4;
+      const smokeSpeed = 15 + ctx.visualRandom.next() * 35;
       ctx.fx.contrails.push({
-        pos: p.pos.clone().add(new Vector2((ctx.random.next() - 0.5) * 16, (ctx.random.next() - 0.5) * 16)),
+        pos: p.pos.clone().add(new Vector2((ctx.visualRandom.next() - 0.5) * 16, (ctx.visualRandom.next() - 0.5) * 16)),
         vel: Vector2.fromAngle(smokeAngle, smokeSpeed),
-        life: 0.7 + ctx.random.next() * 0.4,
+        life: 0.7 + ctx.visualRandom.next() * 0.4,
         maxLife: 1.1,
-        size: 12 + ctx.random.next() * 8,
-        maxSize: 32 + ctx.random.next() * 16,
+        size: 12 + ctx.visualRandom.next() * 8,
+        maxSize: 32 + ctx.visualRandom.next() * 16,
         alpha: 0.85,
-        rotation: ctx.random.next() * Math.PI * 2,
+        rotation: ctx.visualRandom.next() * Math.PI * 2,
         color: [42, 40, 44]
       });
     }
@@ -180,7 +180,7 @@ export class ProjectileCollisionHandler {
 
     if (interceptedCount > 0) {
       ctx.addCameraShake(3, 0.1);
-      if (p.sourceShipId === ctx.playerShip.id && ctx.random.next() < 0.6) {
+      if (p.sourceShipId === ctx.playerShip.id && ctx.visualRandom.next() < 0.6) {
         ctx.addRadioMessage('点防火控', 'PLAYER', `双管高射炮近炸拦截成功！引爆 ${interceptedCount} 枚来袭导弹！`, [140, 255, 180]);
       }
     }
@@ -246,7 +246,7 @@ export class ProjectileCollisionHandler {
             sound.playAtPos('missile_explosion', targetM.pos, ctx.playerShip.pos, 0.5);
             ctx.fx.spawnAuthenticExplosion(targetM.pos, 35, [255, 160, 40], true, 'missile');
             ctx.fx.addFloatingText(targetM.pos.clone(), 'MG INTERCEPTED', [120, 255, 150], 12, 0.8);
-            if (ctx.random.next() < 0.45) {
+            if (ctx.visualRandom.next() < 0.45) {
               ctx.addRadioMessage('点防火控', 'PLAYER', '近防机枪已成功打爆一枚来袭重型导弹！', [140, 255, 180]);
             }
           } else {
@@ -389,8 +389,8 @@ export class ProjectileCollisionHandler {
       for (let a = 0; a < 2; a++) {
         const empEnd = ship.pos.clone().add(
           new Vector2(
-            (ctx.random.next() - 0.5) * ship.spec.collisionRadius,
-            (ctx.random.next() - 0.5) * ship.spec.collisionRadius
+            (ctx.visualRandom.next() - 0.5) * ship.spec.collisionRadius,
+            (ctx.visualRandom.next() - 0.5) * ship.spec.collisionRadius
           ).rotate(ship.facingRad)
         );
         ctx.fx.spawnEmpArc(impactWorld, empEnd);

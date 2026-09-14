@@ -19,7 +19,10 @@ export interface MineFXCallbacks {
 export class MineSystem {
   public mines: SpatialMine[] = [];
 
-  constructor(private readonly random = new SimulationRandom()) {}
+  constructor(
+    private readonly random = new SimulationRandom(),
+    private readonly visualRandom = new SimulationRandom(0x4d494e45)
+  ) {}
 
   public clear() {
     this.mines = [];
@@ -46,7 +49,7 @@ export class MineSystem {
       damage: 1000,
       life: 12.0,
       pingTimer: 0.5,
-      rotation: this.random.next() * Math.PI * 2
+      rotation: this.visualRandom.next() * Math.PI * 2
     });
   }
 
@@ -96,7 +99,7 @@ export class MineSystem {
       if (mine.isDetonating) {
         mine.detonatingTimer -= dt;
         // 临近爆炸火花激涌
-        if (this.random.next() < 0.5) {
+        if (this.visualRandom.next() < 0.5) {
           fx.spawnSparks(mine.pos, 4, [255, 80, 50]);
         }
 
@@ -140,7 +143,7 @@ export class MineSystem {
                 // EMP 电击船体
                 for (let k = 0; k < 4; k++) {
                   const empTarget = target.pos.clone().add(
-                    new Vector2((this.random.next() - 0.5) * 100, (this.random.next() - 0.5) * 100)
+                    new Vector2((this.visualRandom.next() - 0.5) * 100, (this.visualRandom.next() - 0.5) * 100)
                   );
                   fx.spawnEmpArc(mine.pos, empTarget);
                 }

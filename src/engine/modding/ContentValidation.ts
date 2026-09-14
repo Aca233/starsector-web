@@ -44,6 +44,18 @@ function enumValue(value: unknown, label: string, allowed: ReadonlySet<string>):
   return result;
 }
 
+function colorTuple(value: unknown, label: string, length: 3 | 4): number[] {
+  if (!Array.isArray(value) || value.length !== length) throw new Error(`${label} 必须是 ${length === 3 ? 'RGB' : 'RGBA'} 数组`);
+  value.forEach((channel, index) => finite(channel, `${label}[${index}]`, 0, 255));
+  return value as number[];
+}
+
+function finiteArray(value: unknown, label: string): number[] {
+  if (!Array.isArray(value)) throw new Error(`${label} 必须是数值数组`);
+  value.forEach((item, index) => finite(item, `${label}[${index}]`));
+  return value as number[];
+}
+
 function requireAsset(path: string, label: string, required: boolean): void {
   if (!required) return;
   if (!assetManager.isLoaded) throw new Error(`无法校验 ${label}：独立资源清单尚未加载`);
@@ -60,8 +72,44 @@ export function validateWeaponSpec(input: unknown, requireBundledAssets = assetM
   for (const key of ['damagePerShot', 'damagePerSecond', 'fluxPerShot', 'range', 'refireDelay', 'projSpeed', 'projRadius'] as const) {
     finite(spec[key], `${id}.${key}`, 0);
   }
-  if (!Array.isArray(spec.color) || spec.color.length !== 3) throw new Error(`${id}.color 必须是 RGB 三元组`);
-  spec.color.forEach((channel, index) => finite(channel, `${id}.color[${index}]`, 0, 255));
+  colorTuple(spec.color, `${id}.color`, 3);
+
+  for (const key of ['turnRateDegPerSec', 'minSpread', 'maxSpread', 'spreadPerShot', 'spreadDecay', 'visualRecoil', 'hitGlowRadius', 'glowRadius', 'coreWidthMult', 'projLength', 'projWidth', 'muzzleFlashSize', 'burstDelay', 'engineAcceleration', 'maxSpeed', 'maxTurnRate', 'missileHp'] as const) {
+    if (spec[key] !== undefined) finite(spec[key], `${id}.${key}`, 0);
+  }
+  if (spec.textureScrollSpeed !== undefined) finite(spec.textureScrollSpeed, `${id}.textureScrollSpeed`);
+  if (spec.burstSize !== undefined) integer(spec.burstSize, `${id}.burstSize`, 1);
+  for (const key of ['renderBarrelBelow', 'isRocket', 'isGuided', 'isTwoStage'] as const) {
+    if (spec[key] !== undefined && typeof spec[key] !== 'boolean') throw new Error(`${id}.${key} 必须是布尔值`);
+  }
+  if (spec.spawnType !== undefined) enumValue(spec.spawnType, `${id}.spawnType`, new Set(['BALLISTIC', 'BALLISTIC_AS_BEAM', 'MISSILE', 'BEAM']));
+  if (spec.textureType !== undefined) enumValue(spec.textureType, `${id}.textureType`, new Set(['ROUGH', 'SMOOTH']));
+  for (const key of ['fringeColor', 'coreColor', 'glowColor'] as const) {
+    if (spec[key] !== undefined) colorTuple(spec[key], `${id}.${key}`, 4);
+  }
+  for (const key of ['muzzleFlashColor', 'engineFlameColor'] as const) {
+    if (spec[key] !== undefined) colorTuple(spec[key], `${id}.${key}`, 3);
+  }
+  for (const key of ['turretOffsets', 'hardpointOffsets'] as const) {
+    if (spec[key] !== undefined) finiteArray(spec[key], `${id}.${key}`);
+  }
+  if (spec.soundKey !== undefined) text(spec.soundKey, `${id}.soundKey`);
+
+  if (spec.muzzleFlashSpec !== undefined) {
+    const muzzle = object(spec.muzzleFlashSpec, `${id}.muzzleFlashSpec`);
+    for (const key of ['length', 'spread', 'particleSizeMin', 'particleSizeRange', 'particleDuration'] as const) {
+      finite(muzzle[key], `${id}.muzzleFlashSpec.${key}`, 0);
+    }
+    integer(muzzle.particleCount, `${id}.muzzleFlashSpec.particleCount`, 0);
+    colorTuple(muzzle.particleColor, `${id}.muzzleFlashSpec.particleColor`, 4);
+  }
+
+  if (spec.proximityFuse !== undefined) {
+    const fuse = object(spec.proximityFuse, `${id}.proximityFuse`);
+    finite(fuse.range, `${id}.proximityFuse.range`, 0);
+    finite(fuse.explosionRadius, `${id}.proximityFuse.explosionRadius`, 0);
+    if (fuse.soundKey !== undefined) text(fuse.soundKey, `${id}.proximityFuse.soundKey`);
+  }
 
   const assetFields = ['turretSpriteUrl', 'turretGunSpriteUrl', 'hardpointSpriteUrl', 'hardpointGunSpriteUrl', 'glowSpriteUrl', 'hardpointGlowSpriteUrl', 'projSpriteUrl'] as const;
   for (const field of assetFields) {

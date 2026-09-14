@@ -16,6 +16,7 @@ export interface WeaponSimContext {
   statsTracker?: any;
   contrailEngine?: ContrailEngine;
   random: SimulationRandom;
+  visualRandom: SimulationRandom;
   addRadioMessage: (sender: string, faction: 'PLAYER' | 'ENEMY' | 'HQ', text: string, color?: [number, number, number]) => void;
   addCameraShake: (intensity: number, duration: number) => void;
   handleShipDestruction: (ship: Ship) => void;

@@ -19,7 +19,10 @@ export interface AsteroidFXCallbacks {
 export class AsteroidSystem {
   public asteroids: Asteroid[] = [];
 
-  constructor(private readonly random = new SimulationRandom()) {}
+  constructor(
+    private readonly random = new SimulationRandom(),
+    private readonly visualRandom = new SimulationRandom(0xa57e01d)
+  ) {}
 
   public init() {
     this.asteroids = [];
@@ -160,7 +163,7 @@ export class AsteroidSystem {
           a1.pos.subScaled(n, overlap);
           a2.pos.addScaled(n, overlap);
 
-          if (this.random.next() < 0.25) {
+          if (this.visualRandom.next() < 0.25) {
             sound.playAtPos('collision_asteroid_asteroid', a1.pos, playerPos, 0.35);
           }
         }

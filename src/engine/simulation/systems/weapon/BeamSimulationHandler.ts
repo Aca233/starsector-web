@@ -205,7 +205,7 @@ export class BeamSimulationHandler {
             ship.hullHp = Math.max(0, ship.hullHp - result.hullDamage);
             ship.addScorchMark(localImpact, result.armorDamage || result.hullDamage);
 
-            if (ctx.random.next() < dt * 6) {
+            if (ctx.visualRandom.next() < dt * 6) {
               sound.playAtPos('beam_hit', worldImpact, ctx.playerShip.pos, 0.35);
             }
 
@@ -258,7 +258,7 @@ export class BeamSimulationHandler {
               }
             }
 
-            if (ctx.random.next() < 0.08) {
+            if (ctx.visualRandom.next() < 0.08) {
               const debrisColor: [number, number, number] =
                 ship.spec.id === 'onslaught' ? [125, 110, 95] : [100, 130, 160];
               ctx.fx.spawnDebris(worldImpact, 1, debrisColor, 50, 'small');
@@ -268,8 +268,8 @@ export class BeamSimulationHandler {
               for (let arcIdx = 0; arcIdx < 3; arcIdx++) {
                 const arcDest = ship.pos.clone().add(
                   new Vector2(
-                    (ctx.random.next() - 0.5) * ship.spec.collisionRadius * 1.2,
-                    (ctx.random.next() - 0.5) * ship.spec.collisionRadius * 1.2
+                    (ctx.visualRandom.next() - 0.5) * ship.spec.collisionRadius * 1.2,
+                    (ctx.visualRandom.next() - 0.5) * ship.spec.collisionRadius * 1.2
                   ).rotate(ship.facingRad)
                 );
                 ctx.fx.spawnEmpArc(worldImpact, arcDest);

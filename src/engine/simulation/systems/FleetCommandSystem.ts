@@ -17,7 +17,7 @@ export class FleetCommandSystem {
   public radioMessages: RadioMessage[] = [];
   public isTacticalMap = false;
 
-  constructor(private readonly random = new SimulationRandom()) {}
+  constructor(private readonly visualRandom = new SimulationRandom(0xc04d4e44)) {}
 
   public clear() {
     this.commandPoints = 5;
@@ -44,7 +44,7 @@ export class FleetCommandSystem {
     combatTime = 0
   ) {
     this.radioMessages.push({
-      id: this.random.nextNumericId(),
+      id: this.visualRandom.nextNumericId(),
       sender,
       senderFaction,
       text,

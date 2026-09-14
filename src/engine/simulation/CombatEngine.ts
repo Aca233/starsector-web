@@ -53,6 +53,8 @@ export class CombatEngine {
   public enemyShip: Ship;
   public enemyAI: CapitalShipAI;
   public readonly random: SimulationRandom;
+  /** Cosmetic/visual stream. Never use this for authoritative combat decisions. */
+  public readonly visualRandom: SimulationRandom;
 
   // 独立的领域子系统
   public readonly fxSystem: CombatFXSystem;
@@ -119,12 +121,13 @@ export class CombatEngine {
 
   constructor(playerShipId = 'onslaught', enemyShipId = 'paragon', seed = 0x51a7e5ed) {
     this.random = new SimulationRandom(seed);
-    this.fxSystem = new CombatFXSystem(this.random);
-    this.asteroidSystem = new AsteroidSystem(this.random);
-    this.nebulaSystem = new NebulaSystem(this.random);
-    this.fighterSystem = new FighterSystem(this.random);
-    this.mineSystem = new MineSystem(this.random);
-    this.commandSystem = new FleetCommandSystem(this.random);
+    this.visualRandom = new SimulationRandom((seed ^ 0x9e3779b9) >>> 0);
+    this.fxSystem = new CombatFXSystem(this.visualRandom);
+    this.asteroidSystem = new AsteroidSystem(this.random, this.visualRandom);
+    this.nebulaSystem = new NebulaSystem(this.visualRandom);
+    this.fighterSystem = new FighterSystem(this.random, this.visualRandom);
+    this.mineSystem = new MineSystem(this.random, this.visualRandom);
+    this.commandSystem = new FleetCommandSystem(this.visualRandom);
     const playerSpec = modManager.getShip(playerShipId) || modManager.getShip('onslaught')!;
     const enemySpec = modManager.getShip(enemyShipId) || modManager.getShip('paragon')!;
 
@@ -156,6 +159,7 @@ export class CombatEngine {
 
   public switchPlayerShip(newPlayerShipId: string) {
     this.random.reset();
+    this.visualRandom.reset();
     this.battleResult = null;
     this.statsTracker.reset();
     this.combatTime = 0;
@@ -214,6 +218,7 @@ export class CombatEngine {
 
   public setSeed(seed: number): void {
     this.random.reset(seed);
+    this.visualRandom.reset((seed ^ 0x9e3779b9) >>> 0);
   }
 
   public endBattle(isVictory: boolean) {
@@ -439,7 +444,7 @@ export class CombatEngine {
         this.fxSystem.spawnAuthenticMuzzleFlash(spec, pos, angleRad, shipVel || new Vector2(0, 0));
       } else {
         this.fxSystem.muzzleFlashes.push({
-          id: this.random.next(),
+          id: this.visualRandom.next(),
           pos: pos.clone(),
           angleRad,
           size,
@@ -492,7 +497,7 @@ export class CombatEngine {
     this.nebulaSystem.update(dt, allShips, this.projectiles, (pos, color) => {
       this.fxSystem.particles.push({
         pos,
-        vel: new Vector2((this.random.next() - 0.5) * 20, (this.random.next() - 0.5) * 20),
+        vel: new Vector2((this.visualRandom.next() - 0.5) * 20, (this.visualRandom.next() - 0.5) * 20),
         life: 0.35,
         maxLife: 0.35,
         size: 4,
@@ -504,7 +509,8 @@ export class CombatEngine {
     // 2.5 舰船状态视觉特效与自动抢修汇报
     this.statusSystem.update(dt, {
       fx: this.fxSystem,
-      random: this.random,
+      combatRandom: this.random,
+      visualRandom: this.visualRandom,
       statsTracker: this.statsTracker,
       playerShip: this.playerShip,
       enemyShip: this.enemyShip,
@@ -558,6 +564,7 @@ export class CombatEngine {
       statsTracker: this.statsTracker,
       contrailEngine: this.contrailEngine,
       random: this.random,
+      visualRandom: this.visualRandom,
       addRadioMessage: (sender: string, faction: 'PLAYER' | 'ENEMY' | 'HQ', text: string, color?: [number, number, number]) => {
         this.addRadioMessage(sender, faction, text, color);
       },
@@ -606,11 +613,11 @@ export class CombatEngine {
     // 连环大爆炸与次生殉爆音效
     for (let k = 0; k < 9; k++) {
       const off = new Vector2(
-        (this.random.next() - 0.5) * ship.spec.collisionRadius * 1.3,
-        (this.random.next() - 0.5) * ship.spec.collisionRadius * 1.3
+        (this.visualRandom.next() - 0.5) * ship.spec.collisionRadius * 1.3,
+        (this.visualRandom.next() - 0.5) * ship.spec.collisionRadius * 1.3
       );
       const detPos = ship.pos.clone().add(off);
-      this.spawnAuthenticExplosion(detPos, 70 + this.random.next() * 70, [255, 140, 30], true);
+      this.spawnAuthenticExplosion(detPos, 70 + this.visualRandom.next() * 70, [255, 140, 30], true);
       sound.playAtPos('explosion_secondary', detPos, this.playerShip.pos, 0.65);
     }
     this.addCameraShake(25, 0.8);

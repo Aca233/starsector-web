@@ -36,7 +36,10 @@ export class FighterSystem {
   public playerWings: FlightDeckWing[] = [];
   public enemyWings: FlightDeckWing[] = [];
 
-  constructor(private readonly random = new SimulationRandom()) {}
+  constructor(
+    private readonly random = new SimulationRandom(),
+    private readonly visualRandom = new SimulationRandom(0xf17e7a11)
+  ) {}
 
   public init(playerShip: Ship, enemyShip?: Ship) {
     this.fighters = [];
@@ -423,18 +426,18 @@ export class FighterSystem {
       ftr.update(dt, hostileCapital, spawnProj, spawnBeam, spawnFlash);
 
       // 战机尾气推进火焰粒子
-      if (Math.abs(ftr.throttle) > 0.1 && this.random.next() < 0.6) {
+      if (Math.abs(ftr.throttle) > 0.1 && this.visualRandom.next() < 0.6) {
         for (const slot of ftr.spec.engineSlots) {
           const nozzlePos = ftr.pos.clone().add(new Vector2(slot.x, slot.y).rotate(ftr.facingRad));
           fx.spawnContrail({
             pos: nozzlePos,
-            vel: Vector2.fromAngle(ftr.facingRad + Math.PI + (this.random.next() - 0.5) * 0.3, 30).addScaled(ftr.vel, 0.4),
-            life: 0.3 + this.random.next() * 0.2,
+            vel: Vector2.fromAngle(ftr.facingRad + Math.PI + (this.visualRandom.next() - 0.5) * 0.3, 30).addScaled(ftr.vel, 0.4),
+            life: 0.3 + this.visualRandom.next() * 0.2,
             maxLife: 0.5,
-            size: 4 + this.random.next() * 3,
-            maxSize: 12 + this.random.next() * 5,
+            size: 4 + this.visualRandom.next() * 3,
+            maxSize: 12 + this.visualRandom.next() * 5,
             alpha: 0.45,
-            rotation: this.random.next() * Math.PI * 2,
+            rotation: this.visualRandom.next() * Math.PI * 2,
             color: isPlayer ? [240, 180, 100] : [255, 100, 80]
           });
         }
@@ -586,18 +589,18 @@ export class FighterSystem {
       bmr.update(dt, enemyShip, spawnProj, spawnBeam, spawnFlash);
 
       // 高技术蓝紫推进器尾焰
-      if (Math.abs(bmr.throttle) > 0.1 && this.random.next() < 0.65) {
+      if (Math.abs(bmr.throttle) > 0.1 && this.visualRandom.next() < 0.65) {
         for (const slot of bmr.spec.engineSlots) {
           const nozzlePos = bmr.pos.clone().add(new Vector2(slot.x, slot.y).rotate(bmr.facingRad));
           fx.spawnContrail({
             pos: nozzlePos,
-            vel: Vector2.fromAngle(bmr.facingRad + Math.PI + (this.random.next() - 0.5) * 0.2, 35).addScaled(bmr.vel, 0.4),
-            life: 0.35 + this.random.next() * 0.2,
+            vel: Vector2.fromAngle(bmr.facingRad + Math.PI + (this.visualRandom.next() - 0.5) * 0.2, 35).addScaled(bmr.vel, 0.4),
+            life: 0.35 + this.visualRandom.next() * 0.2,
             maxLife: 0.55,
-            size: 5 + this.random.next() * 3,
-            maxSize: 15 + this.random.next() * 5,
+            size: 5 + this.visualRandom.next() * 3,
+            maxSize: 15 + this.visualRandom.next() * 5,
             alpha: 0.5,
-            rotation: this.random.next() * Math.PI * 2,
+            rotation: this.visualRandom.next() * Math.PI * 2,
             color: [100, 180, 255]
           });
         }

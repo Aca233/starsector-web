@@ -4,7 +4,7 @@ import { Vector2 } from '../src/engine/math/Vector2';
 import { parseStarsectorCsv, parseStarsectorJson } from '../src/engine/data/StarsectorTextParsers';
 import { contentRegistry } from '../src/engine/content/ContentRegistry';
 import { ShipWeaponControlSystem } from '../src/engine/simulation/systems/ShipWeaponControlSystem';
-import type { ShipSpec } from '../src/engine/modding/ModManager';
+import { modManager, type ShipSpec } from '../src/engine/modding/ModManager';
 import type { WeaponSpec } from '../src/engine/simulation/Weapon';
 import { FixedTimestepScheduler } from '../src/engine/simulation/FixedTimestepScheduler';
 import { VisualRandom } from '../src/engine/runtime/VisualRandom';
@@ -24,7 +24,7 @@ import {
   getWeaponVisualProfile
 } from '../src/engine/visual/VisualProfiles';
 import { getHudDensity, getHudLayoutProfile } from '../src/ui/hud/HudLayout';
-import { validateShipSpec } from '../src/engine/modding/ContentValidation';
+import { validateShipSpec, validateWeaponSpec } from '../src/engine/modding/ContentValidation';
 import { SimulationRandom } from '../src/engine/simulation/SimulationRandom';
 import { ContentManifestManager } from '../src/engine/content/ContentManifest';
 import { readFileSync } from 'node:fs';
@@ -103,6 +103,20 @@ describe('content validation', () => {
     };
     expect(() => validateShipSpec(copy)).toThrow(/不存在的武器/);
   });
+
+  it('rejects incomplete nested muzzle-flash specs before weapon registration', () => {
+    const base = contentRegistry.getWeapon('tpc');
+    expect(base).toBeDefined();
+    const invalid = {
+      ...base!,
+      id: 'invalid_nested_muzzle_weapon',
+      muzzleFlashSpec: { particleCount: 1 }
+    } as unknown as WeaponSpec;
+
+    expect(() => validateWeaponSpec(invalid)).toThrow(/muzzleFlashSpec\.(length|particleColor)/);
+    expect(() => modManager.registerWeapon(invalid)).toThrow(/muzzleFlashSpec\.(length|particleColor)/);
+    expect(contentRegistry.getWeapon(invalid.id)).toBeUndefined();
+  });
 });
 
 describe('deterministic simulation random source', () => {
@@ -111,6 +125,24 @@ describe('deterministic simulation random source', () => {
     const first = [random.next(), random.next(), random.nextNumericId(), random.nextId('fx')];
     random.reset(20260914);
     expect([random.next(), random.next(), random.nextNumericId(), random.nextId('fx')]).toEqual(first);
+  });
+
+  it('keeps cosmetic muzzle-particle randomness isolated from combat randomness', () => {
+    const seed = 20260914;
+    const withExtraFx = new CombatEngine('onslaught', 'paragon', seed);
+    const baseline = new CombatEngine('onslaught', 'paragon', seed);
+    const muzzle = contentRegistry.getWeapon('tpc')?.muzzleFlashSpec;
+    expect(muzzle).toBeDefined();
+
+    withExtraFx.fxSystem.spawnAuthenticMuzzleFlash(
+      { ...muzzle!, particleCount: muzzle!.particleCount + 1 },
+      new Vector2(0, 0),
+      0,
+      new Vector2(0, 0)
+    );
+
+    expect(Array.from({ length: 8 }, () => withExtraFx.random.next()))
+      .toEqual(Array.from({ length: 8 }, () => baseline.random.next()));
   });
 });
 

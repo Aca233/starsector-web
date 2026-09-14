@@ -12,7 +12,8 @@ export interface ShipStatusContext {
   addRadioMessage: (sender: string, faction: 'PLAYER' | 'ENEMY' | 'HQ', text: string, color?: [number, number, number]) => void;
   deployMine: (targetPos: Vector2, sourceShip: Ship) => void;
   statsTracker?: any;
-  random: SimulationRandom;
+  combatRandom: SimulationRandom;
+  visualRandom: SimulationRandom;
 }
 
 /**
@@ -65,13 +66,13 @@ export class CombatShipStatusSystem {
 
       // 1. 舰船过载剧烈电弧失控
       if (ship.flux.isOverloaded) {
-        if (ctx.random.next() < dt * 18) {
-          const r1 = (ctx.random.next() - 0.5) * ship.spec.collisionRadius * 1.3;
-          const r2 = (ctx.random.next() - 0.5) * ship.spec.collisionRadius * 1.3;
+        if (ctx.visualRandom.next() < dt * 18) {
+          const r1 = (ctx.visualRandom.next() - 0.5) * ship.spec.collisionRadius * 1.3;
+          const r2 = (ctx.visualRandom.next() - 0.5) * ship.spec.collisionRadius * 1.3;
           const start = ship.pos.clone().add(new Vector2(r1, r2).rotate(ship.facingRad));
           const end = start.clone().add(new Vector2(
-            (ctx.random.next() - 0.5) * 60,
-            (ctx.random.next() - 0.5) * 60
+            (ctx.visualRandom.next() - 0.5) * 60,
+            (ctx.visualRandom.next() - 0.5) * 60
           ));
           ctx.fx.spawnEmpArc(start, end, {
             coreColor: [255, 255, 255],
@@ -87,13 +88,13 @@ export class CombatShipStatusSystem {
       if (ship.flux.isVenting) {
         const empMult = ship.flux.totalFlux / Math.max(1, ship.flux.baseDissipation * 2.0);
         const arcRate = Math.min(1.0, empMult > 2.0 ? 1.0 : empMult * 0.5);
-        if (ctx.random.next() < dt * 14 * arcRate) {
-          const r1 = (ctx.random.next() - 0.5) * ship.spec.collisionRadius * 1.1;
-          const r2 = (ctx.random.next() - 0.5) * ship.spec.collisionRadius * 1.1;
+        if (ctx.visualRandom.next() < dt * 14 * arcRate) {
+          const r1 = (ctx.visualRandom.next() - 0.5) * ship.spec.collisionRadius * 1.1;
+          const r2 = (ctx.visualRandom.next() - 0.5) * ship.spec.collisionRadius * 1.1;
           const start = ship.pos.clone().add(new Vector2(r1, r2).rotate(ship.facingRad));
           const end = start.clone().add(new Vector2(
-            (ctx.random.next() - 0.5) * 45,
-            (ctx.random.next() - 0.5) * 45
+            (ctx.visualRandom.next() - 0.5) * 45,
+            (ctx.visualRandom.next() - 0.5) * 45
           ));
           ctx.fx.spawnEmpArc(start, end, {
             coreColor: [255, 255, 255],
@@ -106,46 +107,46 @@ export class CombatShipStatusSystem {
 
       // 3. 舰船严重受创时舰体裂隙冒黑烟与火星
       const damageRatio = 1.0 - (ship.hullHp / ship.spec.hitpoints);
-      if (damageRatio > 0.35 && ctx.random.next() < dt * damageRatio * 16) {
+      if (damageRatio > 0.35 && ctx.visualRandom.next() < dt * damageRatio * 16) {
         const ventOff = new Vector2(
-          (ctx.random.next() - 0.5) * ship.spec.collisionRadius * 0.8,
-          (ctx.random.next() - 0.5) * ship.spec.collisionRadius * 0.8
+          (ctx.visualRandom.next() - 0.5) * ship.spec.collisionRadius * 0.8,
+          (ctx.visualRandom.next() - 0.5) * ship.spec.collisionRadius * 0.8
         ).rotate(ship.facingRad);
         const ventPos = ship.pos.clone().add(ventOff);
 
         ctx.fx.contrails.push({
           pos: ventPos,
           vel: Vector2.fromAngle(
-            ship.facingRad + Math.PI + (ctx.random.next() - 0.5) * 1.2,
-            25 + ctx.random.next() * 35
+            ship.facingRad + Math.PI + (ctx.visualRandom.next() - 0.5) * 1.2,
+            25 + ctx.visualRandom.next() * 35
           ).addScaled(ship.vel, 0.3),
-          life: 0.9 + ctx.random.next() * 0.6,
+          life: 0.9 + ctx.visualRandom.next() * 0.6,
           maxLife: 1.5,
-          size: 10 + ctx.random.next() * 8,
-          maxSize: 32 + ctx.random.next() * 18,
+          size: 10 + ctx.visualRandom.next() * 8,
+          maxSize: 32 + ctx.visualRandom.next() * 18,
           alpha: 0.75 * damageRatio,
-          rotation: ctx.random.next() * Math.PI * 2,
+          rotation: ctx.visualRandom.next() * Math.PI * 2,
           color: [35, 35, 40]
         });
 
-        if (ship.hullHp < ship.spec.hitpoints * 0.45 && ctx.random.next() < 0.6) {
+        if (ship.hullHp < ship.spec.hitpoints * 0.45 && ctx.visualRandom.next() < 0.6) {
           ctx.fx.particles.push({
             pos: ventPos.clone(),
-            vel: Vector2.fromAngle(ctx.random.next() * Math.PI * 2, 40 + ctx.random.next() * 60).addScaled(ship.vel, 0.5),
-            life: 0.2 + ctx.random.next() * 0.25,
+            vel: Vector2.fromAngle(ctx.visualRandom.next() * Math.PI * 2, 40 + ctx.visualRandom.next() * 60).addScaled(ship.vel, 0.5),
+            life: 0.2 + ctx.visualRandom.next() * 0.25,
             maxLife: 0.45,
-            size: 3 + ctx.random.next() * 4,
-            color: [255, 140 + ctx.random.next() * 80, 30],
+            size: 3 + ctx.visualRandom.next() * 4,
+            color: [255, 140 + ctx.visualRandom.next() * 80, 30],
             alpha: 1.0
           });
         }
       }
 
       // 3.5 穿透/剥落装甲格持续逸散微弱青烟与熔渣火星
-      if (ship.armor && ctx.random.next() < dt * 6) {
+      if (ship.armor && ctx.visualRandom.next() < dt * 6) {
         const armor = ship.armor;
-        const randC = Math.floor(ctx.random.next() * armor.cols);
-        const randR = Math.floor(ctx.random.next() * armor.rows);
+        const randC = Math.floor(ctx.visualRandom.next() * armor.cols);
+        const randR = Math.floor(ctx.visualRandom.next() * armor.rows);
         const cellVal = armor.getCell(randC, randR);
         if (cellVal < armor.maxCellArmor * 0.25) {
           const halfW = (armor.cols * armor.cellWidth) / 2;
@@ -158,24 +159,24 @@ export class CombatShipStatusSystem {
 
           ctx.fx.contrails.push({
             pos: worldPos,
-            vel: Vector2.fromAngle(ship.facingRad + Math.PI + (ctx.random.next() - 0.5) * 1.5, 15 + ctx.random.next() * 20).addScaled(ship.vel, 0.4),
-            life: 0.5 + ctx.random.next() * 0.3,
+            vel: Vector2.fromAngle(ship.facingRad + Math.PI + (ctx.visualRandom.next() - 0.5) * 1.5, 15 + ctx.visualRandom.next() * 20).addScaled(ship.vel, 0.4),
+            life: 0.5 + ctx.visualRandom.next() * 0.3,
             maxLife: 0.8,
-            size: 6 + ctx.random.next() * 4,
-            maxSize: 18 + ctx.random.next() * 8,
+            size: 6 + ctx.visualRandom.next() * 4,
+            maxSize: 18 + ctx.visualRandom.next() * 8,
             alpha: 0.5,
-            rotation: ctx.random.next() * Math.PI * 2,
+            rotation: ctx.visualRandom.next() * Math.PI * 2,
             color: [45, 45, 50]
           });
 
-          if (ctx.random.next() < 0.4) {
+          if (ctx.visualRandom.next() < 0.4) {
             ctx.fx.particles.push({
               pos: worldPos.clone(),
-              vel: Vector2.fromAngle(ctx.random.next() * Math.PI * 2, 20 + ctx.random.next() * 30).addScaled(ship.vel, 0.4),
-              life: 0.2 + ctx.random.next() * 0.2,
+              vel: Vector2.fromAngle(ctx.visualRandom.next() * Math.PI * 2, 20 + ctx.visualRandom.next() * 30).addScaled(ship.vel, 0.4),
+              life: 0.2 + ctx.visualRandom.next() * 0.2,
               maxLife: 0.4,
-              size: 2 + ctx.random.next() * 2,
-              color: [255, 110 + ctx.random.next() * 60, 30],
+              size: 2 + ctx.visualRandom.next() * 2,
+              color: [255, 110 + ctx.visualRandom.next() * 60, 30],
               alpha: 0.9
             });
           }
@@ -190,8 +191,8 @@ export class CombatShipStatusSystem {
           deployPos = ship.aimTargetWorld.clone();
         } else {
           const enemyTarget = ship.id === ctx.playerShip.id ? ctx.enemyShip : ctx.playerShip;
-          const offsetAngle = enemyTarget.facingRad + Math.PI + (ctx.random.next() - 0.5) * 1.0;
-          deployPos = enemyTarget.pos.clone().add(Vector2.fromAngle(offsetAngle, 220 + ctx.random.next() * 100));
+          const offsetAngle = enemyTarget.facingRad + Math.PI + (ctx.combatRandom.next() - 0.5) * 1.0;
+          deployPos = enemyTarget.pos.clone().add(Vector2.fromAngle(offsetAngle, 220 + ctx.combatRandom.next() * 100));
         }
         ctx.deployMine(deployPos, ship);
       }

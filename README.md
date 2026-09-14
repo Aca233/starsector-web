@@ -144,7 +144,7 @@ Instead, the production runtime now records browser-side collision telemetry per
 
 ## Final closeout status
 
-The repository-owned engineering gaps identified during final audit are now addressed: imported ship blueprints are structurally/reference validated before registration, asynchronous texture uploads are generation/disposal guarded, image sampler state comes from the asset manifest, runtime public URLs honor the Vite deployment base, HUD controls are isolated from combat pointer input, and simulation-owned randomness is deterministic and resettable. The content manifest now has an explicit schema/content version and default-loadout contract that is cross-validated against the runtime registry before renderer asset preparation completes.
+The repository-owned engineering gaps identified during final audit are now addressed: imported ship blueprints and weapon definitions (including nested muzzle-flash/proximity-fuse structures) are structurally/reference validated before registration, asynchronous texture uploads are generation/disposal guarded, image sampler state comes from the asset manifest, runtime public URLs honor the Vite deployment base, and HUD controls are isolated from combat pointer input. Authoritative combat randomness is deterministic/resettable and is isolated from a separately seeded cosmetic stream, so particle/audio/UI sampling cannot perturb later weapon spread, failure, collision, or AI decisions. The content manifest has an explicit schema/content version and default-loadout contract that is cross-validated against the runtime registry before renderer asset preparation completes.
 
 Production validation covers both the normal build and a nested `/starsector/` base. The nested production preview served the application, both manifests, and the bundled collision Wasm successfully. The App no longer uses a 100 ms global render tick for HUD state; mutable combat presentation refresh is contained inside the HUD subtree while battle-result state is polled separately.
 
@@ -162,6 +162,8 @@ Two visual-acceptance inputs remain external to this standalone repository: stan
 - preservation of scaled backlog rather than dropping it
 - 20 repeated ship switches resetting timing/cooldowns/settlement
 - seeded visual random replay
+- nested weapon-definition rejection before registration
+- cosmetic RNG isolation from authoritative combat RNG
 - asset-root traversal rejection
 - spatial-grid collision candidate pruning
 - swept hull collision and shield-before-hull fallback behavior
