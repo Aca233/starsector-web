@@ -89,8 +89,8 @@ export class CapitalShipAI {
       this.ship.system.activate();
     }
 
-    // 攻势护盾决策: 幅能低于 85% 且处于交火距离时开启
-    if (this.ship.flux.fluxPercent < 0.85 && dist < 1200) {
+    // 攻势护盾决策: Burn Drive 的 noShield 生命周期内不得反复尝试重新开盾。
+    if (this.ship.canUseShields() && this.ship.flux.fluxPercent < 0.85 && dist < 1200) {
       this.ship.shield.setActive(true);
     } else {
       this.ship.shield.setActive(false);
@@ -109,7 +109,7 @@ export class CapitalShipAI {
     }
 
     // 典范常态开启全向 360 度护盾
-    if (!this.ship.flux.isOverloaded && !this.ship.flux.isVenting) {
+    if (this.ship.canUseShields()) {
       this.ship.shield.setActive(true);
     }
 

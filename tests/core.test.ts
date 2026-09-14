@@ -1968,7 +1968,7 @@ describe('source-aligned ship system lifecycles', () => {
     expect(system.isCoolingDown).toBe(false);
   });
 
-  it('enforces Burn Drive no-turning, no-strafing, always-accelerate and no-shield flags', () => {
+  it('enforces Burn Drive no-turning, no-strafing, always-accelerate and no-shield flags without snapping the shield visual away', () => {
     const ship = new Ship('burn-flags', modManager.getShip('onslaught')!, true, new Vector2(), 0, new SimulationRandom(8606));
     ship.system.activate();
     ship.system.update(2);
@@ -1979,11 +1979,57 @@ describe('source-aligned ship system lifecycles', () => {
     ship.turnInput = 1;
     ship.angularVelRad = 0;
     const yBefore = ship.pos.y;
+    const arcBefore = ship.shield.currentArcDeg;
+    expect(ship.canUseShields()).toBe(false);
     ship.update(1 / 60, null, () => {}, () => {});
     expect(ship.shield.isActive).toBe(false);
+    expect(ship.shield.currentArcDeg).toBeLessThan(arcBefore);
+    expect(ship.shield.currentArcDeg).toBeGreaterThan(0);
+    expect(ship.shield.isVisuallyDeployed).toBe(true);
     expect(ship.angularVelRad).toBeCloseTo(0, 8);
     expect(ship.pos.x).toBeGreaterThan(0);
     expect(ship.pos.y).toBeCloseTo(yBefore, 8);
+
+    ship.system.update(5);
+    expect(ship.system.state).toBe('OUT');
+    expect(ship.canUseShields()).toBe(false);
+    ship.system.update(1);
+    expect(ship.system.state).toBe('COOLDOWN');
+    expect(ship.canUseShields()).toBe(true);
+  });
+
+  it('retracts and redeploys a shield continuously instead of snapping currentArcDeg to zero', () => {
+    const shield = new Shield('FRONT', 180, 240, 1, 0);
+    shield.setActive(true);
+    shield.currentArcDeg = shield.maxArcDeg;
+    shield.setActive(false);
+    shield.update(1 / 60, 0, 0);
+    const closingArc = shield.currentArcDeg;
+    expect(closingArc).toBeGreaterThan(0);
+    expect(closingArc).toBeLessThan(shield.maxArcDeg);
+    expect(shield.isVisuallyDeployed).toBe(true);
+
+    shield.setActive(true);
+    shield.update(1 / 60, 0, 0);
+    expect(shield.currentArcDeg).toBeGreaterThan(closingArc);
+
+    shield.setActive(false);
+    for (let i = 0; i < 120; i++) shield.update(1 / 60, 0, 0);
+    expect(shield.currentArcDeg).toBe(0);
+    expect(shield.isVisuallyDeployed).toBe(false);
+  });
+
+  it('keeps the shield retract animation when venting forces protection offline', () => {
+    const ship = new Ship('vent-shield-transition', modManager.getShip('onslaught')!, true, new Vector2(), 0, new SimulationRandom(8607));
+    ship.shield.setActive(true);
+    ship.shield.currentArcDeg = ship.shield.maxArcDeg;
+    ship.flux.softFlux = 1000;
+    expect(ship.startVenting()).toBe(true);
+    expect(ship.shield.isActive).toBe(false);
+    expect(ship.shield.currentArcDeg).toBe(ship.shield.maxArcDeg);
+    ship.shield.update(1 / 60, ship.facingRad, ship.facingRad);
+    expect(ship.shield.currentArcDeg).toBeGreaterThan(0);
+    expect(ship.shield.currentArcDeg).toBeLessThan(ship.shield.maxArcDeg);
   });
 });
 

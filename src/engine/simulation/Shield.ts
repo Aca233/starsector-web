@@ -63,6 +63,16 @@ export class Shield {
     this.isActive = active;
   }
 
+  /** Visual deployment survives toggle-off until the retract animation reaches zero. */
+  public get deploymentLevel(): number {
+    if (this.maxArcDeg <= 0) return 0;
+    return Math.max(0, Math.min(1, this.currentArcDeg / this.maxArcDeg));
+  }
+
+  public get isVisuallyDeployed(): boolean {
+    return this.type !== 'NONE' && this.type !== 'PHASE' && this.currentArcDeg > 0.01;
+  }
+
   /**
    * 判断某个击中点是否被当前护盾阻挡
    * @param shieldCenter 护盾实际中心世界坐标（已包含舰体 shieldCenter 偏移）

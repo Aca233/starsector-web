@@ -241,16 +241,25 @@ export class Ship {
   }
 
   /**
-   * 判断当前是否允许开启护盾 (严格对齐 D.java: canUseShields)
-   * 战舰过载、主动排散幅能或沉没时绝对禁止开盾
+   * 判断当前是否允许开启护盾 (严格对齐 D.java: canUseShields / ship_systems.csv noShield).
+   * Burn Drive 的 IN/ACTIVE/OUT 全阶段都带 noShield；冷却阶段则允许重新展开护盾。
    */
   public canUseShields(): boolean {
-    return !this.flux.isOverloaded && !this.flux.isVenting && !this.isDead;
+    const systemBlocksShield = this.system.type === 'BURN_DRIVE' && this.system.isActive;
+    return !systemBlocksShield && !this.flux.isOverloaded && !this.flux.isVenting && !this.isDead;
+  }
+
+  private lowerShieldWithFeedback(): boolean {
+    if (!this.shield.isActive) return false;
+    this.shield.setActive(false);
+    if (this.shield.type === 'PHASE') sound.play('phase_deactivate', 0.9);
+    else sound.play('shield_down', 0.7);
+    return true;
   }
 
   /**
    * 启动主动幅能排散 (严格对齐 D.java: ventFlux & Ship.java: notifyVentingStarted)
-   * 1. 强制立即关盾 (shield.isActive = false, currentArcDeg = 0)
+   * 1. 立即取消护盾防护状态，但保留 currentArcDeg 让视觉按正常收拢速率退场
    * 2. 强制退出相位潜航与关闭战术系统
    * 3. 播放关盾音效与排散启动音效
    */
@@ -259,16 +268,8 @@ export class Ship {
       return false;
     }
 
-    // 1. 强制立即关盾并重置展开弧度
-    if (this.shield.isActive) {
-      this.shield.setActive(false);
-      this.shield.currentArcDeg = 0;
-      if (this.shield.type === 'PHASE') {
-        sound.play('phase_deactivate', 0.9);
-      } else {
-        sound.play('shield_down', 0.7);
-      }
-    }
+    // 1. 取消防护但不清零当前展开弧度；Shield.update() 会完成收拢动画。
+    this.lowerShieldWithFeedback();
 
     // 2. 强制解除战术技能 (堡垒护盾 / 冲刺推进)
     if (this.system.isActive) {
@@ -338,15 +339,14 @@ export class Ship {
     }
 
     // ship_systems.csv marks Burn Drive as noShield for its entire applied IN/ACTIVE/OUT lifecycle.
+    // noShield 立即取消碰撞防护，但视觉仍通过 currentArcDeg 平滑收拢。
     if (this.system.isActive && this.system.type === 'BURN_DRIVE' && this.shield.isActive) {
-      this.shield.setActive(false);
-      this.shield.currentArcDeg = 0;
+      this.lowerShieldWithFeedback();
     }
 
-    // 严禁过载或排散时使用护盾 (强制持续熄灭)
+    // 严禁过载或排散时使用护盾；同样保留视觉收拢阶段，避免一帧消失。
     if ((this.flux.isOverloaded || this.flux.isVenting) && this.shield.isActive) {
-      this.shield.setActive(false);
-      this.shield.currentArcDeg = 0;
+      this.lowerShieldWithFeedback();
     }
     
     // 护盾维持能耗 (堡垒护盾激活时 upkeep 为 0，对齐 FortressShieldStats.java)

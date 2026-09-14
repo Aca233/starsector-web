@@ -40,6 +40,7 @@ uniform float u_fluxWobble;
 uniform float u_time;
 uniform float u_brightness;
 uniform float u_opacity;
+uniform float u_deployLevel;
 uniform float u_rimWidth;
 uniform float u_hitFlash;
 
@@ -115,8 +116,10 @@ void main() {
     }
   }
 
-  // 6. 最终加色合成
-  vec3 finalRgb = (innerCol + rimCol + ripCol) * u_brightness;
+  // 6. 最终加色合成。展开/收拢阶段不仅改变 active arc，也同步淡入淡出，
+  // 避免 toggle-off 后像贴图被直接切掉一样瞬间消失。
+  float deployAlpha = smoothstep(0.0, 0.22, u_deployLevel);
+  vec3 finalRgb = (innerCol + rimCol + ripCol) * u_brightness * deployAlpha;
   fragColor = vec4(finalRgb, 1.0);
 }
 `;
@@ -141,6 +144,7 @@ export class WebGLShieldShader {
   private uTime: WebGLUniformLocation;
   private uBrightness: WebGLUniformLocation;
   private uOpacity: WebGLUniformLocation;
+  private uDeployLevel: WebGLUniformLocation;
   private uRimWidth: WebGLUniformLocation;
   private uHitFlash: WebGLUniformLocation;
   private uRipplesLocs: WebGLUniformLocation[] = [];
@@ -164,6 +168,7 @@ export class WebGLShieldShader {
     this.uTime = gl.getUniformLocation(this.program, 'u_time')!;
     this.uBrightness = gl.getUniformLocation(this.program, 'u_brightness')!;
     this.uOpacity = gl.getUniformLocation(this.program, 'u_opacity')!;
+    this.uDeployLevel = gl.getUniformLocation(this.program, 'u_deployLevel')!;
     this.uRimWidth = gl.getUniformLocation(this.program, 'u_rimWidth')!;
     this.uHitFlash = gl.getUniformLocation(this.program, 'u_hitFlash')!;
     this.uTexShield = gl.getUniformLocation(this.program, 'u_texShield')!;
@@ -201,7 +206,9 @@ export class WebGLShieldShader {
     nowSec: number
   ) {
     const shield = ship.shield;
-    if (!shield.isActive || shield.radius <= 0 || shield.type === 'PHASE' || shield.type === 'NONE') return;
+    // isActive 表示防护是否生效；currentArcDeg 独立承载视觉展开/收拢。
+    // 因此 toggle-off、Burn Drive、排散和过载后仍要画完退场动画。
+    if (!shield.isVisuallyDeployed || shield.radius <= 0) return;
     if (shield.currentArcDeg <= 2) return;
 
     const gl = this.gl;
@@ -243,13 +250,14 @@ export class WebGLShieldShader {
     gl.uniform3f(this.uInnerColor, innerColor[0], innerColor[1], innerColor[2]);
     gl.uniform3f(this.uRingColor, ringColor[0], ringColor[1], ringColor[2]);
 
-    const deployRaw = Math.max(0, Math.min(1, shield.currentArcDeg / Math.max(1, shield.maxArcDeg)));
+    const deployRaw = shield.deploymentLevel;
     const deployFactor = profile.deployCurve === 'ease-out' ? 1 - Math.pow(1 - deployRaw, 2) : deployRaw;
     const fluxWobble = (ship.flux.totalFlux / ship.spec.maxFlux) * 1.8;
     gl.uniform1f(this.uFluxWobble, fluxWobble);
     gl.uniform1f(this.uTime, nowSec);
     gl.uniform1f(this.uBrightness, profile.brightness * (0.82 + deployFactor * 0.18));
     gl.uniform1f(this.uOpacity, profile.opacity);
+    gl.uniform1f(this.uDeployLevel, deployRaw);
     gl.uniform1f(this.uRimWidth, profile.rimWidth);
     gl.uniform1f(this.uHitFlash, profile.hitFlash);
 
