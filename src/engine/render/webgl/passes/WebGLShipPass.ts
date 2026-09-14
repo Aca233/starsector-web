@@ -22,8 +22,8 @@ export class WebGLShipPass {
   private enemyVentingRenderer = new ShipVentingRenderer();
 
   public updateVisual(engine: CombatEngine, dt: number, random: VisualRandom): void {
-    this.playerVentingRenderer.update(dt, engine.playerShip, engine.playerShip.pos, engine.playerShip.facingRad, random);
-    this.enemyVentingRenderer.update(dt, engine.enemyShip, engine.enemyShip.pos, engine.enemyShip.facingRad, random);
+    this.playerVentingRenderer.update(dt, engine.playerShip, random);
+    this.enemyVentingRenderer.update(dt, engine.enemyShip, random);
   }
 
   public resetVisualState(): void {

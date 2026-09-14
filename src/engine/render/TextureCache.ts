@@ -17,6 +17,8 @@ export const ESSENTIAL_TEXTURE_URLS = [
   '/game-assets/graphics/fx/beam_rough2_core.png',
   '/game-assets/graphics/fx/beam_laser_core.png',
   '/game-assets/graphics/fx/contrail64b.png',
+  '/game-assets/graphics/fx/nebula_colorless.png',
+  '/game-assets/graphics/fx/radial_fx.png',
   '/game-assets/graphics/fx/explosion0.png',
   '/game-assets/graphics/fx/explosion1.png',
   '/game-assets/graphics/fx/explosion2.png',

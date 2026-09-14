@@ -44,6 +44,9 @@ import { WebGLProjectilePass } from '../src/engine/render/webgl/passes/WebGLProj
 import { WebGLCombatRenderer, type WebGLRendererLifecycle } from '../src/engine/render/webgl/WebGLCombatRenderer';
 import { syncCombatPresentationAudio } from '../src/hooks/useCombatLoop';
 import { sound } from '../src/engine/audio/SoundManager';
+import { ESSENTIAL_TEXTURE_URLS } from '../src/engine/render/TextureCache';
+import { ShipVentingRenderer } from '../src/engine/render/webgl/ShipVentingRenderer';
+import { isPointInsideShipHull, sampleShipHullSurface } from '../src/engine/simulation/collision/HullGeometry';
 import { readFileSync } from 'node:fs';
 
 describe('Starsector text import', () => {
@@ -1291,7 +1294,10 @@ describe('M3 reusable visual fidelity profiles', () => {
     expect(paragon.shieldProfile).toBe('highTech');
     expect(paragon.fortressShieldProfile).toBe('fortress');
     expect(doom.phaseColor).not.toEqual(onslaught.phaseColor);
-    expect(onslaught.vent.fringeColor).not.toEqual(paragon.vent.fringeColor);
+    expect(onslaught.vent.fringeColor).toEqual([125, 0, 155]);
+    expect(paragon.vent.fringeColor).toEqual([125, 0, 155]);
+    expect(onslaught.vent.coreColor).toEqual([255, 255, 255]);
+    expect(onslaught.vent.haloScale).not.toBe(paragon.vent.haloScale);
     expect(SHIELD_VISUAL_PROFILES.fortress.brightness).toBeGreaterThan(SHIELD_VISUAL_PROFILES.highTech.brightness);
     expect(ENGINE_VISUAL_PROFILES.LOW_TECH.flameColor).not.toEqual(ENGINE_VISUAL_PROFILES.HIGH_TECH.flameColor);
   });
@@ -2030,6 +2036,69 @@ describe('source-aligned ship system lifecycles', () => {
     ship.shield.update(1 / 60, ship.facingRad, ship.facingRad);
     expect(ship.shield.currentArcDeg).toBeGreaterThan(0);
     expect(ship.shield.currentArcDeg).toBeLessThan(ship.shield.maxArcDeg);
+  });
+});
+
+describe('manual vent visual fidelity', () => {
+  it('preloads the original vent textures so the first manual vent frame is not transparent', () => {
+    expect(ESSENTIAL_TEXTURE_URLS).toContain('/game-assets/graphics/fx/nebula_colorless.png');
+    expect(ESSENTIAL_TEXTURE_URLS).toContain('/game-assets/graphics/fx/radial_fx.png');
+  });
+
+  it('bursts vent plumes immediately from the authored hull perimeter', () => {
+    const ship = new Ship('vent-visual', modManager.getShip('onslaught')!, true, new Vector2(120, -40), 0.31, new SimulationRandom(8702));
+    ship.flux.softFlux = ship.spec.maxFlux * 0.65;
+    expect(ship.startVenting()).toBe(true);
+
+    const renderer = new ShipVentingRenderer();
+    renderer.update(1 / 60, ship, new VisualRandom(8702));
+    const state = renderer.getVisualState();
+    expect(state.emitterCount).toBe(18);
+    expect(state.particleCount).toBeGreaterThanOrEqual(18);
+    expect(state.faderIn).toBeGreaterThanOrEqual(0.5);
+    expect(state.startPulse).toBeGreaterThan(0.9);
+
+    for (let i = 0; i < 12; i++) {
+      const surface = sampleShipHullSurface(ship, (i + 0.37) / 12);
+      const justInside = surface.point.clone().addScaled(surface.outward, -3);
+      const justOutside = surface.point.clone().addScaled(surface.outward, 3);
+      expect(isPointInsideShipHull(ship, justInside)).toBe(true);
+      expect(isPointInsideShipHull(ship, justOutside)).toBe(false);
+    }
+  });
+
+  it('emits the manual-vent onset discharge entirely on the ship body', () => {
+    const engine = new CombatEngine('onslaught', 'paragon', 8703);
+    const ship = engine.playerShip;
+    ship.flux.softFlux = ship.spec.maxFlux * 0.6;
+    ship.prevVenting = false;
+    engine.fxSystem.clear();
+    expect(ship.startVenting()).toBe(true);
+
+    const muffledSpy = vi.spyOn(sound, 'setMuffled').mockImplementation(() => {});
+    try {
+      engine.statusSystem.update(1 / 60, {
+        fx: engine.fxSystem,
+        playerShip: ship,
+        enemyShip: engine.enemyShip,
+        addRadioMessage: vi.fn(),
+        deployMine: vi.fn(),
+        combatRandom: engine.random,
+        visualRandom: engine.visualRandom
+      });
+    } finally {
+      muffledSpy.mockRestore();
+    }
+
+    expect(engine.empArcs.length).toBeGreaterThanOrEqual(3);
+    for (const arc of engine.empArcs) {
+      expect(isPointInsideShipHull(ship, arc.startPos)).toBe(true);
+      expect(isPointInsideShipHull(ship, arc.endPos)).toBe(true);
+      for (const point of arc.segments) expect(isPointInsideShipHull(ship, point)).toBe(true);
+      for (const branch of arc.branches) {
+        for (const point of branch.segments) expect(isPointInsideShipHull(ship, point)).toBe(true);
+      }
+    }
   });
 });
 

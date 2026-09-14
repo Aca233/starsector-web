@@ -114,26 +114,26 @@ export const CAPITAL_EXPLOSION_PROFILE: ExplosionVisualProfile = {
 };
 
 const DEFAULT_VENT: VentVisualProfile = {
-  fringeColor: [135, 15, 175], coreColor: [240, 245, 255], haloScale: 1, plumeScale: 1, particleScale: 1
+  fringeColor: [125, 0, 155], coreColor: [255, 255, 255], haloScale: 1, plumeScale: 1, particleScale: 1
 };
 
 export const SHIP_VISUAL_PROFILES: Record<string, ShipVisualProfile> = {
   onslaught: {
     hullTint: [1.0, 0.965, 0.91], phaseColor: [0.34, 0.62, 1.0], overloadColor: [0.3, 0.82, 1.0],
     shieldProfile: 'lowTech',
-    vent: { fringeColor: [150, 20, 180], coreColor: [255, 244, 238], haloScale: 1.08, plumeScale: 1.08, particleScale: 1.05 },
+    vent: { fringeColor: [125, 0, 155], coreColor: [255, 255, 255], haloScale: 1.08, plumeScale: 1.08, particleScale: 1.05 },
     explosion: { flash: 1.28, fireball: 1.18, shockwave: 1.22, smoke: 1.35, debris: 1.22 }
   },
   paragon: {
     hullTint: [0.93, 0.975, 1.0], phaseColor: [0.38, 0.58, 1.0], overloadColor: [0.52, 0.66, 1.0],
     shieldProfile: 'highTech', fortressShieldProfile: 'fortress',
-    vent: { fringeColor: [86, 78, 220], coreColor: [230, 247, 255], haloScale: 0.96, plumeScale: 0.95, particleScale: 0.92 },
+    vent: { fringeColor: [125, 0, 155], coreColor: [255, 255, 255], haloScale: 0.96, plumeScale: 0.95, particleScale: 0.92 },
     explosion: { flash: 1.2, fireball: 1.1, shockwave: 1.18, smoke: 1.1, debris: 1.08 }
   },
   doom: {
     hullTint: [0.92, 0.94, 1.0], phaseColor: [0.46, 0.3, 1.0], overloadColor: [0.46, 0.72, 1.0],
     shieldProfile: 'highTech',
-    vent: { fringeColor: [112, 45, 210], coreColor: [224, 244, 255], haloScale: 0.9, plumeScale: 0.92, particleScale: 0.9 },
+    vent: { fringeColor: [125, 0, 155], coreColor: [255, 255, 255], haloScale: 0.9, plumeScale: 0.92, particleScale: 0.9 },
     explosion: { flash: 1.12, fireball: 1.06, shockwave: 1.08, smoke: 1.12, debris: 1.08 }
   },
   default: {

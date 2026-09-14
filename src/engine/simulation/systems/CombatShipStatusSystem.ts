@@ -4,6 +4,11 @@ import { sound } from '../../audio/SoundManager';
 import { i18n } from '../../i18n/LocalizationManager';
 import { CombatFXSystem } from './CombatFXSystem';
 import { SimulationRandom } from '../SimulationRandom';
+import {
+  constrainPointToShipHull,
+  getShipHullInteriorAnchor,
+  getShipHullPerimeterPoint
+} from '../collision/HullGeometry';
 
 export interface ShipStatusContext {
   fx: CombatFXSystem;
@@ -21,150 +26,15 @@ export interface ShipStatusContext {
  * 负责舰船过载电弧、主动排能等离子尾气、舰体黑烟、装甲剥落烟雾、空雷战术触发及损管抢修播报。
  */
 export class CombatShipStatusSystem {
-  private getHullPerimeterPoint(ship: Ship, normalizedDistance: number): Vector2 {
-    const bounds = ship.spec.bounds;
-    if (!bounds || bounds.length < 2) {
-      const angle = normalizedDistance * Math.PI * 2;
-      return ship.pos.clone().add(Vector2.fromAngle(angle + ship.facingRad, ship.spec.collisionRadius * 0.82));
-    }
-
-    const lengths: number[] = [];
-    let perimeter = 0;
-    for (let i = 0; i < bounds.length; i++) {
-      const [x1, y1] = bounds[i];
-      const [x2, y2] = bounds[(i + 1) % bounds.length];
-      const length = Math.hypot(x2 - x1, y2 - y1);
-      lengths.push(length);
-      perimeter += length;
-    }
-    if (perimeter <= 0.001) return ship.pos.clone();
-
-    const wrapped = ((normalizedDistance % 1) + 1) % 1;
-    let remaining = wrapped * perimeter;
-    for (let i = 0; i < bounds.length; i++) {
-      const edgeLength = lengths[i];
-      if (remaining <= edgeLength || i === bounds.length - 1) {
-        const [x1, y1] = bounds[i];
-        const [x2, y2] = bounds[(i + 1) % bounds.length];
-        const t = edgeLength > 0.001 ? Math.max(0, Math.min(1, remaining / edgeLength)) : 0;
-        return new Vector2(
-          x1 + (x2 - x1) * t,
-          y1 + (y2 - y1) * t
-        ).rotate(ship.facingRad).add(ship.pos);
-      }
-      remaining -= edgeLength;
-    }
-    return ship.pos.clone();
-  }
-
-  private getHullInteriorAnchor(ship: Ship): Vector2 {
-    const bounds = ship.spec.bounds;
-    if (!bounds || bounds.length < 3) return ship.pos.clone();
-
-    let signedArea2 = 0;
-    for (let i = 0; i < bounds.length; i++) {
-      const [x1, y1] = bounds[i];
-      const [x2, y2] = bounds[(i + 1) % bounds.length];
-      signedArea2 += x1 * y2 - x2 * y1;
-    }
-    const inwardSign = signedArea2 >= 0 ? 1 : -1;
-    const inset = Math.max(3, Math.min(10, ship.spec.collisionRadius * 0.04));
-
-    for (let i = 0; i < bounds.length; i++) {
-      const [x1, y1] = bounds[i];
-      const [x2, y2] = bounds[(i + 1) % bounds.length];
-      const dx = x2 - x1;
-      const dy = y2 - y1;
-      const len = Math.hypot(dx, dy);
-      if (len <= 0.001) continue;
-      const local = new Vector2(
-        (x1 + x2) * 0.5 + (-dy / len) * inset * inwardSign,
-        (y1 + y2) * 0.5 + (dx / len) * inset * inwardSign
-      );
-      const world = local.rotate(ship.facingRad).add(ship.pos);
-      if (this.isPointInsideHull(ship, world)) return world;
-    }
-
-    // 极端退化 bounds 才会走这里；优先选择任意可验证的网格内部点，而不是假设 ship.pos 在多边形内。
-    const xs = bounds.map(([x]) => x);
-    const ys = bounds.map(([, y]) => y);
-    const minX = Math.min(...xs);
-    const maxX = Math.max(...xs);
-    const minY = Math.min(...ys);
-    const maxY = Math.max(...ys);
-    for (let gy = 1; gy < 8; gy++) {
-      for (let gx = 1; gx < 8; gx++) {
-        const local = new Vector2(minX + (maxX - minX) * gx / 8, minY + (maxY - minY) * gy / 8);
-        const world = local.rotate(ship.facingRad).add(ship.pos);
-        if (this.isPointInsideHull(ship, world)) return world;
-      }
-    }
-    return ship.pos.clone();
-  }
-
-  private isPointInsideHull(ship: Ship, worldPoint: Vector2): boolean {
-    const bounds = ship.spec.bounds;
-    if (!bounds || bounds.length < 3) return worldPoint.distanceTo(ship.pos) <= ship.spec.collisionRadius * 0.82;
-
-    const local = worldPoint.clone().sub(ship.pos).rotate(-ship.facingRad);
-    let inside = false;
-    for (let i = 0, j = bounds.length - 1; i < bounds.length; j = i++) {
-      const [xi, yi] = bounds[i];
-      const [xj, yj] = bounds[j];
-      const crosses = ((yi > local.y) !== (yj > local.y))
-        && local.x < ((xj - xi) * (local.y - yi)) / (yj - yi) + xi;
-      if (crosses) inside = !inside;
-    }
-    return inside;
-  }
-
-  private constrainOverloadPointToHull(ship: Ship, worldPoint: Vector2, fallbackInside: Vector2): Vector2 {
-    if (this.isPointInsideHull(ship, worldPoint)) {
-      // 已经在舰体内的节点只轻微向一个已知内部锚点收拢，避免因凹形 bounds 向 ship.pos 收缩反而越界。
-      const inset = Vector2.lerp(worldPoint, fallbackInside, 0.06);
-      return this.isPointInsideHull(ship, inset) ? inset : worldPoint.clone();
-    }
-
-    const bounds = ship.spec.bounds;
-    if (!bounds || bounds.length < 2) return fallbackInside.clone();
-
-    const local = worldPoint.clone().sub(ship.pos).rotate(-ship.facingRad);
-    let closest = new Vector2();
-    let bestDistSq = Number.POSITIVE_INFINITY;
-    for (let i = 0; i < bounds.length; i++) {
-      const a = new Vector2(bounds[i][0], bounds[i][1]);
-      const b = new Vector2(bounds[(i + 1) % bounds.length][0], bounds[(i + 1) % bounds.length][1]);
-      const ab = b.clone().sub(a);
-      const lenSq = ab.dot(ab);
-      const t = lenSq > 1e-9 ? Math.max(0, Math.min(1, local.clone().sub(a).dot(ab) / lenSq)) : 0;
-      const candidate = a.clone().add(ab.scale(t));
-      const dx = candidate.x - local.x;
-      const dy = candidate.y - local.y;
-      const distSq = dx * dx + dy * dy;
-      if (distSq < bestDistSq) {
-        bestDistSq = distSq;
-        closest = candidate;
-      }
-    }
-
-    const closestWorld = closest.rotate(ship.facingRad).add(ship.pos);
-    // 从边界朝一个已知位于舰体内部的放电锚点逐级推进；对凹形 hull 也不允许亮点落到外部。
-    for (const t of [0.12, 0.24, 0.4, 0.6, 0.8, 1]) {
-      const candidate = Vector2.lerp(closestWorld, fallbackInside, t);
-      if (this.isPointInsideHull(ship, candidate)) return candidate;
-    }
-    return fallbackInside.clone();
-  }
-
   private spawnOverloadDischarge(ship: Ship, ctx: ShipStatusContext, onsetBurst = false): void {
     const startT = ctx.visualRandom.next();
     const span = (onsetBurst ? 0.12 : 0.08) + ctx.visualRandom.next() * (onsetBurst ? 0.28 : 0.22);
     const direction = ctx.visualRandom.next() < 0.5 ? -1 : 1;
-    const interiorAnchor = this.getHullInteriorAnchor(ship);
-    const startEdge = this.getHullPerimeterPoint(ship, startT);
-    const endEdge = this.getHullPerimeterPoint(ship, startT + direction * span);
-    const start = this.constrainOverloadPointToHull(ship, startEdge, interiorAnchor);
-    const end = this.constrainOverloadPointToHull(ship, endEdge, interiorAnchor);
+    const interiorAnchor = getShipHullInteriorAnchor(ship);
+    const startEdge = getShipHullPerimeterPoint(ship, startT);
+    const endEdge = getShipHullPerimeterPoint(ship, startT + direction * span);
+    const start = constrainPointToShipHull(ship, startEdge, interiorAnchor);
+    const end = constrainPointToShipHull(ship, endEdge, interiorAnchor);
     const thickness = (onsetBurst ? 1.7 : 1.35) + ctx.visualRandom.next() * 0.65;
     const life = (onsetBurst ? 0.18 : 0.14) + ctx.visualRandom.next() * 0.08;
 
@@ -174,7 +44,25 @@ export class CombatShipStatusSystem {
       thickness,
       life,
       branchCount: onsetBurst ? 3 : 2,
-      constrainPoint: (point) => this.constrainOverloadPointToHull(ship, point, interiorAnchor)
+      constrainPoint: (point) => constrainPointToShipHull(ship, point, interiorAnchor)
+    });
+  }
+
+  private spawnVentingDischarge(ship: Ship, ctx: ShipStatusContext, onsetBurst = false): void {
+    const startT = ctx.visualRandom.next();
+    const span = (onsetBurst ? 0.035 : 0.025) + ctx.visualRandom.next() * (onsetBurst ? 0.1 : 0.07);
+    const direction = ctx.visualRandom.next() < 0.5 ? -1 : 1;
+    const interiorAnchor = getShipHullInteriorAnchor(ship);
+    const start = constrainPointToShipHull(ship, getShipHullPerimeterPoint(ship, startT), interiorAnchor);
+    const end = constrainPointToShipHull(ship, getShipHullPerimeterPoint(ship, startT + direction * span), interiorAnchor);
+
+    ctx.fx.spawnEmpArc(start, end, {
+      coreColor: [255, 255, 255],
+      glowColor: [125, 0, 155],
+      thickness: (onsetBurst ? 1.5 : 1.15) + ctx.visualRandom.next() * 0.4,
+      life: (onsetBurst ? 0.16 : 0.1) + ctx.visualRandom.next() * 0.06,
+      branchCount: onsetBurst ? 1 : 0,
+      constrainPoint: (point) => constrainPointToShipHull(ship, point, interiorAnchor)
     });
   }
 
@@ -217,6 +105,8 @@ export class CombatShipStatusSystem {
           14,
           1.6
         );
+        // 手动排散必须在第一帧就有舰体表面白紫放电反馈；后续由连续 plume/halo 维持主体视觉。
+        for (let i = 0; i < 3; i++) this.spawnVentingDischarge(ship, ctx, true);
         if (ship.isPlayer) {
           ctx.addRadioMessage('轮机工段', 'PLAYER', '正在紧急主动排散幅能...', [100, 220, 255]);
         }
@@ -234,24 +124,12 @@ export class CombatShipStatusSystem {
         }
       }
 
-      // 2. 舰船主动排散表面静电泄放微电弧 (严格对齐 D.java: getEMPDisplayMult)
+      // 2. 舰船主动排散表面静电泄放微电弧；所有节点约束在真实舰体 bounds 上，避免紫色亮点漂到船外。
       if (ship.flux.isVenting) {
         const empMult = ship.flux.totalFlux / Math.max(1, ship.flux.baseDissipation * 2.0);
         const arcRate = Math.min(1.0, empMult > 2.0 ? 1.0 : empMult * 0.5);
         if (ctx.visualRandom.next() < dt * 14 * arcRate) {
-          const r1 = (ctx.visualRandom.next() - 0.5) * ship.spec.collisionRadius * 1.1;
-          const r2 = (ctx.visualRandom.next() - 0.5) * ship.spec.collisionRadius * 1.1;
-          const start = ship.pos.clone().add(new Vector2(r1, r2).rotate(ship.facingRad));
-          const end = start.clone().add(new Vector2(
-            (ctx.visualRandom.next() - 0.5) * 45,
-            (ctx.visualRandom.next() - 0.5) * 45
-          ));
-          ctx.fx.spawnEmpArc(start, end, {
-            coreColor: [255, 255, 255],
-            glowColor: [180, 50, 255],
-            thickness: 1.4,
-            life: 0.09
-          });
+          this.spawnVentingDischarge(ship, ctx);
         }
       }
 
