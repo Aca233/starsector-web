@@ -1988,7 +1988,7 @@ describe('source-aligned ship system lifecycles', () => {
 });
 
 describe('overload visual fidelity', () => {
-  it('anchors repeated overload discharges to the real hull perimeter and emits branched arcs', () => {
+  it('keeps every overload discharge node on the ship body and emits branched arcs', () => {
     const engine = new CombatEngine('paragon', 'onslaught', 8701);
     const ship = engine.playerShip;
     ship.pos.set(120, -80);
@@ -2019,26 +2019,27 @@ describe('overload visual fidelity', () => {
     expect(engine.empArcs.length).toBeGreaterThan(6);
     expect(engine.empArcs.some((arc) => arc.branches.length > 0)).toBe(true);
 
-    const pointSegmentDistance = (p: Vector2, a: Vector2, b: Vector2) => {
-      const ab = b.clone().sub(a);
-      const lenSq = ab.dot(ab);
-      if (lenSq <= 1e-12) return p.distanceTo(a);
-      const t = Math.max(0, Math.min(1, p.clone().sub(a).dot(ab) / lenSq));
-      return p.distanceTo(a.clone().add(ab.scale(t)));
-    };
-    const localBounds = ship.spec.bounds.map(([x, y]) => new Vector2(x, y));
-    const distanceToHull = (worldPoint: Vector2) => {
+    const isInsideHull = (worldPoint: Vector2) => {
       const local = worldPoint.clone().sub(ship.pos).rotate(-ship.facingRad);
-      let min = Number.POSITIVE_INFINITY;
-      for (let i = 0; i < localBounds.length; i++) {
-        min = Math.min(min, pointSegmentDistance(local, localBounds[i], localBounds[(i + 1) % localBounds.length]));
+      const bounds = ship.spec.bounds;
+      let inside = false;
+      for (let i = 0, j = bounds.length - 1; i < bounds.length; j = i++) {
+        const [xi, yi] = bounds[i];
+        const [xj, yj] = bounds[j];
+        const crosses = ((yi > local.y) !== (yj > local.y))
+          && local.x < ((xj - xi) * (local.y - yi)) / (yj - yi) + xi;
+        if (crosses) inside = !inside;
       }
-      return min;
+      return inside;
     };
 
     for (const arc of engine.empArcs) {
-      expect(distanceToHull(arc.startPos)).toBeLessThan(1e-5);
-      expect(distanceToHull(arc.endPos)).toBeLessThan(1e-5);
+      expect(isInsideHull(arc.startPos)).toBe(true);
+      expect(isInsideHull(arc.endPos)).toBe(true);
+      for (const point of arc.segments) expect(isInsideHull(point)).toBe(true);
+      for (const branch of arc.branches) {
+        for (const point of branch.segments) expect(isInsideHull(point)).toBe(true);
+      }
     }
   });
 });

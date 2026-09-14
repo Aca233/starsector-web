@@ -427,6 +427,7 @@ export class CombatFXSystem {
       thickness?: number;
       life?: number;
       branchCount?: number;
+      constrainPoint?: (point: Vector2) => Vector2;
     }
   ) {
     const life = options?.life ?? 0.22;
@@ -449,7 +450,8 @@ export class CombatFXSystem {
       const envelope = Math.sin(t * Math.PI);
       const lateral = (this.random.next() - 0.5) * 2 * maxOffset * envelope;
       const axial = (this.random.next() - 0.5) * 12;
-      const pt = basePoint.clone().add(perp.clone().scale(lateral)).add(dir.clone().scale(axial));
+      const rawPoint = basePoint.clone().add(perp.clone().scale(lateral)).add(dir.clone().scale(axial));
+      const pt = options?.constrainPoint ? options.constrainPoint(rawPoint) : rawPoint;
       segments.push(pt);
 
       const maxBranches = options?.branchCount ?? 3;
@@ -461,10 +463,11 @@ export class CombatFXSystem {
         const bSteps = 3;
         for (let b = 1; b <= bSteps; b++) {
           const stepDist = branchLen / bSteps;
-          branchCur = branchCur.clone().add(Vector2.fromAngle(
+          const rawBranchPoint = branchCur.clone().add(Vector2.fromAngle(
             branchAngle + (this.random.next() - 0.5) * 0.4,
             stepDist
           ));
+          branchCur = options?.constrainPoint ? options.constrainPoint(rawBranchPoint) : rawBranchPoint;
           branchSegs.push(branchCur);
         }
         branches.push({
