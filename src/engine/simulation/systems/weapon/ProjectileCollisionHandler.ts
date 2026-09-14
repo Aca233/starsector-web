@@ -12,6 +12,11 @@ import {
 } from '../../collision/RuntimeCollisionKernel';
 import { getProjectileImpactVisualProfile } from '../../../visual/ImpactVisuals';
 
+export interface LightMGInterceptionResult {
+  targetProjectileId: number;
+  targetDestroyed: boolean;
+}
+
 /**
  * 弹道物理碰撞、近炸引信与装甲毁伤处理器 (ProjectileCollisionHandler)
  * 职责:
@@ -243,19 +248,26 @@ export class ProjectileCollisionHandler {
 
   /**
    * 轻型机枪点防拦截导弹判定 (Light MG PD)
-   * @returns 是否成功打靶拦截并消耗机枪子弹
+   * 返回命中的导弹身份，由外层统一执行数组删除，避免嵌套 splice 破坏遍历游标。
    */
-  public checkLightMGInterception(p: Projectile, ctx: WeaponSimContext, allProjectiles: Projectile[]): boolean {
-    if (p.specId !== 'lightmg') return false;
+  public checkLightMGInterception(
+    p: Projectile,
+    ctx: WeaponSimContext,
+    allProjectiles: Projectile[]
+  ): LightMGInterceptionResult | null {
+    if (p.specId !== 'lightmg') return null;
 
     for (let mIdx = allProjectiles.length - 1; mIdx >= 0; mIdx--) {
       const targetM = allProjectiles[mIdx];
-      if (targetM.isRocket && targetM.sourceShipId !== p.sourceShipId) {
+      const hostile = p.isPlayer === undefined
+        ? targetM.sourceShipId !== p.sourceShipId
+        : targetM.isPlayer !== p.isPlayer;
+      if (targetM.isRocket && hostile && targetM.sourceShipId !== p.sourceShipId) {
         if (p.pos.distanceTo(targetM.pos) < 24) {
           targetM.hitpoints = (targetM.hitpoints ?? 100) - p.damage;
-          if (targetM.hitpoints <= 0) {
-            if (targetM.isRocket) ctx.contrailEngine?.detach(targetM.id);
-            allProjectiles.splice(mIdx, 1);
+          const targetDestroyed = targetM.hitpoints <= 0;
+          if (targetDestroyed) {
+            ctx.contrailEngine?.detach(targetM.id);
             if (ctx.statsTracker) ctx.statsTracker.recordMissileIntercepted(p.isPlayer ?? false);
             sound.playAtPos('missile_explosion', targetM.pos, ctx.playerShip.pos, 0.5);
             this.spawnMissileDestructionVisual(targetM, targetM.pos, ctx, [255, 160, 40]);
@@ -266,12 +278,12 @@ export class ProjectileCollisionHandler {
           } else {
             ctx.fx.spawnSparks(targetM.pos, 8, [255, 180, 60]);
           }
-          return true;
+          return { targetProjectileId: targetM.id, targetDestroyed };
         }
       }
     }
 
-    return false;
+    return null;
   }
 
   /**

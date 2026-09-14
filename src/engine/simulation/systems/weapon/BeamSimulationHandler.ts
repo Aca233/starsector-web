@@ -1,6 +1,7 @@
 import { Vector2 } from '../../../math/Vector2';
 import { intersectSegmentWithPolygon } from '../../../math/Geometry';
 import { Beam } from '../../Weapon';
+import { Ship } from '../../Ship';
 import { sound } from '../../../audio/SoundManager';
 import { i18n } from '../../../i18n/LocalizationManager';
 import { WeaponSimContext } from './WeaponSimContext';
@@ -38,6 +39,47 @@ function intersectRayCircleEntry(
     }
   }
   return null;
+}
+
+function getBeamTargetIntersectionDistance(origin: Vector2, end: Vector2, ship: Ship): number {
+  const beamDir = end.clone().sub(origin);
+  const beamLen = beamDir.length();
+  if (beamLen <= 0.001) return Number.POSITIVE_INFINITY;
+  const beamUnit = beamDir.clone().scale(1 / beamLen);
+  let nearestT = Number.POSITIVE_INFINITY;
+
+  if (ship.shield.isActive && ship.shield.currentArcDeg > 5 && ship.shield.type !== 'NONE' && ship.shield.type !== 'PHASE') {
+    const shieldCenter = ship.getShieldCenter(ship.pos, ship.facingRad);
+    const shieldEntry = intersectRayCircleEntry(origin, beamUnit, shieldCenter, ship.shield.radius);
+    if (shieldEntry && shieldEntry.t <= beamLen && ship.isShieldPointBlocked(shieldEntry.point)) {
+      nearestT = Math.min(nearestT, shieldEntry.t);
+    } else {
+      const distFromShieldCenter = origin.distanceTo(shieldCenter);
+      if (distFromShieldCenter <= ship.shield.radius && distFromShieldCenter > ship.spec.collisionRadius * 0.3) {
+        const toTarget = shieldCenter.clone().sub(origin);
+        if (beamUnit.dot(toTarget) > 0 && ship.isShieldPointBlocked(origin)) {
+          nearestT = 0;
+        }
+      }
+    }
+  }
+
+  const hullCircleEntry = intersectRayCircleEntry(origin, beamUnit, ship.pos, ship.spec.collisionRadius);
+  const isOriginInsideHull = origin.distanceTo(ship.pos) <= ship.spec.collisionRadius;
+  if (isOriginInsideHull || (hullCircleEntry && hullCircleEntry.t <= beamLen)) {
+    if (ship.spec.bounds && ship.spec.bounds.length >= 3) {
+      const localStart = origin.clone().sub(ship.pos).rotate(-ship.facingRad);
+      const localEnd = end.clone().sub(ship.pos).rotate(-ship.facingRad);
+      const polyRes = intersectSegmentWithPolygon(localStart, localEnd, ship.spec.bounds);
+      if (polyRes) nearestT = Math.min(nearestT, polyRes.t * beamLen);
+    } else if (isOriginInsideHull) {
+      nearestT = 0;
+    } else if (hullCircleEntry) {
+      nearestT = Math.min(nearestT, hullCircleEntry.t);
+    }
+  }
+
+  return nearestT;
 }
 
 /**
@@ -97,7 +139,10 @@ export class BeamSimulationHandler {
       // 2. 光束射线与目标物理相交检测 (优先按发射距离由近至远测试障碍物)
       const targetShips = ships
         .filter((s) => s.id !== b.sourceShipId && (b.isPlayer === undefined || s.isPlayer !== b.isPlayer) && !s.isDead && !s.isPhased)
-        .sort((a, bShip) => a.pos.distanceTo(b.startPos) - bShip.pos.distanceTo(b.startPos));
+        .map((ship) => ({ ship, hitT: getBeamTargetIntersectionDistance(b.startPos, b.endPos, ship) }))
+        .filter(({ hitT }) => Number.isFinite(hitT))
+        .sort((a, bTarget) => a.hitT - bTarget.hitT)
+        .map(({ ship }) => ship);
 
       for (const ship of targetShips) {
         const beamDir = b.endPos.clone().sub(b.startPos);
@@ -139,6 +184,9 @@ export class BeamSimulationHandler {
             const hitAngle = Math.atan2(shieldHitPoint.y - sCenter.y, shieldHitPoint.x - sCenter.x);
             const fluxGain = ship.shield.absorbDamage(absorbedDmg, b.damageType, hitAngle);
             ship.flux.increaseFlux(fluxGain, false);
+            if (ctx.statsTracker) {
+              ctx.statsTracker.recordDamageDealt(b.isPlayer ?? false, b.damageType, absorbedDmg, 'SHIELD');
+            }
 
             // Tachyon Lance 护盾硬幅能穿透电弧 (严格对齐 1:1 TachyonLanceEffect.java)
             // 只有当硬幅能高于 10% (pierceChance = hardFlux - 0.1) 且随机通过时，才可能产生电弧瘫痪武器/引擎挂点，
@@ -213,6 +261,14 @@ export class BeamSimulationHandler {
             contactedThisTick = true;
             const tickDmg = b.damagePerSec * dt;
             const result = ship.armor.takeDamage(localImpact, tickDmg, b.damageType, b.damagePerSec, true);
+            if (ctx.statsTracker) {
+              if (result.armorDamage > 0) {
+                ctx.statsTracker.recordDamageDealt(b.isPlayer ?? false, b.damageType, result.armorDamage, 'ARMOR');
+              }
+              if (result.hullDamage > 0) {
+                ctx.statsTracker.recordDamageDealt(b.isPlayer ?? false, b.damageType, result.hullDamage, 'HULL');
+              }
+            }
             ship.hullHp = Math.max(0, ship.hullHp - result.hullDamage);
             ship.addScorchMark(localImpact, result.armorDamage || result.hullDamage);
 

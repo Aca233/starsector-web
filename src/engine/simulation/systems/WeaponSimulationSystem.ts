@@ -113,9 +113,20 @@ export class WeaponSimulationSystem {
 
       // 3. 轻型机枪点防拦截导弹 (Light MG PD)
       if (p.specId === 'lightmg') {
-        const intercepted = this.collisionHandler.checkLightMGInterception(p, ctx, this.projectiles);
-        if (intercepted) {
-          this.projectiles.splice(i, 1);
+        const interception = this.collisionHandler.checkLightMGInterception(p, ctx, this.projectiles);
+        if (interception) {
+          if (interception.targetDestroyed) {
+            const targetIndex = this.projectiles.findIndex((projectile) => projectile.id === interception.targetProjectileId);
+            if (targetIndex >= 0) this.projectiles.splice(targetIndex, 1);
+          }
+
+          // 删除拦截弹后把外层游标重新锚定到它的当前索引。若前方/后方导弹刚被移除，
+          // 下一次 i-- 仍会落在“尚未处理”的原始弹丸上，不会重复更新或误删邻居。
+          const interceptorIndex = this.projectiles.findIndex((projectile) => projectile.id === p.id);
+          if (interceptorIndex >= 0) {
+            this.projectiles.splice(interceptorIndex, 1);
+            i = interceptorIndex;
+          }
           continue;
         }
       }

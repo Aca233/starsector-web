@@ -77,9 +77,20 @@ export class MissileGuidanceHandler {
     }
 
     if (p.isGuided) {
-      // 优先检测附近是否有敌方的诱饵热焰弹在剧烈燃烧 (Decoy Flare Spoofing)
+      const isHostileProjectile = (other: Projectile) => p.isPlayer === undefined
+        ? other.sourceShipId !== p.sourceShipId
+        : other.isPlayer !== p.isPlayer;
+      const isHostileShip = (ship: Ship) => ship.id !== p.sourceShipId
+        && !ship.isDead
+        && !ship.isPhased
+        && (p.isPlayer === undefined || ship.isPlayer !== p.isPlayer);
+
+      // 只允许敌对阵营诱饵欺骗导引头；友军热焰弹不能吸走己方导弹。
       const nearbyFlare = allProjectiles.find(
-        (fl) => fl.isFlare && fl.sourceShipId !== p.sourceShipId && p.pos.distanceTo(fl.pos) < 400
+        (fl) => fl.isFlare
+          && fl.sourceShipId !== p.sourceShipId
+          && isHostileProjectile(fl)
+          && p.pos.distanceTo(fl.pos) < 400
       );
 
       if (nearbyFlare) {
@@ -111,7 +122,15 @@ export class MissileGuidanceHandler {
           return true;
         }
       } else {
-        const targetShip = allShips.find((s) => s.id !== p.sourceShipId && !s.isDead && !s.isPhased);
+        // 发射时保存的 targetShipId 是权威锁定。只要该目标仍是有效敌对舰船就持续追踪；
+        // 目标失效后才重新捕获另一艘敌舰，并把新锁定写回 projectile。
+        let targetShip = p.targetShipId
+          ? allShips.find((ship) => ship.id === p.targetShipId && isHostileShip(ship))
+          : undefined;
+        if (!targetShip) {
+          targetShip = allShips.find(isHostileShip);
+          if (targetShip) p.targetShipId = targetShip.id;
+        }
         if (targetShip) {
           const toTarget = targetShip.pos.clone().sub(p.pos);
           const dist = toTarget.length();

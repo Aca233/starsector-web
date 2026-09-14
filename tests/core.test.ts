@@ -5,7 +5,7 @@ import { parseStarsectorCsv, parseStarsectorJson } from '../src/engine/data/Star
 import { contentRegistry } from '../src/engine/content/ContentRegistry';
 import { ShipWeaponControlSystem } from '../src/engine/simulation/systems/ShipWeaponControlSystem';
 import { modManager, type ShipSpec } from '../src/engine/modding/ModManager';
-import type { WeaponSpec } from '../src/engine/simulation/Weapon';
+import type { Beam, Projectile, WeaponSpec } from '../src/engine/simulation/Weapon';
 import { FixedTimestepScheduler } from '../src/engine/simulation/FixedTimestepScheduler';
 import { ContrailEngine } from '../src/engine/simulation/ContrailEngine';
 import { VisualRandom } from '../src/engine/runtime/VisualRandom';
@@ -1871,6 +1871,206 @@ describe('shield physical collision geometry', () => {
     expect(getShieldToShieldContact(first, second)).toBeNull();
     second.facingRad = Math.PI;
     expect(getShieldToShieldContact(first, second)).not.toBeNull();
+  });
+});
+
+describe('combat correctness review regressions', () => {
+  const makeContext = (engine: CombatEngine, fighters: Ship[] = []) => ({
+    playerShip: engine.playerShip,
+    enemyShip: engine.enemyShip,
+    fighters,
+    hulkFragments: [],
+    fx: engine.fxSystem,
+    statsTracker: engine.statsTracker,
+    contrailEngine: engine.contrailEngine,
+    random: engine.random,
+    visualRandom: engine.visualRandom,
+    addRadioMessage: vi.fn(),
+    addCameraShake: vi.fn(),
+    handleShipDestruction: vi.fn()
+  });
+
+  const projectile = (overrides: Partial<Projectile> & Pick<Projectile, 'id' | 'sourceShipId' | 'specId'>): Projectile => ({
+    id: overrides.id,
+    sourceShipId: overrides.sourceShipId,
+    specId: overrides.specId,
+    isPlayer: true,
+    pos: new Vector2(5000, 5000),
+    prevPos: new Vector2(5000, 5000),
+    vel: new Vector2(),
+    damage: 10,
+    damageType: 'KINETIC',
+    radius: 2,
+    rangeRemaining: 5000,
+    totalRange: 5000,
+    elapsedTime: 0,
+    color: [255, 255, 255],
+    ...overrides
+  });
+
+  const beam = (sourceShipId: string, overrides: Partial<Beam> = {}): Beam => ({
+    id: 1,
+    sourceShipId,
+    isPlayer: true,
+    specId: 'test_beam',
+    startPos: new Vector2(0, 0),
+    endPos: new Vector2(1000, 0),
+    damagePerSec: 600,
+    damageType: 'ENERGY',
+    color: [120, 220, 255],
+    duration: 1,
+    maxDuration: 1,
+    width: 20,
+    elapsedTime: 0,
+    ...overrides
+  });
+
+  it('removes the intercepted missile and MG round without invalidating the projectile iteration cursor', () => {
+    const engine = new CombatEngine('onslaught', 'paragon', 8501);
+    const missile = projectile({
+      id: 1,
+      sourceShipId: engine.enemyShip.id,
+      specId: 'typhoon',
+      isPlayer: false,
+      isRocket: true,
+      isGuided: false,
+      hitpoints: 5,
+      maxHitpoints: 5,
+      facingRad: 0
+    });
+    const mgRound = projectile({
+      id: 2,
+      sourceShipId: engine.playerShip.id,
+      specId: 'lightmg',
+      isPlayer: true,
+      damage: 10
+    });
+    const unrelated = projectile({
+      id: 3,
+      sourceShipId: engine.playerShip.id,
+      specId: 'mark9',
+      isPlayer: true,
+      pos: new Vector2(6000, 6000),
+      prevPos: new Vector2(6000, 6000),
+      vel: new Vector2(60, 0)
+    });
+    engine.projectiles = [missile, mgRound, unrelated];
+    const dt = 1 / 60;
+    const soundSpy = vi.spyOn(sound, 'playAtPos').mockImplementation(() => {});
+    try {
+      engine.weaponSystem.updateProjectiles(dt, makeContext(engine));
+    } finally {
+      soundSpy.mockRestore();
+    }
+
+    expect(engine.projectiles.map((p) => p.id)).toEqual([3]);
+    expect(unrelated.elapsedTime).toBeCloseTo(dt, 8);
+    expect(unrelated.pos.x).toBeCloseTo(6001, 8);
+  });
+
+  it('keeps a friendly guided missile locked to its saved hostile target instead of the friendly flagship', () => {
+    const engine = new CombatEngine('onslaught', 'paragon', 8502);
+    engine.playerShip.pos = new Vector2(-500, 0);
+    engine.enemyShip.pos = new Vector2(500, 0);
+    const base = modManager.getShip('onslaught')!;
+    const bomber = new Ship('friendly-bomber', base, true, new Vector2(0, 0), 0, new SimulationRandom(8503));
+    const otherEnemy = new Ship('other-enemy', base, false, new Vector2(-250, 0), Math.PI, new SimulationRandom(8504));
+    const guided = projectile({
+      id: 10,
+      sourceShipId: bomber.id,
+      specId: 'atropos',
+      isPlayer: true,
+      isRocket: true,
+      isGuided: true,
+      targetShipId: engine.enemyShip.id,
+      pos: new Vector2(0, 0),
+      prevPos: new Vector2(0, 0),
+      facingRad: 0,
+      maxTurnRate: 2.2,
+      engineAcceleration: 300,
+      maxSpeed: 650
+    });
+
+    engine.weaponSystem.missileGuidance.updateMissile(
+      guided,
+      0.1,
+      makeContext(engine, [bomber, otherEnemy]),
+      [],
+      [engine.playerShip, otherEnemy, engine.enemyShip, bomber]
+    );
+
+    expect(guided.targetShipId).toBe(engine.enemyShip.id);
+    expect(guided.facingRad).toBeCloseTo(0, 8);
+  });
+
+  it('clips a beam at the nearest real shield intersection even when another target center is closer', () => {
+    const engine = new CombatEngine('onslaught', 'paragon', 8505);
+    engine.playerShip.pos = new Vector2(0, 0);
+    const base = modManager.getShip('onslaught')!;
+    const shieldSpec: ShipSpec = {
+      ...base,
+      id: 'beam_near_shield',
+      collisionRadius: 30,
+      shieldType: 'OMNI',
+      shieldArcDeg: 360,
+      shieldRadius: 230,
+      shieldCenterX: 0,
+      shieldCenterY: 0,
+      bounds: [[30, 20], [30, -20], [-30, -20], [-30, 20]],
+      weaponSlots: [],
+      defaultWeaponGroups: []
+    };
+    const fighterSpec: ShipSpec = {
+      ...base,
+      id: 'beam_far_fighter',
+      collisionRadius: 20,
+      shieldType: 'NONE',
+      shieldArcDeg: 0,
+      shieldRadius: 0,
+      shieldCenterX: 0,
+      shieldCenterY: 0,
+      bounds: [[20, 12], [20, -12], [-20, -12], [-20, 12]],
+      weaponSlots: [],
+      defaultWeaponGroups: []
+    };
+    const shieldShip = new Ship('shield-target', shieldSpec, false, new Vector2(300, 0), Math.PI, new SimulationRandom(8506));
+    shieldShip.shield.setActive(true);
+    shieldShip.shield.currentArcDeg = 360;
+    const fighter = new Ship('fighter-target', fighterSpec, false, new Vector2(220, 0), Math.PI, new SimulationRandom(8507));
+    engine.enemyShip = shieldShip;
+    const testBeam = beam(engine.playerShip.id);
+    const fighterHullBefore = fighter.hullHp;
+    const soundSpy = vi.spyOn(sound, 'playAtPos').mockImplementation(() => {});
+    try {
+      engine.weaponSystem.beamHandler.update(1 / 60, makeContext(engine, [fighter]), [testBeam]);
+    } finally {
+      soundSpy.mockRestore();
+    }
+
+    expect(testBeam.isHitting).toBe(true);
+    expect(testBeam.endPos.x).toBeCloseTo(70, 5);
+    expect(shieldShip.flux.totalFlux).toBeGreaterThan(0);
+    expect(fighter.hullHp).toBe(fighterHullBefore);
+  });
+
+  it('records beam shield damage and hit events in combat statistics', () => {
+    const engine = new CombatEngine('onslaught', 'paragon', 8508);
+    engine.playerShip.pos = new Vector2(0, 0);
+    engine.enemyShip.pos = new Vector2(300, 0);
+    engine.enemyShip.shield.setActive(true);
+    engine.enemyShip.shield.currentArcDeg = engine.enemyShip.shield.maxArcDeg;
+    const testBeam = beam(engine.playerShip.id);
+    const soundSpy = vi.spyOn(sound, 'playAtPos').mockImplementation(() => {});
+    try {
+      engine.weaponSystem.beamHandler.update(1 / 60, makeContext(engine), [testBeam]);
+    } finally {
+      soundSpy.mockRestore();
+    }
+
+    expect(engine.statsTracker.playerStats.totalDamageDealt).toBeGreaterThan(0);
+    expect(engine.statsTracker.playerStats.energyDamage).toBeGreaterThan(0);
+    expect(engine.statsTracker.playerStats.shotsHit).toBeGreaterThan(0);
+    expect(engine.statsTracker.enemyStats.shieldDamageAbsorbed).toBeGreaterThan(0);
   });
 });
 
