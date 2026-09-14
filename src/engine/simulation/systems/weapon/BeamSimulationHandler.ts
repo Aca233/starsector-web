@@ -143,10 +143,10 @@ export class BeamSimulationHandler {
             if (b.isEmpPiercing) {
               const hardFluxLevel = ship.flux.hardFlux / ship.spec.maxFlux;
               const pierceChance = hardFluxLevel - 0.1;
-              if (pierceChance > 0 && Math.random() < pierceChance * dt * 3.5) {
+              if (pierceChance > 0 && ctx.random.next() < pierceChance * dt * 3.5) {
                 const activeMounts = ship.weapons.filter(w => !w.isDisabled && w.mountType !== 'HIDDEN');
                 if (activeMounts.length > 0) {
-                  const targetMount = activeMounts[Math.floor(Math.random() * activeMounts.length)];
+                  const targetMount = activeMounts[Math.floor(ctx.random.next() * activeMounts.length)];
                   const mOffset = new Vector2(targetMount.relativePos.x, targetMount.relativePos.y).rotate(ship.facingRad);
                   const mPos = ship.pos.clone().add(mOffset);
                   ctx.fx.spawnEmpArc(shieldHitPoint, mPos, {
@@ -205,15 +205,15 @@ export class BeamSimulationHandler {
             ship.hullHp = Math.max(0, ship.hullHp - result.hullDamage);
             ship.addScorchMark(localImpact, result.armorDamage || result.hullDamage);
 
-            if (Math.random() < dt * 6) {
+            if (ctx.random.next() < dt * 6) {
               sound.playAtPos('beam_hit', worldImpact, ctx.playerShip.pos, 0.35);
             }
 
             // 速子长矛命中船体/装甲时释放剧烈紫白 EMP 跳跃电弧 (严格对齐 1:1 TachyonLanceEffect.java)
-            if (b.isEmpPiercing && Math.random() < dt * 4.5) {
+            if (b.isEmpPiercing && ctx.random.next() < dt * 4.5) {
               const activeMounts = ship.weapons.filter(w => !w.isDisabled && w.mountType !== 'HIDDEN');
               if (activeMounts.length > 0) {
-                const targetMount = activeMounts[Math.floor(Math.random() * activeMounts.length)];
+                const targetMount = activeMounts[Math.floor(ctx.random.next() * activeMounts.length)];
                 const mOffset = new Vector2(targetMount.relativePos.x, targetMount.relativePos.y).rotate(ship.facingRad);
                 const mPos = ship.pos.clone().add(mOffset);
                 ctx.fx.spawnEmpArc(worldImpact, mPos, {
@@ -248,7 +248,7 @@ export class BeamSimulationHandler {
 
             // 引擎后向甲板熔穿熄火
             if (localImpact.x < -ship.spec.collisionRadius * 0.25 && (b.specId === 'tachyonlance' || b.damagePerSec > 500)) {
-              if (Math.random() < dt * 0.45) {
+              if (ctx.random.next() < dt * 0.45) {
                 ship.triggerEngineFlameout();
                 if (ship.isPlayer) {
                   ctx.addRadioMessage('损管警报', 'PLAYER', '高能光束熔穿后向甲板！推进器过载熄火！', [255, 100, 80]);
@@ -258,7 +258,7 @@ export class BeamSimulationHandler {
               }
             }
 
-            if (Math.random() < 0.08) {
+            if (ctx.random.next() < 0.08) {
               const debrisColor: [number, number, number] =
                 ship.spec.id === 'onslaught' ? [125, 110, 95] : [100, 130, 160];
               ctx.fx.spawnDebris(worldImpact, 1, debrisColor, 50, 'small');
@@ -268,8 +268,8 @@ export class BeamSimulationHandler {
               for (let arcIdx = 0; arcIdx < 3; arcIdx++) {
                 const arcDest = ship.pos.clone().add(
                   new Vector2(
-                    (Math.random() - 0.5) * ship.spec.collisionRadius * 1.2,
-                    (Math.random() - 0.5) * ship.spec.collisionRadius * 1.2
+                    (ctx.random.next() - 0.5) * ship.spec.collisionRadius * 1.2,
+                    (ctx.random.next() - 0.5) * ship.spec.collisionRadius * 1.2
                   ).rotate(ship.facingRad)
                 );
                 ctx.fx.spawnEmpArc(worldImpact, arcDest);

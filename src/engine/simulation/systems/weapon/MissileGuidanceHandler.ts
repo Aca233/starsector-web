@@ -31,28 +31,28 @@ export class MissileGuidanceHandler {
     p.pos.add(p.vel.clone().scale(dt));
 
     // 燃烧螺旋烟雾尾迹
-    if (Math.random() < 0.75) {
+    if (ctx.random.next() < 0.75) {
       ctx.fx.contrails.push({
-        pos: p.pos.clone().add(new Vector2((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8)),
-        vel: Vector2.fromAngle(Math.random() * Math.PI * 2, 8 + Math.random() * 15),
-        life: 0.55 + Math.random() * 0.35,
+        pos: p.pos.clone().add(new Vector2((ctx.random.next() - 0.5) * 8, (ctx.random.next() - 0.5) * 8)),
+        vel: Vector2.fromAngle(ctx.random.next() * Math.PI * 2, 8 + ctx.random.next() * 15),
+        life: 0.55 + ctx.random.next() * 0.35,
         maxLife: 0.9,
-        size: 8 + Math.random() * 6,
-        maxSize: 22 + Math.random() * 10,
+        size: 8 + ctx.random.next() * 6,
+        maxSize: 22 + ctx.random.next() * 10,
         alpha: 0.65,
-        rotation: Math.random() * Math.PI * 2,
+        rotation: ctx.random.next() * Math.PI * 2,
         color: [225, 225, 230]
       });
     }
 
     // 溅射强光镁粉火星
-    if (Math.random() < 0.65) {
+    if (ctx.random.next() < 0.65) {
       ctx.fx.particles.push({
         pos: p.pos.clone(),
-        vel: Vector2.fromAngle(Math.random() * Math.PI * 2, 35 + Math.random() * 55),
-        life: 0.15 + Math.random() * 0.15,
+        vel: Vector2.fromAngle(ctx.random.next() * Math.PI * 2, 35 + ctx.random.next() * 55),
+        life: 0.15 + ctx.random.next() * 0.15,
         maxLife: 0.3,
-        size: 2.5 + Math.random() * 2,
+        size: 2.5 + ctx.random.next() * 2,
         color: [255, 220, 130],
         alpha: 1.0
       });
@@ -177,14 +177,14 @@ export class MissileGuidanceHandler {
     }
 
     // TPC 炽热等离子残渣
-    if (p.specId === 'tpc' && Math.random() < 0.7) {
+    if (p.specId === 'tpc' && ctx.random.next() < 0.7) {
       ctx.fx.particles.push({
-        pos: p.pos.clone().addScaled(Vector2.fromAngle(p.vel.heading(), 1), -35 + (Math.random() - 0.5) * 20),
-        vel: Vector2.fromAngle(p.vel.heading() + Math.PI + (Math.random() - 0.5) * 0.8, 40 + Math.random() * 60),
-        life: 0.15 + Math.random() * 0.15,
+        pos: p.pos.clone().addScaled(Vector2.fromAngle(p.vel.heading(), 1), -35 + (ctx.random.next() - 0.5) * 20),
+        vel: Vector2.fromAngle(p.vel.heading() + Math.PI + (ctx.random.next() - 0.5) * 0.8, 40 + ctx.random.next() * 60),
+        life: 0.15 + ctx.random.next() * 0.15,
         maxLife: 0.3,
-        size: 3 + Math.random() * 4,
-        color: [255, 120 + Math.random() * 80, 20],
+        size: 3 + ctx.random.next() * 4,
+        color: [255, 120 + ctx.random.next() * 80, 20],
         alpha: 0.95
       });
     }

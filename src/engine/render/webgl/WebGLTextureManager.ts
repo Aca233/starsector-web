@@ -1,4 +1,5 @@
 import { textureCache } from '../TextureCache';
+import { assetManager, type AssetManifestEntry } from '../../assets/AssetResolver';
 
 export interface TextureManagerStats {
   residentTextures: number;
@@ -11,11 +12,13 @@ export interface TextureManagerStats {
 export class WebGLTextureManager {
   private gl: WebGL2RenderingContext;
   private textures: Map<string, WebGLTexture> = new Map();
-  private pending = new Set<string>();
+  private pending = new Map<string, { img: HTMLImageElement; onLoad: () => void; onError: () => void }>();
   private whiteTexture: WebGLTexture;
   private transparentTexture: WebGLTexture;
   private uploads = 0;
   private invalidations = 0;
+  private generation = 0;
+  private disposed = false;
 
   constructor(gl: WebGL2RenderingContext) {
     this.gl = gl;
@@ -26,41 +29,52 @@ export class WebGLTextureManager {
   public getWhiteTexture(): WebGLTexture { return this.whiteTexture; }
 
   public async preload(urls: readonly string[]): Promise<void> {
+    const generation = this.generation;
     await Promise.all(urls.map((url) => textureCache.waitForImage(url)));
+    if (this.disposed || generation !== this.generation) return;
     for (const url of urls) this.getTexture(url);
   }
 
-  private textureKey(url: string, repeat: boolean, tint?: [number, number, number]): string {
-    return `${url}|wrap=${repeat ? 'repeat' : 'clamp'}|filter=linear|mipmap=0${tint ? `|tint=${tint.join(',')}` : ''}`;
+  private samplerFor(url: string, forceRepeat: boolean): Required<NonNullable<AssetManifestEntry['sampler']>> {
+    const sampler = assetManager.getByPath(url)?.sampler;
+    return {
+      wrap: forceRepeat ? 'repeat' : (sampler?.wrap ?? 'clamp'),
+      minFilter: sampler?.minFilter ?? 'linear',
+      magFilter: sampler?.magFilter ?? 'linear',
+      mipmap: sampler?.mipmap ?? false
+    };
   }
 
-  private shouldRepeat(url: string, forceRepeat: boolean): boolean {
-    return forceRepeat || url.includes('beam') || url.includes('shields') || url.includes('contrail');
+  private textureKey(url: string, sampler: Required<NonNullable<AssetManifestEntry['sampler']>>, tint?: [number, number, number]): string {
+    return `${url}|wrap=${sampler.wrap}|min=${sampler.minFilter}|mag=${sampler.magFilter}|mipmap=${sampler.mipmap ? 1 : 0}${tint ? `|tint=${tint.join(',')}` : ''}`;
   }
 
   public getTexture(url: string, forceRepeat = false): WebGLTexture {
-    const repeat = this.shouldRepeat(url, forceRepeat);
-    const key = this.textureKey(url, repeat);
+    if (this.disposed) return this.transparentTexture;
+    const sampler = this.samplerFor(url, forceRepeat);
+    const key = this.textureKey(url, sampler);
     const existing = this.textures.get(key);
     if (existing) return existing;
 
     const img = textureCache.getImage(url);
     if (img.complete && img.naturalWidth > 0) {
-      const uploaded = this.uploadImage(img, repeat);
+      const uploaded = this.uploadImage(img, sampler);
       this.textures.set(key, uploaded);
       return uploaded;
     }
 
     if (!this.pending.has(key)) {
-      this.pending.add(key);
+      const generation = this.generation;
       const finish = () => {
-        this.pending.delete(key);
-        if (!img.complete || img.naturalWidth <= 0 || this.textures.has(key)) return;
-        const uploaded = this.uploadImage(img, repeat);
+        this.removePending(key);
+        if (this.disposed || generation !== this.generation || !img.complete || img.naturalWidth <= 0 || this.textures.has(key)) return;
+        const uploaded = this.uploadImage(img, sampler);
         this.textures.set(key, uploaded);
       };
+      const fail = () => this.removePending(key);
+      this.pending.set(key, { img, onLoad: finish, onError: fail });
       img.addEventListener('load', finish, { once: true });
-      img.addEventListener('error', () => this.pending.delete(key), { once: true });
+      img.addEventListener('error', fail, { once: true });
     }
     return this.transparentTexture;
   }
@@ -79,45 +93,61 @@ export class WebGLTextureManager {
     const ri = Math.min(255, Math.max(0, Math.round(r)));
     const gi = Math.min(255, Math.max(0, Math.round(g)));
     const bi = Math.min(255, Math.max(0, Math.round(b)));
-    const repeat = this.shouldRepeat(url, forceRepeat);
-    const key = this.textureKey(url, repeat, [ri, gi, bi]);
+    if (this.disposed) return this.transparentTexture;
+    const sampler = this.samplerFor(url, forceRepeat);
+    const key = this.textureKey(url, sampler, [ri, gi, bi]);
     const existing = this.textures.get(key);
     if (existing) return existing;
 
     const tinted = textureCache.getTintedImage(url, ri, gi, bi);
     if (tinted) {
-      const uploaded = this.uploadCanvas(tinted, repeat);
+      const uploaded = this.uploadCanvas(tinted, sampler);
       this.textures.set(key, uploaded);
       return uploaded;
     }
     return this.getTexture(url, forceRepeat);
   }
 
-  public uploadCanvas(canvas: HTMLCanvasElement, repeat = false): WebGLTexture {
+  private uploadCanvas(canvas: HTMLCanvasElement, sampler: Required<NonNullable<AssetManifestEntry['sampler']>>): WebGLTexture {
     const tex = this.gl.createTexture();
     if (!tex) throw new Error('Failed to create WebGL texture');
-    this.bindAndConfigure(tex, repeat, () => this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, canvas));
+    this.bindAndConfigure(tex, sampler, () => this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, canvas));
     this.uploads++;
     return tex;
   }
 
-  public uploadImage(img: HTMLImageElement, repeat = false): WebGLTexture {
+  private uploadImage(img: HTMLImageElement, sampler: Required<NonNullable<AssetManifestEntry['sampler']>>): WebGLTexture {
     const tex = this.gl.createTexture();
     if (!tex) throw new Error('Failed to create WebGL texture');
-    this.bindAndConfigure(tex, repeat, () => this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, img));
+    this.bindAndConfigure(tex, sampler, () => this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, img));
     this.uploads++;
     return tex;
   }
 
-  private bindAndConfigure(tex: WebGLTexture, repeat: boolean, upload: () => void): void {
+  private bindAndConfigure(tex: WebGLTexture, sampler: Required<NonNullable<AssetManifestEntry['sampler']>>, upload: () => void): void {
     const gl = this.gl;
-    const wrap = repeat ? gl.REPEAT : gl.CLAMP_TO_EDGE;
+    const wrap = sampler.wrap === 'repeat' ? gl.REPEAT : gl.CLAMP_TO_EDGE;
+    const minFilter = sampler.minFilter === 'nearest' ? gl.NEAREST : gl.LINEAR;
+    const magFilter = sampler.magFilter === 'nearest' ? gl.NEAREST : gl.LINEAR;
     gl.bindTexture(gl.TEXTURE_2D, tex);
     upload();
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, minFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, magFilter);
+    if (sampler.mipmap) gl.generateMipmap(gl.TEXTURE_2D);
+  }
+
+  private removePending(key: string): void {
+    const pending = this.pending.get(key);
+    if (!pending) return;
+    pending.img.removeEventListener('load', pending.onLoad);
+    pending.img.removeEventListener('error', pending.onError);
+    this.pending.delete(key);
+  }
+
+  private cancelPending(): void {
+    for (const key of [...this.pending.keys()]) this.removePending(key);
   }
 
   private createSolidTexture(r: number, g: number, b: number, a: number): WebGLTexture {
@@ -135,8 +165,9 @@ export class WebGLTextureManager {
 
   /** Called on context loss: GPU objects are already invalid, so do not delete them. */
   public invalidateGPU(): void {
+    this.generation++;
+    this.cancelPending();
     this.textures.clear();
-    this.pending.clear();
     this.invalidations++;
   }
 
@@ -145,9 +176,12 @@ export class WebGLTextureManager {
   }
 
   public dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.generation++;
+    this.cancelPending();
     for (const texture of this.textures.values()) this.gl.deleteTexture(texture);
     this.textures.clear();
-    this.pending.clear();
     this.gl.deleteTexture(this.whiteTexture);
     this.gl.deleteTexture(this.transparentTexture);
   }

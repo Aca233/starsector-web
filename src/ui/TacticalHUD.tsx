@@ -61,6 +61,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
 }) => {
   const [showHelpDrawer, setShowHelpDrawer] = useState(false);
   const [hudDensity, setHudDensity] = useState(() => getHudDensity(typeof window !== 'undefined' ? window.innerWidth : 1920, typeof window !== 'undefined' ? window.innerHeight : 1080));
+  const [, setHudTick] = useState(0);
 
   const player = engine.playerShip;
   const enemy = engine.enemyShip;
@@ -85,8 +86,19 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
     return () => window.removeEventListener('resize', updateDensity);
   }, []);
 
+  // Keep mutable simulation snapshots local to the HUD subtree. The render loop no
+  // longer forces the entire App tree to rerender every 100 ms.
+  useEffect(() => {
+    const timer = window.setInterval(() => setHudTick((tick) => tick + 1), 100);
+    return () => window.clearInterval(timer);
+  }, []);
+
   return (
-    <div className="hud-overlay select-none pointer-events-none font-mono" data-hud-density={hudDensity}>
+    <div
+      className="hud-overlay select-none pointer-events-none font-mono"
+      data-hud-density={hudDensity}
+      data-combat-input-block
+    >
       {/* 1. 战术指挥地图全景模式 (仅在按 TAB 展开时显示) */}
       {engine.isTacticalMap && (
         <div className="hud-tactical-bar pointer-events-auto absolute top-12 left-1/2 -translate-x-1/2 bg-slate-950/95 border border-[#94ff00]/70 px-4 py-1.5 rounded flex items-center gap-3 text-xs font-mono shadow-[0_0_24px_rgba(148,255,0,0.4)] z-50 whitespace-nowrap text-[#94ff00]">

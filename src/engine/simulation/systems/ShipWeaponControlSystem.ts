@@ -4,6 +4,7 @@ import { ShipSpec } from '../../modding/ModManager';
 import { sound } from '../../audio/SoundManager';
 import type { Ship } from '../Ship';
 import { contentRegistry } from '../../content/ContentRegistry';
+import { SimulationRandom } from '../SimulationRandom';
 
 /**
  * 战舰武器挂点、火控散布、交替射击与弹道发射控制子系统 (ShipWeaponControlSystem)
@@ -15,6 +16,8 @@ export class ShipWeaponControlSystem {
   public selectedGroupIndex = 0;
   public justDisabledMounts: WeaponMount[] = [];
   public justRepairedMounts: WeaponMount[] = [];
+
+  constructor(private readonly random = new SimulationRandom()) {}
 
   public init(spec: ShipSpec, initialFacingRad: number) {
     this.weapons = [];
@@ -111,7 +114,7 @@ export class ShipWeaponControlSystem {
         if (mount.health <= 0) {
           mount.health = 0;
           mount.isDisabled = true;
-          mount.disabledDuration = 5.0 + Math.random() * 4.0;
+          mount.disabledDuration = 5.0 + this.random.next() * 4.0;
           mount.disabledTimer = mount.disabledDuration;
 
           const sfx = mount.spec.mountSize === 'LARGE' 
@@ -372,7 +375,7 @@ export class ShipWeaponControlSystem {
     const maxSpr = mount.spec.maxSpread || minSpr;
     const sprPerShot = mount.spec.spreadPerShot || 0;
     mount.currentSpreadDeg = Math.min(maxSpr, mount.currentSpreadDeg + sprPerShot);
-    const spreadRad = ((Math.random() - 0.5) * mount.currentSpreadDeg * Math.PI) / 180;
+    const spreadRad = ((this.random.next() - 0.5) * mount.currentSpreadDeg * Math.PI) / 180;
     const fireAngleRad = mount.currentAngleRad + spreadRad;
 
     // 多管武器交替射击管位切换与枪口世界坐标偏移 (1:1 官方 Starsector 炮管偏移算法)
@@ -439,7 +442,7 @@ export class ShipWeaponControlSystem {
       const beamDuration = isBurst ? 1.0 : 0.22;
       mount.glowAlpha = 1.0;
       spawnBeam({
-        id: Math.random(),
+        id: this.random.next(),
         sourceShipId: ship.id,
         slotId: mount.slotId,
         isPlayer: ship.isPlayer,
@@ -466,7 +469,7 @@ export class ShipWeaponControlSystem {
       // 发射实体弹药/脉冲 (使用计入散布的真实弹道角 fireAngleRad)
       const projVel = Vector2.fromAngle(fireAngleRad, mount.spec.projSpeed).add(ship.vel);
       spawnProjectile({
-        id: Math.random(),
+        id: this.random.next(),
         sourceShipId: ship.id,
         isPlayer: ship.isPlayer,
         specId: mount.spec.id,

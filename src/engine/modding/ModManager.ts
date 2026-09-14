@@ -4,6 +4,7 @@ import { WeaponMountType, WeaponSlotSize, WeaponSpec } from '../simulation/Weapo
 import { i18n } from '../i18n/LocalizationManager';
 import { ONSLAUGHT_BOUNDS, PARAGON_BOUNDS, DOOM_BOUNDS } from '../data/hull_bounds';
 import { contentRegistry } from '../content/ContentRegistry';
+import { validateShipSpec, validateWeaponSpec } from './ContentValidation';
 
 export interface WeaponMountSlotConfig {
   slotId: string;
@@ -130,7 +131,8 @@ export class ModManager {
     return ModManager.instance;
   }
 
-  public registerShip(spec: ShipSpec) {
+  public registerShip(spec: ShipSpec, options: { allowExistingId?: boolean; requireBundledAssets?: boolean } = {}) {
+    validateShipSpec(spec, options);
     contentRegistry.registerShip(spec);
     if (spec.i18n) {
       if (spec.i18n.zh_CN) i18n.registerStrings('zh_CN', spec.i18n.zh_CN);
@@ -147,6 +149,8 @@ export class ModManager {
   }
 
   public registerWeapon(spec: WeaponSpec) {
+    validateWeaponSpec(spec);
+    if (contentRegistry.getWeapon(spec.id)) throw new Error(`武器 ID 已注册: ${spec.id}`);
     contentRegistry.registerWeapon(spec);
   }
 
@@ -158,16 +162,30 @@ export class ModManager {
    * 加载外部 Mod 包 (例如用户拖拽或通过 JSON 配置导入)
    */
   public loadMod(mod: ModPackage) {
+    if (!mod || typeof mod !== 'object' || !mod.id?.trim() || !mod.version?.trim()) throw new Error('Mod 包缺少 id/version');
+    if (this.loadedMods.has(mod.id)) throw new Error(`Mod ID 已加载: ${mod.id}`);
+    const incomingWeapons = new Map<string, WeaponSpec>();
+    for (const weapon of mod.weapons ?? []) {
+      validateWeaponSpec(weapon);
+      if (incomingWeapons.has(weapon.id) || contentRegistry.getWeapon(weapon.id)) throw new Error(`武器 ID 冲突: ${weapon.id}`);
+      incomingWeapons.set(weapon.id, weapon);
+    }
+    const incomingShips = new Set<string>();
+    for (const ship of mod.ships ?? []) {
+      if (incomingShips.has(ship.id)) throw new Error(`Mod 内舰船 ID 重复: ${ship.id}`);
+      validateShipSpec(ship, { additionalWeapons: incomingWeapons, requireBundledAssets: true });
+      incomingShips.add(ship.id);
+    }
     this.loadedMods.set(mod.id, mod);
     if (mod.i18n) {
       if (mod.i18n.zh_CN) i18n.registerStrings('zh_CN', mod.i18n.zh_CN);
       if (mod.i18n.en_US) i18n.registerStrings('en_US', mod.i18n.en_US);
     }
     if (mod.weapons) {
-      for (const w of mod.weapons) this.registerWeapon(w);
+      for (const w of mod.weapons) contentRegistry.registerWeapon(w);
     }
     if (mod.ships) {
-      for (const s of mod.ships) this.registerShip(s);
+      for (const s of mod.ships) this.registerShip(s, { requireBundledAssets: true });
     }
   }
 
@@ -477,11 +495,11 @@ export class ModManager {
       ]
     };
 
-    this.registerShip(onslaught);
-    this.registerShip(paragon);
-    this.registerShip(doom);
-    this.registerShip(broadsword);
-    this.registerShip(dagger);
+    this.registerShip(onslaught, { requireBundledAssets: false });
+    this.registerShip(paragon, { requireBundledAssets: false });
+    this.registerShip(doom, { requireBundledAssets: false });
+    this.registerShip(broadsword, { requireBundledAssets: false });
+    this.registerShip(dagger, { requireBundledAssets: false });
   }
 }
 

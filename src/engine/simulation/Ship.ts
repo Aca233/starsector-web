@@ -7,6 +7,7 @@ import { Projectile, Beam, WeaponMount, WeaponGroup, MuzzleFlashSpec } from './W
 import { ShipSpec } from '../modding/ModManager';
 import { sound } from '../audio/SoundManager';
 import { ShipWeaponControlSystem } from './systems/ShipWeaponControlSystem';
+import { SimulationRandom } from './SimulationRandom';
 
 export interface ScorchMark {
   localPos: Vector2;
@@ -50,7 +51,8 @@ export class Ship {
   public flux: FluxTracker;
   public shield: Shield;
   public system: ShipSystem;
-  public readonly weaponControl: ShipWeaponControlSystem = new ShipWeaponControlSystem();
+  public readonly weaponControl: ShipWeaponControlSystem;
+  private readonly random: SimulationRandom;
 
   // --------------------------------------------------------------------------
   // 向后兼容 Getters / Setters (保证 UI、Renderer 和 Hooks 零修改平滑过渡)
@@ -96,10 +98,19 @@ export class Ship {
   public currentCR = 0.70; // 标准 70% 战备值
   public peakPerformanceRemaining: number;
 
-  constructor(id: string, spec: ShipSpec, isPlayer = false, initialPos = new Vector2(), initialFacingRad = 0) {
+  constructor(
+    id: string,
+    spec: ShipSpec,
+    isPlayer = false,
+    initialPos = new Vector2(),
+    initialFacingRad = 0,
+    random = new SimulationRandom()
+  ) {
     this.id = id;
     this.spec = spec;
     this.isPlayer = isPlayer;
+    this.random = random;
+    this.weaponControl = new ShipWeaponControlSystem(random);
     this.shipName = isPlayer
       ? (spec.id === 'onslaught' ? 'TTS HEGEMON' : spec.id === 'doom' ? 'TTS HARBINGER' : 'TTS INVINCIBLE')
       : (spec.id === 'paragon' ? 'ISS RADIANCE' : 'ISS TRI-TACHYON');
@@ -171,7 +182,7 @@ export class Ship {
     if (engineIndex !== undefined && this.engineStatuses[engineIndex]) {
       if (!this.engineStatuses[engineIndex].isFlameout) {
         this.engineStatuses[engineIndex].isFlameout = true;
-        this.engineStatuses[engineIndex].flameoutTimer = 6.0 + Math.random() * 4.0;
+        this.engineStatuses[engineIndex].flameoutTimer = 6.0 + this.random.next() * 4.0;
         sound.play('engine_flameout', 0.9);
         if (this.isPlayer) {
           sound.play('flameout_alarm', 0.85);
@@ -182,9 +193,9 @@ export class Ship {
         .map((e, idx) => ({ e, idx }))
         .filter(item => !item.e.isFlameout);
       if (activeEngines.length > 0) {
-        const picked = activeEngines[Math.floor(Math.random() * activeEngines.length)];
+        const picked = activeEngines[Math.floor(this.random.next() * activeEngines.length)];
         picked.e.isFlameout = true;
-        picked.e.flameoutTimer = 6.0 + Math.random() * 4.0;
+        picked.e.flameoutTimer = 6.0 + this.random.next() * 4.0;
         sound.play('engine_flameout', 0.9);
         if (this.isPlayer) {
           sound.play('flameout_alarm', 0.85);

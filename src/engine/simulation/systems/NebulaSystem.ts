@@ -2,11 +2,12 @@ import { Vector2 } from '../../math/Vector2';
 import { NebulaCloud } from '../CombatTypes';
 import { Ship } from '../Ship';
 import { Projectile } from '../Weapon';
+import { SimulationRandom } from '../SimulationRandom';
 
 export class NebulaSystem {
   public nebulae: NebulaCloud[] = [];
 
-  constructor() {}
+  constructor(private readonly random = new SimulationRandom()) {}
 
   public init() {
     this.nebulae = [];
@@ -66,7 +67,7 @@ export class NebulaSystem {
           if (p.isRocket) {
             p.vel.scale(Math.max(0, 1 - dt * 0.2));
           }
-          if (spawnNebulaParticle && Math.random() < dt * 1.2) {
+          if (spawnNebulaParticle && this.random.next() < dt * 1.2) {
             spawnNebulaParticle(p.pos.clone(), neb.type === 'AMBER' ? [255, 170, 60] : [70, 140, 255]);
           }
           break;

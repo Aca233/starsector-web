@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { modManager, ShipSpec } from '../engine/modding/ModManager';
 import { i18n } from '../engine/i18n/LocalizationManager';
 import { X, Plus, Copy, Check, FileJson } from 'lucide-react';
+import { assetManager } from '../engine/assets/AssetResolver';
 
 interface ModManagerModalProps {
   isOpen: boolean;
@@ -31,19 +32,17 @@ export const ModManagerModal: React.FC<ModManagerModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleImportJson = () => {
+  const handleImportJson = async () => {
     try {
       setImportError('');
-      const parsed = JSON.parse(jsonInput) as ShipSpec;
-      if (!parsed.id || !parsed.nameKey || !parsed.hitpoints) {
-        throw new Error('缺少必要字段 (id, nameKey, hitpoints)');
-      }
-      modManager.registerShip(parsed);
-      setSelectedShipId(parsed.id);
+      await assetManager.ensureManifestLoaded();
+      const parsed = JSON.parse(jsonInput) as unknown;
+      modManager.registerShip(parsed as ShipSpec, { requireBundledAssets: true });
+      setSelectedShipId((parsed as ShipSpec).id);
       setJsonInput('');
-      alert(`舰船 Mod [${parsed.id}] 导入成功！`);
-    } catch (e: any) {
-      setImportError(`导入失败: ${e.message}`);
+      alert(`舰船 Mod [${(parsed as ShipSpec).id}] 导入成功！`);
+    } catch (e: unknown) {
+      setImportError(`导入失败: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 

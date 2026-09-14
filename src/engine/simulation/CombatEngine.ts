@@ -42,6 +42,7 @@ import { CombatShipStatusSystem } from './systems/CombatShipStatusSystem';
 import { CombatStatsTracker } from './systems/CombatStatsTracker';
 import { BattleResult } from './CombatStatistics';
 import { ContrailEngine } from './ContrailEngine';
+import { SimulationRandom } from './SimulationRandom';
 
 /**
  * 远行星号战斗仿真主调度中枢 (CombatEngine)
@@ -51,14 +52,15 @@ export class CombatEngine {
   public playerShip: Ship;
   public enemyShip: Ship;
   public enemyAI: CapitalShipAI;
+  public readonly random: SimulationRandom;
 
   // 独立的领域子系统
-  public readonly fxSystem: CombatFXSystem = new CombatFXSystem();
-  public readonly asteroidSystem: AsteroidSystem = new AsteroidSystem();
-  public readonly nebulaSystem: NebulaSystem = new NebulaSystem();
-  public readonly fighterSystem: FighterSystem = new FighterSystem();
-  public readonly mineSystem: MineSystem = new MineSystem();
-  public readonly commandSystem: FleetCommandSystem = new FleetCommandSystem();
+  public readonly fxSystem: CombatFXSystem;
+  public readonly asteroidSystem: AsteroidSystem;
+  public readonly nebulaSystem: NebulaSystem;
+  public readonly fighterSystem: FighterSystem;
+  public readonly mineSystem: MineSystem;
+  public readonly commandSystem: FleetCommandSystem;
   public readonly weaponSystem: WeaponSimulationSystem = new WeaponSimulationSystem();
   public readonly contrailEngine: ContrailEngine = new ContrailEngine();
   public readonly collisionSystem: ShipCollisionSystem = new ShipCollisionSystem();
@@ -115,13 +117,20 @@ export class CombatEngine {
   public get isTacticalMap(): boolean { return this.commandSystem.isTacticalMap; }
   public set isTacticalMap(v: boolean) { this.commandSystem.isTacticalMap = v; }
 
-  constructor(playerShipId = 'onslaught', enemyShipId = 'paragon') {
+  constructor(playerShipId = 'onslaught', enemyShipId = 'paragon', seed = 0x51a7e5ed) {
+    this.random = new SimulationRandom(seed);
+    this.fxSystem = new CombatFXSystem(this.random);
+    this.asteroidSystem = new AsteroidSystem(this.random);
+    this.nebulaSystem = new NebulaSystem(this.random);
+    this.fighterSystem = new FighterSystem(this.random);
+    this.mineSystem = new MineSystem(this.random);
+    this.commandSystem = new FleetCommandSystem(this.random);
     const playerSpec = modManager.getShip(playerShipId) || modManager.getShip('onslaught')!;
     const enemySpec = modManager.getShip(enemyShipId) || modManager.getShip('paragon')!;
 
     // 攻势从左侧进入，典范从右侧进入
-    this.playerShip = new Ship('player_ship', playerSpec, true, new Vector2(-600, 0), 0);
-    this.enemyShip = new Ship('enemy_ship', enemySpec, false, new Vector2(600, 0), Math.PI);
+    this.playerShip = new Ship('player_ship', playerSpec, true, new Vector2(-600, 0), 0, this.random);
+    this.enemyShip = new Ship('enemy_ship', enemySpec, false, new Vector2(600, 0), Math.PI, this.random);
     this.enemyAI = new CapitalShipAI(this.enemyShip, this.playerShip);
 
     this.initFighters();
@@ -146,6 +155,7 @@ export class CombatEngine {
   }
 
   public switchPlayerShip(newPlayerShipId: string) {
+    this.random.reset();
     this.battleResult = null;
     this.statsTracker.reset();
     this.combatTime = 0;
@@ -160,8 +170,8 @@ export class CombatEngine {
     }
     const enemySpec = modManager.getShip(enemyShipId) || modManager.getShip('onslaught')!;
 
-    this.playerShip = new Ship('player_ship', playerSpec, true, new Vector2(-600, 0), 0);
-    this.enemyShip = new Ship('enemy_ship', enemySpec, false, new Vector2(600, 0), Math.PI);
+    this.playerShip = new Ship('player_ship', playerSpec, true, new Vector2(-600, 0), 0, this.random);
+    this.enemyShip = new Ship('enemy_ship', enemySpec, false, new Vector2(600, 0), Math.PI, this.random);
     this.enemyAI = new CapitalShipAI(this.enemyShip, this.playerShip);
 
     this.weaponSystem.clear();
@@ -200,6 +210,10 @@ export class CombatEngine {
     this.countermeasureCooldownTimer = 0;
     this.enemyCountermeasureCooldownTimer = 0;
     this.switchPlayerShip(playerShipId);
+  }
+
+  public setSeed(seed: number): void {
+    this.random.reset(seed);
   }
 
   public endBattle(isVictory: boolean) {
@@ -276,13 +290,13 @@ export class CombatEngine {
     const launchOrigin = ship.pos.clone().add(aftOffset);
 
     for (let i = 0; i < baseAngles.length; i++) {
-      const angle = baseAngles[i] + (Math.random() - 0.5) * 0.2;
-      const speed = 190 + Math.random() * 80;
+      const angle = baseAngles[i] + (this.random.next() - 0.5) * 0.2;
+      const speed = 190 + this.random.next() * 80;
       const flareVel = Vector2.fromAngle(angle, speed).add(ship.vel.clone().scale(0.4));
       const flarePos = launchOrigin.clone().add(Vector2.fromAngle(angle, 10 + i * 5));
 
       this.projectiles.push({
-        id: Math.random(),
+        id: this.random.next(),
         sourceShipId: ship.id,
         specId: 'flare',
         pos: flarePos,
@@ -425,7 +439,7 @@ export class CombatEngine {
         this.fxSystem.spawnAuthenticMuzzleFlash(spec, pos, angleRad, shipVel || new Vector2(0, 0));
       } else {
         this.fxSystem.muzzleFlashes.push({
-          id: Math.random(),
+          id: this.random.next(),
           pos: pos.clone(),
           angleRad,
           size,
@@ -478,7 +492,7 @@ export class CombatEngine {
     this.nebulaSystem.update(dt, allShips, this.projectiles, (pos, color) => {
       this.fxSystem.particles.push({
         pos,
-        vel: new Vector2((Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20),
+        vel: new Vector2((this.random.next() - 0.5) * 20, (this.random.next() - 0.5) * 20),
         life: 0.35,
         maxLife: 0.35,
         size: 4,
@@ -490,6 +504,7 @@ export class CombatEngine {
     // 2.5 舰船状态视觉特效与自动抢修汇报
     this.statusSystem.update(dt, {
       fx: this.fxSystem,
+      random: this.random,
       statsTracker: this.statsTracker,
       playerShip: this.playerShip,
       enemyShip: this.enemyShip,
@@ -542,6 +557,7 @@ export class CombatEngine {
       fx: this.fxSystem,
       statsTracker: this.statsTracker,
       contrailEngine: this.contrailEngine,
+      random: this.random,
       addRadioMessage: (sender: string, faction: 'PLAYER' | 'ENEMY' | 'HQ', text: string, color?: [number, number, number]) => {
         this.addRadioMessage(sender, faction, text, color);
       },
@@ -590,25 +606,25 @@ export class CombatEngine {
     // 连环大爆炸与次生殉爆音效
     for (let k = 0; k < 9; k++) {
       const off = new Vector2(
-        (Math.random() - 0.5) * ship.spec.collisionRadius * 1.3,
-        (Math.random() - 0.5) * ship.spec.collisionRadius * 1.3
+        (this.random.next() - 0.5) * ship.spec.collisionRadius * 1.3,
+        (this.random.next() - 0.5) * ship.spec.collisionRadius * 1.3
       );
       const detPos = ship.pos.clone().add(off);
-      this.spawnAuthenticExplosion(detPos, 70 + Math.random() * 70, [255, 140, 30], true);
+      this.spawnAuthenticExplosion(detPos, 70 + this.random.next() * 70, [255, 140, 30], true);
       sound.playAtPos('explosion_secondary', detPos, this.playerShip.pos, 0.65);
     }
     this.addCameraShake(25, 0.8);
 
     // 仅大型战舰断裂为残骸断件
     if (ship.spec.collisionRadius > 80) {
-      const shouldBreak = Math.random() < 0.5;
+      const shouldBreak = this.random.next() < 0.5;
       if (shouldBreak) {
         this.fxSystem.hulkFragments.push({
-          id: Math.random(),
+          id: this.random.next(),
           pos: ship.pos.clone().add(Vector2.fromAngle(ship.facingRad, ship.spec.collisionRadius * 0.25)),
           vel: Vector2.fromAngle(ship.facingRad, 30).add(ship.vel),
           facingRad: ship.facingRad,
-          angularVel: (Math.random() - 0.5) * 0.12,
+          angularVel: (this.random.next() - 0.5) * 0.12,
           life: 180,
           maxLife: 180,
           spriteUrl: ship.spec.spriteUrl,
@@ -620,11 +636,11 @@ export class CombatEngine {
           collisionRadius: ship.spec.collisionRadius * 0.55
         });
         this.fxSystem.hulkFragments.push({
-          id: Math.random(),
+          id: this.random.next(),
           pos: ship.pos.clone().add(Vector2.fromAngle(ship.facingRad + Math.PI, ship.spec.collisionRadius * 0.3)),
           vel: Vector2.fromAngle(ship.facingRad + Math.PI, 25).add(ship.vel),
           facingRad: ship.facingRad,
-          angularVel: (Math.random() - 0.5) * 0.12,
+          angularVel: (this.random.next() - 0.5) * 0.12,
           life: 180,
           maxLife: 180,
           spriteUrl: ship.spec.spriteUrl,
@@ -637,11 +653,11 @@ export class CombatEngine {
         });
       } else {
         this.fxSystem.hulkFragments.push({
-          id: Math.random(),
+          id: this.random.next(),
           pos: ship.pos.clone(),
           vel: ship.vel.clone().scale(0.8),
           facingRad: ship.facingRad,
-          angularVel: (Math.random() - 0.5) * 0.06,
+          angularVel: (this.random.next() - 0.5) * 0.06,
           life: 180,
           maxLife: 180,
           spriteUrl: ship.spec.spriteUrl,

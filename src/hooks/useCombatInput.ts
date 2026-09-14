@@ -24,6 +24,14 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return element.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(element.tagName);
 }
 
+function isInteractiveUiTarget(target: EventTarget | null): boolean {
+  const element = target instanceof Element ? target : null;
+  if (!element) return false;
+  return !!element.closest(
+    'button, a, input, textarea, select, [contenteditable="true"], [role="button"], [data-combat-input-block]'
+  );
+}
+
 export function useCombatInput({
   sessionRef,
   canvasRef,
@@ -57,7 +65,9 @@ export function useCombatInput({
       player.turnInput = 0;
     };
 
-    const blocked = (target: EventTarget | null) => inputBlockedRef.current || isEditableTarget(target);
+    const blocked = (target: EventTarget | null) => (
+      inputBlockedRef.current || isEditableTarget(target) || isInteractiveUiTarget(target)
+    );
 
     const onMouseMove = (e: MouseEvent) => {
       if (inputBlockedRef.current) return;

@@ -2,6 +2,7 @@ import { Vector2 } from '../../math/Vector2';
 import { SpatialMine } from '../CombatTypes';
 import { Ship } from '../Ship';
 import { sound } from '../../audio/SoundManager';
+import { SimulationRandom } from '../SimulationRandom';
 
 export interface MineFXCallbacks {
   spawnShieldRipple: (pos: Vector2, maxRadius: number, color: [number, number, number]) => void;
@@ -18,7 +19,7 @@ export interface MineFXCallbacks {
 export class MineSystem {
   public mines: SpatialMine[] = [];
 
-  constructor() {}
+  constructor(private readonly random = new SimulationRandom()) {}
 
   public clear() {
     this.mines = [];
@@ -32,7 +33,7 @@ export class MineSystem {
     fx.spawnSparks(targetPos, 25, [180, 120, 255]);
 
     this.mines.push({
-      id: Math.random(),
+      id: this.random.next(),
       pos: targetPos.clone(),
       vel: new Vector2(),
       sourceShipId: sourceShip.id,
@@ -45,7 +46,7 @@ export class MineSystem {
       damage: 1000,
       life: 12.0,
       pingTimer: 0.5,
-      rotation: Math.random() * Math.PI * 2
+      rotation: this.random.next() * Math.PI * 2
     });
   }
 
@@ -95,7 +96,7 @@ export class MineSystem {
       if (mine.isDetonating) {
         mine.detonatingTimer -= dt;
         // 临近爆炸火花激涌
-        if (Math.random() < 0.5) {
+        if (this.random.next() < 0.5) {
           fx.spawnSparks(mine.pos, 4, [255, 80, 50]);
         }
 
@@ -139,7 +140,7 @@ export class MineSystem {
                 // EMP 电击船体
                 for (let k = 0; k < 4; k++) {
                   const empTarget = target.pos.clone().add(
-                    new Vector2((Math.random() - 0.5) * 100, (Math.random() - 0.5) * 100)
+                    new Vector2((this.random.next() - 0.5) * 100, (this.random.next() - 0.5) * 100)
                   );
                   fx.spawnEmpArc(mine.pos, empTarget);
                 }

@@ -4,6 +4,7 @@ import { Ship } from '../Ship';
 import { Projectile, Beam } from '../Weapon';
 import { modManager } from '../../modding/ModManager';
 import { sound } from '../../audio/SoundManager';
+import { SimulationRandom } from '../SimulationRandom';
 
 export interface FighterFXCallbacks {
   spawnContrail: (c: ContrailParticle) => void;
@@ -35,7 +36,7 @@ export class FighterSystem {
   public playerWings: FlightDeckWing[] = [];
   public enemyWings: FlightDeckWing[] = [];
 
-  constructor() {}
+  constructor(private readonly random = new SimulationRandom()) {}
 
   public init(playerShip: Ship, enemyShip?: Ship) {
     this.fighters = [];
@@ -97,9 +98,9 @@ export class FighterSystem {
         ];
         for (let i = 0; i < 3; i++) {
           const spawnPos = playerShip.pos.clone().add(playerOffsets[i]);
-          const ftr = new Ship(`player_ftr_${i}`, ftrSpec, true, spawnPos, playerShip.facingRad);
+          const ftr = new Ship(`player_ftr_${i}`, ftrSpec, true, spawnPos, playerShip.facingRad, this.random);
           this.fighters.push(ftr);
-          this.fighterAIModes.set(ftr.id, { state: 'ESCORT', timer: Math.random() * 2 });
+          this.fighterAIModes.set(ftr.id, { state: 'ESCORT', timer: this.random.next() * 2 });
         }
       }
 
@@ -112,9 +113,9 @@ export class FighterSystem {
         ];
         for (let i = 0; i < 3; i++) {
           const spawnPos = enemyShip.pos.clone().add(enemyOffsets[i]);
-          const eFtr = new Ship(`enemy_ftr_${i}`, ftrSpec, false, spawnPos, enemyShip.facingRad);
+          const eFtr = new Ship(`enemy_ftr_${i}`, ftrSpec, false, spawnPos, enemyShip.facingRad, this.random);
           this.fighters.push(eFtr);
-          this.fighterAIModes.set(eFtr.id, { state: 'ESCORT', timer: Math.random() * 2 });
+          this.fighterAIModes.set(eFtr.id, { state: 'ESCORT', timer: this.random.next() * 2 });
         }
       }
     }
@@ -128,9 +129,9 @@ export class FighterSystem {
       ];
       for (let i = 0; i < 2; i++) {
         const spawnPos = playerShip.pos.clone().add(bmrOffsets[i]);
-        const bmr = new Ship(`player_bmr_${i}`, bmrSpec, true, spawnPos, playerShip.facingRad);
+        const bmr = new Ship(`player_bmr_${i}`, bmrSpec, true, spawnPos, playerShip.facingRad, this.random);
         this.bombers.push(bmr);
-        this.bomberAIModes.set(bmr.id, { state: 'ESCORT', timer: Math.random() * 2, hasTorpedo: true });
+        this.bomberAIModes.set(bmr.id, { state: 'ESCORT', timer: this.random.next() * 2, hasTorpedo: true });
       }
     }
   }
@@ -174,7 +175,7 @@ export class FighterSystem {
         const baseTime = isBroadsword ? 12.0 : 16.0;
         const rebuildTime = baseTime / Math.max(0.25, wing.crr);
         wing.rebuildQueue.push({
-          craftId: `p_rebuild_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          craftId: this.random.nextId('p_rebuild'),
           timer: rebuildTime,
           maxTimer: rebuildTime
         });
@@ -195,14 +196,14 @@ export class FighterSystem {
         if (item.timer <= 0 && !playerShip.isDead) {
           wing.rebuildQueue.splice(i, 1);
           // 从母舰机库弹射升空
-          const spawnPos = playerShip.pos.clone().add(new Vector2(-60, (Math.random() - 0.5) * 40).rotate(playerShip.facingRad));
+          const spawnPos = playerShip.pos.clone().add(new Vector2(-60, (this.random.next() - 0.5) * 40).rotate(playerShip.facingRad));
           if (isBroadsword && ftrSpec) {
-            const newFtr = new Ship(`player_ftr_rep_${Date.now()}`, ftrSpec, true, spawnPos, playerShip.facingRad);
+            const newFtr = new Ship(this.random.nextId('player_ftr_rep'), ftrSpec, true, spawnPos, playerShip.facingRad, this.random);
             newFtr.vel = playerShip.vel.clone().add(Vector2.fromAngle(playerShip.facingRad, 140));
             this.fighters.push(newFtr);
             this.fighterAIModes.set(newFtr.id, { state: 'ESCORT', timer: 2.0 });
           } else if (!isBroadsword && bmrSpec) {
-            const newBmr = new Ship(`player_bmr_rep_${Date.now()}`, bmrSpec, true, spawnPos, playerShip.facingRad);
+            const newBmr = new Ship(this.random.nextId('player_bmr_rep'), bmrSpec, true, spawnPos, playerShip.facingRad, this.random);
             newBmr.vel = playerShip.vel.clone().add(Vector2.fromAngle(playerShip.facingRad, 120));
             this.bombers.push(newBmr);
             this.bomberAIModes.set(newBmr.id, { state: 'ESCORT', timer: 2.0, hasTorpedo: true });
@@ -225,7 +226,7 @@ export class FighterSystem {
         const baseTime = 13.0;
         const rebuildTime = baseTime / Math.max(0.25, wing.crr);
         wing.rebuildQueue.push({
-          craftId: `e_rebuild_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          craftId: this.random.nextId('e_rebuild'),
           timer: rebuildTime,
           maxTimer: rebuildTime
         });
@@ -242,8 +243,8 @@ export class FighterSystem {
         item.timer -= dt;
         if (item.timer <= 0 && !enemyShip.isDead && ftrSpec) {
           wing.rebuildQueue.splice(i, 1);
-          const spawnPos = enemyShip.pos.clone().add(new Vector2(-60, (Math.random() - 0.5) * 40).rotate(enemyShip.facingRad));
-          const newEFtr = new Ship(`enemy_ftr_rep_${Date.now()}`, ftrSpec, false, spawnPos, enemyShip.facingRad);
+          const spawnPos = enemyShip.pos.clone().add(new Vector2(-60, (this.random.next() - 0.5) * 40).rotate(enemyShip.facingRad));
+          const newEFtr = new Ship(this.random.nextId('enemy_ftr_rep'), ftrSpec, false, spawnPos, enemyShip.facingRad, this.random);
           newEFtr.vel = enemyShip.vel.clone().add(Vector2.fromAngle(enemyShip.facingRad, 140));
           this.fighters.push(newEFtr);
           this.fighterAIModes.set(newEFtr.id, { state: 'ESCORT', timer: 2.0 });
@@ -422,18 +423,18 @@ export class FighterSystem {
       ftr.update(dt, hostileCapital, spawnProj, spawnBeam, spawnFlash);
 
       // 战机尾气推进火焰粒子
-      if (Math.abs(ftr.throttle) > 0.1 && Math.random() < 0.6) {
+      if (Math.abs(ftr.throttle) > 0.1 && this.random.next() < 0.6) {
         for (const slot of ftr.spec.engineSlots) {
           const nozzlePos = ftr.pos.clone().add(new Vector2(slot.x, slot.y).rotate(ftr.facingRad));
           fx.spawnContrail({
             pos: nozzlePos,
-            vel: Vector2.fromAngle(ftr.facingRad + Math.PI + (Math.random() - 0.5) * 0.3, 30).addScaled(ftr.vel, 0.4),
-            life: 0.3 + Math.random() * 0.2,
+            vel: Vector2.fromAngle(ftr.facingRad + Math.PI + (this.random.next() - 0.5) * 0.3, 30).addScaled(ftr.vel, 0.4),
+            life: 0.3 + this.random.next() * 0.2,
             maxLife: 0.5,
-            size: 4 + Math.random() * 3,
-            maxSize: 12 + Math.random() * 5,
+            size: 4 + this.random.next() * 3,
+            maxSize: 12 + this.random.next() * 5,
             alpha: 0.45,
-            rotation: Math.random() * Math.PI * 2,
+            rotation: this.random.next() * Math.PI * 2,
             color: isPlayer ? [240, 180, 100] : [255, 100, 80]
           });
         }
@@ -585,18 +586,18 @@ export class FighterSystem {
       bmr.update(dt, enemyShip, spawnProj, spawnBeam, spawnFlash);
 
       // 高技术蓝紫推进器尾焰
-      if (Math.abs(bmr.throttle) > 0.1 && Math.random() < 0.65) {
+      if (Math.abs(bmr.throttle) > 0.1 && this.random.next() < 0.65) {
         for (const slot of bmr.spec.engineSlots) {
           const nozzlePos = bmr.pos.clone().add(new Vector2(slot.x, slot.y).rotate(bmr.facingRad));
           fx.spawnContrail({
             pos: nozzlePos,
-            vel: Vector2.fromAngle(bmr.facingRad + Math.PI + (Math.random() - 0.5) * 0.2, 35).addScaled(bmr.vel, 0.4),
-            life: 0.35 + Math.random() * 0.2,
+            vel: Vector2.fromAngle(bmr.facingRad + Math.PI + (this.random.next() - 0.5) * 0.2, 35).addScaled(bmr.vel, 0.4),
+            life: 0.35 + this.random.next() * 0.2,
             maxLife: 0.55,
-            size: 5 + Math.random() * 3,
-            maxSize: 15 + Math.random() * 5,
+            size: 5 + this.random.next() * 3,
+            maxSize: 15 + this.random.next() * 5,
             alpha: 0.5,
-            rotation: Math.random() * Math.PI * 2,
+            rotation: this.random.next() * Math.PI * 2,
             color: [100, 180, 255]
           });
         }

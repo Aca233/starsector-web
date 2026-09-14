@@ -9,6 +9,8 @@ import { VisualClock } from './VisualClock';
 import { VisualRandom } from './VisualRandom';
 import { PerformanceMetrics, type PerformanceReport } from './PerformanceMetrics';
 import { CameraController } from './CameraController';
+import { assetManager } from '../assets/AssetResolver';
+import { contentManifestManager } from '../content/ContentManifest';
 
 export type CombatSessionState = 'created' | 'prepared' | 'running' | 'paused' | 'disposed';
 
@@ -35,11 +37,12 @@ export class CombatSession {
 
   private canvas: HTMLCanvasElement | null = null;
   private assetPreparation: Promise<void> = Promise.resolve();
+  private assetsReady = false;
 
   constructor(playerShipId = 'onslaught', enemyShipId = 'paragon', seed = 0x51f15e) {
     this.sessionId = `combat-${nextSessionId++}`;
     this.visualRandom = new VisualRandom(seed);
-    this.engine = new CombatEngine(playerShipId, enemyShipId);
+    this.engine = new CombatEngine(playerShipId, enemyShipId, seed);
     this.playerAI = new CapitalShipAI(this.engine.playerShip, this.engine.enemyShip);
   }
 
@@ -59,7 +62,12 @@ export class CombatSession {
       console.warn('[Starsector] WebGL2 unavailable, using Canvas2D:', error);
       this.renderer = new CombatRenderer(canvas);
     }
-    this.assetPreparation = this.renderer.prepareAssets();
+    this.assetsReady = false;
+    this.assetPreparation = assetManager.ensureManifestLoaded().then(async () => {
+      await contentManifestManager.ensureLoaded();
+      await this.renderer?.prepareAssets();
+      this.assetsReady = true;
+    });
     this.scheduler.reset();
     this.state = 'prepared';
   }
@@ -134,7 +142,7 @@ export class CombatSession {
   }
 
   public render(alpha: number, cameraPos: Vector2, zoom: number): void {
-    if (!this.renderer || this.state === 'disposed') return;
+    if (!this.renderer || !this.assetsReady || this.state === 'disposed') return;
     const prepStart = performance.now();
     const frame = {
       visualTime: this.visualClock.time,
@@ -209,7 +217,10 @@ export class CombatSession {
     if (this.state !== 'disposed') this.state = 'running';
   }
 
-  public setSeed(seed: number): void { this.visualRandom.reseed(seed); }
+  public setSeed(seed: number): void {
+    this.visualRandom.reseed(seed);
+    this.engine.setSeed(seed);
+  }
 
   public setCameraLocked(enabled: boolean): void {
     this.visualOptions.cameraLocked = enabled;
@@ -232,6 +243,7 @@ export class CombatSession {
 
   public dispose(): void {
     if (this.state === 'disposed') return;
+    this.assetsReady = false;
     this.renderer?.dispose();
     this.renderer = null;
     this.canvas = null;

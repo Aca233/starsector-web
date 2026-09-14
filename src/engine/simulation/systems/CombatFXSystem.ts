@@ -14,6 +14,7 @@ import {
 } from '../CombatTypes';
 import { MuzzleFlashSpec } from '../Weapon';
 import { sound } from '../../audio/SoundManager';
+import { SimulationRandom } from '../SimulationRandom';
 
 function fastRemoveAt<T>(arr: T[], index: number) {
   const last = arr.pop();
@@ -51,7 +52,7 @@ export class CombatFXSystem {
   public shieldRipples: ShieldRipple[] = [];
   public hulkFragments: HulkFragment[] = [];
 
-  constructor() {}
+  constructor(private readonly random = new SimulationRandom()) {}
 
   public clear() {
     this.particles = [];
@@ -164,9 +165,9 @@ export class CombatFXSystem {
     const spreadRad = (spec.spread * Math.PI) / 180;
     const baseAngle = angleRad - spreadRad / 2;
     for (let i = 0; i < spec.particleCount; i++) {
-      const pSize = spec.particleSizeRange * Math.random() + spec.particleSizeMin;
-      const pAngle = Math.random() * spreadRad + baseAngle;
-      const pDist = Math.random() * spec.length;
+      const pSize = spec.particleSizeRange * this.random.next() + spec.particleSizeMin;
+      const pAngle = this.random.next() * spreadRad + baseAngle;
+      const pDist = this.random.next() * spec.length;
       const f10 = Math.cos(pAngle) * pDist;
       const f11 = Math.sin(pAngle) * pDist;
       this.muzzleParticles.push({
@@ -232,33 +233,33 @@ export class CombatFXSystem {
       frag.angularVel *= Math.pow(0.9, dt);
 
       // 浓密黑烟与裂口火星
-      if (Math.random() < dt * 6) {
+      if (this.random.next() < dt * 6) {
         const off = new Vector2(
-          (Math.random() - 0.5) * frag.collisionRadius * 1.1,
-          (Math.random() - 0.5) * frag.collisionRadius * 1.1
+          (this.random.next() - 0.5) * frag.collisionRadius * 1.1,
+          (this.random.next() - 0.5) * frag.collisionRadius * 1.1
         ).rotate(frag.facingRad);
         const smokePos = frag.pos.clone().add(off);
 
         this.contrails.push({
           pos: smokePos,
-          vel: Vector2.fromAngle(frag.facingRad + Math.PI + (Math.random() - 0.5) * 1.5, 15).addScaled(frag.vel, 0.2),
-          life: 1.2 + Math.random() * 0.8,
+          vel: Vector2.fromAngle(frag.facingRad + Math.PI + (this.random.next() - 0.5) * 1.5, 15).addScaled(frag.vel, 0.2),
+          life: 1.2 + this.random.next() * 0.8,
           maxLife: 2.0,
-          size: 12 + Math.random() * 10,
-          maxSize: 36 + Math.random() * 16,
+          size: 12 + this.random.next() * 10,
+          maxSize: 36 + this.random.next() * 16,
           alpha: 0.65,
-          rotation: Math.random() * Math.PI * 2,
+          rotation: this.random.next() * Math.PI * 2,
           color: [30, 30, 35]
         });
 
-        if (Math.random() < 0.4) {
+        if (this.random.next() < 0.4) {
           this.particles.push({
             pos: smokePos,
-            vel: Vector2.fromAngle(Math.random() * Math.PI * 2, 30).addScaled(frag.vel, 0.3),
-            life: 0.2 + Math.random() * 0.2,
+            vel: Vector2.fromAngle(this.random.next() * Math.PI * 2, 30).addScaled(frag.vel, 0.3),
+            life: 0.2 + this.random.next() * 0.2,
             maxLife: 0.4,
-            size: 3 + Math.random() * 3,
-            color: [255, 130 + Math.random() * 80, 20],
+            size: 3 + this.random.next() * 3,
+            color: [255, 130 + this.random.next() * 80, 20],
             alpha: 0.9
           });
         }
@@ -270,14 +271,14 @@ export class CombatFXSystem {
     if (this.particles.length >= 450) return;
     const actualCount = Math.min(count, 450 - this.particles.length);
     for (let i = 0; i < actualCount; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 50 + Math.random() * 200;
+      const angle = this.random.next() * Math.PI * 2;
+      const speed = 50 + this.random.next() * 200;
       this.particles.push({
         pos: pos.clone(),
         vel: Vector2.fromAngle(angle, speed),
-        life: 0.2 + Math.random() * 0.3,
+        life: 0.2 + this.random.next() * 0.3,
         maxLife: 0.5,
-        size: 2 + Math.random() * 3,
+        size: 2 + this.random.next() * 3,
         color,
         alpha: 1.0
       });
@@ -288,15 +289,15 @@ export class CombatFXSystem {
     if (this.particles.length >= 450) return;
     const actualCount = Math.min(count, 450 - this.particles.length);
     for (let i = 0; i < actualCount; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 40 + Math.random() * 350;
+      const angle = this.random.next() * Math.PI * 2;
+      const speed = 40 + this.random.next() * 350;
       this.particles.push({
         pos: pos.clone(),
         vel: Vector2.fromAngle(angle, speed),
-        life: 0.6 + Math.random() * 0.8,
+        life: 0.6 + this.random.next() * 0.8,
         maxLife: 1.4,
-        size: 4 + Math.random() * 12,
-        color: [255, 120 + Math.random() * 80, 30],
+        size: 4 + this.random.next() * 12,
+        color: [255, 120 + this.random.next() * 80, 30],
         alpha: 1.0
       });
     }
@@ -311,7 +312,7 @@ export class CombatFXSystem {
     sourceShipId?: string
   ) {
     this.explosions.push({
-      id: Math.random(),
+      id: this.random.next(),
       visualKind,
       sourceShipId,
       pos: pos.clone(),
@@ -320,7 +321,7 @@ export class CombatFXSystem {
       life: 0.35,
       maxLife: 0.35,
       frame: 0,
-      rotation: Math.random() * Math.PI * 2,
+      rotation: this.random.next() * Math.PI * 2,
       color,
       hasShockwaveRing: hasShockwave,
       shockwaveRadius: 6,
@@ -358,22 +359,22 @@ export class CombatFXSystem {
       const t = i / totalSegs;
       const basePoint = Vector2.lerp(from, to, t);
       const envelope = Math.sin(t * Math.PI);
-      const lateral = (Math.random() - 0.5) * 2 * maxOffset * envelope;
-      const axial = (Math.random() - 0.5) * 12;
+      const lateral = (this.random.next() - 0.5) * 2 * maxOffset * envelope;
+      const axial = (this.random.next() - 0.5) * 12;
       const pt = basePoint.clone().add(perp.clone().scale(lateral)).add(dir.clone().scale(axial));
       segments.push(pt);
 
       const maxBranches = options?.branchCount ?? 3;
-      if (Math.random() < 0.4 && branches.length < maxBranches) {
+      if (this.random.next() < 0.4 && branches.length < maxBranches) {
         const branchSegs: Vector2[] = [pt.clone()];
-        const branchAngle = dir.heading() + (Math.random() > 0.5 ? 1 : -1) * (0.5 + Math.random() * 0.5);
+        const branchAngle = dir.heading() + (this.random.next() > 0.5 ? 1 : -1) * (0.5 + this.random.next() * 0.5);
         let branchCur = pt.clone();
-        const branchLen = 25 + Math.random() * 55;
+        const branchLen = 25 + this.random.next() * 55;
         const bSteps = 3;
         for (let b = 1; b <= bSteps; b++) {
           const stepDist = branchLen / bSteps;
           branchCur = branchCur.clone().add(Vector2.fromAngle(
-            branchAngle + (Math.random() - 0.5) * 0.4,
+            branchAngle + (this.random.next() - 0.5) * 0.4,
             stepDist
           ));
           branchSegs.push(branchCur);
@@ -427,14 +428,14 @@ export class CombatFXSystem {
 
     const life = 1.35;
     this.floatingTexts.push({
-      id: Math.random(),
-      pos: pos.clone().add(new Vector2((Math.random() - 0.5) * 16, (Math.random() - 0.5) * 16)),
+      id: this.random.next(),
+      pos: pos.clone().add(new Vector2((this.random.next() - 0.5) * 16, (this.random.next() - 0.5) * 16)),
       text: String(Math.round(amount)),
       color,
       size: Math.min(18, Math.max(12, 11 + Math.sqrt(amount) * 0.35)),
       life,
       maxLife: life,
-      vel: new Vector2((Math.random() - 0.5) * 12, -32 - Math.random() * 14)
+      vel: new Vector2((this.random.next() - 0.5) * 12, -32 - this.random.next() * 14)
     });
   }
 
@@ -446,7 +447,7 @@ export class CombatFXSystem {
     maxLife = 1.5
   ) {
     this.floatingTexts.push({
-      id: Math.random(),
+      id: this.random.next(),
       pos: pos.clone(),
       text,
       color,
@@ -472,21 +473,21 @@ export class CombatFXSystem {
     const maxLife = sizeCategory === 'large' ? 3.0 : sizeCategory === 'medium' ? 2.2 : 1.4;
 
     for (let i = 0; i < count; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = (0.35 + Math.random() * 0.65) * baseSpeed;
-      const size = baseSize * (0.8 + Math.random() * 0.4);
-      const isGlowing = Math.random() > 0.35; // 67% 原版灼热熔融火花红光
-      const shardTex = texList[Math.floor(Math.random() * texList.length)];
+      const angle = this.random.next() * Math.PI * 2;
+      const speed = (0.35 + this.random.next() * 0.65) * baseSpeed;
+      const size = baseSize * (0.8 + this.random.next() * 0.4);
+      const isGlowing = this.random.next() > 0.35; // 67% 原版灼热熔融火花红光
+      const shardTex = texList[Math.floor(this.random.next() * texList.length)];
       const shardColor: [number, number, number] = isGlowing
-        ? [255, Math.floor(160 + Math.random() * 85), 80]
+        ? [255, Math.floor(160 + this.random.next() * 85), 80]
         : color;
 
-      const life = maxLife * (0.7 + Math.random() * 0.4);
+      const life = maxLife * (0.7 + this.random.next() * 0.4);
       this.debris.push({
         pos: pos.clone(),
         vel: Vector2.fromAngle(angle, speed),
-        rotation: Math.random() * Math.PI * 2,
-        angularVel: (Math.random() - 0.5) * 8.0,
+        rotation: this.random.next() * Math.PI * 2,
+        angularVel: (this.random.next() - 0.5) * 8.0,
         size,
         life,
         maxLife: life,

@@ -12,6 +12,7 @@ import { useCombatLoop } from './hooks/useCombatLoop';
 import { CombatSession } from './engine/runtime/CombatSession';
 import { VisualLabPanel } from './visual-lab/VisualLabPanel';
 import { VisualScenarioController } from './visual-lab/VisualScenarioController';
+import { runtimeAssetUrl } from './engine/runtime/RuntimePaths';
 
 i18n.registerStrings('zh_CN', zh_CN);
 i18n.registerStrings('en_US', en_US);
@@ -43,10 +44,11 @@ export const App: React.FC = () => {
   });
   const [visualAssetsReady, setVisualAssetsReady] = useState(!isVisualLab);
   const [visualAssetsError, setVisualAssetsError] = useState<string | null>(null);
+  const [battleResult, setBattleResult] = useState(session.engine.battleResult);
   const isAutopilotRef = useRef(false);
   const [, setTickState] = useState(0);
 
-  const isResultModalOpen = !!session.engine.battleResult && !isResultsModalDismissed;
+  const isResultModalOpen = !!battleResult && !isResultsModalDismissed;
 
   React.useEffect(() => {
     isAutopilotRef.current = isAutopilot;
@@ -55,6 +57,14 @@ export const App: React.FC = () => {
   React.useEffect(() => {
     inputBlockedRef.current = isModModalOpen || isResultModalOpen;
   }, [isModModalOpen, isResultModalOpen]);
+
+  React.useEffect(() => {
+    const timer = window.setInterval(() => {
+      const next = session.engine.battleResult;
+      setBattleResult((current) => current === next ? current : next);
+    }, 150);
+    return () => window.clearInterval(timer);
+  }, [session]);
 
   React.useEffect(() => {
     const canvas = canvasRef.current;
@@ -144,7 +154,6 @@ export const App: React.FC = () => {
     isAutopilotRef,
     keysPressed,
     mouseScreenPos,
-    setTickState,
     visualScenarioController: isVisualLab && !isAutopilot ? visualScenarioController : undefined
   });
 
@@ -158,6 +167,7 @@ export const App: React.FC = () => {
     setIsResultsModalDismissed(false);
     stopTransientAudio();
     session.switchPlayerShip(shipId);
+    setBattleResult(null);
     cameraPosRef.current.copy(session.engine.playerShip.pos);
     setTickState((tick) => tick + 1);
   };
@@ -166,6 +176,7 @@ export const App: React.FC = () => {
     setIsResultsModalDismissed(false);
     stopTransientAudio();
     session.restart();
+    setBattleResult(null);
     cameraPosRef.current.copy(session.engine.playerShip.pos);
     setTickState((tick) => tick + 1);
   };
@@ -174,7 +185,7 @@ export const App: React.FC = () => {
     <div className="relative w-screen h-screen overflow-hidden bg-slate-950">
       <canvas
         ref={canvasRef}
-        style={{ cursor: "url('/game-assets/graphics/cursors/cursor_green.png') 16 16, crosshair" }}
+        style={{ cursor: `url('${runtimeAssetUrl('graphics/cursors/cursor_green.png')}') 16 16, crosshair` }}
         className="w-full h-full block"
       />
 

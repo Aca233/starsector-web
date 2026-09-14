@@ -1,5 +1,6 @@
 import { intersectSegmentWithPolygon, isPointInPolygon } from '../../math/Geometry';
 import { Vector2 } from '../../math/Vector2';
+import { runtimeUrl } from '../../runtime/RuntimePaths';
 import type { Ship } from '../Ship';
 import type { Projectile } from '../Weapon';
 
@@ -102,7 +103,7 @@ export class RuntimeCollisionKernel {
     maxCandidatesPerProjectile: 0
   };
 
-  constructor(wasmUrl = '/runtime/collision_core.wasm', autoLoad = true) {
+  constructor(wasmUrl = runtimeUrl('runtime/collision_core.wasm'), autoLoad = true) {
     this.wasmUrl = wasmUrl;
     if (autoLoad && typeof window !== 'undefined' && typeof fetch === 'function' && typeof WebAssembly !== 'undefined') {
       void this.loadWasm();
@@ -210,7 +211,7 @@ export class RuntimeCollisionKernel {
   }
 
   private nowMs(): number {
-    return typeof performance !== 'undefined' ? performance.now() : Date.now();
+    return typeof performance !== 'undefined' ? performance.now() : 0;
   }
 
   public findHitTypeScript(query: RuntimeCollisionQuery): RuntimeCollisionHit | null {

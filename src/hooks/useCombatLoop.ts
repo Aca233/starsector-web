@@ -11,7 +11,6 @@ export interface UseCombatLoopParams {
   isAutopilotRef: React.MutableRefObject<boolean>;
   keysPressed: React.MutableRefObject<{ [key: string]: boolean }>;
   mouseScreenPos: React.MutableRefObject<Vector2>;
-  setTickState: React.Dispatch<React.SetStateAction<number>>;
   visualScenarioController?: { tick: (dt: number) => boolean };
 }
 
@@ -23,7 +22,6 @@ export function useCombatLoop({
   isAutopilotRef,
   keysPressed,
   mouseScreenPos,
-  setTickState,
   visualScenarioController
 }: UseCombatLoopParams) {
   const prevSystemActiveRef = useRef<boolean>(false);
@@ -33,7 +31,6 @@ export function useCombatLoop({
     if (!canvas) return;
 
     let animId = 0;
-    let lastHudSyncTime = 0;
     const session = sessionRef.current;
     if (!visualScenarioController) session.start();
 
@@ -132,14 +129,10 @@ export function useCombatLoop({
       }
       prevSystemActiveRef.current = engine.playerShip.system.isActive;
 
-      if (nowSec - lastHudSyncTime > 0.10) {
-        setTickState(nowSec);
-        lastHudSyncTime = nowSec;
-      }
       animId = requestAnimationFrame(gameLoop);
     };
 
     animId = requestAnimationFrame(gameLoop);
     return () => cancelAnimationFrame(animId);
-  }, [sessionRef, canvasRef, cameraPosRef, zoomRef, isAutopilotRef, keysPressed, mouseScreenPos, setTickState, visualScenarioController]);
+  }, [sessionRef, canvasRef, cameraPosRef, zoomRef, isAutopilotRef, keysPressed, mouseScreenPos, visualScenarioController]);
 }

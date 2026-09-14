@@ -4,6 +4,7 @@ import { Ship } from '../Ship';
 import { Projectile } from '../Weapon';
 import { sound } from '../../audio/SoundManager';
 import { VisualRandom } from '../../runtime/VisualRandom';
+import { SimulationRandom } from '../SimulationRandom';
 
 export interface AsteroidFXCallbacks {
   spawnShieldRipple: (pos: Vector2, maxRadius: number, color: [number, number, number]) => void;
@@ -18,7 +19,7 @@ export interface AsteroidFXCallbacks {
 export class AsteroidSystem {
   public asteroids: Asteroid[] = [];
 
-  constructor() {}
+  constructor(private readonly random = new SimulationRandom()) {}
 
   public init() {
     this.asteroids = [];
@@ -159,7 +160,7 @@ export class AsteroidSystem {
           a1.pos.subScaled(n, overlap);
           a2.pos.addScaled(n, overlap);
 
-          if (Math.random() < 0.25) {
+          if (this.random.next() < 0.25) {
             sound.playAtPos('collision_asteroid_asteroid', a1.pos, playerPos, 0.35);
           }
         }
@@ -212,13 +213,13 @@ export class AsteroidSystem {
     if (ast.radius > 32) {
       const newR = ast.radius * 0.55;
       for (let k = 0; k < 2; k++) {
-        const angle = Math.random() * Math.PI * 2;
+        const angle = this.random.next() * Math.PI * 2;
         this.asteroids.push({
-          id: Math.random(),
+          id: this.random.next(),
           pos: ast.pos.clone().add(Vector2.fromAngle(angle, newR)),
-          vel: ast.vel.clone().add(Vector2.fromAngle(angle, 40 + Math.random() * 30)),
-          facingRad: Math.random() * Math.PI * 2,
-          angularVel: (Math.random() - 0.5) * 0.8,
+          vel: ast.vel.clone().add(Vector2.fromAngle(angle, 40 + this.random.next() * 30)),
+          facingRad: this.random.next() * Math.PI * 2,
+          angularVel: (this.random.next() - 0.5) * 0.8,
           radius: newR,
           mass: newR * newR * 0.75,
           hp: 250,

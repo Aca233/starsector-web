@@ -1,5 +1,6 @@
 {
-  "version": 1,
+  "schemaVersion": 1,
+  "contentVersion": "1.0.0",
   "ships": [
     "onslaught",
     "paragon",
@@ -25,6 +26,13 @@
     "atropos_single",
     "flak",
     "dualflak"
+  ],
+  "loadouts": [
+    { "id": "onslaught-default", "shipId": "onslaught", "source": "ship-defaults" },
+    { "id": "paragon-default", "shipId": "paragon", "source": "ship-defaults" },
+    { "id": "doom-default", "shipId": "doom", "source": "ship-defaults" },
+    { "id": "broadsword-default", "shipId": "broadsword", "source": "ship-defaults" },
+    { "id": "dagger-default", "shipId": "dagger", "source": "ship-defaults" }
   ],
   "locales": [
     "zh_CN",

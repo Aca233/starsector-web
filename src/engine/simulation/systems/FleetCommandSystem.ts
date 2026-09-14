@@ -1,6 +1,7 @@
 import { Vector2 } from '../../math/Vector2';
 import { RadioMessage, TacticalOrder } from '../CombatTypes';
 import { sound } from '../../audio/SoundManager';
+import { SimulationRandom } from '../SimulationRandom';
 
 export interface CommandFXCallbacks {
   addFloatingText: (pos: Vector2, text: string, color: [number, number, number], size: number, duration: number) => void;
@@ -16,7 +17,7 @@ export class FleetCommandSystem {
   public radioMessages: RadioMessage[] = [];
   public isTacticalMap = false;
 
-  constructor() {}
+  constructor(private readonly random = new SimulationRandom()) {}
 
   public clear() {
     this.commandPoints = 5;
@@ -43,7 +44,7 @@ export class FleetCommandSystem {
     combatTime = 0
   ) {
     this.radioMessages.push({
-      id: Date.now() + Math.random(),
+      id: this.random.nextNumericId(),
       sender,
       senderFaction,
       text,

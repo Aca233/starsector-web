@@ -9,7 +9,7 @@ import type { WeaponSpec } from '../src/engine/simulation/Weapon';
 import { FixedTimestepScheduler } from '../src/engine/simulation/FixedTimestepScheduler';
 import { VisualRandom } from '../src/engine/runtime/VisualRandom';
 import { CombatEngine } from '../src/engine/simulation/CombatEngine';
-import { AssetResolver } from '../src/engine/assets/AssetResolver';
+import { AssetResolver, assetManager } from '../src/engine/assets/AssetResolver';
 import { CameraController } from '../src/engine/runtime/CameraController';
 import { CombatSession } from '../src/engine/runtime/CombatSession';
 import { VISUAL_SCENARIOS, VisualScenarioController } from '../src/visual-lab/VisualScenarioController';
@@ -24,6 +24,10 @@ import {
   getWeaponVisualProfile
 } from '../src/engine/visual/VisualProfiles';
 import { getHudDensity, getHudLayoutProfile } from '../src/ui/hud/HudLayout';
+import { validateShipSpec } from '../src/engine/modding/ContentValidation';
+import { SimulationRandom } from '../src/engine/simulation/SimulationRandom';
+import { ContentManifestManager } from '../src/engine/content/ContentManifest';
+import { readFileSync } from 'node:fs';
 
 describe('Starsector text import', () => {
   it('preserves JSON primitives and // inside quoted URLs', () => {
@@ -64,13 +68,72 @@ describe('ContentRegistry integration', () => {
       range: 500, refireDelay: 1, projSpeed: 500, projRadius: 2, color: [255, 255, 255]
     };
     contentRegistry.registerWeapon(weapon);
-    const ship = {
-      weaponSlots: [{ slotId: 'TEST', mountType: 'TURRET', slotSize: 'SMALL', x: 0, y: 0, baseAngleDeg: 0, arcDeg: 360, defaultWeaponId: weapon.id }]
-    } as ShipSpec;
-    const control = new ShipWeaponControlSystem();
-    control.init(ship, 0);
-    expect(control.weapons).toHaveLength(1);
-    expect(control.weapons[0].spec).toBe(weapon);
+    try {
+      const ship = {
+        weaponSlots: [{ slotId: 'TEST', mountType: 'TURRET', slotSize: 'SMALL', x: 0, y: 0, baseAngleDeg: 0, arcDeg: 360, defaultWeaponId: weapon.id }]
+      } as ShipSpec;
+      const control = new ShipWeaponControlSystem();
+      control.init(ship, 0);
+      expect(control.weapons).toHaveLength(1);
+      expect(control.weapons[0].spec).toBe(weapon);
+    } finally {
+      contentRegistry.unregisterWeapon(weapon.id);
+    }
+  });
+});
+
+describe('content validation', () => {
+  it('rejects incomplete and duplicate ship specs before registration', () => {
+    expect(() => validateShipSpec({ id: 'bad', nameKey: 'bad.name', hitpoints: 1 })).toThrow(/descKey|spriteUrl|weaponSlots/);
+    const engine = new CombatEngine('onslaught', 'paragon');
+    expect(() => validateShipSpec(engine.playerShip.spec)).toThrow(/已注册/);
+  });
+
+  it('rejects missing weapon references in an otherwise valid ship spec', () => {
+    const engine = new CombatEngine('onslaught', 'paragon');
+    const original = engine.playerShip.spec;
+    const copy = {
+      ...original,
+      id: 'invalid_weapon_reference_ship',
+      weaponSlots: original.weaponSlots.map((slot, index) => index === 0
+        ? { ...slot, defaultWeaponId: 'missing_weapon_for_validation' }
+        : { ...slot }),
+      engineSlots: original.engineSlots.map((slot) => ({ ...slot })),
+      bounds: original.bounds.map(([x, y]) => [x, y] as [number, number])
+    };
+    expect(() => validateShipSpec(copy)).toThrow(/不存在的武器/);
+  });
+});
+
+describe('deterministic simulation random source', () => {
+  it('replays values and generated IDs after reset', () => {
+    const random = new SimulationRandom(20260914);
+    const first = [random.next(), random.next(), random.nextNumericId(), random.nextId('fx')];
+    random.reset(20260914);
+    expect([random.next(), random.next(), random.nextNumericId(), random.nextId('fx')]).toEqual(first);
+  });
+});
+
+describe('manifest startup contract', () => {
+  it('validates the real asset/content manifests against the built-in registry', async () => {
+    const assetEntries = JSON.parse(readFileSync(new URL('../public/game-assets/asset-manifest.json', import.meta.url), 'utf8'));
+    const content = JSON.parse(readFileSync(new URL('../public/content/manifest.json', import.meta.url), 'utf8'));
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const body = url.includes('asset-manifest') ? assetEntries : content;
+      return { ok: true, status: 200, json: async () => body } as Response;
+    }) as typeof fetch;
+    try {
+      await assetManager.loadManifest('asset-manifest');
+      const manager = new ContentManifestManager();
+      await manager.ensureLoaded('content-manifest');
+      expect(manager.current?.ships).toHaveLength(5);
+      expect(manager.current?.weapons).toHaveLength(17);
+      expect(manager.current?.loadouts).toHaveLength(5);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });
 

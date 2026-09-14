@@ -13,6 +13,7 @@ export class ContentRegistry {
 
   registerShip(spec: ShipSpec): void { this.ships.set(spec.id, spec); }
   registerWeapon(spec: WeaponSpec): void { this.weapons.set(spec.id, spec); }
+  unregisterWeapon(id: string): void { this.weapons.delete(id); }
   getShip(id: string): ShipSpec | undefined { return this.ships.get(id); }
   getWeapon(id: string): WeaponSpec | undefined { return this.weapons.get(id); }
   getAllShips(): ShipSpec[] { return [...this.ships.values()]; }
