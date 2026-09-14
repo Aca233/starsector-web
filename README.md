@@ -136,6 +136,12 @@ The kernel uses the real Onslaught, Paragon, and Doom hull polygons plus rotated
 
 The latest measured run records `runtimeIntegrated: true` for this bounded path. Spatial pruning removed 91.3% of naive pairs at 50/2,000 and 92.0% at 100/10,000. Spatial+Wasm end-to-end measured 84.5% of the fastest TypeScript path at medium load and 74.6% at large load; large-load P95 was 63.52 ms versus 80.36 ms for the fastest TypeScript path. The 100/10,000 stress case is still outside a 16.67 ms frame budget, so this is intentionally a limited accelerator with a TypeScript fallback rather than a transfer of simulation ownership. The precompiled module is shipped with the web build, while compiling it from Rust remains optional for normal `npm` build/runtime use. See `benchmarks/wasm-pilot/README.md` for boundary details and raw measurements.
 
+### M8 Worker decision
+
+M8 keeps the authoritative simulation on the main fixed-step loop and does **not** move the collision kernel into a Web Worker yet. Projectile collision results are consumed synchronously inside the same fixed tick so hit order, target destruction and damage/effect application stay deterministic. Moving only the geometry query to a Worker would either require blocking the main thread for a reply or accepting delayed authoritative results; neither is an acceptable drop-in replacement for the current contract.
+
+Instead, the production runtime now records browser-side collision telemetry per rendered frame: kernel wall time, TypeScript/Wasm batch counts, Wasm fallback count, projectile count, candidate-pair count and maximum candidates per projectile. The Visual Lab displays the current values and window P95, and `window.__combatPerformanceReport().collision` exposes the aggregate report for real-browser captures. A future full-simulation Worker remains a separate architecture task using sequenced inputs and timestamped snapshots when browser measurements show that moving simulation work off the main thread is worth the added latency and synchronization complexity.
+
 ## Regression coverage
 
 `npm test` covers:

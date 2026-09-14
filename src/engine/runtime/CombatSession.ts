@@ -149,6 +149,7 @@ export class CombatSession {
     });
     this.performance.recordTiming('drawSubmitMs', performance.now() - submitStart);
     const resourceStats = this.renderer.getResourceStats();
+    const collisionTelemetry = this.engine.weaponSystem.collisionHandler.runtimeCollisionKernel.consumeTelemetry();
     const memory = (performance as Performance & { memory?: { usedJSHeapSize?: number } }).memory;
     const particleCount = this.engine.particles.length
       + this.engine.contrails.length
@@ -170,7 +171,15 @@ export class CombatSession {
       textureInvalidations: resourceStats.invalidations,
       resourceRecreations: resourceStats.resourceRecreations,
       drawCalls: resourceStats.drawCalls,
-      memoryBytes: typeof memory?.usedJSHeapSize === 'number' ? memory.usedJSHeapSize : null
+      memoryBytes: typeof memory?.usedJSHeapSize === 'number' ? memory.usedJSHeapSize : null,
+      collisionKernelMs: collisionTelemetry.kernelMs,
+      collisionTypeScriptBatches: collisionTelemetry.typescriptBatches,
+      collisionWasmBatches: collisionTelemetry.wasmBatches,
+      collisionWasmFallbacks: collisionTelemetry.wasmFallbacks,
+      collisionProjectiles: collisionTelemetry.projectileCount,
+      collisionCandidatePairs: collisionTelemetry.candidatePairs,
+      collisionMaxCandidatesPerProjectile: collisionTelemetry.maxCandidatesPerProjectile,
+      collisionBackendState: collisionTelemetry.backendState
     });
   }
 

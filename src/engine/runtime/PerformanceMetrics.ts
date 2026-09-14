@@ -16,6 +16,14 @@ export interface PerformanceSnapshot {
   resourceRecreations: number;
   drawCalls: number;
   memoryBytes: number | null;
+  collisionKernelMs: number;
+  collisionTypeScriptBatches: number;
+  collisionWasmBatches: number;
+  collisionWasmFallbacks: number;
+  collisionProjectiles: number;
+  collisionCandidatePairs: number;
+  collisionMaxCandidatesPerProjectile: number;
+  collisionBackendState: 'idle' | 'loading' | 'ready' | 'failed';
 }
 
 export interface TimingDistribution {
@@ -61,6 +69,16 @@ export interface PerformanceReport {
     invalidationsDelta: number;
     recreationsDelta: number;
   };
+  collision: {
+    backendState: 'idle' | 'loading' | 'ready' | 'failed';
+    kernelMs: TimingDistribution;
+    typescriptBatches: number;
+    wasmBatches: number;
+    wasmFallbacks: number;
+    projectiles: number;
+    candidatePairs: number;
+    maxCandidatesPerProjectile: number;
+  };
 }
 
 interface PerformanceSample {
@@ -80,6 +98,14 @@ interface PerformanceSample {
   resourceRecreations: number;
   drawCalls: number;
   memoryBytes: number | null;
+  collisionKernelMs: number;
+  collisionTypeScriptBatches: number;
+  collisionWasmBatches: number;
+  collisionWasmFallbacks: number;
+  collisionProjectiles: number;
+  collisionCandidatePairs: number;
+  collisionMaxCandidatesPerProjectile: number;
+  collisionBackendState: 'idle' | 'loading' | 'ready' | 'failed';
 }
 
 export interface FrameTelemetry {
@@ -94,6 +120,14 @@ export interface FrameTelemetry {
   resourceRecreations: number;
   drawCalls: number;
   memoryBytes: number | null;
+  collisionKernelMs: number;
+  collisionTypeScriptBatches: number;
+  collisionWasmBatches: number;
+  collisionWasmFallbacks: number;
+  collisionProjectiles: number;
+  collisionCandidatePairs: number;
+  collisionMaxCandidatesPerProjectile: number;
+  collisionBackendState: 'idle' | 'loading' | 'ready' | 'failed';
 }
 
 const ZERO_TIMING = (): Record<PerformanceTimingKey, number> => ({
@@ -128,7 +162,15 @@ export class PerformanceMetrics {
     textureInvalidations: 0,
     resourceRecreations: 0,
     drawCalls: 0,
-    memoryBytes: null
+    memoryBytes: null,
+    collisionKernelMs: 0,
+    collisionTypeScriptBatches: 0,
+    collisionWasmBatches: 0,
+    collisionWasmFallbacks: 0,
+    collisionProjectiles: 0,
+    collisionCandidatePairs: 0,
+    collisionMaxCandidatesPerProjectile: 0,
+    collisionBackendState: 'idle'
   };
 
   private frameTiming: Record<PerformanceTimingKey, number> = ZERO_TIMING();
@@ -157,6 +199,14 @@ export class PerformanceMetrics {
     this.snapshot.resourceRecreations = telemetry.resourceRecreations;
     this.snapshot.drawCalls = telemetry.drawCalls;
     this.snapshot.memoryBytes = telemetry.memoryBytes;
+    this.snapshot.collisionKernelMs = telemetry.collisionKernelMs;
+    this.snapshot.collisionTypeScriptBatches = telemetry.collisionTypeScriptBatches;
+    this.snapshot.collisionWasmBatches = telemetry.collisionWasmBatches;
+    this.snapshot.collisionWasmFallbacks = telemetry.collisionWasmFallbacks;
+    this.snapshot.collisionProjectiles = telemetry.collisionProjectiles;
+    this.snapshot.collisionCandidatePairs = telemetry.collisionCandidatePairs;
+    this.snapshot.collisionMaxCandidatesPerProjectile = telemetry.collisionMaxCandidatesPerProjectile;
+    this.snapshot.collisionBackendState = telemetry.collisionBackendState;
 
     this.samples.push({
       capturedAtMs: performance.now(),
@@ -232,6 +282,16 @@ export class PerformanceMetrics {
         uploadsDelta: first && last ? Math.max(0, last.textureUploads - first.textureUploads) : 0,
         invalidationsDelta: first && last ? Math.max(0, last.textureInvalidations - first.textureInvalidations) : 0,
         recreationsDelta: first && last ? Math.max(0, last.resourceRecreations - first.resourceRecreations) : 0
+      },
+      collision: {
+        backendState: last?.collisionBackendState ?? this.snapshot.collisionBackendState,
+        kernelMs: timing((sample) => sample.collisionKernelMs),
+        typescriptBatches: samples.reduce((sum, sample) => sum + sample.collisionTypeScriptBatches, 0),
+        wasmBatches: samples.reduce((sum, sample) => sum + sample.collisionWasmBatches, 0),
+        wasmFallbacks: samples.reduce((sum, sample) => sum + sample.collisionWasmFallbacks, 0),
+        projectiles: samples.reduce((sum, sample) => sum + sample.collisionProjectiles, 0),
+        candidatePairs: samples.reduce((sum, sample) => sum + sample.collisionCandidatePairs, 0),
+        maxCandidatesPerProjectile: this.maxOf(samples, (sample) => sample.collisionMaxCandidatesPerProjectile)
       }
     };
   }

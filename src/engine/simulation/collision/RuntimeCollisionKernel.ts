@@ -32,6 +32,19 @@ export interface RuntimeCollisionBatchStats {
   maxCandidatesPerProjectile: number;
 }
 
+export type RuntimeCollisionBackendState = 'idle' | 'loading' | 'ready' | 'failed';
+
+export interface RuntimeCollisionTelemetry {
+  backendState: RuntimeCollisionBackendState;
+  typescriptBatches: number;
+  wasmBatches: number;
+  wasmFallbacks: number;
+  projectileCount: number;
+  candidatePairs: number;
+  maxCandidatesPerProjectile: number;
+  kernelMs: number;
+}
+
 interface WasmExports {
   memory: WebAssembly.Memory;
   alloc_bytes: (len: number) => number;
@@ -51,11 +64,20 @@ interface WasmExports {
   ) => number;
 }
 
-type WasmState = 'idle' | 'loading' | 'ready' | 'failed';
 interface WasmBuffer {
   ptr: number;
   capacity: number;
 }
+
+const EMPTY_TELEMETRY = (): Omit<RuntimeCollisionTelemetry, 'backendState'> => ({
+  typescriptBatches: 0,
+  wasmBatches: 0,
+  wasmFallbacks: 0,
+  projectileCount: 0,
+  candidatePairs: 0,
+  maxCandidatesPerProjectile: 0,
+  kernelMs: 0
+});
 
 /**
  * Exact swept projectile collision kernel.
@@ -68,9 +90,10 @@ interface WasmBuffer {
 export class RuntimeCollisionKernel {
   private static readonly MIN_WASM_BATCH = 8;
   private wasm: WasmExports | null = null;
-  private wasmState: WasmState = 'idle';
+  private wasmState: RuntimeCollisionBackendState = 'idle';
   private readonly wasmUrl: string;
   private readonly wasmBuffers = new Map<string, WasmBuffer>();
+  private telemetry = EMPTY_TELEMETRY();
 
   public lastBatchStats: RuntimeCollisionBatchStats = {
     backend: 'typescript',
@@ -86,8 +109,18 @@ export class RuntimeCollisionKernel {
     }
   }
 
-  public get backendState(): WasmState {
+  public get backendState(): RuntimeCollisionBackendState {
     return this.wasmState;
+  }
+
+  /** Returns collision work accumulated since the previous render sample. */
+  public consumeTelemetry(): RuntimeCollisionTelemetry {
+    const snapshot: RuntimeCollisionTelemetry = {
+      backendState: this.wasmState,
+      ...this.telemetry
+    };
+    this.telemetry = EMPTY_TELEMETRY();
+    return snapshot;
   }
 
   public async loadWasm(): Promise<boolean> {
@@ -120,6 +153,7 @@ export class RuntimeCollisionKernel {
   }
 
   public findHits(queries: RuntimeCollisionQuery[]): Array<RuntimeCollisionHit | null> {
+    const startedAt = this.nowMs();
     const candidatePairs = queries.reduce((sum, query) => sum + query.candidates.length, 0);
     const maxCandidatesPerProjectile = queries.reduce((max, query) => Math.max(max, query.candidates.length), 0);
 
@@ -127,6 +161,8 @@ export class RuntimeCollisionKernel {
       this.lastBatchStats = { backend: 'typescript', projectileCount: 0, candidatePairs: 0, maxCandidatesPerProjectile: 0 };
       return [];
     }
+
+    let wasmFallback = false;
 
     if (
       queries.length >= RuntimeCollisionKernel.MIN_WASM_BATCH &&
@@ -137,16 +173,44 @@ export class RuntimeCollisionKernel {
       try {
         const hits = this.findHitsWasm(queries, this.wasm);
         this.lastBatchStats = { backend: 'wasm', projectileCount: queries.length, candidatePairs, maxCandidatesPerProjectile };
+        this.recordTelemetry('wasm', queries.length, candidatePairs, maxCandidatesPerProjectile, this.nowMs() - startedAt, false);
         return hits;
       } catch {
         this.releaseWasmBuffers(this.wasm);
         this.wasm = null;
         this.wasmState = 'failed';
+        wasmFallback = true;
       }
     }
 
     this.lastBatchStats = { backend: 'typescript', projectileCount: queries.length, candidatePairs, maxCandidatesPerProjectile };
-    return queries.map((query) => this.findHitTypeScript(query));
+    const hits = queries.map((query) => this.findHitTypeScript(query));
+    this.recordTelemetry('typescript', queries.length, candidatePairs, maxCandidatesPerProjectile, this.nowMs() - startedAt, wasmFallback);
+    return hits;
+  }
+
+  private recordTelemetry(
+    backend: RuntimeCollisionBackend,
+    projectileCount: number,
+    candidatePairs: number,
+    maxCandidatesPerProjectile: number,
+    kernelMs: number,
+    wasmFallback: boolean
+  ): void {
+    if (backend === 'wasm') this.telemetry.wasmBatches++;
+    else this.telemetry.typescriptBatches++;
+    if (wasmFallback) this.telemetry.wasmFallbacks++;
+    this.telemetry.projectileCount += projectileCount;
+    this.telemetry.candidatePairs += candidatePairs;
+    this.telemetry.maxCandidatesPerProjectile = Math.max(
+      this.telemetry.maxCandidatesPerProjectile,
+      maxCandidatesPerProjectile
+    );
+    this.telemetry.kernelMs += Math.max(0, kernelMs);
+  }
+
+  private nowMs(): number {
+    return typeof performance !== 'undefined' ? performance.now() : Date.now();
   }
 
   public findHitTypeScript(query: RuntimeCollisionQuery): RuntimeCollisionHit | null {

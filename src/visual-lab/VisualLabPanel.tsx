@@ -204,6 +204,8 @@ export const VisualLabPanel: React.FC<Props> = ({
         <div>GPU {perf.gpuTimerAvailable && perf.gpuTimeMs != null ? `${perf.gpuTimeMs.toFixed(2)} ms` : 'timer unavailable'}</div>
         <div>draws {perf.drawCalls} · tex {perf.textureCount} · proj {perf.projectileCount} · particles {perf.particleCount}</div>
         <div>samples {perfReport.sampleCount} · CPU P95 {perfReport.timings.frameCpuMs.p95.toFixed(2)} ms · P99 {perfReport.timings.frameCpuMs.p99.toFixed(2)} ms</div>
+        <div>collision {perf.collisionKernelMs.toFixed(3)} ms · backend {perf.collisionBackendState} · wasm {perf.collisionWasmBatches} · TS {perf.collisionTypeScriptBatches}</div>
+        <div>collision window P95 {perfReport.collision.kernelMs.p95.toFixed(3)} ms · wasm {perfReport.collision.wasmBatches} · TS {perfReport.collision.typescriptBatches} · fallback {perfReport.collision.wasmFallbacks}</div>
         <div>tex pending {perf.pendingTextureUploads} · uploads {perf.textureUploads} · invalidations {perf.textureInvalidations}</div>
         <div>backlog {(session.scheduler.backlogSeconds * 1000).toFixed(1)} ms · dropped {session.scheduler.droppedSimulationSeconds.toFixed(4)} s</div>
         <div>resource recreations {perf.resourceRecreations}{perf.memoryBytes != null ? ` · heap ${(perf.memoryBytes / 1048576).toFixed(1)} MiB` : ''}</div>
