@@ -168,8 +168,11 @@ export class CombatRenderer {
     // 9.5 绘制金属装甲碎片与爆炸残骸 (Debris)
     this.fxRenderer.drawDebris(ctx, engine);
 
-    // 10. 绘制原版官方爆炸翻页书动画与冲击波 (Explosions & Shockwaves)
-    if (frame.layers.has('explosion')) this.fxRenderer.drawExplosions(ctx, engine);
+    // 10. 绘制独立命中辉光与爆炸翻页书；hitGlowRadius 不再冒充火球半径。
+    if (frame.layers.has('explosion')) {
+      this.fxRenderer.drawHitGlows(ctx, engine);
+      this.fxRenderer.drawExplosions(ctx, engine);
+    }
 
     // 10.5 绘制护盾能量冲击空间扩散环 (Shield Ripples)
     this.shieldRenderer.drawShieldRipples(ctx, engine);

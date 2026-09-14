@@ -1,6 +1,6 @@
 import { Vector2 } from '../math/Vector2';
 import { Ship } from './Ship';
-import { Projectile, Beam, MuzzleFlashSpec } from './Weapon';
+import { Projectile, Beam, LauncherSmokeSpec, MuzzleFlashSpec } from './Weapon';
 import { CapitalShipAI } from '../ai/CapitalShipAI';
 import { modManager } from '../modding/ModManager';
 import { sound } from '../audio/SoundManager';
@@ -12,6 +12,7 @@ import {
   Particle,
   ContrailParticle,
   ExplosionAnimation,
+  HitGlowAnimation,
   EmpArc,
   MuzzleFlash,
   MuzzleParticle,
@@ -90,6 +91,7 @@ export class CombatEngine {
   public get particles(): Particle[] { return this.fxSystem.particles; }
   public get contrails(): ContrailParticle[] { return this.fxSystem.contrails; }
   public get explosions(): ExplosionAnimation[] { return this.fxSystem.explosions; }
+  public get hitGlows(): HitGlowAnimation[] { return this.fxSystem.hitGlows; }
   public get empArcs(): EmpArc[] { return this.fxSystem.empArcs; }
   public get muzzleFlashes(): MuzzleFlash[] { return this.fxSystem.muzzleFlashes; }
   public get muzzleParticles(): MuzzleParticle[] { return this.fxSystem.muzzleParticles; }
@@ -438,9 +440,12 @@ export class CombatEngine {
       size: number,
       color: [number, number, number],
       spec?: MuzzleFlashSpec,
-      shipVel?: Vector2
+      shipVel?: Vector2,
+      launcherSmokeSpec?: LauncherSmokeSpec
     ) => {
-      if (spec) {
+      if (launcherSmokeSpec) {
+        this.fxSystem.spawnLauncherSmoke(launcherSmokeSpec, pos, angleRad, shipVel || new Vector2(0, 0));
+      } else if (spec) {
         this.fxSystem.spawnAuthenticMuzzleFlash(spec, pos, angleRad, shipVel || new Vector2(0, 0));
       } else {
         this.fxSystem.muzzleFlashes.push({

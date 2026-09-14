@@ -21,6 +21,11 @@ export interface ContrailStrip {
   accumU: number;
 }
 
+export interface ContrailStats {
+  stripCount: number;
+  pointCount: number;
+}
+
 /**
  * 连续烟雾尾迹带引擎 (1:1 对齐原版 com.fs.starfarer.combat.entities.ContrailEngine.java)
  */
@@ -126,6 +131,13 @@ export class ContrailEngine {
 
   public getStrips(): IterableIterator<ContrailStrip> {
     return this.strips.values();
+  }
+
+  /** Bounded W09 telemetry; never exposes mutable strip ownership to callers. */
+  public getStats(): ContrailStats {
+    let pointCount = 0;
+    for (const strip of this.strips.values()) pointCount += strip.points.length;
+    return { stripCount: this.strips.size, pointCount };
   }
 
   public clear() {

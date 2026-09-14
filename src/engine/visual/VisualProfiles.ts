@@ -149,6 +149,19 @@ export const WEAPON_VISUAL_PROFILES: Record<WeaponVisualFamily, WeaponVisualProf
   MISSILE: { muzzleScale: 0.95, glowScale: 1.16, trailScale: 1.2, impactScale: 1.34, coreScale: 0.62, brightness: 1.05, fadeSeconds: 0.24 }
 };
 
+// W02/W03：家族参数仍作为默认值，但已确认来源尺寸的脉冲武器不再被家族几何倍率二次放大。
+// 这样 TPC 100×35、Autopulse 50×20 可作为与原版逐帧对照的可信起点，其他亮度/命中补偿仍待视觉验收。
+const WEAPON_VISUAL_PROFILES_BY_ID: Record<string, WeaponVisualProfile> = {
+  tpc: { ...WEAPON_VISUAL_PROFILES.TPC, muzzleScale: 1.0, glowScale: 1.0, trailScale: 1.0, impactScale: 1.0, coreScale: 1.0, brightness: 1.0 },
+  autopulse: { ...WEAPON_VISUAL_PROFILES.TPC, muzzleScale: 1.0, glowScale: 1.0, trailScale: 1.0, impactScale: 1.0, coreScale: 1.0, brightness: 1.0 },
+  lightmg: { ...WEAPON_VISUAL_PROFILES.TPC, muzzleScale: 1.0, trailScale: 1.0, glowScale: 1.0 },
+  heavyblaster: { ...WEAPON_VISUAL_PROFILES.TPC, trailScale: 1.0, glowScale: 1.0, coreScale: 1.0, brightness: 1.0 },
+  tachyonlance: { ...WEAPON_VISUAL_PROFILES.BEAM, trailScale: 1.0, glowScale: 1.0, coreScale: 1.0, brightness: 1.0 },
+  gravitonbeam: { ...WEAPON_VISUAL_PROFILES.BEAM, trailScale: 1.0, glowScale: 1.0, coreScale: 1.0, brightness: 1.0 },
+  taclaser: { ...WEAPON_VISUAL_PROFILES.BEAM, trailScale: 1.0, glowScale: 1.0, coreScale: 1.0, brightness: 1.0 },
+  pdburst: { ...WEAPON_VISUAL_PROFILES.BEAM, trailScale: 1.0, glowScale: 1.0, coreScale: 1.0, brightness: 1.0 }
+};
+
 export function getShipVisualProfile(shipId: string): ShipVisualProfile {
   return SHIP_VISUAL_PROFILES[shipId] ?? SHIP_VISUAL_PROFILES.default;
 }
@@ -171,7 +184,8 @@ export function getWeaponVisualProfile(
   isRocket = false,
   isBeam = false
 ): WeaponVisualProfile {
-  return WEAPON_VISUAL_PROFILES[getWeaponVisualFamily(specId, spawnType, isRocket, isBeam)];
+  return WEAPON_VISUAL_PROFILES_BY_ID[specId]
+    ?? WEAPON_VISUAL_PROFILES[getWeaponVisualFamily(specId, spawnType, isRocket, isBeam)];
 }
 
 export function getExplosionVisualProfile(

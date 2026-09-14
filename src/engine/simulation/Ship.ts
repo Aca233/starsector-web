@@ -3,7 +3,7 @@ import { ArmorGrid } from './ArmorGrid';
 import { FluxTracker } from './FluxTracker';
 import { Shield } from './Shield';
 import { ShipSystem } from './ShipSystem';
-import { Projectile, Beam, WeaponMount, WeaponGroup, MuzzleFlashSpec } from './Weapon';
+import { Projectile, Beam, WeaponMount, WeaponGroup, LauncherSmokeSpec, MuzzleFlashSpec } from './Weapon';
 import { ShipSpec } from '../modding/ModManager';
 import { sound } from '../audio/SoundManager';
 import { ShipWeaponControlSystem } from './systems/ShipWeaponControlSystem';
@@ -292,7 +292,7 @@ export class Ship {
     targetShip: Ship | null,
     spawnProjectile: (p: Projectile) => void,
     spawnBeam: (b: Beam) => void,
-    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2) => void
+    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void
   ) {
     if (this.isDead) return;
 

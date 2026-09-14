@@ -9,6 +9,8 @@ export interface PerformanceSnapshot {
   gpuTimerAvailable: boolean;
   projectileCount: number;
   particleCount: number;
+  trailStripCount: number;
+  trailPointCount: number;
   textureCount: number;
   pendingTextureUploads: number;
   textureUploads: number;
@@ -50,6 +52,8 @@ export interface PerformanceReport {
   counts: {
     maxProjectiles: number;
     maxParticles: number;
+    maxTrailStrips: number;
+    maxTrailPoints: number;
     maxDrawCalls: number;
   };
   memory: {
@@ -91,6 +95,8 @@ interface PerformanceSample {
   gpuTimerAvailable: boolean;
   projectileCount: number;
   particleCount: number;
+  trailStripCount: number;
+  trailPointCount: number;
   textureCount: number;
   pendingTextureUploads: number;
   textureUploads: number;
@@ -113,6 +119,8 @@ export interface FrameTelemetry {
   gpuTimerAvailable: boolean;
   projectileCount: number;
   particleCount: number;
+  trailStripCount: number;
+  trailPointCount: number;
   textureCount: number;
   pendingTextureUploads: number;
   textureUploads: number;
@@ -156,6 +164,8 @@ export class PerformanceMetrics {
     gpuTimerAvailable: false,
     projectileCount: 0,
     particleCount: 0,
+    trailStripCount: 0,
+    trailPointCount: 0,
     textureCount: 0,
     pendingTextureUploads: 0,
     textureUploads: 0,
@@ -192,6 +202,8 @@ export class PerformanceMetrics {
     this.snapshot.gpuTimerAvailable = telemetry.gpuTimerAvailable;
     this.snapshot.projectileCount = telemetry.projectileCount;
     this.snapshot.particleCount = telemetry.particleCount;
+    this.snapshot.trailStripCount = telemetry.trailStripCount;
+    this.snapshot.trailPointCount = telemetry.trailPointCount;
     this.snapshot.textureCount = telemetry.textureCount;
     this.snapshot.pendingTextureUploads = telemetry.pendingTextureUploads;
     this.snapshot.textureUploads = telemetry.textureUploads;
@@ -264,6 +276,8 @@ export class PerformanceMetrics {
       counts: {
         maxProjectiles: this.maxOf(samples, (sample) => sample.projectileCount),
         maxParticles: this.maxOf(samples, (sample) => sample.particleCount),
+        maxTrailStrips: this.maxOf(samples, (sample) => sample.trailStripCount),
+        maxTrailPoints: this.maxOf(samples, (sample) => sample.trailPointCount),
         maxDrawCalls: this.maxOf(samples, (sample) => sample.drawCalls)
       },
       memory: {

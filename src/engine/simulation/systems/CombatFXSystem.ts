@@ -3,6 +3,7 @@ import {
   Particle,
   ContrailParticle,
   ExplosionAnimation,
+  HitGlowAnimation,
   EmpArc,
   EmpArcBranch,
   MuzzleFlash,
@@ -12,8 +13,7 @@ import {
   ShieldRipple,
   HulkFragment
 } from '../CombatTypes';
-import { MuzzleFlashSpec } from '../Weapon';
-import { sound } from '../../audio/SoundManager';
+import { LauncherSmokeSpec, MissileExplosionVisualSpec, MuzzleFlashSpec } from '../Weapon';
 import { SimulationRandom } from '../SimulationRandom';
 
 function fastRemoveAt<T>(arr: T[], index: number) {
@@ -44,6 +44,7 @@ export class CombatFXSystem {
   public particles: Particle[] = [];
   public contrails: ContrailParticle[] = [];
   public explosions: ExplosionAnimation[] = [];
+  public hitGlows: HitGlowAnimation[] = [];
   public empArcs: EmpArc[] = [];
   public muzzleFlashes: MuzzleFlash[] = [];
   public muzzleParticles: MuzzleParticle[] = [];
@@ -58,6 +59,7 @@ export class CombatFXSystem {
     this.particles = [];
     this.contrails = [];
     this.explosions = [];
+    this.hitGlows = [];
     this.empArcs = [];
     this.muzzleFlashes = [];
     this.muzzleParticles = [];
@@ -71,6 +73,7 @@ export class CombatFXSystem {
     this.updateParticles(dt);
     this.updateContrails(dt);
     this.updateExplosions(dt);
+    this.updateHitGlows(dt);
     this.updateEmpArcs(dt);
     this.updateMuzzleFlashes(dt);
     this.updateMuzzleParticles(dt);
@@ -120,6 +123,13 @@ export class CombatFXSystem {
       if (exp.life <= 0) {
         fastRemoveAt(this.explosions, i);
       }
+    }
+  }
+
+  public updateHitGlows(dt: number) {
+    for (let i = this.hitGlows.length - 1; i >= 0; i--) {
+      this.hitGlows[i].life -= dt;
+      if (this.hitGlows[i].life <= 0) fastRemoveAt(this.hitGlows, i);
     }
   }
 
@@ -177,6 +187,46 @@ export class CombatFXSystem {
         life: spec.particleDuration,
         maxLife: spec.particleDuration,
         color: [...spec.particleColor]
+      });
+    }
+  }
+
+  public spawnLauncherSmoke(
+    spec: LauncherSmokeSpec,
+    muzzlePos: Vector2,
+    angleRad: number,
+    shipVel: Vector2
+  ) {
+    const [r, g, b, a] = spec.particleColor;
+    for (let i = 0; i < spec.cloudParticleCount; i++) {
+      const theta = this.random.next() * Math.PI * 2;
+      const radius = Math.sqrt(this.random.next()) * spec.cloudRadius;
+      const outward = 4 + this.random.next() * 10;
+      this.muzzleParticles.push({
+        pos: muzzlePos.clone().add(Vector2.fromAngle(theta, radius)),
+        vel: shipVel.clone().add(Vector2.fromAngle(theta, outward)),
+        size: spec.particleSizeMin + this.random.next() * spec.particleSizeRange,
+        life: spec.cloudDuration,
+        maxLife: spec.cloudDuration,
+        color: [r, g, b, a],
+        blendMode: 'NORMAL'
+      });
+    }
+
+    const spreadRad = (spec.blowbackSpread * Math.PI) / 180;
+    const rearAngle = angleRad + Math.PI;
+    for (let i = 0; i < spec.blowbackParticleCount; i++) {
+      const theta = rearAngle + (this.random.next() - 0.5) * spreadRad;
+      const dist = this.random.next() * spec.blowbackLength;
+      const offset = Vector2.fromAngle(theta, dist);
+      this.muzzleParticles.push({
+        pos: muzzlePos.clone().add(offset),
+        vel: shipVel.clone().add(offset),
+        size: spec.particleSizeMin + this.random.next() * spec.particleSizeRange,
+        life: spec.blowbackDuration,
+        maxLife: spec.blowbackDuration,
+        color: [r, g, b, a],
+        blendMode: 'NORMAL'
       });
     }
   }
@@ -303,6 +353,44 @@ export class CombatFXSystem {
     }
   }
 
+  public spawnHitGlow(
+    pos: Vector2,
+    radius: number,
+    color: [number, number, number],
+    life = 0.18
+  ) {
+    if (radius <= 0 || life <= 0) return;
+    this.hitGlows.push({
+      id: this.random.next(),
+      pos: pos.clone(),
+      radius,
+      life,
+      maxLife: life,
+      color: [...color]
+    });
+  }
+
+  public spawnSourceMissileExplosion(pos: Vector2, spec: MissileExplosionVisualSpec) {
+    if (spec.radius <= 0) return;
+    const [r, g, b] = spec.color;
+    this.explosions.push({
+      id: this.random.next(),
+      visualKind: 'missile',
+      sourceAuthored: true,
+      pos: pos.clone(),
+      radius: spec.radius * 0.4,
+      maxRadius: spec.radius,
+      life: 0.35,
+      maxLife: 0.35,
+      frame: 0,
+      rotation: this.random.next() * Math.PI * 2,
+      color: [r, g, b],
+      hasShockwaveRing: false,
+      shockwaveRadius: 0,
+      maxShockwaveRadius: 0
+    });
+  }
+
   public spawnAuthenticExplosion(
     pos: Vector2,
     radius = 50,
@@ -399,9 +487,6 @@ export class CombatFXSystem {
       thickness
     });
 
-    if (dist > 25) {
-      sound.playThrottled('emp_impact', 0.08, 0.4);
-    }
   }
 
   public addFloatingDamage(pos: Vector2, amount: number, color: [number, number, number]) {

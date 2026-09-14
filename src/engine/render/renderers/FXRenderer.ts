@@ -2,14 +2,50 @@ import { visualRandom, visualNowMs } from '../RenderDeterminism';
 import { Vector2 } from '../../math/Vector2';
 import { CombatEngine } from '../../simulation/CombatEngine';
 import { textureCache } from '../TextureCache';
+import { getWeaponVisualProfile } from '../../visual/VisualProfiles';
+import { beamVisualTime, selectRenderableBeams } from '../BeamVisuals';
+import { computeCanvasStripSegments } from '../CanvasStripSampling';
 
 export class FXRenderer {
   constructor() {}
 
   public drawContrails(ctx: CanvasRenderingContext2D, engine: CombatEngine) {
-    if (engine.contrails.length === 0) return;
+    const strips = Array.from(engine.contrailEngine.getStrips());
+    if (strips.length === 0 && engine.contrails.length === 0) return;
 
     ctx.save();
+
+    // Continuous source-authored missile trails live in ContrailEngine. Draw every
+    // segment with its aged width/alpha so Canvas consumes the same ownership data
+    // as the WebGL ribbon path instead of silently falling back to legacy particles.
+    for (const strip of strips) {
+      if (strip.points.length < 2) continue;
+      const [cr, cg, cb, ca = 255] = strip.color;
+      const tintedContrail = textureCache.getTintedImage('/game-assets/graphics/fx/contrail64b.png', cr, cg, cb);
+      if (!tintedContrail) continue;
+      ctx.globalCompositeOperation = strip.blendMode === 'GLOW' ? 'lighter' : 'source-over';
+
+      for (let i = 1; i < strip.points.length; i++) {
+        const p0 = strip.points[i - 1];
+        const p1 = strip.points[i];
+        const dx = p1.pos.x - p0.pos.x;
+        const dy = p1.pos.y - p0.pos.y;
+        const length = Math.hypot(dx, dy);
+        if (length <= 0.001) continue;
+        const width = Math.max(0.01, (p0.currentWidth + p1.currentWidth) * 0.5);
+        const segmentAlpha = Math.max(0, Math.min(1, (p0.alpha + p1.alpha) * 0.5 * (ca / 255)));
+        if (segmentAlpha <= 0) continue;
+
+        ctx.save();
+        ctx.translate(p0.pos.x, p0.pos.y);
+        ctx.rotate(Math.atan2(dy, dx));
+        ctx.globalAlpha = segmentAlpha;
+        ctx.drawImage(tintedContrail, 0, -width * 0.5, length, width);
+        ctx.restore();
+      }
+    }
+
+    // Keep legacy point contrails for older/non-missile effects that still own them.
     ctx.globalCompositeOperation = 'lighter';
     for (const c of engine.contrails) {
       const [cr, cg, cb] = c.color || [220, 180, 140];
@@ -60,33 +96,40 @@ export class FXRenderer {
         continue;
       }
 
-      // 1. 等离子束 / 脉冲类投射物 (BALLISTIC_AS_BEAM)
-      if (p.spawnType === 'BALLISTIC_AS_BEAM' || p.specId === 'tpc' || p.specId === 'autopulse') {
+      // 1. 等离子束 / 脉冲类投射物 (BALLISTIC_AS_BEAM)。visualSpawnType 只控制成像，不改变碰撞语义。
+      const visualSpawnType = p.visualSpawnType ?? p.spawnType;
+      if (visualSpawnType === 'BALLISTIC_AS_BEAM' || p.specId === 'tpc' || p.specId === 'autopulse') {
         const len = p.projLength || (p.specId === 'tpc' ? 100 : 50);
         const wid = p.projWidth || (p.specId === 'tpc' ? 35 : 20);
-        const [fr, fg, fb] = p.fringeColor || (p.specId === 'tpc' ? [255, 0, 0, 255] : [0, 80, 255, 255]);
-        const [cr, cg, cb] = p.coreColor || [255, 255, 255, 220];
-        const [gr, gg, gb] = p.glowColor || (p.specId === 'tpc' ? [255, 100, 100, 255] : [100, 100, 255, 225]);
+        const [fr, fg, fb, fa = 255] = p.fringeColor || (p.specId === 'tpc' ? [255, 0, 0, 255] : [0, 0, 255, 255]);
+        const [cr, cg, cb, ca = 255] = p.coreColor || [255, 255, 255, 200];
 
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-
-        const tintedGlow = textureCache.getTintedImage('/game-assets/graphics/fx/glow64.png', gr, gg, gb);
-        if (tintedGlow) {
-          ctx.globalAlpha = 0.45;
-          ctx.drawImage(tintedGlow, -len * 0.55, -wid * 0.9, len * 1.1, wid * 1.8);
-        }
 
         const isRough = p.textureType === 'ROUGH' || p.specId === 'tpc';
         const fringeUrl = isRough ? '/game-assets/graphics/fx/beam_rough2_fringe.png' : '/game-assets/graphics/fx/beamfringe.png';
         const tintedFringe = textureCache.getTintedImage(fringeUrl, fr, fg, fb);
         if (tintedFringe) {
-          ctx.globalAlpha = 0.92;
-          ctx.drawImage(tintedFringe, -len * 0.5, -wid * 0.5, len, wid);
+          const sourceGeometry = p.pixelsPerTexel !== undefined;
+          ctx.globalAlpha = (sourceGeometry ? 1.0 : 0.92) * (fa / 255);
+          if (sourceGeometry) {
+            const scroll = ((p.elapsedTime ?? engine.combatTime) * (p.textureScrollSpeed ?? 0)) / tintedFringe.width;
+            for (const segment of computeCanvasStripSegments(tintedFringe.width, len, p.pixelsPerTexel!, -scroll)) {
+              ctx.drawImage(
+                tintedFringe,
+                segment.sourceX, 0, segment.sourceWidth, tintedFringe.height,
+                -len * 0.5 + segment.destX, -wid * 0.5, segment.destWidth, wid
+              );
+            }
+          } else {
+            ctx.drawImage(tintedFringe, -len * 0.5, -wid * 0.5, len, wid);
+          }
         } else {
           const fGrad = ctx.createRadialGradient(0, 0, wid * 0.1, 0, 0, len * 0.5);
-          fGrad.addColorStop(0, `rgba(${fr}, ${fg}, ${fb}, 0.9)`);
-          fGrad.addColorStop(0.6, `rgba(${fr}, ${fg}, ${fb}, 0.6)`);
+          const fringeAlpha = fa / 255;
+          fGrad.addColorStop(0, `rgba(${fr}, ${fg}, ${fb}, ${0.9 * fringeAlpha})`);
+          fGrad.addColorStop(0.6, `rgba(${fr}, ${fg}, ${fb}, ${0.6 * fringeAlpha})`);
           fGrad.addColorStop(1, `rgba(${fr}, ${fg}, ${fb}, 0)`);
           ctx.fillStyle = fGrad;
           ctx.beginPath();
@@ -97,20 +140,36 @@ export class FXRenderer {
         const coreUrl = isRough ? '/game-assets/graphics/fx/beam_rough2_core.png' : '/game-assets/graphics/fx/beamcore.png';
         const tintedCore = textureCache.getTintedImage(coreUrl, cr, cg, cb);
         if (tintedCore) {
-          ctx.globalAlpha = 1.0;
-          ctx.drawImage(tintedCore, -len * 0.42, -wid * 0.22, len * 0.85, wid * 0.44);
+          ctx.globalAlpha = ca / 255;
+          if (p.pixelsPerTexel !== undefined) {
+            const scroll = ((p.elapsedTime ?? engine.combatTime) * (p.textureScrollSpeed ?? 0)) / tintedCore.width;
+            for (const segment of computeCanvasStripSegments(tintedCore.width, len, p.pixelsPerTexel, -scroll)) {
+              ctx.drawImage(
+                tintedCore,
+                segment.sourceX, 0, segment.sourceWidth, tintedCore.height,
+                -len * 0.5 + segment.destX, -wid * 0.5, segment.destWidth, wid
+              );
+            }
+          } else {
+            ctx.drawImage(tintedCore, -len * 0.5, -wid * 0.5, len, wid);
+          }
         } else {
-          ctx.fillStyle = `rgba(${cr}, ${cg}, ${cb}, 0.95)`;
+          ctx.fillStyle = `rgba(${cr}, ${cg}, ${cb}, ${0.95 * (ca / 255)})`;
           ctx.beginPath();
-          ctx.ellipse(0, 0, len * 0.38, wid * 0.2, 0, 0, Math.PI * 2);
+          ctx.ellipse(0, 0, len * 0.5, wid * 0.5, 0, 0, Math.PI * 2);
           ctx.fill();
         }
 
-        const tintedTip = textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow.png', cr, cg, cb);
-        if (tintedTip) {
-          ctx.globalAlpha = 0.95;
-          const tipSize = wid * 1.1;
-          ctx.drawImage(tintedTip, len * 0.45 - tipSize * 0.5, -tipSize * 0.5, tipSize, tipSize);
+        // Source .proj glowRadius/glowColor define an in-flight halo, independent
+        // from hitGlowRadius (impact-only). Heavy Blaster relies on this path.
+        if ((p.glowRadius ?? 0) > 0 && p.glowColor) {
+          const [gr, gg, gb, ga = 255] = p.glowColor;
+          const tintedGlow = textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow.png', gr, gg, gb);
+          if (tintedGlow) {
+            const glowDiameter = p.glowRadius! * 2;
+            ctx.globalAlpha = ga / 255;
+            ctx.drawImage(tintedGlow, -glowDiameter * 0.5, -glowDiameter * 0.5, glowDiameter, glowDiameter);
+          }
         }
 
         ctx.restore();
@@ -120,29 +179,48 @@ export class FXRenderer {
         const bulletImg = textureCache.getImage(p.projSpriteUrl);
         const len = p.projLength || 45;
         const wid = p.projWidth || 9;
-        const [fr, fg, fb] = p.fringeColor || p.color;
-        const [cr, cg, cb] = p.coreColor || [255, 255, 255, 255];
+        const [fr, fg, fb, fa = 255] = p.fringeColor || [...p.color, 255];
+        const [cr, cg, cb, ca = 255] = p.coreColor || [255, 255, 255, 255];
 
+        const sourceGeometry = p.pixelsPerTexel !== undefined;
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        const tracerLen = len * 1.8;
+        if (sourceGeometry) {
+          const scrollTime = p.elapsedTime ?? engine.combatTime;
+          const scrollSpeed = p.textureScrollSpeed ?? 0;
+          const tintedTrail = textureCache.getTintedImage('/game-assets/graphics/fx/projtrail.png', fr, fg, fb);
+          if (tintedTrail) {
+            ctx.globalAlpha = fa / 255;
+            const scroll = (scrollTime * scrollSpeed) / tintedTrail.width;
+            for (const segment of computeCanvasStripSegments(tintedTrail.width, len, p.pixelsPerTexel!, -scroll)) {
+              ctx.drawImage(tintedTrail, segment.sourceX, 0, segment.sourceWidth, tintedTrail.height, -len * 0.5 + segment.destX, -wid * 0.5, segment.destWidth, wid);
+            }
+          }
+          const tintedBody = textureCache.getTintedImage('/game-assets/graphics/fx/projbody.png', cr, cg, cb);
+          if (tintedBody) {
+            ctx.globalAlpha = ca / 255;
+            const scroll = (scrollTime * scrollSpeed) / tintedBody.width;
+            for (const segment of computeCanvasStripSegments(tintedBody.width, len, p.pixelsPerTexel!, -scroll)) {
+              ctx.drawImage(tintedBody, segment.sourceX, 0, segment.sourceWidth, tintedBody.height, -len * 0.5 + segment.destX, -wid * 0.5, segment.destWidth, wid);
+            }
+          }
+        } else {
+          const tracerLen = len * 1.8;
+          ctx.strokeStyle = `rgba(${fr}, ${fg}, ${fb}, ${0.65 * (fa / 255)})`;
+          ctx.lineWidth = wid * 0.7;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(-tracerLen, 0);
+          ctx.stroke();
 
-        // 1. 外层发光尾迹 (零 GC 开销，硬件直接光栅化)
-        ctx.strokeStyle = `rgba(${fr}, ${fg}, ${fb}, 0.65)`;
-        ctx.lineWidth = wid * 0.7;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(-tracerLen, 0);
-        ctx.stroke();
-
-        // 2. 内层高能白热核心
-        ctx.strokeStyle = `rgba(${cr}, ${cg}, ${cb}, 0.95)`;
-        ctx.lineWidth = Math.max(1.5, wid * 0.28);
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(-tracerLen * 0.65, 0);
-        ctx.stroke();
+          ctx.strokeStyle = `rgba(${cr}, ${cg}, ${cb}, ${0.95 * (ca / 255)})`;
+          ctx.lineWidth = Math.max(1.5, wid * 0.28);
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(-tracerLen * 0.65, 0);
+          ctx.stroke();
+        }
         ctx.restore();
 
         if (bulletImg.complete && bulletImg.naturalWidth > 0) {
@@ -157,14 +235,16 @@ export class FXRenderer {
           ctx.fill();
         }
 
-        const tipImg = textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow_small.png', cr, cg, cb)
-          || textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow.png', cr, cg, cb);
-        if (tipImg) {
-          ctx.save();
-          ctx.globalCompositeOperation = 'lighter';
-          const tipSize = wid * 1.8;
-          ctx.drawImage(tipImg, len / 2 - tipSize * 0.4, -tipSize / 2, tipSize, tipSize);
-          ctx.restore();
+        if (!sourceGeometry) {
+          const tipImg = textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow_small.png', cr, cg, cb)
+            || textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow.png', cr, cg, cb);
+          if (tipImg) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            const tipSize = wid * 1.8;
+            ctx.drawImage(tipImg, len / 2 - tipSize * 0.4, -tipSize / 2, tipSize, tipSize);
+            ctx.restore();
+          }
         }
       }
       // 3. 导弹 / 火箭
@@ -172,25 +252,40 @@ export class FXRenderer {
         const rocketImg = p.projSpriteUrl ? textureCache.getImage(p.projSpriteUrl) : null;
         const len = p.projLength || 21;
         const wid = p.projWidth || 10;
+        const sourceEngine = p.missileEngineVisualSpec;
 
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        const flameColor = p.engineFlameColor || [255, 140, 40];
+        const flameRgba = sourceEngine?.color ?? [...(p.engineFlameColor || [255, 140, 40]), 255] as [number, number, number, number];
+        const flameColor: [number, number, number] = [flameRgba[0], flameRgba[1], flameRgba[2]];
         const rocketFlame = textureCache.getTintedImage('/game-assets/graphics/fx/engineflame32.png', flameColor[0], flameColor[1], flameColor[2]);
         if (rocketFlame) {
-          const flameMult = p.specId === 'typhoon' ? 1.8 : 1.0;
-          const flameLen = (18 + visualRandom('renderers/FXRenderer.ts#2') * 8) * flameMult;
-          const flameWid = wid * 0.85;
+          const flameLen = sourceEngine?.length ?? (18 + visualRandom('renderers/FXRenderer.ts#2') * 8);
+          const flameWid = sourceEngine?.width ?? (wid * 0.85);
+          ctx.globalAlpha = flameRgba[3] / 255;
           ctx.save();
-          ctx.translate(-len / 2, 0);
+          ctx.translate(sourceEngine?.nozzleOffset ?? -len / 2, 0);
           ctx.rotate(-Math.PI / 2);
           ctx.drawImage(rocketFlame, -flameWid / 2, 0, flameWid, flameLen);
           ctx.restore();
         }
         const rocketGlow = textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow.png', flameColor[0], flameColor[1], flameColor[2]);
         if (rocketGlow) {
-          const glowSize = p.specId === 'typhoon' ? 22 : 12;
-          ctx.drawImage(rocketGlow, -len / 2 - glowSize * 0.5, -glowSize * 0.5, glowSize, glowSize);
+          const glowSize = sourceEngine?.glowSizeMult !== undefined
+            ? (sourceEngine.width * sourceEngine.glowSizeMult * 2)
+            : 12;
+          const glowX = sourceEngine?.nozzleOffset ?? -len / 2;
+          ctx.globalAlpha = flameRgba[3] / 255;
+          ctx.drawImage(rocketGlow, glowX - glowSize * 0.5, -glowSize * 0.5, glowSize, glowSize);
+          if (sourceEngine?.glowAlternateColor) {
+            const alt = sourceEngine.glowAlternateColor;
+            const altGlow = textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow.png', alt[0], alt[1], alt[2]);
+            if (altGlow) {
+              const altSize = glowSize * 0.45;
+              ctx.globalAlpha = alt[3] / 255;
+              ctx.drawImage(altGlow, glowX - altSize * 0.5, -altSize * 0.5, altSize, altSize);
+            }
+          }
         }
         ctx.restore();
 
@@ -221,18 +316,21 @@ export class FXRenderer {
   }
 
   public drawBeams(ctx: CanvasRenderingContext2D, engine: CombatEngine) {
-    for (const b of engine.beams) {
-      const alpha = Math.min(1.0, b.duration / 0.1);
+    for (const b of selectRenderableBeams(engine.beams)) {
+      const visual = getWeaponVisualProfile(b.specId, 'BEAM', false, true);
+      const alpha = Math.min(1.0, b.duration / Math.max(visual.fadeSeconds, 0.01));
       const beamDir = b.endPos.clone().sub(b.startPos);
       const beamLen = beamDir.length();
       if (beamLen < 1) continue;
       const angle = beamDir.heading();
 
-      const [fr, fg, fb] = b.fringeColor || b.color;
-      const [cr, cg, cb] = b.coreColor || [255, 255, 255, 255];
-      const [gr, gg, gb] = b.glowColor || [fr, fg, fb, 255];
-      const width = b.width;
+      const [fr, fg, fb, fa = 255] = b.fringeColor || [...b.color, 255];
+      const [cr, cg, cb, ca = 255] = b.coreColor || [255, 255, 255, 255];
+      const [gr, gg, gb, ga = 255] = b.glowColor || [fr, fg, fb, 255];
+      const width = b.width * visual.trailScale;
       const isRough = b.textureType === 'ROUGH' || b.specId === 'tachyonlance';
+      const sourceGeometry = b.pixelsPerTexel !== undefined;
+      const phaseTime = beamVisualTime(b, engine.combatTime);
 
       ctx.save();
       ctx.translate(b.startPos.x, b.startPos.y);
@@ -241,7 +339,7 @@ export class FXRenderer {
       // 1. 外层光冕
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      ctx.strokeStyle = `rgba(${gr}, ${gg}, ${gb}, ${0.5 * alpha})`;
+      ctx.strokeStyle = `rgba(${gr}, ${gg}, ${gb}, ${0.5 * alpha * (ga / 255)})`;
       ctx.lineWidth = width * 2.2;
       ctx.lineCap = 'round';
       ctx.beginPath();
@@ -253,19 +351,30 @@ export class FXRenderer {
       const fringeUrl = isRough ? '/game-assets/graphics/fx/beam_rough2_fringe.png' : '/game-assets/graphics/fx/beam_laser_fringe.png';
       const tintedFringe = textureCache.getTintedImage(fringeUrl, fr, fg, fb);
       if (tintedFringe) {
-        ctx.globalAlpha = 0.9 * alpha;
-        const pat = ctx.createPattern(tintedFringe, 'repeat');
-        if (pat) {
-          const scrollSpeed = b.textureScrollSpeed || 200;
-          const offset = (b.elapsedTime * scrollSpeed) % tintedFringe.width;
-          try {
-            pat.setTransform(new DOMMatrix().translate(-offset, 0));
-          } catch {}
-          ctx.fillStyle = pat;
-          ctx.fillRect(0, -width / 2, beamLen, width);
+        ctx.globalAlpha = (sourceGeometry ? 1.0 : 0.9) * alpha * (fa / 255);
+        if (sourceGeometry) {
+          const scroll = (phaseTime * (b.textureScrollSpeed ?? 0)) / tintedFringe.width;
+          for (const segment of computeCanvasStripSegments(tintedFringe.width, beamLen, b.pixelsPerTexel!, -scroll)) {
+            ctx.drawImage(
+              tintedFringe,
+              segment.sourceX, 0, segment.sourceWidth, tintedFringe.height,
+              segment.destX, -width / 2, segment.destWidth, width
+            );
+          }
+        } else {
+          const pat = ctx.createPattern(tintedFringe, 'repeat');
+          if (pat) {
+            const scrollSpeed = b.textureScrollSpeed ?? 200;
+            const offset = (phaseTime * scrollSpeed) % tintedFringe.width;
+            try {
+              pat.setTransform(new DOMMatrix().translate(-offset, 0));
+            } catch {}
+            ctx.fillStyle = pat;
+            ctx.fillRect(0, -width / 2, beamLen, width);
+          }
         }
       } else {
-        ctx.strokeStyle = `rgba(${fr}, ${fg}, ${fb}, ${0.85 * alpha})`;
+        ctx.strokeStyle = `rgba(${fr}, ${fg}, ${fb}, ${0.85 * alpha * (fa / 255)})`;
         ctx.lineWidth = width;
         ctx.beginPath();
         ctx.moveTo(0, 0);
@@ -276,21 +385,32 @@ export class FXRenderer {
       // 3. 核心亮纹
       const coreUrl = isRough ? '/game-assets/graphics/fx/beam_rough2_core.png' : '/game-assets/graphics/fx/beam_laser_core.png';
       const tintedCore = textureCache.getTintedImage(coreUrl, cr, cg, cb);
-      const coreWidth = width * 0.4;
+      const coreWidth = sourceGeometry ? width : width * 0.4;
       if (tintedCore) {
-        ctx.globalAlpha = 1.0 * alpha;
-        const pat = ctx.createPattern(tintedCore, 'repeat');
-        if (pat) {
-          const scrollSpeed = (b.textureScrollSpeed || 200) * 1.35;
-          const offset = (b.elapsedTime * scrollSpeed) % tintedCore.width;
-          try {
-            pat.setTransform(new DOMMatrix().translate(-offset, 0));
-          } catch {}
-          ctx.fillStyle = pat;
-          ctx.fillRect(0, -coreWidth / 2, beamLen, coreWidth);
+        ctx.globalAlpha = 1.0 * alpha * (ca / 255);
+        if (sourceGeometry) {
+          const scroll = (phaseTime * (b.textureScrollSpeed ?? 0)) / tintedCore.width;
+          for (const segment of computeCanvasStripSegments(tintedCore.width, beamLen, b.pixelsPerTexel!, -scroll)) {
+            ctx.drawImage(
+              tintedCore,
+              segment.sourceX, 0, segment.sourceWidth, tintedCore.height,
+              segment.destX, -coreWidth / 2, segment.destWidth, coreWidth
+            );
+          }
+        } else {
+          const pat = ctx.createPattern(tintedCore, 'repeat');
+          if (pat) {
+            const scrollSpeed = (b.textureScrollSpeed ?? 200) * 1.35;
+            const offset = (phaseTime * scrollSpeed) % tintedCore.width;
+            try {
+              pat.setTransform(new DOMMatrix().translate(-offset, 0));
+            } catch {}
+            ctx.fillStyle = pat;
+            ctx.fillRect(0, -coreWidth / 2, beamLen, coreWidth);
+          }
         }
       } else {
-        ctx.strokeStyle = `rgba(${cr}, ${cg}, ${cb}, ${0.95 * alpha})`;
+        ctx.strokeStyle = `rgba(${cr}, ${cg}, ${cb}, ${0.95 * alpha * (ca / 255)})`;
         ctx.lineWidth = coreWidth;
         ctx.beginPath();
         ctx.moveTo(0, 0);
@@ -301,28 +421,49 @@ export class FXRenderer {
       // 4. 枪口发射耀斑
       const tintedMuzzle = textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow.png', gr, gg, gb);
       if (tintedMuzzle) {
-        ctx.globalAlpha = 0.95 * alpha;
+        ctx.globalAlpha = 0.95 * alpha * (ga / 255);
         const mSize = width * 2.5;
         ctx.drawImage(tintedMuzzle, -mSize / 2, -mSize / 2, mSize, mSize);
       }
 
       // 5. 目标受击灼烧爆鸣耀斑
-      const tintedImpactGlow = textureCache.getTintedImage('/game-assets/graphics/fx/glow64.png', gr, gg, gb);
-      if (tintedImpactGlow) {
-        ctx.globalAlpha = 0.65 * alpha;
-        const impSize = width * 4.0;
-        ctx.drawImage(tintedImpactGlow, beamLen - impSize / 2, -impSize / 2, impSize, impSize);
-      }
-      const tintedImpactFlare = textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow.png', cr, cg, cb);
-      if (tintedImpactFlare) {
-        ctx.globalAlpha = (0.8 + visualRandom('renderers/FXRenderer.ts#3') * 0.2) * alpha;
-        const impSize = width * 2.8;
-        ctx.drawImage(tintedImpactFlare, beamLen - impSize / 2, -impSize / 2, impSize, impSize);
+      if (b.isHitting) {
+        const brighten = b.hitGlowBrightenDuration && b.hitGlowBrightenDuration > 0
+          ? Math.min(1, b.elapsedTime / b.hitGlowBrightenDuration)
+          : 1;
+        const tintedImpactGlow = textureCache.getTintedImage('/game-assets/graphics/fx/glow64.png', gr, gg, gb);
+        if (tintedImpactGlow) {
+          ctx.globalAlpha = 0.65 * alpha * brighten * (ga / 255);
+          const impSize = width * 4.0;
+          ctx.drawImage(tintedImpactGlow, beamLen - impSize / 2, -impSize / 2, impSize, impSize);
+        }
+        const tintedImpactFlare = textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow.png', cr, cg, cb);
+        if (tintedImpactFlare) {
+          ctx.globalAlpha = (0.8 + visualRandom('renderers/FXRenderer.ts#3') * 0.2) * alpha * brighten * (ca / 255);
+          const impSize = width * 2.8;
+          ctx.drawImage(tintedImpactFlare, beamLen - impSize / 2, -impSize / 2, impSize, impSize);
+        }
       }
 
       ctx.restore();
       ctx.restore();
     }
+  }
+
+  public drawHitGlows(ctx: CanvasRenderingContext2D, engine: CombatEngine) {
+    if (engine.hitGlows.length === 0) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const glow of engine.hitGlows) {
+      const [r, g, b] = glow.color;
+      const alpha = Math.max(0, glow.life / glow.maxLife);
+      const image = textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow.png', r, g, b);
+      if (!image) continue;
+      const diameter = glow.radius * 2;
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(image, glow.pos.x - glow.radius, glow.pos.y - glow.radius, diameter, diameter);
+    }
+    ctx.restore();
   }
 
   public drawExplosions(ctx: CanvasRenderingContext2D, engine: CombatEngine) {
@@ -338,7 +479,7 @@ export class FXRenderer {
       // 1. 初始爆心剧烈耀光
       if (progress < 0.35) {
         const flashAlpha = 1.0 - progress / 0.35;
-        const flashSize = exp.maxRadius * 2.2;
+        const flashSize = exp.maxRadius * (exp.sourceAuthored ? 2 : 2.2);
         const tintedFlash = textureCache.getTintedImage('/game-assets/graphics/fx/hit_glow.png', r, g, b);
         if (tintedFlash) {
           ctx.save();
@@ -382,10 +523,15 @@ export class FXRenderer {
         ctx.globalCompositeOperation = 'lighter';
         ctx.globalAlpha = Math.min(1.0, 1.0 - progress * 0.85);
         ctx.rotate(exp.rotation);
-        const expSize = exp.radius * 2.2;
+        const expSize = exp.radius * (exp.sourceAuthored ? 2 : 2.2);
         ctx.drawImage(tintedFrame, -expSize / 2, -expSize / 2, expSize, expSize);
 
-        const tintedCore = textureCache.getTintedImage(`/game-assets/graphics/fx/explosion${frameIndex}.png`, 255, 235, 170);
+        const tintedCore = textureCache.getTintedImage(
+          `/game-assets/graphics/fx/explosion${frameIndex}.png`,
+          255,
+          exp.sourceAuthored ? 255 : 235,
+          exp.sourceAuthored ? 255 : 170
+        );
         if (tintedCore && progress < 0.6) {
           ctx.globalAlpha = (1.0 - progress / 0.6) * 0.85;
           const coreSize = expSize * 0.6;
@@ -528,9 +674,21 @@ export class FXRenderer {
   }
 
   public drawMuzzleFlashes(ctx: CanvasRenderingContext2D, engine: CombatEngine) {
-    if (engine.muzzleFlashes.length === 0) return;
+    if (engine.muzzleFlashes.length === 0 && engine.muzzleParticles.length === 0) return;
 
     ctx.save();
+
+    for (const particle of engine.muzzleParticles) {
+      const alpha = Math.max(0, particle.life / particle.maxLife) * (particle.color[3] / 255);
+      const [r, g, b] = particle.color;
+      ctx.globalCompositeOperation = particle.blendMode === 'NORMAL' ? 'source-over' : 'lighter';
+      const tintedParticle = textureCache.getTintedImage('/game-assets/graphics/fx/particlealpha32sq.png', r, g, b);
+      if (tintedParticle) {
+        ctx.globalAlpha = alpha;
+        ctx.drawImage(tintedParticle, particle.pos.x - particle.size / 2, particle.pos.y - particle.size / 2, particle.size, particle.size);
+      }
+    }
+
     ctx.globalCompositeOperation = 'lighter';
 
     for (const flash of engine.muzzleFlashes) {

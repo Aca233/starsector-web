@@ -4,6 +4,7 @@ import { Beam } from '../../Weapon';
 import { sound } from '../../../audio/SoundManager';
 import { i18n } from '../../../i18n/LocalizationManager';
 import { WeaponSimContext } from './WeaponSimContext';
+import { advanceBeamContactPulse } from '../../../visual/ImpactVisuals';
 
 /**
  * 计算射线与圆的物理入射交点与参数 t (Ray-Circle Entry Intersection)
@@ -59,6 +60,7 @@ export class BeamSimulationHandler {
       b.elapsedTime += dt;
       b.duration -= dt;
       b.isHitting = false;
+      let contactedThisTick = false;
 
       if (b.duration <= 0) {
         beams.splice(i, 1);
@@ -130,6 +132,7 @@ export class BeamSimulationHandler {
           if (shieldHitPoint) {
             b.endPos.copy(shieldHitPoint);
             b.isHitting = true;
+            contactedThisTick = true;
             const tickDmg = b.damagePerSec * dt;
             const shieldMult = ship.system.getShieldDamageMultiplier();
             const absorbedDmg = tickDmg * shieldMult;
@@ -166,7 +169,14 @@ export class BeamSimulationHandler {
                 }
               }
             }
-            ctx.fx.spawnSparks(shieldHitPoint, 2, b.color);
+            const contactPulse = advanceBeamContactPulse(b, 'SHIELD', dt);
+            if (contactPulse.emitFx) {
+              ctx.fx.spawnSparks(shieldHitPoint, 2, b.color);
+              ctx.fx.spawnShieldRipple(shieldHitPoint, Math.max(18, b.width * 1.4), b.color);
+            }
+            if (contactPulse.emitSound) {
+              sound.playAtPos('shield_hit', shieldHitPoint, ctx.playerShip.pos, 0.22);
+            }
             // 光束截断于护盾表面，绝对不穿透至船体装甲！
             break;
           }
@@ -200,12 +210,18 @@ export class BeamSimulationHandler {
           if (hitPoly) {
             b.endPos.copy(worldImpact);
             b.isHitting = true;
+            contactedThisTick = true;
             const tickDmg = b.damagePerSec * dt;
             const result = ship.armor.takeDamage(localImpact, tickDmg, b.damageType, b.damagePerSec, true);
             ship.hullHp = Math.max(0, ship.hullHp - result.hullDamage);
             ship.addScorchMark(localImpact, result.armorDamage || result.hullDamage);
 
-            if (ctx.visualRandom.next() < dt * 6) {
+            const contactPulse = advanceBeamContactPulse(b, 'HULL', dt);
+            if (contactPulse.emitFx) {
+              ctx.fx.spawnSparks(worldImpact, b.isEmpPiercing ? 8 : 3, b.isEmpPiercing ? [160, 220, 255] : b.color);
+              if (b.isEmpPiercing) ctx.addCameraShake(4, 0.12);
+            }
+            if (contactPulse.emitSound) {
               sound.playAtPos('beam_hit', worldImpact, ctx.playerShip.pos, 0.35);
             }
 
@@ -264,21 +280,6 @@ export class BeamSimulationHandler {
               ctx.fx.spawnDebris(worldImpact, 1, debrisColor, 50, 'small');
             }
 
-            if (b.isEmpPiercing) {
-              for (let arcIdx = 0; arcIdx < 3; arcIdx++) {
-                const arcDest = ship.pos.clone().add(
-                  new Vector2(
-                    (ctx.visualRandom.next() - 0.5) * ship.spec.collisionRadius * 1.2,
-                    (ctx.visualRandom.next() - 0.5) * ship.spec.collisionRadius * 1.2
-                  ).rotate(ship.facingRad)
-                );
-                ctx.fx.spawnEmpArc(worldImpact, arcDest);
-              }
-              sound.playAtPos('emp_discharge', worldImpact, ctx.playerShip.pos, 0.5);
-              ctx.fx.spawnSparks(worldImpact, 8, [160, 220, 255]);
-              ctx.addCameraShake(4, 0.12);
-            }
-
             if (ship.hullHp <= 0) {
               ctx.handleShipDestruction(ship);
             }
@@ -287,6 +288,7 @@ export class BeamSimulationHandler {
           }
         }
       }
+      if (!contactedThisTick) b.contactSurface = undefined;
     }
   }
 }

@@ -10,6 +10,7 @@ import {
   RuntimeCollisionKernel,
   RuntimeCollisionQuery
 } from '../../collision/RuntimeCollisionKernel';
+import { getProjectileImpactVisualProfile } from '../../../visual/ImpactVisuals';
 
 /**
  * 弹道物理碰撞、近炸引信与装甲毁伤处理器 (ProjectileCollisionHandler)
@@ -25,6 +26,19 @@ import {
 export class ProjectileCollisionHandler {
   private readonly spatialIndex = new SpatialShipIndex();
   public readonly runtimeCollisionKernel = new RuntimeCollisionKernel();
+
+  private spawnMissileDestructionVisual(
+    projectile: Projectile,
+    pos: Vector2,
+    ctx: WeaponSimContext,
+    fallbackColor: [number, number, number] = [255, 160, 40]
+  ): void {
+    if (projectile.missileExplosionVisualSpec) {
+      ctx.fx.spawnSourceMissileExplosion(pos, projectile.missileExplosionVisualSpec);
+    } else {
+      ctx.fx.spawnAuthenticExplosion(pos, 35, fallbackColor, true, 'missile');
+    }
+  }
 
   public prepareShipCollisionFrame(allShips: Ship[]): void {
     this.spatialIndex.rebuild(allShips);
@@ -167,7 +181,7 @@ export class ProjectileCollisionHandler {
             if (targetM.isRocket) ctx.contrailEngine?.detach(targetM.id);
             allProjectiles.splice(mIdx, 1);
             sound.playAtPos('missile_explosion', targetM.pos, ctx.playerShip.pos, 0.55);
-            ctx.fx.spawnAuthenticExplosion(targetM.pos, 35, [255, 140, 40], true, 'missile');
+            this.spawnMissileDestructionVisual(targetM, targetM.pos, ctx, [255, 140, 40]);
             ctx.fx.addFloatingText(targetM.pos.clone(), 'BURST INTERCEPTED', [120, 255, 160], 12, 0.85);
             interceptedCount++;
           } else {
@@ -244,7 +258,7 @@ export class ProjectileCollisionHandler {
             allProjectiles.splice(mIdx, 1);
             if (ctx.statsTracker) ctx.statsTracker.recordMissileIntercepted(p.isPlayer ?? false);
             sound.playAtPos('missile_explosion', targetM.pos, ctx.playerShip.pos, 0.5);
-            ctx.fx.spawnAuthenticExplosion(targetM.pos, 35, [255, 160, 40], true, 'missile');
+            this.spawnMissileDestructionVisual(targetM, targetM.pos, ctx, [255, 160, 40]);
             ctx.fx.addFloatingText(targetM.pos.clone(), 'MG INTERCEPTED', [120, 255, 150], 12, 0.8);
             if (ctx.visualRandom.next() < 0.45) {
               ctx.addRadioMessage('点防火控', 'PLAYER', '近防机枪已成功打爆一枚来袭重型导弹！', [140, 255, 180]);
@@ -303,16 +317,19 @@ export class ProjectileCollisionHandler {
       }
       ship.flux.increaseFlux(fluxGain, true);
       ctx.fx.addFloatingDamage(impactWorld, absorbedDmg, [80, 200, 255]);
-      sound.playAtPos('shield_hit', impactWorld, ctx.playerShip.pos, 0.45);
-      ctx.fx.spawnShieldRipple(impactWorld, p.damage > 200 ? 75 : 45, p.color);
-
-      const hitRadius = p.hitGlowRadius || (p.damage > 200 ? 55 : 30);
-      if (p.isRocket || p.damage >= 200) {
-        ctx.fx.spawnAuthenticExplosion(impactWorld, hitRadius, p.color, true, p.isRocket ? 'missile' : 'impact');
-      } else {
-        ctx.fx.spawnSparks(impactWorld, 15, p.color);
-      }
-      ctx.addCameraShake(2, 0.1);
+      const visual = getProjectileImpactVisualProfile({
+        specId: p.specId,
+        damageType: p.damageType,
+        damage: p.damage,
+        isRocket: !!p.isRocket,
+        surface: 'SHIELD'
+      });
+      sound.playAtPos(visual.soundKey, impactWorld, ctx.playerShip.pos, visual.soundVolume);
+      ctx.fx.spawnShieldRipple(impactWorld, visual.shieldRippleRadius, p.color);
+      // Shield contacts stay on the field surface: never draw a hull/missile
+      // fireball merely because a high-damage projectile was blocked.
+      ctx.fx.spawnSparks(impactWorld, visual.sparkCount, p.color);
+      ctx.addCameraShake(visual.cameraShake, 0.1);
       return true;
     }
 
@@ -359,22 +376,26 @@ export class ProjectileCollisionHandler {
       }
     }
 
-    if (p.damage >= 180) {
-      sound.playAtPos('armor_hit_heavy', impactWorld, ctx.playerShip.pos, 0.7);
-    } else if (p.damage >= 80) {
-      sound.playAtPos('armor_hit_solid', impactWorld, ctx.playerShip.pos, 0.6);
-    } else {
-      sound.playAtPos('armor_hit_light', impactWorld, ctx.playerShip.pos, 0.45);
-    }
+    const impactSurface = result.hullDamage > 0 ? 'HULL' : 'ARMOR';
+    const visual = getProjectileImpactVisualProfile({
+      specId: p.specId,
+      damageType: p.damageType,
+      damage: p.damage,
+      isRocket: !!p.isRocket,
+      surface: impactSurface
+    });
+    sound.playAtPos(visual.soundKey, impactWorld, ctx.playerShip.pos, visual.soundVolume);
 
     if (result.armorDamage > 0) ctx.fx.addFloatingDamage(impactWorld, result.armorDamage, [255, 175, 40]);
     if (result.hullDamage > 0) ctx.fx.addFloatingDamage(impactWorld, result.hullDamage, [255, 55, 45]);
 
-    const hitRadius = p.hitGlowRadius || (p.damage > 200 ? 50 : 25);
-    if (p.isRocket || p.damage >= 200) {
-      ctx.fx.spawnAuthenticExplosion(impactWorld, hitRadius, p.color, true, p.isRocket ? 'missile' : 'impact');
-    } else {
-      ctx.fx.spawnSparks(impactWorld, 20, p.color);
+    if (p.hitGlowRadius && p.hitGlowRadius > 0) {
+      ctx.fx.spawnHitGlow(impactWorld, p.hitGlowRadius, p.color);
+    }
+    if (p.isRocket) {
+      this.spawnMissileDestructionVisual(p, impactWorld, ctx, p.color);
+    } else if (visual.sparkCount > 0) {
+      ctx.fx.spawnSparks(impactWorld, visual.sparkCount, p.color);
     }
 
     if (p.damage >= 150) {
@@ -399,7 +420,7 @@ export class ProjectileCollisionHandler {
       ctx.fx.addFloatingDamage(impactWorld.clone().add(new Vector2(10, -10)), p.empDamage, [130, 220, 255]);
     }
 
-    ctx.addCameraShake(Math.min(15, p.damage * 0.04), 0.15);
+    ctx.addCameraShake(visual.cameraShake, 0.15);
     if (ship.hullHp <= 0) ctx.handleShipDestruction(ship);
     return true;
   }

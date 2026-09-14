@@ -924,20 +924,6 @@
     }
   },
   {
-    "id": "graphics/missiles/low_tech_torpedo.png",
-    "path": "graphics/missiles/low_tech_torpedo.png",
-    "type": "image",
-    "bytes": 718,
-    "hash": "c0b4c2bd2af3571f963cc50984341ddca147560f3e2f873b2ccf9ca507ea9d7b",
-    "group": "graphics",
-    "sampler": {
-      "wrap": "clamp",
-      "minFilter": "linear",
-      "magFilter": "linear",
-      "mipmap": false
-    }
-  },
-  {
     "id": "graphics/missiles/missile_annihilator.png",
     "path": "graphics/missiles/missile_annihilator.png",
     "type": "image",
@@ -971,6 +957,20 @@
     "type": "image",
     "bytes": 536,
     "hash": "1e4e87f7175bc4e3b6cb7f1df949103aee6d81fd668fdc617e855ef57ab4333c",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/missiles/missile_torpedo_compact.png",
+    "path": "graphics/missiles/missile_torpedo_compact.png",
+    "type": "image",
+    "bytes": 807,
+    "hash": "92602dbae2ed1cbbc1559dc1d7f3a5e45a6d5ea096c7d29a82bc302a5f0c3c1e",
     "group": "graphics",
     "sampler": {
       "wrap": "clamp",
@@ -1050,11 +1050,39 @@
     }
   },
   {
+    "id": "graphics/missiles/shell_small_yellow.png",
+    "path": "graphics/missiles/shell_small_yellow.png",
+    "type": "image",
+    "bytes": 2924,
+    "hash": "d072526139c925ab2a35047780f4c7789ebbc0f8c275ccd5da1907b38b47a193",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
     "id": "graphics/missiles/shell_small.png",
     "path": "graphics/missiles/shell_small.png",
     "type": "image",
     "bytes": 2906,
     "hash": "4a06d3b478b8e78c8fd7a559416f36ccfe6b6ebbec92df362f59a73d816a272c",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/missiles/torpedo_guided2.png",
+    "path": "graphics/missiles/torpedo_guided2.png",
+    "type": "image",
+    "bytes": 639,
+    "hash": "bb22c41414767e0717860586b4c16ac1ace09c5edcb313cdda14dd8afcc75538",
     "group": "graphics",
     "sampler": {
       "wrap": "clamp",
@@ -1246,6 +1274,118 @@
     }
   },
   {
+    "id": "graphics/weapons/blaster_hardpoint_base.png",
+    "path": "graphics/weapons/blaster_hardpoint_base.png",
+    "type": "image",
+    "bytes": 1987,
+    "hash": "f58d3f736106e734ef067e3a4545d5081ea7ab4606c53e7b3863ffc72f05cd86",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/blaster_hardpoint_glow.png",
+    "path": "graphics/weapons/blaster_hardpoint_glow.png",
+    "type": "image",
+    "bytes": 1115,
+    "hash": "12085bcf5dd3181e0edc740dd1dd553efdcefdbfb0cfe93189f059f78320626d",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/blaster_turret_base.png",
+    "path": "graphics/weapons/blaster_turret_base.png",
+    "type": "image",
+    "bytes": 2098,
+    "hash": "41b4e8fbf833353e62903f5a8dc54526ce25aa9778c846dc822a551e54801724",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/blaster_turret_glow.png",
+    "path": "graphics/weapons/blaster_turret_glow.png",
+    "type": "image",
+    "bytes": 1207,
+    "hash": "68b09a73b18eac254b818b2d1df82f784572b6ebb8f4ab503dfa351ca9a49cd5",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/burstpd_hardpoint_base.png",
+    "path": "graphics/weapons/burstpd_hardpoint_base.png",
+    "type": "image",
+    "bytes": 1341,
+    "hash": "810ecbe8570a3cb037f9c5e896fddd8afc419140204ceecd2d5b43991c4e7b78",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/burstpd_hardpoint_glow.png",
+    "path": "graphics/weapons/burstpd_hardpoint_glow.png",
+    "type": "image",
+    "bytes": 683,
+    "hash": "a57cc242cd8f4a7b45c9d40e93230f1007b77b0783af7bda4473afff72f91cad",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/burstpd_turret_base.png",
+    "path": "graphics/weapons/burstpd_turret_base.png",
+    "type": "image",
+    "bytes": 1515,
+    "hash": "af3dd00b1fc8427aecc3b0cc4908c5f12b0a48208cfc9631eff19cd06fc2f935",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/burstpd_turret_glow.png",
+    "path": "graphics/weapons/burstpd_turret_glow.png",
+    "type": "image",
+    "bytes": 726,
+    "hash": "437068fbdb5db56e0c21889d3cf41f9918d3bbb03c4703dc5675a5ec0ec6d8a5",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
     "id": "graphics/weapons/double_flak_cannon_turret_base.png",
     "path": "graphics/weapons/double_flak_cannon_turret_base.png",
     "type": "image",
@@ -1302,6 +1442,34 @@
     }
   },
   {
+    "id": "graphics/weapons/graviton_beam_hardpoint_base.png",
+    "path": "graphics/weapons/graviton_beam_hardpoint_base.png",
+    "type": "image",
+    "bytes": 3308,
+    "hash": "67d86f6e2af73d47e53f2a5baabad73db8181bc33b43ad631e748ca41634f752",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/graviton_beam_hardpoint_glow.png",
+    "path": "graphics/weapons/graviton_beam_hardpoint_glow.png",
+    "type": "image",
+    "bytes": 819,
+    "hash": "1f7ab3162b08529d008a9927462a553b6194dc06a6fe86bfd56652472fd253ba",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
     "id": "graphics/weapons/graviton_beam_turret_base.png",
     "path": "graphics/weapons/graviton_beam_turret_base.png",
     "type": "image",
@@ -1309,7 +1477,7 @@
     "hash": "6daba6e480178bb0b7e654495586d58e74b407d6e2decb75d49cadf8343423c0",
     "group": "graphics",
     "sampler": {
-      "wrap": "repeat",
+      "wrap": "clamp",
       "minFilter": "linear",
       "magFilter": "linear",
       "mipmap": false
@@ -1323,7 +1491,7 @@
     "hash": "918d393e19441ac6fd5e46c1cd8d0504001169a4bb9f2123bf54bb1f0a7eacc7",
     "group": "graphics",
     "sampler": {
-      "wrap": "repeat",
+      "wrap": "clamp",
       "minFilter": "linear",
       "magFilter": "linear",
       "mipmap": false
@@ -1414,11 +1582,81 @@
     }
   },
   {
-    "id": "graphics/weapons/launcher_annihilator_turret_base.png",
-    "path": "graphics/weapons/launcher_annihilator_turret_base.png",
+    "id": "graphics/weapons/launcher_m5_2x_hardpoint_base.png",
+    "path": "graphics/weapons/launcher_m5_2x_hardpoint_base.png",
     "type": "image",
-    "bytes": 1070,
-    "hash": "c1db78989f54488a90ca02619f5a2ec1c06944c864c49df9a9b82e71c030fb6e",
+    "bytes": 2368,
+    "hash": "4ca283ad154a97b264196a6a2488056d98cf745a0a27d83f9e8437886bb7fbda",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/launcher_m5_2x_turret_base.png",
+    "path": "graphics/weapons/launcher_m5_2x_turret_base.png",
+    "type": "image",
+    "bytes": 2464,
+    "hash": "66b530fe9a0e48ac62397ee05e9d114c3c89d3b979f3c488f10749f26f6def28",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/missile_rack_m_3x_hardpoint_base.png",
+    "path": "graphics/weapons/missile_rack_m_3x_hardpoint_base.png",
+    "type": "image",
+    "bytes": 950,
+    "hash": "6c7b00f5202a00e5c0b950a8b8f681f6dd8349091b7fcabe6cce0dc666f9eb59",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/missile_rack_m_3x_turret_base.png",
+    "path": "graphics/weapons/missile_rack_m_3x_turret_base.png",
+    "type": "image",
+    "bytes": 1006,
+    "hash": "be919f9b5bb3b3e26675f37c9d5da13651fd3595eb0d02f7145afbef806c35a5",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/missile_rack_open_s_1x_hardpoint_base.png",
+    "path": "graphics/weapons/missile_rack_open_s_1x_hardpoint_base.png",
+    "type": "image",
+    "bytes": 828,
+    "hash": "9d2395e7f47bd6bbd24b1aefceaa41e2ba7f36a91ee10b01bb6b3063bc7deaf2",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/missile_rack_open_s_1x_turret_base.png",
+    "path": "graphics/weapons/missile_rack_open_s_1x_turret_base.png",
+    "type": "image",
+    "bytes": 845,
+    "hash": "5f07852ec42c4c4149bf4d207d0f9a449acd2e7a8a48da54fae1322104d2c9c6",
     "group": "graphics",
     "sampler": {
       "wrap": "clamp",
@@ -1512,6 +1750,34 @@
     }
   },
   {
+    "id": "graphics/weapons/tactical_laser_hardpoint_glow.png",
+    "path": "graphics/weapons/tactical_laser_hardpoint_glow.png",
+    "type": "image",
+    "bytes": 969,
+    "hash": "9669bd4ea4933a9fdc044e012aad20617273ce043b477835f4616c7af50e2f7e",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/tactical_laser_hardpoint.png",
+    "path": "graphics/weapons/tactical_laser_hardpoint.png",
+    "type": "image",
+    "bytes": 16051,
+    "hash": "ae8824eade58503e780dcf82a3f23779ddc1b2f2cd69a35e5d39a86dd5319401",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
     "id": "graphics/weapons/tactical_laser_turret_glow.png",
     "path": "graphics/weapons/tactical_laser_turret_glow.png",
     "type": "image",
@@ -1531,6 +1797,34 @@
     "type": "image",
     "bytes": 16084,
     "hash": "0d671018339c929866a0fc9665250d2301696ffbb834ec574749ca908e79c51f",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/typhoon_reaper_launcher_hardpoint_base.png",
+    "path": "graphics/weapons/typhoon_reaper_launcher_hardpoint_base.png",
+    "type": "image",
+    "bytes": 1621,
+    "hash": "33fe21519e367c5b807e2de4694f7a598437161469acfd9d5d6c2f1d53e2a445",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/weapons/typhoon_reaper_launcher_turret_base.png",
+    "path": "graphics/weapons/typhoon_reaper_launcher_turret_base.png",
+    "type": "image",
+    "bytes": 1775,
+    "hash": "453f4a1005e6f7976c0ad322e25bafb3f24b2407c1b5ce67af24132fcd255738",
     "group": "graphics",
     "sampler": {
       "wrap": "clamp",
@@ -1969,6 +2263,22 @@
     "type": "audio",
     "bytes": 5838,
     "hash": "75a80cc5e5c1a220111f83fa94b46b592c98f0056857554e99cf3cfdf6545f00",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_wpn_energy/burst_pd_fire_01.ogg",
+    "path": "sounds/sfx_wpn_energy/burst_pd_fire_01.ogg",
+    "type": "audio",
+    "bytes": 7895,
+    "hash": "93553b250e27e80df115e436cce07422cd1251c878f29416bc85124db1d709f6",
+    "group": "sounds"
+  },
+  {
+    "id": "sounds/sfx_wpn_energy/heavy_blaster_fire_01.ogg",
+    "path": "sounds/sfx_wpn_energy/heavy_blaster_fire_01.ogg",
+    "type": "audio",
+    "bytes": 10806,
+    "hash": "c584e5bb28454a363578aaf110763e549bb12f8d1d98fc82b14d0fa936b185c6",
     "group": "sounds"
   },
   {

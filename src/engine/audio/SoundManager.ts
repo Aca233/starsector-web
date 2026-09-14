@@ -60,7 +60,8 @@ export class SoundManager {
     mine_explosion: 'sounds/sfx_systems/mine_strike_explosion_01.ogg',
 
     // 新增武器音效
-    heavyblaster_fire: 'sounds/sfx_wpn_energy/autopulse_laser_fire_01.ogg',
+    heavyblaster_fire: 'sounds/sfx_wpn_energy/heavy_blaster_fire_01.ogg',
+    pdburst_fire: 'sounds/sfx_wpn_energy/burst_pd_fire_01.ogg',
     sabot_fire: 'sounds/sfx_wpn_missiles/annihilator_fire_01.ogg',
     typhoon_fire: 'sounds/sfx_wpn_missiles/annihilator_fire_01.ogg',
     lightmg_fire: 'sounds/sfx_wpn_guns/light_machinegun_fire_01.ogg',

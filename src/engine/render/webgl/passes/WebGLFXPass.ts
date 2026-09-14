@@ -149,18 +149,31 @@ export class WebGLFXPass {
       }
     }
 
+    // 6.75 来源投射物命中辉光：独立于 explosion 翻页书，半径直接来自 .proj hitGlowRadius。
+    if (engine.hitGlows.length > 0) {
+      batcher.setBlendMode('ADDITIVE');
+      for (const glow of engine.hitGlows) {
+        const alpha = Math.max(0, glow.life / glow.maxLife);
+        const [r, g, b] = glow.color;
+        const diameter = glow.radius * 2;
+        batcher.drawSprite(hitGlowTex, glow.pos.x, glow.pos.y, diameter, diameter, 0, 0, 0, r / 255, g / 255, b / 255, alpha);
+      }
+    }
+
     // 7. 绘制原版官方爆炸翻页书火光、初始白热耀光与扩散冲击波 (Explosions & Shockwaves)
     const expRingTex = textures.getTexture('/game-assets/graphics/fx/explosion_ring0.png');
     const expSmokeTex = textures.getTexture('/game-assets/graphics/fx/contrail64b.png');
     for (const exp of engine.explosions) {
       const progress = Math.max(0, Math.min(1.0, 1.0 - exp.life / exp.maxLife));
       const [er, eg, eb] = exp.color;
-      const explosionVisual = getExplosionVisualProfile(exp.maxRadius, exp.visualKind ?? 'impact', exp.sourceShipId);
+      const explosionVisual = exp.sourceAuthored
+        ? { flash: 1, fireball: 1, shockwave: 0, smoke: 0, debris: 0 }
+        : getExplosionVisualProfile(exp.maxRadius, exp.visualKind ?? 'impact', exp.sourceShipId);
 
       // 7.1 初始爆心剧烈白热耀光
       if (progress < 0.35) {
         const flashAlpha = (1.0 - progress / 0.35) * explosionVisual.flash;
-        const flashSize = exp.maxRadius * 2.2;
+        const flashSize = exp.maxRadius * (exp.sourceAuthored ? 2 : 2.2);
         batcher.setBlendMode('ADDITIVE');
         batcher.drawSprite(hitGlowTex, exp.pos.x, exp.pos.y, flashSize, flashSize, 0, 0, 0, er / 255, eg / 255, eb / 255, flashAlpha);
         batcher.drawSprite(hitGlowTex, exp.pos.x, exp.pos.y, flashSize * 0.55, flashSize * 0.55, 0, 0, 0, 1.0, 1.0, 1.0, flashAlpha * 0.8);
@@ -211,6 +224,12 @@ export class WebGLFXPass {
       const expTex = textures.getTexture(`/game-assets/graphics/fx/explosion${exp.frame}.png`);
       const d = exp.radius * 2;
       batcher.drawSprite(expTex, exp.pos.x, exp.pos.y, d, d, exp.rotation, 0, 0, er / 255, eg / 255, eb / 255, 0.95 * explosionVisual.fireball);
+      // Missile .proj explicitly states that the visual explosion receives a white additive core.
+      // Static data does not define the core scale/envelope, so those remain conservative Web presentation defaults.
+      if (exp.sourceAuthored && progress < 0.6) {
+        const coreAlpha = (1 - progress / 0.6) * 0.85;
+        batcher.drawSprite(expTex, exp.pos.x, exp.pos.y, d * 0.6, d * 0.6, exp.rotation, 0, 0, 1, 1, 1, coreAlpha);
+      }
     }
 
     // 8. 绘制金属装甲战损碎片 (1:1 DebrisParticleSystem.java: 正方形真实金属破片贴图与熔融火光)

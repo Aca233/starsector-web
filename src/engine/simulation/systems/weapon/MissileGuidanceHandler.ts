@@ -98,8 +98,12 @@ export class MissileGuidanceHandler {
         // 近距离冲撞诱饵弹发生殉爆
         if (distFlare < 26) {
           sound.playAtPos('missile_explosion', p.pos, ctx.playerShip.pos, 0.7);
-          ctx.fx.spawnAuthenticExplosion(p.pos, 45, [255, 160, 60], true, 'missile');
-          ctx.fx.spawnSparks(p.pos, 25, [255, 200, 80]);
+          if (p.missileExplosionVisualSpec) {
+            ctx.fx.spawnSourceMissileExplosion(p.pos, p.missileExplosionVisualSpec);
+          } else {
+            ctx.fx.spawnAuthenticExplosion(p.pos, 45, [255, 160, 60], true, 'missile');
+            ctx.fx.spawnSparks(p.pos, 25, [255, 200, 80]);
+          }
           ctx.fx.addFloatingText(p.pos.clone(), 'MISSILE SPOOFED', [255, 200, 80], 13, 1.2);
           if (nearbyFlare.sourceShipId === ctx.playerShip.id) {
             ctx.addRadioMessage('电子战中控', 'PLAYER', '防空雷达确认：敌方制导鱼雷被诱饵热焰弹诱骗引爆！', [140, 255, 180]);
@@ -151,18 +155,20 @@ export class MissileGuidanceHandler {
     // 导弹烟雾尾迹带 (1:1 对齐原版 ContrailEngine.java)
     if (p.isRocket) {
       const heading = p.facingRad !== undefined ? p.facingRad : p.vel.heading();
-      const halfLen = (p.projLength || 25) * 0.5;
-      const nozzlePos = p.pos.clone().addScaled(Vector2.fromAngle(heading, 1), -halfLen);
+      const fallbackNozzleOffset = -(p.projLength || 25) * 0.5;
+      const nozzleOffset = p.missileEngineVisualSpec?.nozzleOffset ?? fallbackNozzleOffset;
+      const trail = p.missileTrailSpec;
+      const nozzlePos = p.pos.clone().addScaled(
+        Vector2.fromAngle(heading, 1),
+        nozzleOffset + (trail?.spawnOffset ?? 0)
+      );
 
-      const contrailDuration = p.specId === 'typhoon' ? 2.5 : (p.specId === 'sabot' ? 1.5 : 1.6);
-      const baseWidth = p.specId === 'typhoon' ? 16 : (p.specId === 'sabot' ? 9 : 11);
-      const widenMult = p.specId === 'typhoon' ? 2.8 : 2.4;
-      const minSeg = 5.0;
-      const smokeColor: [number, number, number, number] = p.specId === 'typhoon'
-        ? [120, 115, 115, 230]
-        : p.specId === 'sabot'
-        ? [160, 200, 240, 200]
-        : [200, 200, 205, 215];
+      const contrailDuration = trail?.duration ?? 1.6;
+      const baseWidth = trail?.baseWidth ?? 11;
+      const widenMult = trail?.widenMult ?? 2.4;
+      const minSeg = trail?.minSeg ?? 5.0;
+      const smokeColor: [number, number, number, number] = trail?.color ?? [200, 200, 205, 215];
+      const blendMode = trail?.blendMode ?? 'NORMAL';
 
       ctx.contrailEngine?.addPoint(
         p.id,
@@ -172,7 +178,7 @@ export class MissileGuidanceHandler {
         widenMult,
         minSeg,
         smokeColor,
-        'NORMAL'
+        blendMode
       );
     }
 

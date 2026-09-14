@@ -163,16 +163,20 @@ export class CombatSession {
       + this.engine.contrails.length
       + this.engine.debris.length
       + this.engine.explosions.length
+      + this.engine.hitGlows.length
       + this.engine.empArcs.length
       + this.engine.muzzleFlashes.length
       + this.engine.muzzleParticles.length
       + this.engine.shieldRipples.length
       + this.engine.hulkFragments.length;
+    const trailStats = this.engine.contrailEngine.getStats();
     this.performance.finalizeFrame({
       gpuTimeMs: resourceStats.gpuTimeMs,
       gpuTimerAvailable: resourceStats.gpuTimerAvailable,
       projectileCount: this.engine.projectiles.length,
       particleCount,
+      trailStripCount: trailStats.stripCount,
+      trailPointCount: trailStats.pointCount,
       textureCount: resourceStats.residentTextures,
       pendingTextureUploads: resourceStats.pendingUploads,
       textureUploads: resourceStats.uploads,

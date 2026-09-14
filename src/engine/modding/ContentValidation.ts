@@ -74,8 +74,13 @@ export function validateWeaponSpec(input: unknown, requireBundledAssets = assetM
   }
   colorTuple(spec.color, `${id}.color`, 3);
 
-  for (const key of ['turnRateDegPerSec', 'minSpread', 'maxSpread', 'spreadPerShot', 'spreadDecay', 'visualRecoil', 'hitGlowRadius', 'glowRadius', 'coreWidthMult', 'projLength', 'projWidth', 'muzzleFlashSize', 'burstDelay', 'engineAcceleration', 'maxSpeed', 'maxTurnRate', 'missileHp'] as const) {
+  for (const key of ['turnRateDegPerSec', 'minSpread', 'maxSpread', 'spreadPerShot', 'spreadDecay', 'visualRecoil', 'hitGlowRadius', 'glowRadius', 'coreWidthMult', 'projLength', 'projWidth', 'muzzleFlashSize', 'burstDelay', 'engineAcceleration', 'maxSpeed', 'maxTurnRate', 'missileHp', 'beamWidth', 'beamDuration', 'beamSourceChargeupTime', 'beamSourceChargedownTime', 'hitGlowBrightenDuration'] as const) {
     if (spec[key] !== undefined) finite(spec[key], `${id}.${key}`, 0);
+  }
+  if (spec.fadeTime !== undefined) finite(spec.fadeTime, `${id}.fadeTime`, 0);
+  if (spec.pixelsPerTexel !== undefined) {
+    const pixelsPerTexel = finite(spec.pixelsPerTexel, `${id}.pixelsPerTexel`, 0);
+    if (pixelsPerTexel <= 0) throw new Error(`${id}.pixelsPerTexel 必须 > 0`);
   }
   if (spec.textureScrollSpeed !== undefined) finite(spec.textureScrollSpeed, `${id}.textureScrollSpeed`);
   if (spec.burstSize !== undefined) integer(spec.burstSize, `${id}.burstSize`, 1);
@@ -83,6 +88,8 @@ export function validateWeaponSpec(input: unknown, requireBundledAssets = assetM
     if (spec[key] !== undefined && typeof spec[key] !== 'boolean') throw new Error(`${id}.${key} 必须是布尔值`);
   }
   if (spec.spawnType !== undefined) enumValue(spec.spawnType, `${id}.spawnType`, new Set(['BALLISTIC', 'BALLISTIC_AS_BEAM', 'MISSILE', 'BEAM']));
+  if (spec.visualSpawnType !== undefined) enumValue(spec.visualSpawnType, `${id}.visualSpawnType`, new Set(['BALLISTIC', 'BALLISTIC_AS_BEAM', 'MISSILE', 'BEAM']));
+  if (spec.beamVisualMode !== undefined) enumValue(spec.beamVisualMode, `${id}.beamVisualMode`, new Set(['BURST', 'SUSTAINED']));
   if (spec.textureType !== undefined) enumValue(spec.textureType, `${id}.textureType`, new Set(['ROUGH', 'SMOOTH']));
   for (const key of ['fringeColor', 'coreColor', 'glowColor'] as const) {
     if (spec[key] !== undefined) colorTuple(spec[key], `${id}.${key}`, 4);
@@ -102,6 +109,39 @@ export function validateWeaponSpec(input: unknown, requireBundledAssets = assetM
     }
     integer(muzzle.particleCount, `${id}.muzzleFlashSpec.particleCount`, 0);
     colorTuple(muzzle.particleColor, `${id}.muzzleFlashSpec.particleColor`, 4);
+  }
+  if (spec.launcherSmokeSpec !== undefined) {
+    const smoke = object(spec.launcherSmokeSpec, `${id}.launcherSmokeSpec`);
+    for (const key of ['particleSizeMin', 'particleSizeRange', 'cloudDuration', 'cloudRadius', 'blowbackDuration', 'blowbackLength', 'blowbackSpread'] as const) {
+      finite(smoke[key], `${id}.launcherSmokeSpec.${key}`, 0);
+    }
+    integer(smoke.cloudParticleCount, `${id}.launcherSmokeSpec.cloudParticleCount`, 0);
+    integer(smoke.blowbackParticleCount, `${id}.launcherSmokeSpec.blowbackParticleCount`, 0);
+    colorTuple(smoke.particleColor, `${id}.launcherSmokeSpec.particleColor`, 4);
+  }
+  if (spec.missileEngineVisualSpec !== undefined) {
+    const engineVisual = object(spec.missileEngineVisualSpec, `${id}.missileEngineVisualSpec`);
+    finite(engineVisual.nozzleOffset, `${id}.missileEngineVisualSpec.nozzleOffset`);
+    finite(engineVisual.width, `${id}.missileEngineVisualSpec.width`, 0);
+    finite(engineVisual.length, `${id}.missileEngineVisualSpec.length`, 0);
+    colorTuple(engineVisual.color, `${id}.missileEngineVisualSpec.color`, 4);
+    if (engineVisual.glowSizeMult !== undefined) finite(engineVisual.glowSizeMult, `${id}.missileEngineVisualSpec.glowSizeMult`, 0);
+    if (engineVisual.glowAlternateColor !== undefined) colorTuple(engineVisual.glowAlternateColor, `${id}.missileEngineVisualSpec.glowAlternateColor`, 4);
+  }
+  if (spec.missileTrailSpec !== undefined) {
+    const trail = object(spec.missileTrailSpec, `${id}.missileTrailSpec`);
+    finite(trail.duration, `${id}.missileTrailSpec.duration`, 0);
+    finite(trail.baseWidth, `${id}.missileTrailSpec.baseWidth`, 0);
+    finite(trail.widenMult, `${id}.missileTrailSpec.widenMult`, 0);
+    finite(trail.minSeg, `${id}.missileTrailSpec.minSeg`, 0);
+    finite(trail.spawnOffset, `${id}.missileTrailSpec.spawnOffset`);
+    colorTuple(trail.color, `${id}.missileTrailSpec.color`, 4);
+    enumValue(trail.blendMode, `${id}.missileTrailSpec.blendMode`, new Set(['NORMAL', 'GLOW']));
+  }
+  if (spec.missileExplosionVisualSpec !== undefined) {
+    const explosion = object(spec.missileExplosionVisualSpec, `${id}.missileExplosionVisualSpec`);
+    finite(explosion.radius, `${id}.missileExplosionVisualSpec.radius`, 0);
+    colorTuple(explosion.color, `${id}.missileExplosionVisualSpec.color`, 4);
   }
 
   if (spec.proximityFuse !== undefined) {

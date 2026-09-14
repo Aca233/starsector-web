@@ -301,9 +301,10 @@ export class ShipRenderer {
 
     // 2. 绘制硬挂点充能/开火光晕
     for (const mount of ship.weapons) {
-      if (mount.mountType === 'HARDPOINT' && mount.spec.glowSpriteUrl && mount.glowAlpha > 0.01 && !mount.isDisabled) {
+      const hardpointGlowUrl = mount.spec.hardpointGlowSpriteUrl || mount.spec.glowSpriteUrl;
+      if (mount.mountType === 'HARDPOINT' && hardpointGlowUrl && mount.glowAlpha > 0.01 && !mount.isDisabled) {
         const [gr, gg, gb] = mount.spec.glowColor || [255, 100, 100];
-        const tintedGlow = textureCache.getTintedImage(mount.spec.glowSpriteUrl, gr, gg, gb);
+        const tintedGlow = textureCache.getTintedImage(hardpointGlowUrl, gr, gg, gb);
         if (tintedGlow) {
           ctx.save();
           ctx.translate(mount.relativePos.x, mount.relativePos.y);

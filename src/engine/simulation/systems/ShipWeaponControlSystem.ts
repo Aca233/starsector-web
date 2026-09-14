@@ -1,5 +1,5 @@
 import { Vector2 } from '../../math/Vector2';
-import { Projectile, Beam, WeaponMount, WeaponGroup, MuzzleFlashSpec } from '../Weapon';
+import { Projectile, Beam, WeaponMount, WeaponGroup, LauncherSmokeSpec, MuzzleFlashSpec } from '../Weapon';
 import { ShipSpec } from '../../modding/ModManager';
 import { sound } from '../../audio/SoundManager';
 import type { Ship } from '../Ship';
@@ -139,7 +139,7 @@ export class ShipWeaponControlSystem {
     targetShip: Ship | null,
     spawnProjectile: (p: Projectile) => void,
     spawnBeam: (b: Beam) => void,
-    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2) => void
+    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void
   ) {
     const isFortressShieldBlockingWeapons = (ship.system.type === 'FORTRESS_SHIELD' && ship.system.isActive);
     const isPhaseBlockingWeapons = ship.isPhased;
@@ -364,7 +364,7 @@ export class ShipWeaponControlSystem {
     ship: Ship,
     spawnProjectile: (p: Projectile) => void,
     spawnBeam: (b: Beam) => void,
-    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2) => void
+    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void
   ) {
     // 触发动态视觉后坐力与充能发光
     mount.recoil = 1.0;
@@ -411,7 +411,17 @@ export class ShipWeaponControlSystem {
 
     // 激发枪口火焰 (1:1 官方原版粒子暴风 _class.o00000 & SmoothParticle.java)
     if (spawnMuzzleFlash) {
-      if (mount.spec.muzzleFlashSpec) {
+      if (mount.spec.launcherSmokeSpec) {
+        spawnMuzzleFlash(
+          firePos,
+          fireAngleRad,
+          mount.spec.muzzleFlashSize || 25,
+          [mount.spec.launcherSmokeSpec.particleColor[0], mount.spec.launcherSmokeSpec.particleColor[1], mount.spec.launcherSmokeSpec.particleColor[2]],
+          undefined,
+          ship.vel,
+          mount.spec.launcherSmokeSpec
+        );
+      } else if (mount.spec.muzzleFlashSpec) {
         spawnMuzzleFlash(
           firePos,
           fireAngleRad,
@@ -438,8 +448,8 @@ export class ShipWeaponControlSystem {
       // 发射持续光束 (严格对齐 Starsector BeamWeaponRay.java 与 weapon_data.csv)
       const beamDir = Vector2.fromAngle(fireAngleRad, effectiveRange);
       const endPos = firePos.clone().add(beamDir);
-      const isBurst = mount.spec.id === 'tachyonlance';
-      const beamDuration = isBurst ? 1.0 : 0.22;
+      // 模拟寿命从配置读取，先保持既有 Web 行为；来源 chargeup/chargedown 独立记录，避免视觉工作改写伤害节奏。
+      const beamDuration = mount.spec.beamDuration ?? 0.22;
       mount.glowAlpha = 1.0;
       spawnBeam({
         id: this.random.next(),
@@ -455,15 +465,18 @@ export class ShipWeaponControlSystem {
         color: mount.spec.color,
         duration: beamDuration,
         maxDuration: beamDuration,
-        width: mount.spec.id === 'tachyonlance' ? 25 : (mount.spec.id === 'gravitonbeam' ? 18 : 12),
+        width: mount.spec.beamWidth ?? 12,
+        visualMode: mount.spec.beamVisualMode,
         isEmpPiercing: mount.spec.id === 'tachyonlance',
         elapsedTime: 0,
         textureType: mount.spec.textureType,
         textureScrollSpeed: mount.spec.textureScrollSpeed,
+        pixelsPerTexel: mount.spec.pixelsPerTexel,
         fringeColor: mount.spec.fringeColor,
         coreColor: mount.spec.coreColor,
         glowColor: mount.spec.glowColor,
-        hitGlowRadius: mount.spec.hitGlowRadius
+        hitGlowRadius: mount.spec.hitGlowRadius,
+        hitGlowBrightenDuration: mount.spec.hitGlowBrightenDuration
       });
     } else {
       // 发射实体弹药/脉冲 (使用计入散布的真实弹道角 fireAngleRad)
@@ -471,6 +484,7 @@ export class ShipWeaponControlSystem {
       spawnProjectile({
         id: this.random.next(),
         sourceShipId: ship.id,
+        slotId: mount.slotId,
         isPlayer: ship.isPlayer,
         specId: mount.spec.id,
         pos: firePos.clone(),
@@ -484,17 +498,21 @@ export class ShipWeaponControlSystem {
         elapsedTime: 0,
         color: mount.spec.color,
         spawnType: mount.spec.spawnType,
+        visualSpawnType: mount.spec.visualSpawnType,
         textureType: mount.spec.textureType,
         textureScrollSpeed: mount.spec.textureScrollSpeed,
+        fadeTime: mount.spec.fadeTime,
+        pixelsPerTexel: mount.spec.pixelsPerTexel,
         fringeColor: mount.spec.fringeColor,
         coreColor: mount.spec.coreColor,
         glowColor: mount.spec.glowColor,
         hitGlowRadius: mount.spec.hitGlowRadius,
-        glowRadius: mount.spec.glowRadius || mount.spec.hitGlowRadius,
+        glowRadius: mount.spec.glowRadius,
         coreWidthMult: mount.spec.coreWidthMult,
         projSpriteUrl: mount.spec.projSpriteUrl,
         projLength: mount.spec.projLength,
         projWidth: mount.spec.projWidth,
+        barrelOffset: { x: offX, y: offY },
         isRocket: mount.spec.isRocket || mount.spec.spawnType === 'MISSILE',
         isGuided: mount.spec.isGuided,
         targetShipId: ship.currentTargetShip?.id,
@@ -503,6 +521,9 @@ export class ShipWeaponControlSystem {
         maxSpeed: mount.spec.maxSpeed,
         maxTurnRate: mount.spec.maxTurnRate,
         engineFlameColor: mount.spec.engineFlameColor,
+        missileEngineVisualSpec: mount.spec.missileEngineVisualSpec,
+        missileTrailSpec: mount.spec.missileTrailSpec,
+        missileExplosionVisualSpec: mount.spec.missileExplosionVisualSpec,
         isTwoStage: mount.spec.isTwoStage,
         proximityFuse: mount.spec.proximityFuse,
         hitpoints: mount.spec.missileHp || (mount.spec.isRocket || mount.spec.spawnType === 'MISSILE' ? 100 : undefined),

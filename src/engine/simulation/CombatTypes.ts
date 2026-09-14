@@ -26,6 +26,7 @@ export interface ExplosionAnimation {
   id: number;
   visualKind?: 'impact' | 'missile' | 'ship';
   sourceShipId?: string;
+  sourceAuthored?: boolean;
   pos: Vector2;
   radius: number;
   maxRadius: number;
@@ -37,6 +38,15 @@ export interface ExplosionAnimation {
   hasShockwaveRing: boolean;
   shockwaveRadius: number;
   maxShockwaveRadius: number;
+}
+
+export interface HitGlowAnimation {
+  id: number;
+  pos: Vector2;
+  radius: number;
+  life: number;
+  maxLife: number;
+  color: [number, number, number];
 }
 
 export interface EmpArcBranch {
@@ -77,6 +87,7 @@ export interface MuzzleParticle {
   life: number;
   maxLife: number;
   color: [number, number, number, number]; // RGBA
+  blendMode?: 'ADDITIVE' | 'NORMAL';
 }
 
 export interface FloatingText {

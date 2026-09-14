@@ -41,7 +41,10 @@ foreach ($relative in ($paths | Sort-Object)) {
   }
   if ($type -eq 'image') {
     $entry.sampler = [ordered]@{
-      wrap = if ($relative -match 'beam|shield|contrail') {'repeat'} else {'clamp'}
+      # Only tiling FX textures should repeat. Weapon sprites such as
+      # graphics/weapons/graviton_beam_*.png contain "beam" in the filename
+      # but must keep clamp sampling at their transparent sprite bounds.
+      wrap = if ($relative -match '^graphics\\fx\\.*(?:beam|shield|contrail)') {'repeat'} else {'clamp'}
       minFilter = 'linear'; magFilter = 'linear'; mipmap = $false
     }
   }
