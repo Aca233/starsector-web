@@ -144,9 +144,11 @@ Instead, the production runtime now records browser-side collision telemetry per
 
 ## Final closeout status
 
-The software-owned scope of the project plan is closed: M1-M4 are implemented and validated, the bounded Wasm decision is measured and integrated, and M8 records the explicit decision not to move the synchronous collision kernel into a Worker yet. A clean-checkout deployment validation was also run from a fresh `git archive` extraction with no inherited workspace `node_modules`, cache, or untracked files: `npm ci` + production build passed, required manifests and `collision_core.wasm` were present, and the production preview served the root page plus both manifests successfully.
+The repository-owned engineering gaps identified during final audit are now addressed: imported ship blueprints are structurally/reference validated before registration, asynchronous texture uploads are generation/disposal guarded, image sampler state comes from the asset manifest, runtime public URLs honor the Vite deployment base, HUD controls are isolated from combat pointer input, and simulation-owned randomness is deterministic and resettable. The content manifest now has an explicit schema/content version and default-loadout contract that is cross-validated against the runtime registry before renderer asset preparation completes.
 
-The one remaining external acceptance dependency is a standardized set of paired native-StarSector reference captures for the planned original-vs-web visual comparison. The repository contains deterministic browser capture evidence, but it intentionally does not claim native pixel-perfect parity without those references. The complete closeout matrix, deployment evidence, decision supersession notes, and outstanding-item list are in `docs/final-closeout.md`.
+Production validation covers both the normal build and a nested `/starsector/` base. The nested production preview served the application, both manifests, and the bundled collision Wasm successfully. The App no longer uses a 100 ms global render tick for HUD state; mutable combat presentation refresh is contained inside the HUD subtree while battle-result state is polled separately.
+
+Two visual-acceptance inputs remain external to this standalone repository: standardized native-StarSector reference captures for the paired original-vs-web comparison, and an original font/bitmap-font glyph source if exact native glyph-atlas comparison is required. The repository does not fabricate either asset. `HudGlyphSample` therefore remains a clearly labelled current-HUD typography sample until a legally available reference is supplied. See `docs/final-closeout.md` for the detailed boundary and validation record.
 
 ## Regression coverage
 
@@ -182,6 +184,7 @@ Then verify:
 3. runtime source contains no `starsector-core` dependency.
 4. `src/engine/render` contains no direct `Math.random()` or `performance.now()` calls.
 5. production preview serves the application and bundled assets without parent-directory access.
+   Also verify a non-root base such as `vite build --base=/starsector/` serves `/starsector/`, both manifests, and `runtime/collision_core.wasm`.
 6. restart / ship switch can be repeated without stale battle state.
 
 The original-format importer and asset regeneration script are explicit developer tools; they are not invoked by normal build or runtime code.

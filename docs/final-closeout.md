@@ -1,6 +1,6 @@
 # Final Project Closeout
 
-Validated on 2026-09-14. This document consolidates the project-plan completion state after M1-M4, the bounded Wasm collision work, and the M8 Worker decision. No test files are added or modified by this closeout.
+Validated on 2026-09-14. This document consolidates the project-plan completion state after M1-M4, the bounded Wasm collision work, the M8 Worker decision, and the final engineering-gap remediation. The existing `tests/core.test.ts` is extended with focused validation/RNG regressions; no separate test file is added.
 
 ## Completion status
 
@@ -14,6 +14,19 @@ Validated on 2026-09-14. This document consolidates the project-plan completion 
 | M8 Worker decision | complete | authoritative simulation stays on the main fixed-step loop; production collision telemetry added to support any later reassessment |
 
 The formal project plan defines M1-M4. The Wasm and Worker items are follow-up architecture decisions required by the same specification rather than evidence that M1-M4 were incomplete.
+
+### Final engineering-gap remediation
+
+A later source audit found repository-owned gaps that the earlier closeout wording had overstated. Those gaps are now handled in code:
+
+- ship/mod imports are validated for required structure, numeric ranges, enums, duplicate IDs/slot IDs, weapon-slot references, weapon size compatibility, weapon-group slot references, and bundled sprite references before registration;
+- the asset/content manifests are validated before renderer asset preparation is considered ready; the content manifest has `schemaVersion`, `contentVersion`, and one declared default-loadout record for every built-in ship;
+- pending WebGL image listeners are explicitly removed on invalidation/disposal, with a generation fence preventing stale load callbacks from uploading after lifecycle reset;
+- WebGL sampler wrap/filter/mipmap behavior comes from manifest metadata rather than filename heuristics;
+- Vite `BASE_URL` is the single public-runtime URL base for manifests, game assets, cursor and Wasm; a `/starsector/` production build/preview has been exercised successfully;
+- interactive HUD/UI elements block combat mouse/wheel handling through ancestor-aware target detection;
+- authoritative simulation randomness is owned by a deterministic `SimulationRandom` source; direct `Math.random()` remains only in the independent audio pitch-variation path;
+- the former App-wide 100 ms HUD rerender tick has been removed; HUD refresh is localized to the HUD subtree.
 
 ## Clean-checkout production deployment validation
 
@@ -52,6 +65,10 @@ The browser side of the visual plan is reproducible and documented:
 
 The project still does **not** claim pixel-perfect parity with native Starsector. The specification's paired original-vs-web comparison requires a standardized native reference set, and that reference set is not present in the repository.
 
+### External typography/reference boundary
+
+The packaged asset closure contains no original Starsector font or bitmap-font glyph-atlas file. The project therefore does not relabel the system monospace `HudGlyphSample` as an original glyph sample. Exact native typography acceptance requires a legally available original glyph/font reference supplied from outside this repository. The asset-manifest schema now has explicit font/glyph-atlas metadata support so such a reference can be validated rather than guessed when one is supplied.
+
 ## Architecture decision reconciliation
 
 The M4 validation document originally recorded that Rust/Wasm was not adopted because the then-available Runner lacked the Rust/Wasm toolchain. That was a correct historical M4 statement but is no longer the current architecture state.
@@ -82,16 +99,23 @@ The specification's final deliverables map to the repository as follows:
 
 ## Outstanding items
 
+The final audit distinguishes repository-owned engineering work from evidence/assets that cannot be generated honestly by the standalone web repository.
+
 ### External acceptance dependency: native paired reference captures
 
-This is the only known closeout item that cannot be completed from the standalone repository alone. A standardized native-StarSector reference capture set is needed to perform the specification's formal paired original-vs-web visual comparison (overlay/difference/frame-sequence review under matched camera, scale, resolution, state, and timestamps).
+A standardized native-StarSector reference capture set is still needed for the formal paired original-vs-web visual comparison (overlay/difference/frame-sequence review under matched camera, scale, resolution, state, and timestamps). Browser-side deterministic capture tooling is ready, but native evidence is not present in the repository.
 
-Until those references are supplied, the correct status is:
+### External acceptance dependency: original font/glyph source
 
-- software implementation and repository-owned validation: **complete**;
-- standalone clean-checkout deployment evidence: **complete**;
-- performance/stability evidence: **complete**;
+No original font or bitmap-font glyph atlas is packaged in the independent asset closure. Exact original-glyph acceptance remains pending until a legally available reference is provided. The current `HudGlyphSample` intentionally demonstrates the web HUD font stack and is not counted as proof of native-font parity.
+
+Until those external inputs are supplied, the correct status is:
+
+- repository-owned engineering remediation and automated validation: **complete for the identified audit gaps**;
+- standalone/root and nested-base deployment path: **validated**;
+- performance/stability evidence: **existing M4 evidence remains the current measured record**;
 - Wasm/Worker architecture decisions: **complete**;
-- native paired visual parity acceptance: **pending external reference evidence**.
+- native paired visual parity acceptance: **pending external reference evidence**;
+- exact original-font/glyph parity acceptance: **pending external reference material**.
 
-No other repository-owned implementation task is currently identified as required to close the supplied project plan.
+No original-game evidence is fabricated or inferred from the web implementation. Any future claim of complete visual parity must attach the missing native evidence rather than merely changing this status text.
