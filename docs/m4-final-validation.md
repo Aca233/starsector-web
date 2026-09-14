@@ -87,9 +87,9 @@ Before final commit the M4 worktree passed:
 - `npm run build`
 - runtime dependency scans and `git diff --check` (final closeout gate)
 
-## Wasm decision
+## Wasm decision (historical M4 state)
 
-The previously planned Rust/Wasm pilot remains not adopted because the Runner does not provide `rustc`, `cargo`, `rustup`, or `wasm-bindgen`. No Rust/Wasm speedup is claimed. The earlier TypeScript-only pilot remains the available comparative evidence.
+At the time M4 was closed, the available Runner did not expose the Rust/Wasm toolchain, so M4 itself did not adopt or claim a Rust/Wasm speedup. This statement is retained only as the historical M4 result. It was superseded by the later bounded collision pilot and production integration: `065f997` completed the measured Wasm pilot, `d21c181` integrated the spatial + Wasm runtime with exact TypeScript fallback, and M8 records the separate Worker decision. See `benchmarks/wasm-pilot/README.md`, the current README collision section, and `docs/m8-worker-decision.md` for the authoritative current architecture.
 
 ## Scope boundary
 

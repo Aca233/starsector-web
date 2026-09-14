@@ -142,6 +142,12 @@ M8 keeps the authoritative simulation on the main fixed-step loop and does **not
 
 Instead, the production runtime now records browser-side collision telemetry per rendered frame: kernel wall time, TypeScript/Wasm batch counts, Wasm fallback count, projectile count, candidate-pair count and maximum candidates per projectile. The Visual Lab displays the current values and window P95, and `window.__combatPerformanceReport().collision` exposes the aggregate report for real-browser captures. A future full-simulation Worker remains a separate architecture task using sequenced inputs and timestamped snapshots when browser measurements show that moving simulation work off the main thread is worth the added latency and synchronization complexity.
 
+## Final closeout status
+
+The software-owned scope of the project plan is closed: M1-M4 are implemented and validated, the bounded Wasm decision is measured and integrated, and M8 records the explicit decision not to move the synchronous collision kernel into a Worker yet. A clean-checkout deployment validation was also run from a fresh `git archive` extraction with no inherited workspace `node_modules`, cache, or untracked files: `npm ci` + production build passed, required manifests and `collision_core.wasm` were present, and the production preview served the root page plus both manifests successfully.
+
+The one remaining external acceptance dependency is a standardized set of paired native-StarSector reference captures for the planned original-vs-web visual comparison. The repository contains deterministic browser capture evidence, but it intentionally does not claim native pixel-perfect parity without those references. The complete closeout matrix, deployment evidence, decision supersession notes, and outstanding-item list are in `docs/final-closeout.md`.
+
 ## Regression coverage
 
 `npm test` covers:
