@@ -41,6 +41,12 @@ export class CombatStatsTracker {
     else this.enemyStats.shotsFired++;
   }
 
+  /** A firing cycle/projectile counts as a hit once, regardless of damage ticks or split armor/hull accounting. */
+  public recordShotHit(isPlayerAttacker: boolean) {
+    if (isPlayerAttacker) this.playerStats.shotsHit++;
+    else this.enemyStats.shotsHit++;
+  }
+
   public recordDamageDealt(
     isPlayerAttacker: boolean,
     type: DamageType,
@@ -52,7 +58,6 @@ export class CombatStatsTracker {
     const defender = isPlayerAttacker ? this.enemyStats : this.playerStats;
 
     attacker.totalDamageDealt += amount;
-    attacker.shotsHit++;
     if (empAmount > 0) attacker.empDamageDealt += empAmount;
 
     switch (type) {

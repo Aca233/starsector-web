@@ -106,6 +106,7 @@ export const App: React.FC = () => {
   const handleActivateSystem = () => {
     const player = session.engine.playerShip;
     const sys = player.system;
+    const wasActive = sys.isActive;
     const activated = sys.activate();
     if (activated) {
       if (sys.type === 'BURN_DRIVE') {
@@ -121,10 +122,10 @@ export const App: React.FC = () => {
           session.engine.deployMine(new Vector2(worldX, worldY), player);
         }
       }
-    } else if (sys.type === 'BURN_DRIVE') {
+    } else if (wasActive && sys.state === 'OUT' && sys.type === 'BURN_DRIVE') {
       sound.stopLoop('burn_drive_loop');
       sound.play('burn_drive_deactivate', 0.8);
-    } else if (sys.type === 'FORTRESS_SHIELD') {
+    } else if (wasActive && sys.state === 'OUT' && sys.type === 'FORTRESS_SHIELD') {
       sound.stopLoop('fortress_shield_loop');
     }
   };

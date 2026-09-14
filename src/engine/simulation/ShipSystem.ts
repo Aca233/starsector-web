@@ -8,44 +8,72 @@
  */
 
 export type ShipSystemType = 'BURN_DRIVE' | 'FORTRESS_SHIELD' | 'MINE_STRIKE' | 'NONE';
+export type ShipSystemState = 'IDLE' | 'IN' | 'ACTIVE' | 'OUT' | 'COOLDOWN';
 
 export class ShipSystem {
   public type: ShipSystemType;
+  public state: ShipSystemState = 'IDLE';
+  public effectLevel = 0;
   public isActive = false;
   public isCoolingDown = false;
+  /** Remaining time in the current finite stage, kept for HUD compatibility. */
   public activeTimer = 0;
   public cooldownTimer = 0;
 
-  public maxDuration = 4.0; // 持续时间 (秒)
-  public maxCooldown = 10.0; // 冷却时间 (秒)
+  public maxDuration = 4.0;
+  public maxCooldown = 10.0;
+  public chargeUpDuration = 0;
+  public activeDuration = 4.0;
+  public chargeDownDuration = 0;
 
   // 战术系统充能层数 (例如空雷突袭 5 次充能)
   public maxCharges = 1;
   public charges = 1;
-  public chargeRegenRate = 0; // 充能恢复速率 (次/秒)
+  public chargeRegenRate = 0;
   private chargeRegenTimer = 0;
+  private stageTimer = 0;
 
   constructor(type: ShipSystemType = 'NONE') {
     this.type = type;
     if (type === 'BURN_DRIVE') {
-      this.maxDuration = 4.5;
-      this.maxCooldown = 12.0;
+      // ship_systems.csv: charge up 2, active 5, down 1, cooldown 10.
+      this.chargeUpDuration = 2.0;
+      this.activeDuration = 5.0;
+      this.chargeDownDuration = 1.0;
+      this.maxDuration = 5.0;
+      this.maxCooldown = 10.0;
     } else if (type === 'FORTRESS_SHIELD') {
-      this.maxDuration = 8.0; // 也可以由玩家主动提前关闭
-      this.maxCooldown = 15.0;
+      // Toggle system: 1.5s IN / indefinite ACTIVE / 1.5s OUT / no cooldown.
+      this.chargeUpDuration = 1.5;
+      this.activeDuration = Number.POSITIVE_INFINITY;
+      this.chargeDownDuration = 1.5;
+      this.maxDuration = 1.5;
+      this.maxCooldown = 0;
     } else if (type === 'MINE_STRIKE') {
       this.maxDuration = 0.3;
+      this.activeDuration = 0.3;
       this.maxCooldown = 0.5;
       this.maxCharges = 5;
       this.charges = 5;
-      this.chargeRegenRate = 0.2; // 每 5 秒恢复 1 枚水雷充能
+      this.chargeRegenRate = 0.2;
     }
   }
 
-  /**
-   * 激活/切换战术系统
-   */
+  public reset(): void {
+    this.state = 'IDLE';
+    this.effectLevel = 0;
+    this.isActive = false;
+    this.isCoolingDown = false;
+    this.activeTimer = 0;
+    this.cooldownTimer = 0;
+    this.stageTimer = 0;
+    this.chargeRegenTimer = 0;
+    this.charges = this.maxCharges;
+  }
+
+  /** Activate a ready system, or toggle an engaged toggle-system into OUT. */
   public activate(): boolean {
+    if (this.type === 'NONE') return false;
     if (this.type === 'MINE_STRIKE') {
       if (this.charges <= 0 || this.isCoolingDown) return false;
       this.charges--;
@@ -56,88 +84,158 @@ export class ShipSystem {
       return true;
     }
 
-    if (this.isCoolingDown) return false;
-
-    if (this.isActive) {
-      // 允许玩家主动关闭
-      this.deactivate();
+    if (this.state === 'COOLDOWN' || this.isCoolingDown) return false;
+    if (this.state === 'IN' || this.state === 'ACTIVE') {
+      this.beginOut();
       return false;
     }
+    if (this.state === 'OUT') return false;
 
-    this.isActive = true;
-    this.activeTimer = this.maxDuration;
+    this.beginIn();
     return true;
   }
 
-  public deactivate() {
-    if (!this.isActive) return;
-    this.isActive = false;
-    this.isCoolingDown = true;
-    this.cooldownTimer = this.maxCooldown;
+  public deactivate(): void {
+    if (this.type === 'MINE_STRIKE') {
+      this.isActive = false;
+      return;
+    }
+    if (this.state === 'IN' || this.state === 'ACTIVE') this.beginOut();
   }
 
-  public update(dt: number) {
+  public update(dt: number): void {
+    if (this.type === 'MINE_STRIKE') {
+      this.updateMineStrike(dt);
+      this.updateChargeRegen(dt);
+      return;
+    }
+
+    if (this.state === 'IN') {
+      this.stageTimer = Math.max(0, this.stageTimer - dt);
+      this.effectLevel = this.chargeUpDuration <= 0 ? 1 : 1 - this.stageTimer / this.chargeUpDuration;
+      this.activeTimer = this.stageTimer;
+      if (this.stageTimer <= 0) this.beginActive();
+    } else if (this.state === 'ACTIVE') {
+      this.effectLevel = 1;
+      if (Number.isFinite(this.activeDuration)) {
+        this.stageTimer = Math.max(0, this.stageTimer - dt);
+        this.activeTimer = this.stageTimer;
+        if (this.stageTimer <= 0) this.beginOut();
+      } else {
+        this.activeTimer = this.maxDuration;
+      }
+    } else if (this.state === 'OUT') {
+      this.stageTimer = Math.max(0, this.stageTimer - dt);
+      this.effectLevel = this.chargeDownDuration <= 0 ? 0 : this.stageTimer / this.chargeDownDuration;
+      this.activeTimer = this.stageTimer;
+      if (this.stageTimer <= 0) this.finishOut();
+    } else if (this.state === 'COOLDOWN') {
+      this.stageTimer = Math.max(0, this.stageTimer - dt);
+      this.cooldownTimer = this.stageTimer;
+      if (this.stageTimer <= 0) {
+        this.state = 'IDLE';
+        this.isCoolingDown = false;
+        this.cooldownTimer = 0;
+      }
+    }
+
+    this.updateChargeRegen(dt);
+  }
+
+  private beginIn(): void {
+    this.state = 'IN';
+    this.isActive = true;
+    this.isCoolingDown = false;
+    this.effectLevel = 0;
+    this.stageTimer = this.chargeUpDuration;
+    this.activeTimer = this.stageTimer;
+    this.cooldownTimer = 0;
+    if (this.chargeUpDuration <= 0) this.beginActive();
+  }
+
+  private beginActive(): void {
+    this.state = 'ACTIVE';
+    this.isActive = true;
+    this.effectLevel = 1;
+    this.stageTimer = this.activeDuration;
+    this.activeTimer = Number.isFinite(this.stageTimer) ? this.stageTimer : this.maxDuration;
+  }
+
+  private beginOut(): void {
+    if (!this.isActive) return;
+    this.state = 'OUT';
+    this.isActive = true;
+    this.effectLevel = Math.max(0, Math.min(1, this.effectLevel));
+    this.stageTimer = this.chargeDownDuration * this.effectLevel;
+    this.activeTimer = this.stageTimer;
+    if (this.stageTimer <= 0) this.finishOut();
+  }
+
+  private finishOut(): void {
+    this.effectLevel = 0;
+    this.isActive = false;
+    this.activeTimer = 0;
+    if (this.maxCooldown > 0) {
+      this.state = 'COOLDOWN';
+      this.isCoolingDown = true;
+      this.stageTimer = this.maxCooldown;
+      this.cooldownTimer = this.maxCooldown;
+    } else {
+      this.state = 'IDLE';
+      this.isCoolingDown = false;
+      this.stageTimer = 0;
+      this.cooldownTimer = 0;
+    }
+  }
+
+  private updateMineStrike(dt: number): void {
     if (this.isActive) {
       this.activeTimer -= dt;
       if (this.activeTimer <= 0) {
-        this.deactivate();
+        this.activeTimer = 0;
+        this.isActive = false;
       }
     } else if (this.isCoolingDown) {
       this.cooldownTimer -= dt;
       if (this.cooldownTimer <= 0) {
+        this.cooldownTimer = 0;
         this.isCoolingDown = false;
       }
     }
-
-    // 充能恢复逻辑
-    if (this.charges < this.maxCharges && this.chargeRegenRate > 0) {
-      this.chargeRegenTimer += dt;
-      if (this.chargeRegenTimer >= 1 / this.chargeRegenRate) {
-        this.charges = Math.min(this.maxCharges, this.charges + 1);
-        this.chargeRegenTimer = 0;
-      }
-    }
   }
 
-  /**
-   * 严格对齐 FortressShieldStats.java:
-   * public static float DAMAGE_MULT = 0.9f;
-   * stats.getShieldDamageTakenMult().modifyMult(id, 1f - DAMAGE_MULT * effectLevel);
-   * stats.getShieldUpkeepMult().modifyMult(id, 0f);
-   */
+  private updateChargeRegen(dt: number): void {
+    if (this.charges >= this.maxCharges || this.chargeRegenRate <= 0) return;
+    this.chargeRegenTimer += dt;
+    const interval = 1 / this.chargeRegenRate;
+    while (this.chargeRegenTimer >= interval && this.charges < this.maxCharges) {
+      this.charges++;
+      this.chargeRegenTimer -= interval;
+    }
+    if (this.charges >= this.maxCharges) this.chargeRegenTimer = 0;
+  }
+
+  /** FortressShieldStats.java: shield damage mult = 1 - 0.9 * effectLevel. */
   public getShieldDamageMultiplier(): number {
-    if (this.type === 'FORTRESS_SHIELD' && this.isActive) {
-      return 0.10; // 1.0 - 0.9 = 0.10 (护盾只受 10% 伤害)
-    }
-    return 1.0;
+    return this.type === 'FORTRESS_SHIELD' && this.isActive
+      ? 1 - 0.9 * this.effectLevel
+      : 1.0;
   }
 
-  /**
-   * 严格对齐 FortressShieldStats.java: 激活期间护盾维持能耗归零
-   */
+  /** Fortress shield upkeep is zero for the entire applied IN/ACTIVE/OUT lifecycle. */
   public getShieldUpkeepMultiplier(): number {
-    if (this.type === 'FORTRESS_SHIELD' && this.isActive) {
-      return 0.0;
-    }
-    return 1.0;
+    return this.type === 'FORTRESS_SHIELD' && this.isActive ? 0.0 : 1.0;
   }
 
-  /**
-   * 严格对齐 BurnDriveStats.java:
-   * stats.getMaxSpeed().modifyFlat(id, 200f * effectLevel);
-   * stats.getAcceleration().modifyFlat(id, 200f * effectLevel);
-   */
+  /** BurnDriveStats.java removes max-speed bonus immediately in OUT. */
   public getSpeedFlatBonus(): number {
-    if (this.type === 'BURN_DRIVE' && this.isActive) {
-      return 200.0;
-    }
-    return 0.0;
+    if (this.type !== 'BURN_DRIVE' || !this.isActive || this.state === 'OUT') return 0;
+    return 200 * this.effectLevel;
   }
 
+  /** The source script leaves the +200 acceleration modifier applied through OUT until unapply(). */
   public getAccelerationFlatBonus(): number {
-    if (this.type === 'BURN_DRIVE' && this.isActive) {
-      return 200.0;
-    }
-    return 0.0;
+    if (this.type !== 'BURN_DRIVE' || !this.isActive) return 0;
+    return this.state === 'OUT' ? 200 : 200 * this.effectLevel;
   }
 }

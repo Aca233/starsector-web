@@ -337,6 +337,12 @@ export class Ship {
       this.system.deactivate();
     }
 
+    // ship_systems.csv marks Burn Drive as noShield for its entire applied IN/ACTIVE/OUT lifecycle.
+    if (this.system.isActive && this.system.type === 'BURN_DRIVE' && this.shield.isActive) {
+      this.shield.setActive(false);
+      this.shield.currentArcDeg = 0;
+    }
+
     // 严禁过载或排散时使用护盾 (强制持续熄灭)
     if ((this.flux.isOverloaded || this.flux.isVenting) && this.shield.isActive) {
       this.shield.setActive(false);
@@ -435,17 +441,13 @@ export class Ship {
     const maxTurnRateRad = ((this.spec.maxTurnRateDeg * Math.PI) / 180) * engineMult;
     const turnAccelRad = ((this.spec.turnAccelerationDeg * Math.PI) / 180) * engineMult;
 
-    // 冲刺推进激活时，舵力被锁定大部分转向 (对齐 burndrive.system clampTurnRateAfter)
-    let steerMult = 1.0;
-    if (this.system.isActive && this.system.type === 'BURN_DRIVE') {
-      steerMult = 0.15;
-    }
-
-    if (Math.abs(this.turnInput) > 0.01 && !this.flux.isOverloaded) {
-      this.angularVelRad += this.turnInput * turnAccelRad * steerMult * dt;
+    // ship_systems.csv: Burn Drive has noTurning=true for the full system lifecycle.
+    const burnDriveLocked = this.system.isActive && this.system.type === 'BURN_DRIVE';
+    if (!burnDriveLocked && Math.abs(this.turnInput) > 0.01 && !this.flux.isOverloaded) {
+      this.angularVelRad += this.turnInput * turnAccelRad * dt;
       this.angularVelRad = Math.max(-maxTurnRateRad, Math.min(maxTurnRateRad, this.angularVelRad));
     } else {
-      // 角速度自然阻尼
+      // Existing angular momentum damps while turning input is unavailable.
       this.angularVelRad *= Math.pow(0.05, dt);
     }
     this.facingRad += this.angularVelRad * dt;
@@ -460,14 +462,11 @@ export class Ship {
       accel += 50 * engineMult;
     }
 
-    if (this.system.isActive && this.system.type === 'FORTRESS_SHIELD') {
-      maxSpeed *= 0.5; // 堡垒护盾开启时机动降低
-    }
-
     // 冲刺推进强制全功率前进且禁止侧移 (对齐 burndrive.system: alwaysAccelerate)
     let curThrottle = this.throttle;
     let curStrafe = this.strafeInput;
-    if (this.system.isActive && this.system.type === 'BURN_DRIVE') {
+    if (burnDriveLocked) {
+      // burndrive.system: alwaysAccelerate=true, noStrafing=true, noAccel=true (manual input disabled).
       curThrottle = 1.0;
       curStrafe = 0;
     }
@@ -503,7 +502,7 @@ export class Ship {
     this.pos.addScaled(this.vel, dt);
 
     // 独立发动机平滑物理推力插值与差动转向模拟 (Engine Spooling & Differential Steering)
-    const isBurnDrive = this.system.isActive && this.system.type === 'BURN_DRIVE';
+    const isBurnDrive = burnDriveLocked;
     const isBraking = curThrottle < -0.05;
     const forwardCmd = Math.max(0, curThrottle);
 

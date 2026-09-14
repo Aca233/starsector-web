@@ -412,13 +412,17 @@ export class CombatEngine {
       this.cameraShakeIntensity = 0;
     }
 
-    const spawnProj = (p: Projectile) => this.projectiles.push(p);
+    const spawnProj = (p: Projectile) => {
+      this.projectiles.push(p);
+      this.statsTracker.recordShotFired(p.isPlayer ?? false);
+    };
     const spawnBeam = (b: Beam) => {
-      // 挂点光束维持去重：若同舰船同挂点已有存活光束，刷新维持其状态，绝不重复创建叠放 (1:1 BeamWeaponRay.java)
+      // One mount owns one beam entity. ACTIVE/CHARGEDOWN states refresh that entity rather than stacking damage rays.
       const existing = b.slotId
         ? this.beams.find(e => e.sourceShipId === b.sourceShipId && e.slotId === b.slotId)
         : null;
       if (existing) {
+        const isNewCycle = b.firingCycleId !== undefined && existing.firingCycleId !== b.firingCycleId;
         existing.startPos.copy(b.startPos);
         existing.endPos.copy(b.endPos);
         existing.duration = b.duration;
@@ -429,9 +433,21 @@ export class CombatEngine {
         existing.coreColor = b.coreColor;
         existing.glowColor = b.glowColor;
         existing.width = b.width;
+        existing.visualMode = b.visualMode;
+        existing.textureType = b.textureType;
+        existing.textureScrollSpeed = b.textureScrollSpeed;
+        existing.pixelsPerTexel = b.pixelsPerTexel;
+        existing.hitGlowRadius = b.hitGlowRadius;
+        existing.hitGlowBrightenDuration = b.hitGlowBrightenDuration;
         existing.isEmpPiercing = b.isEmpPiercing;
+        existing.empPerSec = b.empPerSec;
+        existing.damageActive = b.damageActive;
+        existing.firingCycleId = b.firingCycleId;
+        if (isNewCycle) existing.hasRecordedHit = false;
+        if (isNewCycle && b.damageActive !== false) this.statsTracker.recordShotFired(b.isPlayer ?? false);
         return;
       }
+      if (b.damageActive !== false) this.statsTracker.recordShotFired(b.isPlayer ?? false);
       this.beams.push(b);
     };
     const spawnFlash = (

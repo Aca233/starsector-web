@@ -113,14 +113,12 @@ export class CapitalShipAI {
       this.ship.shield.setActive(true);
     }
 
-    // 堡垒护盾 (Fortress Shield) 激活时机:
-    // 当幅能超过 65% 且敌方火力凶猛，或者敌舰开启冲刺推进撞过来时，激活金身！
-    if (
-      !this.ship.system.isActive &&
-      !this.ship.system.isCoolingDown &&
-      (this.ship.flux.fluxPercent > 0.65 || (this.targetShip.system.isActive && dist < 700))
-    ) {
+    // Fortress Shield is a source toggle: raise it under pressure and explicitly lower it when pressure clears.
+    const shouldFortress = this.ship.flux.fluxPercent > 0.65 || (this.targetShip.system.isActive && dist < 700);
+    if (shouldFortress && !this.ship.system.isActive && !this.ship.system.isCoolingDown) {
       this.ship.system.activate();
+    } else if (!shouldFortress && this.ship.system.isActive && this.ship.system.state !== 'OUT') {
+      this.ship.system.deactivate();
     }
   }
 

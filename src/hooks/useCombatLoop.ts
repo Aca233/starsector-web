@@ -99,8 +99,12 @@ export function useCombatLoop({
       const flameoutRatio = player.getFlameoutRatio();
       const engineMult = Math.max(0.18, 1.0 - flameoutRatio * 0.72) * player.terrainSpeedMult;
       const turnAccelRad = ((player.spec.turnAccelerationDeg * Math.PI) / 180) * engineMult;
-      const steerMult = (player.system.isActive && player.system.type === 'BURN_DRIVE') ? 0.15 : 1.0;
-      const effectiveTurnAccel = Math.max(0.001, turnAccelRad * steerMult);
+      const burnDriveLocksTurning = player.system.isActive && player.system.type === 'BURN_DRIVE';
+      if (burnDriveLocksTurning) {
+        player.turnInput = 0;
+        return;
+      }
+      const effectiveTurnAccel = Math.max(0.001, turnAccelRad);
       const w = player.angularVelRad;
       const stopAngle = (w * Math.abs(w)) / (2 * effectiveTurnAccel);
 

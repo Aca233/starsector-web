@@ -19,6 +19,7 @@ import { initializeVisualLabControllerOnce } from '../src/visual-lab/VisualLabIn
 import type { ICombatRenderer } from '../src/engine/render/ICombatRenderer';
 import { Shield } from '../src/engine/simulation/Shield';
 import { Ship } from '../src/engine/simulation/Ship';
+import { ShipSystem } from '../src/engine/simulation/ShipSystem';
 import { ShipCollisionSystem } from '../src/engine/simulation/systems/ShipCollisionSystem';
 import { AsteroidSystem } from '../src/engine/simulation/systems/AsteroidSystem';
 import {
@@ -1783,6 +1784,209 @@ describe('source-aligned projectile and missile mechanics', () => {
   });
 });
 
+describe('source-aligned weapon firing lifecycles', () => {
+  const configureSingleManualMount = (ship: Ship, slotId: string) => {
+    ship.selectedGroupIndex = 0;
+    for (const group of ship.weaponGroups) group.isAutofire = false;
+    const group = ship.weaponGroups[0];
+    group.mode = 'LINKED';
+    group.weaponSlotIds = [slotId];
+    const mount = ship.weapons.find((weapon) => weapon.slotId === slotId)!;
+    mount.currentAngleRad = 0;
+    mount.cooldownTimer = 0;
+    ship.aimTargetWorld.set(2000, 0);
+    return mount;
+  };
+
+  const makeLifecycleContext = (engine: CombatEngine) => ({
+    playerShip: engine.playerShip,
+    enemyShip: engine.enemyShip,
+    fighters: [] as Ship[],
+    hulkFragments: [],
+    fx: engine.fxSystem,
+    statsTracker: engine.statsTracker,
+    contrailEngine: engine.contrailEngine,
+    random: engine.random,
+    visualRandom: engine.visualRandom,
+    addRadioMessage: vi.fn(),
+    addCameraShake: vi.fn(),
+    handleShipDestruction: vi.fn()
+  });
+
+  it('fires Light MG as a five-round source burst with 0.1s intra-burst spacing', () => {
+    const ship = new Ship('lightmg-burst', modManager.getShip('broadsword')!, true, new Vector2(), 0, new SimulationRandom(8601));
+    const mount = configureSingleManualMount(ship, 'WS 001');
+    const fireTimes: number[] = [];
+    const dt = 1 / 60;
+    for (let tick = 0; tick < 34; tick++) {
+      ship.isFiringMain = true;
+      ship.weaponControl.update(dt, ship, 0, null, () => fireTimes.push(tick * dt), () => {});
+    }
+    expect(fireTimes).toHaveLength(5);
+    for (let i = 1; i < fireTimes.length; i++) expect(fireTimes[i] - fireTimes[i - 1]).toBeCloseTo(0.1, 5);
+    expect(mount.burstRemaining).toBe(0);
+    expect(mount.cooldownTimer).toBeGreaterThan(0);
+  });
+
+  it('keeps a sustained beam in one firing cycle and emits a non-damaging chargedown state on release', () => {
+    const ship = new Ship('graviton-cycle', modManager.getShip('paragon')!, true, new Vector2(), 0, new SimulationRandom(8602));
+    const mount = configureSingleManualMount(ship, 'WS 005');
+    const emitted: Beam[] = [];
+    const dt = 1 / 60;
+    for (let tick = 0; tick < 30; tick++) {
+      ship.isFiringMain = true;
+      ship.weaponControl.update(dt, ship, 0, null, () => {}, (beam) => emitted.push(beam));
+    }
+    expect(mount.firingState).toBe('ACTIVE');
+    expect(emitted.filter((beam) => beam.damageActive !== false)).toHaveLength(1);
+    expect(emitted[0]).toMatchObject({ specId: 'gravitonbeam', damageActive: true, firingCycleId: 1 });
+
+    for (let tick = 0; tick < 8; tick++) {
+      ship.isFiringMain = false;
+      ship.weaponControl.update(dt, ship, 0, null, () => {}, (beam) => emitted.push(beam));
+    }
+    expect(emitted.some((beam) => beam.damageActive === false && beam.firingCycleId === 1)).toBe(true);
+    expect(mount.firingState).toBe('IDLE');
+  });
+
+  it('uses Tachyon chargeup, active, chargedown and burst-delay phases from the source row', () => {
+    const session = new CombatSession('paragon', 'onslaught', 8603);
+    const lab = new VisualScenarioController(session);
+    lab.select('WPN-BEAM-01', 8603);
+    lab.seek(0.85);
+    let mount = session.engine.playerShip.weapons.find((weapon) => weapon.slotId === 'WS 003')!;
+    expect(mount.firingState).toBe('CHARGING');
+    expect(session.engine.beams.some((beam) => beam.specId === 'tachyonlance')).toBe(false);
+
+    lab.seek(0.95);
+    mount = session.engine.playerShip.weapons.find((weapon) => weapon.slotId === 'WS 003')!;
+    expect(mount.firingState).toBe('ACTIVE');
+    expect(session.engine.beams.find((beam) => beam.specId === 'tachyonlance')).toMatchObject({ damageActive: true, empPerSec: 1000 });
+
+    lab.seek(2.0);
+    mount = session.engine.playerShip.weapons.find((weapon) => weapon.slotId === 'WS 003')!;
+    expect(mount.firingState).toBe('CHARGEDOWN');
+    expect(session.engine.beams.find((beam) => beam.specId === 'tachyonlance')).toMatchObject({ damageActive: false });
+  });
+
+  it('consumes and regenerates Burst PD ammo at the source 4-capacity / 0.5-per-second rate', () => {
+    const ship = new Ship('pdburst-ammo', modManager.getShip('doom')!, true, new Vector2(), 0, new SimulationRandom(8604));
+    const mount = configureSingleManualMount(ship, 'WS 009');
+    const emitted: Beam[] = [];
+    const dt = 1 / 60;
+    for (let tick = 0; tick < 8; tick++) {
+      ship.isFiringMain = true;
+      ship.weaponControl.update(dt, ship, 0, null, () => {}, (beam) => emitted.push(beam));
+    }
+    expect(mount.ammo).toBe(3);
+    expect(emitted.filter((beam) => beam.damageActive !== false)).toHaveLength(1);
+
+    for (let tick = 0; tick < 132; tick++) {
+      ship.isFiringMain = false;
+      ship.weaponControl.update(dt, ship, 0, null, () => {}, (beam) => emitted.push(beam));
+    }
+    expect(mount.ammo).toBe(4);
+    expect(emitted.some((beam) => beam.damageActive === false)).toBe(true);
+  });
+
+  it('does not apply damage or count a hit during beam chargedown', () => {
+    const engine = new CombatEngine('onslaught', 'paragon', 8605);
+    engine.playerShip.pos.set(0, 0);
+    engine.enemyShip.pos.set(300, 0);
+    engine.enemyShip.shield.setActive(true);
+    engine.enemyShip.shield.currentArcDeg = engine.enemyShip.shield.maxArcDeg;
+    const fluxBefore = engine.enemyShip.flux.totalFlux;
+    const beam: Beam = {
+      id: 8605,
+      sourceShipId: engine.playerShip.id,
+      isPlayer: true,
+      specId: 'chargedown-test',
+      startPos: new Vector2(0, 0),
+      endPos: new Vector2(1000, 0),
+      damagePerSec: 1000,
+      damageType: 'ENERGY',
+      color: [255, 255, 255],
+      duration: 0.1,
+      maxDuration: 0.1,
+      damageActive: false,
+      width: 10,
+      elapsedTime: 0
+    };
+    engine.weaponSystem.beamHandler.update(1 / 60, makeLifecycleContext(engine), [beam]);
+    expect(engine.enemyShip.flux.totalFlux).toBe(fluxBefore);
+    expect(engine.statsTracker.playerStats.totalDamageDealt).toBe(0);
+    expect(engine.statsTracker.playerStats.shotsHit).toBe(0);
+  });
+});
+
+describe('source-aligned ship system lifecycles', () => {
+  it('ramps Fortress Shield over 1.5s in/out, applies 1 - 0.9*effectLevel, and has no cooldown', () => {
+    const system = new ShipSystem('FORTRESS_SHIELD');
+    expect(system.activate()).toBe(true);
+    expect(system.state).toBe('IN');
+    system.update(0.75);
+    expect(system.effectLevel).toBeCloseTo(0.5, 6);
+    expect(system.getShieldDamageMultiplier()).toBeCloseTo(0.55, 6);
+    expect(system.getShieldUpkeepMultiplier()).toBe(0);
+    system.update(0.75);
+    expect(system.state).toBe('ACTIVE');
+    expect(system.getShieldDamageMultiplier()).toBeCloseTo(0.1, 6);
+
+    expect(system.activate()).toBe(false);
+    expect(system.state).toBe('OUT');
+    system.update(0.75);
+    expect(system.effectLevel).toBeCloseTo(0.5, 6);
+    expect(system.getShieldDamageMultiplier()).toBeCloseTo(0.55, 6);
+    system.update(0.75);
+    expect(system.state).toBe('IDLE');
+    expect(system.isActive).toBe(false);
+    expect(system.isCoolingDown).toBe(false);
+    expect(system.getShieldDamageMultiplier()).toBe(1);
+  });
+
+  it('runs Burn Drive through 2s IN, 5s ACTIVE, 1s OUT and 10s cooldown with source stat ramps', () => {
+    const system = new ShipSystem('BURN_DRIVE');
+    expect(system.activate()).toBe(true);
+    system.update(1);
+    expect(system.state).toBe('IN');
+    expect(system.effectLevel).toBeCloseTo(0.5, 6);
+    expect(system.getSpeedFlatBonus()).toBeCloseTo(100, 6);
+    expect(system.getAccelerationFlatBonus()).toBeCloseTo(100, 6);
+    system.update(1);
+    expect(system.state).toBe('ACTIVE');
+    expect(system.getSpeedFlatBonus()).toBe(200);
+    system.update(5);
+    expect(system.state).toBe('OUT');
+    expect(system.getSpeedFlatBonus()).toBe(0);
+    expect(system.getAccelerationFlatBonus()).toBe(200);
+    system.update(1);
+    expect(system.state).toBe('COOLDOWN');
+    expect(system.cooldownTimer).toBeCloseTo(10, 6);
+    expect(system.activate()).toBe(false);
+    system.update(10);
+    expect(system.state).toBe('IDLE');
+    expect(system.isCoolingDown).toBe(false);
+  });
+
+  it('enforces Burn Drive no-turning, no-strafing, always-accelerate and no-shield flags', () => {
+    const ship = new Ship('burn-flags', modManager.getShip('onslaught')!, true, new Vector2(), 0, new SimulationRandom(8606));
+    ship.system.activate();
+    ship.system.update(2);
+    ship.shield.setActive(true);
+    ship.shield.currentArcDeg = ship.shield.maxArcDeg;
+    ship.throttle = 0;
+    ship.strafeInput = 1;
+    ship.turnInput = 1;
+    ship.angularVelRad = 0;
+    const yBefore = ship.pos.y;
+    ship.update(1 / 60, null, () => {}, () => {});
+    expect(ship.shield.isActive).toBe(false);
+    expect(ship.angularVelRad).toBeCloseTo(0, 8);
+    expect(ship.pos.x).toBeGreaterThan(0);
+    expect(ship.pos.y).toBeCloseTo(yBefore, 8);
+  });
+});
+
 describe('shield physical collision geometry', () => {
   it('uses the offset shield center consistently for arc blocking', () => {
     const engine = new CombatEngine('onslaught', 'paragon', 8001);
@@ -2210,14 +2414,19 @@ describe('combat correctness review regressions', () => {
     const testBeam = beam(engine.playerShip.id);
     const soundSpy = vi.spyOn(sound, 'playAtPos').mockImplementation(() => {});
     try {
-      engine.weaponSystem.beamHandler.update(1 / 60, makeContext(engine), [testBeam]);
+      for (let tick = 0; tick < 3; tick++) {
+        // Production beams with a slot are re-extended from the mount each tick; mirror that here for the slotless fixture.
+        testBeam.endPos.set(1000, 0);
+        engine.weaponSystem.beamHandler.update(1 / 60, makeContext(engine), [testBeam]);
+      }
     } finally {
       soundSpy.mockRestore();
     }
 
     expect(engine.statsTracker.playerStats.totalDamageDealt).toBeGreaterThan(0);
     expect(engine.statsTracker.playerStats.energyDamage).toBeGreaterThan(0);
-    expect(engine.statsTracker.playerStats.shotsHit).toBeGreaterThan(0);
+    expect(engine.statsTracker.playerStats.shotsHit).toBe(1);
+    expect(testBeam.hasRecordedHit).toBe(true);
     expect(engine.statsTracker.enemyStats.shieldDamageAbsorbed).toBeGreaterThan(0);
   });
 });

@@ -134,10 +134,15 @@ export interface WeaponSpec {
   glowRadius?: number;
   coreWidthMult?: number;
   beamWidth?: number; // .wpn width；仅光束视觉宽度
-  beamDuration?: number; // 当前 Web 模拟中的 Beam 实体寿命；不得与来源 chargedown 混为一谈
+  beamDuration?: number; // BURST 光束实际伤害持续时间；持续光束由 trigger 生命周期维持
   beamVisualMode?: 'BURST' | 'SUSTAINED';
-  beamSourceChargeupTime?: number; // weapon_data 来源元数据；当前不改变实际开火延迟
-  beamSourceChargedownTime?: number; // weapon_data 来源元数据；当前不延长伤害/碰撞寿命
+  beamSourceChargeupTime?: number; // weapon_data chargeup，参与真实开火状态机
+  beamSourceChargedownTime?: number; // weapon_data chargedown，参与真实退能状态机
+  beamBurstDelay?: number; // burst beam 完整周期结束后的 source burst delay
+  fluxPerSecond?: number; // 持续/爆发光束的 source energy/second
+  empPerSecond?: number;
+  maxAmmo?: number;
+  ammoRegenPerSec?: number;
   hitGlowBrightenDuration?: number; // .wpn 命中辉光增亮时长；仅视觉，不改变光束伤害节拍
 
   projSpriteUrl?: string;
@@ -186,6 +191,12 @@ export interface WeaponMount {
   isAutofire: boolean;
   burstRemaining: number;
   burstTimer: number;
+  firingState: 'IDLE' | 'CHARGING' | 'ACTIVE' | 'CHARGEDOWN';
+  firingStateTimer: number;
+  triggerHeld: boolean;
+  firingCycleId: number;
+  ammo: number;
+  ammoRechargeProgress: number;
 
   // 动态视觉后坐力与充能光晕状态
   recoil: number; // 0.0 ~ 1.0 (后坐到位为1，逐渐回位至0)
@@ -291,10 +302,14 @@ export interface Beam {
   endPos: Vector2;
   barrelOffset?: { x: number; y: number };
   damagePerSec: number;
+  empPerSec?: number;
   damageType: DamageType;
   color: [number, number, number];
   duration: number;
   maxDuration: number;
+  damageActive?: boolean;
+  firingCycleId?: number;
+  hasRecordedHit?: boolean;
   width: number;
   visualMode?: 'BURST' | 'SUSTAINED';
   isEmpPiercing?: boolean;

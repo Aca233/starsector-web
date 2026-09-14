@@ -162,7 +162,7 @@ export const PlayerStatusCard: React.FC<PlayerStatusCardProps> = ({
                   : 'bg-cyan-600 hover:bg-cyan-500 text-white'
               }`}
             >
-              [F] {player.system.type === 'MINE_STRIKE' ? `[${player.system.charges}]` : player.system.isActive ? `${player.system.activeTimer.toFixed(0)}s` : player.system.isCoolingDown ? `${player.system.cooldownTimer.toFixed(0)}s` : 'READY'}
+              [F] {player.system.type === 'MINE_STRIKE' ? `[${player.system.charges}]` : player.system.isActive ? `${player.system.state} ${(player.system.effectLevel * 100).toFixed(0)}%` : player.system.isCoolingDown ? `${player.system.cooldownTimer.toFixed(0)}s` : 'READY'}
             </button>
           </div>
 
@@ -184,7 +184,7 @@ export const PlayerStatusCard: React.FC<PlayerStatusCardProps> = ({
             <div className="w-full h-1 bg-slate-950 rounded overflow-hidden">
               <div
                 className="h-full bg-amber-400 shadow-[0_0_8px_#f59e0b] transition-all duration-75"
-                style={{ width: `${Math.max(0, (player.system.activeTimer / player.system.maxDuration)) * 100}%` }}
+                style={{ width: `${Math.max(0, Math.min(1, player.system.effectLevel)) * 100}%` }}
               />
             </div>
           ) : player.system.isCoolingDown ? (

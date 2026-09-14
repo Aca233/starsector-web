@@ -33,16 +33,16 @@ export const VISUAL_SCENARIOS: VisualScenarioDefinition[] = [
   { id: 'WPN-MARK9-01', title: 'Mark IX 真实开火：双管交替', description: '使用攻势 WS 019 前向大型炮塔持续开火，检查双管交替、后坐、枪口粒子与实体弹道。', duration: 2.4, shipId: 'onslaught', checkpoints: [0.72, 0.82, 1.08, 1.18, 1.45], mode: 'REAL_WEAPON' },
   { id: 'WPN-HEAVYMAULER-01', title: 'Heavy Mauler 真实开火：单炮空射', description: '在攻势 WS 012 中型炮塔临时装入 Registry 中的 Heavy Mauler，走真实火控、枪口粒子、后坐与投射物链。', duration: 2.2, shipId: 'onslaught', checkpoints: [0.86, 0.92, 0.98, 1.18], mode: 'REAL_WEAPON' },
   { id: 'WPN-HVEL-01', title: 'Hypervelocity Driver 真实开火：单炮空射', description: '使用攻势 WS 012 原生 HVD，走真实火控、枪口粒子、后坐与投射物链。', duration: 2.2, shipId: 'onslaught', checkpoints: [0.86, 0.92, 0.98, 1.18], mode: 'REAL_WEAPON' },
-  { id: 'WPN-LIGHTMG-01', title: 'Light MG 真实开火：Broadsword 单管', description: '使用阔剑 WS 001 原生轻机枪，保留现有 gameplay 弹道语义，仅按来源 visualSpawnType 检查 beam-like 弹体成像。', duration: 2.0, shipId: 'broadsword', checkpoints: [0.86, 0.92, 0.98, 1.12], mode: 'REAL_WEAPON' },
-  { id: 'WPN-FLAK-01', title: 'Flak 真实开火：单管后向空射', description: '在攻势 WS 014 临时装入 Flak 规格并朝后空射，检查来源弹体、枪口焰与后坐；不改变近炸 gameplay。', duration: 2.0, shipId: 'onslaught', checkpoints: [0.86, 0.92, 0.98, 1.15], mode: 'REAL_WEAPON' },
+  { id: 'WPN-LIGHTMG-01', title: 'Light MG 真实开火：Broadsword 单管', description: '使用阔剑 WS 001 原生轻机枪，走来源 5 发 burst 与 RAY-style 弹体契约，检查 beam-like 弹体成像。', duration: 2.0, shipId: 'broadsword', checkpoints: [0.86, 0.92, 0.98, 1.12], mode: 'REAL_WEAPON' },
+  { id: 'WPN-FLAK-01', title: 'Flak 真实开火：单管后向空射', description: '在攻势 WS 014 临时装入 Flak 规格并朝后空射，检查来源弹体、枪口焰、后坐与已对齐的近炸半径契约。', duration: 2.0, shipId: 'onslaught', checkpoints: [0.86, 0.92, 0.98, 1.15], mode: 'REAL_WEAPON' },
   { id: 'WPN-DUALFLAK-01', title: 'Dual Flak 真实开火：双管交替', description: '使用攻势原生 WS 014 双管高射炮朝后持续开火，检查双管交替、来源弹宽和短促枪口粒子。', duration: 2.0, shipId: 'onslaught', checkpoints: [0.72, 0.82, 1.06, 1.12, 1.35], mode: 'REAL_WEAPON' },
   { id: 'WPN-BEAM-01', title: 'Tachyon Lance 真实开火：单束空射', description: '使用典范 WS 003 原生 Tachyon Lance，走真实火控与 BeamSimulation，检查来源宽度、RGBA、纹理滚动和 burst 生命周期。', duration: 2.2, shipId: 'paragon', checkpoints: [0.86, 0.92, 0.98, 1.3, 1.8], mode: 'REAL_WEAPON' },
-  { id: 'WPN-BEAM-02', title: 'Graviton Beam 真实开火：持续束', description: '使用典范 WS 005 原生 Graviton Beam 持续开火，保留当前模拟 Beam 重叠，只在渲染层检查单束成像与连续 UV 相位。', duration: 2.0, shipId: 'paragon', checkpoints: [0.72, 0.9, 1.08, 1.28, 1.5], mode: 'REAL_WEAPON' },
-  { id: 'WPN-BEAM-03', title: 'Tactical Laser 真实开火：持续束', description: '使用典范 WS 007 原生 Tactical Laser 持续开火，检查 13-unit 来源宽度、绿色 RGBA 与持续束渲染去重。', duration: 2.0, shipId: 'paragon', checkpoints: [0.72, 0.9, 1.08, 1.28, 1.5], mode: 'REAL_WEAPON' },
+  { id: 'WPN-BEAM-02', title: 'Graviton Beam 真实开火：持续束', description: '使用典范 WS 005 原生 Graviton Beam，走 0.1s 充能/退能与单实体持续束生命周期，检查连续 UV 相位。', duration: 2.0, shipId: 'paragon', checkpoints: [0.72, 0.9, 1.08, 1.28, 1.5], mode: 'REAL_WEAPON' },
+  { id: 'WPN-BEAM-03', title: 'Tactical Laser 真实开火：持续束', description: '使用典范 WS 007 原生 Tactical Laser 持续开火，检查 13-unit 来源宽度、绿色 RGBA 与单实体持续束生命周期。', duration: 2.0, shipId: 'paragon', checkpoints: [0.72, 0.9, 1.08, 1.28, 1.5], mode: 'REAL_WEAPON' },
   { id: 'WPN-MSL-01', title: 'Reaper 真实开火：直飞与红色 GLOW 尾迹', description: '使用 Doom WS 001 原生 Typhoon/Reaper 发射器空射，检查 compact 弹体、发射烟、发动机与红色 GLOW 尾迹；Reaper 不做转弯验收。', duration: 2.5, shipId: 'doom', checkpoints: [0.86, 0.94, 1.08, 1.4, 2.0], mode: 'REAL_WEAPON' },
   { id: 'WPN-MSL-02', title: 'Atropos 真实开火：制导转弯与尾迹', description: '使用 Dagger WS 002 原生 Atropos 对偏置目标开火，检查实际 MissileGuidance 转向以及来源 GLOW 尾迹。', duration: 2.5, shipId: 'dagger', checkpoints: [0.62, 0.78, 1.0, 1.25, 1.7], mode: 'REAL_WEAPON' },
   { id: 'WPN-MSL-03', title: 'Annihilator 真实开火：快速火箭', description: '使用 Onslaught WS 021 持续开火，检查双管交替、小型火箭、发射烟与短寿命 NORMAL 尾迹。', duration: 2.2, shipId: 'onslaught', checkpoints: [0.72, 0.86, 1.05, 1.28, 1.55], mode: 'REAL_WEAPON' },
-  { id: 'WPN-MSL-04', title: 'Sabot 真实开火：当前分段链', description: '使用 Doom WS 003 对真实目标开火，检查来源弹体/烟/发动机/尾迹以及当前 Web 二段状态；MIRV 机械差异不在此视觉批次修正。', duration: 2.5, shipId: 'doom', checkpoints: [0.62, 0.8, 1.1, 1.45, 1.9], mode: 'REAL_WEAPON' },
+  { id: 'WPN-MSL-04', title: 'Sabot 真实开火：MIRV 分裂链', description: '使用 Doom WS 003 对真实目标开火，检查来源弹体/烟/发动机/尾迹以及 source-aligned 五弹头 MIRV 分裂。', duration: 2.5, shipId: 'doom', checkpoints: [0.62, 0.8, 1.1, 1.45, 1.9], mode: 'REAL_WEAPON' },
   { id: 'WPN-HBLASTER-01', title: 'Heavy Blaster 真实开火：装甲命中', description: '使用 Doom WS 007 原生 Heavy Blaster 对无盾目标开火，检查来源 beam-like 投射物、枪口粒子与真实装甲/舰体命中链。', duration: 1.8, shipId: 'doom', checkpoints: [0.7, 0.82, 0.98, 1.12, 1.35], mode: 'REAL_WEAPON' },
   { id: 'WPN-PDBURST-01', title: 'Burst PD 真实开火：护盾接触', description: '使用 Doom WS 009 原生 Burst PD 对已展开护盾目标开火，检查来源 Beam 材质与确定性的护盾接触节拍。', duration: 1.5, shipId: 'doom', checkpoints: [0.58, 0.66, 0.74, 0.86, 1.05], mode: 'REAL_WEAPON' }
 ];
@@ -267,12 +267,14 @@ export class VisualScenarioController {
         break;
       }
       case 'WPN-BEAM-01': {
-        const fireAt = 0.9;
+        // Hold through the source 0.5s charge-up; the lance becomes damage-active at ~0.9s.
+        const fireStart = 0.4;
+        const fireEnd = 1.0;
         player.throttle = 0;
         player.strafeInput = 0;
         player.turnInput = 0;
         player.aimTargetWorld.set(1400, 0);
-        player.isFiringMain = previousTime < fireAt - EPSILON && currentTime >= fireAt - EPSILON;
+        player.isFiringMain = currentTime >= fireStart - EPSILON && previousTime < fireEnd - EPSILON;
         engine.fixedUpdate(dt);
         player.isFiringMain = false;
         break;
@@ -333,7 +335,9 @@ export class VisualScenarioController {
         player.strafeInput = 0;
         player.turnInput = 0;
         player.aimTargetWorld.copy(engine.enemyShip.pos);
-        player.isFiringMain = previousTime < fireAt - EPSILON && currentTime >= fireAt - EPSILON;
+        player.isFiringMain = this.active.id === 'WPN-HBLASTER-01'
+          ? previousTime < fireAt - EPSILON && currentTime >= fireAt - EPSILON
+          : currentTime >= fireAt - EPSILON && previousTime < 1.2 - EPSILON;
         engine.fixedUpdate(dt);
         player.isFiringMain = false;
         break;
@@ -373,10 +377,8 @@ export class VisualScenarioController {
     player.flux.hardFlux = 0;
     player.flux.isVenting = false;
     player.flux.isOverloaded = false;
-    player.system.isActive = false;
-    player.system.isCoolingDown = false;
-    player.system.cooldownTimer = 0;
-    player.system.activeTimer = 0;
+    player.system.reset();
+    enemy.system.reset();
     for (const status of player.engineStatuses) {
       status.currentThrust = 0;
       status.prevThrust = 0;
@@ -385,6 +387,14 @@ export class VisualScenarioController {
     }
     for (const mount of player.weapons) {
       mount.cooldownTimer = 0;
+      mount.burstRemaining = 0;
+      mount.burstTimer = 0;
+      mount.firingState = 'IDLE';
+      mount.firingStateTimer = 0;
+      mount.triggerHeld = false;
+      mount.firingCycleId = 0;
+      mount.ammo = mount.spec.maxAmmo ?? Number.POSITIVE_INFINITY;
+      mount.ammoRechargeProgress = 0;
       mount.recoil = 0;
       mount.glowAlpha = 0;
     }

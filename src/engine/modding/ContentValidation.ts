@@ -74,7 +74,7 @@ export function validateWeaponSpec(input: unknown, requireBundledAssets = assetM
   }
   colorTuple(spec.color, `${id}.color`, 3);
 
-  for (const key of ['turnRateDegPerSec', 'minSpread', 'maxSpread', 'spreadPerShot', 'spreadDecay', 'visualRecoil', 'hitGlowRadius', 'glowRadius', 'coreWidthMult', 'projLength', 'projWidth', 'muzzleFlashSize', 'burstDelay', 'engineAcceleration', 'maxSpeed', 'maxTurnRate', 'missileHp', 'beamWidth', 'beamDuration', 'beamSourceChargeupTime', 'beamSourceChargedownTime', 'hitGlowBrightenDuration'] as const) {
+  for (const key of ['turnRateDegPerSec', 'minSpread', 'maxSpread', 'spreadPerShot', 'spreadDecay', 'visualRecoil', 'hitGlowRadius', 'glowRadius', 'coreWidthMult', 'projLength', 'projWidth', 'muzzleFlashSize', 'burstDelay', 'engineAcceleration', 'maxSpeed', 'maxTurnRate', 'missileHp', 'beamWidth', 'beamDuration', 'beamSourceChargeupTime', 'beamSourceChargedownTime', 'beamBurstDelay', 'fluxPerSecond', 'empPerSecond', 'maxAmmo', 'ammoRegenPerSec', 'hitGlowBrightenDuration'] as const) {
     if (spec[key] !== undefined) finite(spec[key], `${id}.${key}`, 0);
   }
   if (spec.fadeTime !== undefined) finite(spec.fadeTime, `${id}.fadeTime`, 0);

@@ -42,6 +42,12 @@ export class ShipWeaponControlSystem {
           isAutofire: slot.mountType === 'TURRET',
           burstRemaining: 0,
           burstTimer: 0,
+          firingState: 'IDLE',
+          firingStateTimer: 0,
+          triggerHeld: false,
+          firingCycleId: 0,
+          ammo: weaponSpec.maxAmmo ?? Number.POSITIVE_INFINITY,
+          ammoRechargeProgress: 0,
           recoil: 0,
           glowAlpha: 0,
           barrelIndex: 0,
@@ -148,7 +154,15 @@ export class ShipWeaponControlSystem {
     // 冷却计时器、后坐力回位与弹道散布收束 (严格对齐 MultiBarrelRecoilTracker.java 与 weapon_data.csv)
     for (const mount of this.weapons) {
       if (mount.cooldownTimer > 0) {
-        mount.cooldownTimer -= dt;
+        mount.cooldownTimer = Math.max(0, mount.cooldownTimer - dt);
+      }
+      if (Number.isFinite(mount.ammo) && mount.spec.maxAmmo !== undefined && mount.spec.ammoRegenPerSec) {
+        mount.ammoRechargeProgress += mount.spec.ammoRegenPerSec * dt;
+        while (mount.ammoRechargeProgress >= 1 && mount.ammo < mount.spec.maxAmmo) {
+          mount.ammo++;
+          mount.ammoRechargeProgress -= 1;
+        }
+        if (mount.ammo >= mount.spec.maxAmmo) mount.ammoRechargeProgress = 0;
       }
       // 官方真实后坐力恢复时间: refireDelay * 0.8
       if (mount.recoil > 0) {
@@ -188,8 +202,12 @@ export class ShipWeaponControlSystem {
     }
 
     for (const mount of this.weapons) {
+      mount.triggerHeld = false;
       if (mount.isDisabled) {
         // 故障挂点电机失灵无法旋转瞄准，射控电路短路无法击发
+        mount.burstRemaining = 0;
+        mount.firingState = 'IDLE';
+        mount.firingStateTimer = 0;
         continue;
       }
 
@@ -280,12 +298,12 @@ export class ShipWeaponControlSystem {
 
         if (ship.isFiringMain && canShipFire && mount.cooldownTimer <= 0 && isAimed) {
           if (activeGroup.mode === 'LINKED') {
-            this.fireWeapon(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
+            this.requestWeaponFire(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
           } else if (activeGroup.mode === 'ALTERNATING') {
             const nextSlotId = activeGroup.weaponSlotIds[activeGroup.alternatingIndex % activeGroup.weaponSlotIds.length];
             if (mount.slotId === nextSlotId) {
-              this.fireWeapon(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
-              activeGroup.alternatingIndex = (activeGroup.alternatingIndex + 1) % activeGroup.weaponSlotIds.length;
+              const started = this.requestWeaponFire(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
+              if (started) activeGroup.alternatingIndex = (activeGroup.alternatingIndex + 1) % activeGroup.weaponSlotIds.length;
             }
           }
         }
@@ -327,12 +345,12 @@ export class ShipWeaponControlSystem {
               while (aimError > Math.PI) aimError -= Math.PI * 2;
               while (aimError < -Math.PI) aimError += Math.PI * 2;
               if (canShipFire && mount.cooldownTimer <= 0 && Math.abs(aimError) <= maxAimTol && distToTarget <= effectiveRange) {
-                this.fireWeapon(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
+                this.requestWeaponFire(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
               }
             } else {
               const res = aimTurret(aimTargetPoint, maxAimTol);
               if (canShipFire && mount.cooldownTimer <= 0 && res.isAimedAtTarget && distToTarget <= effectiveRange) {
-                this.fireWeapon(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
+                this.requestWeaponFire(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
               }
             }
           }
@@ -355,6 +373,172 @@ export class ShipWeaponControlSystem {
         } else {
           aimTurret(null);
         }
+      }
+
+      this.advanceWeaponLifecycle(dt, mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
+    }
+  }
+
+  private requestWeaponFire(
+    mount: WeaponMount,
+    ship: Ship,
+    spawnProjectile: (p: Projectile) => void,
+    spawnBeam: (b: Beam) => void,
+    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void
+  ): boolean {
+    mount.triggerHeld = true;
+
+    if (mount.spec.isBeam) {
+      if (mount.firingState !== 'IDLE' || mount.cooldownTimer > 0) return false;
+      if (Number.isFinite(mount.ammo) && mount.ammo < 1) return false;
+      mount.firingCycleId++;
+      const chargeup = mount.spec.beamSourceChargeupTime ?? 0;
+      if (chargeup > 0) {
+        mount.firingState = 'CHARGING';
+        mount.firingStateTimer = chargeup;
+        mount.glowAlpha = 0;
+      } else {
+        this.activateBeam(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
+      }
+      return true;
+    }
+
+    if (mount.burstRemaining > 0 || mount.cooldownTimer > 0) return false;
+    const burstSize = Math.max(1, Math.floor(mount.spec.burstSize ?? 1));
+    this.fireWeapon(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
+    if (burstSize > 1) {
+      mount.burstRemaining = burstSize - 1;
+      mount.burstTimer = mount.spec.burstDelay ?? 0;
+    } else {
+      mount.cooldownTimer = mount.spec.refireDelay;
+    }
+    return true;
+  }
+
+  private activateBeam(
+    mount: WeaponMount,
+    ship: Ship,
+    spawnProjectile: (p: Projectile) => void,
+    spawnBeam: (b: Beam) => void,
+    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void
+  ): void {
+    if (Number.isFinite(mount.ammo)) mount.ammo = Math.max(0, mount.ammo - 1);
+    mount.firingState = 'ACTIVE';
+    mount.firingStateTimer = mount.spec.beamVisualMode === 'BURST'
+      ? Math.max(0.001, mount.spec.beamDuration ?? 0.001)
+      : Number.POSITIVE_INFINITY;
+    this.fireWeapon(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
+  }
+
+  private emitBeamState(
+    mount: WeaponMount,
+    ship: Ship,
+    spawnBeam: (b: Beam) => void,
+    damageActive: boolean,
+    duration: number
+  ): void {
+    const mountOffset = mount.relativePos.clone().rotate(ship.facingRad);
+    const firePos = ship.pos.clone().add(mountOffset);
+    const effectiveRange = mount.spec.range * (ship.spec.weaponRangeMult || 1.0);
+    spawnBeam({
+      id: this.random.next(),
+      sourceShipId: ship.id,
+      slotId: mount.slotId,
+      isPlayer: ship.isPlayer,
+      specId: mount.spec.id,
+      startPos: firePos,
+      endPos: firePos.clone().addScaled(Vector2.fromAngle(mount.currentAngleRad, 1), effectiveRange),
+      damagePerSec: mount.spec.damagePerSecond,
+      empPerSec: mount.spec.empPerSecond,
+      damageType: mount.spec.type,
+      color: mount.spec.color,
+      duration: Math.max(0.001, duration),
+      maxDuration: Math.max(0.001, duration),
+      damageActive,
+      firingCycleId: mount.firingCycleId,
+      width: mount.spec.beamWidth ?? 12,
+      visualMode: mount.spec.beamVisualMode,
+      isEmpPiercing: mount.spec.id === 'tachyonlance',
+      elapsedTime: 0,
+      textureType: mount.spec.textureType,
+      textureScrollSpeed: mount.spec.textureScrollSpeed,
+      pixelsPerTexel: mount.spec.pixelsPerTexel,
+      fringeColor: mount.spec.fringeColor,
+      coreColor: mount.spec.coreColor,
+      glowColor: mount.spec.glowColor,
+      hitGlowRadius: mount.spec.hitGlowRadius,
+      hitGlowBrightenDuration: mount.spec.hitGlowBrightenDuration
+    });
+  }
+
+  private enterBeamChargedown(mount: WeaponMount, ship: Ship, spawnBeam: (b: Beam) => void, hadActiveBeam: boolean): void {
+    const chargedown = mount.spec.beamSourceChargedownTime ?? 0;
+    if (hadActiveBeam && chargedown > 0) this.emitBeamState(mount, ship, spawnBeam, false, chargedown);
+    if (chargedown > 0) {
+      mount.firingState = 'CHARGEDOWN';
+      mount.firingStateTimer = chargedown;
+    } else {
+      mount.firingState = 'IDLE';
+      mount.firingStateTimer = 0;
+      mount.cooldownTimer = Math.max(mount.cooldownTimer, mount.spec.beamBurstDelay ?? mount.spec.refireDelay);
+    }
+  }
+
+  private advanceWeaponLifecycle(
+    dt: number,
+    mount: WeaponMount,
+    ship: Ship,
+    spawnProjectile: (p: Projectile) => void,
+    spawnBeam: (b: Beam) => void,
+    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void
+  ): void {
+    if (!mount.spec.isBeam && mount.burstRemaining > 0) {
+      mount.burstTimer -= dt;
+      const delay = Math.max(0.0001, mount.spec.burstDelay ?? 0.0001);
+      while (mount.burstRemaining > 0 && mount.burstTimer <= 0) {
+        this.fireWeapon(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
+        mount.burstRemaining--;
+        if (mount.burstRemaining > 0) mount.burstTimer += delay;
+        else mount.cooldownTimer = mount.spec.refireDelay;
+      }
+      return;
+    }
+
+    if (!mount.spec.isBeam) return;
+    if (mount.firingState === 'CHARGING') {
+      if (!mount.triggerHeld) {
+        this.enterBeamChargedown(mount, ship, spawnBeam, false);
+        return;
+      }
+      mount.firingStateTimer -= dt;
+      const chargeup = Math.max(0.001, mount.spec.beamSourceChargeupTime ?? 0.001);
+      mount.glowAlpha = Math.max(mount.glowAlpha, 1 - Math.max(0, mount.firingStateTimer) / chargeup);
+      if (mount.firingStateTimer <= 0) this.activateBeam(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
+      return;
+    }
+
+    if (mount.firingState === 'ACTIVE') {
+      const isBurstBeam = mount.spec.beamVisualMode === 'BURST';
+      if (!isBurstBeam && !mount.triggerHeld) {
+        this.enterBeamChargedown(mount, ship, spawnBeam, true);
+        return;
+      }
+      if (mount.spec.fluxPerSecond) ship.flux.increaseFlux(mount.spec.fluxPerSecond * dt, false);
+      if (isBurstBeam) {
+        mount.firingStateTimer -= dt;
+        if (mount.firingStateTimer <= 0) this.enterBeamChargedown(mount, ship, spawnBeam, true);
+      }
+      return;
+    }
+
+    if (mount.firingState === 'CHARGEDOWN') {
+      mount.firingStateTimer -= dt;
+      const chargedown = Math.max(0.001, mount.spec.beamSourceChargedownTime ?? 0.001);
+      mount.glowAlpha = Math.min(mount.glowAlpha, Math.max(0, mount.firingStateTimer) / chargedown);
+      if (mount.firingStateTimer <= 0) {
+        mount.firingState = 'IDLE';
+        mount.firingStateTimer = 0;
+        mount.cooldownTimer = Math.max(mount.cooldownTimer, mount.spec.beamBurstDelay ?? mount.spec.refireDelay);
       }
     }
   }
@@ -400,9 +584,8 @@ export class ShipWeaponControlSystem {
     const rotatedOffset = mount.relativePos.clone().rotate(ship.facingRad);
     const firePos = ship.pos.clone().add(rotatedOffset).add(barrelOffsetWorld);
 
-    // 开火增加幅能
-    ship.flux.increaseFlux(mount.spec.fluxPerShot, false);
-    mount.cooldownTimer = mount.spec.refireDelay;
+    // 实体弹药按发射次数产生幅能；光束按 ACTIVE 时间连续产生 source energy/second 幅能。
+    if (!mount.spec.isBeam && mount.spec.fluxPerShot > 0) ship.flux.increaseFlux(mount.spec.fluxPerShot, false);
 
     // 播放官方真实音效
     if (mount.spec.soundKey) {
@@ -445,11 +628,12 @@ export class ShipWeaponControlSystem {
       : mount.spec.range * (ship.spec.weaponRangeMult || 1.0);
 
     if (mount.spec.isBeam) {
-      // 发射持续光束 (严格对齐 Starsector BeamWeaponRay.java 与 weapon_data.csv)
+      // 每个 beam firing cycle 只创建一个实体；持续光束由挂点 ACTIVE 状态维持。
       const beamDir = Vector2.fromAngle(fireAngleRad, effectiveRange);
       const endPos = firePos.clone().add(beamDir);
-      // 模拟寿命从配置读取，先保持既有 Web 行为；来源 chargeup/chargedown 独立记录，避免视觉工作改写伤害节奏。
-      const beamDuration = mount.spec.beamDuration ?? 0.22;
+      const beamDuration = mount.spec.beamVisualMode === 'SUSTAINED'
+        ? Number.MAX_SAFE_INTEGER
+        : Math.max(0.001, mount.spec.beamDuration ?? 0.001);
       mount.glowAlpha = 1.0;
       spawnBeam({
         id: this.random.next(),
@@ -461,10 +645,14 @@ export class ShipWeaponControlSystem {
         endPos: endPos,
         barrelOffset: { x: offX, y: offY },
         damagePerSec: mount.spec.damagePerSecond,
+        empPerSec: mount.spec.empPerSecond,
         damageType: mount.spec.type,
         color: mount.spec.color,
         duration: beamDuration,
         maxDuration: beamDuration,
+        damageActive: true,
+        firingCycleId: mount.firingCycleId,
+        hasRecordedHit: false,
         width: mount.spec.beamWidth ?? 12,
         visualMode: mount.spec.beamVisualMode,
         isEmpPiercing: mount.spec.id === 'tachyonlance',

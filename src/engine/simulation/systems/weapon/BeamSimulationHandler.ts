@@ -178,6 +178,14 @@ export class BeamSimulationHandler {
             b.endPos.copy(shieldHitPoint);
             b.isHitting = true;
             contactedThisTick = true;
+            if (b.damageActive === false) {
+              b.isHitting = false;
+              break;
+            }
+            if (!b.hasRecordedHit) {
+              ctx.statsTracker?.recordShotHit(b.isPlayer ?? false);
+              b.hasRecordedHit = true;
+            }
             const tickDmg = b.damagePerSec * dt;
             const shieldMult = ship.system.getShieldDamageMultiplier();
             const absorbedDmg = tickDmg * shieldMult;
@@ -259,14 +267,25 @@ export class BeamSimulationHandler {
             b.endPos.copy(worldImpact);
             b.isHitting = true;
             contactedThisTick = true;
+            if (b.damageActive === false) {
+              b.isHitting = false;
+              break;
+            }
+            if (!b.hasRecordedHit) {
+              ctx.statsTracker?.recordShotHit(b.isPlayer ?? false);
+              b.hasRecordedHit = true;
+            }
             const tickDmg = b.damagePerSec * dt;
+            const tickEmp = (b.empPerSec ?? 0) * dt;
             const result = ship.armor.takeDamage(localImpact, tickDmg, b.damageType, b.damagePerSec, true);
             if (ctx.statsTracker) {
+              let empRecorded = false;
               if (result.armorDamage > 0) {
-                ctx.statsTracker.recordDamageDealt(b.isPlayer ?? false, b.damageType, result.armorDamage, 'ARMOR');
+                ctx.statsTracker.recordDamageDealt(b.isPlayer ?? false, b.damageType, result.armorDamage, 'ARMOR', tickEmp);
+                empRecorded = tickEmp > 0;
               }
               if (result.hullDamage > 0) {
-                ctx.statsTracker.recordDamageDealt(b.isPlayer ?? false, b.damageType, result.hullDamage, 'HULL');
+                ctx.statsTracker.recordDamageDealt(b.isPlayer ?? false, b.damageType, result.hullDamage, 'HULL', empRecorded ? 0 : tickEmp);
               }
             }
             ship.hullHp = Math.max(0, ship.hullHp - result.hullDamage);
@@ -306,8 +325,8 @@ export class BeamSimulationHandler {
             }
 
             // 光束穿透破坏武器挂点
-            const beamEmpDmg = b.isEmpPiercing ? tickDmg * 2.5 : tickDmg * 0.4;
-            const disabledMount = ship.damageWeaponMount(localImpact, tickDmg + beamEmpDmg, b.isEmpPiercing);
+            const beamEmpDmg = tickEmp;
+            const disabledMount = ship.damageWeaponMount(localImpact, tickDmg + beamEmpDmg, beamEmpDmg > 0);
             if (disabledMount) {
               ctx.fx.spawnSparks(worldImpact, 25, [165, 100, 255]);
               const weaponName = i18n.t(disabledMount.spec.nameKey).split(' ')[0] || disabledMount.slotId;

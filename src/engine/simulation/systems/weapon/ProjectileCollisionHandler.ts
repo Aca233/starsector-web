@@ -193,6 +193,7 @@ export class ProjectileCollisionHandler {
     }
 
     // 范围破片杀伤结算 (AOE Damage)
+    let damagedHostileTarget = false;
     // 1) 拦截波及范围内的敌方导弹 (计算导弹生命值损耗与殉爆)
     let interceptedCount = 0;
     for (let mIdx = allProjectiles.length - 1; mIdx >= 0; mIdx--) {
@@ -202,6 +203,7 @@ export class ProjectileCollisionHandler {
           const damage = p.damage * this.getExplosionDamageScale(p, p.pos.distanceTo(targetM.pos));
           if (damage <= 0) continue;
           targetM.hitpoints = (targetM.hitpoints ?? 100) - damage;
+          damagedHostileTarget = true;
           if (targetM.hitpoints <= 0) {
             if (targetM.isRocket) ctx.contrailEngine?.detach(targetM.id);
             allProjectiles.splice(mIdx, 1);
@@ -233,6 +235,7 @@ export class ProjectileCollisionHandler {
           const aoeDmg = p.damage * this.getExplosionDamageScale(p, surfaceDistance);
           if (aoeDmg <= 0) continue;
           f.hullHp = Math.max(0, f.hullHp - aoeDmg);
+          damagedHostileTarget = true;
           ctx.fx.addFloatingDamage(f.pos.clone(), aoeDmg, [255, 180, 60]);
           ctx.fx.spawnSparks(f.pos, 10, [255, 120, 40]);
           if (f.hullHp <= 0) {
@@ -255,6 +258,7 @@ export class ProjectileCollisionHandler {
             const shieldSurfaceDistance = Math.max(0, p.pos.distanceTo(s.getShieldCenter()) - s.shield.radius);
             const damage = p.damage * this.getExplosionDamageScale(p, shieldSurfaceDistance);
             if (damage > 0) {
+              damagedHostileTarget = true;
               const fluxGain = s.shield.absorbDamage(damage, 'FRAGMENTATION', p.pos.clone().sub(s.getShieldCenter()).heading());
               s.flux.increaseFlux(fluxGain, true);
               ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, 'FRAGMENTATION', damage, 'SHIELD');
@@ -265,6 +269,7 @@ export class ProjectileCollisionHandler {
             const damage = p.damage * this.getExplosionDamageScale(p, surfaceDistance);
             if (damage <= 0) continue;
             const localImpact = p.pos.clone().sub(s.pos).rotate(-s.facingRad);
+            damagedHostileTarget = true;
             const res = s.armor.takeDamage(localImpact, damage, 'FRAGMENTATION', damage, false);
             if (res.armorDamage > 0) ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, 'FRAGMENTATION', res.armorDamage, 'ARMOR');
             if (res.hullDamage > 0) ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, 'FRAGMENTATION', res.hullDamage, 'HULL');
@@ -274,6 +279,8 @@ export class ProjectileCollisionHandler {
         }
       }
     }
+
+    if (damagedHostileTarget) ctx.statsTracker?.recordShotHit(p.isPlayer ?? false);
 
     return true;
   }
@@ -310,6 +317,7 @@ export class ProjectileCollisionHandler {
           } else {
             ctx.fx.spawnSparks(targetM.pos, 8, [255, 180, 60]);
           }
+          ctx.statsTracker?.recordShotHit(p.isPlayer ?? false);
           return { targetProjectileId: targetM.id, targetDestroyed };
         }
       }
@@ -349,6 +357,7 @@ export class ProjectileCollisionHandler {
     const { projectile: p, ship } = hit;
     if (ship.isDead || ship.isPhased) return false;
     const impactWorld = hit.worldPoint;
+    ctx.statsTracker?.recordShotHit(p.isPlayer ?? false);
 
     if (hit.kind === 'SHIELD') {
       const sCenter = ship.getShieldCenter(ship.pos, ship.facingRad);
