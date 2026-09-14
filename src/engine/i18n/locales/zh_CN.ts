@@ -108,5 +108,20 @@ export const zh_CN: Record<string, string> = {
   'damage.kinetic': '动能伤害 (对护盾 200% / 对装甲 50%)',
   'damage.high_explosive': '高爆伤害 (对装甲 200% / 对护盾 50%)',
   'damage.energy': '能量伤害 (平衡伤害 100%)',
-  'damage.fragmentation': '破片伤害 (对结构 100% / 对护盾装甲 25%)'
+  'damage.fragmentation': '破片伤害 (对结构 100% / 对护盾装甲 25%)',
+
+  // 战斗展示可用性
+  'combat.availability.loading_title': '正在准备战斗画面',
+  'combat.availability.loading_detail': '正在加载战斗资源并初始化 WebGL2。',
+  'combat.availability.context_lost_title': '战斗画面暂时不可用',
+  'combat.availability.context_lost_detail': 'WebGL 上下文已丢失，正在等待浏览器恢复。战斗推进已暂停。',
+  'combat.availability.restoring_title': '正在恢复战斗画面',
+  'combat.availability.restoring_detail': '正在重建 GPU 资源并重新准备必要纹理。',
+  'combat.availability.failed_title': '无法显示战斗画面',
+  'combat.availability.failed_detail': '此战斗需要可用的 WebGL2。请确认浏览器图形加速可用，然后刷新页面重试。',
+  'combat.availability.webgl2_unsupported': '当前环境无法创建 WebGL2 战斗上下文。',
+  'combat.availability.renderer_init_failed': 'WebGL2 战斗渲染器初始化失败。',
+  'combat.availability.resource_prepare_failed': '必要的战斗图形资源准备失败。',
+  'combat.availability.context_restore_failed': '战斗画面恢复失败。',
+  'combat.availability.refresh': '刷新页面'
 };

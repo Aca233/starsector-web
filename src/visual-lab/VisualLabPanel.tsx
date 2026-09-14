@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { CombatSession } from '../engine/runtime/CombatSession';
 import { VISUAL_SCENARIOS, type VisualScenarioController } from './VisualScenarioController';
 import { HudGlyphSample } from '../ui/hud/HudGlyphSample';
+import { initializeVisualLabControllerOnce } from './VisualLabInitialization';
 
 interface Props {
   session: CombatSession;
@@ -47,12 +48,16 @@ export const VisualLabPanel: React.FC<Props> = ({
   const [previewShip, setPreviewShip] = useState(initialPreviewShip);
   const [zoom, setZoom] = useState(0.65);
   const [, force] = useState(0);
+  const initializedControllerRef = useRef<VisualScenarioController | null>(null);
 
   useEffect(() => {
-    controller.setPreviewShip(initialPreviewShip || null);
-    controller.select(initial.id, initialSeed);
-    if (initialTime > 0) controller.seek(initialTime);
-  }, [controller, initial.id, initialSeed, initialPreviewShip, initialTime]);
+    initializeVisualLabControllerOnce(initializedControllerRef, assetsReady, controller, {
+      sceneId: initial.id,
+      seed: initialSeed,
+      time: initialTime,
+      previewShipId: initialPreviewShip || null
+    });
+  }, [assetsReady, controller, initial.id, initialSeed, initialPreviewShip, initialTime]);
 
   const refresh = () => {
     force((value) => value + 1);
@@ -100,13 +105,13 @@ export const VisualLabPanel: React.FC<Props> = ({
         <span>{controller.time.toFixed(3)} / {activeScene.duration.toFixed(1)}s</span>
       </div>
 
-      <select className="w-full bg-slate-900 border border-slate-700 p-1" value={sceneId} onChange={(event) => applyScene(event.target.value)}>
+      <select disabled={!assetsReady} className="w-full bg-slate-900 border border-slate-700 p-1 disabled:opacity-40" value={sceneId} onChange={(event) => applyScene(event.target.value)}>
         {VISUAL_SCENARIOS.map((scene) => <option key={scene.id} value={scene.id}>{scene.id} · {scene.title}</option>)}
       </select>
       <div className="mt-1 min-h-8 text-[10px] leading-4 text-slate-400">{activeScene.description}</div>
       <div className="mt-1 flex items-center gap-2 text-[10px]">
         <span className="text-slate-400">Hull profile</span>
-        <select className="bg-slate-900 border border-slate-700 px-1 py-0.5" value={previewShip} onChange={(event) => applyPreviewShip(event.target.value)}>
+        <select disabled={!assetsReady} className="bg-slate-900 border border-slate-700 px-1 py-0.5 disabled:opacity-40" value={previewShip} onChange={(event) => applyPreviewShip(event.target.value)}>
           <option value="">scene default ({activeScene.shipId})</option>
           <option value="onslaught">Onslaught · low-tech</option>
           <option value="paragon">Paragon · high-tech</option>
@@ -116,7 +121,7 @@ export const VisualLabPanel: React.FC<Props> = ({
       <div className="mt-1 flex flex-wrap items-center gap-1 text-[10px] text-slate-400">
         <span>capture @</span>
         {activeScene.checkpoints.map((time) => (
-          <button key={time} className="rounded border border-slate-700 bg-slate-900 px-1 text-cyan-200" onClick={() => seekTo(time)}>
+          <button key={time} disabled={!assetsReady} className="rounded border border-slate-700 bg-slate-900 px-1 text-cyan-200 disabled:opacity-40" onClick={() => seekTo(time)}>
             {time.toFixed(2)}s
           </button>
         ))}
@@ -133,7 +138,7 @@ export const VisualLabPanel: React.FC<Props> = ({
       <div className="mt-2 flex flex-wrap gap-1">
         <button disabled={!assetsReady} className="bg-slate-800 px-2 py-1 disabled:opacity-40" onClick={() => { controller.play(); refresh(); }}>Play</button>
         <button className="bg-slate-800 px-2 py-1" onClick={() => { controller.pause(); refresh(); }}>Pause</button>
-        <button className="bg-slate-800 px-2 py-1" onClick={() => { controller.replay(); refresh(); }}>Replay</button>
+        <button disabled={!assetsReady} className="bg-slate-800 px-2 py-1 disabled:opacity-40" onClick={() => { controller.replay(); refresh(); }}>Replay</button>
         <button disabled={!assetsReady} className="bg-slate-800 px-2 py-1 disabled:opacity-40" onClick={() => { controller.step(); refresh(); }}>Step 1/60</button>
       </div>
 
@@ -142,6 +147,7 @@ export const VisualLabPanel: React.FC<Props> = ({
         <input
           className="ml-2 w-48 align-middle"
           type="range"
+          disabled={!assetsReady}
           min="0"
           max={activeScene.duration}
           step="0.0166667"
@@ -154,6 +160,7 @@ export const VisualLabPanel: React.FC<Props> = ({
         <input
           className="ml-2 w-24 bg-slate-900"
           type="number"
+          disabled={!assetsReady}
           value={seed}
           onChange={(event) => {
             const value = Number(event.target.value) || 0;

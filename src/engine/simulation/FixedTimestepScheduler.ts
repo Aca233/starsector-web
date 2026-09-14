@@ -31,11 +31,16 @@ export class FixedTimestepScheduler {
     this.fixedDeltaTime = 1 / targetHz;
   }
 
-  public reset(now = performance.now() / 1000) {
+  /** Rebase wall-clock scheduling without clearing long-lived simulation/performance counters. */
+  public resync(now = performance.now() / 1000) {
     this.lastTime = now;
     this.accumulator = 0;
     this.renderDeltaTime = 0;
     this.backlogSeconds = 0;
+  }
+
+  public reset(now = performance.now() / 1000) {
+    this.resync(now);
     this.droppedSimulationSeconds = 0;
   }
 

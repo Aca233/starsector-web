@@ -134,7 +134,7 @@ W09 engineering closure does not change weapon visual-acceptance status. Real br
 ## 2026-09-14 — Static-source renderer closure pass
 
 - Switched the active acceptance workflow to static 0.98a-RC8 reference files plus deterministic Web real-fire scenes; original-runtime launch/capture is not required for this pass. Runtime paired visual acceptance remains a future evidence tier rather than being inferred from static data.
-- Added `CanvasStripSampling` so Canvas2D follows the same signed horizontal UV phase and `pixelsPerTexel` density as WebGL instead of stretching an entire source texture over every pulse/beam.
+- At this stage the then-supported Canvas2D combat path received source-strip sampling so it followed the same signed horizontal UV phase and `pixelsPerTexel` density as WebGL instead of stretching an entire source texture over every pulse/beam. That combat fallback was later retired.
 - TPC/Autopulse source-authored strips now preserve configured fringe alpha exactly in both renderers. TPC no longer aliases its source hardpoint-only glow into a turret glow field, and Canvas hardpoints now use `hardpointGlowSpriteUrl` when present.
 - Neutralized family-only geometry/brightness multipliers for TPC and Autopulse IDs so their authored source fields are not amplified after transport.
 - Converted source-authored ordinary BALLISTIC projectiles (Mark IX, Heavy Mauler, HVD, Flak family) to source length/width + RGBA + signed scroll + texel-density strip sampling using bundled `projtrail/projbody`; the enlarged legacy tracer and synthetic projectile-tip glint remain only for projectiles without a static-source strip contract.
@@ -164,3 +164,9 @@ This pass deliberately does not claim runtime visual parity. Exact perceived bri
 - Canvas missile trails now iterate `engine.contrailEngine.getStrips()`, preserve strip `NORMAL/GLOW` blend, source RGBA alpha, aged width and point alpha, while retaining the old point-contrail path for compatibility. A Reaper regression at `t=1.5s` verifies Canvas emits trail draw calls while `engine.contrails` is empty.
 - Rechecked local 0.98a-RC8 `reaper_torp.proj` and `annihilator_rocket.proj`; both define `fadeTime=0.5`. Registry/real Projectile transport now includes that value. It remains visual metadata only and does not extend collision, damage or entity lifetime.
 - Targeted regression increased from 58 to 60 tests. `STATIC_CLOSED` is restored only after these renderer-consumption tests; it still does not mean original-runtime paired visual acceptance.
+
+## 2026-09-14 — WebGL2-only combat presentation lifecycle
+
+- Removed the Canvas2D world-combat fallback and its combat-only renderer/test surface. Production combat now requires WebGL2.
+- Added explicit loading, context-loss, restoration, and failure states so browser simulation/input stop whenever combat presentation is unavailable; restoration preserves the prior play/pause intent and drops lost wall-clock time instead of catching it up.
+- Canvas2D remains intentionally available for React HUD canvases and CPU/offscreen texture tinting used by the WebGL texture pipeline.

@@ -97,5 +97,20 @@ export const en_US: Record<string, string> = {
   'hud.countermeasures_ready': 'Flares Ready',
   'hud.countermeasures_cooldown': 'Flares Cooldown: {time}s',
   'hud.command_engage': 'Order: ENGAGE TARGET',
-  'hud.command_waypoint': 'Order: WAYPOINT'
+  'hud.command_waypoint': 'Order: WAYPOINT',
+
+  // Combat presentation availability
+  'combat.availability.loading_title': 'Preparing combat display',
+  'combat.availability.loading_detail': 'Loading combat resources and initializing WebGL2.',
+  'combat.availability.context_lost_title': 'Combat display temporarily unavailable',
+  'combat.availability.context_lost_detail': 'The WebGL context was lost. Combat progression is paused while the browser recovers it.',
+  'combat.availability.restoring_title': 'Restoring combat display',
+  'combat.availability.restoring_detail': 'Rebuilding GPU resources and preparing required textures.',
+  'combat.availability.failed_title': 'Unable to display combat',
+  'combat.availability.failed_detail': 'Combat requires working WebGL2. Check that browser graphics acceleration is available, then refresh the page.',
+  'combat.availability.webgl2_unsupported': 'This environment could not create the WebGL2 combat context.',
+  'combat.availability.renderer_init_failed': 'The WebGL2 combat renderer could not be initialized.',
+  'combat.availability.resource_prepare_failed': 'Required combat graphics resources could not be prepared.',
+  'combat.availability.context_restore_failed': 'The combat display could not be restored.',
+  'combat.availability.refresh': 'Refresh page'
 };

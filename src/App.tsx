@@ -9,10 +9,11 @@ import { en_US } from './engine/i18n/locales/en_US';
 import { sound } from './engine/audio/SoundManager';
 import { useCombatInput } from './hooks/useCombatInput';
 import { useCombatLoop } from './hooks/useCombatLoop';
-import { CombatSession } from './engine/runtime/CombatSession';
+import { CombatSession, type CombatPresentationState } from './engine/runtime/CombatSession';
 import { VisualLabPanel } from './visual-lab/VisualLabPanel';
 import { VisualScenarioController } from './visual-lab/VisualScenarioController';
 import { runtimeAssetUrl } from './engine/runtime/RuntimePaths';
+import { CombatAvailabilityOverlay } from './ui/CombatAvailabilityOverlay';
 
 i18n.registerStrings('zh_CN', zh_CN);
 i18n.registerStrings('en_US', en_US);
@@ -42,8 +43,7 @@ export const App: React.FC = () => {
     const url = new URLSearchParams(window.location.search);
     return url.has('autopilot') || url.has('demo');
   });
-  const [visualAssetsReady, setVisualAssetsReady] = useState(!isVisualLab);
-  const [visualAssetsError, setVisualAssetsError] = useState<string | null>(null);
+  const [presentationState, setPresentationState] = useState<CombatPresentationState>(() => session.getPresentationState());
   const [battleResult, setBattleResult] = useState(session.engine.battleResult);
   const isAutopilotRef = useRef(false);
   const [, setTickState] = useState(0);
@@ -55,8 +55,8 @@ export const App: React.FC = () => {
   }, [isAutopilot]);
 
   React.useEffect(() => {
-    inputBlockedRef.current = isModModalOpen || isResultModalOpen;
-  }, [isModModalOpen, isResultModalOpen]);
+    inputBlockedRef.current = isModModalOpen || isResultModalOpen || presentationState.status !== 'ready';
+  }, [isModModalOpen, isResultModalOpen, presentationState.status]);
 
   React.useEffect(() => {
     const timer = window.setInterval(() => {
@@ -69,16 +69,12 @@ export const App: React.FC = () => {
   React.useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    session.prepare(canvas);
+    const unsubscribePresentation = session.subscribePresentation(setPresentationState);
+    void session.prepare(canvas).catch((error: unknown) => {
+      console.error('[Starsector] Combat presentation initialization failed:', error);
+    });
     if (isVisualLab) session.pause();
     else session.start();
-    void session.prepareVisualAssets().then(() => {
-      setVisualAssetsReady(true);
-      setVisualAssetsError(null);
-    }).catch((error: unknown) => {
-      setVisualAssetsReady(false);
-      setVisualAssetsError(error instanceof Error ? error.message : String(error));
-    });
     (window as any).__combatSession = session;
     (window as any).__combatEngine = session.engine;
     (window as any).__combatRenderer = session.renderer;
@@ -92,6 +88,7 @@ export const App: React.FC = () => {
     window.addEventListener('resize', resizeCanvas);
     return () => {
       window.removeEventListener('resize', resizeCanvas);
+      unsubscribePresentation();
       session.dispose();
       delete (window as any).__combatSession;
       delete (window as any).__combatEngine;
@@ -189,6 +186,11 @@ export const App: React.FC = () => {
         className="w-full h-full block"
       />
 
+      <CombatAvailabilityOverlay
+        state={presentationState}
+        onRefresh={() => window.location.reload()}
+      />
+
       <TacticalHUD
         engine={session.engine}
         scheduler={session.scheduler}
@@ -212,8 +214,8 @@ export const App: React.FC = () => {
         <VisualLabPanel
           session={session}
           controller={visualScenarioController}
-          assetsReady={visualAssetsReady}
-          assetsError={visualAssetsError}
+          assetsReady={presentationState.status === 'ready'}
+          assetsError={presentationState.status === 'failed' ? i18n.t('combat.availability.failed_detail') : null}
           isAutopilot={isAutopilot}
           setIsAutopilot={setIsAutopilot}
           onZoomChange={(zoom) => { zoomRef.current = zoom; }}

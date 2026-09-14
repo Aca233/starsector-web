@@ -2,9 +2,11 @@
 
 M4 closes V09 (environment / transparency / occlusion) and P01 (runtime performance / resource stability) without adding or modifying test files. Existing tests were only executed as regression coverage.
 
+> Historical validation note: M4 was recorded while a Canvas2D combat fallback still existed. Production combat was later changed to WebGL2-only; Canvas2D is now retained only for HUD/offscreen texture work. The measurements below remain historical evidence for the WebGL2 path, not a statement of current dual-renderer support.
+
 ## V09 environment and combat presentation
 
-- Background, far/mid nebulae, asteroids, foreground translucent nebulae, world effects, and tactical overlays are separate render layers in both WebGL2 and Canvas2D paths.
+- At the time of this validation, background, far/mid nebulae, asteroids, foreground translucent nebulae, world effects, and tactical overlays were separate render layers in both the WebGL2 path and the then-existing Canvas2D fallback.
 - Foreground nebulae are composited after world-space ships/effects so they can occlude the battlefield softly, while target brackets / lead indicators / tactical information remain above the haze.
 - Starfield generation and asteroid initialization are deterministic; WebGL environment objects are viewport-culled.
 - Production headless visual capture (`artifacts/m4/final-battle-1920x1080-v2.png`) was reviewed at 1920x1080. It shows the background/nebula field, asteroids, two capital ships, shields, projectiles/beams and HUD simultaneously, with tactical markers remaining readable.

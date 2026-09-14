@@ -26,7 +26,7 @@ export class ArmorGrid {
   
   // 单元格装甲当前值数组 (一维扁平存储，优化内存连续性)
   public cells: Float32Array;
-  // 脏版本计数器，供 ShipRenderer 与 ShipPaperDoll 离屏缓冲按需重绘
+  // 脏版本计数器，供 ShipPaperDoll 等装甲可视化按需重绘
   public dirtyVersion = 0;
 
   constructor(cols = 16, rows = 8, cellWidth = 20, cellHeight = 20, maxArmorRating = 1500) {

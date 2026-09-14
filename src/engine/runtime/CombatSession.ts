@@ -1,7 +1,6 @@
 import { CapitalShipAI } from '../ai/CapitalShipAI';
-import { CombatRenderer } from '../render/CombatRenderer';
 import type { ICombatRenderer } from '../render/ICombatRenderer';
-import { WebGLCombatRenderer } from '../render/webgl/WebGLCombatRenderer';
+import { WebGLCombatRenderer, type WebGLRendererLifecycle } from '../render/webgl/WebGLCombatRenderer';
 import { CombatEngine } from '../simulation/CombatEngine';
 import { FixedTimestepScheduler } from '../simulation/FixedTimestepScheduler';
 import { Vector2 } from '../math/Vector2';
@@ -13,6 +12,25 @@ import { assetManager } from '../assets/AssetResolver';
 import { contentManifestManager } from '../content/ContentManifest';
 
 export type CombatSessionState = 'created' | 'prepared' | 'running' | 'paused' | 'disposed';
+
+export type CombatPresentationStatus = 'idle' | 'loading' | 'ready' | 'context-lost' | 'restoring' | 'failed' | 'disposed';
+export type CombatPresentationErrorCode =
+  | 'webgl2-unsupported'
+  | 'renderer-init-failed'
+  | 'resource-prepare-failed'
+  | 'context-restore-failed';
+
+export interface CombatPresentationState {
+  status: CombatPresentationStatus;
+  errorCode: CombatPresentationErrorCode | null;
+  errorMessage: string | null;
+}
+
+export type CombatRendererFactory = (
+  canvas: HTMLCanvasElement,
+  gl: WebGL2RenderingContext,
+  lifecycle: WebGLRendererLifecycle
+) => ICombatRenderer;
 
 let nextSessionId = 1;
 
@@ -38,38 +56,171 @@ export class CombatSession {
   private canvas: HTMLCanvasElement | null = null;
   private assetPreparation: Promise<void> = Promise.resolve();
   private assetsReady = false;
+  private presentationState: CombatPresentationState = { status: 'idle', errorCode: null, errorMessage: null };
+  private readonly presentationListeners = new Set<(state: CombatPresentationState) => void>();
+  private presentationGeneration = 0;
+  private preparationRevision = 0;
 
-  constructor(playerShipId = 'onslaught', enemyShipId = 'paragon', seed = 0x51f15e) {
+  constructor(
+    playerShipId = 'onslaught',
+    enemyShipId = 'paragon',
+    seed = 0x51f15e,
+    private readonly rendererFactory: CombatRendererFactory = (canvas, gl, lifecycle) => new WebGLCombatRenderer(canvas, gl, lifecycle)
+  ) {
     this.sessionId = `combat-${nextSessionId++}`;
     this.visualRandom = new VisualRandom(seed);
     this.engine = new CombatEngine(playerShipId, enemyShipId, seed);
     this.playerAI = new CapitalShipAI(this.engine.playerShip, this.engine.enemyShip);
   }
 
-  public prepare(canvas: HTMLCanvasElement): void {
-    if (this.state === 'disposed') throw new Error('Cannot prepare a disposed CombatSession');
+  public getPresentationState(): CombatPresentationState {
+    return this.presentationState;
+  }
+
+  public isPresentationReady(): boolean {
+    return this.presentationState.status === 'ready';
+  }
+
+  public subscribePresentation(listener: (state: CombatPresentationState) => void): () => void {
+    this.presentationListeners.add(listener);
+    return () => this.presentationListeners.delete(listener);
+  }
+
+  public prepare(canvas: HTMLCanvasElement): Promise<void> {
+    if (this.state === 'disposed') return Promise.reject(new Error('Cannot prepare a disposed CombatSession'));
+
+    const generation = ++this.presentationGeneration;
+    const preparationRevision = ++this.preparationRevision;
     this.renderer?.dispose();
+    this.renderer = null;
     this.canvas = canvas;
+    this.assetsReady = false;
+    this.scheduler.resync();
+    this.setPresentationState({ status: 'loading', errorCode: null, errorMessage: null });
+    if (this.state === 'created') this.state = 'prepared';
+
+    this.assetPreparation = this.initializePresentation(canvas, generation, preparationRevision);
+    return this.assetPreparation;
+  }
+
+  private async initializePresentation(canvas: HTMLCanvasElement, generation: number, preparationRevision: number): Promise<void> {
+    let gl: WebGL2RenderingContext | null = null;
     try {
-      const gl = canvas.getContext('webgl2', {
+      gl = canvas.getContext('webgl2', {
         alpha: false,
         antialias: true,
         powerPreference: 'high-performance',
         desynchronized: true
       });
-      this.renderer = gl ? new WebGLCombatRenderer(canvas, gl) : new CombatRenderer(canvas);
     } catch (error) {
-      console.warn('[Starsector] WebGL2 unavailable, using Canvas2D:', error);
-      this.renderer = new CombatRenderer(canvas);
+      this.failPresentation(generation, 'renderer-init-failed', error);
+      throw error;
     }
-    this.assetsReady = false;
-    this.assetPreparation = assetManager.ensureManifestLoaded().then(async () => {
+
+    if (!gl) {
+      const error = new Error('WebGL2 is required for combat rendering');
+      this.failPresentation(generation, 'webgl2-unsupported', error);
+      throw error;
+    }
+
+    let renderer: ICombatRenderer;
+    try {
+      renderer = this.rendererFactory(canvas, gl, this.createRendererLifecycle(generation));
+    } catch (error) {
+      this.failPresentation(generation, 'renderer-init-failed', error);
+      throw error;
+    }
+
+    if (!this.isCurrentPresentationGeneration(generation)) {
+      renderer.dispose();
+      return;
+    }
+    this.renderer = renderer;
+
+    await this.preparePresentationResources(renderer, generation, preparationRevision, 'resource-prepare-failed');
+  }
+
+  private createRendererLifecycle(generation: number): WebGLRendererLifecycle {
+    return {
+      onContextLost: () => {
+        if (!this.isCurrentPresentationGeneration(generation)) return;
+        this.preparationRevision++;
+        this.assetsReady = false;
+        this.setPresentationState({ status: 'context-lost', errorCode: null, errorMessage: null });
+      },
+      onContextRestoring: () => {
+        if (!this.isCurrentPresentationGeneration(generation)) return;
+        this.assetsReady = false;
+        this.setPresentationState({ status: 'restoring', errorCode: null, errorMessage: null });
+      },
+      onContextRestored: () => {
+        if (!this.isCurrentPresentationGeneration(generation)) return;
+        const renderer = this.renderer;
+        if (!renderer) return;
+        this.assetsReady = false;
+        this.setPresentationState({ status: 'restoring', errorCode: null, errorMessage: null });
+        const preparationRevision = ++this.preparationRevision;
+        const restoration = this.preparePresentationResources(renderer, generation, preparationRevision, 'context-restore-failed');
+        this.assetPreparation = restoration;
+        void restoration.catch(() => {});
+      },
+      onContextRestoreFailed: (error) => {
+        this.failPresentation(generation, 'context-restore-failed', error);
+      }
+    };
+  }
+
+  private async preparePresentationResources(
+    renderer: ICombatRenderer,
+    generation: number,
+    preparationRevision: number,
+    failureCode: Extract<CombatPresentationErrorCode, 'resource-prepare-failed' | 'context-restore-failed'>
+  ): Promise<void> {
+    try {
+      await assetManager.ensureManifestLoaded();
+      if (!this.isCurrentPresentationPreparation(renderer, generation, preparationRevision)) return;
       await contentManifestManager.ensureLoaded();
-      await this.renderer?.prepareAssets();
-      this.assetsReady = true;
-    });
-    this.scheduler.reset();
-    this.state = 'prepared';
+      if (!this.isCurrentPresentationPreparation(renderer, generation, preparationRevision)) return;
+      await renderer.prepareAssets();
+    } catch (error) {
+      if (!this.isCurrentPresentationPreparation(renderer, generation, preparationRevision)) return;
+      this.failPresentation(generation, failureCode, error);
+      throw error;
+    }
+
+    if (!this.isCurrentPresentationPreparation(renderer, generation, preparationRevision)) return;
+    this.assetsReady = true;
+    this.scheduler.resync();
+    this.setPresentationState({ status: 'ready', errorCode: null, errorMessage: null });
+  }
+
+  private isCurrentPresentationPreparation(
+    renderer: ICombatRenderer,
+    generation: number,
+    preparationRevision: number
+  ): boolean {
+    return this.isCurrentPresentationGeneration(generation)
+      && preparationRevision === this.preparationRevision
+      && this.renderer === renderer;
+  }
+
+  private isCurrentPresentationGeneration(generation: number): boolean {
+    return this.state !== 'disposed' && generation === this.presentationGeneration;
+  }
+
+  private failPresentation(generation: number, errorCode: CombatPresentationErrorCode, error: unknown): void {
+    if (!this.isCurrentPresentationGeneration(generation)) return;
+    this.preparationRevision++;
+    this.assetsReady = false;
+    this.renderer?.dispose();
+    this.renderer = null;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    this.setPresentationState({ status: 'failed', errorCode, errorMessage });
+  }
+
+  private setPresentationState(state: CombatPresentationState): void {
+    this.presentationState = state;
+    for (const listener of this.presentationListeners) listener(state);
   }
 
   public start(): void {
@@ -142,7 +293,7 @@ export class CombatSession {
   }
 
   public render(alpha: number, cameraPos: Vector2, zoom: number): void {
-    if (!this.renderer || !this.assetsReady || this.state === 'disposed') return;
+    if (!this.renderer || !this.assetsReady || !this.isPresentationReady() || this.state === 'disposed') return;
     const prepStart = performance.now();
     const frame = {
       visualTime: this.visualClock.time,
@@ -247,10 +398,14 @@ export class CombatSession {
 
   public dispose(): void {
     if (this.state === 'disposed') return;
+    this.presentationGeneration++;
+    this.preparationRevision++;
     this.assetsReady = false;
     this.renderer?.dispose();
     this.renderer = null;
     this.canvas = null;
     this.state = 'disposed';
+    this.setPresentationState({ status: 'disposed', errorCode: null, errorMessage: null });
+    this.presentationListeners.clear();
   }
 }

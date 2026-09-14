@@ -14,6 +14,20 @@ export interface UseCombatLoopParams {
   visualScenarioController?: { tick: (dt: number) => boolean };
 }
 
+export function syncCombatPresentationAudio(session: CombatSession, presentationReady: boolean): void {
+  const player = session.engine.playerShip;
+  if (!presentationReady) {
+    sound.stopLoop('burn_drive_loop');
+    sound.stopLoop('fortress_shield_loop');
+    sound.stopLoop('flux_flush_loop');
+    return;
+  }
+
+  if (player.flux.isVenting) sound.startLoop('flux_flush_loop', 0.65);
+  if (player.system.isActive && player.system.type === 'BURN_DRIVE') sound.startLoop('burn_drive_loop', 0.65);
+  if (player.system.isActive && player.system.type === 'FORTRESS_SHIELD') sound.startLoop('fortress_shield_loop', 0.7);
+}
+
 export function useCombatLoop({
   sessionRef,
   canvasRef,
@@ -32,7 +46,11 @@ export function useCombatLoop({
 
     let animId = 0;
     const session = sessionRef.current;
-    if (!visualScenarioController) session.start();
+    const unsubscribePresentation = session.subscribePresentation((state) => {
+      syncCombatPresentationAudio(session, state.status === 'ready');
+      if (state.status !== 'ready') prevSystemActiveRef.current = session.engine.playerShip.system.isActive;
+    });
+    syncCombatPresentationAudio(session, session.isPresentationReady());
 
     const updatePlayerControls = (fixedDt: number) => {
       const engine = session.engine;
@@ -103,23 +121,29 @@ export function useCombatLoop({
       const nowSec = currentTimeMs / 1000;
       const engine = session.engine;
 
-      session.scheduler.update(
-        nowSec,
-        (fixedDt) => {
-          const handledByVisualLab = visualScenarioController?.tick(fixedDt) ?? false;
-          if (!handledByVisualLab) {
-            updatePlayerControls(fixedDt);
-            session.fixedUpdate(fixedDt);
+      if (session.isPresentationReady()) {
+        session.scheduler.update(
+          nowSec,
+          (fixedDt) => {
+            const handledByVisualLab = visualScenarioController?.tick(fixedDt) ?? false;
+            if (!handledByVisualLab) {
+              updatePlayerControls(fixedDt);
+              session.fixedUpdate(fixedDt);
+            }
+          },
+          (alpha) => {
+            const targetCam = Vector2.lerp(engine.playerShip.prevPos, engine.playerShip.pos, alpha);
+            if (!session.visualOptions.cameraLocked) {
+              session.cameraController.follow(cameraPosRef.current, targetCam, session.scheduler.renderDeltaTime);
+            }
+            session.render(alpha, cameraPosRef.current, zoomRef.current);
           }
-        },
-        (alpha) => {
-          const targetCam = Vector2.lerp(engine.playerShip.prevPos, engine.playerShip.pos, alpha);
-          if (!session.visualOptions.cameraLocked) {
-            session.cameraController.follow(cameraPosRef.current, targetCam, session.scheduler.renderDeltaTime);
-          }
-          session.render(alpha, cameraPosRef.current, zoomRef.current);
-        }
-      );
+        );
+      } else {
+        // Keep the wall-clock baseline current while presentation is unavailable so
+        // context loss/loading time is never replayed as combat simulation backlog.
+        session.scheduler.resync(nowSec);
+      }
 
       if (!engine.playerShip.flux.isVenting) sound.stopLoop('flux_flush_loop');
       if (!engine.playerShip.system.isActive && prevSystemActiveRef.current) {
@@ -133,6 +157,10 @@ export function useCombatLoop({
     };
 
     animId = requestAnimationFrame(gameLoop);
-    return () => cancelAnimationFrame(animId);
+    return () => {
+      unsubscribePresentation();
+      syncCombatPresentationAudio(session, false);
+      cancelAnimationFrame(animId);
+    };
   }, [sessionRef, canvasRef, cameraPosRef, zoomRef, isAutopilotRef, keysPressed, mouseScreenPos, visualScenarioController]);
 }

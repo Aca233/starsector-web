@@ -13,14 +13,21 @@ import { WebGLProjectilePass } from './passes/WebGLProjectilePass';
 import { WebGLFXPass } from './passes/WebGLFXPass';
 import { WebGLTacticalOverlayPass } from './passes/WebGLTacticalOverlayPass';
 import { ESSENTIAL_TEXTURE_URLS } from '../TextureCache';
-import type { RendererResourceStats } from '../ICombatRenderer';
+import type { ICombatRenderer, RendererResourceStats } from '../ICombatRenderer';
+
+export interface WebGLRendererLifecycle {
+  onContextLost?: () => void;
+  onContextRestoring?: () => void;
+  onContextRestored?: () => void;
+  onContextRestoreFailed?: (error: unknown) => void;
+}
 
 /**
  * 远行星号 WebGL2 硬件级 GPU 实例化渲染中枢 (WebGLCombatRenderer)
  * 采用分通道架构 (Pass-based Architecture)，协调环境、光束缎带、战舰挂点、弹丸粒子、护盾特效与战术 HUD
  * 将 2000+ 次 CPU 立即模式绘制合并为 < 10 次 GPU Instanced Draw Calls
  */
-export class WebGLCombatRenderer {
+export class WebGLCombatRenderer implements ICombatRenderer {
   public readonly canvas: HTMLCanvasElement;
   public gl: WebGL2RenderingContext;
   public textures: WebGLTextureManager;
@@ -45,35 +52,51 @@ export class WebGLCombatRenderer {
   private gpuTimerExt: any = null;
   private pendingGpuQueries: WebGLQuery[] = [];
   private lastGpuTimeMs: number | null = null;
+  private restoreGeneration = 0;
+  private disposed = false;
+  private readonly lifecycle: WebGLRendererLifecycle;
 
   private readonly onContextLost = (event: Event) => {
     event.preventDefault();
+    if (this.disposed) return;
     this.contextLost = true;
+    this.restoreGeneration++;
     this.textures.invalidateGPU();
+    this.lifecycle.onContextLost?.();
   };
 
   private readonly onContextRestored = () => {
-    const gl = this.canvas.getContext('webgl2');
-    if (!gl) return;
-    this.gl = gl;
-    this.textures = new WebGLTextureManager(gl);
-    this.batcher = new SpriteBatcher(gl);
-    this.ribbonBatcher = new RibbonBatcher(gl);
-    this.shieldShader = new WebGLShieldShader(gl);
-    this.gpuTimerExt = gl.getExtension('EXT_disjoint_timer_query_webgl2');
-    this.pendingGpuQueries = [];
-    this.lastGpuTimeMs = null;
-    this.contextLost = false;
-    this.resourceRecreations++;
+    if (this.disposed) return;
+    const generation = this.restoreGeneration;
+    void this.restoreContext(generation);
   };
 
-  constructor(canvas: HTMLCanvasElement, gl: WebGL2RenderingContext) {
+  constructor(canvas: HTMLCanvasElement, gl: WebGL2RenderingContext, lifecycle: WebGLRendererLifecycle = {}) {
     this.canvas = canvas;
     this.gl = gl;
-    this.textures = new WebGLTextureManager(gl);
-    this.batcher = new SpriteBatcher(gl);
-    this.ribbonBatcher = new RibbonBatcher(gl);
-    this.shieldShader = new WebGLShieldShader(gl);
+    this.lifecycle = lifecycle;
+    let textures: WebGLTextureManager | null = null;
+    let batcher: SpriteBatcher | null = null;
+    let ribbonBatcher: RibbonBatcher | null = null;
+    let shieldShader: WebGLShieldShader | null = null;
+    try {
+      textures = new WebGLTextureManager(gl);
+      batcher = new SpriteBatcher(gl);
+      ribbonBatcher = new RibbonBatcher(gl);
+      shieldShader = new WebGLShieldShader(gl);
+      this.textures = textures;
+      this.batcher = batcher;
+      this.ribbonBatcher = ribbonBatcher;
+      this.shieldShader = shieldShader;
+    } catch (error) {
+      if (!gl.isContextLost()) {
+        shieldShader?.dispose();
+        ribbonBatcher?.dispose();
+        batcher?.dispose();
+        textures?.dispose();
+      }
+      throw error;
+    }
     this.gpuTimerExt = gl.getExtension('EXT_disjoint_timer_query_webgl2');
 
     // 实例化各子渲染通道
@@ -84,6 +107,65 @@ export class WebGLCombatRenderer {
     this.tacticalOverlayPass = new WebGLTacticalOverlayPass();
     this.canvas.addEventListener('webglcontextlost', this.onContextLost);
     this.canvas.addEventListener('webglcontextrestored', this.onContextRestored);
+  }
+
+  private async restoreContext(generation: number): Promise<void> {
+    if (this.disposed || generation !== this.restoreGeneration) return;
+    this.lifecycle.onContextRestoring?.();
+
+    let nextTextures: WebGLTextureManager | null = null;
+    let nextBatcher: SpriteBatcher | null = null;
+    let nextRibbonBatcher: RibbonBatcher | null = null;
+    let nextShieldShader: WebGLShieldShader | null = null;
+    let nextGl: WebGL2RenderingContext | null = null;
+
+    try {
+      nextGl = this.canvas.getContext('webgl2', {
+        alpha: false,
+        antialias: true,
+        powerPreference: 'high-performance',
+        desynchronized: true
+      });
+      if (!nextGl) throw new Error('WebGL2 context could not be restored');
+
+      nextTextures = new WebGLTextureManager(nextGl);
+      nextBatcher = new SpriteBatcher(nextGl);
+      nextRibbonBatcher = new RibbonBatcher(nextGl);
+      nextShieldShader = new WebGLShieldShader(nextGl);
+      await nextTextures.preload(ESSENTIAL_TEXTURE_URLS);
+
+      if (this.disposed || generation !== this.restoreGeneration || nextGl.isContextLost()) {
+        if (!nextGl.isContextLost()) {
+          nextTextures.dispose();
+          nextBatcher.dispose();
+          nextRibbonBatcher.dispose();
+          nextShieldShader.dispose();
+        }
+        return;
+      }
+
+      this.gl = nextGl;
+      this.textures = nextTextures;
+      this.batcher = nextBatcher;
+      this.ribbonBatcher = nextRibbonBatcher;
+      this.shieldShader = nextShieldShader;
+      this.gpuTimerExt = nextGl.getExtension('EXT_disjoint_timer_query_webgl2');
+      this.pendingGpuQueries = [];
+      this.lastGpuTimeMs = null;
+      this.contextLost = false;
+      this.resourceRecreations++;
+      this.lifecycle.onContextRestored?.();
+    } catch (error) {
+      if (nextGl && !nextGl.isContextLost()) {
+        nextTextures?.dispose();
+        nextBatcher?.dispose();
+        nextRibbonBatcher?.dispose();
+        nextShieldShader?.dispose();
+      }
+      if (this.disposed || generation !== this.restoreGeneration) return;
+      this.contextLost = true;
+      this.lifecycle.onContextRestoreFailed?.(error);
+    }
   }
 
   public prepareAssets(): Promise<void> {
@@ -278,6 +360,9 @@ export class WebGLCombatRenderer {
   }
 
   public dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.restoreGeneration++;
     this.canvas.removeEventListener('webglcontextlost', this.onContextLost);
     this.canvas.removeEventListener('webglcontextrestored', this.onContextRestored);
     if (!this.contextLost) {

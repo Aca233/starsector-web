@@ -6,7 +6,7 @@ A self-contained React + TypeScript + Vite combat sandbox inspired by Starsector
 
 - Node.js 20+ (validated on Node 24)
 - npm
-- A modern browser with Canvas2D; WebGL2 is used when available
+- A modern browser with WebGL2 for combat rendering. Canvas2D remains in use for HUD/offscreen texture work, but it is not a combat fallback.
 
 A Starsector installation is **not** required to build, test, preview, or play the packaged project. It is only needed if a developer intentionally regenerates the curated asset bundle with the offline import script.
 
@@ -103,7 +103,7 @@ The HUD has responsive density rules for 1280×720, 1920×1080 and 2560×1440-cl
 
 ## Rendering lifecycle and metrics
 
-Both renderers implement `dispose()`. The WebGL renderer handles `webglcontextlost` / `webglcontextrestored`, invalidates GPU texture state, recreates programs/buffers/textures and exposes recreation counters.
+Production combat rendering is WebGL2-only. `CombatSession` exposes a low-frequency presentation lifecycle (`loading`, `ready`, context loss/restoration, and failure); browser simulation/input only advance while presentation is `ready`. The WebGL renderer handles `webglcontextlost` / `webglcontextrestored`, invalidates GPU texture state, rebuilds GPU resources, re-prepares required textures, and only returns to `ready` after restoration succeeds. Unsupported WebGL2, initialization failures, resource failures, or failed restoration show an actionable page-level error instead of falling back to Canvas2D combat.
 
 Performance telemetry distinguishes:
 

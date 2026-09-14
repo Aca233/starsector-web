@@ -66,11 +66,19 @@ export function useCombatInput({
     };
 
     const blocked = (target: EventTarget | null) => (
-      inputBlockedRef.current || isEditableTarget(target) || isInteractiveUiTarget(target)
+      inputBlockedRef.current
+      || !sessionRef.current.isPresentationReady()
+      || isEditableTarget(target)
+      || isInteractiveUiTarget(target)
     );
 
+    const unsubscribePresentation = sessionRef.current.subscribePresentation((state) => {
+      if (state.status !== 'ready') clearTransientInput();
+    });
+    if (!sessionRef.current.isPresentationReady()) clearTransientInput();
+
     const onMouseMove = (e: MouseEvent) => {
-      if (inputBlockedRef.current) return;
+      if (inputBlockedRef.current || !sessionRef.current.isPresentationReady()) return;
       mouseScreenPos.current.set(e.clientX, e.clientY);
     };
 
@@ -184,6 +192,7 @@ export function useCombatInput({
 
     return () => {
       clearTransientInput();
+      unsubscribePresentation();
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mousedown', onMouseDown);
       window.removeEventListener('mouseup', onMouseUp);
