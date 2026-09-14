@@ -7,7 +7,27 @@ export type WeaponSlotSize = 'SMALL' | 'MEDIUM' | 'LARGE';
 export interface ProximityFuseSpec {
   range: number; // 接近引信引爆距离 (px)
   explosionRadius: number; // 爆炸范围杀伤波及半径 (px)
+  coreRadius?: number; // 核心全伤半径；核心外至 explosionRadius 线性衰减
   soundKey?: string;
+}
+
+export interface MissileMirvSpec {
+  splitRange: number;
+  splitRangeRange: number;
+  minTimeToSplit: number;
+  canSplitEarly: boolean;
+  numShots: number;
+  damage: number;
+  emp: number;
+  damageType: DamageType;
+  childHitpoints: number;
+  evenSpread: boolean;
+  arcDeg: number;
+  spreadInaccuracyDeg: number;
+  spreadSpeed: number;
+  spreadSpeedRange: number;
+  projectileRange: number;
+  projectileSpec: string;
 }
 
 /**
@@ -137,15 +157,21 @@ export interface WeaponSpec {
   // 导弹与制导物理规格 (严格对齐 Missile.java & MissileAI.java)
   isRocket?: boolean;
   isGuided?: boolean;
+  launchSpeed?: number; // missile launch velocity before engine acceleration
+  flightTime?: number; // authoritative missile lifetime in seconds
+  armingTime?: number;
   engineAcceleration?: number;
+  missileDeceleration?: number;
   maxSpeed?: number;
-  maxTurnRate?: number;
+  maxTurnRate?: number; // radians/sec at runtime
+  maxTurnAcceleration?: number; // radians/sec^2 at runtime
   engineFlameColor?: [number, number, number];
   missileEngineVisualSpec?: MissileEngineVisualSpec;
   missileTrailSpec?: MissileTrailSpec;
   missileExplosionVisualSpec?: MissileExplosionVisualSpec;
   isTwoStage?: boolean;
-  missileHp?: number; // 导弹生命值 (对齐 settings.json / 各 .proj 文件)
+  mirv?: MissileMirvSpec;
+  missileHp?: number; // 导弹生命值 (对齐 weapon_data.csv / 各 .proj 文件)
 }
 
 export interface WeaponMount {
@@ -224,15 +250,23 @@ export interface Projectile {
   isGuided?: boolean;
   targetShipId?: string;
   facingRad?: number;
+  turnVelocityRad?: number;
+  flightTimeRemaining?: number;
+  maxFlightTime?: number;
+  armingTimeRemaining?: number;
   engineAcceleration?: number;
+  missileDeceleration?: number;
   maxSpeed?: number;
   maxTurnRate?: number;
+  maxTurnAcceleration?: number;
   engineFlameColor?: [number, number, number];
   missileEngineVisualSpec?: MissileEngineVisualSpec;
   missileTrailSpec?: MissileTrailSpec;
   missileExplosionVisualSpec?: MissileExplosionVisualSpec;
   isTwoStage?: boolean;
   stageTriggered?: boolean;
+  mirv?: MissileMirvSpec;
+  mirvSplitDistance?: number;
 
   // 近炸引信规格与引爆判定
   proximityFuse?: ProximityFuseSpec;

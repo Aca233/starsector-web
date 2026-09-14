@@ -97,6 +97,24 @@ export class ProjectileCollisionHandler {
       )
     };
   }
+  private getExplosionDamageScale(p: Projectile, surfaceDistance: number): number {
+    const fuse = p.proximityFuse;
+    if (!fuse) return 0;
+    const outer = Math.max(0, fuse.explosionRadius);
+    const core = Math.max(0, Math.min(fuse.coreRadius ?? outer, outer));
+    const distance = Math.max(0, surfaceDistance);
+    if (distance <= core) return 1;
+    if (distance >= outer || outer <= core) return 0;
+    return 1 - (distance - core) / (outer - core);
+  }
+
+  private isHostileProjectile(source: Projectile, candidate: Projectile): boolean {
+    if (candidate.id === source.id || candidate.sourceShipId === source.sourceShipId) return false;
+    return source.isPlayer === undefined || candidate.isPlayer === undefined
+      ? candidate.sourceShipId !== source.sourceShipId
+      : candidate.isPlayer !== source.isPlayer;
+  }
+
   /**
    * 判定高射炮近炸引信与凌空殉爆 AOE 破片杀伤
    * @returns 弹丸是否发生近炸引信引爆
@@ -108,7 +126,7 @@ export class ProjectileCollisionHandler {
 
     // 引信检测 A: 接近敌方导弹
     for (const targetM of allProjectiles) {
-      if (targetM.isRocket && targetM.sourceShipId !== p.sourceShipId) {
+      if (targetM.isRocket && this.isHostileProjectile(p, targetM)) {
         if (p.pos.distanceTo(targetM.pos) <= p.proximityFuse.range) {
           shouldAirburst = true;
           break;
@@ -179,9 +197,11 @@ export class ProjectileCollisionHandler {
     let interceptedCount = 0;
     for (let mIdx = allProjectiles.length - 1; mIdx >= 0; mIdx--) {
       const targetM = allProjectiles[mIdx];
-      if (targetM.isRocket && targetM.sourceShipId !== p.sourceShipId) {
+      if (targetM.isRocket && this.isHostileProjectile(p, targetM)) {
         if (p.pos.distanceTo(targetM.pos) <= expRadius) {
-          targetM.hitpoints = (targetM.hitpoints ?? 100) - p.damage;
+          const damage = p.damage * this.getExplosionDamageScale(p, p.pos.distanceTo(targetM.pos));
+          if (damage <= 0) continue;
+          targetM.hitpoints = (targetM.hitpoints ?? 100) - damage;
           if (targetM.hitpoints <= 0) {
             if (targetM.isRocket) ctx.contrailEngine?.detach(targetM.id);
             allProjectiles.splice(mIdx, 1);
@@ -191,7 +211,7 @@ export class ProjectileCollisionHandler {
             interceptedCount++;
           } else {
             ctx.fx.spawnSparks(targetM.pos, 10, [255, 160, 60]);
-            ctx.fx.addFloatingDamage(targetM.pos.clone(), p.damage, [255, 180, 70]);
+            ctx.fx.addFloatingDamage(targetM.pos.clone(), damage, [255, 180, 70]);
           }
         }
       }
@@ -209,7 +229,9 @@ export class ProjectileCollisionHandler {
       if (f.id !== p.sourceShipId && (p.isPlayer === undefined || f.isPlayer !== p.isPlayer) && !f.isDead && !f.isPhased) {
         const dist = p.pos.distanceTo(f.pos);
         if (dist <= expRadius + f.spec.collisionRadius) {
-          const aoeDmg = p.damage * Math.max(0.3, 1.0 - dist / (expRadius + f.spec.collisionRadius));
+          const surfaceDistance = Math.max(0, dist - f.spec.collisionRadius);
+          const aoeDmg = p.damage * this.getExplosionDamageScale(p, surfaceDistance);
+          if (aoeDmg <= 0) continue;
           f.hullHp = Math.max(0, f.hullHp - aoeDmg);
           ctx.fx.addFloatingDamage(f.pos.clone(), aoeDmg, [255, 180, 60]);
           ctx.fx.spawnSparks(f.pos, 10, [255, 120, 40]);
@@ -230,12 +252,22 @@ export class ProjectileCollisionHandler {
         const distToShip = p.pos.distanceTo(s.pos);
         if (distToShip <= expRadius + (s.shield.isActive ? s.shield.radius : s.spec.collisionRadius)) {
           if (s.isShieldPointBlocked(p.pos)) {
-            const fluxGain = s.shield.absorbDamage(p.damage * 0.5, 'FRAGMENTATION', p.pos.clone().sub(s.getShieldCenter()).heading());
-            s.flux.increaseFlux(fluxGain, true);
-            ctx.fx.spawnShieldRipple(p.pos, 35, [255, 120, 100]);
+            const shieldSurfaceDistance = Math.max(0, p.pos.distanceTo(s.getShieldCenter()) - s.shield.radius);
+            const damage = p.damage * this.getExplosionDamageScale(p, shieldSurfaceDistance);
+            if (damage > 0) {
+              const fluxGain = s.shield.absorbDamage(damage, 'FRAGMENTATION', p.pos.clone().sub(s.getShieldCenter()).heading());
+              s.flux.increaseFlux(fluxGain, true);
+              ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, 'FRAGMENTATION', damage, 'SHIELD');
+              ctx.fx.spawnShieldRipple(p.pos, 35, [255, 120, 100]);
+            }
           } else if (distToShip <= expRadius + s.spec.collisionRadius) {
+            const surfaceDistance = Math.max(0, distToShip - s.spec.collisionRadius);
+            const damage = p.damage * this.getExplosionDamageScale(p, surfaceDistance);
+            if (damage <= 0) continue;
             const localImpact = p.pos.clone().sub(s.pos).rotate(-s.facingRad);
-            const res = s.armor.takeDamage(localImpact, p.damage * 0.5, 'FRAGMENTATION', p.damage * 0.5, false);
+            const res = s.armor.takeDamage(localImpact, damage, 'FRAGMENTATION', damage, false);
+            if (res.armorDamage > 0) ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, 'FRAGMENTATION', res.armorDamage, 'ARMOR');
+            if (res.hullDamage > 0) ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, 'FRAGMENTATION', res.hullDamage, 'HULL');
             s.hullHp = Math.max(0, s.hullHp - res.hullDamage);
             s.addScorchMark(localImpact, res.armorDamage || res.hullDamage);
           }

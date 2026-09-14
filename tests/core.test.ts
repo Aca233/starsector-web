@@ -1037,7 +1037,7 @@ describe('V01 controlled Visual Lab scenarios', () => {
     expect(hvelSession.engine.playerShip.weapons.find((mount) => mount.slotId === 'WS 012')?.recoil).toBeGreaterThan(0);
   });
 
-  it('replays Light MG, Flak and Dual Flak through real fire-control paths without changing their gameplay-only gaps', () => {
+  it('replays Light MG, Flak and Dual Flak through the source-aligned projectile contracts', () => {
     const lightSession = new CombatSession('broadsword', 'paragon', 9401);
     const lightLab = new VisualScenarioController(lightSession);
     lightLab.select('WPN-LIGHTMG-01', 9401);
@@ -1045,7 +1045,7 @@ describe('V01 controlled Visual Lab scenarios', () => {
     const light = lightSession.engine.projectiles.find((p) => p.specId === 'lightmg' && p.slotId === 'WS 001');
     expect(light).toBeDefined();
     expect(light).toMatchObject({
-      spawnType: 'BALLISTIC',
+      spawnType: 'BALLISTIC_AS_BEAM',
       visualSpawnType: 'BALLISTIC_AS_BEAM',
       projLength: 35,
       projWidth: 3.5,
@@ -1191,7 +1191,6 @@ describe('V01 controlled Visual Lab scenarios', () => {
     expect(sabot).toBeDefined();
     expect(sabot).toMatchObject({
       isTwoStage: true,
-      stageTriggered: true,
       projLength: 18,
       projWidth: 9,
       missileEngineVisualSpec: { nozzleOffset: -9, width: 8, length: 20, color: [255, 175, 100, 255], glowSizeMult: 1.5 },
@@ -1208,7 +1207,7 @@ describe('V01 controlled Visual Lab scenarios', () => {
     const heavy = heavySession.engine.projectiles.find((p) => p.specId === 'heavyblaster' && p.slotId === 'WS 007');
     expect(heavy).toBeDefined();
     expect(heavy).toMatchObject({
-      spawnType: 'BALLISTIC',
+      spawnType: 'BALLISTIC_AS_BEAM',
       visualSpawnType: 'BALLISTIC_AS_BEAM',
       projLength: 45,
       projWidth: 7,
@@ -1374,12 +1373,12 @@ describe('M3 reusable visual fidelity profiles', () => {
     });
   });
 
-  it('keeps confirmed Light MG and flak-family visual source values while isolating gameplay-linked discrepancies', () => {
+  it('keeps confirmed Light MG and flak-family visuals after source mechanics alignment', () => {
     const light = contentRegistry.getWeapon('lightmg');
     const flak = contentRegistry.getWeapon('flak');
     const dual = contentRegistry.getWeapon('dualflak');
     expect(light).toMatchObject({
-      spawnType: 'BALLISTIC',
+      spawnType: 'BALLISTIC_AS_BEAM',
       visualSpawnType: 'BALLISTIC_AS_BEAM',
       projLength: 35,
       projWidth: 3.5,
@@ -1404,8 +1403,8 @@ describe('M3 reusable visual fidelity profiles', () => {
       particleCount: 46,
       particleColor: [255, 155, 75, 245]
     });
-    // Source dualflak proximity gameplay is 15/30; the existing web gameplay value remains intentionally unchanged in this visual-only batch.
-    expect(dual?.proximityFuse).toEqual({ range: 35, explosionRadius: 50, soundKey: 'flak_explosion' });
+    expect(flak?.proximityFuse).toEqual({ range: 35, explosionRadius: 50, coreRadius: 35, soundKey: 'flak_explosion' });
+    expect(dual?.proximityFuse).toEqual({ range: 15, explosionRadius: 30, coreRadius: 15, soundKey: 'flak_explosion' });
   });
 
   it('keeps confirmed source beam widths, texel density and RGBA in the content contract', () => {
@@ -1452,9 +1451,9 @@ describe('M3 reusable visual fidelity profiles', () => {
     expect(contentRegistry.getWeapon('pdburst')?.hitGlowRadius).toBeUndefined();
   });
 
-  it('keeps Heavy Blaster source rendering values without changing its Web collision spawn type', () => {
+  it('keeps Heavy Blaster source rendering values with its source RAY spawn contract', () => {
     expect(contentRegistry.getWeapon('heavyblaster')).toMatchObject({
-      spawnType: 'BALLISTIC',
+      spawnType: 'BALLISTIC_AS_BEAM',
       visualSpawnType: 'BALLISTIC_AS_BEAM',
       projLength: 45,
       projWidth: 7,
@@ -1541,14 +1540,17 @@ describe('M3 reusable visual fidelity profiles', () => {
     expect(surfaceChange).toEqual({ emitFx: true, emitSound: true });
   });
 
-  it('keeps confirmed missile body, engine, smoke and trail visual contracts without rewriting gameplay stats', () => {
+  it('keeps confirmed missile visuals alongside source-aligned gameplay stats', () => {
     expect(contentRegistry.getWeapon('typhoon')).toMatchObject({
       projLength: 23,
       projWidth: 14,
       projSpriteUrl: '/game-assets/graphics/missiles/missile_torpedo_compact.png',
-      engineAcceleration: 220,
-      maxSpeed: 450,
-      missileHp: 350,
+      launchSpeed: 100,
+      flightTime: 3.5,
+      engineAcceleration: 500,
+      maxSpeed: 400,
+      maxTurnRate: 0,
+      missileHp: 500,
       missileEngineVisualSpec: { nozzleOffset: -11, width: 10, length: 80, color: [255, 100, 100, 255], glowSizeMult: 2.5, glowAlternateColor: [255, 0, 0, 255] },
       missileTrailSpec: { duration: 2, baseWidth: 15, widenMult: 1, minSeg: 5, spawnOffset: 0, color: [255, 100, 100, 50], blendMode: 'GLOW' },
       missileExplosionVisualSpec: { radius: 350, color: [255, 100, 100, 255] }
@@ -1632,6 +1634,152 @@ describe('M3 reusable visual fidelity profiles', () => {
     expect(lab.time).toBeCloseTo(1.25, 5);
     lab.setPreviewShip(null);
     expect(session.engine.playerShip.spec.id).toBe('onslaught');
+  });
+});
+
+describe('source-aligned projectile and missile mechanics', () => {
+  const makeWeaponContext = (engine: CombatEngine) => ({
+    playerShip: engine.playerShip,
+    enemyShip: engine.enemyShip,
+    fighters: [] as Ship[],
+    hulkFragments: [],
+    fx: engine.fxSystem,
+    statsTracker: engine.statsTracker,
+    contrailEngine: engine.contrailEngine,
+    random: engine.random,
+    visualRandom: engine.visualRandom,
+    addRadioMessage: vi.fn(),
+    addCameraShake: vi.fn(),
+    handleShipDestruction: vi.fn()
+  });
+
+  it('locks gameplay registry values to the confirmed source rows and projectile specs', () => {
+    expect(contentRegistry.getWeapon('lightmg')).toMatchObject({
+      range: 300, damagePerShot: 25, fluxPerShot: 3, projSpeed: 600,
+      spawnType: 'BALLISTIC_AS_BEAM', maxSpread: 5, spreadPerShot: 1, spreadDecay: 15,
+      burstSize: 5, burstDelay: 0.1
+    });
+    expect(contentRegistry.getWeapon('dualflak')?.proximityFuse).toEqual({
+      range: 15, explosionRadius: 30, coreRadius: 15, soundKey: 'flak_explosion'
+    });
+    expect(contentRegistry.getWeapon('heavyblaster')).toMatchObject({
+      spawnType: 'BALLISTIC_AS_BEAM', turnRateDegPerSec: 15
+    });
+    expect(contentRegistry.getWeapon('typhoon')).toMatchObject({
+      projSpeed: 400, launchSpeed: 100, flightTime: 3.5, projRadius: 20,
+      engineAcceleration: 500, maxSpeed: 400, maxTurnRate: 0, missileHp: 500
+    });
+    expect(contentRegistry.getWeapon('annihilatorpod')).toMatchObject({
+      refireDelay: 0.5, projSpeed: 400, launchSpeed: 50, flightTime: 3.75, projRadius: 12,
+      engineAcceleration: 400, maxSpeed: 400, maxTurnRate: 0, missileHp: 50
+    });
+    expect(contentRegistry.getWeapon('atropos_single')).toMatchObject({
+      projSpeed: 400, launchSpeed: 150, flightTime: 4, projRadius: 15,
+      engineAcceleration: 1200, maxSpeed: 400, missileHp: 300,
+      maxTurnRate: 1.3089969389957472, maxTurnAcceleration: 8.726646259971648
+    });
+    expect(contentRegistry.getWeapon('sabot')).toMatchObject({
+      damagePerShot: 100, projSpeed: 150, launchSpeed: 50, flightTime: 8, projRadius: 16,
+      engineAcceleration: 100, maxSpeed: 150, missileHp: 300,
+      maxTurnRate: 2.6179938779914944, maxTurnAcceleration: 10.471975511965978,
+      mirv: { numShots: 5, damage: 200, emp: 200, splitRange: 400, splitRangeRange: 100, minTimeToSplit: 2, projectileSpec: 'sabot_warhead2' }
+    });
+  });
+
+  it('uses source missile launch speed, acceleration, turn acceleration and flight-time lifetime', () => {
+    const engine = new CombatEngine('onslaught', 'paragon', 8401);
+    engine.playerShip.pos.set(5000, 5000);
+    engine.enemyShip.pos.set(5500, 5500);
+    const spec = contentRegistry.getWeapon('typhoon')!;
+    const p: Projectile = {
+      id: 8401, sourceShipId: engine.playerShip.id, isPlayer: true, specId: spec.id,
+      pos: new Vector2(0, 0), prevPos: new Vector2(0, 0), vel: new Vector2(spec.launchSpeed!, 0),
+      damage: spec.damagePerShot, damageType: spec.type, radius: spec.projRadius,
+      rangeRemaining: 10000, totalRange: 10000, elapsedTime: 0, color: spec.color,
+      isRocket: true, facingRad: 0, flightTimeRemaining: spec.flightTime, maxFlightTime: spec.flightTime,
+      engineAcceleration: spec.engineAcceleration, maxSpeed: spec.maxSpeed, maxTurnRate: spec.maxTurnRate,
+      maxTurnAcceleration: spec.maxTurnAcceleration
+    };
+    engine.projectiles = [p];
+    const ctx = makeWeaponContext(engine);
+    engine.weaponSystem.updateProjectiles(0.1, ctx);
+    expect(p.vel.length()).toBeCloseTo(150, 6);
+    for (let i = 0; i < 4; i++) engine.weaponSystem.updateProjectiles(0.1, ctx);
+    expect(p.vel.length()).toBeCloseTo(350, 6);
+    for (let i = 0; i < 29; i++) engine.weaponSystem.updateProjectiles(0.1, ctx);
+    expect(engine.projectiles).toHaveLength(1);
+    engine.weaponSystem.updateProjectiles(0.1, ctx);
+    expect(engine.projectiles).toHaveLength(0);
+
+    const atropos = contentRegistry.getWeapon('atropos_single')!;
+    const guided: Projectile = {
+      id: 8402, sourceShipId: engine.playerShip.id, isPlayer: true, specId: atropos.id,
+      pos: new Vector2(0, 0), prevPos: new Vector2(0, 0), vel: new Vector2(atropos.launchSpeed!, 0),
+      damage: atropos.damagePerShot, damageType: atropos.type, radius: atropos.projRadius,
+      rangeRemaining: 1000, totalRange: 1000, elapsedTime: 0, color: atropos.color,
+      isRocket: true, isGuided: true, targetShipId: engine.enemyShip.id, facingRad: 0, turnVelocityRad: 0,
+      engineAcceleration: 0, maxSpeed: atropos.maxSpeed, maxTurnRate: atropos.maxTurnRate,
+      maxTurnAcceleration: atropos.maxTurnAcceleration
+    };
+    engine.enemyShip.pos.set(0, 1000);
+    engine.weaponSystem.missileGuidance.updateMissile(guided, 0.1, ctx, [], [engine.playerShip, engine.enemyShip]);
+    expect(guided.turnVelocityRad).toBeCloseTo((500 * Math.PI / 180) * 0.1, 6);
+    expect(guided.facingRad).toBeCloseTo((500 * Math.PI / 180) * 0.01, 6);
+  });
+
+  it('splits Sabot into five source warheads with kinetic and EMP payload after the source minimum time', () => {
+    const engine = new CombatEngine('doom', 'paragon', 8403);
+    engine.playerShip.pos.set(0, 0);
+    engine.enemyShip.pos.set(250, 0);
+    const spec = contentRegistry.getWeapon('sabot')!;
+    const p: Projectile = {
+      id: 8403, sourceShipId: engine.playerShip.id, isPlayer: true, specId: spec.id,
+      pos: new Vector2(0, 0), prevPos: new Vector2(0, 0), vel: new Vector2(50, 0),
+      damage: spec.damagePerShot, damageType: spec.type, radius: spec.projRadius,
+      rangeRemaining: 1200, totalRange: 1200, elapsedTime: 2, color: spec.color,
+      isRocket: true, isGuided: true, targetShipId: engine.enemyShip.id, facingRad: 0,
+      flightTimeRemaining: 6, maxFlightTime: 8, engineAcceleration: spec.engineAcceleration,
+      maxSpeed: spec.maxSpeed, maxTurnRate: spec.maxTurnRate, maxTurnAcceleration: spec.maxTurnAcceleration,
+      mirv: spec.mirv, mirvSplitDistance: 400
+    };
+    engine.projectiles = [p];
+    const soundSpy = vi.spyOn(sound, 'playAtPos').mockImplementation(() => {});
+    try {
+      engine.weaponSystem.updateProjectiles(1 / 60, makeWeaponContext(engine));
+    } finally {
+      soundSpy.mockRestore();
+    }
+    expect(engine.projectiles).toHaveLength(5);
+    expect(engine.projectiles.every((child) => child.specId === 'sabot_warhead2' && child.damage === 200 && child.empDamage === 200 && child.damageType === 'KINETIC')).toBe(true);
+    const headings = engine.projectiles.map((child) => child.vel.heading());
+    expect(Math.max(...headings) - Math.min(...headings)).toBeGreaterThan(0.2);
+  });
+
+  it('applies proximity-fuse full damage inside core radius and linear falloff to the outer radius', () => {
+    const engine = new CombatEngine('onslaught', 'paragon', 8404);
+    const fuseRound: Projectile = {
+      id: 8404, sourceShipId: engine.playerShip.id, isPlayer: true, specId: 'dualflak',
+      pos: new Vector2(0, 0), prevPos: new Vector2(0, 0), vel: new Vector2(), damage: 100,
+      damageType: 'FRAGMENTATION', radius: 1, rangeRemaining: 100, totalRange: 100, elapsedTime: 0,
+      color: [255, 120, 100], proximityFuse: { range: 15, explosionRadius: 30, coreRadius: 15 }
+    };
+    const coreMissile: Projectile = {
+      ...fuseRound, id: 8405, sourceShipId: engine.enemyShip.id, isPlayer: false, specId: 'target-core',
+      pos: new Vector2(10, 0), prevPos: new Vector2(10, 0), isRocket: true, hitpoints: 1000, maxHitpoints: 1000
+    };
+    const falloffMissile: Projectile = {
+      ...fuseRound, id: 8406, sourceShipId: engine.enemyShip.id, isPlayer: false, specId: 'target-falloff',
+      pos: new Vector2(22.5, 0), prevPos: new Vector2(22.5, 0), isRocket: true, hitpoints: 1000, maxHitpoints: 1000
+    };
+    const rounds = [fuseRound, coreMissile, falloffMissile];
+    const soundSpy = vi.spyOn(sound, 'playAtPos').mockImplementation(() => {});
+    try {
+      expect(engine.weaponSystem.collisionHandler.checkProximityFuse(fuseRound, makeWeaponContext(engine), rounds)).toBe(true);
+    } finally {
+      soundSpy.mockRestore();
+    }
+    expect(coreMissile.hitpoints).toBeCloseTo(900, 6);
+    expect(falloffMissile.hitpoints).toBeCloseTo(950, 6);
   });
 });
 

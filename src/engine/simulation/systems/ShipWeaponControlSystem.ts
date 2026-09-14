@@ -479,8 +479,11 @@ export class ShipWeaponControlSystem {
         hitGlowBrightenDuration: mount.spec.hitGlowBrightenDuration
       });
     } else {
-      // 发射实体弹药/脉冲 (使用计入散布的真实弹道角 fireAngleRad)
-      const projVel = Vector2.fromAngle(fireAngleRad, mount.spec.projSpeed).add(ship.vel);
+      // 实体弹药使用弹速；导弹则严格区分发射初速与发动机额定极速。
+      const projectileLaunchSpeed = (mount.spec.isRocket || mount.spec.spawnType === 'MISSILE')
+        ? (mount.spec.launchSpeed ?? mount.spec.projSpeed)
+        : mount.spec.projSpeed;
+      const projVel = Vector2.fromAngle(fireAngleRad, projectileLaunchSpeed).add(ship.vel);
       spawnProjectile({
         id: this.random.next(),
         sourceShipId: ship.id,
@@ -517,14 +520,21 @@ export class ShipWeaponControlSystem {
         isGuided: mount.spec.isGuided,
         targetShipId: ship.currentTargetShip?.id,
         facingRad: fireAngleRad,
+        flightTimeRemaining: mount.spec.flightTime,
+        maxFlightTime: mount.spec.flightTime,
+        armingTimeRemaining: mount.spec.armingTime,
+        turnVelocityRad: 0,
         engineAcceleration: mount.spec.engineAcceleration,
-        maxSpeed: mount.spec.maxSpeed,
+        missileDeceleration: mount.spec.missileDeceleration,
+        maxSpeed: mount.spec.maxSpeed ?? (mount.spec.isRocket || mount.spec.spawnType === 'MISSILE' ? mount.spec.projSpeed : undefined),
         maxTurnRate: mount.spec.maxTurnRate,
+        maxTurnAcceleration: mount.spec.maxTurnAcceleration,
         engineFlameColor: mount.spec.engineFlameColor,
         missileEngineVisualSpec: mount.spec.missileEngineVisualSpec,
         missileTrailSpec: mount.spec.missileTrailSpec,
         missileExplosionVisualSpec: mount.spec.missileExplosionVisualSpec,
         isTwoStage: mount.spec.isTwoStage,
+        mirv: mount.spec.mirv,
         proximityFuse: mount.spec.proximityFuse,
         hitpoints: mount.spec.missileHp || (mount.spec.isRocket || mount.spec.spawnType === 'MISSILE' ? 100 : undefined),
         maxHitpoints: mount.spec.missileHp || (mount.spec.isRocket || mount.spec.spawnType === 'MISSILE' ? 100 : undefined)

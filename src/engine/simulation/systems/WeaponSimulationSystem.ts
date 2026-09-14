@@ -61,6 +61,17 @@ export class WeaponSimulationSystem {
       if (!this.collisionHandler.canBatchShipCollision(p)) flushBatchedCollisions();
       p.elapsedTime += dt;
       p.prevPos.copy(p.pos);
+      if (p.armingTimeRemaining !== undefined) {
+        p.armingTimeRemaining = Math.max(0, p.armingTimeRemaining - dt);
+      }
+      if (p.flightTimeRemaining !== undefined) {
+        p.flightTimeRemaining -= dt;
+        if (p.flightTimeRemaining <= 0) {
+          if (p.isRocket) ctx.contrailEngine?.detach(p.id);
+          this.projectiles.splice(i, 1);
+          continue;
+        }
+      }
 
       // 0. 诱饵热焰弹全生命周期模拟 (Decoy Flares)
       if (p.isFlare) {
@@ -104,8 +115,8 @@ export class WeaponSimulationSystem {
         }
       }
 
-      // 寿命耗尽 (非近炸武器)
-      if (p.rangeRemaining <= 0) {
+      // 非导弹继续用弹道射程决定寿命；有 source flightTime 的导弹由飞行时间独立控制。
+      if (p.rangeRemaining <= 0 && p.flightTimeRemaining === undefined) {
         if (p.isRocket) ctx.contrailEngine?.detach(p.id);
         this.projectiles.splice(i, 1);
         continue;
