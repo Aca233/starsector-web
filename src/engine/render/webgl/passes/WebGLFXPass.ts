@@ -92,22 +92,35 @@ export class WebGLFXPass {
         const core = arc.coreColor || [255, 255, 255];
         const baseThick = arc.thickness || 2.0;
 
-        for (let i = 0; i < arc.segments.length - 1; i++) {
-          const p1 = arc.segments[i];
-          const p2 = arc.segments[i + 1];
-          const dx = p2.x - p1.x;
-          const dy = p2.y - p1.y;
-          const len = Math.hypot(dx, dy);
-          const ang = Math.atan2(dy, dx);
+        const drawArcChain = (segments: Vector2[], thickness: number, alphaMult = 1) => {
+          for (let i = 0; i < segments.length - 1; i++) {
+            const p1 = segments[i];
+            const p2 = segments[i + 1];
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const len = Math.hypot(dx, dy);
+            if (len <= 0.001) continue;
+            const ang = Math.atan2(dy, dx);
 
-          // 外层电弧晕光
-          batcher.drawSprite(whiteTex, p1.x, p1.y, len, baseThick * 3.2, ang, -0.5, 0, glow[0] / 255, glow[1] / 255, glow[2] / 255, arcAlpha * 0.65);
-          // 白热电弧核心
-          batcher.drawSprite(whiteTex, p1.x, p1.y, len, baseThick * 0.9, ang, -0.5, 0, core[0] / 255, core[1] / 255, core[2] / 255, arcAlpha);
+            // 原版式两层电弧：柔和蓝色边缘 + 细白热核心。
+            batcher.drawSprite(whiteTex, p1.x, p1.y, len, thickness * 3.0, ang, -0.5, 0, glow[0] / 255, glow[1] / 255, glow[2] / 255, arcAlpha * 0.52 * alphaMult);
+            batcher.drawSprite(whiteTex, p1.x, p1.y, len, thickness * 0.72, ang, -0.5, 0, core[0] / 255, core[1] / 255, core[2] / 255, arcAlpha * alphaMult);
+          }
+        };
+
+        drawArcChain(arc.segments, baseThick);
+        for (const branch of arc.branches) {
+          drawArcChain(branch.segments, branch.thickness, 0.72);
+          const branchEnd = branch.segments[branch.segments.length - 1];
+          if (branchEnd) {
+            batcher.drawSprite(hitGlowTex, branchEnd.x, branchEnd.y, branch.thickness * 5, branch.thickness * 5, 0, 0, 0, glow[0] / 255, glow[1] / 255, glow[2] / 255, arcAlpha * 0.36);
+          }
         }
 
-        // 终点电浆击穿高光
-        batcher.drawSprite(hitGlowTex, arc.endPos.x, arc.endPos.y, baseThick * 8, baseThick * 8, 0, 0, 0, glow[0] / 255, glow[1] / 255, glow[2] / 255, arcAlpha * 0.85);
+        // 局部接点闪光只贴在放电节点上；避免整舰被大面积蓝色光晕洗白。
+        batcher.drawSprite(hitGlowTex, arc.startPos.x, arc.startPos.y, baseThick * 6, baseThick * 6, 0, 0, 0, glow[0] / 255, glow[1] / 255, glow[2] / 255, arcAlpha * 0.32);
+        batcher.drawSprite(hitGlowTex, arc.endPos.x, arc.endPos.y, baseThick * 9, baseThick * 9, 0, 0, 0, glow[0] / 255, glow[1] / 255, glow[2] / 255, arcAlpha * 0.62);
+        batcher.drawSprite(hitGlowTex, arc.endPos.x, arc.endPos.y, baseThick * 3.2, baseThick * 3.2, 0, 0, 0, 1, 1, 1, arcAlpha * 0.8);
       }
     }
 

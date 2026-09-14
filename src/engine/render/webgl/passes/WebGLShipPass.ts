@@ -188,13 +188,8 @@ export class WebGLShipPass {
         batcher.drawSprite(glowTex, shipPos.x, shipPos.y, gSize, gSize, 0, 0, 0, shipVisual.phaseColor[0], shipVisual.phaseColor[1], shipVisual.phaseColor[2], 0.68);
       }
 
-      // 过载电浆辉光
-      if (ship.flux.isOverloaded) {
-        batcher.setBlendMode('ADDITIVE');
-        const glowTex = textures.getTexture('/game-assets/graphics/fx/glow64.png');
-        const gSize = ship.spec.collisionRadius * 2.2;
-        batcher.drawSprite(glowTex, shipPos.x, shipPos.y, gSize, gSize, 0, 0, 0, shipVisual.overloadColor[0], shipVisual.overloadColor[1], shipVisual.overloadColor[2], 0.42 + visualRandom('webgl/passes/WebGLShipPass.ts#3') * 0.42);
-      }
+      // 过载视觉由 WebGLFXPass 的舰体表面 EMP 电弧负责。原版不会用全尺寸蓝色 halo 覆盖整艘舰体，
+      // 因此这里刻意不再叠加 collisionRadius 级的大面积光晕，保持舰体纹理在强制过载时仍清晰可读。
 
       // 2.3 旋转武器炮塔与挂点充能光晕 (Turrets & Hardpoints)
       for (const mount of ship.weapons) {

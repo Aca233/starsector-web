@@ -21,6 +21,64 @@ export interface ShipStatusContext {
  * 负责舰船过载电弧、主动排能等离子尾气、舰体黑烟、装甲剥落烟雾、空雷战术触发及损管抢修播报。
  */
 export class CombatShipStatusSystem {
+  private getHullPerimeterPoint(ship: Ship, normalizedDistance: number): Vector2 {
+    const bounds = ship.spec.bounds;
+    if (!bounds || bounds.length < 2) {
+      const angle = normalizedDistance * Math.PI * 2;
+      return ship.pos.clone().add(Vector2.fromAngle(angle + ship.facingRad, ship.spec.collisionRadius * 0.82));
+    }
+
+    const lengths: number[] = [];
+    let perimeter = 0;
+    for (let i = 0; i < bounds.length; i++) {
+      const [x1, y1] = bounds[i];
+      const [x2, y2] = bounds[(i + 1) % bounds.length];
+      const length = Math.hypot(x2 - x1, y2 - y1);
+      lengths.push(length);
+      perimeter += length;
+    }
+    if (perimeter <= 0.001) return ship.pos.clone();
+
+    const wrapped = ((normalizedDistance % 1) + 1) % 1;
+    let remaining = wrapped * perimeter;
+    for (let i = 0; i < bounds.length; i++) {
+      const edgeLength = lengths[i];
+      if (remaining <= edgeLength || i === bounds.length - 1) {
+        const [x1, y1] = bounds[i];
+        const [x2, y2] = bounds[(i + 1) % bounds.length];
+        const t = edgeLength > 0.001 ? Math.max(0, Math.min(1, remaining / edgeLength)) : 0;
+        return new Vector2(
+          x1 + (x2 - x1) * t,
+          y1 + (y2 - y1) * t
+        ).rotate(ship.facingRad).add(ship.pos);
+      }
+      remaining -= edgeLength;
+    }
+    return ship.pos.clone();
+  }
+
+  private spawnOverloadDischarge(ship: Ship, ctx: ShipStatusContext, onsetBurst = false): void {
+    const startT = ctx.visualRandom.next();
+    const span = (onsetBurst ? 0.12 : 0.08) + ctx.visualRandom.next() * (onsetBurst ? 0.28 : 0.22);
+    const direction = ctx.visualRandom.next() < 0.5 ? -1 : 1;
+    const start = this.getHullPerimeterPoint(ship, startT);
+    const end = this.getHullPerimeterPoint(ship, startT + direction * span);
+    const thickness = (onsetBurst ? 1.7 : 1.35) + ctx.visualRandom.next() * 0.65;
+    const life = (onsetBurst ? 0.18 : 0.14) + ctx.visualRandom.next() * 0.08;
+
+    ctx.fx.spawnEmpArc(start, end, {
+      coreColor: [255, 255, 255],
+      glowColor: [105, 195, 255],
+      thickness,
+      life,
+      branchCount: onsetBurst ? 3 : 2
+    });
+
+    if (onsetBurst || ctx.visualRandom.next() < 0.45) {
+      ctx.fx.spawnSparks(end, onsetBurst ? 3 : 1, [165, 220, 255]);
+    }
+  }
+
   public update(dt: number, ctx: ShipStatusContext) {
     // 沉浸音频：玩家舰船处于过载、主动排能或相位潜航时，全局音效进入低通滤波
     sound.setMuffled(ctx.playerShip.flux.isOverloaded || ctx.playerShip.flux.isVenting || ctx.playerShip.isPhased);
@@ -47,6 +105,8 @@ export class CombatShipStatusSystem {
         } else {
           ctx.addRadioMessage('战术火控', 'PLAYER', '目标舰护盾完全崩溃！敌舰已陷入深度过载！', [120, 255, 140]);
         }
+        // 原版过载瞬间是多点白蓝放电，而不是整舰覆盖一层蓝色雾状光晕。
+        for (let i = 0; i < 4; i++) this.spawnOverloadDischarge(ship, ctx, true);
       }
       ship.prevOverloaded = ship.flux.isOverloaded;
 
@@ -64,23 +124,14 @@ export class CombatShipStatusSystem {
       }
       ship.prevVenting = ship.flux.isVenting;
 
-      // 1. 舰船过载剧烈电弧失控
+      // 1. 舰船过载剧烈电弧失控：沿真实舰体外轮廓选取锚点，维持数条短寿命、带分叉的白蓝放电。
       if (ship.flux.isOverloaded) {
-        if (ctx.visualRandom.next() < dt * 18) {
-          const r1 = (ctx.visualRandom.next() - 0.5) * ship.spec.collisionRadius * 1.3;
-          const r2 = (ctx.visualRandom.next() - 0.5) * ship.spec.collisionRadius * 1.3;
-          const start = ship.pos.clone().add(new Vector2(r1, r2).rotate(ship.facingRad));
-          const end = start.clone().add(new Vector2(
-            (ctx.visualRandom.next() - 0.5) * 60,
-            (ctx.visualRandom.next() - 0.5) * 60
-          ));
-          ctx.fx.spawnEmpArc(start, end, {
-            coreColor: [255, 255, 255],
-            glowColor: [80, 180, 255],
-            thickness: 1.8,
-            life: 0.12
-          });
-          ctx.fx.spawnSparks(end, 4, [100, 200, 255]);
+        const overloadLevel = ship.flux.overloadDuration > 0
+          ? Math.max(0, Math.min(1, ship.flux.overloadTimer / ship.flux.overloadDuration))
+          : 1;
+        const arcRate = 18 + overloadLevel * 8;
+        if (ctx.visualRandom.next() < dt * arcRate) {
+          this.spawnOverloadDischarge(ship, ctx);
         }
       }
 
