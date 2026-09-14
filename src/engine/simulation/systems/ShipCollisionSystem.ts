@@ -1,6 +1,11 @@
 import { Vector2 } from '../../math/Vector2';
 import { Ship } from '../Ship';
 import { sound } from '../../audio/SoundManager';
+import {
+  getDirectionalHullCollisionExtent,
+  getDirectionalShieldCollisionExtent,
+  getShieldToShieldContact
+} from '../collision/ShieldCollisionGeometry';
 
 export interface CollisionFXCallbacks {
   addFloatingDamage: (pos: Vector2, amount: number, color: [number, number, number]) => void;
@@ -8,6 +13,56 @@ export interface CollisionFXCallbacks {
   spawnDebris: (pos: Vector2, count?: number, color?: [number, number, number], baseSpeed?: number) => void;
   addCameraShake: (intensity: number, duration: number) => void;
   getPlayerPos: () => Vector2;
+}
+
+interface ShipPairCollisionContact {
+  normal: Vector2;
+  penetration: number;
+  point: Vector2;
+  s1Surface: 'HULL' | 'SHIELD';
+  s2Surface: 'HULL' | 'SHIELD';
+}
+
+function findShipPairCollisionContact(s1: Ship, s2: Ship): ShipPairCollisionContact | null {
+  const shieldContact = getShieldToShieldContact(s1, s2);
+  if (shieldContact) {
+    return {
+      normal: shieldContact.normal,
+      penetration: shieldContact.penetration,
+      point: shieldContact.point,
+      s1Surface: 'SHIELD',
+      s2Surface: 'SHIELD'
+    };
+  }
+
+  const delta = s2.pos.clone().sub(s1.pos);
+  const dist = delta.length();
+  if (dist <= 0.001) return null;
+  const normal = delta.scale(1 / dist);
+
+  const s1Hull = getDirectionalHullCollisionExtent(s1, normal);
+  const s2Hull = getDirectionalHullCollisionExtent(s2, normal.clone().scale(-1));
+  const s1Shield = getDirectionalShieldCollisionExtent(s1, normal);
+  const s2Shield = getDirectionalShieldCollisionExtent(s2, normal.clone().scale(-1));
+  const candidates = [
+    [s1Hull, s2Hull] as const,
+    ...(s1Shield ? [[s1Shield, s2Hull] as const] : []),
+    ...(s2Shield ? [[s1Hull, s2Shield] as const] : [])
+  ];
+
+  let best: ShipPairCollisionContact | null = null;
+  for (const [s1Extent, s2Extent] of candidates) {
+    const penetration = s1Extent.distance + s2Extent.distance - dist;
+    if (penetration <= 0 || (best && penetration <= best.penetration)) continue;
+    best = {
+      normal,
+      penetration,
+      point: s1Extent.point.clone().add(s2Extent.point).scale(0.5),
+      s1Surface: s1Extent.surface,
+      s2Surface: s2Extent.surface
+    };
+  }
+  return best;
 }
 
 /**
@@ -18,18 +73,11 @@ export class ShipCollisionSystem {
   public resolveShipToShipCollision(s1: Ship, s2: Ship, fx: CollisionFXCallbacks, _dt: number) {
     if (s1.isDead || s2.isDead || s1.isPhased || s2.isPhased) return;
 
-    const delta = s2.pos.clone().sub(s1.pos);
-    const dist = delta.length();
-    const s1ShieldActive = s1.shield.isActive && s1.shield.currentArcDeg > 45 && s1.shield.type !== 'NONE' && s1.shield.type !== 'PHASE';
-    const s2ShieldActive = s2.shield.isActive && s2.shield.currentArcDeg > 45 && s2.shield.type !== 'NONE' && s2.shield.type !== 'PHASE';
-
-    const r1 = s1ShieldActive ? s1.shield.radius * 0.92 : s1.spec.collisionRadius;
-    const r2 = s2ShieldActive ? s2.shield.radius * 0.92 : s2.spec.collisionRadius;
-    const minDist = r1 + r2;
-
-    if (dist < minDist && dist > 0.001) {
-      const overlap = minDist - dist;
-      const normal = delta.clone().normalize();
+    const contact = findShipPairCollisionContact(s1, s2);
+    if (contact) {
+      const { normal, penetration: overlap, point: contactPoint } = contact;
+      const s1ShieldContact = contact.s1Surface === 'SHIELD';
+      const s2ShieldContact = contact.s2Surface === 'SHIELD';
 
       s1.pos.addScaled(normal, -overlap * 0.5);
       s2.pos.addScaled(normal, overlap * 0.5);
@@ -43,13 +91,13 @@ export class ShipCollisionSystem {
         s2.vel.addScaled(normal, impactSpeed * 0.4);
 
         const ramDmg = impactSpeed * 8;
-        const midPoint = s1.pos.clone().add(s2.pos).scale(0.5);
 
-        // 若护盾开启，撞击动能被偏振护盾吸收并转为硬幅能
-        if (s1ShieldActive) {
+        // 只有实际接触到已展开的护盾弧面时，撞击动能才转为硬幅能。
+        if (s1ShieldContact) {
           s1.flux.increaseFlux(ramDmg * 0.8, true);
+          const s1ShieldCenter = s1.getShieldCenter();
           s1.shield.ripples.push({
-            angle: Math.atan2(midPoint.y - s1.pos.y, midPoint.x - s1.pos.x),
+            angle: Math.atan2(contactPoint.y - s1ShieldCenter.y, contactPoint.x - s1ShieldCenter.x),
             intensity: Math.min(1.0, impactSpeed / 80),
             life: 0.6,
             color: [255, 200, 100]
@@ -60,10 +108,11 @@ export class ShipCollisionSystem {
           s1.addScorchMark(contact1, ramDmg);
         }
 
-        if (s2ShieldActive) {
+        if (s2ShieldContact) {
           s2.flux.increaseFlux(ramDmg * 0.8, true);
+          const s2ShieldCenter = s2.getShieldCenter();
           s2.shield.ripples.push({
-            angle: Math.atan2(midPoint.y - s2.pos.y, midPoint.x - s2.pos.x),
+            angle: Math.atan2(contactPoint.y - s2ShieldCenter.y, contactPoint.x - s2ShieldCenter.x),
             intensity: Math.min(1.0, impactSpeed / 80),
             life: 0.6,
             color: [255, 200, 100]
@@ -74,11 +123,11 @@ export class ShipCollisionSystem {
           s2.addScorchMark(contact2, ramDmg);
         }
 
-        fx.addFloatingDamage(midPoint.clone().add(new Vector2(-25, -25)), ramDmg, [255, 175, 40]);
-        fx.addFloatingDamage(midPoint.clone().add(new Vector2(25, 25)), ramDmg, [255, 175, 40]);
+        fx.addFloatingDamage(contactPoint.clone().add(new Vector2(-25, -25)), ramDmg, [255, 175, 40]);
+        fx.addFloatingDamage(contactPoint.clone().add(new Vector2(25, 25)), ramDmg, [255, 175, 40]);
 
-        fx.spawnSparks(midPoint, 40, [255, 200, 100]);
-        fx.spawnDebris(midPoint, 16, [130, 115, 100], 120);
+        fx.spawnSparks(contactPoint, 40, [255, 200, 100]);
+        fx.spawnDebris(contactPoint, 16, [130, 115, 100], 120);
         fx.addCameraShake(Math.min(30, impactSpeed * 0.25), 0.35);
       }
     }

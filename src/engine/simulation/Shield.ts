@@ -65,17 +65,17 @@ export class Shield {
 
   /**
    * 判断某个击中点是否被当前护盾阻挡
-   * @param shipPos 舰船中心世界坐标
+   * @param shieldCenter 护盾实际中心世界坐标（已包含舰体 shieldCenter 偏移）
    * @param hitWorldPos 击中点世界坐标
    * @param shipFacing 舰船自身朝向 (弧度)
    */
-  public isHitBlocked(shipPos: Vector2, hitWorldPos: Vector2, shipFacing: number): boolean {
+  public isHitBlocked(shieldCenter: Vector2, hitWorldPos: Vector2, shipFacing: number): boolean {
     if (!this.isActive || this.currentArcDeg <= 5 || this.type === 'NONE' || this.type === 'PHASE') {
       return false;
     }
 
-    // 击中点相对于舰船中心的角度
-    const hitAngle = Math.atan2(hitWorldPos.y - shipPos.y, hitWorldPos.x - shipPos.x);
+    // 击中点相对于护盾实际中心的角度
+    const hitAngle = Math.atan2(hitWorldPos.y - shieldCenter.y, hitWorldPos.x - shieldCenter.x);
     
     // 护盾中心朝向
     const centerFacing = this.type === 'FRONT' ? shipFacing : this.facingAngleRad;

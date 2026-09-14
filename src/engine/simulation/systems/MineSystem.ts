@@ -120,10 +120,10 @@ export class MineSystem {
               const dmg = mine.damage * damageFalloff;
 
               // 护盾阻挡判定
-              if (target.shield.isActive && target.shield.isHitBlocked(target.pos, mine.pos, target.facingRad)) {
+              if (target.isShieldPointBlocked(mine.pos)) {
                 const shieldMult = target.system.getShieldDamageMultiplier();
                 const absorbedDmg = dmg * shieldMult * 0.5; // HE 对盾 50%
-                const hitAngle = mine.pos.clone().sub(target.pos).heading();
+                const hitAngle = mine.pos.clone().sub(target.getShieldCenter()).heading();
                 const fluxGain = target.shield.absorbDamage(absorbedDmg, 'HIGH_EXPLOSIVE', hitAngle);
                 target.flux.increaseFlux(fluxGain, true);
                 fx.addFloatingDamage(mine.pos, absorbedDmg, [80, 200, 255]);

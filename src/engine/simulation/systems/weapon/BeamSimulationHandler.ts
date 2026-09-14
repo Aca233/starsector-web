@@ -112,7 +112,7 @@ export class BeamSimulationHandler {
           let shieldHitPoint: Vector2 | null = null;
 
           if (shieldEntry && shieldEntry.t <= beamLen) {
-            if (ship.shield.isHitBlocked(sCenter, shieldEntry.point, ship.facingRad)) {
+            if (ship.isShieldPointBlocked(shieldEntry.point)) {
               shieldHitPoint = shieldEntry.point;
             }
           } else {
@@ -122,7 +122,7 @@ export class BeamSimulationHandler {
             if (distFromShieldCenter <= ship.shield.radius && distFromShieldCenter > ship.spec.collisionRadius * 0.3) {
               const toTarget = sCenter.clone().sub(b.startPos);
               if (beamUnit.dot(toTarget) > 0) {
-                if (ship.shield.isHitBlocked(sCenter, b.startPos, ship.facingRad)) {
+                if (ship.isShieldPointBlocked(b.startPos)) {
                   shieldHitPoint = b.startPos.clone();
                 }
               }

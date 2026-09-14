@@ -224,8 +224,8 @@ export class ProjectileCollisionHandler {
       if (s.id !== p.sourceShipId && (p.isPlayer === undefined || s.isPlayer !== p.isPlayer) && !s.isDead && !s.isPhased) {
         const distToShip = p.pos.distanceTo(s.pos);
         if (distToShip <= expRadius + (s.shield.isActive ? s.shield.radius : s.spec.collisionRadius)) {
-          if (s.shield.isActive && s.shield.isHitBlocked(s.pos, p.pos, s.facingRad)) {
-            const fluxGain = s.shield.absorbDamage(p.damage * 0.5, 'FRAGMENTATION', p.pos.clone().sub(s.pos).heading());
+          if (s.isShieldPointBlocked(p.pos)) {
+            const fluxGain = s.shield.absorbDamage(p.damage * 0.5, 'FRAGMENTATION', p.pos.clone().sub(s.getShieldCenter()).heading());
             s.flux.increaseFlux(fluxGain, true);
             ctx.fx.spawnShieldRipple(p.pos, 35, [255, 120, 100]);
           } else if (distToShip <= expRadius + s.spec.collisionRadius) {

@@ -177,6 +177,12 @@ export class Ship {
     return shipPos.clone().add(new Vector2(cx, cy).rotate(shipFacingRad));
   }
 
+  /** Use the same offset shield center for every simulation-side arc test. */
+  public isShieldPointBlocked(hitWorldPos: Vector2): boolean {
+    const shieldCenter = this.getShieldCenter();
+    return this.shield.isHitBlocked(shieldCenter, hitWorldPos, this.facingRad);
+  }
+
   public triggerEngineFlameout(engineIndex?: number) {
     if (this.engineStatuses.length === 0) return;
     if (engineIndex !== undefined && this.engineStatuses[engineIndex]) {

@@ -5,6 +5,7 @@ import { Projectile } from '../Weapon';
 import { sound } from '../../audio/SoundManager';
 import { VisualRandom } from '../../runtime/VisualRandom';
 import { SimulationRandom } from '../SimulationRandom';
+import { getShieldCircleContact } from '../collision/ShieldCollisionGeometry';
 
 export interface AsteroidFXCallbacks {
   spawnShieldRipple: (pos: Vector2, maxRadius: number, color: [number, number, number]) => void;
@@ -96,50 +97,50 @@ export class AsteroidSystem {
 
       for (const ship of allShips) {
         if (ship.isDead || ship.isPhased) continue;
+        const shieldContact = getShieldCircleContact(ship, ast.pos, ast.radius);
+        if (shieldContact) {
+          const relVel = ast.vel.clone().sub(ship.vel);
+          const impulse = Math.max(80, relVel.length() * (ast.mass / (ast.mass + ship.spec.mass * 20)));
+          const fluxGain = impulse * 2.2;
+          ship.flux.increaseFlux(fluxGain, true);
+          fx.spawnShieldRipple(shieldContact.point, 40 + ast.radius, [100, 200, 255]);
+          fx.addFloatingDamage(shieldContact.point, fluxGain, [80, 200, 255]);
+          sound.playAtPos('collision_asteroid_ship', shieldContact.point, playerPos, 0.6);
+
+          // 护盾作为真实物理表面：沿护盾法线把小行星推出可见弧面。
+          ast.vel.addScaled(shieldContact.normal, (impulse / ast.mass) * 80);
+          ast.pos.addScaled(shieldContact.normal, shieldContact.penetration);
+          continue;
+        }
+
         const toShip = ship.pos.clone().sub(ast.pos);
         const dist = toShip.length();
         const combinedR = ast.radius + ship.spec.collisionRadius;
-
         if (dist < combinedR && dist > 0.001) {
           const normal = toShip.clone().normalize();
           const overlap = combinedR - dist;
 
-          // 护盾吸收撞击判定
-          if (ship.shield.isActive && ship.shield.isHitBlocked(ship.pos, ast.pos, ship.facingRad)) {
-            const relVel = ast.vel.clone().sub(ship.vel);
-            const impulse = Math.max(80, relVel.length() * (ast.mass / (ast.mass + ship.spec.mass * 20)));
-            const fluxGain = impulse * 2.2;
-            ship.flux.increaseFlux(fluxGain, true);
-            fx.spawnShieldRipple(ast.pos.clone().addScaled(normal, ast.radius), 40 + ast.radius, [100, 200, 255]);
-            fx.addFloatingDamage(ast.pos, fluxGain, [80, 200, 255]);
-            sound.playAtPos('collision_asteroid_ship', ast.pos, playerPos, 0.6);
+          // 装甲撞击金属与岩石碎屑
+          const impactDmg = Math.min(600, 80 + ast.mass * 0.15);
+          const localHit = ast.pos.clone().sub(ship.pos).rotate(-ship.facingRad);
+          const res = ship.armor.takeDamage(localHit, impactDmg, 'KINETIC', impactDmg, false);
+          ship.hullHp = Math.max(0, ship.hullHp - res.hullDamage);
+          ship.addScorchMark(localHit, res.armorDamage || res.hullDamage);
 
-            // 护盾推斥小行星反弹
-            ast.vel.subScaled(normal, (impulse / ast.mass) * 80);
-            ast.pos.subScaled(normal, overlap);
-          } else {
-            // 装甲撞击金属与岩石碎屑
-            const impactDmg = Math.min(600, 80 + ast.mass * 0.15);
-            const localHit = ast.pos.clone().sub(ship.pos).rotate(-ship.facingRad);
-            const res = ship.armor.takeDamage(localHit, impactDmg, 'KINETIC', impactDmg, false);
-            ship.hullHp = Math.max(0, ship.hullHp - res.hullDamage);
-            ship.addScorchMark(localHit, res.armorDamage || res.hullDamage);
+          if (res.armorDamage > 0) fx.addFloatingDamage(ast.pos, res.armorDamage, [255, 180, 50]);
+          if (res.hullDamage > 0) fx.addFloatingDamage(ast.pos, res.hullDamage, [255, 60, 60]);
 
-            if (res.armorDamage > 0) fx.addFloatingDamage(ast.pos, res.armorDamage, [255, 180, 50]);
-            if (res.hullDamage > 0) fx.addFloatingDamage(ast.pos, res.hullDamage, [255, 60, 60]);
+          fx.spawnSparks(ast.pos, 15, [255, 170, 70]);
+          fx.spawnDebris(ast.pos, 6, [140, 120, 100], 80);
+          sound.playAtPos('collision_asteroid_ship', ast.pos, playerPos, 0.7);
 
-            fx.spawnSparks(ast.pos, 15, [255, 170, 70]);
-            fx.spawnDebris(ast.pos, 6, [140, 120, 100], 80);
-            sound.playAtPos('collision_asteroid_ship', ast.pos, playerPos, 0.7);
-
-            // 物理反冲
-            ast.vel.subScaled(normal, 60);
-            ast.pos.subScaled(normal, overlap);
-            ast.hp -= impactDmg * 0.5;
-            if (ast.hp <= 0) {
-              this.shatter(i, fx);
-              break;
-            }
+          // 物理反冲
+          ast.vel.subScaled(normal, 60);
+          ast.pos.subScaled(normal, overlap);
+          ast.hp -= impactDmg * 0.5;
+          if (ast.hp <= 0) {
+            this.shatter(i, fx);
+            break;
           }
         }
       }

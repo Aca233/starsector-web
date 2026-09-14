@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ArmorGrid } from '../src/engine/simulation/ArmorGrid';
 import { Vector2 } from '../src/engine/math/Vector2';
 import { parseStarsectorCsv, parseStarsectorJson } from '../src/engine/data/StarsectorTextParsers';
@@ -15,8 +15,16 @@ import { AssetResolver, assetManager } from '../src/engine/assets/AssetResolver'
 import { CameraController } from '../src/engine/runtime/CameraController';
 import { CombatSession } from '../src/engine/runtime/CombatSession';
 import { VISUAL_SCENARIOS, VisualScenarioController } from '../src/visual-lab/VisualScenarioController';
+import { initializeVisualLabControllerOnce } from '../src/visual-lab/VisualLabInitialization';
 import type { ICombatRenderer } from '../src/engine/render/ICombatRenderer';
 import { Shield } from '../src/engine/simulation/Shield';
+import { Ship } from '../src/engine/simulation/Ship';
+import { ShipCollisionSystem } from '../src/engine/simulation/systems/ShipCollisionSystem';
+import { AsteroidSystem } from '../src/engine/simulation/systems/AsteroidSystem';
+import {
+  getDirectionalShipCollisionExtent,
+  getShieldToShieldContact
+} from '../src/engine/simulation/collision/ShieldCollisionGeometry';
 import {
   ENGINE_VISUAL_PROFILES,
   SHIELD_VISUAL_PROFILES,
@@ -28,13 +36,13 @@ import {
 import { getHudDensity, getHudLayoutProfile } from '../src/ui/hud/HudLayout';
 import { validateShipSpec, validateWeaponSpec } from '../src/engine/modding/ContentValidation';
 import { SimulationRandom } from '../src/engine/simulation/SimulationRandom';
-import { ContentManifestManager } from '../src/engine/content/ContentManifest';
+import { ContentManifestManager, contentManifestManager } from '../src/engine/content/ContentManifest';
 import { beamVisualTime, selectRenderableBeams } from '../src/engine/render/BeamVisuals';
-import { computeCanvasStripSegments } from '../src/engine/render/CanvasStripSampling';
 import { advanceBeamContactPulse, getProjectileImpactVisualProfile } from '../src/engine/visual/ImpactVisuals';
-import { FXRenderer } from '../src/engine/render/renderers/FXRenderer';
 import { WebGLProjectilePass } from '../src/engine/render/webgl/passes/WebGLProjectilePass';
-import { textureCache } from '../src/engine/render/TextureCache';
+import { WebGLCombatRenderer, type WebGLRendererLifecycle } from '../src/engine/render/webgl/WebGLCombatRenderer';
+import { syncCombatPresentationAudio } from '../src/hooks/useCombatLoop';
+import { sound } from '../src/engine/audio/SoundManager';
 import { readFileSync } from 'node:fs';
 
 describe('Starsector text import', () => {
@@ -261,6 +269,23 @@ describe('R02 timing and camera invariants', () => {
     expect(scheduler.droppedSimulationSeconds).toBeGreaterThan(0);
   });
 
+  it('resyncs wall-clock scheduling without clearing lifetime counters', () => {
+    const scheduler = new FixedTimestepScheduler(60);
+    scheduler.update(10, () => {}, () => {});
+    scheduler.update(10.05, () => {}, () => {});
+    const simTicks = scheduler.simTicks;
+    const renderFrames = scheduler.renderFrames;
+    scheduler.droppedSimulationSeconds = 0.25;
+
+    scheduler.resync(100);
+    scheduler.update(100 + 1 / 120, () => {}, () => {});
+
+    expect(scheduler.simTicks).toBe(simTicks);
+    expect(scheduler.renderFrames).toBe(renderFrames + 1);
+    expect(scheduler.droppedSimulationSeconds).toBe(0.25);
+    expect(scheduler.backlogSeconds).toBeLessThan(scheduler.fixedDeltaTime);
+  });
+
   it('camera smoothing is refresh-rate independent at 30/60/144 Hz', () => {
     const simulateCamera = (hz: number) => {
       const camera = new Vector2(0, 0);
@@ -274,6 +299,316 @@ describe('R02 timing and camera invariants', () => {
       expect(pos.x).toBeCloseTo(positions[0].x, 8);
       expect(pos.y).toBeCloseTo(positions[0].y, 8);
     }
+  });
+});
+
+describe('CombatSession presentation lifecycle', () => {
+  const fakeGl = {} as WebGL2RenderingContext;
+  const canvasWith = (gl: WebGL2RenderingContext | null) => ({
+    getContext: (kind: string) => kind === 'webgl2' ? gl : null
+  }) as unknown as HTMLCanvasElement;
+  const stats = () => ({
+    residentTextures: 0,
+    pendingUploads: 0,
+    uploads: 0,
+    invalidations: 0,
+    resourceRecreations: 0,
+    drawCalls: 0,
+    gpuTimerAvailable: false,
+    gpuTimeMs: null
+  });
+  const makeRenderer = (prepareAssets: () => Promise<void> = async () => {}, onDispose: () => void = () => {}): ICombatRenderer => ({
+    prepareAssets,
+    updateVisual: () => {},
+    render: () => {},
+    getResourceStats: stats,
+    resetVisualState: () => {},
+    dispose: onDispose
+  });
+  const mockPresentationDependencies = () => {
+    vi.spyOn(assetManager, 'ensureManifestLoaded').mockResolvedValue(undefined);
+    vi.spyOn(contentManifestManager, 'ensureLoaded').mockResolvedValue(undefined);
+  };
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('fails cleanly when WebGL2 is unavailable and never invokes the renderer factory', async () => {
+    let factoryCalls = 0;
+    const session = new CombatSession('onslaught', 'paragon', 701, () => {
+      factoryCalls++;
+      return makeRenderer();
+    });
+    const statuses: string[] = [];
+    session.subscribePresentation((state) => statuses.push(state.status));
+
+    await expect(session.prepare(canvasWith(null))).rejects.toThrow('WebGL2 is required');
+
+    expect(factoryCalls).toBe(0);
+    expect(session.renderer).toBeNull();
+    expect(session.getPresentationState()).toMatchObject({ status: 'failed', errorCode: 'webgl2-unsupported' });
+    expect(statuses).toEqual(['loading', 'failed']);
+    session.dispose();
+  });
+
+  it('keeps a stale initial prepare success from restoring ready after context loss', async () => {
+    mockPresentationDependencies();
+    let lifecycle: WebGLRendererLifecycle | null = null;
+    let releaseInitial!: () => void;
+    let markStarted!: () => void;
+    const initialGate = new Promise<void>((resolve) => { releaseInitial = resolve; });
+    const initialStarted = new Promise<void>((resolve) => { markStarted = resolve; });
+    let prepareCalls = 0;
+    const renderer = makeRenderer(() => {
+      prepareCalls++;
+      if (prepareCalls === 1) {
+        markStarted();
+        return initialGate;
+      }
+      return Promise.resolve();
+    });
+    const session = new CombatSession('onslaught', 'paragon', 707, (_canvas, _gl, callbacks) => {
+      lifecycle = callbacks;
+      return renderer;
+    });
+
+    const preparation = session.prepare(canvasWith(fakeGl));
+    await initialStarted;
+    lifecycle!.onContextLost?.();
+    releaseInitial();
+    await preparation;
+
+    expect(session.getPresentationState()).toMatchObject({ status: 'context-lost', errorCode: null });
+    expect(prepareCalls).toBe(1);
+
+    lifecycle!.onContextRestoring?.();
+    lifecycle!.onContextRestored?.();
+    await session.prepareVisualAssets();
+    expect(prepareCalls).toBe(2);
+    expect(session.getPresentationState().status).toBe('ready');
+    session.dispose();
+  });
+
+  it('keeps a stale initial prepare failure from replacing context loss or blocking restoration', async () => {
+    mockPresentationDependencies();
+    let lifecycle: WebGLRendererLifecycle | null = null;
+    let rejectInitial!: (error: Error) => void;
+    let markStarted!: () => void;
+    const initialGate = new Promise<void>((_resolve, reject) => { rejectInitial = reject; });
+    const initialStarted = new Promise<void>((resolve) => { markStarted = resolve; });
+    let prepareCalls = 0;
+    const renderer = makeRenderer(() => {
+      prepareCalls++;
+      if (prepareCalls === 1) {
+        markStarted();
+        return initialGate;
+      }
+      return Promise.resolve();
+    });
+    const session = new CombatSession('onslaught', 'paragon', 708, (_canvas, _gl, callbacks) => {
+      lifecycle = callbacks;
+      return renderer;
+    });
+
+    const preparation = session.prepare(canvasWith(fakeGl));
+    await initialStarted;
+    lifecycle!.onContextLost?.();
+    rejectInitial(new Error('stale texture failure'));
+    await expect(preparation).resolves.toBeUndefined();
+
+    expect(session.getPresentationState()).toMatchObject({ status: 'context-lost', errorCode: null });
+    expect(session.renderer).toBe(renderer);
+
+    lifecycle!.onContextRestoring?.();
+    lifecycle!.onContextRestored?.();
+    await session.prepareVisualAssets();
+    expect(prepareCalls).toBe(2);
+    expect(session.getPresentationState().status).toBe('ready');
+    session.dispose();
+  });
+
+  it('preserves playing and paused intent across context loss and successful restoration', async () => {
+    mockPresentationDependencies();
+    let lifecycle: WebGLRendererLifecycle | null = null;
+    let releaseAssets!: () => void;
+    const assetGate = new Promise<void>((resolve) => { releaseAssets = resolve; });
+    const renderer = makeRenderer(() => assetGate);
+    const session = new CombatSession('onslaught', 'paragon', 702, (_canvas, _gl, callbacks) => {
+      lifecycle = callbacks;
+      return renderer;
+    });
+
+    const preparation = session.prepare(canvasWith(fakeGl));
+    expect(session.getPresentationState().status).toBe('loading');
+    releaseAssets();
+    await preparation;
+    expect(session.getPresentationState().status).toBe('ready');
+
+    session.start();
+    session.scheduler.simTicks = 42;
+    session.scheduler.droppedSimulationSeconds = 0.5;
+    lifecycle!.onContextLost?.();
+    expect(session.getPresentationState().status).toBe('context-lost');
+    expect(session.state).toBe('running');
+    lifecycle!.onContextRestoring?.();
+    expect(session.getPresentationState().status).toBe('restoring');
+    lifecycle!.onContextRestored?.();
+    await session.prepareVisualAssets();
+    expect(session.getPresentationState().status).toBe('ready');
+    expect(session.state).toBe('running');
+    expect(session.scheduler.simTicks).toBe(42);
+    expect(session.scheduler.droppedSimulationSeconds).toBe(0.5);
+
+    session.pause();
+    lifecycle!.onContextLost?.();
+    lifecycle!.onContextRestoring?.();
+    lifecycle!.onContextRestored?.();
+    await session.prepareVisualAssets();
+    expect(session.state).toBe('paused');
+    expect(session.getPresentationState().status).toBe('ready');
+    session.dispose();
+  });
+
+  it('classifies renderer, resource and restore failures without a fallback renderer', async () => {
+    mockPresentationDependencies();
+    const initFailure = new CombatSession('onslaught', 'paragon', 703, () => {
+      throw new Error('constructor failed');
+    });
+    await expect(initFailure.prepare(canvasWith(fakeGl))).rejects.toThrow('constructor failed');
+    expect(initFailure.getPresentationState().errorCode).toBe('renderer-init-failed');
+    expect(initFailure.renderer).toBeNull();
+
+    let disposed = 0;
+    const resourceFailure = new CombatSession('onslaught', 'paragon', 704, () => makeRenderer(
+      async () => { throw new Error('texture failed'); },
+      () => { disposed++; }
+    ));
+    await expect(resourceFailure.prepare(canvasWith(fakeGl))).rejects.toThrow('texture failed');
+    expect(resourceFailure.getPresentationState().errorCode).toBe('resource-prepare-failed');
+    expect(resourceFailure.renderer).toBeNull();
+    expect(disposed).toBe(1);
+
+    let lifecycle: WebGLRendererLifecycle | null = null;
+    const restoreFailure = new CombatSession('onslaught', 'paragon', 705, (_canvas, _gl, callbacks) => {
+      lifecycle = callbacks;
+      return makeRenderer();
+    });
+    await restoreFailure.prepare(canvasWith(fakeGl));
+    restoreFailure.start();
+    lifecycle!.onContextLost?.();
+    lifecycle!.onContextRestoring?.();
+    lifecycle!.onContextRestoreFailed?.(new Error('restore failed'));
+    expect(restoreFailure.getPresentationState()).toMatchObject({ status: 'failed', errorCode: 'context-restore-failed' });
+    expect(restoreFailure.renderer).toBeNull();
+    expect(restoreFailure.state).toBe('running');
+  });
+
+  it('cleans completed GPU allocations when WebGL renderer construction fails partway', () => {
+    const createdTextures: unknown[] = [];
+    const deletedTextures: unknown[] = [];
+    const gl = {
+      TEXTURE_2D: 1,
+      RGBA: 2,
+      UNSIGNED_BYTE: 3,
+      TEXTURE_WRAP_S: 4,
+      TEXTURE_WRAP_T: 5,
+      TEXTURE_MIN_FILTER: 6,
+      TEXTURE_MAG_FILTER: 7,
+      CLAMP_TO_EDGE: 8,
+      NEAREST: 9,
+      VERTEX_SHADER: 10,
+      createTexture: () => {
+        const texture = { id: createdTextures.length + 1 };
+        createdTextures.push(texture);
+        return texture;
+      },
+      bindTexture: () => {},
+      texImage2D: () => {},
+      texParameteri: () => {},
+      deleteTexture: (texture: unknown) => { deletedTextures.push(texture); },
+      createShader: () => null,
+      isContextLost: () => false
+    } as unknown as WebGL2RenderingContext;
+
+    expect(() => new WebGLCombatRenderer({} as HTMLCanvasElement, gl)).toThrow('Failed to create WebGL shader');
+    expect(createdTextures).toHaveLength(2);
+    expect(deletedTextures).toEqual(createdTextures);
+  });
+
+  it('stops persistent combat loops while presentation is unavailable and restores active loops when ready', () => {
+    const session = new CombatSession('onslaught', 'paragon', 709);
+    const stopLoop = vi.spyOn(sound, 'stopLoop').mockImplementation(() => {});
+    const startLoop = vi.spyOn(sound, 'startLoop').mockImplementation(() => {});
+    session.engine.playerShip.flux.isVenting = true;
+    session.engine.playerShip.system.isActive = true;
+
+    syncCombatPresentationAudio(session, false);
+    expect(stopLoop.mock.calls.map(([key]) => key)).toEqual([
+      'burn_drive_loop',
+      'fortress_shield_loop',
+      'flux_flush_loop'
+    ]);
+
+    syncCombatPresentationAudio(session, true);
+    expect(startLoop).toHaveBeenCalledWith('flux_flush_loop', 0.65);
+    expect(startLoop).toHaveBeenCalledWith('burn_drive_loop', 0.65);
+    session.dispose();
+  });
+
+  it('ignores stale preparation results and callbacks after disposal', async () => {
+    mockPresentationDependencies();
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    let factoryCalls = 0;
+    let firstDisposed = 0;
+    let latestLifecycle: WebGLRendererLifecycle | null = null;
+    const session = new CombatSession('onslaught', 'paragon', 706, (_canvas, _gl, callbacks) => {
+      latestLifecycle = callbacks;
+      factoryCalls++;
+      return factoryCalls === 1
+        ? makeRenderer(() => firstGate, () => { firstDisposed++; })
+        : makeRenderer();
+    });
+
+    const first = session.prepare(canvasWith(fakeGl));
+    const second = session.prepare(canvasWith(fakeGl));
+    await second;
+    expect(session.getPresentationState().status).toBe('ready');
+    expect(firstDisposed).toBe(1);
+    releaseFirst();
+    await first;
+    expect(session.getPresentationState().status).toBe('ready');
+
+    const callbacks = latestLifecycle!;
+    session.dispose();
+    callbacks.onContextLost?.();
+    callbacks.onContextRestored?.();
+    expect(session.getPresentationState().status).toBe('disposed');
+  });
+});
+
+describe('Visual Lab presentation lifecycle', () => {
+  it('initializes URL scene state only once per controller and preserves runtime scene state after restoration', () => {
+    const session = new CombatSession('onslaught', 'paragon', 9701);
+    const controller = new VisualScenarioController(session);
+    const initializedControllerRef: { current: VisualScenarioController | null } = { current: null };
+    const initialState = {
+      sceneId: 'WPN-TPC-01',
+      seed: 1337,
+      time: 0,
+      previewShipId: null
+    };
+
+    expect(initializeVisualLabControllerOnce(initializedControllerRef, true, controller, initialState)).toBe(true);
+    controller.select('WPN-MSL-01', 9701);
+    controller.seek(1.5);
+    controller.play();
+
+    expect(initializeVisualLabControllerOnce(initializedControllerRef, true, controller, initialState)).toBe(false);
+    expect(controller.scene?.id).toBe('WPN-MSL-01');
+    expect(controller.time).toBeCloseTo(1.5, 6);
+    expect(controller.currentSeed).toBe(9701);
+    expect(session.state).toBe('running');
+    session.dispose();
   });
 });
 
@@ -914,7 +1249,7 @@ describe('V01 controlled Visual Lab scenarios', () => {
     expect(pdSession.engine.fxSystem.shieldRipples.length).toBeGreaterThan(0);
   });
 
-  it('consumes Heavy Blaster in-flight glowRadius in both WebGL and Canvas draw paths', () => {
+  it('consumes Heavy Blaster in-flight glowRadius in the WebGL projectile pass', () => {
     const session = new CombatSession('doom', 'paragon', 9703);
     const lab = new VisualScenarioController(session);
     lab.select('WPN-HBLASTER-01', 9703);
@@ -944,93 +1279,6 @@ describe('V01 controlled Visual Lab scenarios', () => {
     webgl.renderProjectilesAndMuzzle(session.engine, webglCtx);
     expect(hasWebglGlow()).toBe(false);
     heavy!.glowRadius = 35;
-
-    const canvasDraws: unknown[][] = [];
-    const fakeCtx = new Proxy<Record<PropertyKey, unknown>>({}, {
-      get: (_target, prop) => {
-        if (prop === 'drawImage') return (...args: unknown[]) => canvasDraws.push(args);
-        if (prop === 'createPattern') return () => null;
-        return () => {};
-      },
-      set: (target, prop, value) => { target[prop] = value; return true; }
-    }) as unknown as CanvasRenderingContext2D;
-    const originalTinted = textureCache.getTintedImage;
-    (textureCache as any).getTintedImage = (url: string) => ({ width: 128, height: 32, __url: url });
-    try {
-      const canvas = new FXRenderer();
-      canvas.drawProjectiles(fakeCtx, session.engine);
-      const hasCanvasGlow = () => canvasDraws.some((call) => {
-        const image = call[0] as { __url?: string } | undefined;
-        return image?.__url === '/game-assets/graphics/fx/hit_glow.png' && call[3] === 70 && call[4] === 70;
-      });
-      expect(hasCanvasGlow()).toBe(true);
-
-      heavy!.glowRadius = 0;
-      canvasDraws.length = 0;
-      canvas.drawProjectiles(fakeCtx, session.engine);
-      expect(hasCanvasGlow()).toBe(false);
-    } finally {
-      (textureCache as any).getTintedImage = originalTinted;
-      heavy!.glowRadius = 35;
-    }
-  });
-
-  it('renders Reaper continuous ContrailEngine strips in the Canvas fallback', () => {
-    const session = new CombatSession('doom', 'paragon', 9704);
-    const lab = new VisualScenarioController(session);
-    lab.select('WPN-MSL-01', 9704);
-    lab.seek(1.5);
-    expect(session.engine.contrails).toHaveLength(0);
-    expect(session.engine.contrailEngine.getStats().pointCount).toBeGreaterThan(0);
-
-    const drawCalls: unknown[][] = [];
-    const blendModes: unknown[] = [];
-    const fakeCtx = new Proxy<Record<PropertyKey, unknown>>({}, {
-      get: (_target, prop) => {
-        if (prop === 'drawImage') return (...args: unknown[]) => drawCalls.push(args);
-        return () => {};
-      },
-      set: (target, prop, value) => {
-        if (prop === 'globalCompositeOperation') blendModes.push(value);
-        target[prop] = value;
-        return true;
-      }
-    }) as unknown as CanvasRenderingContext2D;
-    const originalTinted = textureCache.getTintedImage;
-    (textureCache as any).getTintedImage = (url: string) => ({ width: 64, height: 64, __url: url });
-    try {
-      new FXRenderer().drawContrails(fakeCtx, session.engine);
-    } finally {
-      (textureCache as any).getTintedImage = originalTinted;
-    }
-
-    expect(drawCalls.length).toBeGreaterThan(0);
-    expect(blendModes).toContain('lighter');
-  });
-});
-
-describe('static-source Canvas strip sampling', () => {
-  it('maps source texel density and signed scroll without stretching beam textures', () => {
-    expect(computeCanvasStripSegments(128, 100, 1, 0)).toEqual([
-      { sourceX: 0, sourceWidth: 100, destX: 0, destWidth: 100 }
-    ]);
-    expect(computeCanvasStripSegments(128, 50, 1, 0)).toEqual([
-      { sourceX: 0, sourceWidth: 50, destX: 0, destWidth: 50 }
-    ]);
-    expect(computeCanvasStripSegments(128, 1000, 5, 0)).toEqual([
-      { sourceX: 0, sourceWidth: 128, destX: 0, destWidth: 640 },
-      { sourceX: 0, sourceWidth: 72, destX: 640, destWidth: 360 }
-    ]);
-    expect(computeCanvasStripSegments(64, 40, 5, 0)).toEqual([
-      { sourceX: 0, sourceWidth: 8, destX: 0, destWidth: 40 }
-    ]);
-    expect(computeCanvasStripSegments(32, 40, 5, 0)).toEqual([
-      { sourceX: 0, sourceWidth: 8, destX: 0, destWidth: 40 }
-    ]);
-    expect(computeCanvasStripSegments(128, 100, 1, -0.25)).toEqual([
-      { sourceX: 96, sourceWidth: 32, destX: 0, destWidth: 32 },
-      { sourceX: 0, sourceWidth: 68, destX: 32, destWidth: 68 }
-    ]);
   });
 });
 
@@ -1384,6 +1632,245 @@ describe('M3 reusable visual fidelity profiles', () => {
     expect(lab.time).toBeCloseTo(1.25, 5);
     lab.setPreviewShip(null);
     expect(session.engine.playerShip.spec.id).toBe('onslaught');
+  });
+});
+
+describe('shield physical collision geometry', () => {
+  it('uses the offset shield center consistently for arc blocking', () => {
+    const engine = new CombatEngine('onslaught', 'paragon', 8001);
+    const ship = engine.playerShip;
+    ship.pos = new Vector2(0, 0);
+    ship.facingRad = 0;
+    ship.shield.setActive(true);
+    ship.shield.currentArcDeg = ship.shield.maxArcDeg;
+
+    const shieldCenter = ship.getShieldCenter();
+    const insideArc = shieldCenter.clone().add(Vector2.fromAngle(Math.PI * 0.45, ship.shield.radius));
+    const outsideArc = shieldCenter.clone().add(Vector2.fromAngle(Math.PI * 0.55, ship.shield.radius));
+    expect(ship.isShieldPointBlocked(insideArc)).toBe(true);
+    expect(ship.isShieldPointBlocked(outsideArc)).toBe(false);
+  });
+
+  it('uses the deployed shield arc as the outer ship collision surface', () => {
+    const engine = new CombatEngine('onslaught', 'paragon', 8002);
+    const onslaught = engine.playerShip;
+    const paragon = engine.enemyShip;
+    onslaught.pos = new Vector2(0, 0);
+    paragon.pos = new Vector2(520, 0);
+    onslaught.facingRad = 0;
+    paragon.facingRad = Math.PI;
+    onslaught.shield.setActive(true);
+    paragon.shield.setActive(true);
+    onslaught.shield.currentArcDeg = onslaught.shield.maxArcDeg;
+    paragon.shield.currentArcDeg = paragon.shield.maxArcDeg;
+
+    const frontExtent = getDirectionalShipCollisionExtent(onslaught, new Vector2(1, 0));
+    const rearExtent = getDirectionalShipCollisionExtent(onslaught, new Vector2(-1, 0));
+    expect(frontExtent.surface).toBe('SHIELD');
+    expect(frontExtent.distance).toBeCloseTo(272, 5);
+    expect(rearExtent.surface).toBe('HULL');
+
+    const collision = new ShipCollisionSystem();
+    const beforeDistance = paragon.pos.x - onslaught.pos.x;
+    collision.resolveShipToShipCollision(onslaught, paragon, {
+      addFloatingDamage: vi.fn(),
+      spawnSparks: vi.fn(),
+      spawnDebris: vi.fn(),
+      addCameraShake: vi.fn(),
+      getPlayerPos: () => onslaught.pos
+    }, 1 / 60);
+    expect(paragon.pos.x - onslaught.pos.x).toBeGreaterThan(beforeDistance);
+  });
+
+  it('blocks an asteroid on the visible shield before the hull collision radius', () => {
+    const base = modManager.getShip('onslaught')!;
+    const spec: ShipSpec = {
+      ...base,
+      id: 'shield_collision_test_ship',
+      collisionRadius: 80,
+      shieldRadius: 140,
+      shieldCenterX: 20,
+      shieldCenterY: 0,
+      bounds: [[60, 35], [70, 0], [60, -35], [-60, -35], [-70, 0], [-60, 35]],
+      weaponSlots: [],
+      defaultWeaponGroups: []
+    };
+    const ship = new Ship('shield_collision_test', spec, true, new Vector2(0, 0), 0, new SimulationRandom(8003));
+    ship.shield.setActive(true);
+    ship.shield.currentArcDeg = ship.shield.maxArcDeg;
+
+    const asteroids = new AsteroidSystem(new SimulationRandom(8004), new SimulationRandom(8005));
+    asteroids.asteroids = [{
+      id: 1,
+      pos: new Vector2(150, 0),
+      vel: new Vector2(-20, 0),
+      facingRad: 0,
+      angularVel: 0,
+      radius: 10,
+      mass: 100,
+      hp: 350,
+      maxHp: 350,
+      spriteUrl: '/game-assets/graphics/asteroids/asteroid1.png'
+    }];
+    const hullBefore = ship.hullHp;
+    const soundSpy = vi.spyOn(sound, 'playAtPos').mockImplementation(() => {});
+    try {
+      asteroids.resolveShipCollisions([ship], {
+        spawnShieldRipple: vi.fn(),
+        addFloatingDamage: vi.fn(),
+        addFloatingText: vi.fn(),
+        spawnSparks: vi.fn(),
+        spawnDebris: vi.fn(),
+        spawnAuthenticExplosion: vi.fn(),
+        getPlayerPos: () => ship.pos
+      });
+    } finally {
+      soundSpy.mockRestore();
+    }
+
+    expect(ship.flux.totalFlux).toBeGreaterThan(0);
+    expect(ship.hullHp).toBe(hullBefore);
+    expect(asteroids.asteroids[0].pos.x).toBeCloseTo(170, 5);
+  });
+
+  it('does not report shield-to-shield contact from ship-center projection alone', () => {
+    const base = modManager.getShip('onslaught')!;
+    const makeShip = (id: string, pos: Vector2, shieldCenterY: number) => {
+      const spec: ShipSpec = {
+        ...base,
+        id,
+        collisionRadius: 20,
+        shieldType: 'OMNI',
+        shieldArcDeg: 360,
+        shieldRadius: 100,
+        shieldCenterX: 0,
+        shieldCenterY,
+        bounds: [[20, 20], [20, -20], [-20, -20], [-20, 20]],
+        weaponSlots: [],
+        defaultWeaponGroups: []
+      };
+      const ship = new Ship(id, spec, false, pos, 0, new SimulationRandom(8100 + id.length));
+      ship.shield.setActive(true);
+      ship.shield.currentArcDeg = 360;
+      return ship;
+    };
+    const first = makeShip('offset_shield_a', new Vector2(0, 0), 50);
+    const second = makeShip('offset_shield_b', new Vector2(190, 0), -50);
+    expect(first.getShieldCenter().distanceTo(second.getShieldCenter())).toBeGreaterThan(200);
+    expect(getShieldToShieldContact(first, second)).toBeNull();
+
+    const firstBefore = first.pos.clone();
+    const secondBefore = second.pos.clone();
+    new ShipCollisionSystem().resolveShipToShipCollision(first, second, {
+      addFloatingDamage: vi.fn(),
+      spawnSparks: vi.fn(),
+      spawnDebris: vi.fn(),
+      addCameraShake: vi.fn(),
+      getPlayerPos: () => first.pos
+    }, 1 / 60);
+    expect(first.pos.x).toBe(firstBefore.x);
+    expect(first.pos.y).toBe(firstBefore.y);
+    expect(second.pos.x).toBe(secondBefore.x);
+    expect(second.pos.y).toBe(secondBefore.y);
+  });
+
+  it('resolves diagonal shield-to-shield overlap along the real shield-center normal', () => {
+    const base = modManager.getShip('onslaught')!;
+    const makeShip = (id: string, pos: Vector2, shieldCenterY: number) => {
+      const spec: ShipSpec = {
+        ...base,
+        id,
+        collisionRadius: 20,
+        shieldType: 'OMNI',
+        shieldArcDeg: 360,
+        shieldRadius: 100,
+        shieldCenterX: 0,
+        shieldCenterY,
+        bounds: [[20, 20], [20, -20], [-20, -20], [-20, 20]],
+        weaponSlots: [],
+        defaultWeaponGroups: []
+      };
+      const ship = new Ship(id, spec, false, pos, 0, new SimulationRandom(8200 + id.length));
+      ship.shield.setActive(true);
+      ship.shield.currentArcDeg = 360;
+      return ship;
+    };
+    const first = makeShip('diagonal_shield_a', new Vector2(0, 0), 40);
+    const second = makeShip('diagonal_shield_b', new Vector2(170, 0), -40);
+    const contact = getShieldToShieldContact(first, second);
+    expect(contact).not.toBeNull();
+    expect(contact!.normal.y).toBeLessThan(0);
+
+    new ShipCollisionSystem().resolveShipToShipCollision(first, second, {
+      addFloatingDamage: vi.fn(),
+      spawnSparks: vi.fn(),
+      spawnDebris: vi.fn(),
+      addCameraShake: vi.fn(),
+      getPlayerPos: () => first.pos
+    }, 1 / 60);
+    expect(first.pos.y).toBeGreaterThan(0);
+    expect(second.pos.y).toBeLessThan(0);
+    expect(first.getShieldCenter().distanceTo(second.getShieldCenter())).toBeCloseTo(200, 5);
+  });
+
+  it('detects flank arc intersections even when the centerline points are outside both arcs', () => {
+    const base = modManager.getShip('onslaught')!;
+    const spec: ShipSpec = {
+      ...base,
+      id: 'shield_arc_intersection_test',
+      collisionRadius: 20,
+      shieldType: 'FRONT',
+      shieldArcDeg: 30,
+      shieldRadius: 100,
+      shieldCenterX: 0,
+      shieldCenterY: 0,
+      bounds: [[20, 20], [20, -20], [-20, -20], [-20, 20]],
+      weaponSlots: [],
+      defaultWeaponGroups: []
+    };
+    const first = new Ship('arc_intersection_a', spec, false, new Vector2(0, 0), 0, new SimulationRandom(8251));
+    const second = new Ship('arc_intersection_b', spec, false, new Vector2(160, 0), 0, new SimulationRandom(8252));
+    const intersectionAngle = Math.atan2(60, 80);
+    first.facingRad = intersectionAngle;
+    second.facingRad = Math.PI - intersectionAngle;
+    first.shield.setActive(true);
+    second.shield.setActive(true);
+    first.shield.currentArcDeg = 30;
+    second.shield.currentArcDeg = 30;
+
+    expect(first.isShieldPointBlocked(new Vector2(100, 0))).toBe(false);
+    expect(second.isShieldPointBlocked(new Vector2(60, 0))).toBe(false);
+    const contact = getShieldToShieldContact(first, second);
+    expect(contact).not.toBeNull();
+    expect(contact!.point.x).toBeCloseTo(80, 5);
+    expect(contact!.point.y).toBeCloseTo(60, 5);
+  });
+
+  it('requires both deployed shield arcs to cover a shield-to-shield contact', () => {
+    const base = modManager.getShip('onslaught')!;
+    const spec: ShipSpec = {
+      ...base,
+      id: 'front_arc_shield_collision_test',
+      collisionRadius: 20,
+      shieldType: 'FRONT',
+      shieldArcDeg: 90,
+      shieldRadius: 100,
+      shieldCenterX: 0,
+      shieldCenterY: 0,
+      bounds: [[20, 20], [20, -20], [-20, -20], [-20, 20]],
+      weaponSlots: [],
+      defaultWeaponGroups: []
+    };
+    const first = new Ship('front_arc_a', spec, false, new Vector2(0, 0), 0, new SimulationRandom(8301));
+    const second = new Ship('front_arc_b', spec, false, new Vector2(180, 0), 0, new SimulationRandom(8302));
+    first.shield.setActive(true);
+    second.shield.setActive(true);
+    first.shield.currentArcDeg = 90;
+    second.shield.currentArcDeg = 90;
+
+    expect(getShieldToShieldContact(first, second)).toBeNull();
+    second.facingRad = Math.PI;
+    expect(getShieldToShieldContact(first, second)).not.toBeNull();
   });
 });
 
