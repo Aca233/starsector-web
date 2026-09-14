@@ -70,6 +70,7 @@ export class CombatEngine {
   public readonly statusSystem: CombatShipStatusSystem = new CombatShipStatusSystem();
   public readonly statsTracker: CombatStatsTracker = new CombatStatsTracker();
   public battleResult: BattleResult | null = null;
+  private suppressDestructionSideEffects = false;
 
   public combatTime = 0;
   public cameraShakeIntensity = 0;
@@ -402,7 +403,8 @@ export class CombatEngine {
   // --------------------------------------------------------------------------
   // 60Hz 固定步长确定性逻辑 Tick
   // --------------------------------------------------------------------------
-  public fixedUpdate(dt: number) {
+  public fixedUpdate(dt: number, options: { suppressDestructionSideEffects?: boolean } = {}) {
+    this.suppressDestructionSideEffects = options.suppressDestructionSideEffects === true;
     this.combatTime += dt;
 
     // 屏幕震颤衰减
@@ -559,8 +561,12 @@ export class CombatEngine {
     // 4.1 更新连续烟雾尾迹带 (1:1 原版 ContrailEngine)
     this.contrailEngine.update(dt);
 
-    // 6. 更新折跃空间水雷
-    this.mineSystem.update(dt, [this.playerShip, this.enemyShip], this.getMineFXCallbacks());
+    // 6. 更新折跃空间水雷（主力舰与舰载机共享同一引信/爆炸目标集合）
+    this.mineSystem.update(
+      dt,
+      [this.playerShip, this.enemyShip, ...this.fighterSystem.fighters, ...this.fighterSystem.bombers],
+      this.getMineFXCallbacks()
+    );
 
     // 7. 更新所有粒子特效生命周期
     this.fxSystem.update(dt);
@@ -600,6 +606,7 @@ export class CombatEngine {
 
   private handleShipDestruction(ship: Ship) {
     if (ship.isDead) return;
+    if (this.suppressDestructionSideEffects) return;
     ship.isDead = true;
     sound.playAtPos('explosion', ship.pos, this.playerShip.pos, 0.95);
     if (ship.spec.collisionRadius > 80) {
@@ -713,7 +720,8 @@ export class CombatEngine {
       spawnEmpArc: (from: Vector2, to: Vector2) => this.spawnEmpArc(from, to),
       addFloatingDamage: (pos: Vector2, amount: number, color: [number, number, number]) => this.addFloatingDamage(pos, amount, color),
       addCameraShake: (intensity: number, duration: number) => this.addCameraShake(intensity, duration),
-      getPlayerPos: () => this.playerShip.pos
+      getPlayerPos: () => this.playerShip.pos,
+      handleShipDestruction: (ship: Ship) => this.handleShipDestruction(ship)
     };
   }
 
@@ -727,7 +735,10 @@ export class CombatEngine {
       addRadioMessage: (sender: string, faction: 'PLAYER' | 'ENEMY' | 'HQ', text: string, color: [number, number, number]) => this.addRadioMessage(sender, faction, text, color),
       cancelOrder: (unitId: string) => this.cancelOrder(unitId),
       getOrder: (unitId: string) => this.commandSystem.orders.get(unitId),
-      getPlayerPos: () => this.playerShip.pos
+      getPlayerPos: () => this.playerShip.pos,
+      recordFighterDestroyed: (isPlayerCraft: boolean) => this.statsTracker.recordFighterKill(!isPlayerCraft),
+      recordFighterRebuilt: (isPlayerCraft: boolean) => this.statsTracker.recordFighterRebuilt(isPlayerCraft),
+      destructionSideEffectsEnabled: () => !this.suppressDestructionSideEffects
     };
   }
 
@@ -739,7 +750,8 @@ export class CombatEngine {
       spawnSparks: (pos: Vector2, count: number, color: [number, number, number]) => this.spawnSparks(pos, count, color),
       spawnDebris: (pos: Vector2, count: number, color: [number, number, number], speed: number) => this.spawnDebris(pos, count, color, speed),
       spawnAuthenticExplosion: (pos: Vector2, radius: number, color: [number, number, number], shockwave?: boolean) => this.spawnAuthenticExplosion(pos, radius, color, shockwave),
-      getPlayerPos: () => this.playerShip.pos
+      getPlayerPos: () => this.playerShip.pos,
+      detachContrail: (projectileId: number) => this.contrailEngine.detach(projectileId)
     };
   }
 }

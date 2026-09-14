@@ -113,6 +113,21 @@ export class BeamSimulationHandler {
       const srcShip = ships.find((s) => s.id === b.sourceShipId);
       if (srcShip && b.slotId) {
         const mount = srcShip.weapons.find((w) => w.slotId === b.slotId);
+
+        // A damaging production beam is valid only while its exact source firing
+        // cycle is still ACTIVE. Disabled/replaced mounts must not leave a stale
+        // sustained beam dealing damage; chargedown beams are visual-only and are
+        // intentionally exempt from this check.
+        if (
+          b.damageActive !== false &&
+          (!mount || mount.isDisabled ||
+            (b.firingCycleId !== undefined &&
+              (mount.firingCycleId !== b.firingCycleId || mount.firingState !== 'ACTIVE')))
+        ) {
+          beams.splice(i, 1);
+          continue;
+        }
+
         if (mount) {
           const isHardpoint = mount.mountType === 'HARDPOINT';
           const offsets = isHardpoint

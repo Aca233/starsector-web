@@ -131,7 +131,16 @@ export class Ship {
       spec.collisionRadius / (spec.armorRows / 2),
       spec.armorRating
     );
-    this.flux = new FluxTracker(spec.maxFlux, spec.fluxDissipation, 'CAPITAL_SHIP');
+    const inferredHullSize = spec.collisionRadius <= 50
+      ? 'FIGHTER'
+      : spec.collisionRadius <= 90
+      ? 'FRIGATE'
+      : spec.collisionRadius <= 140
+      ? 'DESTROYER'
+      : spec.collisionRadius <= 210
+      ? 'CRUISER'
+      : 'CAPITAL_SHIP';
+    this.flux = new FluxTracker(spec.maxFlux, spec.fluxDissipation, spec.hullSize ?? inferredHullSize);
     this.shield = new Shield(
       spec.shieldType,
       spec.shieldArcDeg,
@@ -349,10 +358,19 @@ export class Ship {
       this.lowerShieldWithFeedback();
     }
     
-    // 护盾维持能耗 (堡垒护盾激活时 upkeep 为 0，对齐 FortressShieldStats.java)
+    // 护盾维持能耗 (堡垒护盾激活时普通 shield upkeep 为 0，对齐 FortressShieldStats.java)
     if (this.shield.isActive && !this.flux.isOverloaded && !this.flux.isVenting) {
       const upkeepMult = this.system.getShieldUpkeepMultiplier();
       this.flux.increaseFlux(this.shield.upkeepRate * upkeepMult * dt, false);
+    }
+
+    // Fortress Shield 自身另有 2.5% 基础幅能容量/秒的硬幅能成本；
+    // 不能被上面的 shield-upkeep 归零逻辑一并吞掉。
+    if (!this.flux.isOverloaded && !this.flux.isVenting) {
+      const systemHardFluxPerSecond = this.system.getHardFluxPerSecond(this.spec.maxFlux);
+      if (systemHardFluxPerSecond > 0) {
+        this.flux.increaseFlux(systemHardFluxPerSecond * dt, true);
+      }
     }
     this.flux.update(dt, this.shield.isActive);
 

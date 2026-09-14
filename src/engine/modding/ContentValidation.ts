@@ -77,6 +77,9 @@ export function validateWeaponSpec(input: unknown, requireBundledAssets = assetM
   for (const key of ['turnRateDegPerSec', 'minSpread', 'maxSpread', 'spreadPerShot', 'spreadDecay', 'visualRecoil', 'hitGlowRadius', 'glowRadius', 'coreWidthMult', 'projLength', 'projWidth', 'muzzleFlashSize', 'burstDelay', 'engineAcceleration', 'maxSpeed', 'maxTurnRate', 'missileHp', 'beamWidth', 'beamDuration', 'beamSourceChargeupTime', 'beamSourceChargedownTime', 'beamBurstDelay', 'fluxPerSecond', 'empPerSecond', 'maxAmmo', 'ammoRegenPerSec', 'hitGlowBrightenDuration'] as const) {
     if (spec[key] !== undefined) finite(spec[key], `${id}.${key}`, 0);
   }
+  for (const key of ['launchSpeed', 'flightTime', 'armingTime', 'missileDeceleration', 'maxTurnAcceleration'] as const) {
+    if (spec[key] !== undefined) finite(spec[key], `${id}.${key}`, 0);
+  }
   if (spec.fadeTime !== undefined) finite(spec.fadeTime, `${id}.fadeTime`, 0);
   if (spec.pixelsPerTexel !== undefined) {
     const pixelsPerTexel = finite(spec.pixelsPerTexel, `${id}.pixelsPerTexel`, 0);
@@ -148,7 +151,20 @@ export function validateWeaponSpec(input: unknown, requireBundledAssets = assetM
     const fuse = object(spec.proximityFuse, `${id}.proximityFuse`);
     finite(fuse.range, `${id}.proximityFuse.range`, 0);
     finite(fuse.explosionRadius, `${id}.proximityFuse.explosionRadius`, 0);
+    if (fuse.coreRadius !== undefined) finite(fuse.coreRadius, `${id}.proximityFuse.coreRadius`, 0);
     if (fuse.soundKey !== undefined) text(fuse.soundKey, `${id}.proximityFuse.soundKey`);
+  }
+
+  if (spec.mirv !== undefined) {
+    const mirv = object(spec.mirv, `${id}.mirv`);
+    for (const key of ['splitRange', 'splitRangeRange', 'minTimeToSplit', 'damage', 'emp', 'childHitpoints', 'arcDeg', 'spreadInaccuracyDeg', 'spreadSpeed', 'spreadSpeedRange', 'projectileRange'] as const) {
+      finite(mirv[key], `${id}.mirv.${key}`, 0);
+    }
+    integer(mirv.numShots, `${id}.mirv.numShots`, 1);
+    if (typeof mirv.canSplitEarly !== 'boolean') throw new Error(`${id}.mirv.canSplitEarly 必须是布尔值`);
+    if (typeof mirv.evenSpread !== 'boolean') throw new Error(`${id}.mirv.evenSpread 必须是布尔值`);
+    enumValue(mirv.damageType, `${id}.mirv.damageType`, new Set(['KINETIC', 'HIGH_EXPLOSIVE', 'ENERGY', 'FRAGMENTATION']));
+    text(mirv.projectileSpec, `${id}.mirv.projectileSpec`);
   }
 
   const assetFields = ['turretSpriteUrl', 'turretGunSpriteUrl', 'hardpointSpriteUrl', 'hardpointGunSpriteUrl', 'glowSpriteUrl', 'hardpointGlowSpriteUrl', 'projSpriteUrl'] as const;
@@ -204,6 +220,7 @@ export function validateShipSpec(input: unknown, options: ShipValidationOptions 
   finite(spec.shieldArcDeg, `${id}.shieldArcDeg`, 0, 360);
   enumValue(spec.shieldType, `${id}.shieldType`, SHIELD_TYPES);
   enumValue(spec.systemType, `${id}.systemType`, SYSTEM_TYPES);
+  if (spec.hullSize !== undefined) enumValue(spec.hullSize, `${id}.hullSize`, new Set(['FIGHTER', 'FRIGATE', 'DESTROYER', 'CRUISER', 'CAPITAL_SHIP']));
   if (spec.shieldCenterX !== undefined) finite(spec.shieldCenterX, `${id}.shieldCenterX`);
   if (spec.shieldCenterY !== undefined) finite(spec.shieldCenterY, `${id}.shieldCenterY`);
   if (spec.peakCRSec !== undefined) finite(spec.peakCRSec, `${id}.peakCRSec`, 0);

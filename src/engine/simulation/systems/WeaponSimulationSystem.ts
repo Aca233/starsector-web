@@ -110,7 +110,15 @@ export class WeaponSimulationSystem {
         const burst = this.collisionHandler.checkProximityFuse(p, ctx, this.projectiles);
         if (burst) {
           if (p.isRocket) ctx.contrailEngine?.detach(p.id);
-          this.projectiles.splice(i, 1);
+
+          // checkProximityFuse() may destroy multiple hostile missiles by splicing
+          // this same array. Re-resolve the fuse round by id instead of deleting at
+          // the stale outer-loop index, then re-anchor the descending cursor.
+          const burstIndex = this.projectiles.findIndex((projectile) => projectile.id === p.id);
+          if (burstIndex >= 0) {
+            this.projectiles.splice(burstIndex, 1);
+            i = burstIndex;
+          }
           continue;
         }
       }

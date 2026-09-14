@@ -16,6 +16,7 @@ export interface UseCombatInputParams {
   isMouseDown: React.MutableRefObject<boolean>;
   setIsAutopilot: React.Dispatch<React.SetStateAction<boolean>>;
   onActivateSystem: () => void;
+  onRestart: () => void;
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -43,13 +44,19 @@ export function useCombatInput({
   mouseScreenPos,
   isMouseDown,
   setIsAutopilot,
-  onActivateSystem
+  onActivateSystem,
+  onRestart
 }: UseCombatInputParams) {
   const onActivateSystemRef = useRef(onActivateSystem);
+  const onRestartRef = useRef(onRestart);
 
   useEffect(() => {
     onActivateSystemRef.current = onActivateSystem;
   }, [onActivateSystem]);
+
+  useEffect(() => {
+    onRestartRef.current = onRestart;
+  }, [onRestart]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -161,11 +168,7 @@ export function useCombatInput({
       if (e.code === 'KeyF') onActivateSystemRef.current();
       if (e.code === 'KeyC') engine.launchCountermeasures();
       if (e.code === 'KeyR') {
-        sound.stopLoop('burn_drive_loop');
-        sound.stopLoop('fortress_shield_loop');
-        sound.stopLoop('flux_flush_loop');
-        session.restart();
-        cameraPosRef.current.copy(session.engine.playerShip.pos);
+        onRestartRef.current();
         clearTransientInput();
       }
 

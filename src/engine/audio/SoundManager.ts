@@ -10,6 +10,9 @@ export class SoundManager {
   private ctx: AudioContext | null = null;
   private audioBuffers: Map<string, AudioBuffer> = new Map();
   private isMuted = false;
+  private preloadComplete = false;
+  private preloadPromise: Promise<void> | null = null;
+  private loadingBuffers: Map<string, Promise<AudioBuffer | null>> = new Map();
 
   // 循环音效源 (冲刺推进 / 堡垒护盾 / 战役背景乐)
   private loopingSources: Map<string, AudioBufferSourceNode> = new Map();
@@ -131,6 +134,7 @@ export class SoundManager {
         this.ctx = new AudioCtx();
         // 创建主混音总线与动态低通滤波 (用于过载/排能低沉静默音效)
         this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.value = this.isMuted ? 0 : 1;
         this.masterFilter = this.ctx.createBiquadFilter();
         this.masterFilter.type = 'lowpass';
         this.masterFilter.frequency.value = 22000; // 默认全频放开
@@ -143,22 +147,44 @@ export class SoundManager {
     }
   }
 
-  public async preloadSounds() {
+  public preloadSounds(): Promise<void> {
     this.initContext();
-    const loadPromises = Object.entries(this.SOUND_MAP).map(async ([key, relPath]) => {
+    if (this.preloadComplete) return Promise.resolve();
+    if (this.preloadPromise) return this.preloadPromise;
+    this.preloadPromise = Promise.all(
+      Object.entries(this.SOUND_MAP).map(([key, relPath]) => this.loadBuffer(key, relPath))
+    ).then(() => {
+      this.preloadComplete = true;
+    }).finally(() => {
+      this.preloadPromise = null;
+    });
+    return this.preloadPromise;
+  }
+
+  private loadBuffer(key: string, relPath: string): Promise<AudioBuffer | null> {
+    const existing = this.audioBuffers.get(key);
+    if (existing) return Promise.resolve(existing);
+    const inFlight = this.loadingBuffers.get(key);
+    if (inFlight) return inFlight;
+    if (!this.ctx) return Promise.resolve(null);
+    const ctx = this.ctx;
+    const request = (async () => {
       try {
         const res = await fetch(assetResolver.url(relPath));
-        if (!res.ok) return;
+        if (!res.ok) return null;
         const arrayBuffer = await res.arrayBuffer();
-        if (this.ctx) {
-          const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
-          this.audioBuffers.set(key, audioBuffer);
-        }
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+        this.audioBuffers.set(key, audioBuffer);
+        return audioBuffer;
       } catch (e) {
-        console.warn(`Failed to preload sound: ${key}`, e);
+        console.warn(`Failed to load sound: ${key}`, e);
+        return null;
+      } finally {
+        this.loadingBuffers.delete(key);
       }
-    });
-    await Promise.all(loadPromises);
+    })();
+    this.loadingBuffers.set(key, request);
+    return request;
   }
 
   /**
@@ -283,16 +309,8 @@ export class SoundManager {
   private async fetchAndPlay(key: string, volume: number, playbackRate: number) {
     const relPath = this.SOUND_MAP[key];
     if (!relPath || !this.ctx) return;
-    try {
-      const res = await fetch(assetResolver.url(relPath));
-      if (!res.ok) return;
-      const arrayBuffer = await res.arrayBuffer();
-      const buffer = await this.ctx.decodeAudioData(arrayBuffer);
-      this.audioBuffers.set(key, buffer);
-      this.play(key, volume, playbackRate);
-    } catch {
-      // ignore
-    }
+    const buffer = await this.loadBuffer(key, relPath);
+    if (buffer && !this.isMuted) this.play(key, volume, playbackRate);
   }
 
   /**
@@ -338,6 +356,17 @@ export class SoundManager {
 
   public toggleMute(): boolean {
     this.isMuted = !this.isMuted;
+    this.initContext();
+    if (this.masterGain && this.ctx) {
+      try {
+        this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : 1, this.ctx.currentTime);
+      } catch {
+        this.masterGain.gain.value = this.isMuted ? 0 : 1;
+      }
+    }
+    if (this.isMuted) {
+      for (const key of Array.from(this.loopingSources.keys())) this.stopLoop(key);
+    }
     return this.isMuted;
   }
 }

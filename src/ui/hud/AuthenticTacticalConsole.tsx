@@ -243,8 +243,8 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
 
             return (
               <div
-                key={gIdx}
-                onClick={() => player.selectWeaponGroup(gIdx)}
+                key={group.index}
+                onClick={() => player.selectWeaponGroup(group.index)}
                 className={`px-1.5 py-[1px] cursor-pointer transition select-none ${
                   isSelected
                     ? 'text-white font-bold drop-shadow-[0_0_2px_#94ff00]'
@@ -254,7 +254,7 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
                 {/* 第一行: 组号 + 武器图标 + 数量与名称 + 射击模式 */}
                 <div className="flex items-center justify-between text-[11px]">
                   <div className="flex items-center gap-1 flex-1 min-w-0">
-                    <span className="font-bold text-[12px]">{gIdx + 1}.</span>
+                    <span className="font-bold text-[12px]">{group.index + 1}.</span>
                     {first?.spec.turretSpriteUrl && (
                       <img
                         src={first.spec.turretSpriteUrl}

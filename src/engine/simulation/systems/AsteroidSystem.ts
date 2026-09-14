@@ -15,6 +15,23 @@ export interface AsteroidFXCallbacks {
   spawnDebris: (pos: Vector2, count: number, color: [number, number, number], speed: number) => void;
   spawnAuthenticExplosion: (pos: Vector2, radius: number, color: [number, number, number], hasShockwave?: boolean) => void;
   getPlayerPos: () => Vector2;
+  detachContrail: (projectileId: number) => void;
+}
+
+function segmentCircleHit(start: Vector2, end: Vector2, center: Vector2, radius: number): Vector2 | null {
+  const d = end.clone().sub(start);
+  const f = start.clone().sub(center);
+  const a = d.dot(d);
+  if (a <= 1e-12) return start.distanceTo(center) <= radius ? start.clone() : null;
+  const b = 2 * f.dot(d);
+  const c = f.dot(f) - radius * radius;
+  const discriminant = b * b - 4 * a * c;
+  if (discriminant < 0) return null;
+  const sqrt = Math.sqrt(discriminant);
+  const t1 = (-b - sqrt) / (2 * a);
+  const t2 = (-b + sqrt) / (2 * a);
+  const t = t1 >= 0 && t1 <= 1 ? t1 : t2 >= 0 && t2 <= 1 ? t2 : null;
+  return t === null ? null : start.clone().addScaled(d, t);
 }
 
 export class AsteroidSystem {
@@ -181,16 +198,18 @@ export class AsteroidSystem {
         const ast = this.asteroids[j];
         if (ast.hp <= 0) continue;
 
-        if (p.pos.distanceTo(ast.pos) < ast.radius + p.radius) {
+        const impactPos = segmentCircleHit(p.prevPos, p.pos, ast.pos, ast.radius + p.radius);
+        if (impactPos) {
           // 击中小行星！弹丸引爆
           ast.hp -= p.damage;
-          fx.addFloatingDamage(p.pos, p.damage, [200, 180, 140]);
-          fx.spawnSparks(p.pos, 12, [255, 180, 80]);
-          fx.spawnDebris(p.pos, 4, [130, 110, 90], 60);
+          fx.addFloatingDamage(impactPos, p.damage, [200, 180, 140]);
+          fx.spawnSparks(impactPos, 12, [255, 180, 80]);
+          fx.spawnDebris(impactPos, 4, [130, 110, 90], 60);
 
           if (p.isRocket) {
-            fx.spawnAuthenticExplosion(p.pos, 60, [255, 120, 40], true);
-            sound.playAtPos('explosion', p.pos, playerPos, 0.5);
+            fx.detachContrail(p.id);
+            fx.spawnAuthenticExplosion(impactPos, 60, [255, 120, 40], true);
+            sound.playAtPos('explosion', impactPos, playerPos, 0.5);
           }
 
           projectiles.splice(i, 1);

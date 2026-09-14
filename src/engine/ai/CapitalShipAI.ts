@@ -1,4 +1,6 @@
 import { Ship } from '../simulation/Ship';
+import type { TacticalOrder } from '../simulation/CombatTypes';
+import { Vector2 } from '../math/Vector2';
 
 /**
  * 战列舰专属战术 AI (CapitalShipAI)
@@ -19,8 +21,13 @@ export class CapitalShipAI {
     this.targetShip = targetShip;
   }
 
-  public update(dt: number) {
-    if (this.ship.isDead || this.targetShip.isDead) return;
+  public update(dt: number, order: TacticalOrder | null = null) {
+    if (this.ship.isDead) return;
+    if (order?.type === 'WAYPOINT' && order.targetPos) {
+      this.navigateToWaypoint(order.targetPos);
+      return;
+    }
+    if (this.targetShip.isDead) return;
 
     this.thinkTimer -= dt;
     this.ventCheckTimer -= dt;
@@ -64,6 +71,20 @@ export class CapitalShipAI {
         this.ship.startVenting();
       }
     }
+  }
+
+  private navigateToWaypoint(targetPos: { x: number; y: number }) {
+    const toWaypoint = new Vector2(targetPos.x, targetPos.y).sub(this.ship.pos);
+    const dist = toWaypoint.length();
+    const targetAngle = toWaypoint.heading();
+    let angleDiff = targetAngle - this.ship.facingRad;
+    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+    this.ship.aimTargetWorld.set(targetPos.x, targetPos.y);
+    this.ship.turnInput = Math.abs(angleDiff) > 0.05 ? Math.sign(angleDiff) : 0;
+    this.ship.strafeInput = 0;
+    this.ship.throttle = dist > 90 ? 1 : 0;
+    this.ship.isFiringMain = false;
   }
 
   private updateOnslaughtTactics(dist: number, angleDiff: number) {

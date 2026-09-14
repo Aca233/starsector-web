@@ -11,6 +11,7 @@ export interface UseCombatLoopParams {
   isAutopilotRef: React.MutableRefObject<boolean>;
   keysPressed: React.MutableRefObject<{ [key: string]: boolean }>;
   mouseScreenPos: React.MutableRefObject<Vector2>;
+  isMouseDown: React.MutableRefObject<boolean>;
   visualScenarioController?: { tick: (dt: number) => boolean };
 }
 
@@ -36,6 +37,7 @@ export function useCombatLoop({
   isAutopilotRef,
   keysPressed,
   mouseScreenPos,
+  isMouseDown,
   visualScenarioController
 }: UseCombatLoopParams) {
   const prevSystemActiveRef = useRef<boolean>(false);
@@ -55,7 +57,8 @@ export function useCombatLoop({
     const updatePlayerControls = (fixedDt: number) => {
       const engine = session.engine;
       if (isAutopilotRef.current) {
-        session.playerAI.update(fixedDt);
+        const order = engine.orders.get(engine.playerShip.id) ?? engine.orders.get('fleet') ?? null;
+        session.playerAI.update(fixedDt, order);
         return;
       }
 
@@ -65,6 +68,9 @@ export function useCombatLoop({
       const worldMouseY = (mouseScreenPos.current.y - curCanvas.height / 2) / zoomRef.current + cameraPosRef.current.y;
       const player = engine.playerShip;
       player.aimTargetWorld.set(worldMouseX, worldMouseY);
+      // Manual control owns the fire latch every tick; this clears any stale AI
+      // firing state immediately when autopilot is disabled.
+      player.isFiringMain = isMouseDown.current && !player.isDead;
 
       let throttle = 0;
       if (keysPressed.current['KeyW'] || keysPressed.current['ArrowUp']) throttle += 1.0;
@@ -166,5 +172,5 @@ export function useCombatLoop({
       syncCombatPresentationAudio(session, false);
       cancelAnimationFrame(animId);
     };
-  }, [sessionRef, canvasRef, cameraPosRef, zoomRef, isAutopilotRef, keysPressed, mouseScreenPos, visualScenarioController]);
+  }, [sessionRef, canvasRef, cameraPosRef, zoomRef, isAutopilotRef, keysPressed, mouseScreenPos, isMouseDown, visualScenarioController]);
 }

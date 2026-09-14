@@ -79,8 +79,8 @@ export const WeaponsConsole: React.FC<{ player: Ship; isAutopilot?: boolean }> =
 
           return (
             <div
-              key={gIdx}
-              onClick={() => player.selectWeaponGroup(gIdx)}
+              key={group.index}
+              onClick={() => player.selectWeaponGroup(group.index)}
               className={`relative h-[68px] rounded cursor-pointer transition-all duration-100 flex flex-col justify-between p-1.5 select-none ${
                 anyDisabled
                   ? 'border-2 border-amber-500/80 shadow-[0_0_12px_rgba(245,158,11,0.5)]'
@@ -97,12 +97,12 @@ export const WeaponsConsole: React.FC<{ player: Ship; isAutopilot?: boolean }> =
               {/* 顶部: 组号 + 射击模式切换 */}
               <div className="flex items-center justify-between text-[10px] font-bold">
                 <span className={`px-1 rounded text-[9px] ${anyDisabled ? 'bg-amber-600 text-slate-950 font-mono' : isActive ? 'bg-cyan-500 text-slate-950' : 'text-slate-300'}`}>
-                  [{gIdx + 1}]
+                  [{group.index + 1}]
                 </span>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    player.toggleFireMode(gIdx);
+                    player.toggleFireMode(group.index);
                   }}
                   className="text-[9px] px-1 py-0.2 rounded hover:bg-slate-700/70 text-slate-400 hover:text-cyan-300 font-mono transition"
                   title="点击切换齐射/交替开火模式 (LINKED / ALTERNATING)"

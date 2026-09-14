@@ -151,8 +151,7 @@ export class FluxTracker {
 
       if (this.overloadTimer <= 0) {
         this.isOverloaded = false;
-        this.softFlux = 0;
-        this.hardFlux = 0;
+        this.overloadTimer = 0;
       }
       this.zeroFluxTimer = 0;
       this.isEngineBoostActive = false;

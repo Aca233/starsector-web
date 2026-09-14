@@ -83,26 +83,31 @@ export class ShipWeaponControlSystem {
     }
   }
 
-  public selectGroup(index: number) {
-    if (index >= 0 && index < this.weaponGroups.length) {
-      if (this.selectedGroupIndex !== index) {
-        this.selectedGroupIndex = index;
-        sound.play('ui_button_press', 0.5);
-      }
+  private resolveGroupArrayIndex(declaredIndex: number): number {
+    return this.weaponGroups.findIndex((group) => group.index === declaredIndex);
+  }
+
+  public selectGroup(declaredIndex: number) {
+    const arrayIndex = this.resolveGroupArrayIndex(declaredIndex);
+    if (arrayIndex >= 0 && this.selectedGroupIndex !== arrayIndex) {
+      this.selectedGroupIndex = arrayIndex;
+      sound.play('ui_button_press', 0.5);
     }
   }
 
-  public toggleAutofire(groupIndex: number) {
-    if (groupIndex >= 0 && groupIndex < this.weaponGroups.length) {
-      const g = this.weaponGroups[groupIndex];
+  public toggleAutofire(declaredIndex: number) {
+    const arrayIndex = this.resolveGroupArrayIndex(declaredIndex);
+    if (arrayIndex >= 0) {
+      const g = this.weaponGroups[arrayIndex];
       g.isAutofire = !g.isAutofire;
       sound.play('autofire_toggle', 0.7);
     }
   }
 
-  public toggleFireMode(groupIndex: number) {
-    if (groupIndex >= 0 && groupIndex < this.weaponGroups.length) {
-      const g = this.weaponGroups[groupIndex];
+  public toggleFireMode(declaredIndex: number) {
+    const arrayIndex = this.resolveGroupArrayIndex(declaredIndex);
+    if (arrayIndex >= 0) {
+      const g = this.weaponGroups[arrayIndex];
       g.mode = g.mode === 'LINKED' ? 'ALTERNATING' : 'LINKED';
       sound.play('ui_button_press', 0.6);
     }
@@ -375,7 +380,7 @@ export class ShipWeaponControlSystem {
         }
       }
 
-      this.advanceWeaponLifecycle(dt, mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
+      this.advanceWeaponLifecycle(dt, mount, ship, canShipFire, spawnProjectile, spawnBeam, spawnMuzzleFlash);
     }
   }
 
@@ -404,8 +409,9 @@ export class ShipWeaponControlSystem {
     }
 
     if (mount.burstRemaining > 0 || mount.cooldownTimer > 0) return false;
+    if (Number.isFinite(mount.ammo) && mount.ammo < 1) return false;
     const burstSize = Math.max(1, Math.floor(mount.spec.burstSize ?? 1));
-    this.fireWeapon(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
+    if (!this.fireWeapon(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash)) return false;
     if (burstSize > 1) {
       mount.burstRemaining = burstSize - 1;
       mount.burstTimer = mount.spec.burstDelay ?? 0;
@@ -488,15 +494,30 @@ export class ShipWeaponControlSystem {
     dt: number,
     mount: WeaponMount,
     ship: Ship,
+    canShipFire: boolean,
     spawnProjectile: (p: Projectile) => void,
     spawnBeam: (b: Beam) => void,
     spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void
   ): void {
     if (!mount.spec.isBeam && mount.burstRemaining > 0) {
+      // A burst is not an autonomous entity: overload/venting/phase/system weapon
+      // lock interrupts the remaining shots immediately.
+      if (!canShipFire) {
+        mount.burstRemaining = 0;
+        mount.burstTimer = 0;
+        mount.cooldownTimer = Math.max(mount.cooldownTimer, mount.spec.refireDelay);
+        return;
+      }
+
       mount.burstTimer -= dt;
       const delay = Math.max(0.0001, mount.spec.burstDelay ?? 0.0001);
       while (mount.burstRemaining > 0 && mount.burstTimer <= 0) {
-        this.fireWeapon(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
+        if (!this.fireWeapon(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash)) {
+          mount.burstRemaining = 0;
+          mount.burstTimer = 0;
+          mount.cooldownTimer = Math.max(mount.cooldownTimer, mount.spec.refireDelay);
+          break;
+        }
         mount.burstRemaining--;
         if (mount.burstRemaining > 0) mount.burstTimer += delay;
         else mount.cooldownTimer = mount.spec.refireDelay;
@@ -549,7 +570,13 @@ export class ShipWeaponControlSystem {
     spawnProjectile: (p: Projectile) => void,
     spawnBeam: (b: Beam) => void,
     spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void
-  ) {
+  ): boolean {
+    // 非光束有限弹药按“实际发射一发”扣除；无弹时不得产生任何发射副作用。
+    if (!mount.spec.isBeam && Number.isFinite(mount.ammo)) {
+      if (mount.ammo < 1) return false;
+      mount.ammo = Math.max(0, mount.ammo - 1);
+    }
+
     // 触发动态视觉后坐力与充能发光
     mount.recoil = 1.0;
     mount.glowAlpha = 1.0;
@@ -728,5 +755,6 @@ export class ShipWeaponControlSystem {
         maxHitpoints: mount.spec.missileHp || (mount.spec.isRocket || mount.spec.spawnType === 'MISSILE' ? 100 : undefined)
       });
     }
+    return true;
   }
 }

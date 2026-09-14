@@ -256,7 +256,9 @@ export class ProjectileCollisionHandler {
         if (distToShip <= expRadius + (s.shield.isActive ? s.shield.radius : s.spec.collisionRadius)) {
           if (s.isShieldPointBlocked(p.pos)) {
             const shieldSurfaceDistance = Math.max(0, p.pos.distanceTo(s.getShieldCenter()) - s.shield.radius);
-            const damage = p.damage * this.getExplosionDamageScale(p, shieldSurfaceDistance);
+            const damage = p.damage
+              * this.getExplosionDamageScale(p, shieldSurfaceDistance)
+              * s.system.getShieldDamageMultiplier();
             if (damage > 0) {
               damagedHostileTarget = true;
               const fluxGain = s.shield.absorbDamage(damage, 'FRAGMENTATION', p.pos.clone().sub(s.getShieldCenter()).heading());

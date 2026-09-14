@@ -16,6 +16,9 @@ export interface FighterFXCallbacks {
   cancelOrder: (unitId: string) => void;
   getOrder: (unitId: string) => TacticalOrder | undefined;
   getPlayerPos: () => Vector2;
+  recordFighterDestroyed: (isPlayerCraft: boolean) => void;
+  recordFighterRebuilt: (isPlayerCraft: boolean) => void;
+  destructionSideEffectsEnabled: () => boolean;
 }
 
 /**
@@ -164,6 +167,17 @@ export class FighterSystem {
     const ftrSpec = modManager.getShip('broadsword');
     const bmrSpec = modManager.getShip('dagger');
 
+    for (let i = this.fighters.length - 1; i >= 0; i--) {
+      if (!this.fighters[i].isDead) continue;
+      this.fighterAIModes.delete(this.fighters[i].id);
+      this.fighters.splice(i, 1);
+    }
+    for (let i = this.bombers.length - 1; i >= 0; i--) {
+      if (!this.bombers[i].isDead) continue;
+      this.bomberAIModes.delete(this.bombers[i].id);
+      this.bombers.splice(i, 1);
+    }
+
     // 1. 处理玩家母舰甲板联队
     for (const wing of this.playerWings) {
       const isBroadsword = wing.specId === 'broadsword';
@@ -205,11 +219,13 @@ export class FighterSystem {
             newFtr.vel = playerShip.vel.clone().add(Vector2.fromAngle(playerShip.facingRad, 140));
             this.fighters.push(newFtr);
             this.fighterAIModes.set(newFtr.id, { state: 'ESCORT', timer: 2.0 });
+            fx.recordFighterRebuilt(true);
           } else if (!isBroadsword && bmrSpec) {
             const newBmr = new Ship(this.random.nextId('player_bmr_rep'), bmrSpec, true, spawnPos, playerShip.facingRad, this.random);
             newBmr.vel = playerShip.vel.clone().add(Vector2.fromAngle(playerShip.facingRad, 120));
             this.bombers.push(newBmr);
             this.bomberAIModes.set(newBmr.id, { state: 'ESCORT', timer: 2.0, hasTorpedo: true });
+            fx.recordFighterRebuilt(true);
           }
 
           sound.play('fighter_deploy', 0.85);
@@ -251,6 +267,7 @@ export class FighterSystem {
           newEFtr.vel = enemyShip.vel.clone().add(Vector2.fromAngle(enemyShip.facingRad, 140));
           this.fighters.push(newEFtr);
           this.fighterAIModes.set(newEFtr.id, { state: 'ESCORT', timer: 2.0 });
+          fx.recordFighterRebuilt(false);
         }
       }
     }
@@ -443,8 +460,9 @@ export class FighterSystem {
         }
       }
 
-      if (ftr.hullHp <= 0 && !ftr.isDead) {
+      if (ftr.hullHp <= 0 && !ftr.isDead && fx.destructionSideEffectsEnabled()) {
         ftr.isDead = true;
+        fx.recordFighterDestroyed(ftr.isPlayer);
         sound.playAtPos('explosion', ftr.pos, fx.getPlayerPos(), 0.45);
         fx.spawnAuthenticExplosion(ftr.pos, 42, [255, 180, 50], true);
         fx.spawnDebris(ftr.pos, 8, [130, 115, 100], 100);
@@ -498,6 +516,11 @@ export class FighterSystem {
         bmr.vel.scale(0.8);
         if (mode.timer <= 0) {
           mode.hasTorpedo = true;
+          for (const mount of bmr.weapons) {
+            if (!Number.isFinite(mount.ammo) || mount.spec.maxAmmo === undefined) continue;
+            mount.ammo = mount.spec.maxAmmo;
+            mount.ammoRechargeProgress = 0;
+          }
           mode.state = this.isFighterRecall ? 'ESCORT' : 'ATTACK_RUN';
           mode.timer = 12.0;
           fx.addFloatingText(bmr.pos, 'DAGGER ARMED & LAUNCHING', [100, 220, 255], 13, 1.8);
@@ -606,8 +629,9 @@ export class FighterSystem {
         }
       }
 
-      if (bmr.hullHp <= 0 && !bmr.isDead) {
+      if (bmr.hullHp <= 0 && !bmr.isDead && fx.destructionSideEffectsEnabled()) {
         bmr.isDead = true;
+        fx.recordFighterDestroyed(bmr.isPlayer);
         sound.playAtPos('fighter_explosion', bmr.pos, fx.getPlayerPos(), 0.5);
         fx.spawnAuthenticExplosion(bmr.pos, 50, [255, 120, 50], true);
         fx.spawnDebris(bmr.pos, 10, [140, 160, 190], 120);

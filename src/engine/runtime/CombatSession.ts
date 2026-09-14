@@ -239,16 +239,9 @@ export class CombatSession {
     this.state = 'paused';
   }
 
-  public step(dt = this.scheduler.fixedDeltaTime): void {
-    if (this.state === 'disposed') return;
-    this.engine.fixedUpdate(dt);
-    this.visualClock.seek(this.visualClock.time + dt);
-    this.updateVisualOnly(dt);
-  }
-
-  public fixedUpdate(dt: number): void {
-    if (this.state === 'paused' || this.state === 'disposed') return;
-    const protectedShips = this.visualOptions.damage
+  private advanceSimulation(dt: number): void {
+    const damageEnabled = this.visualOptions.damage;
+    const protectedShips = damageEnabled
       ? null
       : [this.engine.playerShip, this.engine.enemyShip, ...this.engine.fighters, ...this.engine.bombers].map((ship) => ({
           ship,
@@ -260,8 +253,14 @@ export class CombatSession {
           overloaded: ship.flux.isOverloaded,
           overloadTimer: ship.flux.overloadTimer
         }));
-    const simStart = performance.now();
-    this.engine.fixedUpdate(dt);
+    const protectedStats = damageEnabled ? null : {
+      player: { ...this.engine.statsTracker.playerStats },
+      enemy: { ...this.engine.statsTracker.enemyStats },
+      battleResult: this.engine.battleResult
+    };
+
+    this.engine.fixedUpdate(dt, { suppressDestructionSideEffects: !damageEnabled });
+
     if (protectedShips) {
       for (const snapshot of protectedShips) {
         snapshot.ship.hullHp = snapshot.hullHp;
@@ -274,6 +273,24 @@ export class CombatSession {
         snapshot.ship.flux.overloadTimer = snapshot.overloadTimer;
       }
     }
+    if (protectedStats) {
+      this.engine.statsTracker.playerStats = protectedStats.player;
+      this.engine.statsTracker.enemyStats = protectedStats.enemy;
+      this.engine.battleResult = protectedStats.battleResult;
+    }
+  }
+
+  public step(dt = this.scheduler.fixedDeltaTime): void {
+    if (this.state === 'disposed') return;
+    this.advanceSimulation(dt);
+    this.visualClock.seek(this.visualClock.time + dt);
+    this.updateVisualOnly(dt);
+  }
+
+  public fixedUpdate(dt: number): void {
+    if (this.state === 'paused' || this.state === 'disposed') return;
+    const simStart = performance.now();
+    this.advanceSimulation(dt);
     this.performance.recordTiming('simulationMs', performance.now() - simStart);
     this.visualClock.advance(dt);
     this.updateVisualOnly(dt);

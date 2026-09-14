@@ -298,7 +298,10 @@ export class WebGLCombatRenderer implements ICombatRenderer {
 
     // 4.5 通道 5: 折跃水雷、极坐标护盾 Shader、护盾涟漪、EMP 闪电与火球爆炸碎片
     if (frame.layers.has('shield') || frame.layers.has('explosion')) {
-      this.fxPass.render(engine, ctx, nowSec, enemyPos, enemyFacing, playerPos, playerFacing);
+      this.fxPass.render(engine, ctx, nowSec, enemyPos, enemyFacing, playerPos, playerFacing, {
+        shield: frame.layers.has('shield'),
+        explosion: frame.layers.has('explosion')
+      });
     }
 
     // 4.5.5 前景透明星云对世界对象产生柔和遮挡，但不盖住战术标记/HUD。
@@ -319,6 +322,9 @@ export class WebGLCombatRenderer implements ICombatRenderer {
   }
 
   private resolveGpuQueries(): void {
+    // A GPU timing value is a one-shot sample. If no query completes this frame,
+    // resource stats must report null rather than replaying the previous sample.
+    this.lastGpuTimeMs = null;
     if (!this.gpuTimerExt || this.pendingGpuQueries.length === 0 || this.contextLost) return;
     const query = this.pendingGpuQueries[0];
     const available = this.gl.getQueryParameter(query, this.gl.QUERY_RESULT_AVAILABLE) as boolean;

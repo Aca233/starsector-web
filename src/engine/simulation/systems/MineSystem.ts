@@ -14,6 +14,7 @@ export interface MineFXCallbacks {
   addFloatingDamage: (pos: Vector2, amount: number, color: [number, number, number]) => void;
   addCameraShake: (intensity: number, duration: number) => void;
   getPlayerPos: () => Vector2;
+  handleShipDestruction: (ship: Ship) => void;
 }
 
 export class MineSystem {
@@ -30,14 +31,19 @@ export class MineSystem {
 
   public deployMine(targetPos: Vector2, sourceShip: Ship, fx: MineFXCallbacks) {
     const playerPos = fx.getPlayerPos();
-    sound.playAtPos('mine_teleport', targetPos, playerPos, 0.9);
+    const maxDeployRange = 1000 + sourceShip.spec.collisionRadius;
+    const fromSource = targetPos.clone().sub(sourceShip.pos);
+    const deployPos = fromSource.length() > maxDeployRange
+      ? sourceShip.pos.clone().add(fromSource.normalize().scale(maxDeployRange))
+      : targetPos.clone();
+    sound.playAtPos('mine_teleport', deployPos, playerPos, 0.9);
     // 空间折跃能量环
-    fx.spawnShieldRipple(targetPos, 80, [150, 100, 255]);
-    fx.spawnSparks(targetPos, 25, [180, 120, 255]);
+    fx.spawnShieldRipple(deployPos, 80, [150, 100, 255]);
+    fx.spawnSparks(deployPos, 25, [180, 120, 255]);
 
     this.mines.push({
       id: this.random.next(),
-      pos: targetPos.clone(),
+      pos: deployPos,
       vel: new Vector2(),
       sourceShipId: sourceShip.id,
       armedTimer: 1.2,
@@ -47,7 +53,7 @@ export class MineSystem {
       triggerRadius: 220,
       explosionRadius: 380,
       damage: 1000,
-      life: 12.0,
+      life: 5.0,
       pingTimer: 0.5,
       rotation: this.visualRandom.next() * Math.PI * 2
     });
@@ -122,7 +128,9 @@ export class MineSystem {
               // 护盾阻挡判定
               if (target.isShieldPointBlocked(mine.pos)) {
                 const shieldMult = target.system.getShieldDamageMultiplier();
-                const absorbedDmg = dmg * shieldMult * 0.5; // HE 对盾 50%
+                // Shield.absorbDamage() applies the HE-vs-shield multiplier; the
+                // system multiplier must be applied exactly once before that API.
+                const absorbedDmg = dmg * shieldMult;
                 const hitAngle = mine.pos.clone().sub(target.getShieldCenter()).heading();
                 const fluxGain = target.shield.absorbDamage(absorbedDmg, 'HIGH_EXPLOSIVE', hitAngle);
                 target.flux.increaseFlux(fluxGain, true);
@@ -150,9 +158,7 @@ export class MineSystem {
                 fx.addFloatingDamage(mine.pos.clone().add(new Vector2(15, -15)), 600, [130, 220, 255]);
 
                 if (target.hullHp <= 0) {
-                  target.isDead = true;
-                  sound.playAtPos('explosion', target.pos, playerPos, 0.95);
-                  fx.spawnExplosion(target.pos, 120);
+                  fx.handleShipDestruction(target);
                 }
               }
             }

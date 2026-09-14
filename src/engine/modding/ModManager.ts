@@ -5,6 +5,7 @@ import { i18n } from '../i18n/LocalizationManager';
 import { ONSLAUGHT_BOUNDS, PARAGON_BOUNDS, DOOM_BOUNDS } from '../data/hull_bounds';
 import { contentRegistry } from '../content/ContentRegistry';
 import { validateShipSpec, validateWeaponSpec } from './ContentValidation';
+import type { HullSize } from '../simulation/FluxTracker';
 
 export interface WeaponMountSlotConfig {
   slotId: string;
@@ -38,6 +39,7 @@ export interface ShipSpec {
   pivotY: number;
   collisionRadius: number;
   mass: number;
+  hullSize?: HullSize;
   
   // 机动参数
   maxSpeed: number;
@@ -206,6 +208,7 @@ export class ModManager {
       pivotY: 244,
       collisionRadius: 275,
       mass: 3500,
+      hullSize: 'CAPITAL_SHIP',
       maxSpeed: 25, // 严格对齐 ship_data.csv: max speed 25
       acceleration: 10, // 严格对齐 ship_data.csv: acceleration 10
       deceleration: 10, // 严格对齐 ship_data.csv: deceleration 10
@@ -278,6 +281,7 @@ export class ModManager {
       pivotY: 174,
       collisionRadius: 270,
       mass: 3500,
+      hullSize: 'CAPITAL_SHIP',
       maxSpeed: 30, // 严格对齐 ship_data.csv: max speed 30
       acceleration: 15, // 严格对齐 ship_data.csv
       deceleration: 12,
@@ -342,6 +346,7 @@ export class ModManager {
       pivotY: 133,
       collisionRadius: 170,
       mass: 2200,
+      hullSize: 'CRUISER',
       maxSpeed: 75, // 严格对齐 ship_data.csv: max speed 75
       acceleration: 55,
       deceleration: 40,
@@ -411,6 +416,7 @@ export class ModManager {
       pivotY: 20, // 严格对齐 broadsword.ship: center [15, 13] -> (33 - 13 = 20)
       collisionRadius: 28,
       mass: 30,
+      hullSize: 'FIGHTER',
       maxSpeed: 200,
       acceleration: 220,
       deceleration: 160,
@@ -459,6 +465,7 @@ export class ModManager {
       pivotY: 18, // 严格对齐 dagger.ship: center [15, 16] -> 34 - 16 = 18
       collisionRadius: 39,
       mass: 35,
+      hullSize: 'FIGHTER',
       maxSpeed: 180,
       acceleration: 200,
       deceleration: 140,

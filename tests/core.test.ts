@@ -1788,6 +1788,41 @@ describe('source-aligned projectile and missile mechanics', () => {
     expect(coreMissile.hitpoints).toBeCloseTo(900, 6);
     expect(falloffMissile.hitpoints).toBeCloseTo(950, 6);
   });
+
+  it('keeps the projectile cursor valid when one proximity burst destroys multiple missiles', () => {
+    const engine = new CombatEngine('onslaught', 'paragon', 8407);
+    engine.playerShip.pos.set(-5000, 0);
+    engine.enemyShip.pos.set(5000, 0);
+    const survivor: Projectile = {
+      id: 8410, sourceShipId: engine.playerShip.id, isPlayer: true, specId: 'survivor',
+      pos: new Vector2(200, 0), prevPos: new Vector2(200, 0), vel: new Vector2(60, 0), damage: 10,
+      damageType: 'ENERGY', radius: 1, rangeRemaining: 1000, totalRange: 1000, elapsedTime: 0,
+      color: [255, 255, 255]
+    };
+    const fuseRound: Projectile = {
+      id: 8407, sourceShipId: engine.playerShip.id, isPlayer: true, specId: 'dualflak',
+      pos: new Vector2(0, 0), prevPos: new Vector2(0, 0), vel: new Vector2(), damage: 100,
+      damageType: 'FRAGMENTATION', radius: 1, rangeRemaining: 100, totalRange: 100, elapsedTime: 0,
+      color: [255, 120, 100], proximityFuse: { range: 15, explosionRadius: 30, coreRadius: 15 }
+    };
+    const missileA: Projectile = {
+      ...fuseRound, id: 8408, sourceShipId: engine.enemyShip.id, isPlayer: false, specId: 'missile-a',
+      pos: new Vector2(8, 0), prevPos: new Vector2(8, 0), isRocket: true, hitpoints: 50, maxHitpoints: 50
+    };
+    const missileB: Projectile = {
+      ...fuseRound, id: 8409, sourceShipId: engine.enemyShip.id, isPlayer: false, specId: 'missile-b',
+      pos: new Vector2(-8, 0), prevPos: new Vector2(-8, 0), isRocket: true, hitpoints: 50, maxHitpoints: 50
+    };
+    engine.weaponSystem.projectiles = [survivor, missileA, missileB, fuseRound];
+    const soundSpy = vi.spyOn(sound, 'playAtPos').mockImplementation(() => {});
+    try {
+      expect(() => engine.weaponSystem.updateProjectiles(1 / 60, makeWeaponContext(engine))).not.toThrow();
+    } finally {
+      soundSpy.mockRestore();
+    }
+    expect(engine.weaponSystem.projectiles.map((projectile) => projectile.id)).toEqual([survivor.id]);
+    expect(survivor.elapsedTime).toBeCloseTo(1 / 60, 8);
+  });
 });
 
 describe('source-aligned weapon firing lifecycles', () => {
@@ -1895,6 +1930,73 @@ describe('source-aligned weapon firing lifecycles', () => {
     expect(emitted.some((beam) => beam.damageActive === false)).toBe(true);
   });
 
+  it('stops a sustained damaging beam immediately when its source mount is disabled', () => {
+    const engine = new CombatEngine('paragon', 'onslaught', 8607);
+    engine.playerShip.pos.set(0, 0);
+    engine.enemyShip.pos.set(300, 0);
+    engine.enemyShip.shield.setActive(true);
+    engine.enemyShip.shield.currentArcDeg = engine.enemyShip.shield.maxArcDeg;
+    const mount = configureSingleManualMount(engine.playerShip, 'WS 005');
+    const dt = 1 / 60;
+    for (let tick = 0; tick < 8; tick++) {
+      engine.playerShip.isFiringMain = true;
+      engine.playerShip.weaponControl.update(
+        dt,
+        engine.playerShip,
+        0,
+        engine.enemyShip,
+        (projectile) => engine.weaponSystem.projectiles.push(projectile),
+        (beam) => engine.weaponSystem.beams.push(beam)
+      );
+    }
+    expect(mount.firingState).toBe('ACTIVE');
+    expect(engine.weaponSystem.beams.some((beam) => beam.damageActive !== false && beam.slotId === mount.slotId)).toBe(true);
+
+    mount.isDisabled = true;
+    const fluxBefore = engine.enemyShip.flux.totalFlux;
+    engine.weaponSystem.updateBeams(dt, makeLifecycleContext(engine));
+
+    expect(engine.weaponSystem.beams.some((beam) => beam.damageActive !== false && beam.slotId === mount.slotId)).toBe(false);
+    expect(engine.enemyShip.flux.totalFlux).toBe(fluxBefore);
+  });
+
+  it('enforces finite missile ammo at the actual projectile spawn boundary', () => {
+    const ship = new Ship('typhoon-ammo', modManager.getShip('doom')!, true, new Vector2(), 0, new SimulationRandom(8608));
+    const mount = configureSingleManualMount(ship, 'WS 001');
+    mount.ammo = 1;
+    const fired: Projectile[] = [];
+    const dt = 1 / 60;
+
+    ship.isFiringMain = true;
+    ship.weaponControl.update(dt, ship, 0, null, (projectile) => fired.push(projectile), () => {});
+    expect(fired).toHaveLength(1);
+    expect(mount.ammo).toBe(0);
+
+    mount.cooldownTimer = 0;
+    ship.weaponControl.update(dt, ship, 0, null, (projectile) => fired.push(projectile), () => {});
+    expect(fired).toHaveLength(1);
+    expect(mount.ammo).toBe(0);
+  });
+
+  it('cancels the remainder of an in-progress burst when the ship overloads', () => {
+    const ship = new Ship('lightmg-overload', modManager.getShip('broadsword')!, true, new Vector2(), 0, new SimulationRandom(8609));
+    const mount = configureSingleManualMount(ship, 'WS 001');
+    const fired: Projectile[] = [];
+    const dt = 1 / 60;
+
+    ship.isFiringMain = true;
+    ship.weaponControl.update(dt, ship, 0, null, (projectile) => fired.push(projectile), () => {});
+    expect(fired).toHaveLength(1);
+    expect(mount.burstRemaining).toBe(4);
+
+    ship.flux.isOverloaded = true;
+    ship.weaponControl.update(dt, ship, 0, null, (projectile) => fired.push(projectile), () => {});
+    expect(fired).toHaveLength(1);
+    expect(mount.burstRemaining).toBe(0);
+    expect(mount.burstTimer).toBe(0);
+    expect(mount.cooldownTimer).toBeGreaterThan(0);
+  });
+
   it('does not apply damage or count a hit during beam chargedown', () => {
     const engine = new CombatEngine('onslaught', 'paragon', 8605);
     engine.playerShip.pos.set(0, 0);
@@ -1948,6 +2050,19 @@ describe('source-aligned ship system lifecycles', () => {
     expect(system.isActive).toBe(false);
     expect(system.isCoolingDown).toBe(false);
     expect(system.getShieldDamageMultiplier()).toBe(1);
+  });
+
+  it('charges Fortress Shield system hard flux independently from normal shield upkeep', () => {
+    const ship = new Ship('fortress-hard-flux', modManager.getShip('paragon')!, true, new Vector2(), 0, new SimulationRandom(8610));
+    ship.shield.setActive(true);
+    ship.shield.currentArcDeg = ship.shield.maxArcDeg;
+    expect(ship.system.activate()).toBe(true);
+    const dt = 1 / 60;
+
+    ship.update(dt, null, () => {}, () => {});
+
+    expect(ship.flux.softFlux).toBe(0);
+    expect(ship.flux.hardFlux).toBeCloseTo(ship.spec.maxFlux * 0.025 * dt, 8);
   });
 
   it('runs Burn Drive through 2s IN, 5s ACTIVE, 1s OUT and 10s cooldown with source stat ramps', () => {

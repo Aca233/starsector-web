@@ -59,6 +59,17 @@ export const App: React.FC = () => {
   }, [isModModalOpen, isResultModalOpen, presentationState.status]);
 
   React.useEffect(() => {
+    if (!isModModalOpen) return;
+    for (const key of Object.keys(keysPressed.current)) keysPressed.current[key] = false;
+    isMouseDown.current = false;
+    const player = session.engine.playerShip;
+    player.isFiringMain = false;
+    player.throttle = 0;
+    player.strafeInput = 0;
+    player.turnInput = 0;
+  }, [isModModalOpen, session]);
+
+  React.useEffect(() => {
     const timer = window.setInterval(() => {
       const next = session.engine.battleResult;
       setBattleResult((current) => current === next ? current : next);
@@ -114,13 +125,6 @@ export const App: React.FC = () => {
         sound.startLoop('burn_drive_loop', 0.65);
       } else if (sys.type === 'FORTRESS_SHIELD') {
         sound.startLoop('fortress_shield_loop', 0.7);
-      } else if (sys.type === 'MINE_STRIKE') {
-        const canvas = canvasRef.current;
-        if (canvas) {
-          const worldX = (mouseScreenPos.current.x - canvas.width / 2) / zoomRef.current + cameraPosRef.current.x;
-          const worldY = (mouseScreenPos.current.y - canvas.height / 2) / zoomRef.current + cameraPosRef.current.y;
-          session.engine.deployMine(new Vector2(worldX, worldY), player);
-        }
       }
     } else if (wasActive && sys.state === 'OUT' && sys.type === 'BURN_DRIVE') {
       sound.stopLoop('burn_drive_loop');
@@ -128,6 +132,15 @@ export const App: React.FC = () => {
     } else if (wasActive && sys.state === 'OUT' && sys.type === 'FORTRESS_SHIELD') {
       sound.stopLoop('fortress_shield_loop');
     }
+  };
+
+  const handleReset = () => {
+    setIsResultsModalDismissed(false);
+    stopTransientAudio();
+    session.restart();
+    setBattleResult(null);
+    cameraPosRef.current.copy(session.engine.playerShip.pos);
+    setTickState((tick) => tick + 1);
   };
 
   useCombatInput({
@@ -141,7 +154,8 @@ export const App: React.FC = () => {
     mouseScreenPos,
     isMouseDown,
     setIsAutopilot,
-    onActivateSystem: handleActivateSystem
+    onActivateSystem: handleActivateSystem,
+    onRestart: handleReset
   });
 
   useCombatLoop({
@@ -152,6 +166,7 @@ export const App: React.FC = () => {
     isAutopilotRef,
     keysPressed,
     mouseScreenPos,
+    isMouseDown,
     visualScenarioController: isVisualLab && !isAutopilot ? visualScenarioController : undefined
   });
 
@@ -165,15 +180,6 @@ export const App: React.FC = () => {
     setIsResultsModalDismissed(false);
     stopTransientAudio();
     session.switchPlayerShip(shipId);
-    setBattleResult(null);
-    cameraPosRef.current.copy(session.engine.playerShip.pos);
-    setTickState((tick) => tick + 1);
-  };
-
-  const handleReset = () => {
-    setIsResultsModalDismissed(false);
-    stopTransientAudio();
-    session.restart();
     setBattleResult(null);
     cameraPosRef.current.copy(session.engine.playerShip.pos);
     setTickState((tick) => tick + 1);

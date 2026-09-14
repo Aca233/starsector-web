@@ -17,11 +17,22 @@ import { getExplosionVisualProfile, getShipVisualProfile, SHIELD_VISUAL_PROFILES
  * 7. 金属装甲战损碎片 (Debris Particles)
  */
 export class WebGLFXPass {
-  public render(engine: CombatEngine, ctx: WebGLPassContext, nowSec: number, enemyPos: Vector2, enemyFacing: number, playerPos: Vector2, playerFacing: number) {
+  public render(
+    engine: CombatEngine,
+    ctx: WebGLPassContext,
+    nowSec: number,
+    enemyPos: Vector2,
+    enemyFacing: number,
+    playerPos: Vector2,
+    playerFacing: number,
+    layers: { shield: boolean; explosion: boolean } = { shield: true, explosion: true }
+  ) {
     const { batcher, textures, shieldShader, hitGlowTex, whiteTex } = ctx;
+    const renderShieldLayer = layers.shield;
+    const renderExplosionLayer = layers.explosion;
 
     // 1. 绘制折跃空间水雷 (Spatial Mines)
-    if (engine.mines.length > 0) {
+    if (renderExplosionLayer && engine.mines.length > 0) {
       const mineBase = textures.getTexture('/game-assets/graphics/missiles/heavy_mine2.png');
       const mineGlow = textures.getTexture('/game-assets/graphics/missiles/heavy_mine2_glow.png');
       for (const m of engine.mines) {
@@ -41,8 +52,10 @@ export class WebGLFXPass {
     const enemyShieldPos = engine.enemyShip.getShieldCenter(enemyPos, enemyFacing);
     const playerShieldPos = engine.playerShip.getShieldCenter(playerPos, playerFacing);
 
-    shieldShader.renderShield(batcher.currentViewProj, engine.enemyShip, enemyShieldPos, enemyFacing, mainShieldTex, nowSec);
-    shieldShader.renderShield(batcher.currentViewProj, engine.playerShip, playerShieldPos, playerFacing, mainShieldTex, nowSec);
+    if (renderShieldLayer) {
+      shieldShader.renderShield(batcher.currentViewProj, engine.enemyShip, enemyShieldPos, enemyFacing, mainShieldTex, nowSec);
+      shieldShader.renderShield(batcher.currentViewProj, engine.playerShip, playerShieldPos, playerFacing, mainShieldTex, nowSec);
+    }
 
     // 恢复 SpriteBatcher 程序与 VAO 状态
     batcher.resumeProgram();
@@ -67,11 +80,13 @@ export class WebGLFXPass {
         batcher.drawSprite(hitGlowTex, hx, hy, gSize * 0.6, gSize * 0.6, 0, 0, 0, 1.0, 1.0, 1.0, rip.intensity);
       }
     };
-    renderShieldImpacts(engine.enemyShip, enemyShieldPos);
-    renderShieldImpacts(engine.playerShip, playerShieldPos);
+    if (renderShieldLayer) {
+      renderShieldImpacts(engine.enemyShip, enemyShieldPos);
+      renderShieldImpacts(engine.playerShip, playerShieldPos);
+    }
 
     // 4. 全局护盾冲击波 (Global Shield Ripples: 柔和光晕扩散)
-    if (engine.shieldRipples.length > 0) {
+    if (renderShieldLayer && engine.shieldRipples.length > 0) {
       batcher.setBlendMode('ADDITIVE');
       for (const rip of engine.shieldRipples) {
         const ripAlpha = Math.max(0, rip.life / rip.maxLife);
@@ -82,7 +97,7 @@ export class WebGLFXPass {
     }
 
     // 5. 绘制 EMP 闪电电弧 (EMP Arcs)
-    if (engine.empArcs.length > 0) {
+    if (renderExplosionLayer && engine.empArcs.length > 0) {
       batcher.setBlendMode('ADDITIVE');
       for (const arc of engine.empArcs) {
         const progress = Math.max(0, Math.min(1.0, arc.life / (arc.maxLife || 0.22)));
@@ -125,7 +140,7 @@ export class WebGLFXPass {
     }
 
     // 6. 绘制粒子与火星 (1:1 SmoothParticle.java: 必须使用柔和高斯光晕贴图与加色混合，严禁使用硬边单色白方块)
-    if (engine.particles && engine.particles.length > 0) {
+    if (renderExplosionLayer && engine.particles && engine.particles.length > 0) {
       batcher.setBlendMode('ADDITIVE');
       const sparkTex = textures.getTexture('/game-assets/graphics/fx/particlealpha32sq.png');
       for (const part of engine.particles) {
@@ -136,7 +151,7 @@ export class WebGLFXPass {
     }
 
     // 6.5 绘制战损青烟与尾迹扩散云团 (Contrails & Smoke Puffs: 1:1 contrail64b.png 柔和带旋转烟雾)
-    if (engine.contrails && engine.contrails.length > 0) {
+    if (renderExplosionLayer && engine.contrails && engine.contrails.length > 0) {
       const smokeTex = textures.getTexture('/game-assets/graphics/fx/contrail64b.png');
       for (const c of engine.contrails) {
         const progress = Math.min(1.0, c.life / c.maxLife);
@@ -163,7 +178,7 @@ export class WebGLFXPass {
     }
 
     // 6.75 来源投射物命中辉光：独立于 explosion 翻页书，半径直接来自 .proj hitGlowRadius。
-    if (engine.hitGlows.length > 0) {
+    if (renderExplosionLayer && engine.hitGlows.length > 0) {
       batcher.setBlendMode('ADDITIVE');
       for (const glow of engine.hitGlows) {
         const alpha = Math.max(0, glow.life / glow.maxLife);
@@ -176,7 +191,7 @@ export class WebGLFXPass {
     // 7. 绘制原版官方爆炸翻页书火光、初始白热耀光与扩散冲击波 (Explosions & Shockwaves)
     const expRingTex = textures.getTexture('/game-assets/graphics/fx/explosion_ring0.png');
     const expSmokeTex = textures.getTexture('/game-assets/graphics/fx/contrail64b.png');
-    for (const exp of engine.explosions) {
+    for (const exp of renderExplosionLayer ? engine.explosions : []) {
       const progress = Math.max(0, Math.min(1.0, 1.0 - exp.life / exp.maxLife));
       const [er, eg, eb] = exp.color;
       const explosionVisual = exp.sourceAuthored
@@ -246,7 +261,7 @@ export class WebGLFXPass {
     }
 
     // 8. 绘制金属装甲战损碎片 (1:1 DebrisParticleSystem.java: 正方形真实金属破片贴图与熔融火光)
-    if (engine.debris && engine.debris.length > 0) {
+    if (renderExplosionLayer && engine.debris && engine.debris.length > 0) {
       for (const d of engine.debris) {
         const alphaVal = Math.min(1.0, Math.max(0, d.life / (d.maxLife * 0.35)));
         if (alphaVal <= 0.01) continue;

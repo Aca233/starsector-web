@@ -227,6 +227,13 @@ export class ShipSystem {
     return this.type === 'FORTRESS_SHIELD' && this.isActive ? 0.0 : 1.0;
   }
 
+  /** ship_systems.csv: Fortress Shield generates hard flux at 2.5% of base capacity per second. */
+  public getHardFluxPerSecond(baseFluxCapacity: number): number {
+    return this.type === 'FORTRESS_SHIELD' && this.isActive
+      ? Math.max(0, baseFluxCapacity) * 0.025
+      : 0;
+  }
+
   /** BurnDriveStats.java removes max-speed bonus immediately in OUT. */
   public getSpeedFlatBonus(): number {
     if (this.type !== 'BURN_DRIVE' || !this.isActive || this.state === 'OUT') return 0;
