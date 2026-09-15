@@ -2,6 +2,7 @@ import React from 'react';
 import { Ship } from '../../engine/simulation/Ship';
 import { i18n } from '../../engine/i18n/LocalizationManager';
 import { Bot } from 'lucide-react';
+import { summarizeGroupAmmo } from './hudUtils';
 
 /**
  * 官方正统底部中央武器控制台 (使用 weapons_bar_... 与 weapon_status_bg.png)
@@ -9,6 +10,10 @@ import { Bot } from 'lucide-react';
 export const WeaponsConsole: React.FC<{ player: Ship; isAutopilot?: boolean }> = ({ player, isAutopilot }) => {
   const totalFluxRatio = Math.min(1.0, player.flux.totalFlux / player.spec.maxFlux);
   const hardFluxRatio = Math.min(1.0, player.flux.hardFlux / player.spec.maxFlux);
+
+  const mountsOfGroup = (slotIds: string[]) => player.weapons.filter((w) => slotIds.includes(w.slotId));
+  const activeGroup = player.weaponGroups[player.selectedGroupIndex];
+  const activeAmmo = summarizeGroupAmmo(activeGroup ? mountsOfGroup(activeGroup.weaponSlotIds) : []);
 
   return (
     <div className="w-[640px] flex flex-col items-center">
@@ -43,6 +48,17 @@ export const WeaponsConsole: React.FC<{ player: Ship; isAutopilot?: boolean }> =
           <span className="text-slate-400 text-[10px]">
             ({Math.round(totalFluxRatio * 100)}%)
           </span>
+          {/* 当前编组剩余弹药 (导弹/火箭等有限弹药武器) */}
+          {activeAmmo.limited && (
+            <span
+              className={`font-bold tracking-wider ${
+                activeAmmo.allEmpty ? 'text-red-400 animate-pulse' : activeAmmo.lowest <= 2 ? 'text-amber-300' : 'text-amber-200/90'
+              }`}
+              title="当前编组剩余弹药 / 弹药上限"
+            >
+              {activeAmmo.allEmpty ? '弹药耗尽 NO AMMO' : `弹药 AMMO: ${activeAmmo.remaining}/${activeAmmo.capacity}`}
+            </span>
+          )}
         </div>
         <div className="text-[10px] text-slate-400">
           <span className="text-[#ffd200] font-bold">[V]</span> {player.flux.isVenting ? '正在排散 (VENTING...)' : '主动排散 (Vent)'}
@@ -65,10 +81,11 @@ export const WeaponsConsole: React.FC<{ player: Ship; isAutopilot?: boolean }> =
       <div className="w-full grid grid-cols-5 gap-2">
         {player.weaponGroups.map((group, gIdx) => {
           const isActive = player.selectedGroupIndex === gIdx;
-          const mountsInGroup = player.weapons.filter((w) => group.weaponSlotIds.includes(w.slotId));
+          const mountsInGroup = mountsOfGroup(group.weaponSlotIds);
           const firstMount = mountsInGroup[0];
           const count = mountsInGroup.length;
           const isAutofire = group.isAutofire;
+          const ammo = summarizeGroupAmmo(mountsInGroup);
 
           // 计算最高冷却进度与故障抢修状态
           const anyDisabled = mountsInGroup.some((m) => m.isDisabled);
@@ -119,8 +136,18 @@ export const WeaponsConsole: React.FC<{ player: Ship; isAutopilot?: boolean }> =
                       {count > 1 ? `${count}x ` : ''}
                       {i18n.t(firstMount.spec.nameKey).replace(/（.*）/, '').replace(/\(.*\)/, '')}
                     </div>
-                    <div className="text-[8px] text-slate-400 uppercase tracking-tighter">
-                      {firstMount.spec.type}
+                    <div className="text-[8px] text-slate-400 uppercase tracking-tighter flex items-center gap-1">
+                      <span>{firstMount.spec.type}</span>
+                      {/* 有限弹药武器 (火箭/导弹/点防连发) 显示剩余弹药 */}
+                      {ammo.limited && (
+                        <span
+                          className={`font-mono font-bold tracking-tight ${
+                            ammo.allEmpty ? 'text-red-400' : ammo.lowest <= 2 ? 'text-amber-300' : 'text-amber-200/90'
+                          }`}
+                        >
+                          {ammo.allEmpty ? '弹尽' : `弹药 ${ammo.remaining}/${ammo.capacity}`}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ) : (
