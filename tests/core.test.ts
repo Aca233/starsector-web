@@ -57,7 +57,6 @@ import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { summarizeGroupAmmo } from '../src/ui/hud/hudUtils';
-import { WeaponsConsole } from '../src/ui/hud/WeaponsConsole';
 import { AuthenticTacticalConsole } from '../src/ui/hud/AuthenticTacticalConsole';
 
 describe('Starsector text import', () => {
@@ -3498,35 +3497,6 @@ describe('HUD weapon group ammo readout', () => {
     expect(kinetics.length).toBeGreaterThan(0);
     expect(summarizeGroupAmmo(kinetics).limited).toBe(false);
     expect(summarizeGroupAmmo([]).limited).toBe(false);
-  });
-
-  it('shows remaining rockets in the weapons console and flags an empty launcher', () => {
-    const engine = new CombatEngine('onslaught', 'paragon');
-    const player = engine.playerShip;
-    const rockets = player.weapons.filter((mount) => mount.spec.id === 'annihilatorpod');
-    const rocketGroupIndex = player.weaponGroups.findIndex((group) =>
-      group.weaponSlotIds.some((slotId) => rockets.some((mount) => mount.slotId === slotId))
-    );
-    expect(rocketGroupIndex).toBeGreaterThanOrEqual(0);
-    player.selectWeaponGroup(player.weaponGroups[rocketGroupIndex].index);
-
-    const renderText = () =>
-      renderToStaticMarkup(createElement(WeaponsConsole, { player })).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-
-    expect(renderText()).toContain('弹药 AMMO: 400/400');
-
-    rockets.forEach((mount) => { mount.ammo = 0; });
-    const emptyText = renderText();
-    expect(emptyText).toContain('弹药耗尽 NO AMMO');
-    expect(emptyText).toContain('弹尽');
-
-    // 切到纯实弹编组后，顶部横幅不再显示弹药
-    const kineticGroupIndex = player.weaponGroups.findIndex((group) =>
-      group.weaponSlotIds.some((slotId) => player.weapons.find((mount) => mount.slotId === slotId)?.spec.id === 'mark9')
-    );
-    player.selectWeaponGroup(player.weaponGroups[kineticGroupIndex].index);
-    expect(renderText()).not.toContain('弹药 AMMO:');
-    expect(renderText()).not.toContain('弹药耗尽');
   });
 
   it('shows remaining rockets in the tactical console the combat HUD actually renders', () => {

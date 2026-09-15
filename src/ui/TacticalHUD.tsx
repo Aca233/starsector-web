@@ -11,7 +11,6 @@ import {
 import { ShipPaperDoll } from './hud/ShipPaperDoll';
 import { PlayerStatusCard } from './hud/PlayerStatusCard';
 import { TargetStatusCard } from './hud/TargetStatusCard';
-import { WeaponsConsole } from './hud/WeaponsConsole';
 import { RadioChatterLog } from './hud/RadioChatterLog';
 import { CarrierDeckConsole } from './hud/CarrierDeckConsole';
 import { AuthenticTacticalConsole } from './hud/AuthenticTacticalConsole';
@@ -24,7 +23,6 @@ export {
   ShipPaperDoll, 
   PlayerStatusCard, 
   TargetStatusCard, 
-  WeaponsConsole, 
   RadioChatterLog, 
   CarrierDeckConsole, 
   AuthenticTacticalConsole, 
