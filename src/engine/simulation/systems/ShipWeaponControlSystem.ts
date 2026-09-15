@@ -206,6 +206,13 @@ export class ShipWeaponControlSystem {
       }
     }
 
+    // 交替射击组本帧轮到哪个挂点，由组级一次性解析 (见 resolveNextAlternatingSlot)：
+    // 故障/无弹/冷却中的挂点必须被跳过，否则它们会永久阻塞整组轮转。
+    const alternatingSlotId =
+      activeGroup && activeGroup.mode === 'ALTERNATING' && ship.isFiringMain && canShipFire
+        ? this.resolveNextAlternatingSlot(activeGroup)
+        : undefined;
+
     for (const mount of this.weapons) {
       mount.triggerHeld = false;
       if (mount.isDisabled) {
@@ -305,10 +312,10 @@ export class ShipWeaponControlSystem {
           if (activeGroup.mode === 'LINKED') {
             this.requestWeaponFire(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
           } else if (activeGroup.mode === 'ALTERNATING') {
-            const nextSlotId = activeGroup.weaponSlotIds[activeGroup.alternatingIndex % activeGroup.weaponSlotIds.length];
-            if (mount.slotId === nextSlotId) {
-              const started = this.requestWeaponFire(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
-              if (started) activeGroup.alternatingIndex = (activeGroup.alternatingIndex + 1) % activeGroup.weaponSlotIds.length;
+            // 轮转指针已在 resolveNextAlternatingSlot 中前进，无论本次是否真的击发，
+            // 保证拒绝开火的挂点不会独占轮转权。
+            if (mount.slotId === alternatingSlotId) {
+              this.requestWeaponFire(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
             }
           }
         }
@@ -320,7 +327,10 @@ export class ShipWeaponControlSystem {
           : mount.spec.range * (ship.spec.weaponRangeMult || 1.0);
 
         let targetFound = false;
-        if (targetShip && !targetShip.isDead) {
+        // 已阵亡或完全进入相位的目标均不被所有碰撞路径接受 (ProjectileCollisionHandler /
+        // BeamSimulationHandler / MineSystem 全部跳过 isPhased 舰船)，自动火控对其开火
+        // 只会白白浪费弹药 (尤其是有限弹药的导弹)，因此直接视为无目标而保持待发。
+        if (targetShip && !targetShip.isDead && !targetShip.isPhased) {
           // 目标前置量计算 (Target Leading for Ballistics)
           let aimTargetPoint = targetShip.pos;
           if (!mount.spec.isBeam && mount.spec.projSpeed && mount.spec.projSpeed > 0) {
@@ -382,6 +392,29 @@ export class ShipWeaponControlSystem {
 
       this.advanceWeaponLifecycle(dt, mount, ship, canShipFire, spawnProjectile, spawnBeam, spawnMuzzleFlash);
     }
+  }
+
+  /**
+   * 交替射击组的下一个可击发挂点 (Starsector WeaponGroup.java 轮转射击)
+   * 从 alternatingIndex 起向前扫描至多一圈，跳过不存在、故障、无弹与冷却中的挂点；
+   * 命中后立即把轮转指针移到其后一位并返回该挂点 slotId，无论它最终是否真的击发——
+   * 这样单个拒绝开火的挂点绝不可能永久卡死整组轮转；整组全部不可用时返回 undefined，
+   * 本帧不击发且指针原地不动 (不会空转)。
+   */
+  private resolveNextAlternatingSlot(group: WeaponGroup): string | undefined {
+    const slotIds = group.weaponSlotIds;
+    if (slotIds.length === 0) return undefined;
+    const start = ((group.alternatingIndex % slotIds.length) + slotIds.length) % slotIds.length;
+    for (let offset = 0; offset < slotIds.length; offset++) {
+      const index = (start + offset) % slotIds.length;
+      const mount = this.weapons.find((w) => w.slotId === slotIds[index]);
+      if (!mount || mount.isDisabled) continue;
+      if (Number.isFinite(mount.ammo) && mount.ammo < 1) continue;
+      if (mount.cooldownTimer > 0) continue;
+      group.alternatingIndex = (index + 1) % slotIds.length;
+      return mount.slotId;
+    }
+    return undefined;
   }
 
   private requestWeaponFire(
@@ -454,7 +487,8 @@ export class ShipWeaponControlSystem {
       specId: mount.spec.id,
       startPos: firePos,
       endPos: firePos.clone().addScaled(Vector2.fromAngle(mount.currentAngleRad, 1), effectiveRange),
-      damagePerSec: mount.spec.damagePerSecond,
+      // 纯视觉充能收束光束同样带上按战备值修正的伤害数值 (damageActive=false，不结算伤害)
+      damagePerSec: mount.spec.damagePerSecond * ship.crDamageDealtMultiplier,
       empPerSec: mount.spec.empPerSecond,
       damageType: mount.spec.type,
       color: mount.spec.color,
@@ -540,6 +574,13 @@ export class ShipWeaponControlSystem {
 
     if (mount.firingState === 'ACTIVE') {
       const isBurstBeam = mount.spec.beamVisualMode === 'BURST';
+      // 光束射击循环不是独立实体：母舰过载/排散/相位/堡垒护盾锁定会立即打断它
+      // (vanilla stoppedFiring() 在 isOverloadedOrVenting 时直接销毁光束)，
+      // 否则速子长矛这类爆发光束会在母舰过载期间继续倾泻伤害。
+      if (!canShipFire) {
+        this.enterBeamChargedown(mount, ship, spawnBeam, true);
+        return;
+      }
       if (!isBurstBeam && !mount.triggerHeld) {
         this.enterBeamChargedown(mount, ship, spawnBeam, true);
         return;
@@ -571,6 +612,18 @@ export class ShipWeaponControlSystem {
     spawnBeam: (b: Beam) => void,
     spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void
   ): boolean {
+    // 开火必须校验剩余幅能容量 (vanilla com/fs/starfarer/combat/entities/ship/A/if.java:346
+    // startedChargeup(): `getFluxAvailable() >= getFluxCostToFire()`，与弹药、过载/排散判定并列)。
+    // 幅能不足时严禁产生任何副作用：不扣弹药、不产生后坐力/散布增长/枪口火焰/音效，也不生成弹丸。
+    // 光束不受此限：其幅能按 ACTIVE 时长以 fluxPerSecond 连续累积。
+    if (
+      !mount.spec.isBeam &&
+      mount.spec.fluxPerShot > 0 &&
+      ship.flux.maxFlux - ship.flux.totalFlux < mount.spec.fluxPerShot
+    ) {
+      return false;
+    }
+
     // 非光束有限弹药按“实际发射一发”扣除；无弹时不得产生任何发射副作用。
     if (!mount.spec.isBeam && Number.isFinite(mount.ammo)) {
       if (mount.ammo < 1) return false;
@@ -671,7 +724,8 @@ export class ShipWeaponControlSystem {
         startPos: firePos,
         endPos: endPos,
         barrelOffset: { x: offX, y: offY },
-        damagePerSec: mount.spec.damagePerSecond,
+        // 武器输出伤害按母舰战备值修正 (CRPluginImpl.getDamageChangePercent)
+        damagePerSec: mount.spec.damagePerSecond * ship.crDamageDealtMultiplier,
         empPerSec: mount.spec.empPerSecond,
         damageType: mount.spec.type,
         color: mount.spec.color,
@@ -708,7 +762,8 @@ export class ShipWeaponControlSystem {
         pos: firePos.clone(),
         prevPos: firePos.clone(),
         vel: projVel,
-        damage: mount.spec.damagePerShot,
+        // 武器输出伤害按母舰战备值修正 (CRPluginImpl.getDamageChangePercent)
+        damage: mount.spec.damagePerShot * ship.crDamageDealtMultiplier,
         damageType: mount.spec.type,
         radius: mount.spec.projRadius,
         rangeRemaining: effectiveRange,

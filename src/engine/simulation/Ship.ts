@@ -8,6 +8,13 @@ import { ShipSpec } from '../modding/ModManager';
 import { sound } from '../audio/SoundManager';
 import { ShipWeaponControlSystem } from './systems/ShipWeaponControlSystem';
 import { SimulationRandom } from './SimulationRandom';
+import {
+  crDamageChangePercent,
+  crDamageTakenChangePercent,
+  crMovementChangePercent,
+  computeCombatReadinessEffects,
+  CombatReadinessEffects
+} from './CombatReadiness';
 
 export interface ScorchMark {
   localPos: Vector2;
@@ -93,6 +100,9 @@ export class Ship {
   public prevVenting = false;
   public currentTargetShip: Ship | null = null;
 
+  /** 战备值故障判定节拍 (原版按每秒概率掷点)。 */
+  private crMalfunctionTimer = 0;
+
   // 1:1 原版战备值与峰值性能时钟 (Combat Readiness & Peak Performance Time)
   public shipName: string;
   public currentCR = 0.70; // 标准 70% 战备值
@@ -141,13 +151,22 @@ export class Ship {
       ? 'CRUISER'
       : 'CAPITAL_SHIP';
     this.flux = new FluxTracker(spec.maxFlux, spec.fluxDissipation, spec.hullSize ?? inferredHullSize);
+    // ship_data.csv: shield upkeep 是基础耗散的比例 (攻势 0.4 → 240/s, 典范 0.6 → 750/s)。
+    const shieldUpkeepRate = Math.max(0, spec.shieldUpkeep ?? 0) * this.flux.baseDissipation;
     this.shield = new Shield(
       spec.shieldType,
       spec.shieldArcDeg,
       spec.shieldRadius,
-      spec.shieldEfficiency
+      spec.shieldEfficiency,
+      shieldUpkeepRate,
+      (amount) => this.flux.increaseFluxClamped(amount, true)
     );
-    this.system = new ShipSystem(spec.systemType);
+    // ship_data.csv: phase cost / phase upkeep 是基础幅能容量的比例 (厄运 0.05/0.05)。
+    this.shield.phaseActivationCost = Math.max(0, spec.phaseCost ?? 0) * this.flux.maxFlux;
+    this.shield.phaseUpkeepPerSecond = Math.max(0, spec.phaseUpkeep ?? 0) * this.flux.maxFlux;
+    // HUD/检查工具读取 upkeepRate：相位线圈的维持费即每秒硬幅能成本。
+    if (this.shield.type === 'PHASE') this.shield.upkeepRate = this.shield.phaseUpkeepPerSecond;
+    this.system = new ShipSystem(spec.systemType, this.flux.maxFlux);
 
     // 初始化挂点武器与武器编组
     this.weaponControl.init(spec, initialFacingRad);
@@ -161,6 +180,117 @@ export class Ship {
         prevThrust: 0
       }));
     }
+  }
+
+  // --------------------------------------------------------------------------
+  // 战备值 (CR) 性能修正接口 — 对齐 CRPluginImpl.applyCRToStats()
+  // 在标准 70% 战备下所有倍率恒为 1.0，因此仅在衰退/超常战备时改变作战性能。
+  // --------------------------------------------------------------------------
+  public get crEffects(): CombatReadinessEffects {
+    return computeCombatReadinessEffects(this.currentCR);
+  }
+
+  /** 最高航速/加速度/减速度/转向速率倍率 (±10%)。 */
+  public get crMovementMultiplier(): number {
+    return 1 + crMovementChangePercent(this.currentCR) / 100;
+  }
+
+  /** 武器输出伤害倍率 (±10%)。 */
+  public get crDamageDealtMultiplier(): number {
+    return 1 + crDamageChangePercent(this.currentCR) / 100;
+  }
+
+  /** 承受装甲/船体/护盾伤害倍率 (±10%)。 */
+  public get crDamageTakenMultiplier(): number {
+    return 1 + crDamageTakenChangePercent(this.currentCR) / 100;
+  }
+
+  /**
+   * 战备值性能修正与故障机制 (1:1 CRPluginImpl.applyCRToStats / applyCRToShip)
+   * - cr <= 0: setShipSystemDisabled(true) + setDefenseDisabled(true)
+   * - cr < 0.4: 每秒按战备缺口掷武器 10% / 引擎 7.5% 故障
+   * - cr < 0.2: 严重故障 (LowCRShipDamageSequence: 永久瘫痪挂点或发动机)
+   * - cr < 0.1: 护盾故障 (幅能高于 75% 时护盾掉线)
+   * 移动/伤害/受伤倍率由 crMovementMultiplier / crDamageDealtMultiplier /
+   * crDamageTakenMultiplier 提供，供运动学与各伤害结算点使用。
+   */
+  private applyCombatReadiness(dt: number) {
+    const effects = this.crEffects;
+
+    this.system.disabled = effects.systemDisabled;
+    if (effects.systemDisabled && this.system.isActive) {
+      this.system.deactivate();
+    }
+    if (effects.defenseDisabled && this.shield.isActive) {
+      this.lowerShieldWithFeedback();
+    }
+
+    this.crMalfunctionTimer += dt;
+    if (this.crMalfunctionTimer < 1) return;
+    this.crMalfunctionTimer -= 1;
+
+    if (effects.criticalMalfunctionChancePerSec > 0 && this.random.next() < effects.criticalMalfunctionChancePerSec) {
+      this.applyCriticalMalfunction();
+    } else {
+      if (effects.weaponMalfunctionChancePerSec > 0 && this.random.next() < effects.weaponMalfunctionChancePerSec) {
+        this.applyWeaponMalfunction();
+      }
+      if (effects.engineMalfunctionChancePerSec > 0 && this.random.next() < effects.engineMalfunctionChancePerSec) {
+        this.triggerEngineFlameout();
+      }
+    }
+
+    // CRPluginImpl: shield malfunction flux level 0.75 — 高幅能时护盾有概率掉线。
+    if (
+      effects.shieldMalfunctionChancePerSec > 0 &&
+      this.shield.isActive &&
+      this.flux.fluxPercent > 0.75 &&
+      this.random.next() < effects.shieldMalfunctionChancePerSec
+    ) {
+      this.lowerShieldWithFeedback();
+    }
+  }
+
+  /** 武器故障：随机一门可用挂点短路停机数秒 (原版 weapon malfunction)。 */
+  private applyWeaponMalfunction(): void {
+    const candidates = this.weapons.filter((w) => !w.isDisabled);
+    if (candidates.length === 0) return;
+    const mount = candidates[Math.floor(this.random.next() * candidates.length)];
+    mount.isDisabled = true;
+    mount.disabledDuration = 3.0 + this.random.next() * 3.0;
+    mount.disabledTimer = mount.disabledDuration;
+    mount.burstRemaining = 0;
+    mount.firingState = 'IDLE';
+    mount.firingStateTimer = 0;
+    this.weaponControl.justDisabledMounts.push(mount);
+  }
+
+  /**
+   * 严重故障 (LowCRShipDamageSequence): 永久瘫痪一门挂点或一台发动机，
+   * 而不是像普通故障那样数秒后自动抢修。
+   */
+  private applyCriticalMalfunction(): void {
+    const usableMounts = this.weapons.filter((w) => !w.isDisabled);
+    const usableEngines = this.engineStatuses.filter((e) => !e.isFlameout);
+    const totalTargets = usableMounts.length + usableEngines.length;
+    if (totalTargets === 0) return;
+
+    const pick = Math.floor(this.random.next() * totalTargets);
+    if (pick < usableMounts.length) {
+      const mount = usableMounts[pick];
+      mount.isDisabled = true;
+      mount.disabledDuration = 9999;
+      mount.disabledTimer = 9999;
+      mount.burstRemaining = 0;
+      mount.firingState = 'IDLE';
+      mount.firingStateTimer = 0;
+      this.weaponControl.justDisabledMounts.push(mount);
+      return;
+    }
+
+    const engine = usableEngines[pick - usableMounts.length];
+    engine.isFlameout = true;
+    engine.flameoutTimer = 9999;
   }
 
   public interpolatedPos(alpha: number): Vector2 {
@@ -255,7 +385,9 @@ export class Ship {
    */
   public canUseShields(): boolean {
     const systemBlocksShield = this.system.type === 'BURN_DRIVE' && this.system.isActive;
-    return !systemBlocksShield && !this.flux.isOverloaded && !this.flux.isVenting && !this.isDead;
+    // CRPluginImpl: cr <= 0 时 setDefenseDisabled(true)，护盾完全不可用。
+    const crBlocksShield = this.crEffects.defenseDisabled;
+    return !systemBlocksShield && !crBlocksShield && !this.flux.isOverloaded && !this.flux.isVenting && !this.isDead;
   }
 
   private lowerShieldWithFeedback(): boolean {
@@ -339,6 +471,9 @@ export class Ship {
     // 1. 更新战术技能与幅能
     this.system.update(effectiveDt);
 
+    // 1.1 战备值惩罚：cr <= 0 时舰船系统与防御彻底失效；低战备触发故障机制
+    this.applyCombatReadiness(dt);
+
     // 严禁过载或主动排散时开启/保持系统，或在全发动机熄火时继续冲刺
     if ((this.flux.isOverloaded || this.flux.isVenting) && this.system.isActive) {
       this.system.deactivate();
@@ -359,9 +494,13 @@ export class Ship {
     }
     
     // 护盾维持能耗 (堡垒护盾激活时普通 shield upkeep 为 0，对齐 FortressShieldStats.java)
-    if (this.shield.isActive && !this.flux.isOverloaded && !this.flux.isVenting) {
+    // 相位线圈的开启/维持成本由 Shield 状态机以硬幅能结算，绝不过载。
+    if (this.shield.type !== 'PHASE' && this.shield.isActive && !this.flux.isOverloaded && !this.flux.isVenting) {
       const upkeepMult = this.system.getShieldUpkeepMultiplier();
       this.flux.increaseFlux(this.shield.upkeepRate * upkeepMult * dt, false);
+    }
+    if (this.shield.type === 'PHASE' && this.shield.isPhaseUpkeepActive) {
+      this.flux.increaseFluxClamped(this.shield.phaseUpkeepPerSecond * dt, true);
     }
 
     // Fortress Shield 自身另有 2.5% 基础幅能容量/秒的硬幅能成本；
@@ -371,6 +510,12 @@ export class Ship {
       if (systemHardFluxPerSecond > 0) {
         this.flux.increaseFlux(systemHardFluxPerSecond * dt, true);
       }
+    }
+
+    // 系统激活成本 (ship_systems.csv flux/use)：空雷突袭每次使用消耗 10% 基础幅能容量。
+    const systemActivationFlux = this.system.consumePendingActivationFlux();
+    if (systemActivationFlux > 0) {
+      this.flux.increaseFlux(systemActivationFlux, this.system.generatesHardFlux);
     }
     this.flux.update(dt, this.shield.isActive);
 
@@ -455,9 +600,12 @@ export class Ship {
     const flameoutRatio = this.getFlameoutRatio();
     const engineMult = Math.max(0.18, 1.0 - flameoutRatio * 0.72) * this.terrainSpeedMult;
 
+    // 战备值机动修正 (CRPluginImpl: 低于 50% 战备最多 -10%，高于 70% 最多 +10%)
+    const crMult = this.crMovementMultiplier;
+
     // 转向加减速
-    const maxTurnRateRad = ((this.spec.maxTurnRateDeg * Math.PI) / 180) * engineMult;
-    const turnAccelRad = ((this.spec.turnAccelerationDeg * Math.PI) / 180) * engineMult;
+    const maxTurnRateRad = ((this.spec.maxTurnRateDeg * Math.PI) / 180) * engineMult * crMult;
+    const turnAccelRad = ((this.spec.turnAccelerationDeg * Math.PI) / 180) * engineMult * crMult;
 
     // ship_systems.csv: Burn Drive has noTurning=true for the full system lifecycle.
     const burnDriveLocked = this.system.isActive && this.system.type === 'BURN_DRIVE';
@@ -471,8 +619,14 @@ export class Ship {
     this.facingRad += this.angularVelRad * dt;
 
     // 前进推力与极速 (对齐 BurnDriveStats.java: stats.getMaxSpeed().modifyFlat(200f))
-    let accel = (this.spec.acceleration + this.system.getAccelerationFlatBonus()) * engineMult;
-    let maxSpeed = (this.spec.maxSpeed + this.system.getSpeedFlatBonus()) * engineMult;
+    let accel = (this.spec.acceleration + this.system.getAccelerationFlatBonus()) * engineMult * crMult;
+    let maxSpeed = (this.spec.maxSpeed + this.system.getSpeedFlatBonus()) * engineMult * crMult;
+
+    // 相位线圈硬幅能减速 (PhaseCloakStats.getSpeedMult: 基础阈值 50%，满缺口降至 33%)
+    if (this.shield.type === 'PHASE' && this.shield.isPhaseEngaged) {
+      const hardFluxLevel = this.flux.maxFlux > 0 ? this.flux.hardFlux / this.flux.maxFlux : 0;
+      maxSpeed *= this.shield.getPhaseSpeedMultiplier(hardFluxLevel);
+    }
 
     // 零幅能引擎推进加力 (严格对齐 settings.json: zeroFluxEngineBoost = 50)
     if (this.flux.isEngineBoostActive) {

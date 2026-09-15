@@ -111,7 +111,17 @@ export class BeamSimulationHandler {
 
       // 1. 动态锁定发射挂点坐标与炮口物理偏移 (1:1 BeamWeaponRay.java:114)
       const srcShip = ships.find((s) => s.id === b.sourceShipId);
-      if (srcShip && b.slotId) {
+
+      // 母舰阵亡后其挂点不会再收到 update，firingState 会永久停留在 ACTIVE；
+      // 因此光束有效性必须同时检查发射舰本身。vanilla BeamWeaponRay.isExpired() 无条件判定
+      // `getShip().isHulk() && !getShip().isAlive()`，即舰船被摧毁的瞬间所有光束 (含充能收束的
+      // 纯视觉光束) 一并消失；发射舰已不在战场实体列表时同样无法维持光束。
+      if (!srcShip || srcShip.isDead) {
+        beams.splice(i, 1);
+        continue;
+      }
+
+      if (b.slotId) {
         const mount = srcShip.weapons.find((w) => w.slotId === b.slotId);
 
         // A damaging production beam is valid only while its exact source firing
@@ -203,7 +213,8 @@ export class BeamSimulationHandler {
             }
             const tickDmg = b.damagePerSec * dt;
             const shieldMult = ship.system.getShieldDamageMultiplier();
-            const absorbedDmg = tickDmg * shieldMult;
+            // 护盾吸收量同样按目标战备值修正 (CRPluginImpl.getDamageTakenChangePercent)
+            const absorbedDmg = tickDmg * shieldMult * ship.crDamageTakenMultiplier;
             const hitAngle = Math.atan2(shieldHitPoint.y - sCenter.y, shieldHitPoint.x - sCenter.x);
             const fluxGain = ship.shield.absorbDamage(absorbedDmg, b.damageType, hitAngle);
             ship.flux.increaseFlux(fluxGain, false);
@@ -292,7 +303,9 @@ export class BeamSimulationHandler {
             }
             const tickDmg = b.damagePerSec * dt;
             const tickEmp = (b.empPerSec ?? 0) * dt;
-            const result = ship.armor.takeDamage(localImpact, tickDmg, b.damageType, b.damagePerSec, true);
+            // 装甲/结构承受伤害按目标战备值修正 (CRPluginImpl.getDamageTakenChangePercent)
+            const takenDmg = tickDmg * ship.crDamageTakenMultiplier;
+            const result = ship.armor.takeDamage(localImpact, takenDmg, b.damageType, b.damagePerSec, true);
             if (ctx.statsTracker) {
               let empRecorded = false;
               if (result.armorDamage > 0) {

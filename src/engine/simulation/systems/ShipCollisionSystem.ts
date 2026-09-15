@@ -91,10 +91,16 @@ export class ShipCollisionSystem {
         s2.vel.addScaled(normal, impactSpeed * 0.4);
 
         const ramDmg = impactSpeed * 8;
+        let s1ArmorDmg = 0;
+        let s1HullDmg = 0;
+        let s2ArmorDmg = 0;
+        let s2HullDmg = 0;
 
         // 只有实际接触到已展开的护盾弧面时，撞击动能才转为硬幅能。
         if (s1ShieldContact) {
-          s1.flux.increaseFlux(ramDmg * 0.8, true);
+          // FortressShieldStats.java: shield damage mult = 1 - 0.9 * effectLevel，
+          // 堡垒护盾的减伤同样作用于冲撞动能转硬幅能。
+          s1.flux.increaseFlux(ramDmg * s1.system.getShieldDamageMultiplier() * 0.8, true);
           const s1ShieldCenter = s1.getShieldCenter();
           s1.shield.ripples.push({
             angle: Math.atan2(contactPoint.y - s1ShieldCenter.y, contactPoint.x - s1ShieldCenter.x),
@@ -104,12 +110,17 @@ export class ShipCollisionSystem {
           });
         } else {
           const contact1 = normal.clone().scale(s1.spec.collisionRadius * 0.75).rotate(-s1.facingRad);
-          s1.armor.takeDamage(contact1, ramDmg, 'HIGH_EXPLOSIVE');
-          s1.addScorchMark(contact1, ramDmg);
+          // CRPluginImpl.applyCRToStats(): 承伤倍率作用于冲撞的装甲/船体伤害。
+          const result1 = s1.armor.takeDamage(contact1, ramDmg * s1.crDamageTakenMultiplier, 'HIGH_EXPLOSIVE');
+          // 装甲网格被击穿后溢出的伤害必须结入船体 HP，否则冲撞永远无法击沉目标。
+          s1.hullHp = Math.max(0, s1.hullHp - result1.hullDamage);
+          s1.addScorchMark(contact1, result1.armorDamage || result1.hullDamage);
+          s1ArmorDmg = result1.armorDamage;
+          s1HullDmg = result1.hullDamage;
         }
 
         if (s2ShieldContact) {
-          s2.flux.increaseFlux(ramDmg * 0.8, true);
+          s2.flux.increaseFlux(ramDmg * s2.system.getShieldDamageMultiplier() * 0.8, true);
           const s2ShieldCenter = s2.getShieldCenter();
           s2.shield.ripples.push({
             angle: Math.atan2(contactPoint.y - s2ShieldCenter.y, contactPoint.x - s2ShieldCenter.x),
@@ -119,12 +130,35 @@ export class ShipCollisionSystem {
           });
         } else {
           const contact2 = normal.clone().scale(-s2.spec.collisionRadius * 0.75).rotate(-s2.facingRad);
-          s2.armor.takeDamage(contact2, ramDmg, 'HIGH_EXPLOSIVE');
-          s2.addScorchMark(contact2, ramDmg);
+          const result2 = s2.armor.takeDamage(contact2, ramDmg * s2.crDamageTakenMultiplier, 'HIGH_EXPLOSIVE');
+          s2.hullHp = Math.max(0, s2.hullHp - result2.hullDamage);
+          s2.addScorchMark(contact2, result2.armorDamage || result2.hullDamage);
+          s2ArmorDmg = result2.armorDamage;
+          s2HullDmg = result2.hullDamage;
         }
 
-        fx.addFloatingDamage(contactPoint.clone().add(new Vector2(-25, -25)), ramDmg, [255, 175, 40]);
-        fx.addFloatingDamage(contactPoint.clone().add(new Vector2(25, 25)), ramDmg, [255, 175, 40]);
+        // 浮伤数字按实际结算路径分色 (对齐 ProjectileCollisionHandler.applyShipCollisionHit)：
+        // 护盾接触不进入装甲网格，沿用原有的冲撞动能数值；装甲橙、船体红。
+        if (s1ShieldContact || s1ArmorDmg > 0) {
+          fx.addFloatingDamage(
+            contactPoint.clone().add(new Vector2(-25, -25)),
+            s1ShieldContact ? ramDmg : s1ArmorDmg,
+            [255, 175, 40]
+          );
+        }
+        if (!s1ShieldContact && s1HullDmg > 0) {
+          fx.addFloatingDamage(contactPoint.clone().add(new Vector2(-25, -25)), s1HullDmg, [255, 55, 45]);
+        }
+        if (s2ShieldContact || s2ArmorDmg > 0) {
+          fx.addFloatingDamage(
+            contactPoint.clone().add(new Vector2(25, 25)),
+            s2ShieldContact ? ramDmg : s2ArmorDmg,
+            [255, 175, 40]
+          );
+        }
+        if (!s2ShieldContact && s2HullDmg > 0) {
+          fx.addFloatingDamage(contactPoint.clone().add(new Vector2(25, 25)), s2HullDmg, [255, 55, 45]);
+        }
 
         fx.spawnSparks(contactPoint, 40, [255, 200, 100]);
         fx.spawnDebris(contactPoint, 16, [130, 115, 100], 120);

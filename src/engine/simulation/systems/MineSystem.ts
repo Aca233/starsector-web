@@ -1,5 +1,6 @@
 import { Vector2 } from '../../math/Vector2';
 import { SpatialMine } from '../CombatTypes';
+import { DamageType } from '../ArmorGrid';
 import { Ship } from '../Ship';
 import { sound } from '../../audio/SoundManager';
 import { SimulationRandom } from '../SimulationRandom';
@@ -15,6 +16,13 @@ export interface MineFXCallbacks {
   addCameraShake: (intensity: number, duration: number) => void;
   getPlayerPos: () => Vector2;
   handleShipDestruction: (ship: Ship) => void;
+  /** Battle statistics: mine detonations are real damage and must feed the result screen. */
+  recordDamageDealt?: (
+    isPlayerAttacker: boolean,
+    damageType: DamageType,
+    amount: number,
+    targetArea: 'SHIELD' | 'ARMOR' | 'HULL'
+  ) => void;
 }
 
 export class MineSystem {
@@ -46,6 +54,7 @@ export class MineSystem {
       pos: deployPos,
       vel: new Vector2(),
       sourceShipId: sourceShip.id,
+      sourceIsPlayer: sourceShip.isPlayer,
       armedTimer: 1.2,
       isArmed: false,
       detonatingTimer: 0.6,
@@ -80,6 +89,9 @@ export class MineSystem {
         }
       }
 
+      // 归属方判定：发射舰可能已被击毁，回退到部署时记录的阵营快照
+      const sourceIsPlayer = ships.find(s => s.id === mine.sourceShipId)?.isPlayer ?? mine.sourceIsPlayer;
+
       // 2. 周期性雷达警示音与光环
       mine.pingTimer -= dt;
       if (mine.pingTimer <= 0) {
@@ -90,8 +102,11 @@ export class MineSystem {
 
       // 3. 引信侦测与引爆倒计时
       if (mine.isArmed && !mine.isDetonating) {
+        // 引信沿用原版 minelayer_mine_heavy.proj 的 "collisionClass":"MISSILE_NO_FF"：
+        // 只识别敌对方目标，友方战机/母舰不会引爆自己的空雷（爆炸本体仍为 MISSILE_FF，可杀伤友军）。
         for (const ship of ships) {
           if (ship.id === mine.sourceShipId || ship.isDead || ship.isPhased) continue;
+          if (ship.isPlayer === sourceIsPlayer) continue;
           const dist = mine.pos.distanceTo(ship.pos);
           if (dist <= mine.triggerRadius + ship.spec.collisionRadius * 0.5) {
             mine.isDetonating = true;
@@ -129,23 +144,30 @@ export class MineSystem {
               if (target.isShieldPointBlocked(mine.pos)) {
                 const shieldMult = target.system.getShieldDamageMultiplier();
                 // Shield.absorbDamage() applies the HE-vs-shield multiplier; the
-                // system multiplier must be applied exactly once before that API.
-                const absorbedDmg = dmg * shieldMult;
+                // system multiplier and the CR damage-taken multiplier must each be
+                // applied exactly once before that API.
+                const absorbedDmg = dmg * shieldMult * target.crDamageTakenMultiplier;
                 const hitAngle = mine.pos.clone().sub(target.getShieldCenter()).heading();
                 const fluxGain = target.shield.absorbDamage(absorbedDmg, 'HIGH_EXPLOSIVE', hitAngle);
                 target.flux.increaseFlux(fluxGain, true);
+                fx.recordDamageDealt?.(sourceIsPlayer ?? false, 'HIGH_EXPLOSIVE', absorbedDmg, 'SHIELD');
                 fx.addFloatingDamage(mine.pos, absorbedDmg, [80, 200, 255]);
                 fx.spawnShieldRipple(mine.pos, 90, [255, 120, 50]);
               } else {
-                // 装甲与船体毁灭破坏
+                // 装甲与船体毁灭破坏 (战备值 CR 同样影响空雷的实际承伤；
+                // hitStrength 保持空雷标称伤害，避免修正被装甲减伤公式二次放大)
+                const impactDmg = dmg * target.crDamageTakenMultiplier;
                 const localImpact = mine.pos.clone().sub(target.pos).rotate(-target.facingRad);
-                const res = target.armor.takeDamage(localImpact, dmg, 'HIGH_EXPLOSIVE', dmg, false);
+                const res = target.armor.takeDamage(localImpact, impactDmg, 'HIGH_EXPLOSIVE', dmg, false);
                 target.hullHp = Math.max(0, target.hullHp - res.hullDamage);
                 target.addScorchMark(localImpact, res.armorDamage || res.hullDamage);
                 if (res.armorDamage > 0) {
+                  // 空雷伤害计入战斗统计，记录方式与 ProjectileCollisionHandler 一致（空雷不是炮弹，不计 shotsHit）
+                  fx.recordDamageDealt?.(sourceIsPlayer ?? false, 'HIGH_EXPLOSIVE', res.armorDamage, 'ARMOR');
                   fx.addFloatingDamage(mine.pos, res.armorDamage, [255, 175, 40]);
                 }
                 if (res.hullDamage > 0) {
+                  fx.recordDamageDealt?.(sourceIsPlayer ?? false, 'HIGH_EXPLOSIVE', res.hullDamage, 'HULL');
                   fx.addFloatingDamage(mine.pos, res.hullDamage, [255, 55, 45]);
                 }
                 // EMP 电击船体

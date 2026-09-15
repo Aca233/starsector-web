@@ -129,6 +129,8 @@ export interface SpatialMine {
   pos: Vector2;
   vel: Vector2;
   sourceShipId: string;
+  // 部署时的阵营快照；发射舰被击毁后仍可据此判定引信敌我 (对齐 MISSILE_NO_FF)
+  sourceIsPlayer?: boolean;
   armedTimer: number;
   isArmed: boolean;
   detonatingTimer: number;

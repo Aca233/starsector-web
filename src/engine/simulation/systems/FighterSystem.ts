@@ -1,7 +1,7 @@
 import { Vector2 } from '../../math/Vector2';
 import { FighterAIState, BomberAIState, TacticalOrder, ContrailParticle, FlightDeckWing } from '../CombatTypes';
 import { Ship } from '../Ship';
-import { Projectile, Beam } from '../Weapon';
+import { Projectile, Beam, WeaponMount } from '../Weapon';
 import { modManager } from '../../modding/ModManager';
 import { sound } from '../../audio/SoundManager';
 import { SimulationRandom } from '../SimulationRandom';
@@ -307,6 +307,12 @@ export class FighterSystem {
       }
       modeData.timer -= dt;
 
+      // 检查战术地图对战斗机的特定指令 (Tactical Orders)
+      // 舰队级指令只属于玩家编队，敌机不得执行玩家标定的航路点
+      const specificOrder = fx.getOrder(ftr.id);
+      const fleetOrder = isPlayer ? fx.getOrder('fleet') : undefined;
+      const activeOrder = specificOrder || fleetOrder;
+
       // 敌方来袭重型导弹检测 (点防近程威胁)
       const nearbyHostileMissile = projectiles.find(
         (p) => p.isRocket && p.isPlayer !== isPlayer && p.pos.distanceTo(ftr.pos) < 680
@@ -358,7 +364,32 @@ export class FighterSystem {
         ftr.turnInput = Math.sign(angleDiff);
         ftr.throttle = Math.min(1.0, dist / 180);
       }
-      // 3. 空空格斗咬尾 (Dogfight): 发现敌方战机/轰炸机，进入高速咬尾火神扫射
+      // 3. 战术航路点指令：直接指令优先于自主追击逻辑，全速转场并在抵达后消耗指令
+      else if (activeOrder && activeOrder.type === 'WAYPOINT' && activeOrder.targetPos) {
+        modeData.state = 'ESCORT';
+        const toWp = activeOrder.targetPos.clone().sub(ftr.pos);
+        const dist = toWp.length();
+        if (dist < 90) {
+          // 抵达航路点：消耗指令（舰队级指令按存储键注销，避免残留指令把战机钉在航路点上）
+          fx.cancelOrder(specificOrder ? ftr.id : 'fleet');
+        } else {
+          // 转场期间不主动追击敌人：仅当原瞄准点仍处于有效射界内时才保留开火状态
+          const prevAim = ftr.aimTargetWorld.clone().sub(ftr.pos);
+          let prevAimDiff = prevAim.heading() - ftr.facingRad;
+          while (prevAimDiff >= Math.PI) prevAimDiff -= Math.PI * 2;
+          while (prevAimDiff < -Math.PI) prevAimDiff += Math.PI * 2;
+          ftr.isFiringMain = ftr.isFiringMain && prevAim.length() > 1 && Math.abs(prevAimDiff) < 0.35;
+
+          ftr.aimTargetWorld = activeOrder.targetPos.clone();
+          // 方位偏差归一化到 [-π, π)：正后方时统一向左破转，保证航路点机动方向确定
+          let angleDiff = toWp.heading() - ftr.facingRad;
+          while (angleDiff >= Math.PI) angleDiff -= Math.PI * 2;
+          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+          ftr.turnInput = Math.sign(angleDiff);
+          ftr.throttle = 1.0;
+        }
+      }
+      // 4. 空空格斗咬尾 (Dogfight): 发现敌方战机/轰炸机，进入高速咬尾火神扫射
       else if (closestOpposingCraft) {
         modeData.state = 'DOGFIGHT';
         const toOpp = closestOpposingCraft.pos.clone().sub(ftr.pos);
@@ -388,7 +419,7 @@ export class FighterSystem {
           ftr.turnInput = Math.sign(breakDiff);
         }
       }
-      // 4. 敌舰在攻击范围内：发起俯冲扫射突击 (Attack Run)
+      // 5. 敌舰在攻击范围内：发起俯冲扫射突击 (Attack Run)
       else if (!hostileCapital.isDead && ftr.pos.distanceTo(hostileCapital.pos) < 1800) {
         modeData.state = 'ATTACK';
         const toHostile = hostileCapital.pos.clone().sub(ftr.pos);
@@ -414,7 +445,7 @@ export class FighterSystem {
           ftr.isFiringMain = true;
         }
       }
-      // 5. 巡弋编队护卫母舰 (Escort Formation)
+      // 6. 巡弋编队护卫母舰 (Escort Formation)
       else {
         modeData.state = 'ESCORT';
         const escortSlot = formationOffsets[i % formationOffsets.length];
@@ -503,6 +534,17 @@ export class FighterSystem {
       }
       mode.timer -= dt;
 
+      // 发射确认：请求开火前记录鱼雷挂点状态，只有真正离管才承认发射成功
+      // (挂点瘫痪/弹药耗尽/未完成开火循环时不得清空挂载并返航)
+      let launchRequested = false;
+      let launcherStateBefore: {
+        mount: WeaponMount;
+        ammo: number;
+        cooldownTimer: number;
+        burstRemaining: number;
+        firingCycleId: number;
+      }[] = [];
+
       // 检查战术地图对轰炸机的特定指令 (Tactical Orders)
       const specificOrder = fx.getOrder(bmr.id);
       const fleetOrder = fx.getOrder('fleet');
@@ -551,7 +593,9 @@ export class FighterSystem {
         const toWp = activeOrder.targetPos.clone().sub(bmr.pos);
         const dist = toWp.length();
         if (dist < 90) {
-          fx.cancelOrder(bmr.id);
+          // 抵达航路点：注销真正持有该指令的键 (舰队级指令挂在 'fleet' 上)，
+          // 否则注销单位 id 不会移除舰队指令，轰炸机会被永久钉在航点上。
+          fx.cancelOrder(specificOrder ? bmr.id : 'fleet');
         } else {
           const targetAngle = toWp.heading();
           let angleDiff = targetAngle - bmr.facingRad;
@@ -575,14 +619,18 @@ export class FighterSystem {
         bmr.turnInput = Math.sign(angleDiff);
         bmr.throttle = 1.0;
 
-        // 进入 650 SU 鱼雷射界并迎头对准 (角度差 < 20度): 发射阿特罗波斯高爆鱼雷！
+        // 进入 650 SU 鱼雷射界并迎头对准 (角度差 < 20度): 请求发射阿特罗波斯高爆鱼雷！
         if (dist < 650 && Math.abs(angleDiff) < 0.35 && mode.hasTorpedo) {
           bmr.isFiringMain = true;
-          mode.hasTorpedo = false;
-          mode.state = 'RETURN_TO_REARM';
-          fx.addFloatingText(bmr.pos, 'ATROPOS TORPEDO LAUNCHED!', [255, 140, 40], 14, 2.0);
-          fx.addCameraShake(3, 0.2);
-          fx.addRadioMessage('匕首轰炸分队', 'PLAYER', '阿特罗波斯重型鱼雷已齐射！脱离攻击航线！', [255, 180, 60]);
+          // 只登记发射请求；是否真的打出鱼雷要等本帧 update 之后校验挂点证据
+          launchRequested = true;
+          launcherStateBefore = bmr.weapons.map(mount => ({
+            mount,
+            ammo: mount.ammo,
+            cooldownTimer: mount.cooldownTimer,
+            burstRemaining: mount.burstRemaining,
+            firingCycleId: mount.firingCycleId
+          }));
         } else {
           bmr.isFiringMain = false;
         }
@@ -610,6 +658,27 @@ export class FighterSystem {
       }
 
       bmr.update(dt, enemyShip, spawnProj, spawnBeam, spawnFlash);
+
+      // 校验鱼雷是否真的离管：有限弹药挂点看弹药消耗，无限弹药挂点看冷却/连发/开火周期推进
+      if (launchRequested) {
+        const torpedoLaunched = launcherStateBefore.some(before => {
+          const mount = before.mount;
+          if (Number.isFinite(mount.ammo) && mount.spec.maxAmmo !== undefined) {
+            return mount.ammo < before.ammo;
+          }
+          return mount.cooldownTimer > before.cooldownTimer
+            || mount.burstRemaining > before.burstRemaining
+            || mount.firingCycleId > before.firingCycleId;
+        });
+        if (torpedoLaunched) {
+          // 仅在确认鱼雷离管后才宣告发射成功并脱离攻击航线（每次实际发射只宣告一次）
+          mode.hasTorpedo = false;
+          mode.state = 'RETURN_TO_REARM';
+          fx.addFloatingText(bmr.pos, 'ATROPOS TORPEDO LAUNCHED!', [255, 140, 40], 14, 2.0);
+          fx.addCameraShake(3, 0.2);
+          fx.addRadioMessage('匕首轰炸分队', 'PLAYER', '阿特罗波斯重型鱼雷已齐射！脱离攻击航线！', [255, 180, 60]);
+        }
+      }
 
       // 高技术蓝紫推进器尾焰
       if (Math.abs(bmr.throttle) > 0.1 && this.visualRandom.next() < 0.65) {

@@ -67,6 +67,20 @@ export class FluxTracker {
   }
 
   /**
+   * 增加幅能但不触发过载 (对齐原版 ship_systems.csv: canNotCauseOverload=TRUE)。
+   * 相位线圈的开启与维持成本会顶到容量上限，但绝不会把舰船打进过载。
+   */
+  public increaseFluxClamped(amount: number, isHard: boolean): void {
+    if (!(amount > 0)) return;
+    if (isHard) {
+      this.hardFlux = Math.min(this.maxFlux, this.hardFlux + amount);
+    } else {
+      const room = Math.max(0, this.maxFlux - this.hardFlux);
+      this.softFlux = Math.min(room, this.softFlux + amount);
+    }
+  }
+
+  /**
    * 触发严重过载 (严格对齐 com.fs.starfarer.combat.entities.ship.D.java: beginOverload)
    * 官方按舰级基础过载时长:
    * CAPITAL_SHIP: 10.0s, CRUISER: 8.0s, DESTROYER: 6.0s, FRIGATE: 4.0s, FIGHTER: 10.0s

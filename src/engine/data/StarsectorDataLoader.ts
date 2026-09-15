@@ -56,11 +56,20 @@ export class StarsectorDataLoader {
     const shieldType = (row['shield type'] || 'NONE') as ShieldType;
     const shieldArc = parseFloat(row['shield arc'] || '0');
     const shieldEfficiency = parseFloat(row['shield efficiency'] || '1.0');
+    // 原版 ship_data.csv 中护盾维持费与相位成本均为“基础耗散/基础容量”的比例。
+    const shieldUpkeepRaw = row['shield upkeep'];
+    const shieldUpkeep = shieldUpkeepRaw === undefined || shieldUpkeepRaw === '' ? 0 : parseFloat(shieldUpkeepRaw);
+    const phaseCostRaw = row['phase cost'];
+    const phaseUpkeepRaw = row['phase upkeep'];
+    const phaseCost = phaseCostRaw === undefined || phaseCostRaw === '' ? 0 : parseFloat(phaseCostRaw);
+    const phaseUpkeep = phaseUpkeepRaw === undefined || phaseUpkeepRaw === '' ? 0 : parseFloat(phaseUpkeepRaw);
     const systemId = (row['system id'] || '').toLowerCase();
     const systemType: ShipSystemType = systemId.includes('burn')
       ? 'BURN_DRIVE'
       : systemId.includes('fortress')
       ? 'FORTRESS_SHIELD'
+      : systemId.includes('mine_strike') || systemId.includes('mine strike')
+      ? 'MINE_STRIKE'
       : 'NONE';
 
     // 转换原版 weaponSlots
@@ -136,6 +145,9 @@ export class StarsectorDataLoader {
       shieldArcDeg: shieldArc,
       shieldRadius: shipJson.shieldRadius || shipJson.collisionRadius,
       shieldEfficiency,
+      shieldUpkeep,
+      phaseCost,
+      phaseUpkeep,
       systemType,
       weaponSlots,
       engineSlots,

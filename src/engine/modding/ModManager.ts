@@ -70,6 +70,12 @@ export interface ShipSpec {
   shieldCenterX?: number;
   shieldCenterY?: number;
   shieldEfficiency: number;
+  /** ship_data.csv `shield upkeep`: 护盾维持费占基础耗散的比例 (攻势 0.4 → 240/s, 典范 0.6 → 750/s)。 */
+  shieldUpkeep?: number;
+  /** ship_data.csv `phase cost`: 开启相位消耗的硬幅能占基础幅能容量的比例 (厄运 0.05 → 500)。 */
+  phaseCost?: number;
+  /** ship_data.csv `phase upkeep`: 相位维持硬幅能占基础幅能容量的比例 (厄运 0.05 → 500/s)。 */
+  phaseUpkeep?: number;
   systemType: ShipSystemType;
   
   // 挂点与发动机
@@ -229,6 +235,7 @@ export class ModManager {
       shieldCenterX: 32, // 严格对齐 onslaught.ship: shieldCenter [32, 0]
       shieldCenterY: 0,
       shieldEfficiency: 1.0,
+      shieldUpkeep: 0.4, // ship_data.csv: onslaught shield upkeep 0.4 -> 240/s
       systemType: 'BURN_DRIVE', // 冲刺推进
       weaponSlots: [
         // 双联装内置核心重炮 TPC (WS 016, WS 017 位于船体左右前突主炮位)
@@ -302,6 +309,7 @@ export class ModManager {
       shieldCenterX: 1, // 严格对齐 paragon.ship: shieldCenter [1, 0]
       shieldCenterY: 0,
       shieldEfficiency: 0.6, // 0.6 超高防御效率
+      shieldUpkeep: 0.6, // ship_data.csv: paragon shield upkeep 0.6 -> 750/s
       systemType: 'FORTRESS_SHIELD', // 堡垒护盾
       weaponRangeMult: 1.8, // Advanced Targeting Core (ATC: +80% ~ +100% 战列舰能量射程加成)
       weaponSlots: [
@@ -365,6 +373,8 @@ export class ModManager {
       shieldArcDeg: 360,
       shieldRadius: 155,
       shieldEfficiency: 1.0,
+      phaseCost: 0.05, // ship_data.csv: doom phase cost 0.05 -> 500 硬幅能
+      phaseUpkeep: 0.05, // ship_data.csv: doom phase upkeep 0.05 -> 500/s 硬幅能
       systemType: 'MINE_STRIKE', // 核心专属系统：空雷突袭
       weaponSlots: [
         // 2 门死神鱼雷发射器 (WS 001, WS 002)

@@ -234,9 +234,17 @@ export class ProjectileCollisionHandler {
           const surfaceDistance = Math.max(0, dist - f.spec.collisionRadius);
           const aoeDmg = p.damage * this.getExplosionDamageScale(p, surfaceDistance);
           if (aoeDmg <= 0) continue;
-          f.hullHp = Math.max(0, f.hullHp - aoeDmg);
+          // 战机在本引擎中同样是 Ship 实例，破片必须经装甲网格结算 (与下方大舰分支一致)，
+          // 否则凌空近炸会直接穿透战机装甲扣船体。
+          const localImpact = p.pos.clone().sub(f.pos).rotate(-f.facingRad);
+          const res = f.armor.takeDamage(localImpact, aoeDmg * f.crDamageTakenMultiplier, 'FRAGMENTATION', aoeDmg, false);
+          if (res.armorDamage > 0) ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, 'FRAGMENTATION', res.armorDamage, 'ARMOR');
+          if (res.hullDamage > 0) ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, 'FRAGMENTATION', res.hullDamage, 'HULL');
+          f.hullHp = Math.max(0, f.hullHp - res.hullDamage);
+          f.addScorchMark(localImpact, res.armorDamage || res.hullDamage);
           damagedHostileTarget = true;
-          ctx.fx.addFloatingDamage(f.pos.clone(), aoeDmg, [255, 180, 60]);
+          const appliedDmg = res.armorDamage + res.hullDamage;
+          if (appliedDmg > 0) ctx.fx.addFloatingDamage(f.pos.clone(), appliedDmg, [255, 180, 60]);
           ctx.fx.spawnSparks(f.pos, 10, [255, 120, 40]);
           if (f.hullHp <= 0) {
             ctx.handleShipDestruction(f);
@@ -256,9 +264,11 @@ export class ProjectileCollisionHandler {
         if (distToShip <= expRadius + (s.shield.isActive ? s.shield.radius : s.spec.collisionRadius)) {
           if (s.isShieldPointBlocked(p.pos)) {
             const shieldSurfaceDistance = Math.max(0, p.pos.distanceTo(s.getShieldCenter()) - s.shield.radius);
+            // 护盾承伤同时受目标战备值修正 (CRPluginImpl.getDamageTakenChangePercent)
             const damage = p.damage
               * this.getExplosionDamageScale(p, shieldSurfaceDistance)
-              * s.system.getShieldDamageMultiplier();
+              * s.system.getShieldDamageMultiplier()
+              * s.crDamageTakenMultiplier;
             if (damage > 0) {
               damagedHostileTarget = true;
               const fluxGain = s.shield.absorbDamage(damage, 'FRAGMENTATION', p.pos.clone().sub(s.getShieldCenter()).heading());
@@ -268,11 +278,12 @@ export class ProjectileCollisionHandler {
             }
           } else if (distToShip <= expRadius + s.spec.collisionRadius) {
             const surfaceDistance = Math.max(0, distToShip - s.spec.collisionRadius);
-            const damage = p.damage * this.getExplosionDamageScale(p, surfaceDistance);
-            if (damage <= 0) continue;
+            const rawDamage = p.damage * this.getExplosionDamageScale(p, surfaceDistance);
+            if (rawDamage <= 0) continue;
+            const damage = rawDamage * s.crDamageTakenMultiplier;
             const localImpact = p.pos.clone().sub(s.pos).rotate(-s.facingRad);
             damagedHostileTarget = true;
-            const res = s.armor.takeDamage(localImpact, damage, 'FRAGMENTATION', damage, false);
+            const res = s.armor.takeDamage(localImpact, damage, 'FRAGMENTATION', rawDamage, false);
             if (res.armorDamage > 0) ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, 'FRAGMENTATION', res.armorDamage, 'ARMOR');
             if (res.hullDamage > 0) ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, 'FRAGMENTATION', res.hullDamage, 'HULL');
             s.hullHp = Math.max(0, s.hullHp - res.hullDamage);
@@ -365,7 +376,8 @@ export class ProjectileCollisionHandler {
       const sCenter = ship.getShieldCenter(ship.pos, ship.facingRad);
       const toShield = impactWorld.clone().sub(sCenter);
       const shieldMult = ship.system.getShieldDamageMultiplier();
-      const absorbedDmg = p.damage * shieldMult;
+      // CRPluginImpl: 护盾承伤按战备值修正 (标准 70% 战备时为 1.0)
+      const absorbedDmg = p.damage * shieldMult * ship.crDamageTakenMultiplier;
       const fluxGain = ship.shield.absorbDamage(absorbedDmg, p.damageType, toShield.heading());
       if (ctx.statsTracker) {
         ctx.statsTracker.recordDamageDealt(p.isPlayer ?? false, p.damageType, absorbedDmg, 'SHIELD');
@@ -389,7 +401,10 @@ export class ProjectileCollisionHandler {
     }
 
     const impactPoint = hit.localPoint;
-    const result = ship.armor.takeDamage(impactPoint, p.damage, p.damageType, p.damage, false);
+    // 装甲/结构承伤按目标战备值修正 (CRPluginImpl.getDamageTakenChangePercent)；
+    // hitStrength 保持武器标称伤害，避免战备修正被装甲减伤公式二次放大。
+    const takenDamage = p.damage * ship.crDamageTakenMultiplier;
+    const result = ship.armor.takeDamage(impactPoint, takenDamage, p.damageType, p.damage, false);
     if (ctx.statsTracker) {
       if (result.armorDamage > 0) {
         ctx.statsTracker.recordDamageDealt(

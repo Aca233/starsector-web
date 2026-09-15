@@ -30,10 +30,17 @@ export class ShipSystem {
   public maxCharges = 1;
   public charges = 1;
   public chargeRegenRate = 0;
+  /** CRPluginImpl: cr <= 0 时 setShipSystemDisabled(true)，系统彻底离线。 */
+  public disabled = false;
+  /** ship_systems.csv `f/u (base cap)`: 每次使用的幅能成本 (基础容量比例 × maxFlux)。 */
+  public fluxCostPerUse = 0;
+  /** 系统成本类型：只有 hardFlux=TRUE 的系统 (相位线圈/堡垒护盾) 生成硬幅能。 */
+  public generatesHardFlux = false;
+  private pendingActivationFlux = 0;
   private chargeRegenTimer = 0;
   private stageTimer = 0;
 
-  constructor(type: ShipSystemType = 'NONE') {
+  constructor(type: ShipSystemType = 'NONE', baseFluxCapacity = 0) {
     this.type = type;
     if (type === 'BURN_DRIVE') {
       // ship_systems.csv: charge up 2, active 5, down 1, cooldown 10.
@@ -42,6 +49,9 @@ export class ShipSystem {
       this.chargeDownDuration = 1.0;
       this.maxDuration = 5.0;
       this.maxCooldown = 10.0;
+      // ship_systems.csv: burndrive 只有 flux/second 1 (每秒 1% 基础容量) 的持续成本，
+      // 无 flux/use 激活成本；该持续成本目前尚未建模，故此处保持 0。
+      this.fluxCostPerUse = 0;
     } else if (type === 'FORTRESS_SHIELD') {
       // Toggle system: 1.5s IN / indefinite ACTIVE / 1.5s OUT / no cooldown.
       this.chargeUpDuration = 1.5;
@@ -49,6 +59,7 @@ export class ShipSystem {
       this.chargeDownDuration = 1.5;
       this.maxDuration = 1.5;
       this.maxCooldown = 0;
+      this.generatesHardFlux = true;
     } else if (type === 'MINE_STRIKE') {
       this.maxDuration = 0.3;
       this.activeDuration = 0.3;
@@ -56,6 +67,8 @@ export class ShipSystem {
       this.maxCharges = 5;
       this.charges = 5;
       this.chargeRegenRate = 0.2;
+      // ship_systems.csv: mine_strike `f/u (base cap)` 0.1 → 每次使用消耗 10% 基础幅能容量。
+      this.fluxCostPerUse = Math.max(0, baseFluxCapacity) * 0.1;
     }
   }
 
@@ -69,14 +82,17 @@ export class ShipSystem {
     this.stageTimer = 0;
     this.chargeRegenTimer = 0;
     this.charges = this.maxCharges;
+    this.pendingActivationFlux = 0;
   }
 
   /** Activate a ready system, or toggle an engaged toggle-system into OUT. */
   public activate(): boolean {
-    if (this.type === 'NONE') return false;
+    if (this.type === 'NONE' || this.disabled) return false;
     if (this.type === 'MINE_STRIKE') {
       if (this.charges <= 0 || this.isCoolingDown) return false;
       this.charges--;
+      // 原版 system charge tracker 在激活时立刻扣除 flux/use (mine_strike: 10% 基础容量)。
+      this.pendingActivationFlux += this.fluxCostPerUse;
       this.isCoolingDown = true;
       this.cooldownTimer = this.maxCooldown;
       this.isActive = true;
@@ -93,6 +109,13 @@ export class ShipSystem {
 
     this.beginIn();
     return true;
+  }
+
+  /** 取出并清空待结算的系统激活幅能成本 (由 Ship 在幅能追踪器上结算)。 */
+  public consumePendingActivationFlux(): number {
+    const cost = this.pendingActivationFlux;
+    this.pendingActivationFlux = 0;
+    return cost;
   }
 
   public deactivate(): void {

@@ -18,11 +18,17 @@ export interface AsteroidFXCallbacks {
   detachContrail: (projectileId: number) => void;
 }
 
-function segmentCircleHit(start: Vector2, end: Vector2, center: Vector2, radius: number): Vector2 | null {
+interface SegmentCircleImpact {
+  /** 归一化弹道参数 t ∈ [0, 1]，与 RuntimeCollisionHit.t 可直接比较。 */
+  t: number;
+  point: Vector2;
+}
+
+function segmentCircleImpact(start: Vector2, end: Vector2, center: Vector2, radius: number): SegmentCircleImpact | null {
   const d = end.clone().sub(start);
   const f = start.clone().sub(center);
   const a = d.dot(d);
-  if (a <= 1e-12) return start.distanceTo(center) <= radius ? start.clone() : null;
+  if (a <= 1e-12) return start.distanceTo(center) <= radius ? { t: 0, point: start.clone() } : null;
   const b = 2 * f.dot(d);
   const c = f.dot(f) - radius * radius;
   const discriminant = b * b - 4 * a * c;
@@ -31,7 +37,14 @@ function segmentCircleHit(start: Vector2, end: Vector2, center: Vector2, radius:
   const t1 = (-b - sqrt) / (2 * a);
   const t2 = (-b + sqrt) / (2 * a);
   const t = t1 >= 0 && t1 <= 1 ? t1 : t2 >= 0 && t2 <= 1 ? t2 : null;
-  return t === null ? null : start.clone().addScaled(d, t);
+  return t === null ? null : { t, point: start.clone().addScaled(d, t) };
+}
+
+/** 弹丸本帧与最近小行星的扫掠交点 (供武器仿真在舰船碰撞前做优先级比较)。 */
+export interface AsteroidProjectileImpact {
+  asteroidIndex: number;
+  t: number;
+  point: Vector2;
 }
 
 export class AsteroidSystem {
@@ -189,37 +202,61 @@ export class AsteroidSystem {
     }
   }
 
+  /**
+   * 找出弹丸本帧扫掠路径上最先接触的小行星 (取最小 t，而非数组顺序)。
+   * 原版弹道阻挡按距离排序，弹丸必须先命中更靠前的小行星。
+   */
+  public queryProjectileImpact(p: Projectile): AsteroidProjectileImpact | null {
+    let best: AsteroidProjectileImpact | null = null;
+    for (let j = 0; j < this.asteroids.length; j++) {
+      const ast = this.asteroids[j];
+      if (ast.hp <= 0) continue;
+      const impact = segmentCircleImpact(p.prevPos, p.pos, ast.pos, ast.radius + p.radius);
+      if (!impact) continue;
+      if (!best || impact.t < best.t) {
+        best = { asteroidIndex: j, t: impact.t, point: impact.point };
+      }
+    }
+    return best;
+  }
+
+  /** 结算弹丸命中：扣小行星 HP、播放特效，并在 HP 归零时碎裂。 */
+  public commitProjectileImpact(
+    p: Projectile,
+    impact: AsteroidProjectileImpact,
+    fx: AsteroidFXCallbacks,
+    playerPos: Vector2 = fx.getPlayerPos()
+  ): void {
+    const ast = this.asteroids[impact.asteroidIndex];
+    if (!ast || ast.hp <= 0) return;
+
+    ast.hp -= p.damage;
+    fx.addFloatingDamage(impact.point, p.damage, [200, 180, 140]);
+    fx.spawnSparks(impact.point, 12, [255, 180, 80]);
+    fx.spawnDebris(impact.point, 4, [130, 110, 90], 60);
+
+    if (p.isRocket) {
+      fx.detachContrail(p.id);
+      fx.spawnAuthenticExplosion(impact.point, 60, [255, 120, 40], true);
+      sound.playAtPos('explosion', impact.point, playerPos, 0.5);
+    }
+
+    if (ast.hp <= 0) {
+      this.shatter(impact.asteroidIndex, fx);
+    }
+  }
+
   public resolveProjectileCollisions(projectiles: Projectile[], fx: AsteroidFXCallbacks) {
     const playerPos = fx.getPlayerPos();
 
     for (let i = projectiles.length - 1; i >= 0; i--) {
       const p = projectiles[i];
-      for (let j = this.asteroids.length - 1; j >= 0; j--) {
-        const ast = this.asteroids[j];
-        if (ast.hp <= 0) continue;
+      const impact = this.queryProjectileImpact(p);
+      if (!impact) continue;
 
-        const impactPos = segmentCircleHit(p.prevPos, p.pos, ast.pos, ast.radius + p.radius);
-        if (impactPos) {
-          // 击中小行星！弹丸引爆
-          ast.hp -= p.damage;
-          fx.addFloatingDamage(impactPos, p.damage, [200, 180, 140]);
-          fx.spawnSparks(impactPos, 12, [255, 180, 80]);
-          fx.spawnDebris(impactPos, 4, [130, 110, 90], 60);
-
-          if (p.isRocket) {
-            fx.detachContrail(p.id);
-            fx.spawnAuthenticExplosion(impactPos, 60, [255, 120, 40], true);
-            sound.playAtPos('explosion', impactPos, playerPos, 0.5);
-          }
-
-          projectiles.splice(i, 1);
-
-          if (ast.hp <= 0) {
-            this.shatter(j, fx);
-          }
-          break;
-        }
-      }
+      this.commitProjectileImpact(p, impact, fx, playerPos);
+      // 命中即引爆：弹丸不会继续飞向后方的小行星或舰船。
+      projectiles.splice(i, 1);
     }
   }
 

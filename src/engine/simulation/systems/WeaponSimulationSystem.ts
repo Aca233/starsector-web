@@ -1,4 +1,5 @@
 import { Projectile, Beam } from '../Weapon';
+import { Ship } from '../Ship';
 import { WeaponSimContext } from './weapon/WeaponSimContext';
 import { MissileGuidanceHandler } from './weapon/MissileGuidanceHandler';
 import { ProjectileCollisionHandler } from './weapon/ProjectileCollisionHandler';
@@ -38,6 +39,8 @@ export class WeaponSimulationSystem {
     const allShips = [ctx.playerShip, ctx.enemyShip, ...ctx.fighters];
     this.collisionHandler.prepareShipCollisionFrame(allShips);
     const batchedCollisionProjectiles: Projectile[] = [];
+    // 射程在本帧耗尽的弹丸必须先把最后一段位移交给碰撞检测，再决定是否移除。
+    const expiredProjectileIds = new Set<number>();
     const flushBatchedCollisions = () => {
       if (batchedCollisionProjectiles.length === 0) return;
       const consumedIds = this.collisionHandler.checkShipCollisionsBatch(
@@ -46,14 +49,17 @@ export class WeaponSimulationSystem {
         ctx
       );
       batchedCollisionProjectiles.length = 0;
-      if (consumedIds.size === 0) return;
 
       // Pending batches contain only already-visited (higher-index) projectiles,
       // so removing them here preserves the descending iteration cursor while
       // restoring the original collision/damage ordering before a special shot.
       for (let j = this.projectiles.length - 1; j >= 0; j--) {
-        if (consumedIds.has(this.projectiles[j].id)) this.projectiles.splice(j, 1);
+        const candidate = this.projectiles[j];
+        if (!consumedIds.has(candidate.id) && !expiredProjectileIds.has(candidate.id)) continue;
+        if (candidate.isRocket) ctx.contrailEngine?.detach(candidate.id);
+        this.projectiles.splice(j, 1);
       }
+      expiredProjectileIds.clear();
     };
 
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
@@ -105,6 +111,10 @@ export class WeaponSimulationSystem {
       // 尾迹缎带点与等离子余烬微粒采样
       this.missileGuidance.updateParticlesAndContrail(p, ctx);
 
+      // 弹道射程是否在本帧耗尽。注意此处只记录、不立即删除：最后一段位移
+      // 仍然必须参与碰撞检测，否则近距离的最后一击会被直接吞掉。
+      const isRangeExpired = p.rangeRemaining <= 0 && p.flightTimeRemaining === undefined;
+
       // 2. 高射炮近炸引信与凌空殉爆判定 (Proximity Fuse Airburst PD)
       if (p.proximityFuse) {
         const burst = this.collisionHandler.checkProximityFuse(p, ctx, this.projectiles);
@@ -121,13 +131,6 @@ export class WeaponSimulationSystem {
           }
           continue;
         }
-      }
-
-      // 非导弹继续用弹道射程决定寿命；有 source flightTime 的导弹由飞行时间独立控制。
-      if (p.rangeRemaining <= 0 && p.flightTimeRemaining === undefined) {
-        if (p.isRocket) ctx.contrailEngine?.detach(p.id);
-        this.projectiles.splice(i, 1);
-        continue;
       }
 
       // 3. 轻型机枪点防拦截导弹 (Light MG PD)
@@ -156,14 +159,41 @@ export class WeaponSimulationSystem {
         continue;
       }
 
+      const canBatch = this.collisionHandler.canBatchShipCollision(p);
+
+      // 4.5 小行星阻挡：与舰船碰撞共用同一段位移，按归一化交点 t 取更早者。
+      // 修复前小行星检测在弹丸移动之前、舰船检测在移动之后，同一帧穿过两者时
+      // 舰船会先被扣血而小行星毫发无损。
+      const asteroidImpact = ctx.queryAsteroidImpact?.(p) ?? null;
+      if (asteroidImpact) {
+        const shipHitT = this.findShipHitParameter(p, allShips);
+        if (shipHitT === null || asteroidImpact.t <= shipHitT) {
+          ctx.commitAsteroidImpact?.(p, asteroidImpact);
+          if (canBatch) {
+            const batchIndex = batchedCollisionProjectiles.indexOf(p);
+            if (batchIndex >= 0) batchedCollisionProjectiles.splice(batchIndex, 1);
+          }
+          this.projectiles.splice(i, 1);
+          continue;
+        }
+      }
+
       // 5. 与敌对舰船碰撞判定 (护盾与装甲)
-      if (this.collisionHandler.canBatchShipCollision(p)) {
+      if (canBatch) {
         batchedCollisionProjectiles.push(p);
+        if (isRangeExpired) expiredProjectileIds.add(p.id);
         continue;
       }
 
       const hit = this.collisionHandler.checkShipCollision(p, allShips, ctx);
       if (hit) {
+        if (p.isRocket) ctx.contrailEngine?.detach(p.id);
+        this.projectiles.splice(i, 1);
+        continue;
+      }
+
+      // 6. 最后一段位移未命中任何目标，射程耗尽才真正移除。
+      if (isRangeExpired) {
         if (p.isRocket) ctx.contrailEngine?.detach(p.id);
         this.projectiles.splice(i, 1);
       }
@@ -172,6 +202,23 @@ export class WeaponSimulationSystem {
     // Flush the final contiguous ordinary-ballistic run. Damage/effects are
     // still applied in the same descending projectile order as the legacy loop.
     flushBatchedCollisions();
+  }
+
+  /**
+   * 只查询、不结算的舰船交点参数 t ∈ [0, 1]，用于与小行星交点比较先后顺序。
+   * 候选筛选条件与 ProjectileCollisionHandler.createRuntimeQuery() 保持一致。
+   */
+  private findShipHitParameter(p: Projectile, allShips: Ship[]): number | null {
+    const candidates = allShips.filter(
+      (ship) =>
+        ship.id !== p.sourceShipId &&
+        (p.isPlayer === undefined || ship.isPlayer !== p.isPlayer) &&
+        !ship.isDead &&
+        !ship.isPhased
+    );
+    if (candidates.length === 0) return null;
+    const hit = this.collisionHandler.runtimeCollisionKernel.findHits([{ projectile: p, candidates }])[0];
+    return hit ? hit.t : null;
   }
 
   public updateBeams(dt: number, ctx: WeaponSimContext) {

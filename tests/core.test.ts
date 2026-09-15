@@ -22,6 +22,12 @@ import { Ship } from '../src/engine/simulation/Ship';
 import { ShipSystem } from '../src/engine/simulation/ShipSystem';
 import { ShipCollisionSystem } from '../src/engine/simulation/systems/ShipCollisionSystem';
 import { AsteroidSystem } from '../src/engine/simulation/systems/AsteroidSystem';
+import type { AsteroidFXCallbacks } from '../src/engine/simulation/systems/AsteroidSystem';
+import type { CollisionFXCallbacks } from '../src/engine/simulation/systems/ShipCollisionSystem';
+import type { MineFXCallbacks } from '../src/engine/simulation/systems/MineSystem';
+import type { FighterFXCallbacks } from '../src/engine/simulation/systems/FighterSystem';
+import type { WeaponSimContext } from '../src/engine/simulation/systems/weapon/WeaponSimContext';
+import type { Asteroid } from '../src/engine/simulation/CombatTypes';
 import {
   getDirectionalShipCollisionExtent,
   getShieldToShieldContact
@@ -2742,5 +2748,721 @@ describe('deterministic visual primitives', () => {
     const resolver = new AssetResolver();
     expect(() => resolver.url('../../outside.txt')).toThrow(/escapes bundle root/);
     expect(resolver.url('graphics/../sounds/test.ogg')).toBe('/game-assets/sounds/test.ogg');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Combat audit regressions: permanent ports of the probe scenarios that confirmed
+// 22 engine defects (artifacts/audit-2026-09-14/*.mjs).
+// ---------------------------------------------------------------------------
+
+type CombatEngineInternals = {
+  getWeaponSimContext(): WeaponSimContext;
+  getAsteroidFXCallbacks(): AsteroidFXCallbacks;
+  getMineFXCallbacks(): MineFXCallbacks;
+  getFighterFXCallbacks(): FighterFXCallbacks;
+  handleShipDestruction(ship: Ship): void;
+};
+
+/**
+ * The audit probes reached CombatEngine's integration helpers through Vite SSR, where TypeScript's
+ * `private` modifier has no runtime effect. These tests keep the exact probe wiring by going through
+ * one explicit structural cast instead of re-implementing the callback objects.
+ */
+const auditInternals = (engine: CombatEngine): CombatEngineInternals =>
+  engine as unknown as CombatEngineInternals;
+
+const auditNoop = (): void => {};
+
+/** Mirrors clearBattle()/clear() in the probes: empties every battle participant and asteroid. */
+const clearAuditBattle = (engine: CombatEngine): void => {
+  engine.playerShip.pos.set(-3000, 0);
+  engine.enemyShip.pos.set(3000, 0);
+  engine.playerShip.weapons = [];
+  engine.enemyShip.weapons = [];
+  engine.fighterSystem.fighters = [];
+  engine.fighterSystem.bombers = [];
+  engine.fighterSystem.playerWings = [];
+  engine.fighterSystem.enemyWings = [];
+  engine.asteroidSystem.asteroids = [];
+};
+
+/** Mirrors shot() in verify-b34d0ed.mjs. */
+const auditShot = (engine: CombatEngine, id: number, overrides: Partial<Projectile> = {}): Projectile => ({
+  id,
+  sourceShipId: engine.playerShip.id,
+  isPlayer: true,
+  specId: 'dualflak',
+  pos: new Vector2(),
+  prevPos: new Vector2(),
+  vel: new Vector2(),
+  damage: 100,
+  damageType: 'FRAGMENTATION',
+  radius: 1,
+  rangeRemaining: 1000,
+  totalRange: 1000,
+  elapsedTime: 0,
+  color: [255, 255, 255],
+  ...overrides
+});
+
+/** Mirrors asteroid() in verify-b34d0ed.mjs. */
+const auditAsteroid = (pos: Vector2 = new Vector2()): Asteroid => ({
+  id: 999,
+  pos,
+  vel: new Vector2(),
+  radius: 10,
+  mass: 100,
+  hp: 1000,
+  maxHp: 1000,
+  facingRad: 0,
+  angularVel: 0,
+  spriteUrl: '/game-assets/graphics/asteroids/asteroid3.png'
+});
+
+/** Mirrors collisionFX in gameplay-round2.mjs. */
+const auditCollisionFX: CollisionFXCallbacks = {
+  addFloatingDamage: vi.fn(),
+  spawnSparks: vi.fn(),
+  spawnDebris: vi.fn(),
+  addCameraShake: vi.fn(),
+  getPlayerPos: () => new Vector2()
+};
+
+/** Runs a probe body while suppressing the positional combat audio that body produces. */
+const withMutedSound = <T>(run: () => T): T => {
+  const spy = vi.spyOn(sound, 'playAtPos').mockImplementation(() => {});
+  try {
+    return run();
+  } finally {
+    spy.mockRestore();
+  }
+};
+
+const armorTotal = (ship: Ship): number => ship.armor.cells.reduce((sum, cell) => sum + cell, 0);
+
+describe('combat audit: projectiles and asteroids', () => {
+  it('hits the asteroid in front of a ship when both are crossed in the same frame', () => {
+    const engine = new CombatEngine('onslaught', 'broadsword');
+    clearAuditBattle(engine);
+    engine.enemyShip.pos.set(100, 0);
+    engine.enemyShip.shield.type = 'NONE';
+    engine.enemyShip.armor.cells.fill(0);
+    engine.asteroidSystem.asteroids = [auditAsteroid()];
+    engine.weaponSystem.projectiles = [
+      auditShot(engine, 71, {
+        specId: 'mark9',
+        damageType: 'ENERGY',
+        pos: new Vector2(-20, 0),
+        prevPos: new Vector2(-20, 0),
+        vel: new Vector2(12000, 0)
+      })
+    ];
+    const hullBefore = engine.enemyShip.hullHp;
+
+    withMutedSound(() => engine.fixedUpdate(1 / 60));
+
+    expect(hullBefore - engine.enemyShip.hullHp).toBe(0);
+    expect(engine.asteroidSystem.asteroids[0].hp).toBeLessThan(1000);
+    expect(engine.projectiles).toHaveLength(0);
+  });
+
+  it('damages the nearest asteroid when a projectile crosses two of them', () => {
+    const engine = new CombatEngine();
+    clearAuditBattle(engine);
+    engine.asteroidSystem.asteroids = [auditAsteroid(), { ...auditAsteroid(new Vector2(40, 0)), id: 1000 }];
+    engine.weaponSystem.projectiles = [
+      auditShot(engine, 72, { pos: new Vector2(80, 0), prevPos: new Vector2(-20, 0) })
+    ];
+
+    engine.asteroidSystem.resolveProjectileCollisions(engine.projectiles, auditInternals(engine).getAsteroidFXCallbacks());
+
+    expect(engine.asteroidSystem.asteroids[0].hp).toBe(900);
+    expect(engine.asteroidSystem.asteroids[1].hp).toBe(1000);
+  });
+
+  it('settles the last segment of a projectile whose range expires mid-frame', () => {
+    const engine = new CombatEngine();
+    engine.playerShip.pos.set(-1000, 0);
+    engine.enemyShip.pos.set(1000, 0);
+    engine.asteroidSystem.asteroids = [];
+    engine.fighterSystem.bombers = [];
+    const tinySpec: ShipSpec = {
+      ...modManager.getShip('broadsword')!,
+      id: 'tiny-range-target',
+      collisionRadius: 1,
+      bounds: [[-1, -1], [1, -1], [1, 1], [-1, 1]] as [number, number][]
+    };
+    const target = new Ship('tiny-range-target-1', tinySpec, false, new Vector2(1.5, 0), 0, new SimulationRandom(9301));
+    target.shield.type = 'NONE';
+    target.armor.cells.fill(0);
+    engine.fighterSystem.fighters = [target];
+    const hullBefore = target.hullHp;
+    engine.weaponSystem.projectiles = [
+      auditShot(engine, 19, {
+        specId: 'mark9',
+        damageType: 'ENERGY',
+        radius: 0.1,
+        rangeRemaining: 1,
+        totalRange: 100,
+        vel: new Vector2(600, 0)
+      })
+    ];
+
+    engine.weaponSystem.updateProjectiles(1 / 60, auditInternals(engine).getWeaponSimContext());
+
+    expect(hullBefore - target.hullHp).toBeCloseTo(94.34, 1);
+    expect(engine.projectiles).toHaveLength(0);
+  });
+});
+
+describe('combat audit: ramming and flak', () => {
+  it('settles armor overflow into hull when two ships ram', () => {
+    const engine = new CombatEngine();
+    const player = engine.playerShip;
+    const enemy = engine.enemyShip;
+    player.pos.set(0, 0);
+    enemy.pos.set(100, 0);
+    player.shield.type = 'NONE';
+    enemy.shield.type = 'NONE';
+    player.armor.cells.fill(0);
+    enemy.armor.cells.fill(0);
+    player.hullHp = 1;
+    enemy.hullHp = 1;
+    player.vel.set(100, 0);
+    enemy.vel.set(-100, 0);
+
+    withMutedSound(() => engine.collisionSystem.resolveShipToShipCollision(player, enemy, auditCollisionFX, 1 / 60));
+
+    expect(player.hullHp).toBe(0);
+    expect(enemy.hullHp).toBe(0);
+  });
+
+  it('applies the Fortress Shield multiplier to ram hard flux', () => {
+    const ramFlux = (fortressActive: boolean) => {
+      const engine = new CombatEngine();
+      const player = engine.playerShip;
+      const enemy = engine.enemyShip;
+      player.pos.set(0, 0);
+      enemy.pos.set(400, 0);
+      player.shield.type = 'OMNI';
+      enemy.shield.type = 'OMNI';
+      player.shield.setActive(true);
+      enemy.shield.setActive(true);
+      player.shield.currentArcDeg = 360;
+      enemy.shield.currentArcDeg = 360;
+      player.vel.set(100, 0);
+      enemy.vel.set(-100, 0);
+      if (fortressActive) {
+        enemy.system.activate();
+        enemy.system.update(2);
+      }
+
+      withMutedSound(() => engine.collisionSystem.resolveShipToShipCollision(player, enemy, auditCollisionFX, 1 / 60));
+
+      return { multiplier: enemy.system.getShieldDamageMultiplier(), flux: enemy.flux.totalFlux };
+    };
+
+    const unmitigated = ramFlux(false);
+    const fortress = ramFlux(true);
+
+    expect(unmitigated.multiplier).toBe(1);
+    expect(unmitigated.flux).toBe(1280);
+    expect(fortress.multiplier).toBeCloseTo(0.1, 8);
+    expect(fortress.flux).toBeCloseTo(unmitigated.flux * 0.1, 6);
+  });
+
+  it('settles flak airburst damage through fighter armor', () => {
+    const engine = new CombatEngine();
+    clearAuditBattle(engine);
+    const fighter = new Ship('enemy-ftr', modManager.getShip('broadsword')!, false, new Vector2(), 0, new SimulationRandom(6106));
+    fighter.shield.setActive(false);
+    engine.fighterSystem.fighters = [fighter];
+    const hullBefore = fighter.hullHp;
+    const armorBefore = armorTotal(fighter);
+    const shell = auditShot(engine, 91, { proximityFuse: { range: 15, explosionRadius: 30, coreRadius: 15 } });
+
+    withMutedSound(() =>
+      engine.weaponSystem.collisionHandler.checkProximityFuse(
+        shell,
+        auditInternals(engine).getWeaponSimContext(),
+        [shell]
+      )
+    );
+
+    // This port builds fighter armor grids at their true 4x4 size without vanilla's padded outer
+    // ring, so the same airburst leaves almost no overflow for the hull: only a few points reach
+    // it instead of the full 100. Armor must still absorb the burst (the pre-fix code skipped the
+    // grid entirely and dealt the raw 100 straight to hull).
+    expect(armorBefore - armorTotal(fighter)).toBeGreaterThan(0);
+    expect(hullBefore - fighter.hullHp).toBeLessThan(20);
+  });
+});
+
+describe('combat audit: mines and fighters', () => {
+  it('keeps a friendly fighter from tripping its own mine fuse while the blast stays friendly-fire capable', () => {
+    const engine = new CombatEngine('doom', 'paragon');
+    clearAuditBattle(engine);
+    engine.playerShip.pos.set(-900, 0);
+    const friendly = new Ship('friendly-broadsword', modManager.getShip('broadsword')!, true, new Vector2(), 0, new SimulationRandom(7007));
+    engine.fighterSystem.fighters = [friendly];
+    const internals = auditInternals(engine);
+    const ships = [engine.playerShip, engine.enemyShip, friendly];
+
+    withMutedSound(() => {
+      engine.deployMine(new Vector2(), engine.playerShip);
+      engine.mines[0].isArmed = true;
+      engine.mines[0].armedTimer = 0;
+      engine.mineSystem.update(1 / 60, ships, internals.getMineFXCallbacks());
+    });
+
+    expect(engine.mines[0].isDetonating).toBe(false);
+    const hullBefore = friendly.hullHp;
+    const armorBefore = armorTotal(friendly);
+
+    withMutedSound(() => {
+      const mine = engine.mines[0];
+      mine.isDetonating = true;
+      mine.detonatingTimer = 0;
+      engine.mineSystem.update(0.7, ships, internals.getMineFXCallbacks());
+    });
+
+    expect(hullBefore - friendly.hullHp + (armorBefore - armorTotal(friendly))).toBeGreaterThan(0);
+  });
+
+  it('settles mine damage into the battle statistics and the kill count', () => {
+    const engine = new CombatEngine('doom', 'onslaught');
+    clearAuditBattle(engine);
+    engine.enemyShip.armor.cells.fill(0);
+    engine.enemyShip.hullHp = 1;
+    engine.enemyShip.shield.setActive(false);
+    engine.playerShip.pos.copy(engine.enemyShip.pos.clone().add(new Vector2(-900, 0)));
+
+    withMutedSound(() => {
+      engine.deployMine(engine.enemyShip.pos, engine.playerShip);
+      const mine = engine.mines[0];
+      mine.isArmed = true;
+      mine.isDetonating = true;
+      mine.detonatingTimer = 0;
+      engine.fixedUpdate(1 / 60);
+    });
+
+    expect(engine.enemyShip.isDead).toBe(true);
+    expect(engine.statsTracker.playerStats.totalDamageDealt).toBeGreaterThan(0);
+    expect(engine.statsTracker.playerStats.heDamage).toBeGreaterThan(0);
+  });
+
+  it('steers a fighter to its tactical waypoint instead of chasing the enemy', () => {
+    const engine = new CombatEngine();
+    clearAuditBattle(engine);
+    engine.enemyShip.pos.set(1000, 0);
+    const fighter = new Ship('player-waypoint-ftr', modManager.getShip('broadsword')!, true, new Vector2(), 0, new SimulationRandom(9009));
+    engine.fighterSystem.fighters = [fighter];
+
+    expect(engine.issueOrder(fighter.id, { type: 'WAYPOINT', targetPos: new Vector2(-1000, 0) })).toBe(true);
+    engine.fighterSystem.updateFighters(
+      1 / 60,
+      engine.playerShip,
+      engine.enemyShip,
+      [],
+      auditNoop,
+      auditNoop,
+      auditNoop,
+      auditInternals(engine).getFighterFXCallbacks()
+    );
+
+    expect(fighter.turnInput).toBeLessThan(0);
+    expect(engine.fighterSystem.fighterAIModes.get(fighter.id)?.state).not.toBe('ATTACK');
+  });
+
+  it('keeps a bomber armed when its torpedo launcher cannot fire', () => {
+    const engine = new CombatEngine();
+    const bomber = engine.bombers[0];
+    engine.fighterSystem.bombers = [bomber];
+    bomber.pos.set(0, 0);
+    bomber.facingRad = 0;
+    engine.enemyShip.pos.set(500, 0);
+    const launcher = bomber.weapons.find((w) => w.spec.id === 'atropos_single')!;
+    launcher.isDisabled = true;
+    launcher.disabledTimer = 10;
+
+    withMutedSound(() =>
+      engine.fighterSystem.updateBombers(
+        1 / 60,
+        engine.playerShip,
+        engine.enemyShip,
+        auditNoop,
+        auditNoop,
+        auditNoop,
+        auditInternals(engine).getFighterFXCallbacks()
+      )
+    );
+
+    const mode = engine.fighterSystem.bomberAIModes.get(bomber.id)!;
+    expect(mode.hasTorpedo).toBe(true);
+    expect(mode.state).not.toBe('RETURN_TO_REARM');
+  });
+
+  it('refills a docked bomber and re-arms it', () => {
+    const engine = new CombatEngine();
+    const bomber = engine.bombers[0];
+    const launcher = bomber.weapons.find((w) => w.spec.id === 'atropos_single')!;
+    launcher.ammo = 0;
+    const mode = engine.fighterSystem.bomberAIModes.get(bomber.id)!;
+    mode.state = 'DOCKED';
+    mode.timer = 0;
+    mode.hasTorpedo = false;
+
+    withMutedSound(() =>
+      engine.fighterSystem.updateBombers(
+        1 / 60,
+        engine.playerShip,
+        engine.enemyShip,
+        auditNoop,
+        auditNoop,
+        auditNoop,
+        auditInternals(engine).getFighterFXCallbacks()
+      )
+    );
+
+    expect(launcher.ammo).toBe(launcher.spec.maxAmmo);
+    expect(mode.hasTorpedo).toBe(true);
+  });
+});
+
+describe('combat audit: beams and weapon control', () => {
+  const runBeamInterruption = (reason: 'death' | 'overload') => {
+    const engine = new CombatEngine('paragon', 'onslaught');
+    const ship = engine.playerShip;
+    ship.pos.set(0, 0);
+    ship.facingRad = 0;
+    ship.aimTargetWorld.set(2000, 0);
+    ship.isFiringMain = true;
+    const mount = reason === 'death'
+      ? ship.weapons.find((w) => w.slotId === 'WS 005')!
+      : ship.weapons.find((w) => w.spec.id === 'tachyonlance')!;
+    ship.weapons = [mount];
+    mount.currentAngleRad = 0;
+    ship.weaponGroups = [
+      { index: 0, mode: 'LINKED', isAutofire: false, weaponSlotIds: [mount.slotId], alternatingIndex: 0 }
+    ];
+    engine.enemyShip.pos.set(500, 0);
+    engine.enemyShip.shield.type = 'OMNI';
+    engine.enemyShip.shield.setActive(true);
+    engine.enemyShip.shield.currentArcDeg = 360;
+
+    const beams: Beam[] = [];
+    const emit = (b: Beam) => {
+      const existing = beams.find((x) => x.slotId === b.slotId);
+      if (existing) Object.assign(existing, b);
+      else beams.push(b);
+    };
+
+    return withMutedSound(() => {
+      for (let n = 0; n < 120 && mount.firingState !== 'ACTIVE'; n++) {
+        ship.weaponControl.update(1 / 60, ship, 0, engine.enemyShip, auditNoop, emit);
+      }
+      const initial = mount.firingState;
+
+      if (reason === 'death') auditInternals(engine).handleShipDestruction(ship);
+      else ship.flux.triggerOverload(0);
+
+      const fluxBefore = engine.enemyShip.flux.totalFlux;
+      for (let n = 0; n < 15; n++) {
+        ship.update(1 / 60, engine.enemyShip, auditNoop, emit);
+        engine.weaponSystem.beamHandler.update(1 / 60, auditInternals(engine).getWeaponSimContext(), beams);
+      }
+      return { initial, beamCount: beams.length, fluxAdded: engine.enemyShip.flux.totalFlux - fluxBefore };
+    });
+  };
+
+  it('stops a beam from dealing damage once its source ship is destroyed', () => {
+    const result = runBeamInterruption('death');
+
+    expect(result.initial).toBe('ACTIVE');
+    expect(result.beamCount).toBe(0);
+    expect(result.fluxAdded).toBe(0);
+  });
+
+  it('interrupts an active burst beam when the source ship overloads', () => {
+    const result = runBeamInterruption('overload');
+
+    // The retracting beam may survive as a purely visual beam, so only damage stopping is asserted.
+    expect(result.initial).toBe('ACTIVE');
+    expect(result.fluxAdded).toBe(0);
+  });
+
+  it('lets an ALTERNATING group fire past a disabled mount', () => {
+    const fireShots = (mode: 'ALTERNATING' | 'LINKED', disableFirstMount: boolean) => {
+      const ship = new Ship('broadsword-alt', modManager.getShip('broadsword')!, true, new Vector2(), 0, new SimulationRandom(1301));
+      ship.weapons = ship.weapons.slice(0, 2);
+      const [first, second] = ship.weapons;
+      if (disableFirstMount) {
+        first.isDisabled = true;
+        first.disabledTimer = 10;
+      }
+      ship.weaponGroups = [{ index: 0, mode, isAutofire: false, weaponSlotIds: [first.slotId, second.slotId], alternatingIndex: 0 }];
+      ship.aimTargetWorld.set(1000, 0);
+      ship.isFiringMain = true;
+      const shotsBySlot = new Map<string, number>();
+      const recordShot = (projectile: Projectile) => {
+        shotsBySlot.set(projectile.slotId, (shotsBySlot.get(projectile.slotId) ?? 0) + 1);
+      };
+      for (let n = 0; n < 60; n++) ship.weaponControl.update(1 / 60, ship, 0, null, recordShot, auditNoop);
+      return {
+        firstSlotShots: shotsBySlot.get(first.slotId) ?? 0,
+        secondSlotShots: shotsBySlot.get(second.slotId) ?? 0,
+        total: [...shotsBySlot.values()].reduce((sum, count) => sum + count, 0)
+      };
+    };
+
+    const alternating = fireShots('ALTERNATING', true);
+    const linked = fireShots('LINKED', true);
+
+    // A disabled mount must never stall its group: before the fix the ALTERNATING group fired
+    // 0 shots in this exact scenario. With only one usable mount left, the rotation resolves
+    // straight back to that gun, so it fires at its own cadence and equals the LINKED count —
+    // equality is the correct outcome here, not a shortfall.
+    expect(alternating.total).toBeGreaterThan(0);
+    expect(alternating.total).toBe(linked.total);
+    expect(alternating.firstSlotShots).toBe(0);
+    expect(alternating.secondSlotShots).toBe(alternating.total);
+
+    // Positive control: with both mounts healthy the rotation really does visit both slots.
+    const healthy = fireShots('ALTERNATING', false);
+    expect(healthy.firstSlotShots).toBeGreaterThan(0);
+    expect(healthy.secondSlotShots).toBeGreaterThan(0);
+  });
+
+  it('refuses to spend a limited missile on a fully phased target', () => {
+    const ship = new Ship('doom-autofire', modManager.getShip('doom')!, true, new Vector2(), 0, new SimulationRandom(1401));
+    const target = new Ship('doom-phased-target', modManager.getShip('doom')!, false, new Vector2(500, 0), 0, new SimulationRandom(1402));
+    target.shield.setActive(true);
+    const launcher = ship.weapons.find((w) => w.spec.id === 'typhoon')!;
+    ship.weapons = [launcher];
+    ship.weaponGroups = [
+      { index: 0, mode: 'LINKED', isAutofire: false, weaponSlotIds: [], alternatingIndex: 0 },
+      { index: 1, mode: 'LINKED', isAutofire: true, weaponSlotIds: [launcher.slotId], alternatingIndex: 0 }
+    ];
+    target.pos.copy(launcher.relativePos.clone().add(Vector2.fromAngle((launcher.baseAngleDeg * Math.PI) / 180, 500)));
+    let shots = 0;
+    for (let n = 0; n < 120; n++) ship.weaponControl.update(1 / 60, ship, 0, target, () => shots++, auditNoop);
+
+    expect(target.isPhased).toBe(true);
+    expect(shots).toBe(0);
+    expect(launcher.ammo).toBe(6);
+
+    // Control: the same geometry does launch once the target leaves phase, so the refusal above is
+    // the phased-target gate and not a mount that could never fire in the first place.
+    target.shield.setActive(false);
+    expect(target.isPhased).toBe(false);
+    let controlShots = 0;
+    for (let n = 0; n < 120; n++) ship.weaponControl.update(1 / 60, ship, 0, target, () => controlShots++, auditNoop);
+    expect(controlShots).toBeGreaterThan(0);
+  });
+
+  it('refuses to fire when the ship lacks the flux capacity for the shot', () => {
+    const fireOnce = (softFlux: number, shipId: string) => {
+      const ship = new Ship(shipId, modManager.getShip('onslaught')!, true, new Vector2(), 0, new SimulationRandom(1501));
+      const mount = ship.weapons.find((w) => !w.spec.isBeam && w.spec.fluxPerShot > 0)!;
+      ship.weapons = [mount];
+      ship.weaponGroups = [
+        { index: 0, mode: 'LINKED', isAutofire: false, weaponSlotIds: [mount.slotId], alternatingIndex: 0 }
+      ];
+      mount.currentAngleRad = (mount.baseAngleDeg * Math.PI) / 180;
+      ship.aimTargetWorld.copy(mount.relativePos.clone().add(Vector2.fromAngle(mount.currentAngleRad, 2000)));
+      ship.isFiringMain = true;
+      ship.flux.softFlux = softFlux;
+      let shots = 0;
+      ship.weaponControl.update(1 / 60, ship, 0, null, () => shots++, auditNoop);
+      return { shots, overloaded: ship.flux.isOverloaded, fluxPerShot: mount.spec.fluxPerShot };
+    };
+
+    const starved = fireOnce(modManager.getShip('onslaught')!.maxFlux - 1, 'onslaught-flux');
+    expect(starved.fluxPerShot).toBeGreaterThan(0);
+    expect(starved.shots).toBe(0);
+    expect(starved.overloaded).toBe(false);
+
+    // Control: with the same aimed mount it does fire once the flux is available, so the refusal
+    // above is the flux-capacity gate.
+    expect(fireOnce(0, 'onslaught-flux-control').shots).toBeGreaterThan(0);
+  });
+});
+
+describe('combat audit: phase cloak, shield upkeep and CR', () => {
+  it('gates the phase cloak through IN, ACTIVE, OUT and COOLDOWN without flicker', () => {
+    const ship = new Ship('doom-phase', modManager.getShip('doom')!, true, new Vector2(), 0, new SimulationRandom(1601));
+    ship.weapons = [];
+    const shield = ship.shield;
+
+    expect(shield.toggle()).toBe(true);
+    expect(shield.phaseState).toBe('IN');
+    expect(ship.isPhased).toBe(true);
+
+    for (let n = 0; n < 31; n++) shield.update(1 / 60, 0, 0);
+    expect(shield.phaseState).toBe('ACTIVE');
+
+    // Turning an engaged cloak off only starts the 0.5 s OUT stage; it is never an instant flip.
+    expect(shield.toggle()).toBe(false);
+    expect(shield.phaseState).toBe('OUT');
+    expect(shield.toggle()).toBe(false);
+    expect(shield.toggle()).toBe(false);
+    expect(shield.phaseState).toBe('OUT');
+
+    for (let n = 0; n < 31; n++) shield.update(1 / 60, 0, 0);
+    expect(shield.phaseState).toBe('COOLDOWN');
+    expect(ship.isPhased).toBe(false);
+    expect(shield.toggle()).toBe(false);
+    expect(shield.phaseState).toBe('COOLDOWN');
+
+    for (let n = 0; n < 121; n++) shield.update(1 / 60, 0, 0);
+    expect(shield.phaseState).toBe('IDLE');
+
+    // A toggle one frame after engaging must only start OUT, so the cloak cannot be flickered.
+    const flicker = new Ship('doom-flicker', modManager.getShip('doom')!, true, new Vector2(), 0, new SimulationRandom(1602));
+    flicker.weapons = [];
+    expect(flicker.shield.toggle()).toBe(true);
+    flicker.shield.update(1 / 60, 0, 0);
+    expect(flicker.shield.toggle()).toBe(false);
+    expect(flicker.shield.phaseState).toBe('OUT');
+    expect(flicker.shield.isPhaseEngaged).toBe(true);
+    expect(flicker.shield.toggle()).toBe(false);
+    expect(flicker.shield.phaseState).toBe('OUT');
+  });
+
+  it('charges phase activation and upkeep as hard flux taken from hull data', () => {
+    const ship = new Ship('doom-phase-flux', modManager.getShip('doom')!, true, new Vector2(), 0, new SimulationRandom(1701));
+    ship.weapons = [];
+    ship.flux.baseDissipation = 0;
+
+    expect(ship.shield.phaseActivationCost).toBeCloseTo(500, 6);
+    expect(ship.shield.phaseUpkeepPerSecond).toBeCloseTo(500, 6);
+
+    ship.shield.toggle();
+    expect(ship.flux.hardFlux).toBeCloseTo(500, 6);
+    expect(ship.flux.softFlux).toBe(0);
+
+    for (let n = 0; n < 60; n++) ship.update(1 / 60, null, auditNoop, auditNoop);
+
+    expect(ship.flux.hardFlux).toBeCloseTo(1000, 4);
+    expect(ship.flux.softFlux).toBe(0);
+  });
+
+  it('never lets phase upkeep or activation overload the ship', () => {
+    const ship = new Ship('doom-phase-overload', modManager.getShip('doom')!, true, new Vector2(), 0, new SimulationRandom(1801));
+    ship.weapons = [];
+    ship.flux.hardFlux = ship.spec.maxFlux - 1;
+
+    ship.shield.setActive(true);
+    ship.update(1 / 60, null, auditNoop, auditNoop);
+
+    expect(ship.flux.isOverloaded).toBe(false);
+    expect(ship.isPhased).toBe(true);
+    expect(ship.flux.hardFlux).toBe(ship.spec.maxFlux);
+  });
+
+  it('slows a phased ship with hard flux through the phase coil speed penalty', () => {
+    const settlePhaseSpeed = (hardFluxFraction: number) => {
+      const ship = new Ship('doom-phase-speed', modManager.getShip('doom')!, true, new Vector2(), 0, new SimulationRandom(1901));
+      ship.weapons = [];
+      ship.flux.hardFlux = ship.spec.maxFlux * hardFluxFraction;
+      ship.flux.softFlux = 100;
+      ship.shield.setActive(true);
+      ship.throttle = 1;
+      ship.vel.set(ship.spec.maxSpeed, 0);
+      for (let n = 0; n < 60; n++) ship.update(1 / 60, null, auditNoop, auditNoop);
+      return ship.vel.length();
+    };
+
+    const speedAtHalfFlux = settlePhaseSpeed(0.5);
+    const speedAtZeroFlux = settlePhaseSpeed(0);
+
+    expect(speedAtHalfFlux).toBeCloseTo(24.75, 1);
+    expect(speedAtZeroFlux).toBeGreaterThan(speedAtHalfFlux);
+  });
+
+  it('takes shield upkeep from hull data instead of a hard-coded rate', () => {
+    const upkeepAfterOneSecond = (shipId: string) => {
+      const ship = new Ship(`upkeep-${shipId}`, modManager.getShip(shipId)!, true, new Vector2(), 0, new SimulationRandom(2001));
+      ship.weapons = [];
+      ship.shield.setActive(true);
+      ship.flux.baseDissipation = 0;
+      for (let n = 0; n < 60; n++) ship.update(1 / 60, null, auditNoop, auditNoop);
+      return ship.flux.softFlux;
+    };
+
+    expect(upkeepAfterOneSecond('onslaught')).toBeCloseTo(240, 2);
+    expect(upkeepAfterOneSecond('paragon')).toBeCloseTo(750, 2);
+  });
+
+  it('charges 10% of base flux capacity for a Mine Strike activation', () => {
+    const engine = new CombatEngine('doom', 'paragon');
+    clearAuditBattle(engine);
+    engine.playerShip.aimTargetWorld.copy(engine.playerShip.pos.clone().add(new Vector2(500, 0)));
+    const system = engine.playerShip.system;
+
+    expect(system.fluxCostPerUse).toBeCloseTo(1000, 6);
+
+    withMutedSound(() => {
+      system.activate();
+      engine.fixedUpdate(1 / 60);
+    });
+
+    expect(engine.playerShip.flux.totalFlux).toBeGreaterThan(900);
+    expect(engine.mines).toHaveLength(1);
+  });
+
+  it('applies CRPluginImpl movement, damage and malfunction effects from combat readiness', () => {
+    const standard = new Ship('cr-standard', modManager.getShip('onslaught')!, true, new Vector2(), 0, new SimulationRandom(2201));
+    expect(standard.currentCR).toBeCloseTo(0.7, 8);
+    expect(standard.crMovementMultiplier).toBe(1);
+    expect(standard.crDamageDealtMultiplier).toBe(1);
+    expect(standard.crDamageTakenMultiplier).toBe(1);
+
+    standard.throttle = 0;
+    standard.vel.set(400, 0);
+    standard.update(1 / 60, null, auditNoop, auditNoop);
+    expect(standard.vel.length()).toBeCloseTo(25, 6);
+
+    const degraded = new Ship('cr-zero', modManager.getShip('onslaught')!, true, new Vector2(), 0, new SimulationRandom(2202));
+    degraded.currentCR = 0;
+    expect(degraded.crMovementMultiplier).toBeCloseTo(0.9, 8);
+    expect(degraded.crDamageDealtMultiplier).toBeCloseTo(0.9, 8);
+    expect(degraded.crDamageTakenMultiplier).toBeCloseTo(1.1, 8);
+    expect(degraded.crEffects.weaponMalfunctionChancePerSec).toBeCloseTo(0.1, 8);
+    expect(degraded.crEffects.criticalMalfunctionChancePerSec).toBeCloseTo(0.25, 8);
+    expect(degraded.crEffects.systemDisabled).toBe(true);
+    expect(degraded.canUseShields()).toBe(false);
+
+    degraded.throttle = 0;
+    degraded.vel.set(400, 0);
+    degraded.update(1 / 60, null, auditNoop, auditNoop);
+    expect(degraded.vel.length()).toBeCloseTo(22.5, 6);
+
+    const attrited = new Ship('cr-attrition', modManager.getShip('onslaught')!, true, new Vector2(), 0, new SimulationRandom(2203));
+    attrited.currentCR = 0;
+    for (let n = 0; n < 3600; n++) attrited.update(1 / 60, null, auditNoop, auditNoop);
+
+    expect(
+      attrited.weapons.some((w) => w.isDisabled) || attrited.engineStatuses.some((e) => e.isFlameout)
+    ).toBe(true);
+  });
+});
+
+describe('combat audit: tactical orders', () => {
+  it('completes a reached WAYPOINT order and keeps an unreached one', () => {
+    const waypointSurvives = (targetX: number) => {
+      const engine = new CombatEngine();
+      engine.playerShip.pos.set(0, 0);
+      engine.enemyShip.pos.set(2000, 0);
+      expect(engine.issueOrder(engine.playerShip.id, { type: 'WAYPOINT', targetPos: new Vector2(targetX, 0) })).toBe(true);
+
+      withMutedSound(() => engine.fixedUpdate(1 / 60));
+
+      return engine.orders.has(engine.playerShip.id);
+    };
+
+    expect(waypointSurvives(0)).toBe(false);
+    expect(waypointSurvives(2000)).toBe(true);
   });
 });

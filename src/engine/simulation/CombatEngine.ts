@@ -1,5 +1,6 @@
 import { Vector2 } from '../math/Vector2';
 import { Ship } from './Ship';
+import { DamageType } from './ArmorGrid';
 import { Projectile, Beam, LauncherSmokeSpec, MuzzleFlashSpec } from './Weapon';
 import { CapitalShipAI } from '../ai/CapitalShipAI';
 import { modManager } from '../modding/ModManager';
@@ -260,6 +261,22 @@ export class CombatEngine {
     }, this.combatTime);
   }
 
+  /**
+   * 战术航路点到达判定 (原版导航指令抵达即完成)。
+   * 缺少这步时旗舰/敌舰会被永久钉在航点上：油门归零、主炮停火，再也无法恢复交战。
+   * 战机与轰炸机由 FighterSystem 自行处理各自的航点指令。
+   */
+  private updateOrderCompletion() {
+    if (this.orders.size === 0) return;
+    for (const ship of [this.playerShip, this.enemyShip]) {
+      const order = this.orders.get(ship.id);
+      if (!order || order.type !== 'WAYPOINT' || !order.targetPos) continue;
+      if (ship.isDead || ship.pos.distanceTo(order.targetPos) <= 90) {
+        this.cancelOrder(ship.id);
+      }
+    }
+  }
+
   public toggleFighterRecall() {
     this.fighterSystem.toggleRecall((sender, faction, text, color) => {
       this.addRadioMessage(sender, faction, text, color);
@@ -503,6 +520,9 @@ export class CombatEngine {
     this.playerShip.update(dt, this.enemyShip, spawnProj, spawnBeam, spawnFlash);
     this.enemyShip.update(dt, this.playerShip, spawnProj, spawnBeam, spawnFlash);
 
+    // 2.1 战术航路点抵达判定 (抵达即完成，避免指挥舰被永久钉在航点上)
+    this.updateOrderCompletion();
+
     // 2.2 更新战机与轰炸机中队
     const fighterFX = this.getFighterFXCallbacks();
     this.fighterSystem.updateDecks(dt, this.playerShip, this.enemyShip, fighterFX);
@@ -514,7 +534,9 @@ export class CombatEngine {
     this.asteroidSystem.update(dt);
     const allShips = [this.playerShip, this.enemyShip, ...this.fighterSystem.fighters, ...this.fighterSystem.bombers];
     this.asteroidSystem.resolveShipCollisions(allShips, asteroidFX);
-    this.asteroidSystem.resolveProjectileCollisions(this.projectiles, asteroidFX);
+    // 弹丸与小行星的结算改由武器仿真在位移之后、舰船碰撞之前按交点顺序处理
+    // (见 WeaponSimulationSystem.updateProjectiles 步骤 4.5)，此处的旧调用会和
+    // 尚未移动的弹丸重复结算。
 
     // 2.4 更新星云流体 (Nebulae)
     this.nebulaSystem.update(dt, allShips, this.projectiles, (pos, color) => {
@@ -600,7 +622,10 @@ export class CombatEngine {
       },
       handleShipDestruction: (ship: Ship) => {
         this.handleShipDestruction(ship);
-      }
+      },
+      queryAsteroidImpact: (p) => this.asteroidSystem.queryProjectileImpact(p),
+      commitAsteroidImpact: (p, impact) =>
+        this.asteroidSystem.commitProjectileImpact(p, impact, this.getAsteroidFXCallbacks())
     };
   }
 
@@ -721,7 +746,13 @@ export class CombatEngine {
       addFloatingDamage: (pos: Vector2, amount: number, color: [number, number, number]) => this.addFloatingDamage(pos, amount, color),
       addCameraShake: (intensity: number, duration: number) => this.addCameraShake(intensity, duration),
       getPlayerPos: () => this.playerShip.pos,
-      handleShipDestruction: (ship: Ship) => this.handleShipDestruction(ship)
+      handleShipDestruction: (ship: Ship) => this.handleShipDestruction(ship),
+      recordDamageDealt: (
+        isPlayerAttacker: boolean,
+        damageType: DamageType,
+        amount: number,
+        targetArea: 'SHIELD' | 'ARMOR' | 'HULL'
+      ) => this.statsTracker.recordDamageDealt(isPlayerAttacker, damageType, amount, targetArea)
     };
   }
 
