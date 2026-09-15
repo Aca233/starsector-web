@@ -58,6 +58,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { summarizeGroupAmmo } from '../src/ui/hud/hudUtils';
 import { WeaponsConsole } from '../src/ui/hud/WeaponsConsole';
+import { AuthenticTacticalConsole } from '../src/ui/hud/AuthenticTacticalConsole';
 
 describe('Starsector text import', () => {
   it('preserves JSON primitives and // inside quoted URLs', () => {
@@ -3526,5 +3527,38 @@ describe('HUD weapon group ammo readout', () => {
     player.selectWeaponGroup(player.weaponGroups[kineticGroupIndex].index);
     expect(renderText()).not.toContain('弹药 AMMO:');
     expect(renderText()).not.toContain('弹药耗尽');
+  });
+
+  it('shows remaining rockets in the tactical console the combat HUD actually renders', () => {
+    const engine = new CombatEngine('onslaught', 'paragon');
+    const player = engine.playerShip;
+    const rockets = player.weapons.filter((mount) => mount.spec.id === 'annihilatorpod');
+    expect(rockets).toHaveLength(4);
+    const rocketGroupIndex = player.weaponGroups.findIndex((group) =>
+      group.weaponSlotIds.some((slotId) => rockets.some((mount) => mount.slotId === slotId))
+    );
+    player.selectWeaponGroup(player.weaponGroups[rocketGroupIndex].index);
+
+    const consoleText = () =>
+      renderToStaticMarkup(createElement(AuthenticTacticalConsole, { player, engine }))
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ');
+
+    // 编组卡片与逐门武器清单都要给出剩余弹数
+    expect(consoleText()).toContain('弹药 400/400');
+    expect(consoleText()).toContain('弹药 100/100');
+
+    rockets.forEach((mount) => { mount.ammo = 1; });
+    expect(consoleText()).toContain('弹药 4/400');
+
+    rockets.forEach((mount) => { mount.ammo = 0; });
+    expect(consoleText()).toContain('弹尽');
+
+    // 纯实弹编组不得出现弹药读数
+    const kineticGroupIndex = player.weaponGroups.findIndex((group) =>
+      group.weaponSlotIds.some((slotId) => player.weapons.find((mount) => mount.slotId === slotId)?.spec.id === 'mark9')
+    );
+    player.selectWeaponGroup(player.weaponGroups[kineticGroupIndex].index);
+    expect(consoleText()).not.toContain('伤害类型: 动能 弹药');
   });
 });

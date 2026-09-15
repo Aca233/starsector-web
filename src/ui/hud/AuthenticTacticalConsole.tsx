@@ -3,6 +3,7 @@ import { Ship } from '../../engine/simulation/Ship';
 import { CombatEngine } from '../../engine/simulation/CombatEngine';
 import { i18n } from '../../engine/i18n/LocalizationManager';
 import { ShipPaperDoll } from './ShipPaperDoll';
+import { summarizeGroupAmmo } from './hudUtils';
 
 export interface AuthenticTacticalConsoleProps {
   player: Ship;
@@ -240,6 +241,8 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
             const dmgType = first ? damageTypeLabel(first.spec.type) : '能量';
             const fireMode = group.mode === 'LINKED' ? '齐射' : '交替';
             const isAutofire = group.isAutofire;
+            // 有限弹药武器 (火箭/导弹/点防连发) 的剩余弹数，实弹与能量武器不显示
+            const ammo = summarizeGroupAmmo(mounts);
 
             return (
               <div
@@ -271,9 +274,23 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
                   </span>
                 </div>
 
-                {/* 第二行: 伤害类型 + 自动开火开关 */}
+                {/* 第二行: 伤害类型 + 剩余弹药 + 自动开火开关 */}
                 <div className="flex items-center justify-between pl-4 text-[10px] text-[#94ff00]/85">
                   <span>伤害类型:&nbsp;{dmgType}</span>
+                  {ammo.limited && (
+                    <span
+                      className={`font-bold ${
+                        ammo.allEmpty
+                          ? 'text-red-400 animate-pulse'
+                          : ammo.lowest <= 2
+                          ? 'text-amber-300'
+                          : 'text-amber-200/90'
+                      }`}
+                      title="该编组剩余弹药 / 弹药上限"
+                    >
+                      {ammo.allEmpty ? '弹尽' : `弹药 ${ammo.remaining}/${ammo.capacity}`}
+                    </span>
+                  )}
                   <div
                     onClick={(e) => {
                       e.stopPropagation();
@@ -299,11 +316,24 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
             {activeMounts.slice(0, 4).map((m, mIdx) => {
               const name = i18n.t(m.spec.nameKey).split(' ')[0];
               const isCooling = m.cooldownTimer > 0;
+              const limitedAmmo = Number.isFinite(m.ammo);
+              const maxAmmo = m.spec.maxAmmo ?? m.ammo;
               return (
                 <div key={mIdx} className="flex items-center justify-between text-[10px]">
                   <span className="text-[#94ff00]/90">{name}</span>
-                  <span className="text-[#94ff00]/70 font-mono">
-                    {isCooling ? `---- (${m.cooldownTimer.toFixed(1)}s)` : '---- |'}
+                  <span className="flex items-center gap-1.5">
+                    {limitedAmmo && (
+                      <span
+                        className={`font-bold ${
+                          m.ammo < 1 ? 'text-red-400 animate-pulse' : m.ammo <= 2 ? 'text-amber-300' : 'text-amber-200/90'
+                        }`}
+                      >
+                        {m.ammo < 1 ? '弹尽' : `弹药 ${m.ammo}/${maxAmmo}`}
+                      </span>
+                    )}
+                    <span className="text-[#94ff00]/70 font-mono">
+                      {isCooling ? `---- (${m.cooldownTimer.toFixed(1)}s)` : '---- |'}
+                    </span>
                   </span>
                 </div>
               );
