@@ -218,6 +218,16 @@ export interface WeaponGroup {
   isAutofire: boolean;
   weaponSlotIds: string[];
   alternatingIndex: number;
+  /**
+   * 交替射击组当前活动挂点已持续的时间 (秒)。
+   * 对齐 WeaponGroup.advanceAlternating(): 同一时刻只允许活动挂点开火，
+   * 活动权按 ((burstSize-1)*burstDelay + refireDelay + chargeTime)/炮数 的时间片轮换。
+   */
+  alternatingElapsed?: number;
+  /** 上一帧是否处于击发状态（用于原版的"松开扳机即手动换炮"判定）。 */
+  alternatingWasFiring?: boolean;
+  /** 上一次活动权变更是时间片自动轮换而非玩家手动切换。 */
+  alternatingJustSwitched?: boolean;
 }
 
 export interface Projectile {

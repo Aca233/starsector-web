@@ -206,12 +206,26 @@ export class ShipWeaponControlSystem {
       }
     }
 
-    // 交替射击组本帧轮到哪个挂点，由组级一次性解析 (见 resolveNextAlternatingSlot)：
-    // 故障/无弹/冷却中的挂点必须被跳过，否则它们会永久阻塞整组轮转。
-    const alternatingSlotId =
-      activeGroup && activeGroup.mode === 'ALTERNATING' && ship.isFiringMain && canShipFire
-        ? this.resolveNextAlternatingSlot(activeGroup)
-        : undefined;
+    // 交替射击组：同一时刻只允许"当前活动挂点"开火，并按原版时间片轮换
+    // (见 advanceAlternatingActive)。故障/无弹挂点会被跳过，否则它们会永久阻塞整组。
+    const isAlternatingGroup = !!activeGroup && activeGroup.mode === 'ALTERNATING';
+    if (isAlternatingGroup && activeGroup) {
+      if (ship.isFiringMain && canShipFire) {
+        this.advanceAlternatingActive(activeGroup, dt);
+      } else {
+        // 原版 WeaponGroup.advanceAlternating：松开扳机时，若上一次活动权不是被时间片
+        // 自动轮换掉的，就把活动权手动交给下一门可用炮——也就是玩家常用的"轻点扳机换炮"。
+        if (activeGroup.alternatingWasFiring && !activeGroup.alternatingJustSwitched) {
+          this.selectNextAlternatingActive(activeGroup);
+        }
+        activeGroup.alternatingElapsed = 0;
+        activeGroup.alternatingWasFiring = false;
+        activeGroup.alternatingJustSwitched = false;
+      }
+    }
+    const alternatingSlotId = isAlternatingGroup && activeGroup
+      ? activeGroup.weaponSlotIds[((activeGroup.alternatingIndex % activeGroup.weaponSlotIds.length) + activeGroup.weaponSlotIds.length) % activeGroup.weaponSlotIds.length]
+      : undefined;
 
     for (const mount of this.weapons) {
       mount.triggerHeld = false;
@@ -312,8 +326,8 @@ export class ShipWeaponControlSystem {
           if (activeGroup.mode === 'LINKED') {
             this.requestWeaponFire(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
           } else if (activeGroup.mode === 'ALTERNATING') {
-            // 轮转指针已在 resolveNextAlternatingSlot 中前进，无论本次是否真的击发，
-            // 保证拒绝开火的挂点不会独占轮转权。
+            // 原版交替模式：本帧只把开火指令发给当前活动挂点，其余挂点禁止击发。
+            // 活动权由 advanceAlternatingActive 按时间片轮换，因此两门炮会错开半个周期。
             if (mount.slotId === alternatingSlotId) {
               this.requestWeaponFire(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
             }
@@ -395,26 +409,118 @@ export class ShipWeaponControlSystem {
   }
 
   /**
-   * 交替射击组的下一个可击发挂点 (Starsector WeaponGroup.java 轮转射击)
-   * 从 alternatingIndex 起向前扫描至多一圈，跳过不存在、故障、无弹与冷却中的挂点；
-   * 命中后立即把轮转指针移到其后一位并返回该挂点 slotId，无论它最终是否真的击发——
-   * 这样单个拒绝开火的挂点绝不可能永久卡死整组轮转；整组全部不可用时返回 undefined，
-   * 本帧不击发且指针原地不动 (不会空转)。
+   * 交替射击组的时间片轮换 (1:1 原版 WeaponGroup.advanceAlternating)
+   *
+   * 原版规则：同一时刻只把"开火指令"发给当前活动挂点，其余挂点一律 advance(false) 禁止击发；
+   * 活动权按下述时间片轮换，而不是"谁冷却好了谁打"——因此两门同型炮在交替模式下会
+   * 各占半个周期、交替倾泻，而不会像齐射那样同帧齐发。
+   *
+   *   非光束时间片 = ((burstSize-1)*burstDelay + refireDelay + chargeTime) / 炮数
+   *   爆发光束时间片 = (burstDuration + burstCooldown + chargeup + chargedown) / 炮数
+   *   持续光束不轮换 (原版只在 isBurstBeam 分支里 selectNextActive)
+   *
+   * 故障/无弹挂点会被立即跳过（原版 findNextWeaponFrom 跳过 getAmmo()<=0），
+   * 因此单个坏挂点既不会卡死整组，也不会白占一个时间片。
    */
-  private resolveNextAlternatingSlot(group: WeaponGroup): string | undefined {
+  private advanceAlternatingActive(group: WeaponGroup, dt: number): void {
     const slotIds = group.weaponSlotIds;
-    if (slotIds.length === 0) return undefined;
-    const start = ((group.alternatingIndex % slotIds.length) + slotIds.length) % slotIds.length;
-    for (let offset = 0; offset < slotIds.length; offset++) {
-      const index = (start + offset) % slotIds.length;
+    if (slotIds.length === 0) return;
+
+    const mountAt = (index: number) => this.weapons.find((w) => w.slotId === slotIds[index]);
+    const isFireable = (mount?: WeaponMount) =>
+      !!mount && !mount.isDisabled && (!Number.isFinite(mount.ammo) || mount.ammo >= 1);
+
+    const startIndex = ((group.alternatingIndex % slotIds.length) + slotIds.length) % slotIds.length;
+    let activeIndex = startIndex;
+    let active = mountAt(activeIndex);
+    let rotated = false;
+
+    // 活动挂点不可用时立即轮换到下一个可用挂点 (不让坏挂点白占时间片)
+    if (!isFireable(active)) {
+      const nextIndex = this.findNextFireableAlternatingIndex(group, startIndex);
+      if (nextIndex === undefined) {
+        // 整组都不可击发：本帧不开火，指针保持不动 (不空转)
+        group.alternatingWasFiring = true;
+        group.alternatingJustSwitched = false;
+        return;
+      }
+      activeIndex = nextIndex;
+      active = mountAt(activeIndex)!;
+      group.alternatingElapsed = 0;
+      rotated = true;
+    }
+
+    // 持续光束不参与轮换：原版只对爆发光束做 selectNextActive
+    const isSustainedBeam = !!active.spec.isBeam && active.spec.beamVisualMode !== 'BURST';
+    if (isSustainedBeam) {
+      group.alternatingIndex = activeIndex;
+      group.alternatingElapsed = 0;
+      group.alternatingWasFiring = true;
+      group.alternatingJustSwitched = false;
+      return;
+    }
+
+    const slice = this.getAlternatingSlice(active, slotIds.length);
+    const elapsed = (group.alternatingElapsed ?? 0) + dt;
+    if (elapsed > slice) {
+      const nextIndex = this.findNextFireableAlternatingIndex(group, activeIndex);
+      if (nextIndex !== undefined && nextIndex !== activeIndex) {
+        activeIndex = nextIndex;
+      }
+      group.alternatingElapsed = 0;
+      rotated = true;
+    } else {
+      group.alternatingElapsed = elapsed;
+    }
+
+    group.alternatingIndex = activeIndex;
+    group.alternatingWasFiring = true;
+    group.alternatingJustSwitched = rotated;
+  }
+
+  /** 从 fromIndex 之后开始找下一个可击发挂点在 weaponSlotIds 中的下标 (跳过故障/无弹)。 */
+  private findNextFireableAlternatingIndex(group: WeaponGroup, fromIndex: number): number | undefined {
+    const slotIds = group.weaponSlotIds;
+    for (let offset = 1; offset <= slotIds.length; offset++) {
+      const index = (fromIndex + offset) % slotIds.length;
       const mount = this.weapons.find((w) => w.slotId === slotIds[index]);
-      if (!mount || mount.isDisabled) continue;
-      if (Number.isFinite(mount.ammo) && mount.ammo < 1) continue;
-      if (mount.cooldownTimer > 0) continue;
-      group.alternatingIndex = (index + 1) % slotIds.length;
-      return mount.slotId;
+      if (mount && !mount.isDisabled && (!Number.isFinite(mount.ammo) || mount.ammo >= 1)) return index;
     }
     return undefined;
+  }
+
+  /** 玩家手动换炮 (轻点扳机)：把活动权交给下一门可击发挂点。 */
+  private selectNextAlternatingActive(group: WeaponGroup): void {
+    const slotIds = group.weaponSlotIds;
+    if (slotIds.length === 0) return;
+    const current = ((group.alternatingIndex % slotIds.length) + slotIds.length) % slotIds.length;
+    const next = this.findNextFireableAlternatingIndex(group, current);
+    if (next !== undefined) group.alternatingIndex = next;
+    group.alternatingElapsed = 0;
+  }
+
+  /** 原版时间片长度：单门炮的完整射击周期除以炮数 (RoF 倍率与 chargeTime 本移植未建模，按 1/0 计)。 */
+  private getAlternatingSlice(mount: WeaponMount, weaponCount: number): number {
+    const count = Math.max(1, weaponCount);
+    const spec = mount.spec;
+    let cycle: number;
+    if (spec.isBeam) {
+      // burstduration + burstcooldown + chargeup + chargedown，原版缺省 3 秒
+      cycle =
+        (spec.beamDuration ?? 0) +
+        (spec.beamBurstDelay ?? 0) +
+        (spec.beamSourceChargeupTime ?? 0) +
+        (spec.beamSourceChargedownTime ?? 0);
+      if (!(cycle > 0)) cycle = 3.0;
+    } else {
+      const burstSize = spec.burstSize && Number.isFinite(spec.burstSize) ? spec.burstSize : 1;
+      // 原版对超大弹数 (>50) 直接使用 3 秒固定时间片
+      cycle =
+        burstSize > 50
+          ? 3.0
+          : Math.max(0, burstSize - 1) * (spec.burstDelay ?? 0) + spec.refireDelay + 0;
+    }
+    return Math.max(1 / 240, cycle / count);
   }
 
   private requestWeaponFire(
