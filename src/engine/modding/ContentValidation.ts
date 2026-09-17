@@ -1,7 +1,7 @@
 import { weaponFitsSlotType } from '../content/WeaponCompatibility';
 import { validateResources } from '../extensions/Dependencies';
 import { requireSound } from '../audio/SoundBank';
-import { hullModDefinitions, hullModLoadoutErrors } from '../extensions/HullMods';
+import { effectiveFighterBays, hullModDefinitions, hullModLoadoutErrors } from '../extensions/HullMods';
 import { combatSkillErrors } from '../extensions/CombatSkills';
 import { resolveSystemId, shipSystemDefinitions } from '../extensions/ship-systems/Registry';
 import { requireWeaponEffect } from '../extensions/weapon-effects/Registry';
@@ -112,12 +112,14 @@ export function validateWeaponSpec(input: unknown, requireBundledAssets = assetM
   }
   colorTuple(spec.color, `${id}.color`, 3);
 
-  for (const key of ['turnRateDegPerSec', 'minSpread', 'maxSpread', 'spreadPerShot', 'spreadDecay', 'visualRecoil', 'hitGlowRadius', 'glowRadius', 'coreWidthMult', 'projLength', 'projWidth', 'muzzleFlashSize', 'burstDelay', 'engineAcceleration', 'maxSpeed', 'maxTurnRate', 'missileHp', 'beamWidth', 'beamDuration', 'beamSourceChargeupTime', 'beamSourceChargedownTime', 'beamBurstDelay', 'fluxPerSecond', 'empPerSecond', 'empPerShot', 'chargeTime', 'maxAmmo', 'ammoRegenPerSec', 'hitGlowBrightenDuration'] as const) {
+  for (const key of ['turnRateDegPerSec', 'minSpread', 'maxSpread', 'spreadPerShot', 'spreadDecay', 'visualRecoil', 'glowRadius', 'coreWidthMult', 'projLength', 'projWidth', 'muzzleFlashSize', 'burstDelay', 'engineAcceleration', 'maxSpeed', 'maxTurnRate', 'missileHp', 'beamWidth', 'beamDuration', 'beamSourceChargeupTime', 'beamSourceChargedownTime', 'beamBurstDelay', 'fluxPerSecond', 'empPerSecond', 'empPerShot', 'chargeTime', 'maxAmmo', 'ammoRegenPerSec', 'hitGlowBrightenDuration'] as const) {
     if (spec[key] !== undefined) finite(spec[key], `${id}.${key}`, 0);
   }
   for (const key of ['launchSpeed', 'flightTime', 'armingTime', 'missileDeceleration', 'maxTurnAcceleration', 'autofireAccuracyBonus', 'eccmChanceBonus', 'missileGuidanceBonus', 'projectileSpeedBonusPercent'] as const) {
     if (spec[key] !== undefined) finite(spec[key], `${id}.${key}`, 0);
   }
+  // Native hit-glow radii may be negative (projectile disable / beam auto).
+  if (spec.hitGlowRadius !== undefined) finite(spec.hitGlowRadius, `${id}.hitGlowRadius`);
   if (spec.fadeTime !== undefined) finite(spec.fadeTime, `${id}.fadeTime`, 0);
   if (spec.pixelsPerTexel !== undefined) {
     const pixelsPerTexel = finite(spec.pixelsPerTexel, `${id}.pixelsPerTexel`, 0);
@@ -256,7 +258,10 @@ function validateEngineSlot(slotInput: unknown, shipId: string, index: number): 
 export function validateShipSpec(input: unknown, options: ShipValidationOptions = {}): asserts input is ShipSpec {
   const registry = options.registry ?? contentRegistry;
   const spec = object(input, '舰船规格');
+  if (spec.overloadColor !== undefined) colorTuple(spec.overloadColor, '舰船规格.overloadColor', 3);
   const id = text(spec.id, 'ship.id');
+  if (spec.sourceHullId !== undefined && !/^[A-Za-z0-9._-]+$/.test(text(spec.sourceHullId, 'ship.sourceHullId'))) throw new Error('Invalid source hull identity');
+  if (spec.sourceVariantId !== undefined && !/^[a-zA-Z0-9_-]{1,160}$/.test(text(spec.sourceVariantId, 'ship.sourceVariantId'))) throw new Error('Invalid source variant identity');
   if (!/^[A-Za-z0-9._-]+$/.test(id)) throw new Error(`ship.id 含非法字符: ${id}`);
   if (!options.allowExistingId && registry.getShip(id)) throw new Error(`舰船 ID 已注册: ${id}`);
 
@@ -293,7 +298,7 @@ export function validateShipSpec(input: unknown, options: ShipValidationOptions 
     if (!Array.isArray(spec.sourceHullTraits)) throw new Error(`${id}.sourceHullTraits 必须是数组`);
     spec.sourceHullTraits.forEach(value => text(value, `${id}.sourceHullTraits`));
   }
-  for (const key of ['builtInHullMods', 'hullMods'] as const) {
+  for (const key of ['builtInHullMods', 'hullMods', 'sMods'] as const) {
     if (spec[key] === undefined) continue;
     if (!Array.isArray(spec[key])) throw new Error(`${id}.${key} 必须是数组`);
     for (const mod of spec[key]) validateResources(hullModDefinitions.require(text(mod, `${id}.${key}`), id).resources, requireAssets);
@@ -316,9 +321,10 @@ export function validateShipSpec(input: unknown, options: ShipValidationOptions 
   }
   if (spec.fighterWings !== undefined) {
     if (!Array.isArray(spec.fighterWings)) throw new Error(`${id}.fighterWings must be an array`);
-    if (spec.fighterWings.length > Number(spec.fighterBays ?? 0)) throw new Error(`${id}: wings exceed flight decks`);
+    if (spec.fighterWings.length > effectiveFighterBays(spec as unknown as ShipSpec)) throw new Error(`${id}: wings exceed flight decks`);
     for (const input of spec.fighterWings) {
       const wing = object(input, `${id}.fighterWings`);
+      if (wing.range !== undefined) finite(wing.range, `${id}.fighterWings.range`, 0);
       text(wing.specId, `${id}.wing.specId`);
       if (wing.tags !== undefined) {
         if (!Array.isArray(wing.tags)) throw new Error(`${id}.wing.tags 必须是数组`);
@@ -334,6 +340,16 @@ export function validateShipSpec(input: unknown, options: ShipValidationOptions 
   if (!Array.isArray(spec.engineSlots)) throw new Error(`${id}.engineSlots 必须是数组`);
   if (!Array.isArray(spec.bounds) || spec.bounds.length < 3) throw new Error(`${id}.bounds 至少需要 3 个顶点`);
   const slots = spec.weaponSlots.map((slot, index) => validateWeaponSlot(slot, id, index));
+  if (spec.deploymentPoints !== undefined && finite(spec.deploymentPoints, id + '.deploymentPoints', 0) <= 0) throw new Error(id + ': deployment points must be positive');
+  if (spec.deploymentCRCost !== undefined && (typeof spec.deploymentCRCost !== 'number' || !Number.isFinite(spec.deploymentCRCost) || spec.deploymentCRCost < 0 || spec.deploymentCRCost > 1)) throw new Error(id + ': invalid deployment CR cost');
+  if (spec.decorativeWeapons !== undefined) {
+    if (!Array.isArray(spec.decorativeWeapons)) throw new Error(id + '.decorativeWeapons must be an array');
+    for (const d of spec.decorativeWeapons) {
+      text(d.id, id + '.decoration.id'); text(d.spriteUrl, id + '.decoration.spriteUrl');
+      for (const v of [d.x,d.y,d.angleDeg]) if (!Number.isFinite(v)) throw new Error(id + ': invalid decoration pose');
+      if (d.tags !== undefined && (!Array.isArray(d.tags) || d.tags.some(t=>typeof t !== 'string'))) throw new Error(id + ': invalid decoration tags');
+    }
+  }
   if (spec.systemWeaponSlots !== undefined) {
     if (!Array.isArray(spec.systemWeaponSlots)) throw new Error(`${id}.systemWeaponSlots must be an array`);
     // Native hulls such as heron reuse an ordinary ID in the independent SYSTEM slot list.

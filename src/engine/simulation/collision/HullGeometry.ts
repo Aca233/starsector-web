@@ -1,5 +1,10 @@
 import { Vector2 } from '../../math/Vector2';
+import { indexedPointContains } from '../../math/PolygonQueryIndex';
+import { isImmutableMetadata } from '../../extensions/Immutable';
 import type { Ship } from '../Ship';
+
+const nativeClone = Vector2.prototype.clone, nativeSub = Vector2.prototype.sub;
+const nativeRotate = Vector2.prototype.rotate;
 
 export interface HullSurfaceSample {
   point: Vector2;
@@ -67,7 +72,14 @@ export function isPointInsideShipHull(ship: Ship, worldPoint: Vector2): boolean 
   const bounds = ship.spec.bounds;
   if (!bounds || bounds.length < 3) return worldPoint.distanceTo(ship.pos) <= ship.spec.collisionRadius * 0.82;
 
+  const native = worldPoint.clone === nativeClone && Vector2.prototype.sub === nativeSub
+    && Vector2.prototype.rotate === nativeRotate && isImmutableMetadata(bounds);
   const local = worldPoint.clone().sub(ship.pos).rotate(-ship.facingRad);
+  // Native operations supply ordinary numeric components. Custom vectors and
+  // unbranded/mutable outlines retain their original per-edge reads/callbacks.
+  const indexed = native && Vector2.prototype.sub === nativeSub && Vector2.prototype.rotate === nativeRotate
+    ? indexedPointContains(local, bounds) : undefined;
+  if (indexed !== undefined) return indexed;
   let inside = false;
   for (let i = 0, j = bounds.length - 1; i < bounds.length; j = i++) {
     const [xi, yi] = bounds[i];

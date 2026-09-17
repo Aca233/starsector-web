@@ -12,6 +12,9 @@ export default defineConfig({
   // Relative URLs keep the production bundle deployable at `/`, `/starsector/`,
   // or any other static subdirectory without a path-specific rebuild.
   base: './',
+  // Native combat AI owners use immutable SAB input. Non-isolated static hosting falls back to serial.
+  server: { watch: { ignored: ['**/artifacts/**'] }, headers: { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' } },
+  preview: { headers: { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' } },
   plugins: [lanLaunchPlugin(), { name: 'lan-build-id', generateBundle() { this.emitFile({type:'asset',fileName:'lan-build.json',source:JSON.stringify({build:lanBuildId})}); } }, studioSummaryPlugin(), catalogDataPlugin(), tailwindcss(), react(), {
     name: 'combat-definition-reload',
     apply: 'serve',

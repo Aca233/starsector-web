@@ -1,3 +1,4 @@
+import { sameTeam } from "../../CombatTeams";
 import { initializeSourceProjectile } from './SourceProjectileLifecycle';
 import { Vector2 } from '../../../math/Vector2';
 import { bindProjectileSource, projectileSource } from './OutgoingDamage';
@@ -8,6 +9,7 @@ import { WeaponSimContext } from './WeaponSimContext';
 
 import { missileGuidancePoint } from './MissileLeading';
 import { FlareGuidance } from './FlareGuidance';
+import { advanceMote } from './MoteGuidance';
 
 /** Missile steering, source decoy behavior, MIRV and authored trails. */
 export class MissileGuidanceHandler {
@@ -67,7 +69,7 @@ export class MissileGuidanceHandler {
         id: ctx.random.next(),
         sourceShipId: p.sourceShipId,
         slotId: p.slotId,
-        isPlayer: p.isPlayer,
+        isPlayer: p.isPlayer, teamId: p.teamId,
         specId: mirv.projectileSpec,
         pos,
         prevPos: pos.clone(),
@@ -121,6 +123,7 @@ export class MissileGuidanceHandler {
     allProjectiles: Projectile[],
     allShips: Ship[]
   ): boolean {
+    if (p.mote) { advanceMote(p,dt,ctx,allProjectiles,allShips); return false; }
     if (p.facingRad === undefined) {
       p.facingRad = p.vel.heading();
     }
@@ -129,13 +132,13 @@ export class MissileGuidanceHandler {
       const isHostileShip = (ship: Ship) => ship.id !== p.sourceShipId
         && !ship.isDead
         && !ship.isPhased
-        && (p.isPlayer === undefined || ship.isPlayer !== p.isPlayer);
+        && (p.isPlayer === undefined || !sameTeam(ship, p));
 
       // Lock changes only when a flare's source probability/ECCM check succeeds.
       // Range is checked by the flare at capture, not continuously against the seeker.
       const decoy = p.targetProjectileId === undefined ? undefined : allProjectiles.find(other =>
         other.id === p.targetProjectileId && other.isFlare && !other.flareFizzling && (other.hitpoints ?? 1) > 0
-        && (p.isPlayer === undefined ? other.sourceShipId !== p.sourceShipId : other.isPlayer !== p.isPlayer));
+        && (p.isPlayer === undefined ? other.sourceShipId !== p.sourceShipId : !sameTeam(other, p)));
       if (decoy) {
         this.steerToward(p, decoy.pos.clone().sub(p.pos).heading(), dt);
       } else {

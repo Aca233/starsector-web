@@ -1,3 +1,6 @@
+import { shipPresentationPose } from "../visual/ShipPresentation";
+import { sameTeam } from "./CombatTeams";
+import { RuntimeCombatModifiers } from '../extensions/RuntimeCombatModifiers';
 import { advanceCombatSkills, polarizedArmorLevel } from '../extensions/CombatSkills';
 import { hasOnlyNativeRangeModifiers, installedHullMods, effectiveHullStats, hullModLoadoutErrors } from '../extensions/HullMods';
 import { i18n } from '../i18n/LocalizationManager';
@@ -93,15 +96,47 @@ function getArmorGridLocalRect(spec: ShipSpec): ArmorGridLocalRect {
 }
 
 export class Ship {
+  public readonly runtimeModifiers = new RuntimeCombatModifiers();
+  /** Presentation-lab protection must intercept before one-shot lethal-damage listeners. */
+  public hullDamageSuppressed = false;
+  /** Team-shared fog state, refreshed by the simulation, never used to disable physics. */
+  public visibleToPlayer = true;
+  public visibleToEnemy = true;
+  public visibilityMask = 0x7fffffff;
+  /** Delimited IDs avoid 32-bit aliasing for large free-for-all battles. */
+  public visibilityOverflow = "*";
+  public isVisibleTo(side: number | boolean): boolean { const team = typeof side === "boolean" ? (side ? 0 : 1) : side; return this.teamId === team || (team < 31 ? !!(this.visibilityMask & (1 << team)) : this.visibilityOverflow === "*" || this.visibilityOverflow.includes("|" + team + "|")); }
+  public get sightRadius(): number { return Math.max(0, (3000 + this.hullStats.sightRadiusFlat + this.system.getSightRadiusFlat()) * (1 + (this.hullStats.sightRadiusPercent + this.system.getSightRadiusPercent()) / 100)); }
+  public encounterEffects = { emergencyPhaseDiveUsed: false };
+  public readonly hullDamageInterceptors = new Set<(damage: number) => boolean>();
+  public retreating = false;
+  public isRetreated = false;
+  /** Extra combat events charged to the persistent fleet member, not immediate in-combat CR. */
+  public pendingCombatCRLoss = 0;
+  public applyHullDamage(damage: number): number {
+    if (!(damage > 0) || this.isDead || this.isRetreated || this.hullDamageSuppressed) return 0;
+    for (const intercept of this.hullDamageInterceptors) if (intercept(damage)) return 0;
+    const dealt = Math.min(this.hullHp,damage); this.hullHp -= dealt; return dealt;
+  }
+  public retreatFromCombat(): void {
+    if (this.isDead || this.isRetreated) return;
+    this.retreating = this.isRetreated = true;
+    this.clearInput(); this.shield.setActive(false); this.flux.cancelVenting();
+    this.system.deactivate(); this.defenseSystem.deactivate();
+    this.pos.set(0,-1000000); this.prevPos.copy(this.pos); this.vel.set(0,0);
+  }
   public id: string;
   public spec: ShipSpec;
   /** Combat-instance only: recalculated from the deployed roster each fixed step. */
   public ecmRangePenalty = 0;
+  public fleetSpeedBonusPercent = 0;
   public readonly hullStats: ReturnType<typeof effectiveHullStats>;
   public isPlayer: boolean;
+  public teamId: number;
   public flightDeckWingId?: string;
   /** Runtime ownership, never persisted in hull specs or inferred from team alone. */
   public sourceCarrier?: Ship;
+  public readonly deployedWingCraft = new Set<Ship>();
   public getWeaponDamageMultiplier(type: WeaponMount["spec"]["weaponType"]): number {
     const carrier = this.sourceCarrier;
     const support = carrier && !carrier.isDead && carrier.hullHp > 0 ? carrier.system.getFighterDamageMultiplier() : 1;
@@ -162,13 +197,14 @@ export class Ship {
   public readonly damageTakenModifiers = new Map<string, () => number>();
   /** Unknown damage readers or extension hooks disable shared projectile queries. */
   public get hasNativeThreatPhaseHooks(): boolean {
-    return this.damageTakenModifiers.size === 0
+    return this.damageTakenModifiers.size === 0 && this.externalPhaseEffects.size === 0
       && !Object.hasOwn(this, 'externalDamageTakenMultiplier')
       && this.shield.externalDamageTakenMultiplier === nativeShieldReaders.get(this)
       && this.shield.damageTakenMultiplierFor === nativeShieldDamageFor
       && !Object.hasOwn(this.shield, 'damageTakenMultiplier')
       && this.system.hasNativeThreatPhaseAI && this.defenseSystem.hasNativeThreatPhaseAI
-      && hasOnlyNativeRangeModifiers(this.spec);
+      && hasOnlyNativeRangeModifiers(this.spec)
+      && (!this.sourceCarrier || hasOnlyNativeRangeModifiers(this.sourceCarrier.spec));
   }
   public get externalDamageTakenMultiplier(): number {
     let value = 1;
@@ -226,6 +262,9 @@ export class Ship {
   public prevOverloaded = false;
   public prevVenting = false;
   public currentTargetShip: Ship | null = null;
+  /** Explicit pilot lock; null means no lock, not "pick the nearest enemy". */
+  public playerTargetId: string | null = null;
+  public fighterRecall = false;
   public combatShips: readonly Ship[] = [];
 
   /** Native IntervalTracker(.75, 1.25); overshoot is discarded on the next advance. */
@@ -249,13 +288,15 @@ export class Ship {
     initialPos = new Vector2(),
     initialFacingRad = 0,
     random = new SimulationRandom(),
-    visualRandom = new SimulationRandom(0x5c07c4)
+    visualRandom = new SimulationRandom(0x5c07c4),
+    sourceCarrier?: Ship
   ) {
     this.id = id;
     this.spec = spec;
     const modErrors = hullModLoadoutErrors(spec);
     if (modErrors.length) throw new Error(spec.id + ": " + modErrors.join("; "));
-    const refit = this.hullStats = effectiveHullStats(spec);
+    this.sourceCarrier = sourceCarrier;
+    const refit = this.hullStats = effectiveHullStats(spec, sourceCarrier?.spec);
     this.weaponHealthMultiplier *= 1 + refit.weaponHealthPercent / 100;
     this.engineHealthMultiplier *= 1 + refit.engineHealthPercent / 100;
     this.weaponDamageTakenMultiplier *= refit.weaponDamageTakenMultiplier;
@@ -265,6 +306,7 @@ export class Ship {
     this.combatEngineRepairTimeMultiplier *= refit.engineRepairTimeMultiplier;
     this.combatWeaponRepairTimeMultiplier *= refit.weaponRepairTimeMultiplier;
     this.isPlayer = isPlayer;
+    this.teamId = sourceCarrier?.teamId ?? (isPlayer ? 0 : 1);
     this.random = random;
     this.weaponControl = new ShipWeaponControlSystem(random);
     this.shipName = i18n.t(spec.nameKey).split(' (')[0];
@@ -307,7 +349,9 @@ export class Ship {
       : 'CAPITAL_SHIP';
     this.flux = new FluxTracker(refit.maxFlux, refit.fluxDissipation, spec.hullSize ?? inferredHullSize);
     this.flux.ventRateMultiplier = refit.ventRateMultiplier;
+    this.flux.shieldSoftFluxConversion = refit.shieldSoftFluxConversion;
     this.flux.overloadTimeMultiplier = refit.overloadTimeMultiplier;
+    this.flux.onOverloadStarted = () => this.shield.setActive(false);
     this.empDamageTakenMultiplier *= refit.empDamageMultiplier;
     if (spec.captainSkills?.target_analysis === 2) {
       this.damageToTargetWeaponsMultiplier *= 2;
@@ -360,7 +404,8 @@ export class Ship {
   // --------------------------------------------------------------------------
   public get crEffects(): CombatReadinessEffects {
     const effects = computeCombatReadinessEffects(this.currentCR, this.crMalfunctionRangeMultiplier, this.flux.hullSize === 'FIGHTER');
-    effects.criticalMalfunctionChance *= this.criticalMalfunctionChanceMultiplier;
+    effects.weaponMalfunctionChance += this.hullStats.weaponMalfunctionChanceBonus;
+    effects.criticalMalfunctionChance = (effects.criticalMalfunctionChance + this.hullStats.criticalMalfunctionChanceBonus) * this.criticalMalfunctionChanceMultiplier;
     return effects;
   }
 
@@ -397,7 +442,7 @@ export class Ship {
     if (effects.systemDisabled && this.system.isActive) {
       this.system.deactivate();
     }
-    if (effects.defenseDisabled && this.shield.isActive) {
+    if (effects.defenseDisabled && this.shield.isRaiseRequested) {
       this.lowerShieldWithFeedback();
     }
 
@@ -466,23 +511,27 @@ export class Ship {
     const lethal = this.hullHp <= damage;
     if (!lethal && this.random.next() > .25) {
       const hullDamage = Math.min(this.hullHp, damage);
-      this.hullHp = Math.max(0, this.hullHp - damage);
+      this.applyHullDamage(damage);
       this.justCriticalDamage.push({ local: local.clone(), armorDamage: 0, hullDamage });
       return;
     }
     const raw = lethal ? this.maxHullHp * 10 : damage;
     const result = this.armor.takeDamage(local, raw * this.crDamageTakenMultiplier, 'ENERGY', raw, false);
-    this.hullHp = Math.max(0, this.hullHp - result.hullDamage);
+    this.applyHullDamage(result.hullDamage);
     applyComponentDamage(this, local, result, 0, this);
     this.justCriticalDamage.push({ local: local.clone(), armorDamage: result.armorDamage, hullDamage: result.hullDamage });
   }
 
   public interpolatedPos(alpha: number): Vector2 {
+    const presentation = shipPresentationPose(this);
+    if (presentation) return presentation.pos.clone();
     if (!this.prevPos) return this.pos.clone();
     return Vector2.lerp(this.prevPos, this.pos, alpha);
   }
 
   public interpolatedFacing(alpha: number): number {
+    const presentation = shipPresentationPose(this);
+    if (presentation) return presentation.facing;
     if (this.prevFacingRad === undefined) return this.facingRad;
     let dAngle = this.facingRad - this.prevFacingRad;
     while (dAngle > Math.PI) dAngle -= Math.PI * 2;
@@ -497,7 +546,18 @@ export class Ship {
     const cx = this.spec.shieldCenterX || 0;
     const cy = this.spec.shieldCenterY || 0;
     if (cx === 0 && cy === 0) return shipPos.clone();
-    return shipPos.clone().add(new Vector2(cx, cy).rotate(shipFacingRad));
+    // Cache only trigonometry, never a mutable world position or returned vector.
+    let rotation = shieldCenterRotations.get(this);
+    if (!rotation) {
+      rotation = { facing: shipFacingRad, cos: Math.cos(shipFacingRad), sin: Math.sin(shipFacingRad) };
+      shieldCenterRotations.set(this, rotation);
+    } else if (!Object.is(rotation.facing, shipFacingRad)) {
+      rotation.facing = shipFacingRad;
+      rotation.cos = Math.cos(shipFacingRad);
+      rotation.sin = Math.sin(shipFacingRad);
+    }
+    return new Vector2(shipPos.x + (cx * rotation.cos - cy * rotation.sin),
+      shipPos.y + (cx * rotation.sin + cy * rotation.cos));
   }
 
   /** Use the same offset shield center for every simulation-side arc test. */
@@ -545,29 +605,70 @@ export class Ship {
   /**
    * 60Hz 逻辑步长更新
    */
+  /** Independent external phase sources never overwrite the ship's own phase coil. */
+  public readonly externalPhaseEffects = new Map<object, () => number | undefined>();
+  public isDocked = false;
+  public isSystemDrone = false;
+  public get isCollisionless(): boolean { return this.isPhased || (this.runtimeModifiers.value.collisionDisabled ?? 0) > 0; }
+  public get phaseVisualAlpha(): number {
+    let alpha = this.shield.type === 'PHASE' ? 1 - .75 * this.shield.phaseEffectLevel : 1;
+    for (const effect of this.externalPhaseEffects.values()) {
+      const value = effect();
+      if (value !== undefined) alpha = Math.min(alpha, Math.max(0, Math.min(1, value)));
+    }
+    return this.isDocked || this.isRetreated ? 0 : alpha * (this.runtimeModifiers.value.visualAlphaMultiplier ?? 1);
+  }
   public get isPhased(): boolean {
-    return this.shield.isPhased || this.system.isPhased;
+    if (this.isDocked || this.isRetreated || this.shield.isPhased || this.system.isPhased) return true;
+    for (const effect of this.externalPhaseEffects.values()) if (effect() !== undefined) return true;
+    return false;
   }
 
   /**
    * 判断当前是否允许开启护盾 (严格对齐 D.java: canUseShields / ship_systems.csv noShield).
    * Burn Drive 的 IN/ACTIVE/OUT 全阶段都带 noShield；冷却阶段则允许重新展开护盾。
    */
+  public get defenseFailureReason(): string | undefined {
+    if (this.isDead || this.hullHp <= 0 || this.isDocked || this.isRetreated) return '舰船不在战斗状态';
+    if (this.defenseSystem.type !== 'NONE') {
+      if (!this.defenseSystem.isActive && (this.system.blocksShields || this.crEffects.defenseDisabled)) return '独立防御被禁用';
+      return this.defenseSystem.activationFailureReason;
+    }
+    if (this.shield.type === 'NONE') return '没有护盾或独立防御';
+    if (this.shield.toggleLocked) return '护盾常开，不能手动关闭';
+    if (this.shield.type === 'PHASE' && this.shield.phaseState === 'OUT') return '正在退出相位';
+    if (this.shield.type === 'PHASE' && this.shield.phaseState === 'COOLDOWN') return '相位线圈冷却中';
+    if (this.system.blocksShields || this.crEffects.defenseDisabled) return '防御被禁用';
+    if (this.flux.isOverloaded) return '幅能过载';
+    if (this.flux.isVenting) return '正在排散幅能';
+    if (this.retreating) return '撤退中';
+    return undefined;
+  }
   public activateDefenseSystem(): boolean {
-    if (this.defenseSystem.isActive) return this.defenseSystem.activate();
-    if (this.system.blocksShields || this.crEffects.defenseDisabled) return false;
+    if (this.defenseFailureReason || this.defenseSystem.type === 'NONE') return false;
     return this.defenseSystem.activate();
+  }
+  public toggleDefense(): boolean {
+    if (this.defenseFailureReason) return false;
+    if (this.defenseSystem.type !== 'NONE') return this.activateDefenseSystem();
+    const raising = this.shield.type === 'PHASE' ? this.shield.phaseState === 'IDLE' : !this.shield.isRaiseRequested;
+    this.shield.toggle();
+    // toggle() reports instantaneous protection, not whether the request was accepted.
+    if (this.shield.type === 'PHASE') sound.play(raising ? 'phase_activate' : 'phase_deactivate', .9);
+    else sound.play(raising ? 'shield_up' : 'shield_down', .65);
+    return true;
   }
 
   public canUseShields(): boolean {
     const systemBlocksShield = this.system.blocksShields;
     // CRPluginImpl: cr <= 0 时 setDefenseDisabled(true)，护盾完全不可用。
     const crBlocksShield = this.crEffects.defenseDisabled;
-    return this.shield.type !== 'NONE' && !systemBlocksShield && !crBlocksShield && !this.flux.isOverloaded && !this.flux.isVenting && !this.isDead;
+    return this.shield.type !== 'NONE' && !systemBlocksShield && !crBlocksShield && !this.flux.isOverloaded && !this.flux.isVenting && !this.isDead && !this.retreating;
   }
 
   private lowerShieldWithFeedback(): boolean {
-    if (!this.shield.isActive) return false;
+    if (!this.shield.isRaiseRequested) return false;
+    if (this.shield.type === 'PHASE' && this.shield.phaseState !== 'IN' && this.shield.phaseState !== 'ACTIVE') return false;
     this.shield.setActive(false);
     if (this.shield.type === 'PHASE') sound.play('phase_deactivate', 0.9);
     else sound.play('shield_down', 0.7);
@@ -580,10 +681,17 @@ export class Ship {
    * 2. 强制退出相位潜航与关闭战术系统
    * 3. 播放关盾音效与排散启动音效
    */
+  public get ventFailureReason(): string | undefined {
+    if (this.isDead || this.hullHp <= 0 || this.isDocked || this.isRetreated) return '舰船不在战斗状态';
+    if (this.retreating) return '撤退中';
+    if (this.shield.toggleLocked || this.system.blocksVenting || this.hullStats.ventRateMultiplier <= 0) return '当前配置禁止主动排幅';
+    if (this.flux.isOverloaded) return '幅能过载';
+    if (this.flux.isVenting) return '正在排散幅能';
+    if (this.flux.totalFlux <= 5) return '无需排散幅能';
+    return undefined;
+  }
   public startVenting(): boolean {
-    if (this.isDead || this.system.blocksVenting || this.hullStats.ventRateMultiplier <= 0 || this.flux.isOverloaded || this.flux.isVenting || this.flux.totalFlux <= 5) {
-      return false;
-    }
+    if (this.ventFailureReason) return false;
 
     // 1. 取消防护但不清零当前展开弧度；Shield.update() 会完成收拢动画。
     this.lowerShieldWithFeedback();
@@ -606,19 +714,21 @@ export class Ship {
    * 判定视野与战术测距内是否存在重要敌对主力舰 (1:1 com.fs.starfarer.combat.entities.Ship.areSignificantEnemiesInRange)
    */
   public areSignificantEnemiesInRange(range = 2500, enemy?: Ship | null): boolean {
-    const target = enemy || this.currentTargetShip;
-    if (!target || target.isDead) return false;
-    return this.pos.distanceTo(target.pos) <= range;
+    const significant = (other: Ship) => other !== this && !sameTeam(other, this) && !other.isDead && !other.isRetreated && !other.isDocked
+      && other.spec.hullSize !== 'FIGHTER' && this.pos.distanceTo(other.pos) <= range;
+    // Enemy presence/PPT is a world query, never contingent on the player's R lock.
+    return !!(enemy && significant(enemy)) || this.combatShips.some(significant);
   }
 
   /** Adapt source D flux modifiers without mutating saved ShipSpec or FluxTracker defaults. */
   private advanceHullModFlux(dt: number): void {
+    this.flux.dissipationMultiplier = this.system.getDissipationMultiplier();
     const boostTimer = this.flux.zeroFluxTimer;
     const fluxLocked = this.flux.isOverloaded || this.flux.isVenting;
     if (dt > 0 && !fluxLocked && !this.system.blocksFluxDissipation && this.shield.isActive && this.hullStats.hardFluxDissipationFraction > 0) {
       // D.cfr_renamed_4: soft flux consumes the full budget first; only the
       // remaining budget is scaled by the hard-flux dissipation fraction.
-      const leftover = Math.max(0, this.flux.baseDissipation * dt - this.flux.softFlux);
+      const leftover = Math.max(0, this.flux.effectiveDissipation * dt - this.flux.softFlux);
       this.flux.hardFlux = Math.max(0, this.flux.hardFlux - leftover * Math.min(1, this.hullStats.hardFluxDissipationFraction));
     }
     this.flux.update(dt, this.shield.isActive, !this.system.blocksFluxDissipation);
@@ -648,13 +758,13 @@ export class Ship {
     if (dt > 0) for (const mod of installedHullMods(this.spec)) if (mod.status === 'implemented') mod.advance?.(this, dt, this.random);
     // This deployment plugin uses world dt, before phase scales the ship clock.
     this.advanceDeploymentReadiness(dt);
-    if (this.isDead || this.hullHp <= 0) return;
+    if (this.isDead || this.isRetreated || this.hullHp <= 0) return;
 
     // 记录上一物理帧状态，用于渲染亚帧平滑插值
     this.prevPos.copy(this.pos);
     this.prevFacingRad = this.facingRad;
     this.currentTargetShip = targetShip || null;
-    this.combatShips = fireControlWorld?.ships ?? (targetShip ? [this, targetShip] : [this]);
+    this.combatShips = fireControlWorld?.ships ?? (this.combatShips.length ? this.combatShips : targetShip ? [this, targetShip] : [this]);
 
     // 战备值与峰值性能时钟推进 (1:1 RepairTracker.java & C.java)
     if (this.hullStats.peakCRSec > 0) {
@@ -699,13 +809,14 @@ export class Ship {
     }
 
     // ship_systems.csv marks Burn Drive as noShield for its entire applied IN/ACTIVE/OUT lifecycle.
+    // Cancel delayed raise requests too; otherwise closing can finish by raising a forbidden shield.
     // noShield 立即取消碰撞防护，但视觉仍通过 currentArcDeg 平滑收拢。
-    if (this.system.blocksShields && this.shield.isActive) {
+    if (this.system.blocksShields && this.shield.isRaiseRequested) {
       this.lowerShieldWithFeedback();
     }
 
     // 严禁过载或排散时使用护盾；同样保留视觉收拢阶段，避免一帧消失。
-    if ((this.flux.isOverloaded || this.flux.isVenting) && this.shield.isActive) {
+    if ((this.flux.isOverloaded || this.flux.isVenting) && this.shield.isRaiseRequested) {
       this.lowerShieldWithFeedback();
     }
     
@@ -713,7 +824,8 @@ export class Ship {
     // 相位线圈的开启/维持成本由 Shield 状态机以硬幅能结算，绝不过载。
     if (this.shield.type !== 'PHASE' && this.shield.isActive && !this.flux.isOverloaded && !this.flux.isVenting) {
       const upkeepMult = this.system.getShieldUpkeepMultiplier();
-      this.flux.increaseFlux(this.shield.upkeepRate * upkeepMult * tacticalDt, false);
+      if (this.flux.totalFlux >= this.flux.maxFlux
+        || !this.flux.trySpendSoftFlux(this.shield.upkeepRate * upkeepMult * tacticalDt)) this.lowerShieldWithFeedback();
     }
     if (this.shield.type === 'PHASE' && this.shield.isPhaseUpkeepActive) {
       this.flux.increaseFluxClamped(this.shield.phaseUpkeepPerSecond * dt, true);
@@ -787,3 +899,7 @@ export class Ship {
     return advanceShipMotion(this, dt);
   }
 }
+
+const shieldCenterRotations = new WeakMap<Ship, { facing: number; cos: number; sin: number }>();
+/** Identity gate for read-only geometry memoization; overridden callbacks stay uncached. */
+export const nativeGetShieldCenter = Ship.prototype.getShieldCenter;

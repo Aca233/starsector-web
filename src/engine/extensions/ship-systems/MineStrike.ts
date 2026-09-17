@@ -1,3 +1,4 @@
+import { sameTeam } from "../../simulation/CombatTeams";
 import { Vector2 } from '../../math/Vector2';
 import type { ShipSystemDefinition } from './Types';
 export const mineStrike: ShipSystemDefinition = {
@@ -5,10 +6,10 @@ export const mineStrike: ShipSystemDefinition = {
   resources:{textures:['/game-assets/graphics/missiles/heavy_mine3.png','/game-assets/graphics/missiles/heavy_mine3_glow.png'],sounds:['mine_teleport','mine_ping','mine_windup_heavy','mine_explosion']}, sourceIds: ['mine_strike', 'minestrike'], name: '空雷突袭',
   chargeUp: .25, active: 0, chargeDown: .25, cooldown: 0,
   charges: 5, chargeRegen: .2, fluxPerUseFraction: .1,
-  onActive: (ship, world) => {
-    let target = ship.aimTargetWorld.clone();
+  onActive: (ship, world, system) => {
+    let target = (system.activationInput?.point ?? ship.aimTargetWorld).clone();
     if (ship.fireControlMode === 'AI') {
-      const enemy = ship.currentTargetShip ?? world.ships.find(s => !s.isDead && s.isPlayer !== ship.isPlayer);
+      const enemy = ship.currentTargetShip ?? world.ships.find(s => !s.isDead && !sameTeam(s, ship) && s.isVisibleTo(ship.teamId));
       if (!enemy) return;
       // Existing Web targeting policy, not native BasicShipAI.
       const angle = enemy.facingRad + Math.PI + (world.combatRandom.next() - .5);

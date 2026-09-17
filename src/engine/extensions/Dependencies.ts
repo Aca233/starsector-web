@@ -1,9 +1,9 @@
 import { assetManager } from '../assets/AssetResolver';
 import { requireSound } from '../audio/SoundBank';
-export interface ExtensionResources { textures?: readonly string[]; sounds?: readonly string[] }
+export interface ExtensionResources { textures?: readonly string[]; sounds?: readonly string[]; ships?: readonly string[]; weapons?: readonly string[] }
 export function validateResources(resources?: ExtensionResources, requireAssets = false): void {
   if (!resources) return;
-  for (const values of [resources.textures, resources.sounds]) if (values !== undefined && (!Array.isArray(values) || values.some(v=>typeof v !== 'string' || !v.trim()))) throw new Error('Invalid extension resource list');
+  for (const values of [resources.textures, resources.sounds, resources.ships, resources.weapons]) if (values !== undefined && (!Array.isArray(values) || values.some(v=>typeof v !== 'string' || !v.trim()))) throw new Error('Invalid extension resource list');
   if (requireAssets) for (const path of resources.textures ?? []) if (!assetManager.isLoaded || !assetManager.hasPath(path)) throw new Error('Unbundled extension texture: ' + path);
   for (const key of resources.sounds ?? []) requireSound(key, requireAssets);
 }

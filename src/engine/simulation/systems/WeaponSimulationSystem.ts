@@ -1,3 +1,5 @@
+import { sameTeam } from "../CombatTeams";
+import { sound } from '../../audio/SoundManager';
 import { ProjectileInterceptionIndex } from '../collision/ProjectileInterceptionIndex';
 import { requireWeaponEffect } from '../../extensions/weapon-effects/Registry';
 import { ProjectileExplosionSystem } from './weapon/ProjectileExplosionSystem';
@@ -147,8 +149,21 @@ export class WeaponSimulationSystem {
         p.rangeRemaining -= moveStep.length();
       }
 
+      if (p.systemFuseSeconds !== undefined) {
+        p.fadeProgress = p.systemFadeInSeconds ? Math.max(0, 1-p.elapsedTime/p.systemFadeInSeconds) : 0;
+        if (p.elapsedTime + 1e-9 >= p.systemFuseSeconds) {
+          p.systemFuseTriggered = true;
+          if (p.missileExplosionVisualSpec) ctx.fx.spawnSourceMissileExplosion(p.pos, p.missileExplosionVisualSpec);
+          if (p.systemExplosionSound) sound.playAtPos(p.systemExplosionSound, p.pos, ctx.playerShip.pos, 1);
+          ctx.spawnProjectileExplosion?.(p, p.pos, p.sourceShipId);
+          const index = this.projectiles.findIndex(other => other.id === p.id);
+          if (index >= 0) { removeProjectileAt(index); i = index; }
+          continue;
+        }
+      }
+      if (p.collisionDisabled) continue;
       // Fizzling source decoys drift/fade but no longer attract or deal impact damage.
-      if (p.flareFizzling) continue;
+      if (p.flareFizzling || p.isDisarmed) continue;
 
       // 尾迹缎带点与等离子余烬微粒采样
       this.missileGuidance.updateParticlesAndContrail(p, ctx);
@@ -184,7 +199,7 @@ export class WeaponSimulationSystem {
 
       // Source projectile/missile swept contacts; TPC may pierce several missiles.
       let intercepted = false;
-      if ((!p.isRocket || p.targetProjectileId !== undefined) && hasMissiles) {
+      if ((!p.isRocket || p.interceptsMissiles || p.targetProjectileId !== undefined) && hasMissiles) {
         flushBatchedCollisions();
         interceptionIndex.update(p); // A rocket pursuing a flare queries after its own movement.
         for (let remaining = this.projectiles.length; remaining > 0; remaining--) {
@@ -268,7 +283,7 @@ export class WeaponSimulationSystem {
     const candidates = allShips.filter(
       (ship) =>
         ship.id !== p.sourceShipId &&
-        (p.isPlayer === undefined || ship.isPlayer !== p.isPlayer) &&
+        (p.isPlayer === undefined || !sameTeam(ship, p)) &&
         !ship.isDead &&
         !ship.isPhased
     );

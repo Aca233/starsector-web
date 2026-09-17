@@ -42,6 +42,7 @@ export class Shield {
   public efficiency: number; // 护盾受损转幅能效率 (越低越肉)
   public upkeepRate: number; // 维持每秒幅能消耗 (ship_data.csv shield upkeep × flux dissipation)
   
+  public toggleLocked = false;
   public isActive = false;
   public currentArcDeg = 0; // 当前已展开弧度 (度)
   public facingAngleRad = 0; // 当前护盾中心朝向 (弧度)
@@ -113,6 +114,8 @@ export class Shield {
   // 相位线圈 (ship_systems.csv phasecloak: charge up 0.5 / down 0.5 / cooldown 2, toggle)
   // --------------------------------------------------------------------------
   public phaseState: PhaseCloakState = 'IDLE';
+  /** Explicit forced state for emergency phase dives, independent of ordinary player toggles. */
+  public forcedPhaseEffectLevel?: number;
   public phaseEffectLevel = 0;
   public phaseMinSpeedFluxThresholdMultiplier = 1;
   public phaseChargeUpDuration = 0.5;
@@ -168,7 +171,11 @@ export class Shield {
     this.raisePhaseFlux = raisePhaseFlux;
   }
 
+  /** Requested state includes a raise queued behind the shield's physical close time. */
+  public get isRaiseRequested(): boolean { return this.isActive || this.pendingRaise; }
+
   public toggle(): boolean {
+    if (this.toggleLocked) return this.isActive;
     if (this.type === 'NONE') return false;
     if (this.type === 'PHASE') return this.togglePhase();
     this.setActive(!(this.isActive || this.pendingRaise));
@@ -180,6 +187,7 @@ export class Shield {
    * OUT 与 COOLDOWN 阶段拒绝操作 —— 因此无法瞬时反复切换。
    */
   public togglePhase(): boolean {
+    if (this.toggleLocked) return this.isActive;
     if (this.phaseState === 'IDLE') {
       this.beginPhaseIn();
       return true;
@@ -380,7 +388,10 @@ export class Shield {
    */
   public update(dt: number, shipFacing: number, aimFacing: number) {
     // 0. 相位线圈状态机 (IN 0.5s → ACTIVE → OUT 0.5s → COOLDOWN 2s) 与硬幅能成本
-    if (this.type === 'PHASE') this.updatePhase(dt);
+    if (this.type === 'PHASE') {
+      if (this.forcedPhaseEffectLevel === undefined) this.updatePhase(dt);
+      else { this.phaseState = 'IN'; this.isActive = true; this.phaseEffectLevel = Math.max(0,Math.min(1,this.forcedPhaseEffectLevel)); }
+    }
 
     // systems/G.java and ship/trackers/oooO: unfold the arc, then fade it in place on shutdown.
     if (this.type === 'FRONT' || this.type === 'OMNI') {

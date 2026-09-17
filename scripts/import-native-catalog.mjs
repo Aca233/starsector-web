@@ -545,11 +545,17 @@ report.counts = { ...report.counts, sourceFiles: report.sourceFiles.length, refe
 await writeJson(manifestPath, manifest);
 await writeJson(catalogPath, catalog);
 // Lightweight stock fits for the refit chooser; do not load the entire codex to fit a ship.
-const refitVariants = {};
-for (const { spec } of catalog.variants) {
-  if (spec?.goalVariant !== true || !spec.hullId) continue;
-  (refitVariants[spec.hullId] ??= []).push(spec);
+const refitVariants = {}, simulationVariants = {};
+for (const { spec, sourcePath } of catalog.variants) {
+  if (!spec?.hullId) continue;
+  (simulationVariants[spec.hullId] ??= []).push({...spec, catalogSourcePath:sourcePath});
+  if (spec.goalVariant === true) (refitVariants[spec.hullId] ??= []).push(spec);
 }
+// Simulator may use special native fits too; deployment costs include resolved .skin inheritance.
+await writeJson(resolve(projectRoot, 'src/engine/data/generated/simulation-variants.json'), simulationVariants);
+await writeJson(resolve(projectRoot, 'src/engine/data/generated/deployment-costs.json'), Object.fromEntries(
+  catalog.ships.filter(ship => Number(ship.stats?.['supplies/rec']) > 0).map(ship => [ship.id, Number(ship.stats['supplies/rec'])])
+));
 await writeJson(resolve(projectRoot, 'src/engine/data/generated/refit-variants.json'), refitVariants);
 const weaponDescriptions = new Map(catalog.descriptions.filter(d => d.type === 'WEAPON').map(d => [d.id, d]));
 const refitWeaponTooltips = Object.fromEntries(catalog.weapons.map(w => {

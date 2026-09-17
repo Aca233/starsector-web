@@ -56,6 +56,8 @@ export function advanceSourceProjectile(p: Projectile, dt: number): boolean {
 }
 
 export function markSourceProjectileImpact(p: Projectile, point = p.pos): boolean {
+  // Impact identity also matters to attached-entity systems; non-beam missiles still retire immediately.
+  p.didDamage = true;
   if (!hasSourceProjectileLifecycle(p)) return false;
   p.pos.copy(point);
   p.didDamage = true;

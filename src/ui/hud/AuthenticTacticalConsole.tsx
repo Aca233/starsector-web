@@ -16,10 +16,11 @@ export interface AuthenticTacticalConsoleProps {
   engine?: CombatEngine;
   hudVisuals?: CombatHudVisuals;
   weaponControls?: WeaponGroupControls;
+  onToggleRecall?: () => void;
 }
 
 /** Readable system text (user preference) and source meters; full layout is still being reconciled. */
-export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> = ({ player, engine, hudVisuals, weaponControls }) => {
+export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> = ({ player, engine, hudVisuals, weaponControls, onToggleRecall }) => {
   const isZeroFlux = player.flux.totalFlux <= 0 && !player.shield.isActive && !player.flux.isOverloaded;
   const speed = player.vel.length().toFixed(1);
   const totalFlux = Math.trunc(player.flux.totalFlux);
@@ -32,7 +33,7 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
   // 战术系统名称与状态
   const systemStatus = (system: typeof player.system) => !system.available ? '未接入 · 不可激活' : player.isDead || system.disabled ? '离线'
     : system.state === 'IN' ? '启动中' : system.state === 'OUT' ? '关闭中' : system.isActive ? '运行中'
-    : system.isCoolingDown ? '冷却中 (' + system.cooldownTimer.toFixed(1) + 's)' : system.charges <= 0 ? '充能耗尽' : '就绪';
+    : system.isCoolingDown ? '冷却中 (' + system.cooldownTimer.toFixed(1) + 's)' : system.activationFailureReason ?? system.statusText ?? '就绪';
 
   // 原版参考战备与敌情感知 (RepairTracker.java & C.java)
   const hasEnemiesInRange = player.areSignificantEnemiesInRange(2500, engine?.findHostile(player));
@@ -42,7 +43,8 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
 
   const groups = buildWeaponHudGroups(player);
   const groupHeight = Math.max(50, weaponHudHeight(groups));
-  const wingBand = engine?.playerWings.length ? 58 : 0;
+  const carrierWings = engine ? [...engine.playerWings, ...engine.enemyWings].filter(wing => wing.carrierId === player.id) : [];
+  const wingBand = carrierWings.length ? 58 : 0;
   // _return.setShip: pivot.x = 150 + contentHeight/2 + 1.5; anchor is at x=3.
   const consolePivot = 148.5 + (groupHeight + wingBand) * 0.5;
 
@@ -101,7 +103,7 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
                 alt=""
                 className="w-4 h-4 object-contain"
               />
-              <span className="font-bold"><span className="hud-text">深度过载</span></span>
+              <span className="font-bold"><span className="hud-text">幅能过载</span></span>
               <span className="text-red-300/90"><span className="hud-text">({Math.ceil(player.flux.overloadTimer)}s 后恢复)</span></span>
             </div>
           )}
@@ -214,21 +216,22 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
         </div>
 
         {/* 航母机库甲板状态 (若有舰载联队) */}
-        {engine && engine.playerWings && engine.playerWings.length > 0 && (
+        {engine && carrierWings.length > 0 && (
           <div className="pt-1 mt-1 border-t border-[#9bff00]/40 space-y-0.5 text-[10px]">
             <div className="flex items-center justify-between font-bold text-[10px] pb-0.5">
-              <span><span className="hud-text">机库甲板 ({engine.playerWings.length} 联队)</span></span>
-              <span
+              <span><span className="hud-text">机库甲板 ({carrierWings.length} 联队)</span></span>
+              <button type="button" aria-label={player.fighterRecall ? '本舰联队出击' : '召回本舰联队'}
+                title={player.fighterRecall ? '[Z] 解除本舰联队召回' : '[Z] 召回本舰联队；其他航母不受影响'}
                 onClick={(e) => {
                   e.stopPropagation();
-                  engine.toggleFighterRecall();
+                  if (onToggleRecall) onToggleRecall(); else engine.toggleFighterRecall();
                 }}
                 className="cursor-pointer hover:text-white text-[9px] text-[#9bff00]/80"
               ><span className="hud-text">
-                [Z] {engine.isFighterRecall ? '全员召回' : '自由交火'}
-              </span></span>
+                [Z] {player.fighterRecall ? '本舰联队召回' : '本舰联队出击'}
+              </span></button>
             </div>
-            {engine.playerWings.map((wing) => {
+            {carrierWings.map((wing) => {
               const aliveCount = engine.ships.filter(craft => craft.flightDeckWingId === wing.wingId && !craft.isDead).length;
 
               return (

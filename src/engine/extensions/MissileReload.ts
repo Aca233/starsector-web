@@ -46,7 +46,7 @@ export function advanceMissileAutoloader(ship: Ship, dt: number, random: Simulat
     let amount = w.baseMaxAmmo!;
     if (cost > state.capacity) amount = Math.ceil(amount * state.capacity / cost / salvo) * salvo;
     w.ammo = Math.min(w.spec.maxAmmo!, amount);
-    w.reloadDelayRemaining = 5;
+    w.reloadDelayRemaining = ship.spec.sMods?.includes('missile_autoloader') ? 10 : 5;
     w.cooldownTimer = Math.max(w.cooldownTimer, w.spec.refireDelay);
     state.capacity = Math.max(0, state.capacity - cost);
     if (!state.capacity) break;

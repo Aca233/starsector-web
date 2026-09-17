@@ -806,7 +806,7 @@
       "scope": "mixed",
       "combat": "implemented",
       "campaign": "not-simulated",
-      "summary": "结构加成已接入；船员伤亡与S-mod减伤效果未模拟。"
+      "summary": "结构+20%已接入；普通/S-mod船员伤亡结算不模拟，原版没有S-mod战斗减伤。"
     }
   },
   "comp_armor": {
@@ -945,5 +945,755 @@
     "icon": "graphics/hullmods/eccm_package.png",
     "source": "data.hullmods.ECCMPackage",
     "builtInOnly": false
+  },
+  "terminator_core": {
+    "name": "终结者核心",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [
+      "武器"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/terminator_core.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.TerminatorCore",
+    "builtInOnly": true
+  },
+  "expanded_deck_crew": {
+    "name": "扩编飞行甲板人员",
+    "cost": {
+      "FRIGATE": 5,
+      "DESTROYER": 10,
+      "CRUISER": 15,
+      "CAPITAL_SHIP": 25
+    },
+    "uiTags": [
+      "战机"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/expanded_deck_crew.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.ExpandedDeckCrew",
+    "builtInOnly": false,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "补充率战损下降量×0.85，自然恢复速度+25%；每甲板增加20最低船员的战役人员需求未模拟。"
+    }
+  },
+  "damaged_deck": {
+    "name": "受损的飞行甲板",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/damaged_flight_deck.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.DamagedFlightDeck",
+    "builtInOnly": true,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "战机补充时间+30%；战役部署费用折扣未模拟。"
+    }
+  },
+  "faulty_auto": {
+    "name": "自动化系统损毁",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/faulty_automated_systems.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.FaultyAutomatedSystems",
+    "builtInOnly": true,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "最大战备-5个百分点，人员/部署代价不模拟。"
+    }
+  },
+  "glitched_sensors": {
+    "name": "传感器阵列失灵",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/glitched_sensor_array.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.GlitchedSensorArray",
+    "builtInOnly": true,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "实弹和能量射程×0.9；战役传感器不模拟。"
+    }
+  },
+  "erratic_injector": {
+    "name": "失常的燃料喷注器",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/erratic_injector.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.ErraticInjector",
+    "builtInOnly": true,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "零幅能加速-10航速；燃料代价不模拟。"
+    }
+  },
+  "malfunctioning_comms": {
+    "name": "通讯系统故障",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/malfunctioning_comms.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.MalfunctioningComms",
+    "builtInOnly": true,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "战机交战范围×0.6；部署代价不模拟。"
+    }
+  },
+  "ex_phase_coils": {
+    "name": "实验性相位线圈",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/phase_coils_experimental.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.ExperimentalPhaseCoils",
+    "builtInOnly": true,
+    "support": {
+      "scope": "combat",
+      "combat": "implemented",
+      "campaign": "not-applicable",
+      "summary": "相位冷却×0.2。"
+    }
+  },
+  "andrada_mods": {
+    "name": "忠诚改装",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/special_modifications.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.AndradaMods",
+    "builtInOnly": true,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "耗散-5%，战斗修复时间+25%；人员结算不模拟。"
+    }
+  },
+  "chassis_storage": {
+    "name": "战机底盘储备",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/expanded_deck_crew.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.FighterChassisStorage",
+    "builtInOnly": true,
+    "support": {
+      "scope": "combat",
+      "combat": "implemented",
+      "campaign": "not-applicable",
+      "summary": "战机损失不降低补充率。"
+    }
+  },
+  "defective_manufactory": {
+    "name": "受损的制造工厂",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/defective_manufactory.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.DefectiveManufactory",
+    "builtInOnly": true,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "所属战机航速×0.75，盾甲结构承伤+25%；部署代价不模拟。"
+    }
+  },
+  "converted_bay": {
+    "name": "货舱改装",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/converted_hangar.png",
+    "source": "data.hullmods.ConvertedCargoBay",
+    "builtInOnly": true,
+    "support": {
+      "scope": "combat",
+      "combat": "implemented",
+      "campaign": "not-applicable",
+      "summary": "增加两个甲板，战机带有劣质制造惩罚。"
+    }
+  },
+  "defensive_targeting_array": {
+    "name": "护航定位阵列",
+    "cost": {
+      "FRIGATE": 2,
+      "DESTROYER": 4,
+      "CRUISER": 6,
+      "CAPITAL_SHIP": 10
+    },
+    "uiTags": [
+      "战机"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/defensive_targeting_array.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.DefensiveTargetingArray",
+    "builtInOnly": false,
+    "support": {
+      "scope": "combat",
+      "combat": "implemented",
+      "campaign": "not-applicable",
+      "summary": "战机改为母舰前方护卫，对导弹和战机伤害×1.5。"
+    }
+  },
+  "converted_hangar": {
+    "name": "机库改装",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 10,
+      "CRUISER": 10,
+      "CAPITAL_SHIP": 10
+    },
+    "uiTags": [
+      "战机"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/converted_hangar.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.ConvertedHangar",
+    "builtInOnly": false,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "增加甲板，补充率/整备代价及S-mod已接入；部署和人员代价不模拟。"
+    }
+  },
+  "vast_hangar": {
+    "name": "巨型机库",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/vast_hangar.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.VastHangar",
+    "builtInOnly": true,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "改装机库额外一个甲板，并取消其整备与后勤代价；后勤不模拟。"
+    }
+  },
+  "design_compromises": {
+    "name": "权衡设计",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/design_compromises.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.DesignCompromises",
+    "builtInOnly": true,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "原生幅能/武器惩罚及允许额外机库；部署费用不模拟。"
+    }
+  },
+  "bdeck": {
+    "name": "后备甲板",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/bdeck.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.BDeck",
+    "builtInOnly": true,
+    "support": {
+      "scope": "combat",
+      "combat": "implemented",
+      "campaign": "not-applicable",
+      "summary": "补充率首次降至40%时恢复到100%，快速补齐存活编制。"
+    }
+  },
+  "converted_fighterbay": {
+    "name": "战机甲板改装",
+    "cost": {
+      "FRIGATE": 2,
+      "DESTROYER": 4,
+      "CRUISER": 6,
+      "CAPITAL_SHIP": 10
+    },
+    "uiTags": [
+      "战机",
+      "后勤",
+      "需要船坞"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/converted_fighter_bay.png",
+    "source": "data.hullmods.ConvertedFighterBay",
+    "builtInOnly": false,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "移除全部内置甲板；货舱和人员代价不模拟。"
+    }
+  },
+  "nav_relay": {
+    "name": "导航中继器",
+    "cost": {
+      "FRIGATE": 10,
+      "DESTROYER": 15,
+      "CRUISER": 20,
+      "CAPITAL_SHIP": 25
+    },
+    "uiTags": [
+      "引擎",
+      "支援"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/nav_relay.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.NavRelay",
+    "builtInOnly": false,
+    "support": {
+      "scope": "combat",
+      "combat": "implemented",
+      "campaign": "not-applicable",
+      "summary": "提供2/3/4/5%舰队航速加成，同阵营累加至20%，包含自身。"
+    }
+  },
+  "do_not_back_off": {
+    "name": "取消后退",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "",
+    "source": "com.fs.starfarer.api.impl.hullmods.DoNotBackOff",
+    "builtInOnly": true,
+    "support": {
+      "scope": "combat",
+      "combat": "implemented",
+      "campaign": "not-applicable",
+      "summary": "原生隐藏AI指令：非排幅期间不主动退避。"
+    }
+  },
+  "axialrotation": {
+    "name": "绕轴旋转",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/axial_rotation.png",
+    "source": "data.hullmods.AxialRotation",
+    "builtInOnly": true,
+    "support": {
+      "scope": "combat",
+      "combat": "implemented",
+      "campaign": "not-applicable",
+      "summary": "原生隐藏控制器：持续右转。"
+    }
+  },
+  "escort_package": {
+    "name": "护航套件",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 7,
+      "CRUISER": 15,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [
+      "特殊",
+      "武器",
+      "引擎"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/escort_package.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.EscortPackage",
+    "builtInOnly": false,
+    "support": {
+      "scope": "combat",
+      "combat": "implemented",
+      "campaign": "not-applicable",
+      "summary": "按更大友舰距离提供机动/射程，护航主力的驱逐舰效果加倍；S-mod护盾减伤接实战。"
+    }
+  },
+  "assault_package": {
+    "name": "突击套件",
+    "cost": {
+      "FRIGATE": 3,
+      "DESTROYER": 6,
+      "CRUISER": 9,
+      "CAPITAL_SHIP": 15
+    },
+    "uiTags": [
+      "特殊",
+      "防御"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/assault_package.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.AssaultPackage",
+    "builtInOnly": false,
+    "support": {
+      "scope": "combat",
+      "combat": "implemented",
+      "campaign": "not-applicable",
+      "summary": "安装军事化子系统后获得结构+10%、装甲+5%、幅容+10%；无额外战役指挥官技能时采用原版基础效果。"
+    }
+  },
+  "militarized_subsystems": {
+    "name": "军事化子系统",
+    "cost": {
+      "FRIGATE": 4,
+      "DESTROYER": 8,
+      "CRUISER": 12,
+      "CAPITAL_SHIP": 20
+    },
+    "uiTags": [
+      "特殊",
+      "后勤",
+      "需要船坞"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/militarized_subsystems.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.MilitarizedSubsystems",
+    "builtInOnly": false,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "在民用级舰体上启用战斗套件安装；战役传感器/航速/船员消耗不模拟。"
+    }
+  },
+  "phase_anchor": {
+    "name": "相位锚点",
+    "cost": {
+      "FRIGATE": 10,
+      "DESTROYER": 20,
+      "CRUISER": 30,
+      "CAPITAL_SHIP": 50
+    },
+    "uiTags": [
+      "相位"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/phase_anchor.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.PhaseAnchor",
+    "builtInOnly": false,
+    "support": {
+      "scope": "combat",
+      "combat": "implemented",
+      "campaign": "not-applicable",
+      "summary": "相位开启费用归零；潜航时双倍耗散、武器冷却和弹药恢复；全场共享一次致命保护、额外部署CR账单与真实撤出。"
+    }
+  },
+  "ill_advised": {
+    "name": "不明智改装",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/illadvised.png",
+    "source": "data.hullmods.IllAdvised",
+    "builtInOnly": true,
+    "support": {
+      "scope": "combat",
+      "combat": "implemented",
+      "campaign": "not-applicable",
+      "summary": "武器故障概率+5%，故障升级为致命故障的概率+50%；接入开火周期故障与实际组件/结构损伤。"
+    }
+  },
+  "shield_always_on": {
+    "name": "保持开盾",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/hardened_shields.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.ShieldAlwaysOn",
+    "builtInOnly": true,
+    "support": {
+      "scope": "combat",
+      "combat": "implemented",
+      "campaign": "not-applicable",
+      "summary": "禁止主动收盾和排幅，过载时长×2；过载/排幅时耗散×10，99%幅能自动进入5秒基础过载。"
+    }
+  },
+  "hiressensors": {
+    "name": "高精度传感器",
+    "cost": {
+      "FRIGATE": 4,
+      "DESTROYER": 6,
+      "CRUISER": 9,
+      "CAPITAL_SHIP": 15
+    },
+    "uiTags": [
+      "后勤",
+      "需要船坞"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/high_res_sensors.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.HighResSensors",
+    "builtInOnly": false,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "普通安装仅战役传感器；S-mod提高战斗视野，接舰队共享视野、火控与战术地图。"
+    }
+  },
+  "supercomputer": {
+    "name": "目标定位巨型机",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/targeting_supercomputer.png",
+    "source": "data.hullmods.TargetingSupercomputer",
+    "builtInOnly": true,
+    "support": {
+      "scope": "combat",
+      "combat": "implemented",
+      "campaign": "not-applicable",
+      "summary": "实弹/能量射程+250%（点防净+60%），战斗视野+2000，自动瞄准+.5，最大/单发后坐力×.5。"
+    }
+  },
+  "operations_center": {
+    "name": "作战中心",
+    "cost": {
+      "FRIGATE": 30,
+      "DESTROYER": 30,
+      "CRUISER": 30,
+      "CAPITAL_SHIP": 30
+    },
+    "uiTags": [
+      "特殊"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/operations_center.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.OperationsCenter",
+    "builtInOnly": false,
+    "support": {
+      "scope": "combat",
+      "combat": "implemented",
+      "campaign": "not-applicable",
+      "summary": "玩家当前指挥舰装备时，指挥点恢复速率增加250%；换舰或撤离后按实际指挥舰重新计算。"
+    }
+  },
+  "high_frequency_attractor": {
+    "name": "感灵吸引场",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/high_volition_attractor.png",
+    "source": "com.fs.starfarer.api.combat.BaseHullMod",
+    "builtInOnly": true,
+    "support": {
+      "scope": "combat",
+      "combat": "implemented",
+      "campaign": "not-applicable",
+      "summary": "光尘上限30→50，单发能量1→300，额外反战机/导弹伤害200→1000；EMP仍为1500，不影响其他武器。"
+    }
+  },
+  "stealth_minefield": {
+    "name": "感应雷区",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/stealth_mines.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.StealthMinefield",
+    "builtInOnly": true,
+    "support": {
+      "scope": "combat",
+      "combat": "implemented",
+      "campaign": "not-applicable",
+      "summary": "原生单源感应雷区：真实延迟布雷、原生型号、引信、拦截与范围伤害；运动制导为Web适配。"
+    }
+  },
+  "stealth_minefield_lt": {
+    "name": "感应雷区 - 低端技术",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/stealth_mines.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.StealthMinefieldLT",
+    "builtInOnly": true,
+    "support": {
+      "scope": "combat",
+      "combat": "implemented",
+      "campaign": "not-applicable",
+      "summary": "原生单源感应雷区：真实延迟布雷、原生型号、引信、拦截与范围伤害；运动制导为Web适配。"
+    }
+  },
+  "civgrade": {
+    "name": "民用级船体",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/civilian_grade.png",
+    "source": "data.hullmods.CivGrade",
+    "builtInOnly": true,
+    "support": {
+      "scope": "campaign-only",
+      "combat": "not-applicable",
+      "campaign": "not-simulated",
+      "summary": "仅战役航行或传感器效果，不属于战斗实现缺口。"
+    }
+  },
+  "augmentedengines": {
+    "name": "增强驱动场",
+    "cost": {
+      "FRIGATE": 8,
+      "DESTROYER": 16,
+      "CRUISER": 24,
+      "CAPITAL_SHIP": 40
+    },
+    "uiTags": [
+      "后勤",
+      "需要船坞"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/augmented_drive_field2.png",
+    "source": "data.hullmods.AugmentedEngines",
+    "builtInOnly": true,
+    "support": {
+      "scope": "campaign-only",
+      "combat": "not-applicable",
+      "campaign": "not-simulated",
+      "summary": "仅战役航行或传感器效果，不属于战斗实现缺口。"
+    }
+  },
+  "reduced_explosion": {
+    "name": "爆炸减免",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/reduced_explosion.png",
+    "source": "data.hullmods.ReducedExplosion",
+    "builtInOnly": true,
+    "support": {
+      "scope": "combat",
+      "combat": "implemented",
+      "campaign": "not-applicable",
+      "summary": "殉爆伤害×0.1，舰体外扩伤害半径×0.25；不错误缩小舰体本身半径或纯视觉爆炸。"
+    }
   }
 }

@@ -24,7 +24,12 @@ export class WebGLTextureManager {
   constructor(gl: WebGL2RenderingContext) {
     this.gl = gl;
     this.whiteTexture = this.createSolidTexture(255, 255, 255, 255);
-    this.transparentTexture = this.createSolidTexture(0, 0, 0, 0);
+    try {
+      this.transparentTexture = this.createSolidTexture(0, 0, 0, 0);
+    } catch (error) {
+      this.gl.deleteTexture(this.whiteTexture);
+      throw error;
+    }
   }
 
   public getWhiteTexture(): WebGLTexture { return this.whiteTexture; }
@@ -115,8 +120,6 @@ export class WebGLTextureManager {
     const key = `@canvas:${cacheId}`;
     const existing = this.textures.get(key);
     if (existing && this.canvasTextureRevisions.get(key) === revision) return existing;
-    if (existing) this.gl.deleteTexture(existing);
-
     const sampler: Required<NonNullable<AssetManifestEntry['sampler']>> = {
       wrap: 'clamp',
       minFilter: 'linear',
@@ -126,6 +129,7 @@ export class WebGLTextureManager {
     const uploaded = this.uploadCanvas(canvas, sampler);
     this.textures.set(key, uploaded);
     this.canvasTextureRevisions.set(key, revision);
+    if (existing) this.gl.deleteTexture(existing);
     return uploaded;
   }
 
@@ -140,19 +144,24 @@ export class WebGLTextureManager {
   }
 
   private uploadCanvas(canvas: HTMLCanvasElement, sampler: Required<NonNullable<AssetManifestEntry['sampler']>>): WebGLTexture {
-    const tex = this.gl.createTexture();
-    if (!tex) throw new Error('Failed to create WebGL texture');
-    this.bindAndConfigure(tex, sampler, () => this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, canvas));
+    const tex = this.createTexture(texture => this.bindAndConfigure(texture, sampler, () => this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, canvas)));
     this.uploads++;
     return tex;
   }
 
   private uploadImage(img: HTMLImageElement, sampler: Required<NonNullable<AssetManifestEntry['sampler']>>): WebGLTexture {
-    const tex = this.gl.createTexture();
-    if (!tex) throw new Error('Failed to create WebGL texture');
-    this.bindAndConfigure(tex, sampler, () => this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, img));
+    const tex = this.createTexture(texture => this.bindAndConfigure(texture, sampler, () => this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, img)));
     this.uploads++;
     return tex;
+  }
+
+  /** Publish only fully uploaded textures; failed uploads retain no GPU objects. */
+  private createTexture(upload: (texture: WebGLTexture) => void): WebGLTexture {
+    const texture = this.gl.createTexture();
+    if (!texture) throw new Error('Failed to create WebGL texture');
+    try { upload(texture); }
+    catch (error) { this.gl.deleteTexture(texture); throw error; }
+    return texture;
   }
 
   private bindAndConfigure(tex: WebGLTexture, sampler: Required<NonNullable<AssetManifestEntry['sampler']>>, upload: () => void): void {
@@ -183,15 +192,14 @@ export class WebGLTextureManager {
 
   private createSolidTexture(r: number, g: number, b: number, a: number): WebGLTexture {
     const gl = this.gl;
-    const tex = gl.createTexture();
-    if (!tex) throw new Error('Failed to create solid texture');
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([r, g, b, a]));
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    return tex;
+    return this.createTexture(tex => {
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([r, g, b, a]));
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    });
   }
 
   /** Called on context loss: GPU objects are already invalid, so do not delete them. */

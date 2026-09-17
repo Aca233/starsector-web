@@ -1,0 +1,26 @@
+/* Native-style compact text feed; never intercept flight/map pointer input. */
+.combat-notifications {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 25;
+  width: min(620px, 48vw);
+  pointer-events: none;
+  color: #b4c9c7;
+  font: 18px/1.4 var(--native-font-body, var(--ui-font));
+  text-shadow: 0 1px 3px #000, 1px 0 2px #000;
+}
+.combat-notification { padding: 2px 6px; background: linear-gradient(90deg, #0a262c80, transparent); overflow-wrap: anywhere; }
+.combat-notification-friendly { color: #94ff00; }
+.combat-notification-hostile { color: #ff6868; }
+.combat-observer-hint, .combat-observation-bar {
+  position: absolute; top: 18px; right: 18px;
+  z-index: 26; color: #b4c9c7; background: #081b24e6; padding: 8px 12px;
+  font: 13px/1.5 var(--ui-font); max-width: min(600px, 44vw);
+}
+.combat-observation-bar { display: flex; align-items: center; gap: 12px; }
+.combat-observation-bar button { border: 1px solid #567975; padding: 4px 9px; color: #94ff00; white-space: nowrap; cursor: pointer; }
+.combat-observation-bar button:focus-visible { outline: 2px solid #94ff00; outline-offset: 2px; }
+@media (max-width: 1366px) { .combat-notifications { top: 12px; left: 12px; font-size: 15px; width: min(500px, 48vw); } }
+
+@media (max-width: 800px) { .combat-observation-bar { top: auto; bottom: 230px; max-width: calc(100vw - 36px); } }

@@ -1,3 +1,6 @@
+import { BattleSizeControl } from './BattleSizeControl';
+import { readBattleSize } from '../engine/runtime/BattleSizeSettings';
+import { battleTeamLimit } from '../shared/battle-size.mjs';
 import React, { useRef, useState } from 'react';
 import type { GameSession } from '../engine/game/GameSession';
 import { i18n } from '../engine/i18n/LocalizationManager';
@@ -10,6 +13,8 @@ interface Props { game: GameSession; onClose: () => void; onAction: (action: () 
 export function GameStatePanel({ game, onClose, onAction, actionError, onClearError }: Props) {
   const state = game.getSnapshot();
   const activeFleet = state.pendingCombat?.kind === 'fleet';
+  const [firstWave,setFirstWave]=useState<string[]>([]);
+  const [deploymentLimit,setDeploymentLimit]=useState(()=>battleTeamLimit(readBattleSize()));
   const [selectedId, setSelectedId] = useState(state.fleet[0]?.id);
   const selected = state.fleet.find(member => member.id === selectedId) ?? state.fleet[0];
   const spec = selected && contentRegistry.getShip(selected.hullId);
@@ -41,7 +46,12 @@ export function GameStatePanel({ game, onClose, onAction, actionError, onClearEr
           {game.saveStatus.state !== 'saved' && <Notice tone="warning">{game.saveStatus.message}</Notice>}
           {selected && <><h3>舰船状态</h3><ConditionBar label="结构完整度" value={selected.hullFraction} /><ConditionBar label="战备值 CR" value={selected.combatReadiness} kind="cr" />
             <Readout label="装配武器" value={`${selected.weapons.length} 门`} /><Readout label="战斗状态" value={selected.status === 'destroyed' ? '战沉' : activeFleet ? '出击中' : '待命'} />
-            {!activeFleet && selected.status === 'ready' && <Button variant="primary" onClick={() => onAction(() => game.startFleetCombat([selected.id]))}>舰队出击</Button>}
+            {!activeFleet && selected.status === 'ready' && <>
+              <h3>出击编成</h3><p>当前选中舰作为旗舰；其余可用舰船默认待命，可勾选为首发。</p>
+              <BattleSizeControl value={deploymentLimit*2} onChange={value=>setDeploymentLimit(value/2)}/>
+              {state.fleet.filter(m=>m.status==='ready'&&m.id!==selected.id).map(m=><label key={m.id} style={{display:'block'}}><input type="checkbox" checked={firstWave.includes(m.id)} onChange={e=>setFirstWave(ids=>e.target.checked?[...ids,m.id]:ids.filter(id=>id!==m.id))}/>{i18n.t(contentRegistry.getShip(m.hullId)?.nameKey??m.hullId)} 首发</label>)}
+              <Button variant="primary" onClick={() => onAction(() => game.startFleetCombat([selected.id,...state.fleet.filter(m=>m.status==='ready'&&m.id!==selected.id).map(m=>m.id)],undefined,[selected.id,...firstWave.filter(id=>id!==selected.id&&state.fleet.some(m=>m.id===id&&m.status==='ready'))],deploymentLimit))}>按此编成出击</Button>
+            </>}
             {activeFleet && <Button size="sm" onClick={() => onAction(() => game.restartCombat())}>从战前重新开始</Button>}
           </>}
           {state.outcomes.length > 0 && <><h3>最近战果</h3><div className="native-history">{ state.outcomes.slice(-5).reverse().map(outcome => <div key={outcome.encounterId}><strong className={outcome.victory ? '' : 'loss'}>{outcome.victory ? '胜利' : '失败'}</strong> · {outcome.kind === 'fleet' ? '舰队' : '沙盒'}<span style={{ float: 'right' }}>{outcome.duration.toFixed(1)} 秒</span></div>)}</div></>}

@@ -6,6 +6,15 @@ import { nativeCombatSystems } from './NativeCombatSystems';
 import { canisterFlak } from './NativeWeaponSystems';
 import { flareSystems } from './FlareSystems';
 import { lidarArray } from './LidarArray';
+import { recallDevice } from './RecallDevice';
+import { droneLaunchers } from './DroneLaunchers';
+import { energyLashSystems } from './EnergyLashSystems';
+import { pulseDrives } from './PulseDrive';
+import { empEmitter } from './EmpEmitter';
+import { chiralFigment } from './ChiralFigment';
+import { droneStrike } from './DroneStrike';
+import { moteControl } from './MoteControl';
+import { convulsiveLunge } from './ConvulsiveLunge';
 import { targetingFeed, reserveWing } from './CarrierSupportSystems';
 import { burnDrive } from './BurnDrive';
 import { fortressShield } from './FortressShield';
@@ -18,19 +27,20 @@ import { displacer, displacerDegraded, phaseTeleporter, droneSkimmer } from './P
 export const shipSystemDefinitions = new DefinitionRegistry<ShipSystemDefinition>('ship system', d => {
   if (typeof d.name !== 'string' || !d.name.trim() || !Array.isArray(d.sourceIds) || d.sourceIds.some(id=>typeof id !== 'string' || !id.trim()) || new Set(d.sourceIds).size !== d.sourceIds.length) throw new Error(d.id + ': invalid name/source IDs');
   for (const value of [d.description, d.implementationDetails]) if (value !== undefined && typeof value !== 'string') throw new Error(d.id + ': invalid description');
-  validateResources(d.resources); validateHooks(d, ['passiveModifiers','weaponEnabled','modifiers','onActivate','onActive','onAdvance','advanceAI','canActivate','initialize','selectTarget','isExecuting']);
+  validateResources(d.resources); validateHooks(d, ['statusText','passiveModifiers','weaponEnabled','modifiers','onActivate','onActive','onAdvance','advanceAI','canActivate','initialize','onReset','selectTarget','isExecuting','onEnergyLash','canVent','preventAIVenting','motionControl']);
   for (const group of [d.controls,d.visuals,d.phase]) if (group) for (const value of Object.values(group)) if (typeof value !== 'boolean') throw new Error(d.id + ': invalid capability flag');
-  for (const value of [d.toggle,d.hardFlux,d.unavailable]) if (value !== undefined && typeof value !== 'boolean') throw new Error(d.id + ': invalid boolean');
+  for (const value of [d.toggle,d.hardFlux,d.unavailable,d.usesChargesForActivation]) if (value !== undefined && typeof value !== 'boolean') throw new Error(d.id + ': invalid boolean');
   for (const key of [d.audio?.activate,d.audio?.loop,d.audio?.deactivate]) if (key !== undefined) requireSound(key,false);
   if (d.audio?.loopVolume !== undefined && (!Number.isFinite(d.audio.loopVolume) || d.audio.loopVolume < 0)) throw new Error(d.id + ': invalid volume');
   for (const key of ['chargeUp','chargeDown','cooldown'] as const) if (!Number.isFinite(d[key]) || d[key] < 0) throw new Error(`${d.id}.${key} must be nonnegative`);
   if (!(d.active >= 0) || (d.active === Infinity && !d.toggle)) throw new Error(`${d.id}: invalid active duration`);
   if (d.charges !== undefined && (!Number.isInteger(d.charges) || d.charges < 1)) throw new Error(`${d.id}: invalid charges`);
-  for (const value of [d.chargeRegen ?? 0, d.fluxPerUseFraction ?? 0]) if (!Number.isFinite(value) || value < 0) throw new Error(`${d.id}: invalid cost/regen`);
+  if (d.initialCharges !== undefined && (!Number.isInteger(d.initialCharges) || d.initialCharges < 0 || d.initialCharges > (d.charges ?? 0))) throw new Error(d.id + ': invalid initial stock');
+  for (const value of [d.chargeRegen ?? 0, d.fluxPerUseFraction ?? 0, d.fluxPerUseFlat ?? 0, d.fluxPerUseDissipationFraction ?? 0]) if (!Number.isFinite(value) || value < 0) throw new Error(`${d.id}: invalid cost/regen`);
   for (const alias of d.sourceIds) if (shipSystemDefinitions.all().some(other => other.sourceIds.includes(alias))) throw new Error(`Duplicate source system ${alias}`);
 });
 shipSystemDefinitions.register({id:'NONE', sourceIds:[], name:'无', chargeUp:0, active:0, chargeDown:0, cooldown:0});
-for (const definition of [burnDrive, fortressShield, mineStrike, maneuveringJets, plasmaJets, highEnergyFocus, ammoFeed, displacer, displacerDegraded, phaseTeleporter, droneSkimmer, canisterFlak, targetingFeed, reserveWing, lidarArray, ...flareSystems, ...nativeCombatSystems]) shipSystemDefinitions.register(definition);
+for (const definition of [burnDrive, fortressShield, mineStrike, maneuveringJets, plasmaJets, highEnergyFocus, ammoFeed, displacer, displacerDegraded, phaseTeleporter, droneSkimmer, canisterFlak, targetingFeed, reserveWing, lidarArray, recallDevice, ...droneLaunchers, ...energyLashSystems, ...pulseDrives, empEmitter, chiralFigment, droneStrike, moteControl, convulsiveLunge, ...flareSystems, ...nativeCombatSystems]) shipSystemDefinitions.register(definition);
 // Only this audited set has side-effect-free modifiers/passiveModifiers/isExecuting.
 // Registration by external extensions does not confer this property.
 const nativeStatDefinitions = new WeakSet(shipSystemDefinitions.all());

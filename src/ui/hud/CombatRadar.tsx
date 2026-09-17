@@ -1,3 +1,4 @@
+import { sameTeam, combatTeamColor } from "../../engine/simulation/CombatTeams";
 import React, { useRef, useEffect } from 'react';
 import { CombatEngine } from '../../engine/simulation/CombatEngine';
 import { Vector2 } from '../../engine/math/Vector2';
@@ -57,15 +58,15 @@ export const CombatRadar: React.FC<CombatRadarProps> = ({ engine }) => {
 
       // 3. 绘制敌舰 (红色三角箭头，对齐 iconEnemyColor: [255, 0, 0])
       for (const enemy of engine.capitalShips.filter(s => s !== player)) {
-      if (enemy && !enemy.isDead) {
+      if (enemy && !enemy.isDead && !enemy.isRetreated && enemy.isVisibleTo(player.teamId)) {
         const { rx, ry } = toRadarPos(enemy.pos);
         if (rx >= 0 && rx <= w && ry >= 0 && ry <= h) {
           ctx.save();
           ctx.translate(rx, ry);
           ctx.rotate(enemy.facingRad);
 
-          ctx.fillStyle = enemy.isPlayer === player.isPlayer ? '#22c55e' : '#ef4444';
-          ctx.strokeStyle = enemy.isPlayer === player.isPlayer ? '#86efac' : '#fca5a5';
+          ctx.fillStyle = engine.multiTeamBattle ? combatTeamColor(enemy.teamId) : sameTeam(enemy, player) ? '#22c55e' : '#ef4444';
+          ctx.strokeStyle = engine.multiTeamBattle ? combatTeamColor(enemy.teamId) : sameTeam(enemy, player) ? '#86efac' : '#fca5a5';
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(6, 0);
@@ -85,8 +86,8 @@ export const CombatRadar: React.FC<CombatRadarProps> = ({ engine }) => {
       if (engine.fighters) {
         ctx.fillStyle = '#4ade80';
         for (const ftr of engine.fighters) {
-          ctx.fillStyle = ftr.isPlayer === player.isPlayer ? '#4ade80' : '#ef4444';
-          if (ftr.isDead) continue;
+          ctx.fillStyle = engine.multiTeamBattle ? combatTeamColor(ftr.teamId) : sameTeam(ftr, player) ? '#4ade80' : '#ef4444';
+          if (ftr.isDead || !ftr.isVisibleTo(player.teamId)) continue;
           const { rx, ry } = toRadarPos(ftr.pos);
           if (rx >= 2 && rx <= w - 2 && ry >= 2 && ry <= h - 2) {
             ctx.fillRect(rx - 1, ry - 1, 2, 2);
@@ -96,8 +97,8 @@ export const CombatRadar: React.FC<CombatRadarProps> = ({ engine }) => {
       if (engine.bombers) {
         ctx.fillStyle = '#60a5fa';
         for (const bmr of engine.bombers) {
-          ctx.fillStyle = bmr.isPlayer ? '#60a5fa' : '#ef4444';
-          if (bmr.isDead) continue;
+          ctx.fillStyle = engine.multiTeamBattle ? combatTeamColor(bmr.teamId) : sameTeam(bmr, player) ? '#60a5fa' : '#ef4444';
+          if (bmr.isDead || !bmr.isVisibleTo(player.teamId)) continue;
           const { rx, ry } = toRadarPos(bmr.pos);
           if (rx >= 2 && rx <= w - 2 && ry >= 2 && ry <= h - 2) {
             ctx.fillRect(rx - 1.5, ry - 1.5, 3, 3);

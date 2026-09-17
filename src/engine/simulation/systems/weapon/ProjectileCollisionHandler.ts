@@ -1,3 +1,4 @@
+import { sameTeam, combatTeam } from "../../CombatTeams";
 import { damageToMissiles } from './DamageToMissiles';
 import { segmentCircleEntry } from '../../../math/Geometry';
 import { distanceToSegment, segmentHullHit } from '../../../visual/HulkGeometry';
@@ -5,7 +6,7 @@ import { Vector2 } from '../../../math/Vector2';
 import { Ship } from '../../Ship';
 import { Projectile } from '../../Weapon';
 import { sound } from '../../../audio/SoundManager';
-import { requireWeaponEffect } from '../../../extensions/weapon-effects/Registry';
+import { requireWeaponEffect, weaponEffects } from '../../../extensions/weapon-effects/Registry';
 import { applyComponentDamage } from './ComponentDamage';
 import { projectileOutgoingMultiplier, projectileSource, bindProjectileSource } from './OutgoingDamage';
 import { WeaponSimContext } from './WeaponSimContext';
@@ -17,7 +18,7 @@ import {
 } from '../../collision/RuntimeCollisionKernel';
 import { getProjectileImpactVisualProfile } from '../../../visual/ImpactVisuals';
 import { shieldHitGlowDamage } from '../../../visual/HitGlowVisuals';
-import { distanceToDeployedShield } from '../../collision/ShieldCollisionGeometry';
+import { distanceToDeployedShield, isShieldCollisionActive } from '../../collision/ShieldCollisionGeometry';
 import { getShipExplosionContact } from '../../collision/ExplosionContact';
 import { distanceToShipHull, mayBeWithinShipHullDistance } from '../../collision/HullGeometry';
 
@@ -75,14 +76,14 @@ export class ProjectileCollisionHandler {
       let hit = hits[index];
       if (!hit) continue;
 
-      // A previous projectile in this same fixed step may have destroyed the
-      // snapshotted target. Re-resolve only that rare query against surviving
-      // candidates so the authoritative TS state keeps the original ordering
-      // semantics without throwing away the whole batch.
-      if (hit.ship.isDead || hit.ship.isPhased) {
+      // Earlier impacts can destroy a target or overload its snapshotted shield.
+      // Resolve that shot again along its original segment: it may hit the hull,
+      // reach a ship behind it, or miss entirely. Keep batching unaffected hits.
+      if (hit.ship.isDead || hit.ship.isCollisionless
+        || (hit.kind === 'SHIELD' && !isShieldCollisionActive(hit.ship))) {
         const surviving: RuntimeCollisionQuery = {
           projectile: queries[index].projectile,
-          candidates: queries[index].candidates.filter((ship) => !ship.isDead && !ship.isPhased)
+          candidates: queries[index].candidates.filter((ship) => !ship.isDead && !ship.isCollisionless)
         };
         hit = this.runtimeCollisionKernel.findHitTypeScript(surviving);
       }
@@ -102,9 +103,9 @@ export class ProjectileCollisionHandler {
       candidates: broadphaseCandidates.filter((ship) =>
         ship.id !== p.sourceShipId &&
         !p.damagedTargetIds?.includes(ship.id) &&
-        (p.isPlayer === undefined || ship.isPlayer !== p.isPlayer) &&
+        (p.isPlayer === undefined || !sameTeam(ship, p)) &&
         !ship.isDead &&
-        !ship.isPhased
+        !ship.isCollisionless
       )
     };
   }
@@ -120,10 +121,10 @@ export class ProjectileCollisionHandler {
   }
 
   private isHostileProjectile(source: Projectile, candidate: Projectile): boolean {
-    if (candidate.id === source.id || candidate.sourceShipId === source.sourceShipId) return false;
+    if (candidate.collisionDisabled || candidate.id === source.id || candidate.sourceShipId === source.sourceShipId) return false;
     return source.isPlayer === undefined || candidate.isPlayer === undefined
       ? candidate.sourceShipId !== source.sourceShipId
-      : candidate.isPlayer !== source.isPlayer;
+      : !sameTeam(candidate, source);
   }
 
   /**
@@ -149,7 +150,7 @@ export class ProjectileCollisionHandler {
     // 引信检测 B: 接近敌方战机/轰炸机
     if (!shouldAirburst) {
       for (const f of ctx.fighters) {
-        if (f.id !== p.sourceShipId && (p.isPlayer === undefined || f.isPlayer !== p.isPlayer) && !f.isDead && !f.isPhased) {
+        if (f.id !== p.sourceShipId && (p.isPlayer === undefined || !sameTeam(f, p)) && !f.isDead && !f.isCollisionless) {
           if (p.pos.distanceTo(f.pos) <= p.proximityFuse.range + f.spec.collisionRadius * 0.7) {
             shouldAirburst = true;
             break;
@@ -161,10 +162,10 @@ export class ProjectileCollisionHandler {
     // 引信检测 C: 接近敌方大舰护盾或外壳
     if (!shouldAirburst) {
       for (const s of ctx.capitalShips ?? [ctx.playerShip, ctx.enemyShip]) {
-        if (s.id !== p.sourceShipId && (p.isPlayer === undefined || s.isPlayer !== p.isPlayer) && !s.isDead && !s.isPhased) {
+        if (s.id !== p.sourceShipId && (p.isPlayer === undefined || !sameTeam(s, p)) && !s.isDead && !s.isCollisionless) {
           // Fuse contacts must match the currently deployed arc and authored hull,
           // not a full shield/bounding circle as soon as the toggle is active.
-          const shieldDistance = distanceToDeployedShield(s, p.pos);
+          const shieldDistance = distanceToDeployedShield(s, p.pos, p.proximityFuse.range * 0.5);
           // Most fuse/ship pairs are distant. Do not walk an entire hull unless
           // its conservative bound can reach the fuse or the shield is already
           // close. Keep Math.min and the exact fallback for NaN/Infinity inputs.
@@ -227,7 +228,7 @@ export class ProjectileCollisionHandler {
       const targetM = allProjectiles[mIdx];
       if (targetM.isRocket && this.isHostileProjectile(p, targetM)) {
         if (p.pos.distanceTo(targetM.pos) <= expRadius) {
-          const damage = damageToMissiles(p.damage * this.getExplosionDamageScale(p, p.pos.distanceTo(targetM.pos)) * projectileOutgoingMultiplier(p, undefined, targetM.pos, ctx), p.sourceShipId, ctx, projectileSource(p, ctx));
+          const damage = damageToMissiles(p.damage * this.getExplosionDamageScale(p, p.pos.distanceTo(targetM.pos)) * projectileOutgoingMultiplier(p, undefined, targetM.pos, ctx), p.sourceShipId, ctx, projectileSource(p, ctx), targetM);
           if (damage <= 0) continue;
           targetM.hitpoints = (targetM.hitpoints ?? 100) - damage;
           damagedHostileTarget = true;
@@ -257,13 +258,13 @@ export class ProjectileCollisionHandler {
     // use the same route. Deduplicate mixed contexts so a target is hit once.
     const ships = ctx.ships ?? [...(ctx.capitalShips ?? [ctx.playerShip, ctx.enemyShip]), ...ctx.fighters];
     const sourceShip = projectileSource(p, ctx);
-    const sourceIsPlayer = p.isPlayer ?? sourceShip?.isPlayer;
+    const sourceTeam = combatTeam(p) ?? sourceShip?.teamId;
     const fighterIds = new Set(ctx.fighters.map(ship => ship.id));
     const visited = new Set<string>();
     for (const ship of ships) {
       if (visited.has(ship.id)) continue;
       visited.add(ship.id);
-      if (ship.id === p.sourceShipId || (sourceIsPlayer !== undefined && ship.isPlayer === sourceIsPlayer) || ship.isDead || ship.isPhased) continue;
+      if (ship.id === p.sourceShipId || (sourceTeam !== undefined && ship.teamId === sourceTeam) || ship.isDead || ship.isCollisionless) continue;
 
       const contact = getShipExplosionContact(ship, p.pos);
       const shieldContact = contact.shield;
@@ -276,7 +277,7 @@ export class ProjectileCollisionHandler {
       if (shieldContact) {
         const shieldDamage = takenDamage * ship.system.getShieldDamageMultiplier();
         const fluxGain = ship.shield.absorbDamage(shieldDamage, 'FRAGMENTATION', contact.point.clone().sub(shieldCenter).heading());
-        ship.flux.increaseFlux(fluxGain, true);
+        ship.flux.increaseShieldFlux(fluxGain, true);
         ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, 'FRAGMENTATION', shieldDamage * ship.shield.damageTakenMultiplierFor("FRAGMENTATION"), 'SHIELD');
         ctx.fx.spawnShieldRipple(p.pos, 35, [255, 120, 100]);
         continue;
@@ -288,7 +289,7 @@ export class ProjectileCollisionHandler {
       ctx.fx.spawnArmorDamageSparks(ship, localImpact, result.armorDamage);
       if (result.armorDamage > 0) ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, 'FRAGMENTATION', result.armorDamage, 'ARMOR');
       if (result.hullDamage > 0) ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, 'FRAGMENTATION', result.hullDamage, 'HULL');
-      ship.hullHp = Math.max(0, ship.hullHp - result.hullDamage);
+      ship.applyHullDamage(result.hullDamage);
       const fighter = fighterIds.has(ship.id) || ship.spec.hullSize === 'FIGHTER';
       if (fighter) {
         const applied = result.armorDamage + result.hullDamage;
@@ -320,11 +321,11 @@ export class ProjectileCollisionHandler {
     ctx: WeaponSimContext,
     allProjectiles: Projectile[]
   ): ProjectileInterceptionResult | null {
-    if ((p.isRocket && p.targetProjectileId === undefined) || p.isFlare || p.didDamage) return null;
+    if ((p.isRocket && !p.interceptsMissiles && p.targetProjectileId === undefined) || p.isFlare || p.didDamage) return null;
     let target: Projectile | undefined, first = Infinity;
     for (const candidate of allProjectiles) {
       if (!candidate.isRocket || !this.isHostileProjectile(p, candidate) || p.damagedTargetIds?.includes('projectile:' + candidate.id)) continue;
-      if (p.isRocket && (candidate.id !== p.targetProjectileId || !candidate.isFlare || candidate.flareFizzling)) continue;
+      if (p.isRocket && !p.interceptsMissiles && (candidate.id !== p.targetProjectileId || !candidate.isFlare || candidate.flareFizzling)) continue;
       const t = segmentCircleEntry(p.prevPos, p.pos, candidate.pos, candidate.radius + (p.spawnType === 'BALLISTIC_AS_BEAM' ? 0 : p.radius));
       if (t !== null && t < first) { target = candidate; first = t; }
     }
@@ -342,7 +343,8 @@ export class ProjectileCollisionHandler {
     }
     if (!(first < limit)) return null;
     const point = Vector2.lerp(p.prevPos, p.pos, first);
-    target.hitpoints = (target.hitpoints ?? 100) - damageToMissiles(p.damage * projectileOutgoingMultiplier(p, undefined, point, ctx), p.sourceShipId, ctx, projectileSource(p, ctx));
+    target.hitpoints = (target.hitpoints ?? 100) - damageToMissiles(p.damage * projectileOutgoingMultiplier(p, undefined, point, ctx), p.sourceShipId, ctx, projectileSource(p, ctx), target);
+    if (p.onHitEffect) weaponEffects.require(p.onHitEffect).hitProjectile?.(p,target,point,projectileSource(p,ctx),ctx);
     const targetDestroyed = target.hitpoints <= 0;
     if (targetDestroyed) {
       ctx.contrailEngine?.detach(target.id);
@@ -400,7 +402,7 @@ export class ProjectileCollisionHandler {
 
   private applyShipCollisionHit(hit: RuntimeCollisionHit, ctx: WeaponSimContext): boolean {
     const { projectile: p, ship } = hit;
-    if (ship.isDead || ship.isPhased) return false;
+    if (ship.isDead || ship.isCollisionless) return false;
     const impactWorld = hit.worldPoint;
     const impactDamage = p.damage * projectileOutgoingMultiplier(p, ship, impactWorld, ctx);
     p.pos.copy(impactWorld);
@@ -417,7 +419,7 @@ export class ProjectileCollisionHandler {
         ctx.statsTracker.recordDamageDealt(p.isPlayer ?? false, p.damageType, absorbedDmg * ship.shield.damageTakenMultiplierFor(p.damageType), 'SHIELD');
       }
       const shieldDamage = shieldHitGlowDamage(fluxGain, ship.flux.maxFlux - ship.flux.totalFlux, ship.shield.efficiency);
-      ship.flux.increaseFlux(fluxGain, !p.softFlux);
+      ship.flux.increaseShieldFlux(fluxGain, !p.softFlux);
       ctx.fx.addFloatingDamage(impactWorld, absorbedDmg * ship.shield.damageTakenMultiplierFor(p.damageType), [80, 200, 255]);
       const visual = getProjectileImpactVisualProfile({
         specId: p.specId,
@@ -457,7 +459,7 @@ export class ProjectileCollisionHandler {
         ctx.statsTracker.recordDamageDealt(p.isPlayer ?? false, p.damageType, result.hullDamage, 'HULL');
       }
     }
-    ship.hullHp = Math.max(0, ship.hullHp - result.hullDamage);
+    ship.applyHullDamage(result.hullDamage);
 
     const source = projectileSource(p, ctx);
     applyComponentDamage(ship, impactPoint, result, p.empDamage ?? 0, source);

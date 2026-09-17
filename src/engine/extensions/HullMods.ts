@@ -1,3 +1,7 @@
+import { advanceStealthMinefield } from './StealthMinefield';
+import type { SystemWorld } from './ship-systems/Types';
+import { installPhaseAnchor, advancePhaseAnchor } from './PhaseAnchor';
+import { advanceEscortPackage } from './EscortPackage';
 import { isImmutableMetadata } from './Immutable';
 import { skillHullModifiers, skillWeaponModifiers, skillRangePercent, combatSkillLevel } from './CombatSkills';
 import { contentRegistry } from '../content/ContentRegistry';
@@ -8,6 +12,9 @@ import type { WeaponSpec } from '../simulation/Weapon';
 import type { Ship } from '../simulation/Ship';
 import { DefinitionRegistry } from './DefinitionRegistry';
 import nativeMetadata from './native-hullmod-metadata.json';
+import nativeHullFacts from './native-hull-facts.json';
+import nativeSModMetadata from './native-smod-metadata.json';
+import { nativeSModEffects } from './SModEffects';
 import type { SimulationRandom } from '../simulation/SimulationRandom';
 import { missileReloadCapacity, advanceMissileAutoloader, advancePeriodicMissileReload } from './MissileReload';
 
@@ -26,7 +33,19 @@ export interface HullModSupport {
   campaign: 'not-applicable' | 'not-simulated';
   summary: string;
 }
-export interface HullModDefinition {
+export interface FighterHullModEffects {
+  fighterStats?: (carrier: ShipSpec, craft: ShipSpec) => Partial<HullModStats>;
+  fighterRangeFlat?: (carrier: ShipSpec, weapon: WeaponSpec) => number;
+}
+export interface SModEffect extends FighterHullModEffects {
+  description: string;
+  stats?: (ship: ShipSpec) => Partial<HullModStats>;
+  weaponStats?: (ship: ShipSpec, weapon: WeaponSpec) => Partial<HullModWeaponStats>;
+  rangePercent?: (ship: ShipSpec, weapon: WeaponSpec) => number;
+}
+export interface HullModDefinition extends FighterHullModEffects {
+  sMod?: SModEffect;
+
   resources?: ExtensionResources;
   id: string;
   name: string;
@@ -51,6 +70,8 @@ export interface HullModDefinition {
   weaponOPFlat?: (ship: ShipSpec, weapon: WeaponSpec) => number;
   apply?: (ship: Ship) => void;
   advance?: (ship: Ship, dt: number, random: SimulationRandom) => void;
+  /** World-dependent combat effects; dt is real battle time, not the phase clock. */
+  advanceCombat?: (ship: Ship, dt: number, world: SystemWorld) => void;
 }
 export const hullModDefinitions = new DefinitionRegistry<HullModDefinition>('hullmod', d => {
   if (!d.name?.trim() || !['implemented', 'metadata-only'].includes(d.status)) throw new Error(d.id + ': invalid hullmod definition');
@@ -63,8 +84,9 @@ export const hullModDefinitions = new DefinitionRegistry<HullModDefinition>('hul
     const mixed = s.scope === 'mixed' && s.combat === 'implemented' && s.campaign === 'not-simulated' && d.status === 'implemented';
     if ((!combatOnly && !campaignOnly && !mixed) || !s.summary?.trim()) throw new Error(d.id + ': invalid hullmod support scope');
   }
+  if (d.sMod) { if (!d.sMod.description?.trim()) throw new Error(d.id + ': invalid S-mod description'); validateHooks(d.sMod, ['stats', 'weaponStats', 'rangePercent', 'fighterStats', 'fighterRangeFlat']); }
   validateResources(d.resources);
-  validateHooks(d, ['rangePercent', 'rangeFlat', 'rangeBaseFlat', 'rangeMultiplier', 'weaponOPFlat', 'stats', 'weaponStats', 'shieldSpec', 'applicable', 'apply', 'advance']);
+  validateHooks(d, ['rangePercent', 'rangeFlat', 'rangeBaseFlat', 'rangeMultiplier', 'weaponOPFlat', 'stats', 'weaponStats', 'shieldSpec', 'applicable', 'apply', 'advance', 'advanceCombat', 'fighterStats', 'fighterRangeFlat']);
   if (d.priority !== undefined && !Number.isFinite(d.priority)) throw new Error(d.id + ': invalid priority');
   if (d.conflicts && (!Array.isArray(d.conflicts) || d.conflicts.some(id => typeof id !== 'string' || !id || id === d.id))) throw new Error(d.id + ': invalid conflicts');
   if (d.refit) {
@@ -72,11 +94,41 @@ export const hullModDefinitions = new DefinitionRegistry<HullModDefinition>('hul
     for (const cost of Object.values(d.refit.cost)) if (!Number.isFinite(cost) || cost < 0) throw new Error(d.id + ': invalid OP cost');
     if (!d.refit.builtInOnly && (d.status !== 'implemented' || !d.description?.trim())) throw new Error(d.id + ': installable hullmod needs implementation and description');
   }
-  if (d.status === 'metadata-only' && (d.apply || d.advance || d.rangePercent || d.rangeFlat || d.rangeBaseFlat || d.rangeMultiplier || d.weaponOPFlat || d.stats || d.weaponStats || d.shieldSpec)) throw new Error(d.id + ': metadata-only hullmod cannot have runtime hooks');
+  if (d.status === 'metadata-only' && (d.apply || d.advance || d.advanceCombat || d.rangePercent || d.rangeFlat || d.rangeBaseFlat || d.rangeMultiplier || d.weaponOPFlat || d.stats || d.weaponStats || d.shieldSpec || d.fighterStats || d.fighterRangeFlat || d.sMod)) throw new Error(d.id + ': metadata-only hullmod cannot have runtime hooks');
 });
 
 /** Flat/percent bonuses add; multipliers multiply. Never write derived values into saved ShipSpec. */
 export interface HullModStats {
+  explosionDamageMultiplier: number;
+  explosionRadiusMultiplier: number;
+  commandPointRateFlat: number;
+  sightRadiusFlat: number;
+  sightRadiusPercent: number;
+  weaponMalfunctionChanceBonus: number;
+  criticalMalfunctionChanceBonus: number;
+  navRating: number;
+  doNotBackOff: number;
+  forcedRightTurn: number;
+  fighterBaysBonus: number;
+  fighterRefitTimeMultiplier: number;
+  fighterRearmTimeFraction: number;
+  replacementRateIncreaseMultiplier: number;
+  fighterWingRangeMultiplier: number;
+  fighterDefenseFormation: number;
+  reserveDeck: number;
+  damageToFightersMultiplier: number;
+  damageToMissilesMultiplier: number;
+  armorDamageTakenPercent: number;
+  hullDamageTakenPercent: number;
+  engineRepairTimePercent: number;
+  weaponRepairTimePercent: number;
+  systemFluxCostMultiplier: number;
+  shieldSoftFluxConversion: number;
+  zeroFluxSpeedBonus: number;
+  zeroFluxTurnMultiplier: number;
+  damageToFrigatesPercent: number;
+  damageToDestroyersPercent: number;
+  damageToCruisersPercent: number;
   autofireAimAccuracy: number;
   ecmRating: number;
   ecmPenaltyMultiplier: number;
@@ -145,6 +197,9 @@ export interface HullModStats {
   effectiveArmorMultiplier: number;
   minArmorFractionMultiplier: number;
   damageToMissilesPercent: number;
+  damageToFightersPercent: number;
+  replacementRateDecreaseMultiplier: number;
+  replacementRateIncreasePercent: number;
   pdIgnoresFlares: number;
   shieldTurnRatePercent: number;
   shieldUnfoldRatePercent: number;
@@ -168,6 +223,8 @@ export interface HullModWeaponStats {
   projectileSpeedPercent: number;
   missileHealthPercent: number;
   rateOfFirePercent: number;
+  rateOfFireMultiplier: number;
+  grantsPointDefense: number;
   ammoRegenPercent: number;
   damagePercent: number;
   beamHardFlux: number;
@@ -214,15 +271,19 @@ const nativeRangeDefinitions = new WeakSet<HullModDefinition>();
 function native(id: keyof typeof nativeMetadata, description: string, hooks: Partial<HullModDefinition> = {}) {
   // JSON support values are checked by the registry alongside the runtime-hook status.
   const { name, support, ...refit } = nativeMetadata[id] as HullModRefitMetadata & { name: string; support?: HullModSupport };
-  hullModDefinitions.register({ id, name, status: 'implemented', refit, support, description, ...hooks });
+  hullModDefinitions.register({ id, name, status: 'implemented', refit, support, description, sMod: nativeSModEffects[id], ...hooks });
   nativeRangeDefinitions.add(hullModDefinitions.require(id));
 }
 // Mixed scope is explicit: real combat hooks do not imply a campaign simulation.
-native('eccm', '导弹抗诱骗概率+50%，制导加成+1；极速+25%、加速度+150%、转速+50%、转向加速度+150%，飞行时间×0.8。电子战射程惩罚×0.5。S-mod效果尚未接入。', {
+native('eccm', '导弹抗诱骗概率+50%，制导加成+1；极速+25%、加速度+150%、转速+50%、转向加速度+150%，飞行时间×0.8。电子战射程惩罚×0.5。', {
   stats: () => ({ ecmPenaltyMultiplier: .5 }),
   rangeMultiplier: (_s,w) => w.weaponType === 'MISSILE' ? .8 * (w.isRocket || w.spawnType === 'MISSILE' ? 1.25 : 1) : 1,
   weaponStats: (_s,w) => w.weaponType === 'MISSILE' ? { eccmChanceBonus: .5, missileGuidanceBonus: 1, missileSpeedPercent: 25, missileAccelerationPercent: 150, missileTurnPercent: 50, missileTurnAccelerationPercent: 150, missileFlightTimeMultiplier: .8 } : {},
 });
+native('high_frequency_attractor', '将光尘上限提高至50，单发能量提高至300，额外反战机/导弹伤害提高至1000；EMP仍为1500。由光尘系统与命中插件消费，不对整舰套用通用增伤。');
+native('operations_center', '当前指挥舰的指挥点恢复速度+250%。基础每120秒恢复1点；该舰存活且仍在场指挥时约34.29秒恢复1点。', {stats:()=>({commandPointRateFlat:2.5})});
+native('hiressensors', '普通安装不增加战斗视野。S-mod按护卫/驱逐/巡洋/主力增加1000/1500/2000/2500视野。战役舰队传感器不模拟。');
+native('supercomputer', '实弹/能量射程+250%，点防净+60%；视野+2000，自动瞄准精度+.5，最大与每发后坐力×.5。原脚本未启用弹速加成。', { stats:()=>({sightRadiusFlat:2000,autofireAimAccuracy:.5}), rangePercent:(_s,w)=>w.weaponType==='MISSILE'?0:w.isPointDefense?60:250, weaponStats:()=>({maxRecoilMultiplier:.5,recoilPerShotMultiplier:.5}) });
 native('ecm', '部署时依舰体级别为己方舰队提供1/2/3/4%电子战强度。双方电子战会互相抵消部分惩罚；上限10%。', { stats: s => ({ ecmRating: bySize(s, [1,2,3,4]) }) });
 native('coherer', '非光束能量武器基础射程+100；全自动舰船+200。在百分比射程修正之前计算。原版有人舰船员伤亡+50%的人员结算未模拟。', {
   rangeBaseFlat: (s,w) => !w.isBeam && w.weaponType === 'ENERGY' ? ((s.sourceHullTraits ?? s.builtInHullMods ?? []).includes('automated') ? 200 : 100) : 0,
@@ -279,7 +340,7 @@ native('targetingunit', '实弹与能量武器射程 +10 / 20 / 40 / 60%（护�
 native('dedicated_targeting_core', '实弹与能量武器射程：巡洋舰 +35%，主力舰 +50%。', { rangeGroup: 'targeting', priority: 1, conflicts: targeting.filter(id => id !== 'dedicated_targeting_core'), applicable: s => ['CRUISER', 'CAPITAL_SHIP'].includes(s.hullSize ?? '') ? null : '仅巡洋舰 / 主力舰可用', rangePercent: (s,w) => w.weaponType === 'MISSILE' ? 0 : bySize(s, [0, 0, 35, 50]) });
 native('stabilizedshieldemitter', '护盾维持幅能 −50%。不影响受击产生的硬幅能。', { applicable: needsShield, stats: () => ({ shieldUpkeepMultiplier: .5 }) });
 native('hardenedshieldemitter', '护盾承伤 −20%，EMP 电弧穿盾概率减半。', { applicable: needsShield, stats: () => ({ shieldDamageMultiplier: .8, shieldPiercedMultiplier: .5 }) });
-native('fluxbreakers', '主动排幅速度 +25%，武器和引擎所受 EMP 损害 −50%。', { stats: () => ({ ventRateMultiplier: 1.25, empDamageMultiplier: .5 }) });
+native('fluxbreakers', '主动排幅速度 +25%，武器和引擎所受 EMP 损害 −50%。', { stats: () => ({ ventRatePercent: 25, empDamageMultiplier: .5 }) });
 native('fluxdistributor', '幅能耗散 +30 / 60 / 90 / 150（护卫 / 驱逐 / 巡洋 / 主力）。', { stats: s => ({ dissipationBonus: bySize(s, [30, 60, 90, 150]) }) });
 native('advancedshieldemitter', '护盾转向速度 +100%，展开速度 +100%。', { applicable: needsShield, stats: () => ({ shieldTurnRatePercent: 100, shieldUnfoldRatePercent: 100 }) });
 native('extendedshieldemitter', '护盾弧度 +60°，最大 360°。', { applicable: needsShield, stats: () => ({ shieldArcBonus: 60 }) });
@@ -302,6 +363,84 @@ native('fourteenth', '装甲 +100；幅能容量与耗散 ×1.05；最高航速�
 native('distributed_fire_control', '武器所受损害 ×0.5，EMP 所受损害 ×0.5。不提供射程加成；保留原版目标定位插件的不兼容限制。仅限舰体内置。', {
   stats: () => ({ weaponDamageTakenMultiplier: .5, empDamageMultiplier: .5 }),
 });
+native('expanded_deck_crew', '战机战损导致的补充率下降量降低15%，补充率自然恢复速度提高25%。原版每甲板最低船员+20的战役需求未模拟。', {
+  applicable: s => (s.fighterBays ?? 0) > 0 ? null : '需要标准飞行甲板',
+  stats: () => ({ replacementRateDecreaseMultiplier: .85, replacementRateIncreasePercent: 25 }),
+});
+native('damaged_deck', '内置损伤：战机补充时间+30%。战役部署费用折扣未模拟。', { stats: () => ({ fighterRefitTimePercent: 30 }) });
+native('terminator_core', '对导弹和战机伤害+100%；光束射程+300、转速×2；自动瞄准精度+1，点防忽略诱饵弹，引擎所受伤害×0。仅内置。', {
+  stats: () => ({ damageToMissilesPercent: 100, damageToFightersPercent: 100, autofireAimAccuracy: 1, pdIgnoresFlares: 1, engineDamageTakenMultiplier: 0 }),
+  rangeFlat: (_s, w) => w.isBeam ? 300 : 0,
+  weaponStats: (_s, w) => ({ turnRateMultiplier: w.isBeam ? 2 : 1 }),
+});
+
+const nativeFacts: Record<string, {deployCR: number; builtInWings: number}> = nativeHullFacts;
+const defectiveFighters = () => ({ speedMultiplier: .75, armorDamageTakenPercent: 25, hullDamageTakenPercent: 25, shieldDamagePercent: 25 });
+native('ill_advised', '武器每次故障判定额外+5%故障概率，致命故障概率额外+50%；可能导致永久失效与真实结构损伤。不虚构原脚本未启用的后坐力或引擎惩罚。', {
+  stats:()=>({weaponMalfunctionChanceBonus:.05,criticalMalfunctionChanceBonus:.5}),
+});
+native('shield_always_on', '保持开盾，禁止主动收盾与排幅；过载持续时间×2。过载/排幅时幅能耗散×10，正常状态达到99%幅能后触发5秒基础过载。', {
+  stats:()=>({overloadTimeMultiplier:2}), apply:ship=>{ship.shield.toggleLocked=true;},
+  advance:ship=>{
+    if(ship.isDead||ship.isRetreated)return;
+    const locked=ship.flux.isOverloaded||ship.flux.isVenting;
+    ship.runtimeModifiers.set('shield_always_on',{dissipationMultiplier:locked?10:1});
+    if(!locked){ship.shield.setActive(true);if(ship.flux.fluxPercent>.99)ship.flux.overloadFor(5);}
+  },
+});
+native('phase_anchor', '相位开启幅能费用归零。潜航且不处于退出阶段时，耗散、武器冷却和弹药恢复×2。全场双方共享一次紧急下潜：足够部署CR时拦截致命结构伤害、保留1结构、计入额外部署CR损耗并渐隐撤出，不算击毁。', {
+  applicable:s=>s.shieldType==='PHASE'?null:'需要原生相位舰', conflicts:['adaptive_coils'], apply:installPhaseAnchor, advance:advancePhaseAnchor,
+});
+native('escort_package', '靠近更大友舰时获得最高25%机动、10%航速和20%实弹/能量射程；700距离内满效，至1200线性衰减（距离扣除盾半径和的75%）。驱逐舰护航主力时加倍，多艘友舰不叠加。', {
+  applicable:s=>s.hullSize==='DESTROYER'||s.hullSize==='CRUISER'?null:'仅限驱逐舰或巡洋舰', advance:advanceEscortPackage,
+});
+native('militarized_subsystems', '仅能安装于民用级船体，为突击套件提供实际安装前置；原版航行、传感器与船员变更属于未模拟的战役效果。', {
+  applicable:s=>(s.sourceHullTraits ?? s.builtInHullMods ?? []).includes('civgrade')?null:'需要民用级船体',
+});
+native('assault_package', '需军事化子系统：结构+10%、装甲+5%、幅能容量+10%。不虚构未启用的战役领导力技能加成。', {
+  applicable:s=>hasHullMod(s,'militarized_subsystems')?null:'需要军事化子系统', stats:()=>({hullPercent:10,armorPercent:5,capacityPercent:10}),
+});
+native('nav_relay', '根据舰级为己方部署舰队提供2/3/4/5%航速加成，包含自身，上限20%。不提高加速度或转向。', {stats: s => ({navRating:bySize(s,[2,3,4,5])})});
+native('do_not_back_off', '非排幅期间禁止AI因高幅能而主动退避。仍遵守碰撞避让和显式命令。', {stats: () => ({doNotBackOff:1})});
+native('axialrotation', '内置轴向自转控制器：持续右转，仍受真实转向加速度、转速和引擎故障限制。', {stats: () => ({forcedRightTurn:1})});
+native('faulty_auto', '最大战备值-5个百分点。人员需求和部署费用不模拟。', {stats: () => ({maxCombatReadinessBonus:-.05})});
+native('glitched_sensors', '实弹/能量射程×0.9；战役探测不模拟。', {rangeMultiplier: (_s,w) => w.weaponType === 'MISSILE' ? 1 : .9});
+native('erratic_injector', '零幅能加速少10点航速；战役燃耗不模拟。', {stats: () => ({zeroFluxSpeedBonus:-10})});
+native('malfunctioning_comms', '所属战机交战范围×0.6；战役部署代价不模拟。', {stats: () => ({fighterWingRangeMultiplier:.6})});
+native('ex_phase_coils', '相位线圈冷却×0.2。', {stats: () => ({phaseCooldownMultiplier:.2})});
+native('andrada_mods', '幅能耗散-5%，武器/引擎战斗修复时间+25%；人员伤亡不模拟。', {stats: () => ({dissipationPercent:-5,engineRepairTimePercent:25,weaponRepairTimePercent:25})});
+native('chassis_storage', '战机损失不再降低补充率。', {stats: () => ({replacementRateDecreaseMultiplier:0})});
+native('defective_manufactory', '所属战机航速×0.75，盾/甲/结构所受损伤+25%；不增加EMP承伤。', {fighterStats: defectiveFighters});
+native('converted_bay', '增加两个战机甲板；所属战机具有劣质制造惩罚：航速×0.75，盾甲结构承伤+25%。', {stats: () => ({fighterBaysBonus:2}), fighterStats: defectiveFighters});
+native('defensive_targeting_array', '所属战机留在母舰前方护卫，对导弹和战机伤害×1.5；不能派遣远程打击。', {
+  applicable: s => effectiveFighterBays(s) > 0 ? null : '没有飞行甲板',
+  stats: () => ({fighterWingRangeMultiplier:0, fighterDefenseFormation:1}),
+  fighterStats: () => ({damageToFightersMultiplier:1.5,damageToMissilesMultiplier:1.5}),
+});
+native('converted_hangar', '增加一个改装甲板。补充时间×1.5，补充率升降速度×2/3；轰炸机补弹额外增加基础整备时间的40%。后勤代价不模拟。', {
+  applicable: s => hasHullMod(s,'design_compromises') || hasHullMod(s,'vast_hangar') ? null : (nativeFacts[s.sourceHullId ?? s.id]?.deployCR ?? 0) > 70 ? '原生部署战备代价超过70%' : ['FIGHTER','FRIGATE'].includes(s.hullSize ?? '') || s.shieldType === 'PHASE' || (s.fighterBays ?? 0) > 0 || hasHullMod(s,'converted_bay') ? '需要非护卫、非相位且没有原生甲板的舰体' : null,
+  stats: s => { const exempt = hasHullMod(s,'vast_hangar') || hasHullMod(s,'design_compromises'); return {
+    fighterBaysBonus: 1, fighterRefitTimeMultiplier: exempt ? 1 : 1.5,
+    replacementRateDecreaseMultiplier: exempt ? 1 : 2/3, replacementRateIncreaseMultiplier: exempt ? 1 : 2/3,
+    fighterRearmTimeFraction: exempt ? 0 : .4,
+  }; },
+});
+native('vast_hangar', '改装机库额外增加一个甲板，并取消改装机库的整备惩罚。', {stats: s => ({fighterBaysBonus:hasHullMod(s,'converted_hangar')?1:0})});
+native('design_compromises', '容量/耗散/系统幅能消耗×0.6，实弹射程×0.85，导弹射速×0.5，能量武器开火幅能+100%；允许安装改装机库且免除其整备惩罚。', {
+  stats: () => ({capacityMultiplier:.6,dissipationMultiplier:.6,systemFluxCostMultiplier:.6}),
+  rangeMultiplier: (_s,w) => w.weaponType === 'BALLISTIC' ? .85 : 1,
+  weaponStats: (_s,w) => ({rateOfFireMultiplier:w.weaponType === 'MISSILE'?.5:1,fluxCostPercent:w.weaponType === 'ENERGY'?100:0}),
+});
+native('bdeck', '首次平均战机补充率降至40%时启用后备甲板：所有甲板恢复100%，快速补齐损失战机；每战仅一次。', {stats: () => ({reserveDeck:1})});
+native('converted_fighterbay', '移除全部原生战机甲板。只能装于全部甲板均为内置联队的舰体；后勤收益不模拟。', {
+  applicable: s => (nativeFacts[s.sourceHullId ?? s.id]?.builtInWings ?? 0) > 0 && (s.fighterBays ?? 0) <= nativeFacts[s.sourceHullId ?? s.id].builtInWings ? null : '必须有且仅有内置战机',
+  stats: s => ({fighterBaysBonus:-(s.fighterBays ?? 0)}),
+});
+/** Lightweight deck query avoids skill/weapon OP evaluation and does not modify source specs. */
+export function effectiveFighterBays(ship: ShipSpec): number {
+  return Math.max(0, (ship.fighterBays ?? 0) + installedHullMods(ship).reduce((n,m) => n + (m.stats?.(ship).fighterBaysBonus ?? 0), 0));
+}
+
 native('no_weapon_flux', '所有实弹、能量和导弹武器的开火幅能消耗为零，包含持续光束。不影响护盾或舰船系统。仅限舰体内置。', {
   weaponStats: () => ({ fluxCostMultiplier: 0 }),
 });
@@ -353,6 +492,15 @@ native('phasefield', '仅战役：本舰传感器截面降低 50%；关闭应答
   status: 'metadata-only',
 });
 
+for (const [id, sprite] of [['stealth_minefield', 'heavy_mine3'], ['stealth_minefield_lt', 'heavy_mine2']] as const) native(id,
+  '全战场共享一个布雷源。每0.5–1.5秒对合资格敌舰进行25%候选筛选，在舰体半径外400–600距离选择安全点，延迟0–1.5秒布置原生重型感应空雷。源舰阵亡后停止新增；空雷可被点防御拦截，并走真实引信与范围伤害。', {
+    resources: { textures: ['/game-assets/graphics/missiles/' + sprite + '.png', '/game-assets/graphics/missiles/' + sprite + '_glow.png'], sounds: ['mine_spawn', 'mine_ping', 'mine_windup_heavy', 'mine_explosion'] },
+    advanceCombat: advanceStealthMinefield,
+  });
+native('reduced_explosion', '舰船殉爆伤害降低90%，舰体外扩伤害半径降低75%。舰体半径内仍是核心伤害区域，不缩小纯视觉爆炸。', { stats: () => ({ explosionDamageMultiplier: .1, explosionRadiusMultiplier: .25 }) });
+native('civgrade', '仅战役：传感器截面+100%，传感器强度×0.5。原版点防武器装配点变更代码未启用，不凭空增加战斗效果。', { status: 'metadata-only' });
+native('augmentedengines', '仅战役：最大航行速度等级+2，固化额外+1；不改变战斗最高航速。', { status: 'metadata-only' });
+
 const resolvedMods = new WeakMap<ShipSpec, readonly HullModDefinition[]>();
 function resolvedHullMods(ship: ShipSpec): readonly HullModDefinition[] {
   const cached = resolvedMods.get(ship);
@@ -385,10 +533,24 @@ export function hullModInstallReason(ship: ShipSpec, id: string, builtIn = false
   if (conflict) return '不兼容于 ' + (hullModDefinitions.get(conflict)?.name ?? conflict);
   return null;
 }
+export function isSMod(ship: ShipSpec, id: string): boolean { return !!ship.sMods?.includes(id); }
+export function sModInstallReason(ship: ShipSpec, id: string): string | null {
+  const mod = hullModDefinitions.get(id);
+  if (!mod || mod.status !== 'implemented') return '插件战斗效果尚未实现';
+  if (!hasHullMod(ship, id)) return '先安装该插件';
+  const meta = (nativeSModMetadata as Record<string, { allowed: boolean; hasSpecialEffect: boolean }>)[id];
+  if (meta && !meta.allowed) return '原版禁止固化该插件';
+  if (meta?.hasSpecialEffect && !mod.sMod) return '该插件的S-mod效果尚未实现';
+  if (ship.builtInHullMods?.includes(id) && !mod.sMod) return '该内置插件没有可增强的S-mod效果';
+  if (!ship.builtInHullMods?.includes(id) && (ship.sMods ?? []).filter(m => m !== id && !ship.builtInHullMods?.includes(m)).length >= 2) return '最多固化两个外装插件（内置增强不占名额）';
+  return null;
+}
 export function hullModLoadoutErrors(ship: ShipSpec): string[] {
   const all = [...(ship.builtInHullMods ?? []), ...(ship.hullMods ?? [])];
   const errors: string[] = [];
   if (new Set(all).size !== all.length) errors.push('舰体插件重复安装');
+  if (new Set(ship.sMods ?? []).size !== (ship.sMods ?? []).length) errors.push('S-mod重复');
+  for (const id of ship.sMods ?? []) { const reason = sModInstallReason(ship, id); if (reason) errors.push(id + '：' + reason); }
   for (const id of new Set(all)) {
     const reason = hullModInstallReason(ship, id, ship.builtInHullMods?.includes(id));
     if (reason) errors.push(id + '：' + reason);
@@ -400,14 +562,17 @@ export function hullModOPCost(ship: ShipSpec, id: string): number {
   if (ship.builtInHullMods?.includes(id)) return 0;
   const cost = mod.refit?.cost[ship.hullSize ?? 'FRIGATE'];
   if (cost === undefined || mod.refit?.builtInOnly || mod.status !== 'implemented') throw new Error(id + ': no installable OP cost for hull size');
-  return cost;
+  return isSMod(ship, id) ? 0 : cost;
+}
+export function fighterWeaponRangeFlat(carrier: ShipSpec, weapon: WeaponSpec): number {
+  return installedHullMods(carrier).reduce((total, mod) => total + (mod.fighterRangeFlat?.(carrier, weapon) ?? 0) + (isSMod(carrier, mod.id) ? mod.sMod?.fighterRangeFlat?.(carrier, weapon) ?? 0 : 0), 0);
 }
 export function effectiveWeaponOP(ship: ShipSpec, weapon: WeaponSpec, baseOP: number): number {
   return Math.max(0, baseOP + installedHullMods(ship).reduce((sum, mod) => sum + (mod.weaponOPFlat?.(ship, weapon) ?? 0), 0));
 }
 export function hullModRangePercent(ship: ShipSpec, weapon: WeaponSpec): number {
   const groups = new Map<string, HullModDefinition>();
-  let total = skillRangePercent(ship, weapon);
+  let total = skillRangePercent(ship, weapon) + resolvedHullMods(ship).reduce((sum, mod) => sum + (isSMod(ship, mod.id) ? mod.sMod?.rangePercent?.(ship, weapon) ?? 0 : 0), 0);
   for (const mod of resolvedHullMods(ship)) {
     if (!mod.rangePercent) continue;
     if (!mod.rangeGroup) total += mod.rangePercent(ship, weapon);
@@ -437,8 +602,15 @@ export function hullModRangeThresholdStats(ship: ShipSpec) {
   }
   return { rangeThreshold, rangePastThresholdMultiplier };
 }
-export function effectiveHullStats(spec: ShipSpec) {
+export function effectiveHullStats(spec: ShipSpec, carrier?: ShipSpec) {
   const modifiers: HullModStats = {
+    explosionDamageMultiplier: 1, explosionRadiusMultiplier: 1,
+    commandPointRateFlat: 0, sightRadiusFlat: 0, sightRadiusPercent: 0,
+    weaponMalfunctionChanceBonus: 0, criticalMalfunctionChanceBonus: 0,
+    navRating: 0, doNotBackOff: 0, forcedRightTurn: 0,
+    fighterBaysBonus: 0, fighterRefitTimeMultiplier: 1, fighterRearmTimeFraction: 0, replacementRateIncreaseMultiplier: 1, fighterWingRangeMultiplier: 1, fighterDefenseFormation: 0, reserveDeck: 0,
+    damageToFightersMultiplier: 1, damageToMissilesMultiplier: 1, armorDamageTakenPercent: 0, hullDamageTakenPercent: 0, engineRepairTimePercent: 0, weaponRepairTimePercent: 0, systemFluxCostMultiplier: 1,
+    shieldSoftFluxConversion: 0, zeroFluxSpeedBonus: 0, zeroFluxTurnMultiplier: 1, damageToFrigatesPercent: 0, damageToDestroyersPercent: 0, damageToCruisersPercent: 0,
     autofireAimAccuracy: 0, ecmRating: 0, ecmPenaltyMultiplier: 1,
     systemUsesBonus: 0, systemRegenMultiplier: 1, systemRangeMultiplier: 1, systemCooldownMultiplier: 1,
     peakCRBonus: 0, maxCombatReadinessBonus: 0, allowZeroFluxAtAnyLevel: 0, armorDamageMultiplier: 1, hullDamageMultiplier: 1, energyDamageMultiplier: 1,
@@ -454,12 +626,13 @@ export function effectiveHullStats(spec: ShipSpec) {
     weaponDamageTakenMultiplier: 1, fighterRefitTimePercent: 0,
     accelerationPercent: 0, decelerationPercent: 0, turnAccelerationPercent: 0, turnRatePercent: 0,
     shieldArcPercent: 0, shieldArcMultiplier: 1, phaseMinSpeedFluxThresholdPercent: 0, phaseTimeBonusMultiplier: 1,
-    effectiveArmorMultiplier: 1, minArmorFractionMultiplier: 1, damageToMissilesPercent: 0, pdIgnoresFlares: 0,
+    effectiveArmorMultiplier: 1, minArmorFractionMultiplier: 1, damageToMissilesPercent: 0, damageToFightersPercent: 0, replacementRateDecreaseMultiplier: 1, replacementRateIncreasePercent: 0, pdIgnoresFlares: 0,
     shieldArcBonus: 0, shieldTurnRatePercent: 0, shieldUnfoldRatePercent: 0, weaponHealthPercent: 0,
     shieldDamageMultiplier: 1, shieldUpkeepMultiplier: 1, shieldPiercedMultiplier: 1,
     ventRateMultiplier: 1, empDamageMultiplier: 1, engineRepairTimeMultiplier: 1, weaponRepairTimeMultiplier: 1,
   };
-  for (const mod of installedHullMods(spec)) combine(modifiers, mod.stats?.(spec));
+  for (const mod of installedHullMods(spec)) { combine(modifiers, mod.stats?.(spec)); if (isSMod(spec, mod.id)) combine(modifiers, mod.sMod?.stats?.(spec)); }
+  if (carrier) for (const mod of installedHullMods(carrier)) { combine(modifiers, mod.fighterStats?.(carrier, spec)); if (isSMod(carrier, mod.id)) combine(modifiers, mod.sMod?.fighterStats?.(carrier, spec)); }
   // Resolve base weapon OP only for this skill; free built-ins never count as spent OP.
   const weaponOP = combatSkillLevel(spec, "ordnance_expert") ? spec.weaponSlots.reduce((sum, slot) => {
     if (!slot.defaultWeaponId || slot.builtIn || slot.weaponType === "BUILT_IN") return sum;
@@ -467,6 +640,10 @@ export function effectiveHullStats(spec: ShipSpec) {
     return sum + (weapon ? effectiveWeaponOP(spec, weapon, weapon.ordnancePointCost ?? 0) : 0);
   }, 0) : 0;
   for (const stats of skillHullModifiers(spec, weaponOP)) combine(modifiers, stats);
+  modifiers.armorDamageMultiplier *= 1 + modifiers.armorDamageTakenPercent / 100;
+  modifiers.hullDamageMultiplier *= 1 + modifiers.hullDamageTakenPercent / 100;
+  modifiers.engineRepairTimeMultiplier *= 1 + modifiers.engineRepairTimePercent / 100;
+  modifiers.weaponRepairTimeMultiplier *= 1 + modifiers.weaponRepairTimePercent / 100;
   modifiers.ventRateMultiplier *= 1 + modifiers.ventRatePercent / 100;
   modifiers.shieldDamageMultiplier *= 1 + modifiers.shieldDamagePercent / 100;
   const fluxDissipation = (spec.fluxDissipation + modifiers.dissipationBonus) * (1 + modifiers.dissipationPercent / 100) * modifiers.dissipationMultiplier;
@@ -474,7 +651,8 @@ export function effectiveHullStats(spec: ShipSpec) {
   return { ...modifiers, fluxDissipation, ...shield,
     hitpoints: spec.hitpoints * (1 + modifiers.hullPercent / 100) * modifiers.hullMultiplier,
     breakProbability: (spec.breakProbability ?? 0) * modifiers.breakProbabilityMultiplier,
-    fighterRefitTimeMultiplier: 1 + modifiers.fighterRefitTimePercent / 100,
+    fighterBays: Math.max(0, (spec.fighterBays ?? 0) + modifiers.fighterBaysBonus),
+    fighterRefitTimeMultiplier: (1 + modifiers.fighterRefitTimePercent / 100) * modifiers.fighterRefitTimeMultiplier,
     maxFlux: (spec.maxFlux + modifiers.capacityBonus) * (1 + modifiers.capacityPercent / 100) * modifiers.capacityMultiplier,
     maxSpeed: (spec.maxSpeed + modifiers.speedBonus) * (1 + modifiers.speedPercent / 100) * modifiers.speedMultiplier,
     peakCRSec: ((spec.peakCRSec ?? 720) + modifiers.peakCRBonus) * (1 + modifiers.peakCRPercent / 100) * modifiers.peakCRMultiplier,
@@ -492,15 +670,16 @@ export function effectiveHullStats(spec: ShipSpec) {
 }
 /** Call with the registry's base weapon, never with an already-derived mount spec. Range stays centralized in WeaponRange. */
 export function effectiveHullModWeaponSpec(ship: ShipSpec, base: WeaponSpec): WeaponSpec {
-  const stats: HullModWeaponStats = { eccmChanceBonus: 0, missileGuidanceBonus: 0, missileSpeedPercent: 0, missileAccelerationPercent: 0, missileTurnPercent: 0, missileTurnAccelerationPercent: 0, missileFlightTimeMultiplier: 1, projectileSpeedPercent: 0, missileHealthPercent: 0, rateOfFirePercent: 0, ammoRegenPercent: 0, damagePercent: 0, beamHardFlux: 0, fluxCostPercent: 0, fluxCostMultiplier: 1, turnRatePercent: 0, turnRateMultiplier: 1, ammoPercent: 0, maxRecoilPercent: 0, recoilPerShotPercent: 0, maxRecoilMultiplier: 1, recoilPerShotMultiplier: 1, recoilDecayMultiplier: 1 };
-  for (const mod of installedHullMods(ship)) combine(stats, mod.weaponStats?.(ship, base));
+  const stats: HullModWeaponStats = { rateOfFireMultiplier: 1, grantsPointDefense: 0, eccmChanceBonus: 0, missileGuidanceBonus: 0, missileSpeedPercent: 0, missileAccelerationPercent: 0, missileTurnPercent: 0, missileTurnAccelerationPercent: 0, missileFlightTimeMultiplier: 1, projectileSpeedPercent: 0, missileHealthPercent: 0, rateOfFirePercent: 0, ammoRegenPercent: 0, damagePercent: 0, beamHardFlux: 0, fluxCostPercent: 0, fluxCostMultiplier: 1, turnRatePercent: 0, turnRateMultiplier: 1, ammoPercent: 0, maxRecoilPercent: 0, recoilPerShotPercent: 0, maxRecoilMultiplier: 1, recoilPerShotMultiplier: 1, recoilDecayMultiplier: 1 };
+  for (const mod of installedHullMods(ship)) { combine(stats, mod.weaponStats?.(ship, base)); if (isSMod(ship, mod.id)) combine(stats, mod.sMod?.weaponStats?.(ship, base)); }
   for (const bonus of skillWeaponModifiers(ship, base)) combine(stats, bonus);
   const fluxCost = (1 + stats.fluxCostPercent / 100) * stats.fluxCostMultiplier;
-  const rof = 1 + stats.rateOfFirePercent / 100;
+  const rof = (1 + stats.rateOfFirePercent / 100) * stats.rateOfFireMultiplier;
   // Native minRefireDelay=.05: a bonus never slows an already-faster weapon.
   const cycleRof = rof > 1 ? Math.max(1, Math.min(rof, (base.refireDelay + (base.chargeTime ?? 0)) / .05)) : rof;
   const burstRof = rof > 1 ? Math.max(1, Math.min(rof, (base.burstDelay ?? 0) / .05)) : rof;
   return { ...base,
+    isPointDefense: base.isPointDefense || stats.grantsPointDefense > 0,
     eccmChanceBonus: (base.eccmChanceBonus ?? 0) + stats.eccmChanceBonus,
     missileGuidanceBonus: (base.missileGuidanceBonus ?? 0) + stats.missileGuidanceBonus,
     maxSpeed: base.maxSpeed === undefined ? undefined : base.maxSpeed * (1 + stats.missileSpeedPercent / 100),

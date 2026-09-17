@@ -128,14 +128,14 @@ export class AsteroidSystem {
       if (ast.hp <= 0) continue;
 
       for (const ship of allShips) {
-        if (ship.isDead || ship.isPhased) continue;
+        if (ship.isDead || ship.isCollisionless) continue;
         const shieldContact = getShieldCircleContact(ship, ast.pos, ast.radius);
         if (shieldContact) {
           const relVel = ast.vel.clone().sub(ship.vel);
           const impulse = Math.max(80, relVel.length() * (ast.mass / (ast.mass + ship.spec.mass * 20)));
           const fluxGain = impulse * 2.2;
           ship.shield.recordDamageContact(fluxGain);
-          ship.flux.increaseFlux(fluxGain, true);
+          ship.flux.increaseShieldFlux(fluxGain, true);
           fx.spawnShieldRipple(shieldContact.point, 40 + ast.radius, [100, 200, 255]);
           fx.addFloatingDamage(shieldContact.point, fluxGain, [80, 200, 255]);
           sound.playAtPos('collision_asteroid_ship', shieldContact.point, playerPos, 0.6);
@@ -149,8 +149,8 @@ export class AsteroidSystem {
         const toShip = ship.pos.clone().sub(ast.pos);
         const dist = toShip.length();
         const combinedR = ast.radius + ship.spec.collisionRadius;
-        if (dist < combinedR && dist > 0.001) {
-          const normal = toShip.clone().normalize();
+        if (dist < combinedR) {
+          const normal = dist > 1e-12 ? toShip.scale(1 / dist) : new Vector2(1, 0);
           const overlap = combinedR - dist;
 
           // 装甲撞击金属与岩石碎屑
@@ -159,7 +159,7 @@ export class AsteroidSystem {
           const res = ship.armor.takeDamage(localHit, impactDmg, 'KINETIC', impactDmg, false);
           applyComponentDamage(ship, localHit, res, 0);
           fx.spawnArmorDamageSparks(ship, localHit, res.armorDamage);
-          ship.hullHp = Math.max(0, ship.hullHp - res.hullDamage);
+          ship.applyHullDamage(res.hullDamage);
 
           if (res.armorDamage > 0) fx.addFloatingDamage(ast.pos, res.armorDamage, [255, 180, 50]);
           if (res.hullDamage > 0) fx.addFloatingDamage(ast.pos, res.hullDamage, [255, 60, 60]);
@@ -187,8 +187,9 @@ export class AsteroidSystem {
         const diff = a2.pos.clone().sub(a1.pos);
         const dist = diff.length();
         const minR = a1.radius + a2.radius;
-        if (dist < minR && dist > 0.001) {
-          const n = diff.normalize();
+        if (dist < minR) {
+          // Array pair order is stable; do not consume gameplay RNG for overlap.
+          const n = dist > 1e-12 ? diff.scale(1 / dist) : new Vector2(1, 0);
           const p = (2 * (a1.vel.x * n.x + a1.vel.y * n.y - a2.vel.x * n.x - a2.vel.y * n.y)) / (a1.mass + a2.mass);
           a1.vel.subScaled(n, p * a2.mass);
           a2.vel.addScaled(n, p * a1.mass);

@@ -1,3 +1,4 @@
+import { sameTeam } from "../simulation/CombatTeams";
 import { Vector2 } from '../math/Vector2';
 import { signedAngle } from '../math/Angles';
 import type { Ship } from '../simulation/Ship';
@@ -37,6 +38,7 @@ function obstacles(ship: Ship,world: TacticalWorld,horizon:number): Obstacle[] {
   };
   for(const other of world.ships){
     if(other===ship||other.isDead||other.isPhased||other.spec.hullSize==='FIGHTER')continue;
+    world.noteNavigationObstacle?.(ship, other, horizon);
     add(other.pos,other.vel,Math.max(other.spec.collisionRadius,other.shield.isActive&&other.shield.type!=='PHASE'?other.shield.radius:0));
   }
   for(const asteroid of world.asteroids)if(asteroid.hp>0)add(asteroid.pos,asteroid.vel,asteroid.radius);
@@ -121,7 +123,7 @@ export const facingError=(ship:Ship,facing:number)=>signedAngle(facing-ship.faci
 export function yieldFireLane(ship:Ship,desired:Vector2,world:TacticalWorld):{velocity:Vector2;yielding:boolean}{
   if(ship.isPhased)return {velocity:desired,yielding:false};
   for(const ally of world.ships){
-    if(ally===ship||ally.isDead||ally.isPlayer!==ship.isPlayer)continue;
+    if(ally===ship||ally.isDead||!sameTeam(ally, ship))continue;
     for(const mount of ally.weapons){
       if(mount.fireControl?.reason!=='FRIENDLY_BLOCKED'||mount.fireControl.targetKind!=='SHIP')continue;
       const target=world.ships.find(s=>s.id===mount.fireControlTargetShipId&&!s.isDead&&!s.isPhased);

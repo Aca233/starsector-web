@@ -27,6 +27,8 @@ export class FixedTimestepScheduler {
   private secondTimer = 0;
   private workTimeAccumMs = 0;
   private clockRevision = 0;
+  private pendingTick: Promise<void | false> | null = null;
+  public lastTickError: unknown = null;
 
   constructor(targetHz = 60) {
     this.fixedDeltaTime = 1 / targetHz;
@@ -58,7 +60,7 @@ export class FixedTimestepScheduler {
    */
   public update(
     now: number,
-    onFixedTick: (dt: number) => void,
+    onFixedTick: (dt: number) => void | false | Promise<void | false>,
     onRenderFrame: (alpha: number) => void
   ) {
     if (this.lastTime === 0) {
@@ -84,15 +86,37 @@ export class FixedTimestepScheduler {
     // Consume a bounded number of ticks but preserve remaining scaled time.
     let steps = 0;
     const maxSubSteps = 8;
-    while (this.accumulator >= this.fixedDeltaTime && steps < maxSubSteps) {
-      const revision = this.clockRevision;
-      this.accumulator -= this.fixedDeltaTime;
-      onFixedTick(this.fixedDeltaTime);
-      this.simTicks++;
-      this.tpsCounter++;
-      steps++;
-      if (revision !== this.clockRevision) break;
-    }
+    const countTick = (result: void | false) => {
+      if (result !== false) { this.simTicks++; this.tpsCounter++; }
+    };
+    const drain = () => {
+      while (!this.pendingTick && this.accumulator >= this.fixedDeltaTime && steps < maxSubSteps) {
+        const revision = this.clockRevision;
+        this.accumulator -= this.fixedDeltaTime;
+        const result = onFixedTick(this.fixedDeltaTime);
+        steps++;
+        if (result instanceof Promise) {
+          this.pendingTick = result;
+          void result.then(completed => {
+            if (this.pendingTick !== result) return;
+            this.pendingTick = null;
+            countTick(completed);
+            if (revision === this.clockRevision && completed !== false) drain();
+          }, error => {
+            this.pendingTick = null;
+            this.lastTickError = error;
+            this.resync();
+            console.error('Combat tick failed', error);
+          });
+          break;
+        }
+        countTick(result);
+        if (result === false) { this.accumulator = 0; break; }
+        if (revision !== this.clockRevision) break;
+      }
+      this.backlogSeconds = this.accumulator;
+    };
+    drain();
 
     // Clamp catastrophic backlog rather than dropping all accumulated time, and expose any loss.
     const maxBacklog = this.fixedDeltaTime * maxSubSteps;

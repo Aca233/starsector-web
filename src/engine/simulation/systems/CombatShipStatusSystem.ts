@@ -1,3 +1,5 @@
+import { installedHullMods } from '../../extensions/HullMods';
+import type { SystemWorld } from '../../extensions/ship-systems/Types';
 import type { Projectile } from '../Weapon';
 import { ENGINE_VISUAL_PROFILES } from '../../visual/VisualProfiles';
 import { Vector2 } from '../../math/Vector2';
@@ -6,13 +8,11 @@ import { sound } from '../../audio/SoundManager';
 import { i18n } from '../../i18n/LocalizationManager';
 import { CombatFXSystem } from './CombatFXSystem';
 import { SimulationRandom } from '../SimulationRandom';
-import {
-  constrainPointToShipHull,
-  getShipHullInteriorAnchor,
-  getShipHullPerimeterPoint
-} from '../collision/HullGeometry';
 
 export interface ShipStatusContext {
+  spawnNativeMine?: SystemWorld['spawnNativeMine'];
+  spawnShip?: import('../../extensions/ship-systems/Types').SystemWorld['spawnShip'];
+  addCombatEffect?: import('../../extensions/ship-systems/Types').SystemWorld['addCombatEffect'];
   fx: CombatFXSystem;
   playerShip: Ship;
   enemyShip: Ship;
@@ -23,6 +23,10 @@ export interface ShipStatusContext {
   asteroids?: readonly { pos: Vector2; radius: number; hp?: number }[];
   addRadioMessage: (sender: string, faction: 'PLAYER' | 'ENEMY' | 'HQ', text: string, color?: [number, number, number]) => void;
   deployReserveWing?: (carrier: Ship) => void;
+  recoverWingCraft?: (carrier: Ship, craft: Ship) => void;
+  detachWingCraft?: (carrier: Ship, craft: Ship) => boolean;
+  retireCombatCraft?: (craft: Ship) => void;
+  advanceDroneLauncher?: (carrier: Ship, system: Ship['system'], dt: number) => void;
   deployMine: (targetPos: Vector2, sourceShip: Ship, range?: number) => void;
   statsTracker?: any;
   combatRandom: SimulationRandom;
@@ -34,28 +38,8 @@ export interface ShipStatusContext {
  * 负责舰船过载电弧、状态通知、空雷战术触发及损管抢修播报；战损粒子由实际受击路径触发。
  */
 export class CombatShipStatusSystem {
-  private spawnOverloadDischarge(ship: Ship, ctx: ShipStatusContext, onsetBurst = false): void {
-    const startT = ctx.visualRandom.next();
-    const span = (onsetBurst ? 0.12 : 0.08) + ctx.visualRandom.next() * (onsetBurst ? 0.28 : 0.22);
-    const direction = ctx.visualRandom.next() < 0.5 ? -1 : 1;
-    const interiorAnchor = getShipHullInteriorAnchor(ship);
-    const startEdge = getShipHullPerimeterPoint(ship, startT);
-    const endEdge = getShipHullPerimeterPoint(ship, startT + direction * span);
-    const start = constrainPointToShipHull(ship, startEdge, interiorAnchor);
-    const end = constrainPointToShipHull(ship, endEdge, interiorAnchor);
-    const thickness = (onsetBurst ? 1.7 : 1.35) + ctx.visualRandom.next() * 0.65;
-    const life = (onsetBurst ? 0.18 : 0.14) + ctx.visualRandom.next() * 0.08;
-
-    ctx.fx.spawnEmpArc(start, end, {
-      coreColor: [255, 255, 255],
-      glowColor: [105, 195, 255],
-      thickness,
-      life,
-      branchCount: onsetBurst ? 3 : 2,
-      constrainPoint: (point) => constrainPointToShipHull(ship, point, interiorAnchor)
-    });
-  }
-
+  private combatScope = {};
+  public reset(): void { this.combatScope = {}; }
   public update(dt: number, ctx: ShipStatusContext) {
     // 沉浸音频：玩家舰船处于过载、主动排能或相位潜航时，全局音效进入低通滤波
     sound.setMuffled(ctx.playerShip.flux.isOverloaded || ctx.playerShip.flux.isVenting || ctx.playerShip.isPhased);
@@ -73,19 +57,12 @@ export class CombatShipStatusSystem {
         if (!ship.justShieldMalfunction) {
           ctx.fx.addFloatingText(
             ship.pos.clone().add(new Vector2(0, -ship.spec.collisionRadius * 0.7)),
-            `OVERLOADED! (${ship.flux.overloadDuration.toFixed(1)}s)`,
+            i18n.t('combat.overloaded'),
             [255, 60, 60],
             16,
             2.2
           );
-          if (ship.isPlayer) {
-            ctx.addRadioMessage('损管警报', 'PLAYER', '警告！电弧熔断！核心幅能系统发生深度过载！', [255, 80, 80]);
-          } else {
-            ctx.addRadioMessage('战术火控', 'PLAYER', '目标舰护盾完全崩溃！敌舰已陷入深度过载！', [120, 255, 140]);
-          }
         }
-        // 原版过载瞬间是多点白蓝放电，而不是整舰覆盖一层蓝色雾状光晕。
-        for (let i = 0; i < 4; i++) this.spawnOverloadDischarge(ship, ctx, true);
       }
       ship.prevOverloaded = ship.flux.isOverloaded;
 
@@ -103,16 +80,7 @@ export class CombatShipStatusSystem {
       }
       ship.prevVenting = ship.flux.isVenting;
 
-      // 1. 舰船过载剧烈电弧失控：沿真实舰体外轮廓选取锚点，维持数条短寿命、带分叉的白蓝放电。
-      if (ship.flux.isOverloaded) {
-        const overloadLevel = ship.flux.overloadDuration > 0
-          ? Math.max(0, Math.min(1, ship.flux.overloadTimer / ship.flux.overloadDuration))
-          : 1;
-        const arcRate = 18 + overloadLevel * 8;
-        if (ctx.visualRandom.next() < dt * arcRate) {
-          this.spawnOverloadDischarge(ship, ctx);
-        }
-      }
+      // Overload is a ship-local native EMP decal, not world-space damaging arcs.
 
       // Standard venting is the renderer's radial/plume animation, not EMP arcs.
 
@@ -124,8 +92,14 @@ export class CombatShipStatusSystem {
 
     }
     for (const ship of ctx.componentShips ?? ships) {
-      if (!ship.isDead) for (const system of [ship.system, ship.defenseSystem]) system.dispatchEvents(ship, { ships: ctx.componentShips ?? ships, asteroids: ctx.asteroids, combatRandom: ctx.combatRandom, deployReserveWing: ctx.deployReserveWing, deployMine: ctx.deployMine, projectiles: ctx.projectiles,
-        spawnSystemSmoke: (spec, pos, facing, velocity) => ctx.fx.spawnLauncherSmoke(spec, pos, facing, velocity) }, dt * ship.subjectiveTimeMultiplier);
+      if (ship.isDocked) continue;
+      if (!ship.isDead && !ship.isRetreated) {
+        const world: SystemWorld = { combatScope: this.combatScope, spawnNativeMine:ctx.spawnNativeMine, spawnShip:ctx.spawnShip, addCombatEffect:ctx.addCombatEffect, ships: ctx.componentShips ?? ships, asteroids: ctx.asteroids, combatRandom: ctx.combatRandom, deployReserveWing: ctx.deployReserveWing, recoverWingCraft: ctx.recoverWingCraft, detachWingCraft:ctx.detachWingCraft, retireCombatCraft:ctx.retireCombatCraft, advanceDroneLauncher: ctx.advanceDroneLauncher, deployMine: ctx.deployMine, projectiles: ctx.projectiles,
+          spawnSystemArc: (from, to, color) => ctx.fx.spawnEmpArc(from, to, { coreColor: [255, 255, 255], glowColor: color ?? [130, 155, 145], thickness: 3, life: .3 }),
+          spawnSystemSmoke: (spec, pos, facing, velocity) => ctx.fx.spawnLauncherSmoke(spec, pos, facing, velocity) };
+        for (const system of [ship.system, ship.defenseSystem]) system.dispatchEvents(ship, world, dt * ship.subjectiveTimeMultiplier);
+        for (const mod of installedHullMods(ship.spec)) mod.advanceCombat?.(ship, dt, world);
+      }
       if (!ship.isDead) {
         if (ship.justShieldMalfunction) {
           ctx.fx.addFloatingText(ship.pos.clone().add(new Vector2(0, 20)),

@@ -1,3 +1,4 @@
+import { randomId } from "../shared/RandomId";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "../ui/core/UI";
 import { i18n } from "../engine/i18n/LocalizationManager";
@@ -5,9 +6,12 @@ import { zh_CN } from "../engine/i18n/locales/zh_CN";
 import { en_US } from "../engine/i18n/locales/en_US";
 import {
   createDesign,
+  data,
   decodeDesign,
   evaluate,
   readLibrary,
+  writeLibrary,
+  DesignLibraryConflictError,
   registerPrototype,
   storageKey,
   withWeapon,
@@ -16,11 +20,13 @@ import type { HullFilter } from "./HullRoster";
 import type { Design, DesignLibrary } from "./DesignModel";
 import { NativeRefit } from "./NativeRefit";
 import { NativeHome } from "./NativeHome";
+import { pushStudioLocation, readStudioLocation, type SkillsOrigin, type StudioLocation, type StudioPage } from "./StudioNavigation";
 import { NativeButton } from "../ui/NativeChrome";
 import { simulationHullCost } from "../ui/tactical/SimulationRoster";
 import "./studio.css";
 import "./source-variant-picker.css";
 import "./source-weapon-picker.css";
+const CaptainSkillsScreen = lazy(() => import("./CaptainSkillsScreen").then(module => ({ default: module.CaptainSkillsScreen })));
 const NativeCatalog = lazy(() => import("./NativeCatalog"));
 const CombatView = lazy(() => import("../CombatView"));
 i18n.registerStrings("zh_CN", zh_CN);
@@ -33,7 +39,9 @@ type Confirmation = {
   saveable?: boolean;
   action?: string;
 };
-export function StudioApp({ initialView = "home" }: { initialView?: "home" | "editor" }) {
+export function StudioApp() {
+  const [initialLocation] = useState(readStudioLocation);
+  const currentUrl = useRef(window.location.href);
   const [initial] = useState(readLibrary);
   const [draft, setDraft] = useState(initial.library.draft);
   const [designs, setDesigns] = useState(initial.library.designs);
@@ -41,8 +49,9 @@ export function StudioApp({ initialView = "home" }: { initialView?: "home" | "ed
   const [baseline, setBaseline] = useState(
     initial.library.baseline ?? initial.library.draft,
   );
-  const [view, setView] = useState<"home" | "editor" | "combat">(initialView);
-  const [catalogOpen, setCatalogOpen] = useState(new URLSearchParams(window.location.search).get("view") === "catalog");
+  const [view, setView] = useState<"home" | "editor" | "skills" | "combat">(initialLocation.page === "catalog" ? "home" : initialLocation.page);
+  const [skillsOrigin, setSkillsOrigin] = useState<SkillsOrigin>(initialLocation.skillsOrigin);
+  const [catalogOpen, setCatalogOpen] = useState(initialLocation.page === "catalog");
   const [editorKey, setEditorKey] = useState(0);
   const [hullFilter, setHullFilter] = useState<HullFilter>({query: "", hullClass: "", faction: ""});
   const hullScrollPosition = useRef(0);
@@ -62,6 +71,7 @@ export function StudioApp({ initialView = "home" }: { initialView?: "home" | "ed
     deploymentCost: number;
   } | null>(null);
   const protectedStorage = useRef(initial.protected);
+  const observedStorage = useRef(initial.observedRaw);
   const uncached = useRef(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const saved = designs.find((d) => d.id === draft.id);
@@ -81,17 +91,22 @@ export function StudioApp({ initialView = "home" }: { initialView?: "home" | "ed
       baseline: nextBaseline,
     };
     try {
-      localStorage.setItem(storageKey, JSON.stringify(value));
+      observedStorage.current = writeLibrary(value, observedStorage.current);
       uncached.current = false;
       setStorageWarning(null);
     } catch (e) {
       uncached.current = true;
-      setStorageWarning("浏览器未能保存方案。当前修改仅在内存中，请导出备份。");
+      if (e instanceof DesignLibraryConflictError) {
+        protectedStorage.current = true;
+        setStorageWarning(e.message);
+      } else {
+        setStorageWarning("浏览器未能保存方案。当前修改仅在内存中，请导出备份。");
+      }
       throw e;
     }
   };
   useEffect(() => {
-    if (view !== "editor" || catalogOpen) return;
+    if ((view !== "editor" && view !== "skills") || catalogOpen) return;
     uncached.current = true;
     if (protectedStorage.current) {
       setSaveState("写入已暂停");
@@ -136,7 +151,7 @@ export function StudioApp({ initialView = "home" }: { initialView?: "home" | "ed
     document.title =
       catalogOpen ? "远行星号 · 全量原版内容" : view === "home"
         ? "远行星号 · 舰船设计"
-        : draft.name + (view === "combat" ? " · 模拟战斗" : " · 舰队改装");
+        : draft.name + (view === "combat" ? " · 模拟战斗" : view === "skills" ? " · 角色技能" : " · 舰队改装");
   }, [view, draft.name, catalogOpen]);
   const change = (next: Design) => {
     if (signature(next) === signature(draft)) return;
@@ -162,7 +177,7 @@ export function StudioApp({ initialView = "home" }: { initialView?: "home" | "ed
     }
     const next = {
       ...structuredClone(candidate),
-      id: saveAsNew ? crypto.randomUUID() : candidate.id,
+      id: saveAsNew ? randomId() : candidate.id,
       name: candidate.name.trim(),
       updatedAt: Date.now(),
     };
@@ -198,6 +213,44 @@ export function StudioApp({ initialView = "home" }: { initialView?: "home" | "ed
       saveable: true,
     });
   };
+  const applyLocation = (location: StudioLocation) => {
+    setCatalogOpen(location.page === "catalog");
+    setView(location.page === "catalog" ? "home" : location.page);
+    setSkillsOrigin(location.skillsOrigin);
+    currentUrl.current = window.location.href;
+  };
+  const navigate = (page: StudioPage, origin: SkillsOrigin = "home") => {
+    pushStudioLocation(page, origin);
+    applyLocation({ page, skillsOrigin: origin });
+  };
+  const cacheDraft = () => {
+    if (!protectedStorage.current) {
+      try { persist(draft, designs); setSaveState("草稿已缓存"); }
+      catch { setSaveState("仅在内存"); }
+    }
+  };
+  useEffect(() => {
+    const restoreLocation = () => {
+      if (view === "combat" && !window.confirm("离开当前模拟战斗？战斗进度不会保留。")) {
+        window.history.pushState(null, "", currentUrl.current);
+        return;
+      }
+      // Browser navigation retains the draft; flush before cancelling its debounce.
+      if (!catalogOpen && (view === "editor" || view === "skills")) cacheDraft();
+      setConfirmation(null);
+      setTrial(null);
+      applyLocation(readStudioLocation());
+    };
+    window.addEventListener("popstate", restoreLocation);
+    return () => window.removeEventListener("popstate", restoreLocation);
+  });
+  const openSkills = (origin: SkillsOrigin) => navigate("skills", origin);
+  const leaveSkills = (destination: SkillsOrigin) => {
+    // Flush before leaving: the debounce is cancelled when returning to the menu.
+    cacheDraft();
+    navigate(destination);
+    requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('[data-skills-entry]')?.focus());
+  };
   const goHome = () =>
     guard((wasSaved) => {
       if (dirty && !wasSaved) {
@@ -209,7 +262,7 @@ export function StudioApp({ initialView = "home" }: { initialView?: "home" | "ed
           /* Retain the persistent warning. */
         }
       }
-      setView("home");
+      navigate("home");
     }, "返回主页面？");
   const exportDesign = () => {
     const blob = new Blob([JSON.stringify(draft, null, 2)], {
@@ -238,6 +291,7 @@ export function StudioApp({ initialView = "home" }: { initialView?: "home" | "ed
       }
       const id = registerPrototype(draft);
       setTrial({ id, name: draft.name, key: Date.now(), deploymentCost: simulationHullCost(draft.hullId) });
+      // Keep the launching screen URL: refresh must not create a new battle.
       setView("combat");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -255,6 +309,7 @@ export function StudioApp({ initialView = "home" }: { initialView?: "home" | "ed
         change({
           ...next,
           hullMods: [],
+          sMods: [],
           capacitors: 0,
           vents: 0,
           updatedAt: Date.now(),
@@ -265,7 +320,7 @@ export function StudioApp({ initialView = "home" }: { initialView?: "home" | "ed
     try {
       const { importNativeVariant } = await import("./NativeVariantImport");
       const { design, warnings } = importNativeVariant(spec);
-      const enter = () => { open(design); setView("editor"); setCatalogOpen(false); };
+      const enter = () => { open(design); navigate("editor"); };
       guard(() => {
         if (warnings.length) setConfirmation({title: "以基础适配载入原版方案？", body: warnings.join("\n"), action: "载入并查看", run: enter});
         else enter();
@@ -298,12 +353,13 @@ export function StudioApp({ initialView = "home" }: { initialView?: "home" | "ed
     const key = (e: KeyboardEvent) => {
       if (catalogOpen) return;
       if (
-        view === "editor" &&
+        (view === "editor" || view === "skills") &&
         (e.ctrlKey || e.metaKey) &&
         e.key.toLowerCase() === "s" &&
         !confirmation
       ) {
         e.preventDefault();
+        if (view === "skills" && document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
         save();
       }
 
@@ -317,7 +373,7 @@ export function StudioApp({ initialView = "home" }: { initialView?: "home" | "ed
         fallback={
           <div className="native-loading">
             准备模拟战斗...
-            <NativeButton onClick={() => setView("editor")}>
+            <NativeButton onClick={() => { setTrial(null); navigate("editor"); }}>
               返回改装
             </NativeButton>
           </div>
@@ -330,7 +386,7 @@ export function StudioApp({ initialView = "home" }: { initialView?: "home" | "ed
           deploymentCost={trial.deploymentCost}
           onExit={() => {
             setTrial(null);
-            setView("editor");
+            navigate("editor");
           }}
         />
       </Suspense>
@@ -339,13 +395,23 @@ export function StudioApp({ initialView = "home" }: { initialView?: "home" | "ed
     <>
       {catalogOpen ? (
         <Suspense fallback={<div className="native-loading">正在加载原版内容…</div>}>
-          <NativeCatalog onVariant={loadNativeVariant} onClose={() => setCatalogOpen(false)} onRefit={(id) => {
-            const enter = () => { if (id !== draft.hullId) open(createDesign(id)); setView("editor"); setCatalogOpen(false); };
+          <NativeCatalog onVariant={loadNativeVariant} onClose={() => navigate("home")} onRefit={(id) => {
+            const enter = () => { if (id !== draft.hullId) open(createDesign(id)); navigate("editor"); };
             if (id === draft.hullId) enter(); else guard(enter, "更换舰体？");
           }} />
         </Suspense>
       ) : view === "home" ? (
-        <NativeHome onEnter={() => setView("editor")} />
+        <NativeHome onEnter={() => navigate("editor")} onSkills={() => openSkills("home")} onLan={() => window.location.assign("?view=lan")} />
+      ) : view === "skills" ? (
+        <Suspense fallback={<div className="native-loading" role="status">正在准备角色技能…</div>}>
+          <CaptainSkillsScreen value={draft.captainSkills ?? {}} profile={draft.captainProfile} designName={draft.name} hullName={data.ships[draft.hullId]?.name ?? draft.hullId}
+            status={saveState} dirty={dirty} warning={storageWarning} backLabel={skillsOrigin === "home" ? "返回主菜单" : "返回改装"}
+            onChange={captainSkills => change({ ...draft, captainSkills })}
+            onProfileChange={captainProfile => change({ ...draft, captainProfile })}
+            canUndo={history.length > 0} onUndo={undo} onImport={() => fileRef.current?.click()}
+            onLaunch={launch} launchDisabledReason={evaluation.errors.length ? evaluation.errors.join("；") : null}
+            onBack={() => leaveSkills(skillsOrigin)} onRefit={() => leaveSkills("editor")} onSave={save} onExport={exportDesign} />
+        </Suspense>
       ) : (
         <NativeRefit
           key={editorKey}
@@ -392,7 +458,7 @@ export function StudioApp({ initialView = "home" }: { initialView?: "home" | "ed
           onCopy={() =>
             open({
               ...structuredClone(draft),
-              id: crypto.randomUUID(),
+              id: randomId(),
               name: (draft.name + " · 副本").slice(0, 48),
               updatedAt: Date.now(),
             })
@@ -410,6 +476,7 @@ export function StudioApp({ initialView = "home" }: { initialView?: "home" | "ed
           onClear={clear}
           onLaunch={launch}
           onHome={goHome}
+          onSkills={() => openSkills("editor")}
         />
       )}
       <input
@@ -426,7 +493,7 @@ export function StudioApp({ initialView = "home" }: { initialView?: "home" | "ed
             if (file.size > 1_000_000) throw new Error("方案文件超过 1 MB");
             const d = decodeDesign(JSON.parse(await file.text()));
             guard(
-              () => open({ ...d, id: crypto.randomUUID() }),
+              () => open({ ...d, id: randomId() }),
               "导入舰船方案？",
             );
           } catch (err) {

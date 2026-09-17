@@ -1,3 +1,4 @@
+import { Vector2 } from '../math/Vector2';
 import type { WeaponMount } from '../simulation/Weapon';
 import type { Ship } from '../simulation/Ship';
 import { weaponMuzzleExtent } from './FireControlGeometry';
@@ -11,17 +12,24 @@ interface Envelope {
   ranges: number[];
   dps: number[];
   muzzleExtents: number[];
+  /** Lazy per-mount muzzle coordinates, valid only for this native AI phase. */
+  muzzleX: number[];
+  muzzleY: number[];
 }
+
+const nativeVectorSet = Vector2.prototype.set;
 
 /** Shared only inside an audited native AI phase. A ship's AI may activate a
  * range/speed system or change phase/vent state: invalidate that ship immediately
- * after its update, and close the entire cache before any simulation advances. */
+ * after its update, and close the entire cache before any simulation advances.
+ * Native AI does not advance motion, mount angles or barrels here; activation
+ * effects (including teleports) are dispatched after this cache is closed. */
 export class WeaponThreatEnvelope {
   private active = true;
   private readonly envelopes = new Map<Ship, Envelope>();
 
   public get(ship: Ship): Envelope | undefined {
-    if (!this.active || !ship.hasNativeThreatPhaseHooks) return undefined;
+    if (!this.active || Vector2.prototype.set !== nativeVectorSet || !ship.hasNativeThreatPhaseHooks) return undefined;
     const cached = this.envelopes.get(ship);
     if (cached) return cached;
     let maxRangeAndMuzzle = -Infinity;
@@ -39,7 +47,7 @@ export class WeaponThreatEnvelope {
     }
     const motion = maxRangeAndMuzzle === -Infinity ? undefined : ship.getMotionStats();
     const envelope = { maxRangeAndMuzzle, maxSpeed: motion?.maxSpeed ?? 0,
-      motion, mounts, ranges, dps, muzzleExtents };
+      motion, mounts, ranges, dps, muzzleExtents, muzzleX: [] as number[], muzzleY: [] as number[] };
     this.envelopes.set(ship, envelope);
     return envelope;
   }

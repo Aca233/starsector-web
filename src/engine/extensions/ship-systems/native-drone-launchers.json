@@ -1,0 +1,837 @@
+{
+  "drone_borer": {
+    "spec": {
+      "id": "drone_borer",
+      "type": "DRONE_LAUNCHER",
+      "aiType": "DRONE_LAUNCHER_PD",
+      "droneVariant": "drone_borer",
+      "allowFreeRoam": true,
+      "launchSpeed": 300,
+      "launchDelay": 0.5,
+      "maxDrones": 5,
+      "droneBehavior": [
+        {
+          "droneIndex": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "defaultFacing": "MATCH_DRONE_HEADING",
+          "faceEnemy": true,
+          "holdRoamRange": 100,
+          "freeRoamRange": 2000,
+          "targetPriority": [
+            "MISSILE",
+            "FIGHTER",
+            "SHIP"
+          ],
+          "initialOrbitAngle": 0,
+          "orbitRadius": 100,
+          "orbitDir": 1,
+          "orbitSpeed": 50
+        }
+      ],
+      "useSound": "drone_launch",
+      "outOfUsesSound": "gun_out_of_ammo",
+      "aiHints": {}
+    },
+    "row": {
+      "name": "螟蜂无人机",
+      "id": "drone_borer",
+      "flux/second": "",
+      "f/s (base rate)": "",
+      "f/s (base cap)": "",
+      "flux/use": "",
+      "f/u (base rate)": "",
+      "f/u (base cap)": "",
+      "cr/u": "",
+      "max uses": "15",
+      "regen": "",
+      "charge up": "0",
+      "active": "",
+      "down": "0",
+      "cooldown": "0",
+      "toggle": "",
+      "noDissipation": "",
+      "noHardDissipation": "",
+      "hardFlux": "",
+      "noFiring": "",
+      "noTurning": "",
+      "noStrafing": "",
+      "noAccel": "",
+      "noShield": "",
+      "noVent": "",
+      "isPhaseCloak": "",
+      "tags": "",
+      "icon": "graphics/icons/hullsys/drone_borer.png"
+    },
+    "variant": {
+      "displayName": "无人机",
+      "hullId": "drone_borer",
+      "variantId": "drone_borer",
+      "fluxVents": 0,
+      "fluxCapacitors": 0,
+      "mods": [],
+      "weaponGroups": [
+        {
+          "mode": "LINKED",
+          "weapons": {
+            "WS 001": "mininglaser"
+          }
+        }
+      ]
+    }
+  },
+  "drone_pd": {
+    "spec": {
+      "id": "drone_pd",
+      "type": "DRONE_LAUNCHER",
+      "aiType": "DRONE_LAUNCHER_PD",
+      "droneVariant": "drone_pd",
+      "allowFreeRoam": true,
+      "launchSpeed": 300,
+      "launchDelay": 0.5,
+      "maxDrones": 9,
+      "droneBehavior": [
+        {
+          "droneIndex": [
+            0,
+            2,
+            4,
+            6,
+            8
+          ],
+          "defaultFacing": "MATCH_DRONE_HEADING",
+          "faceEnemy": true,
+          "holdRoamRange": 100,
+          "freeRoamRange": 500,
+          "targetPriority": [
+            "MISSILE",
+            "FIGHTER",
+            "SHIP"
+          ],
+          "initialOrbitAngle": 0,
+          "orbitRadius": 40,
+          "orbitDir": 1,
+          "orbitSpeed": 100
+        },
+        {
+          "droneIndex": [
+            1,
+            3,
+            5,
+            7,
+            9
+          ],
+          "defaultFacing": "MATCH_DRONE_HEADING",
+          "faceEnemy": true,
+          "holdRoamRange": 100,
+          "freeRoamRange": 500,
+          "targetPriority": [
+            "MISSILE",
+            "FIGHTER",
+            "SHIP"
+          ],
+          "initialOrbitAngle": 0,
+          "orbitRadius": 20,
+          "orbitDir": -1,
+          "orbitSpeed": 100
+        }
+      ],
+      "useSound": "drone_launch",
+      "outOfUsesSound": "gun_out_of_ammo",
+      "aiHints": {}
+    },
+    "row": {
+      "name": "点防无人机",
+      "id": "drone_pd",
+      "flux/second": "",
+      "f/s (base rate)": "",
+      "f/s (base cap)": "",
+      "flux/use": "",
+      "f/u (base rate)": "",
+      "f/u (base cap)": "",
+      "cr/u": "",
+      "max uses": "20",
+      "regen": "",
+      "charge up": "0",
+      "active": "",
+      "down": "0",
+      "cooldown": "0",
+      "toggle": "",
+      "noDissipation": "",
+      "noHardDissipation": "",
+      "hardFlux": "",
+      "noFiring": "",
+      "noTurning": "",
+      "noStrafing": "",
+      "noAccel": "",
+      "noShield": "",
+      "noVent": "",
+      "isPhaseCloak": "",
+      "tags": "",
+      "icon": "graphics/icons/hullsys/drone_pd_high.png"
+    },
+    "variant": {
+      "displayName": "标准",
+      "hullId": "drone_pd",
+      "variantId": "drone_pd",
+      "fluxVents": 0,
+      "fluxCapacitors": 0,
+      "mods": [],
+      "weaponGroups": [
+        {
+          "mode": "LINKED",
+          "weapons": {
+            "WS 001": "pdlaser"
+          }
+        }
+      ]
+    }
+  },
+  "drone_pd_x2": {
+    "spec": {
+      "id": "drone_pd_x2",
+      "type": "DRONE_LAUNCHER",
+      "aiType": "DRONE_LAUNCHER_PD",
+      "droneVariant": "drone_pd_midline",
+      "allowFreeRoam": true,
+      "launchSpeed": 300,
+      "launchDelay": 0.5,
+      "maxDrones": 5,
+      "droneBehavior": [
+        {
+          "droneIndex": [
+            0,
+            2,
+            4,
+            6,
+            8
+          ],
+          "defaultFacing": "MATCH_DRONE_HEADING",
+          "faceEnemy": true,
+          "holdRoamRange": 100,
+          "freeRoamRange": 500,
+          "targetPriority": [
+            "MISSILE",
+            "FIGHTER",
+            "SHIP"
+          ],
+          "initialOrbitAngle": 0,
+          "orbitRadius": 50,
+          "orbitDir": 1,
+          "orbitSpeed": 100
+        },
+        {
+          "droneIndex": [
+            1,
+            3,
+            5,
+            7,
+            9
+          ],
+          "defaultFacing": "MATCH_DRONE_HEADING",
+          "faceEnemy": true,
+          "holdRoamRange": 100,
+          "freeRoamRange": 500,
+          "targetPriority": [
+            "MISSILE",
+            "FIGHTER",
+            "SHIP"
+          ],
+          "initialOrbitAngle": 0,
+          "orbitRadius": 70,
+          "orbitDir": -1,
+          "orbitSpeed": 100
+        }
+      ],
+      "useSound": "drone_launch",
+      "outOfUsesSound": "gun_out_of_ammo",
+      "aiHints": {}
+    },
+    "row": {
+      "name": "点防无人机",
+      "id": "drone_pd_x2",
+      "flux/second": "",
+      "f/s (base rate)": "",
+      "f/s (base cap)": "",
+      "flux/use": "",
+      "f/u (base rate)": "",
+      "f/u (base cap)": "",
+      "cr/u": "",
+      "max uses": "10",
+      "regen": "",
+      "charge up": "0",
+      "active": "",
+      "down": "0",
+      "cooldown": "0",
+      "toggle": "",
+      "noDissipation": "",
+      "noHardDissipation": "",
+      "hardFlux": "",
+      "noFiring": "",
+      "noTurning": "",
+      "noStrafing": "",
+      "noAccel": "",
+      "noShield": "",
+      "noVent": "",
+      "isPhaseCloak": "",
+      "tags": "",
+      "icon": "graphics/icons/hullsys/drone_pd_mid.png"
+    },
+    "variant": {
+      "displayName": "标准",
+      "hullId": "drone_pd_midline",
+      "variantId": "drone_pd_midline",
+      "fluxVents": 0,
+      "fluxCapacitors": 0,
+      "mods": [],
+      "weaponGroups": [
+        {
+          "mode": "LINKED",
+          "weapons": {
+            "WS 001": "lightmg"
+          }
+        }
+      ]
+    }
+  },
+  "drone_station_high": {
+    "spec": {
+      "id": "drone_station_high",
+      "type": "DRONE_LAUNCHER",
+      "aiType": "DRONE_LAUNCHER_PD",
+      "droneVariant": "gargoyle_Standard",
+      "allowFreeRoam": false,
+      "launchSpeed": 300,
+      "launchDelay": 1,
+      "maxDrones": 7,
+      "droneBehavior": [
+        {
+          "droneIndex": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14
+          ],
+          "defaultFacing": "AWAY_FROM_SHIP",
+          "faceEnemy": false,
+          "holdRoamRange": 0,
+          "freeRoamRange": 0,
+          "targetPriority": [
+            "FIGHTER",
+            "SHIP",
+            "MISSILE"
+          ],
+          "initialOrbitAngle": 0,
+          "orbitRadius": 650,
+          "orbitDir": 1,
+          "orbitSpeed": 100
+        }
+      ],
+      "useSound": "drone_launch",
+      "outOfUsesSound": "gun_out_of_ammo",
+      "aiHints": {}
+    },
+    "row": {
+      "name": "石像鬼无人机",
+      "id": "drone_station_high",
+      "flux/second": "",
+      "f/s (base rate)": "",
+      "f/s (base cap)": "",
+      "flux/use": "",
+      "f/u (base rate)": "",
+      "f/u (base cap)": "",
+      "cr/u": "",
+      "max uses": "4",
+      "regen": "",
+      "charge up": "0",
+      "active": "",
+      "down": "0",
+      "cooldown": "0",
+      "toggle": "",
+      "noDissipation": "",
+      "noHardDissipation": "",
+      "hardFlux": "",
+      "noFiring": "",
+      "noTurning": "",
+      "noStrafing": "",
+      "noAccel": "",
+      "noShield": "",
+      "noVent": "",
+      "isPhaseCloak": "",
+      "tags": "",
+      "icon": "graphics/icons/hullsys/station_defense_drones_high.png"
+    },
+    "variant": {
+      "displayName": "标准",
+      "fluxCapacitors": 10,
+      "fluxVents": 10,
+      "hullId": "gargoyle",
+      "hullMods": [
+        "turretgyros",
+        "magazines"
+      ],
+      "permaMods": [],
+      "variantId": "gargoyle_Standard",
+      "weaponGroups": [
+        {
+          "autofire": true,
+          "mode": "LINKED",
+          "weapons": {
+            "WS 000": "guardian"
+          }
+        }
+      ]
+    }
+  },
+  "drone_station_lt": {
+    "spec": {
+      "id": "drone_station_lt",
+      "type": "DRONE_LAUNCHER",
+      "aiType": "DRONE_LAUNCHER_PD",
+      "droneVariant": "merlon_Standard",
+      "allowFreeRoam": false,
+      "launchSpeed": 300,
+      "launchDelay": 1,
+      "maxDrones": 5,
+      "droneBehavior": [
+        {
+          "droneIndex": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14
+          ],
+          "defaultFacing": "AWAY_FROM_SHIP",
+          "faceEnemy": false,
+          "holdRoamRange": 0,
+          "freeRoamRange": 0,
+          "targetPriority": [
+            "FIGHTER",
+            "SHIP",
+            "MISSILE"
+          ],
+          "initialOrbitAngle": 0,
+          "orbitRadius": 650,
+          "orbitDir": -1,
+          "orbitSpeed": 50
+        }
+      ],
+      "useSound": "drone_launch",
+      "outOfUsesSound": "gun_out_of_ammo",
+      "aiHints": {}
+    },
+    "row": {
+      "name": "城齿无人机",
+      "id": "drone_station_lt",
+      "flux/second": "",
+      "f/s (base rate)": "",
+      "f/s (base cap)": "",
+      "flux/use": "",
+      "f/u (base rate)": "",
+      "f/u (base cap)": "",
+      "cr/u": "",
+      "max uses": "5",
+      "regen": "",
+      "charge up": "0",
+      "active": "",
+      "down": "0",
+      "cooldown": "0",
+      "toggle": "",
+      "noDissipation": "",
+      "noHardDissipation": "",
+      "hardFlux": "",
+      "noFiring": "",
+      "noTurning": "",
+      "noStrafing": "",
+      "noAccel": "",
+      "noShield": "",
+      "noVent": "",
+      "isPhaseCloak": "",
+      "tags": "",
+      "icon": "graphics/icons/hullsys/station_defense_drones_low.png"
+    },
+    "variant": {
+      "displayName": "标准",
+      "fluxCapacitors": 10,
+      "fluxVents": 10,
+      "hullId": "merlon",
+      "hullMods": [
+        "turretgyros"
+      ],
+      "permaMods": [],
+      "quality": 0.5,
+      "variantId": "merlon_Standard",
+      "weaponGroups": [
+        {
+          "autofire": true,
+          "mode": "LINKED",
+          "weapons": {
+            "WS 000": "dualflak"
+          }
+        },
+        {
+          "autofire": true,
+          "mode": "LINKED",
+          "weapons": {
+            "WS 001": "vulcan",
+            "WS 002": "vulcan",
+            "WS 003": "vulcan",
+            "WS 004": "vulcan"
+          }
+        }
+      ]
+    }
+  },
+  "drone_station_mid": {
+    "spec": {
+      "id": "drone_station_mid",
+      "type": "DRONE_LAUNCHER",
+      "aiType": "DRONE_LAUNCHER_PD",
+      "droneVariant": "ravelin_Standard",
+      "allowFreeRoam": false,
+      "launchSpeed": 300,
+      "launchDelay": 2,
+      "maxDrones": 3,
+      "droneBehavior": [
+        {
+          "droneIndex": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14
+          ],
+          "defaultFacing": "AWAY_FROM_SHIP",
+          "faceEnemy": false,
+          "holdRoamRange": 0,
+          "freeRoamRange": 0,
+          "targetPriority": [
+            "SHIP",
+            "FIGHTER",
+            "MISSILE"
+          ],
+          "initialOrbitAngle": 0,
+          "orbitRadius": 650,
+          "orbitDir": 1,
+          "orbitSpeed": 150
+        }
+      ],
+      "useSound": "drone_launch",
+      "outOfUsesSound": "gun_out_of_ammo",
+      "aiHints": {}
+    },
+    "row": {
+      "name": "三角堡无人机",
+      "id": "drone_station_mid",
+      "flux/second": "",
+      "f/s (base rate)": "",
+      "f/s (base cap)": "",
+      "flux/use": "",
+      "f/u (base rate)": "",
+      "f/u (base cap)": "",
+      "cr/u": "",
+      "max uses": "3",
+      "regen": "",
+      "charge up": "0",
+      "active": "",
+      "down": "0",
+      "cooldown": "0",
+      "toggle": "",
+      "noDissipation": "",
+      "noHardDissipation": "",
+      "hardFlux": "",
+      "noFiring": "",
+      "noTurning": "",
+      "noStrafing": "",
+      "noAccel": "",
+      "noShield": "",
+      "noVent": "",
+      "isPhaseCloak": "",
+      "tags": "",
+      "icon": "graphics/icons/hullsys/station_defense_drones_mid.png"
+    },
+    "variant": {
+      "displayName": "标准",
+      "fluxCapacitors": 10,
+      "fluxVents": 10,
+      "hullId": "ravelin",
+      "hullMods": [
+        "armoredweapons"
+      ],
+      "permaMods": [],
+      "variantId": "ravelin_Standard",
+      "weaponGroups": [
+        {
+          "autofire": false,
+          "mode": "LINKED",
+          "weapons": {
+            "WS 001": "chaingun"
+          }
+        },
+        {
+          "autofire": true,
+          "mode": "LINKED",
+          "weapons": {
+            "WS 006": "ioncannon",
+            "WS 007": "ioncannon"
+          }
+        },
+        {
+          "autofire": true,
+          "mode": "LINKED",
+          "weapons": {
+            "WS 004": "heavymg",
+            "WS 005": "heavymg"
+          }
+        },
+        {
+          "autofire": true,
+          "mode": "LINKED",
+          "weapons": {
+            "WS 002": "lightmg",
+            "WS 003": "lightmg"
+          }
+        }
+      ]
+    }
+  },
+  "drone_terminator": {
+    "spec": {
+      "id": "drone_terminator",
+      "type": "DRONE_LAUNCHER",
+      "aiType": "DRONE_LAUNCHER_PD",
+      "droneVariant": "drone_terminator",
+      "allowFreeRoam": true,
+      "launchSpeed": 100,
+      "launchDelay": 1,
+      "maxDrones": 1,
+      "droneBehavior": [
+        {
+          "droneIndex": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "defaultFacing": "MATCH_DRONE_HEADING",
+          "faceEnemy": true,
+          "holdRoamRange": 250,
+          "freeRoamRange": 1500,
+          "targetPriority": [
+            "MISSILE",
+            "SHIP_TARGET",
+            "FIGHTER",
+            "SHIP"
+          ],
+          "initialOrbitAngle": 0,
+          "orbitRadius": 50,
+          "orbitDir": 1,
+          "orbitSpeed": 100
+        }
+      ],
+      "useSound": "drone_launch",
+      "outOfUsesSound": "gun_out_of_ammo",
+      "aiHints": {}
+    },
+    "row": {
+      "name": "终结者无人机",
+      "id": "drone_terminator",
+      "flux/second": "",
+      "f/s (base rate)": "",
+      "f/s (base cap)": "",
+      "flux/use": "",
+      "f/u (base rate)": "",
+      "f/u (base cap)": "",
+      "cr/u": "",
+      "max uses": "1",
+      "regen": "0.0333",
+      "charge up": "0",
+      "active": "",
+      "down": "0",
+      "cooldown": "0",
+      "toggle": "",
+      "noDissipation": "",
+      "noHardDissipation": "",
+      "hardFlux": "",
+      "noFiring": "",
+      "noTurning": "",
+      "noStrafing": "",
+      "noAccel": "",
+      "noShield": "",
+      "noVent": "",
+      "isPhaseCloak": "",
+      "tags": "",
+      "icon": "graphics/icons/hullsys/termination_sequence.png"
+    },
+    "variant": {
+      "displayName": "无人机",
+      "hullId": "drone_terminator",
+      "variantId": "drone_terminator",
+      "fluxVents": 0,
+      "fluxCapacitors": 0,
+      "hullMods": [
+        "no_weapon_flux",
+        "terminator_core"
+      ],
+      "weaponGroups": [
+        {
+          "mode": "LINKED",
+          "weapons": {
+            "WS 001": "irpulse"
+          }
+        },
+        {
+          "mode": "LINKED",
+          "weapons": {
+            "WS 002": "pdlaser"
+          }
+        }
+      ]
+    }
+  },
+  "drone_sensor": {
+    "spec": {
+      "id": "drone_sensor",
+      "type": "DRONE_LAUNCHER",
+      "aiType": "DRONE_LAUNCHER_STANDARD",
+      "statsScript": "data.shipsystems.scripts.SensorDroneStats",
+      "droneVariant": "drone_sensor",
+      "allowFreeRoam": false,
+      "launchSpeed": 300,
+      "launchDelay": 1,
+      "maxDrones": 2,
+      "droneBehavior": [
+        {
+          "droneIndex": [
+            0
+          ],
+          "defaultFacing": "MATCH_SHIP_FACING",
+          "faceEnemy": true,
+          "holdRoamRange": 0,
+          "freeRoamRange": 150,
+          "targetPriority": [
+            "FIGHTER",
+            "SHIP"
+          ],
+          "initialOrbitAngle": 60,
+          "orbitRadius": -100,
+          "orbitDir": 1,
+          "orbitSpeed": 0
+        },
+        {
+          "droneIndex": [
+            1
+          ],
+          "defaultFacing": "MATCH_SHIP_FACING",
+          "faceEnemy": true,
+          "holdRoamRange": 0,
+          "freeRoamRange": 150,
+          "targetPriority": [
+            "FIGHTER",
+            "SHIP"
+          ],
+          "initialOrbitAngle": 110,
+          "orbitRadius": -100,
+          "orbitDir": 1,
+          "orbitSpeed": 0
+        }
+      ],
+      "useSound": "drone_launch",
+      "outOfUsesSound": "gun_out_of_ammo"
+    },
+    "row": {
+      "name": "感应无人机",
+      "id": "drone_sensor",
+      "flux/second": "",
+      "f/s (base rate)": "",
+      "f/s (base cap)": "",
+      "flux/use": "",
+      "f/u (base rate)": "",
+      "f/u (base cap)": "",
+      "cr/u": "",
+      "max uses": "5",
+      "regen": "",
+      "charge up": "0",
+      "active": "",
+      "down": "0",
+      "cooldown": "0",
+      "toggle": "",
+      "noDissipation": "",
+      "noHardDissipation": "",
+      "hardFlux": "",
+      "noFiring": "",
+      "noTurning": "",
+      "noStrafing": "",
+      "noAccel": "",
+      "noShield": "",
+      "noVent": "",
+      "isPhaseCloak": "",
+      "tags": "",
+      "icon": "graphics/icons/hullsys/drone_sensor.png"
+    },
+    "variant": {
+      "displayName": "标准",
+      "hullId": "drone_sensor",
+      "variantId": "drone_sensor",
+      "fluxVents": 0,
+      "fluxCapacitors": 0,
+      "mods": [],
+      "weaponGroups": [
+        {
+          "mode": "LINKED",
+          "weapons": {
+            "WS 001": "ioncannon"
+          }
+        }
+      ]
+    }
+  }
+}

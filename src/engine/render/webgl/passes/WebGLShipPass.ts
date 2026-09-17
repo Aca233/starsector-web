@@ -1,3 +1,4 @@
+import { pulsePusherOffset } from '../../../extensions/ship-systems/PulseDrive';
 import { visualRandom } from '../../RenderDeterminism';
 import { CombatEngine } from '../../../simulation/CombatEngine';
 import { WebGLPassContext } from '../WebGLPassContext';
@@ -7,6 +8,7 @@ import { getHulkAppearance } from '../../../visual/HulkVisuals';
 import { renderHulkHullCanvas } from '../../HulkSpriteMask';
 import { Vector2 } from '../../../math/Vector2';
 import { ShipVentingRenderer } from '../ShipVentingRenderer';
+import { ShipOverloadRenderer } from '../ShipOverloadRenderer';
 import { getShipVisualProfile, getWeaponVisualProfile } from '../../../visual/VisualProfiles';
 import { renderShipEngines } from '../ShipEngineRenderer';
 import type { VisualRandom } from '../../../runtime/VisualRandom';
@@ -28,6 +30,7 @@ import {
  */
 export class WebGLShipPass {
   private ventingRenderers = new Map<Ship, ShipVentingRenderer>();
+  private overloadRenderers = new Map<Ship, ShipOverloadRenderer>();
   private hulkHullStates = new WeakMap<HulkFragment, { canvas: HTMLCanvasElement; ready: boolean; instanceId: number }>();
   private damageOverlayStates = new WeakMap<Ship | HulkFragment, {
     instanceId: number;
@@ -41,7 +44,14 @@ export class WebGLShipPass {
   public updateVisual(engine: CombatEngine, dt: number, random: VisualRandom): void {
     const ships = new Set(engine.ships);
     for (const ship of this.ventingRenderers.keys()) if (!ships.has(ship)) this.ventingRenderers.delete(ship);
-    for (const ship of ships) this.ventRendererFor(ship).update(dt, ship, random);
+    for (const ship of this.overloadRenderers.keys()) if (!ships.has(ship) || ship.isDead) this.overloadRenderers.delete(ship);
+    for (const ship of ships) {
+      this.ventRendererFor(ship).update(dt, ship, random);
+      if (ship.isDead) continue;
+      let overload = this.overloadRenderers.get(ship);
+      if (!overload) { overload = new ShipOverloadRenderer(ship); this.overloadRenderers.set(ship, overload); }
+      overload.update(dt, ship, random);
+    }
   }
 
   private ventRendererFor(ship: Ship): ShipVentingRenderer {
@@ -55,6 +65,7 @@ export class WebGLShipPass {
 
   public resetVisualState(): void {
     this.ventingRenderers.clear();
+    this.overloadRenderers.clear();
     this.damageOverlayStates = new WeakMap();
     this.hulkHullStates = new WeakMap();
   }
@@ -73,6 +84,7 @@ export class WebGLShipPass {
     };
     for (const ship of engine.ships) if (!ship.isDead) collectDamage(ship);
     for (const hulk of engine.hulkFragments) collectDamage(hulk.sourceShip, hulk);
+    for (const [ship, renderer] of this.overloadRenderers) if (ship.flux.isOverloaded) activeDamageTextures.add(renderer.textureId);
     textures.retainCanvasTextures(activeDamageTextures);
 
     // 2. 战舰与挂点渲染函数
@@ -102,7 +114,7 @@ export class WebGLShipPass {
       const pivotNormY = ship.spec.pivotY / height - 0.5;
       const hulkAppearance = hulk ? getHulkAppearance(hulk) : null;
       const tint = hulkAppearance?.tint ?? 1;
-      const shipAlpha = hulkAppearance?.alpha ?? (ship.shield.type === 'PHASE' ? 1 - 0.75 * ship.shield.phaseEffectLevel : 1);
+      const shipAlpha = hulkAppearance?.alpha ?? ship.phaseVisualAlpha;
       batcher.drawSprite(
         shipTex,
         shipPos.x,
@@ -197,9 +209,19 @@ export class WebGLShipPass {
         }
       }
 
-      // 过载视觉由 WebGLFXPass 的舰体表面 EMP 电弧负责。原版不会用全尺寸蓝色 halo 覆盖整艘舰体，
-      // 因此这里刻意不再叠加 collisionRadius 级的大面积光晕，保持舰体纹理在强制过载时仍清晰可读。
+      // I.java renders the hull-masked EMP texture before weapons; it follows the hull.
+      if (!hulk) this.overloadRenderers.get(ship)?.render(ship, shipPos, shipFacing, ctx);
 
+      // Native non-firing pusher plates are artwork, not fake playable weapons.
+      if (!hulk) for (const decoration of ship.spec.decorativeWeapons ?? []) {
+        const info = textures.getTextureInfo(decoration.spriteUrl);
+        if (!info.texture || info.width <= 0 || info.height <= 0) continue;
+        const compression = decoration.tags?.includes('pusherplate') ? pulsePusherOffset(ship.system) : 0;
+        const offset = new Vector2(decoration.x+compression,decoration.y).rotate(shipFacing);
+        batcher.setBlendMode('NORMAL');
+        batcher.drawSprite(info.texture,shipPos.x+offset.x,shipPos.y+offset.y,info.width,info.height,
+          shipFacing+decoration.angleDeg*Math.PI/180+Math.PI/2,0,0,tint,tint,tint,shipAlpha);
+      }
       // 2.3 旋转武器炮塔与挂点充能光晕 (Turrets & Hardpoints)
       for (const mount of ship.weapons) {
         if (mount.mountType === 'HIDDEN') continue;
@@ -343,7 +365,7 @@ export class WebGLShipPass {
       if (!hulk) this.ventRendererFor(ship).render(batcher, ctx.ribbonBatcher, textures, ship, shipPos, shipFacing, shipAlpha);
     };
 
-    for (const ship of engine.ships) renderShip(ship, ship.interpolatedPos(alpha), ship.interpolatedFacing(alpha));
+    for (const ship of engine.ships) if (ship.isVisibleTo(engine.playerShip.teamId)) renderShip(ship, ship.interpolatedPos(alpha), ship.interpolatedFacing(alpha));
 
     // Retain the actual hull, damage and mounted-weapon composition after death.
     for (const hulk of engine.hulkFragments) {

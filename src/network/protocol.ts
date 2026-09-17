@@ -1,39 +1,81 @@
 import config from "./protocol.json";
+import { wireBytes } from "./room-fleet.mjs";
+import type { Design } from "../studio/DesignModel";
 export const LAN_PROTOCOL = config.version;
 export const LAN_SHIPS = config.ships;
 export const LAN_BUILD = __LAN_BUILD_ID__;
-export type Seat = 0 | 1;
+// Seat identifies controller ownership, not faction.
+export type Seat = number;
+export const LAN_MAX_PLAYERS = config.maxPlayers;
+export type Team = number;
+export { teamName } from "./room-fleet.mjs";
+export { combatTeamColor as teamColor } from "../engine/simulation/CombatTeams";
+export const LAN_MAX_OPTIONS_BYTES = config.maxOptionsBytes;
+export const LAN_MAX_SNAPSHOT_BYTES = config.maxSnapshotBytes;
+export const roomTeams = (options: RoomOptions) => options.aiHulls.map((_,i)=>i);
 export interface Member {
   id: string;
   name: string;
   seat: Seat;
+  team: Team;
   hull: string;
+  design: Design | null;
+  designRevision: number;
+  editing: boolean;
   ready: boolean;
+  loaded: boolean;
+  connected: boolean;
+  reconnectUntil: number | null;
+}
+export interface RoomOptions {
+  /** Independently assigned AI loadout references, indexed by team. Raw hull IDs are legacy defaults. */
+  aiHulls: string[][];
+  /** Deduplicated immutable combat configurations; no design is repeated per ship. */
+  aiLoadouts?: Record<string, Design>;
+  aiNextId?: number;
+  aiRevision?: number;
+  assignment: "teams" | "solo";
+  /** Whole-battle DP selected by the host. Frozen on match start. */
+  battleSize: number;
+  /** Server-derived per-team active DP ceiling. */
+  deploymentLimit?: number;
+  /** Initial DP target; humans and each team flagship always deploy. */
+  initialDeploymentLimit?: number | null;
 }
 export interface Match {
+  options: RoomOptions;
   id: string;
   seed: number;
-  hulls: [string, string];
+  players: Array<Pick<Member, "id" | "name" | "seat" | "team" | "hull" | "design">>;
+  snapshotHz: 2 | 5 | 10 | 20;
   hostId: string;
 }
 export interface Room {
   code: string;
+  capacity: number;
   hostId: string;
   members: Member[];
   status: "lobby" | "loading" | "running" | "ended";
   match: Match | null;
   reason?: string;
+  options: RoomOptions;
+  passwordProtected: boolean;
+  chat: Array<{ id: string; name: string; text: string; time: number }>;
 }
 export interface Action {
   id: number;
-  kind: "shield" | "vent" | "system" | "group";
+  kind: "shield" | "vent" | "system" | "group" | "mode" | "autofire" | "target" | "recall";
   value?: number;
+  /** Command-edge world point, independent of a later movement packet. */
+  aim?: [number, number];
 }
 export interface PlayerInput {
   seq: number;
   keys: number;
   aim: [number, number];
   firing: boolean;
+  /** True only after a real cockpit pointer event; menus/focus loss revoke it. */
+  pointerActive: boolean;
   actions: Action[];
 }
 export const KEY_CODES = [
@@ -51,13 +93,52 @@ export const blankInput = (): PlayerInput => ({
   keys: 0,
   aim: [0, 0],
   firing: false,
+  pointerActive: false,
   actions: [],
 });
 export type Listener = (message: any) => void;
-/** No reconnect replay: a new connection obtains a new identity. P1 explicitly ends on disconnect. */
+const STORAGE_KEY = "starsector.lan.session.v5";
+/** Session token is tab-local. A new page can resume a guest, never reconstruct a host Worker. */
 export class LanConnection {
   socket: WebSocket | null = null;
+  ready = false;
+  /** Browser-to-relay round trip, not host simulation or end-to-end input delay. */
+  rttMs: number | null = null;
+  jitterMs = 0;
+  private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
+  private pingSent = 0;
+  private pongAt = 0;
+  inputSequence = 0;
+  actionSequence = 0;
+  saved: { token: string; name: string; url: string; build: string } | null =
+    null;
   private listeners = new Set<Listener>();
+  private url = "";
+  private name = "";
+  private stopped = false;
+  private retryTimer: ReturnType<typeof setTimeout> | undefined;
+  private handshakeTimer: ReturnType<typeof setTimeout> | undefined;
+  private deadline = 0;
+  private attempts = 0;
+  private readonly instance = Array.from(
+    crypto.getRandomValues(new Uint8Array(16)),
+    (n) => n.toString(16).padStart(2, "0"),
+  ).join("");
+  constructor() {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY) ?? "null");
+      if (
+        saved?.build === LAN_BUILD &&
+        typeof saved.token === "string" &&
+        /^[a-f0-9]{64}$/.test(saved.token) &&
+        typeof saved.url === "string" &&
+        typeof saved.name === "string"
+      )
+        this.saved = saved;
+    } catch {
+      /* Storage may be unavailable in a private/embedded browser. */
+    }
+  }
   subscribe(fn: Listener) {
     this.listeners.add(fn);
     return () => {
@@ -67,47 +148,192 @@ export class LanConnection {
   emit(message: any) {
     for (const fn of this.listeners) fn(message);
   }
+  private forget() {
+    this.saved = null;
+    try {
+      sessionStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* optional */
+    }
+  }
   connect(url: string, name: string) {
-    this.socket?.close();
-    const socket = (this.socket = new WebSocket(url));
-    socket.onopen = () =>
-      this.send({
-        type: "hello",
-        protocol: LAN_PROTOCOL,
-        build: LAN_BUILD,
-        name,
-      });
-    socket.onmessage = (event) => {
-      if (this.socket !== socket) return;
-      try {
-        this.emit(JSON.parse(event.data));
-      } catch {
-        this.emit({ type: "error", message: "无法解析服务器消息" });
-      }
-    };
-    socket.onclose = () => {
-      if (this.socket === socket) this.emit({ type: "disconnected" });
-    };
-    socket.onerror = () => {
+    clearTimeout(this.retryTimer);
+    this.stopped = false;
+    this.deadline = 0;
+    this.attempts = 0;
+    if (this.saved && this.saved.url !== url) this.forget();
+    this.url = url;
+    this.name = name;
+    this.open();
+  }
+  private open() {
+    clearTimeout(this.handshakeTimer);
+    clearInterval(this.heartbeatTimer);
+    this.rttMs = null;
+    this.jitterMs = 0;
+    const old = this.socket;
+    this.socket = null;
+    old?.close();
+    this.ready = false;
+    const socket = (this.socket = new WebSocket(this.url));
+    this.handshakeTimer = setTimeout(
+      () => {
+        if (this.socket === socket && !this.ready) this.retry(socket, 1006);
+      },
+      Math.min(
+        5000,
+        this.deadline ? Math.max(1, this.deadline - Date.now()) : 5000,
+      ),
+    );
+    socket.onopen = () => {
       if (this.socket === socket)
-        this.emit({
-          type: "error",
-          message: "无法连接局域网服务。请检查地址、端口和专用网络防火墙。",
+        this.send({
+          type: "hello",
+          protocol: LAN_PROTOCOL,
+          build: LAN_BUILD,
+          name: this.name,
+          instance: this.instance,
+          resumeToken: this.saved?.token,
         });
     };
+    socket.onmessage = (event) => {
+      if (this.socket !== socket) return;
+      let m: any;
+      try {
+        m = JSON.parse(event.data);
+      } catch {
+        this.emit({ type: "error", message: "无法解析服务器消息" });
+        return;
+      }
+      if (m.type === "welcome") {
+        clearTimeout(this.handshakeTimer);
+        this.ready = true;
+        this.pongAt = performance.now();
+        this.pingSent = 0;
+        clearInterval(this.heartbeatTimer);
+        this.heartbeatTimer = setInterval(() => {
+          if (this.socket !== socket || !this.ready) return;
+          const now = performance.now();
+          if (now - this.pongAt > 10000) {
+            this.retry(socket, 1006);
+            return;
+          }
+          // One outstanding probe; a blocked TCP queue must not grow with probes.
+          if (!this.pingSent && socket.bufferedAmount === 0) {
+            this.pingSent = now;
+            if (!this.send({ type: "ping", sent: now })) this.pingSent = 0;
+          }
+        }, 1000);
+        this.deadline = 0;
+        this.attempts = 0;
+        this.inputSequence = Math.max(this.inputSequence, m.inputSeq ?? 0);
+        this.actionSequence = Math.max(this.actionSequence, m.actionId ?? 0);
+        this.saved = {
+          token: m.resumeToken,
+          name: this.name,
+          url: this.url,
+          build: LAN_BUILD,
+        };
+        try {
+          sessionStorage.setItem(STORAGE_KEY, JSON.stringify(this.saved));
+        } catch {
+          /* optional */
+        }
+      }
+      if (m.type === "pong" && m.sent === this.pingSent && this.pingSent > 0) {
+        const now = performance.now(), sample = Math.max(0, now - this.pingSent);
+        this.jitterMs = this.rttMs === null ? 0 : this.jitterMs * .8 + Math.abs(sample - this.rttMs) * .2;
+        this.rttMs = this.rttMs === null ? sample : this.rttMs * .7 + sample * .3;
+        this.pongAt = now;
+        this.pingSent = 0;
+      }
+      if (m.type === "error" && ["RESUME_EXPIRED", "VERSION"].includes(m.code))
+        this.forget();
+      this.emit(m);
+    };
+    socket.onclose = (event) => this.retry(socket, event.code);
+    socket.onerror = () => {}; // close owns retry/error reporting.
+  }
+  private retry(socket: WebSocket, code: number) {
+    if (this.socket !== socket || this.stopped) return;
+    clearTimeout(this.handshakeTimer);
+    clearInterval(this.heartbeatTimer);
+    this.socket = null;
+    socket.close();
+    this.ready = false;
+    if ([1008, 1009, 4001, 4003].includes(code) || !this.saved) {
+      this.forget();
+      this.emit({
+        type: "disconnected",
+        reason:
+          code === 4001
+            ? "此身份已在另一个页面连接。"
+            : "连接已关闭，请重新连接。",
+      });
+      return;
+    }
+    if (!this.deadline) this.deadline = Date.now() + config.reconnectMs;
+    const remaining = this.deadline - Date.now();
+    if (remaining <= 0) {
+      this.forget();
+      this.emit({
+        type: "disconnected",
+        reason: "30 秒内未能重新连接，请重新加入房间。",
+      });
+      return;
+    }
+    this.emit({
+      type: "reconnecting",
+      remaining: Math.ceil(remaining / 1000),
+    });
+    this.retryTimer = setTimeout(
+      () => this.open(),
+      Math.min(4000, 500 * 2 ** this.attempts++, remaining),
+    );
+  }
+  /** Bound snapshot backlog; allow tiny command packets ahead, never another substantial world. */
+  sendSnapshot(message: unknown): "sent" | "skipped" | "oversized" | "disconnected" {
+    if (this.socket?.readyState !== WebSocket.OPEN) return "disconnected";
+    if (this.socket.bufferedAmount > 16384) return "skipped";
+    try {
+      const encoded = JSON.stringify(message);
+      if (new TextEncoder().encode(encoded).byteLength > LAN_MAX_SNAPSHOT_BYTES) return "oversized";
+      this.socket.send(encoded);
+      return "sent";
+    } catch { return "disconnected"; }
   }
   send(message: unknown): boolean {
     if (
       this.socket?.readyState !== WebSocket.OPEN ||
-      this.socket.bufferedAmount > 2_000_000
+      this.socket.bufferedAmount > LAN_MAX_SNAPSHOT_BYTES * 2
     )
       return false;
-    this.socket.send(JSON.stringify(message));
-    return true;
+    try {
+      if (wireBytes(message) > LAN_MAX_SNAPSHOT_BYTES) return false;
+      this.socket.send(JSON.stringify(message));
+      const m = message as { type?: string; input?: PlayerInput };
+      if (m.type === "input" && m.input) {
+        this.inputSequence = Math.max(this.inputSequence, m.input.seq);
+        for (const a of m.input.actions)
+          this.actionSequence = Math.max(this.actionSequence, a.id);
+      }
+      return true;
+    } catch {
+      return false;
+    }
   }
-  close() {
+  close(intentional = true) {
+    this.stopped = true;
+    clearTimeout(this.handshakeTimer);
+    clearTimeout(this.retryTimer);
+    clearInterval(this.heartbeatTimer);
+    if (intentional) {
+      this.send({ type: "leave" });
+      this.forget();
+    }
     const socket = this.socket;
     this.socket = null;
+    this.ready = false;
     socket?.close();
     this.listeners.clear();
   }

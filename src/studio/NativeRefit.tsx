@@ -1,5 +1,5 @@
 import { currentImportReasons } from '../engine/data/SourceCapabilities';
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { NativeButton, NativeFrame } from "../ui/NativeChrome";
 export { NativeButton, NativeFrame } from "../ui/NativeChrome";
 import { Modal } from "../ui/core/UI";
@@ -7,14 +7,15 @@ import { contentRegistry } from "../engine/content/ContentRegistry";
 import {
   hullModDefinitions,
   hullModOPCost,
+  sModInstallReason,
   effectiveHullStats,
   effectiveHullModWeaponSpec,
 } from "../engine/extensions/HullMods";
 import { shipSystemDefinitions } from "../engine/extensions/ship-systems/Registry";
 import { runtimeAssetUrl } from "../engine/runtime/RuntimePaths";
 import { ShipStage } from "./ShipStage";
+import { useRefitWeaponTooltip } from "./RefitWeaponTooltip";
 import { FighterDecks } from "./FighterDecks";
-import { CombatSkillPicker } from "./CombatSkillPicker";
 import { SourceWingPicker } from "./SourceWingPicker";
 import { HullRoster } from "./HullRoster";
 import type { HullFilter } from "./HullRoster";
@@ -37,6 +38,7 @@ import {
   weaponName,
   withWeapon,
   withWing,
+  designWingSlots,
 } from "./DesignModel";
 import type { Design, Group } from "./DesignModel";
 import type { ShipSpec } from "../engine/content/ShipSpec";
@@ -44,8 +46,12 @@ import type { ShipSpec } from "../engine/content/ShipSpec";
 const SourceVariantPicker = lazy(() => import("./SourceVariantPicker").then(module => ({ default: module.SourceVariantPicker })));
 
 type Panel =
-  "weapons" | "groups" | "mods" | "designs" | "help" | "wings" | "skills" | null;
+  "weapons" | "groups" | "mods" | "designs" | "help" | "wings" | null;
 interface Props {
+  /** Context-specific presentation; the normal single-player editor keeps its defaults. */
+  embedded?: { title: string; backLabel: string; primaryLabel: string; disabledReason?: string };
+  hullUnavailableReason?: (spec: ShipSpec) => string | null;
+  roomLayout?: { sidebar: ReactNode; footer: ReactNode; onPickHull: () => void; locked: boolean };
   draft: Design;
   designs: Design[];
   dirty: boolean;
@@ -66,6 +72,7 @@ interface Props {
   onClear: () => void;
   onLaunch: () => void;
   onHome: () => void;
+  onSkills: () => void;
   hullFilter: HullFilter;
   onHullFilter: (filter: HullFilter) => void;
   readHullScroll: () => number;
@@ -77,10 +84,9 @@ export function NativeRefit(props: Props) {
   const modDetails = useHullModTooltip(panel === null);
   const [slotId, setSlotId] = useState("");
   const [deckIndex, setDeckIndex] = useState(0);
-  const [zoom, setZoom] = useState(0.65);
+  const [zoom, setZoom] = useState(props.roomLayout ? 0.95 : 0.65);
   const [groupHighlight, setGroupHighlight] = useState<number | null>(null);
   const [showMounts, setShowMounts] = useState(false);
-  const [hoverSlot, setHoverSlot] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
   const importStatus = nativeRefit.shipStatus[draft.hullId];
   const equippedCaveats = [...new Set(Object.values(draft.weapons).filter((id): id is string => !!id).flatMap(id =>
@@ -97,15 +103,19 @@ export function NativeRefit(props: Props) {
   const missingBuiltins = (nativeRefit.sourceBuiltInMods?.[draft.hullId] ?? []).filter(id => hullModDefinitions.get(id)?.status !== "implemented" && hullModDefinitions.get(id)?.support?.scope !== "campaign-only");
   const campaignBuiltins = (spec.builtInHullMods ?? []).filter(id => hullModDefinitions.get(id)?.support?.scope === "campaign-only");
   const info = data.ships[draft.hullId];
-  const hover = spec.weaponSlots.find((s) => s.slotId === hoverSlot);
+  const weaponDetails = useRefitWeaponTooltip(draft, spec, panel === null && !props.roomLayout?.locked);
   useEffect(() => {
     if (!feedback) return;
     const timer = window.setTimeout(() => setFeedback(""), 3200);
     return () => clearTimeout(timer);
   }, [feedback]);
   const selected = spec.weaponSlots.find((s) => s.slotId === slotId);
-  const change = (patch: Partial<Design>) =>
-    onChange({ ...draft, ...patch, updatedAt: draft.updatedAt });
+  const change = (patch: Partial<Design>) => {
+    const next = { ...draft, ...patch, updatedAt: draft.updatedAt };
+    next.sMods = (next.sMods ?? []).filter(id => next.hullMods.includes(id) || spec.builtInHullMods?.includes(id));
+    if (patch.hullMods) next.wings = designWingSlots(next);
+    onChange(next);
+  };
   const selectSlot = (id: string) => {
     setSlotId(id);
     setPanel("weapons");
@@ -118,13 +128,17 @@ export function NativeRefit(props: Props) {
       return total + (weapon ? weaponFluxPerSecond(effectiveHullModWeaponSpec(spec, weapon)) : 0);
     }, 0),
   );
-  const nextHull = () =>
-    props.onHull(
-      hulls[(hulls.findIndex((h) => h.id === draft.hullId) + 1) % hulls.length]
-        .id,
-    );
+  const nextHull = () => {
+    if (props.roomLayout) { props.roomLayout.onPickHull(); return; }
+    const current = hulls.findIndex(h => h.id === draft.hullId);
+    for (let offset = 1; offset <= hulls.length; offset++) {
+      const next = hulls[(current + offset) % hulls.length];
+      if (!props.hullUnavailableReason?.(next)) { props.onHull(next.id); return; }
+    }
+  };
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
+      if (props.roomLayout?.locked) return;
       // The expanded hullmod table is a refit mode, not a modal: keep stats live,
       // but never route its keys to the concealed ship/clear/trial controls.
       if (
@@ -161,11 +175,12 @@ export function NativeRefit(props: Props) {
         return;
       const actions: Record<string, () => void> = {
         r: props.onHome,
+        c: props.onSkills,
         w: () => setPanel("groups"),
         v: () => setPanel("designs"),
         a: () => setPanel("mods"),
         n: () => {
-          if (!errors.length) props.onLaunch();
+          if (!errors.length && !props.embedded?.disabledReason) props.onLaunch();
         },
 
         u: props.onUndo,
@@ -212,7 +227,13 @@ export function NativeRefit(props: Props) {
       tabIndex={0}
       {...modDetails.bind(id)}
     >
-      <span>{builtInModName(id)}</span>
+      <span>{builtInModName(id)}{draft.sMods?.includes(id) ? " · S" : ""}</span>
+      {(draft.sMods?.includes(id) || !sModInstallReason(spec, id)) && <button className="native-step"
+        title={(hullModDefinitions.get(id)?.sMod?.description ?? "固化免除OP费用，无额外战斗加成。") + " 沙盒允许撤销固化。"}
+        aria-label={(draft.sMods?.includes(id) ? "撤销固化" : "固化") + builtInModName(id)}
+        onClick={() => change({sMods: draft.sMods?.includes(id) ? draft.sMods.filter(m => m !== id) : [...(draft.sMods ?? []), id]})}>
+        {draft.sMods?.includes(id) ? "撤销 S" : "固化 S"}
+      </button>}
       {!builtin && (
         <>
           <b>{hullModOPCost(spec, id)}</b>
@@ -238,26 +259,29 @@ export function NativeRefit(props: Props) {
   return (
     <main
       className={
-        "native-refit-app " + (panel === "mods" ? "mods-expanded" : "")
+        "native-refit-app " + (props.roomLayout ? "lan-room-workbench " : "") + (props.embedded ? "lan-refit-editor " : "") + (panel === "mods" ? "mods-expanded" : "")
       }
     >
+      {props.roomLayout?.footer}
       {modDetails.content}
       <div className="native-screen-tab">
-        舰队改装 <span className="native-shortcut">[R]</span>
+        {props.embedded?.title ?? "舰队改装"} <span className="native-shortcut">[R]</span>
       </div>
+      <div className="refit-skills-entry"><NativeButton shortcut="C" disabled={props.roomLayout?.locked} onClick={props.onSkills} data-skills-entry>角色技能 · {Object.keys(draft.captainSkills ?? {}).length} 项</NativeButton></div>
       <button
         className="native-screen-close"
-        aria-label="返回主页面"
+        aria-label={props.embedded?.backLabel ?? "返回主页面"}
         onClick={props.onHome}
       >
         ×
       </button>
       <NativeFrame className="refit-shell">
-        <HullRoster draft={draft} spec={spec} filter={props.hullFilter} onFilter={props.onHullFilter}
-          readScrollPosition={props.readHullScroll} writeScrollPosition={props.writeHullScroll} onHull={props.onHull} inert={panel === "mods"} />
+        {props.roomLayout?.sidebar ?? <HullRoster unavailableReason={props.hullUnavailableReason} draft={draft} spec={spec} filter={props.hullFilter} onFilter={props.onHullFilter}
+          readScrollPosition={props.readHullScroll} writeScrollPosition={props.writeHullScroll} onHull={props.onHull} inert={panel === "mods"} />}
         <div
-          className={"refit-grid " + (spec.fighterBays ? "has-flight-decks " : "") + (showMounts ? "show-all-mounts" : "")}
+          className={"refit-grid " + (stats.fighterBays ? "has-flight-decks " : "") + (showMounts ? "show-all-mounts" : "")}
           ref={mainRef}
+          inert={props.roomLayout?.locked}
         >
           <div className="refit-cr">
             <div className="native-cr-meter">
@@ -270,38 +294,19 @@ export function NativeRefit(props: Props) {
           <FighterDecks draft={draft} selected={panel === "wings" ? deckIndex : null} inert={panel === "mods"}
             onSelect={index => { setDeckIndex(index); setPanel("wings"); }}
             onRemove={index => { onChange(withWing(draft, index, null)); setFeedback("已卸下联队 · 可撤消恢复"); }} />
-          {hover && (
-            <div className="refit-hover-info">
-              <strong>
-                {hover.defaultWeaponId
-                  ? weaponName(hover.defaultWeaponId)
-                  : "空挂点"}
-              </strong>
-              <span>
-                {sizes[hover.slotSize]} {types[hover.weaponType ?? "UNIVERSAL"]}{" "}
-                · {hover.arcDeg}° 射界
-              </span>
-              <small>
-                {isBuiltIn(draft.hullId, hover.slotId)
-                  ? "舰体内置，不能拆卸"
-                  : "点击选择武器"}
-              </small>
-            </div>
-          )}
           <div
             className="refit-vessel"
             inert={panel === "mods"}
-            onWheel={(e) =>
-              setZoom((z) =>
-                Math.max(0.65, Math.min(1.5, z - e.deltaY * 0.001)),
-              )
-            }
+            onWheel={(e) => {
+              weaponDetails.hide();
+              setZoom((z) => Math.max(0.65, Math.min(1.5, z - e.deltaY * 0.001)));
+            }}
           >
             <ShipStage
               spec={spec}
               onSelect={selectSlot}
-              selectedSlot={hoverSlot ?? slotId}
-              onHover={setHoverSlot}
+              selectedSlot={weaponDetails.activeSlot?.slotId ?? slotId}
+              slotBindings={weaponDetails.bind}
               onRemove={(id) => {
                 onChange(withWeapon(draft, id, null));
                 setFeedback(
@@ -470,8 +475,7 @@ export function NativeRefit(props: Props) {
               <b>{weaponFlux}</b>
             </div>
             <section className="refit-hullmods">
-              <h2>舰体插件</h2>
-              <NativeButton onClick={() => setPanel("skills")}>舰长战斗技能 · {Object.keys(draft.captainSkills ?? {}).length} 项</NativeButton>
+              <h2>舰体插件 · S-mod {(draft.sMods ?? []).filter(id => !spec.builtInHullMods?.includes(id)).length}/2</h2>
               {(spec.builtInHullMods ?? []).map((id) => modRow(id, true))}
               {draft.hullMods.map((id) => modRow(id, false))}
               {campaignBuiltins.map(id => <details className="refit-campaign-mods" key={id}><summary>{builtInModName(id)}：仅战役 · 当前无战役模拟</summary><p>{modDescriptions[id]}</p></details>)}
@@ -535,19 +539,20 @@ export function NativeRefit(props: Props) {
               >
                 修复...
               </NativeButton>
-              <NativeButton
+              {!props.roomLayout && <NativeButton
                 shortcut="N"
-                disabled={!!errors.length}
+                disabled={!!errors.length || !!props.embedded?.disabledReason}
+                title={props.embedded?.disabledReason}
                 onClick={() => props.onLaunch()}
               >
-                模拟战斗
-              </NativeButton>
+                {props.embedded?.primaryLabel ?? "模拟战斗"}
+              </NativeButton>}
               <NativeButton
                 shortcut="X"
                 className="refit-next"
                 onClick={nextHull}
               >
-                下一艘/空闲装配点
+                {props.roomLayout ? "更换舰船" : "下一艘/空闲装配点"}
               </NativeButton>
             </div>
           </div>
@@ -566,6 +571,7 @@ export function NativeRefit(props: Props) {
           />
         )}
       </NativeFrame>
+      {weaponDetails.content}
       {panel === "weapons" && selected && (
         <SourceWeaponPicker
           draft={draft}
@@ -603,11 +609,10 @@ export function NativeRefit(props: Props) {
           onSave={props.onSave} onDelete={props.onDelete} onRename={props.onRename} />
         </Suspense>
       )}
-      {panel === "wings" && deckIndex < (spec.fighterBays ?? 0) && (
+      {panel === "wings" && deckIndex < stats.fighterBays && (
         <SourceWingPicker key={draft.hullId + ':' + deckIndex} draft={draft} index={deckIndex}
           onClose={() => setPanel(null)} onEquip={id => { onChange(withWing(draft, deckIndex, id)); setPanel(null); setFeedback(id ? "已更换联队 · 可撤消恢复" : "已卸下联队 · 可撤消恢复"); }} />
       )}
-      {panel === "skills" && <CombatSkillPicker value={draft.captainSkills ?? {}} onChange={captainSkills => change({ captainSkills })} onClose={() => setPanel(null)} />}
       {panel === "help" && (
         <Modal
           title="舰船改装"
@@ -626,7 +631,7 @@ export function NativeRefit(props: Props) {
               底部「武器组」设置齐射、交替与自动开火；「装配方案」保存、读取、重命名或删除本地设计。
             </p>
             <p>
-              「模拟战斗」使用当前配置进入战斗，结束后回到这里，战损不改变设计。
+              {props.roomLayout ? "在房间内直接改装自己的舰船，应用修改收到确认后才可准备或开始。" : props.embedded ? "「应用并返回房间」提交当前配装；编辑期间不会改变房间配置，返回后还需准备。" : "「模拟战斗」使用当前配置进入战斗，结束后回到这里，战损不改变设计。"}
             </p>
             <label>
               <input
@@ -637,8 +642,9 @@ export function NativeRefit(props: Props) {
               始终显示武器挂点
             </label>
             <p className="native-modal-note">
+              顶部「角色技能」或 C 进入独立舰长技能界面。
               滚轮缩放舰体；W 武器组，V 装配方案，A 插件，Ctrl+S 保存，U 撤消，T
-              清空，N 模拟战斗，X 下一舰体。
+              清空，N {props.embedded?.primaryLabel ?? "模拟战斗"}，X 下一舰体。
             </p>
           </div>
         </Modal>

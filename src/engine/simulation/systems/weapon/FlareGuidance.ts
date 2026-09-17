@@ -1,8 +1,11 @@
+import { sameTeam } from "../../CombatTeams";
 import type { Projectile } from '../../Weapon';
 import type { WeaponSimContext } from './WeaponSimContext';
 import { Vector2 } from '../../../math/Vector2';
+import type { Ship } from '../../Ship';
+import { signedAngle } from '../../../math/Angles';
 
-interface FlareState { wait: number; spin: number; seekAfter: number; immune: WeakSet<Projectile>; target?: Projectile }
+interface FlareState { wait: number; spin: number; seekAfter: number; immune: WeakSet<Projectile>; target?: Projectile; orbitTarget?: Ship }
 /** FlareAI / SeekerFlareAI. Combat RNG only; no visual random draws affect targeting. */
 export class FlareGuidance {
   private readonly states = new WeakMap<Projectile, FlareState>();
@@ -20,10 +23,36 @@ export class FlareGuidance {
     if (!state) {
       state = {wait: .05 + ctx.random.next() * .05, spin: ctx.random.next() > .5 ? -1 : 1,
         seekAfter: spec.mode === 'SEEKER' ? .5 + ctx.random.next() * .5 : Infinity, immune: new WeakSet()};
+      if (spec.mode === 'JAMMER') {
+        const ships = ctx.ships ?? [ctx.playerShip, ctx.enemyShip, ...ctx.fighters];
+        state.orbitTarget = ships.filter(s => !s.isDead && !s.isPhased && !sameTeam(s, p) && s.pos.distanceTo(p.pos) <= 1000)
+          .sort((a,b) => a.pos.distanceTo(p.pos)-b.pos.distanceTo(p.pos))[0];
+      }
       this.states.set(p, state);
     }
+    if (spec.mode === 'JAMMER') {
+      // FlareJammerAI's parsed effectChance is never used: this is a physical fighter-class decoy.
+      const target = state.orbitTarget;
+      let angle = p.facingRad ?? p.vel.heading();
+      if (target) {
+        const center = target.getShieldCenter();
+        const radius = (target.shield.type !== 'NONE' ? target.shield.radius : target.spec.collisionRadius) + 75;
+        const distance = p.pos.distanceTo(center);
+        angle = center.clone().sub(p.pos).heading() + (distance < radius ? Math.PI : 0)
+          + Math.max(0, 1 - Math.abs(distance-radius)/100) * Math.PI/2 * state.spin;
+      }
+      const facing = p.facingRad ?? p.vel.heading();
+      const desiredTurn = Math.max(-(p.maxTurnRate ?? 0), Math.min(p.maxTurnRate ?? 0, signedAngle(angle-facing)*4));
+      const change = (p.maxTurnAcceleration ?? 0)*dt;
+      p.turnVelocityRad = (p.turnVelocityRad ?? 0)+Math.max(-change,Math.min(change,desiredTurn-(p.turnVelocityRad ?? 0)));
+      p.facingRad = facing+p.turnVelocityRad*dt;
+      p.vel.add(Vector2.fromAngle(p.facingRad, (p.engineAcceleration ?? 0)*dt));
+      const speed = p.vel.length();
+      if (speed > (p.maxSpeed ?? speed)) p.vel.scale((p.maxSpeed ?? speed)/speed);
+      return false;
+    }
     const hostile = (other: Projectile) => other !== p && (p.isPlayer === undefined
-      ? other.sourceShipId !== p.sourceShipId : other.isPlayer !== p.isPlayer)
+      ? other.sourceShipId !== p.sourceShipId : !sameTeam(other, p))
       && (other.hitpoints === undefined || other.hitpoints > 0) && !other.flareFizzling
       && (other.flightTimeRemaining === undefined || other.flightTimeRemaining > 0);
     state.wait -= dt;

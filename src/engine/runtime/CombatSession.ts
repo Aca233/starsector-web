@@ -1,3 +1,5 @@
+import { CombatMulticore } from '../ai/multicore/CombatMulticore';
+import type { AIPhaseBatch } from '../ai/multicore/Types';
 import { DEFAULT_PLAYER_HULL, DEFAULT_ENEMY_HULL } from '../data/SandboxDefaults';
 import { CapitalShipAI } from '../ai/CapitalShipAI';
 import type { ICombatRenderer } from '../render/ICombatRenderer';
@@ -58,6 +60,29 @@ export class CombatSession {
     cameraLocked: false
   };
 
+  private readonly multicore = new CombatMulticore();
+  private pendingTick: { promise: Promise<void | false>; finish: (batch?: AIPhaseBatch) => void; discard: () => void } | null = null;
+  private completedSimulationSteps = 0;
+  private totalSimulationMs = 0;
+  private lastSimulationMs = 0;
+  public getMulticoreStatus() {
+    return { ...this.multicore.status, completedSteps: this.completedSimulationSteps,
+      lastStepMs: this.lastSimulationMs,
+      meanStepMs: this.completedSimulationSteps ? this.totalSimulationMs / this.completedSimulationSteps : 0 };
+  }
+  public setMulticoreEnabled(enabled: boolean): void {
+    this.finishPendingTick(); this.multicore.enabled = enabled;
+    if (!enabled) this.multicore.reset();
+  }
+  /** Resolve a previously sampled input once before a pause or direct roster edit. */
+  private finishPendingTick(): void {
+    const pending = this.pendingTick;
+    if (pending) { this.multicore.reset(); pending.finish(); }
+  }
+  private discardPendingTick(): void {
+    this.multicore.reset(); this.pendingTick?.discard();
+  }
+
   private canvas: HTMLCanvasElement | null = null;
   private assetPreparation: Promise<void> = Promise.resolve();
   private assetsReady = false;
@@ -76,6 +101,7 @@ export class CombatSession {
   /** Install a new authoritative encounter; caller applies its roster before asset preparation. */
   public beginEncounter(playerShipId: string | ShipSpec, enemyShipId: string | ShipSpec, seed: number): void {
     if (this.state === 'disposed') throw new Error('Cannot reuse a disposed CombatSession');
+    this.discardPendingTick();
     this.setSeed(seed);
     this.engine.switchPlayerShip(playerShipId, enemyShipId);
     this.playerAI = new CapitalShipAI(this.engine.playerShip, this.engine.enemyShip);
@@ -83,6 +109,7 @@ export class CombatSession {
     this.scheduler.reset();
     this.visualClock.reset();
     this.hudVisuals.reset();
+    this.cameraController.reset();
     this.renderer?.resetVisualState();
     this.state = 'running';
   }
@@ -285,17 +312,19 @@ export class CombatSession {
 
   public pause(): void {
     if (this.state === 'disposed') return;
+    this.finishPendingTick();
     this.visualClock.setPaused(true);
     this.state = 'paused';
   }
 
-  private advanceSimulation(dt: number): void {
+  private advanceSimulation(dt: number, aiBatch?: AIPhaseBatch): void {
     const damageEnabled = this.visualOptions.damage;
     const protectedShips = damageEnabled
       ? null
       : this.engine.ships.map((ship) => ({
           ship,
           hullHp: ship.hullHp,
+          hullDamageSuppressed: ship.hullDamageSuppressed,
           isDead: ship.isDead,
           armor: ship.armor.cells.slice(),
           softFlux: ship.flux.softFlux,
@@ -311,11 +340,11 @@ export class CombatSession {
 
     // Suppress damage callbacks while the lab temporarily applies/restores armor.
     // Existing heat still advances; ignored hits create neither decals nor visual RNG draws.
-    if (protectedShips) for (const { ship } of protectedShips) ship.damageDecals.suppressed = true;
+    if (protectedShips) for (const { ship } of protectedShips) { ship.damageDecals.suppressed = true; ship.hullDamageSuppressed = true; }
     try {
-      this.engine.fixedUpdate(dt, { suppressDestructionSideEffects: !damageEnabled });
+      this.engine.fixedUpdate(dt, { suppressDestructionSideEffects: !damageEnabled, aiBatch });
     } finally {
-      if (protectedShips) for (const { ship } of protectedShips) ship.damageDecals.suppressed = false;
+      if (protectedShips) for (const { ship, hullDamageSuppressed } of protectedShips) { ship.damageDecals.suppressed = false; ship.hullDamageSuppressed = hullDamageSuppressed; }
     }
 
     if (protectedShips) {
@@ -345,13 +374,49 @@ export class CombatSession {
 
   public step(dt = this.scheduler.fixedDeltaTime): void {
     if (this.state === 'disposed') return;
+    this.finishPendingTick();
     this.advanceSimulation(dt);
     this.visualClock.seek(this.visualClock.time + dt);
     this.updateVisualOnly(dt);
   }
 
+  /** Same full tick as fixedUpdate, with an optional pre-tick ownership prediction. */
+  public fixedUpdateScheduled(dt: number, beforeTick: () => void = () => {}): void | false | Promise<void | false> {
+    if (this.state !== 'running') return false;
+    if (this.pendingTick) return this.pendingTick.promise;
+    const start = performance.now(), engine = this.engine;
+    beforeTick();
+    const prediction = this.visualOptions.damage ? this.multicore.prepare(this.engine, this.playerAI, dt) : null;
+    const complete = (batch?: AIPhaseBatch) => {
+      try { this.advanceSimulation(dt, batch); }
+      finally { batch?.finish(); }
+      // Includes player controls/AI, eligibility, packing, wait, validation, merge and fallback.
+      this.lastSimulationMs = performance.now() - start;
+      this.totalSimulationMs += this.lastSimulationMs; this.completedSimulationSteps++;
+      this.performance.recordTiming('simulationMs', this.lastSimulationMs);
+      this.visualClock.advance(dt); this.updateVisualOnly(dt);
+    };
+    if (!prediction) { complete(); return; }
+    let resolve!: (result: void | false) => void, reject!: (error: unknown) => void;
+    const promise = new Promise<void | false>((ok, fail) => { resolve = ok; reject = fail; });
+    let done = false;
+    const finish = (batch?: AIPhaseBatch) => {
+      if (done) { batch?.finish(); return; }
+      done = true; this.pendingTick = null;
+      if (this.engine !== engine) { batch?.finish(); resolve(false); return; }
+      try { complete(batch); resolve(); }
+      catch (error) { this.pause(); reject(error); }
+    };
+    this.pendingTick = { promise, finish, discard: () => {
+      if (!done) { done = true; this.pendingTick = null; resolve(false); }
+    } };
+    void prediction.then(finish, () => finish());
+    return promise;
+  }
+
   public fixedUpdate(dt: number): void {
     if (this.state === 'paused' || this.state === 'disposed') return;
+    this.finishPendingTick();
     const simStart = performance.now();
     this.advanceSimulation(dt);
     this.performance.recordTiming('simulationMs', performance.now() - simStart);
@@ -436,43 +501,53 @@ export class CombatSession {
   }
 
   public restart(shipId = this.engine.playerShip.spec.id): void {
+    if (this.state === 'disposed') return;
+    this.discardPendingTick();
     this.engine.resetBattle(shipId);
     this.playerAI = new CapitalShipAI(this.engine.playerShip, this.engine.enemyShip);
     this.scheduler.reset();
     this.visualClock.reset();
     this.hudVisuals.reset();
+    this.cameraController.reset();
     this.renderer?.resetVisualState();
-    if (this.state !== 'disposed') this.state = 'running';
+    this.state = 'running';
     this.refreshPresentationAssets();
   }
 
   public addShip(specId: string, isPlayer: boolean, pos: Vector2, facingRad = 0) {
+    this.finishPendingTick();
     const ship = this.engine.addShip(specId, isPlayer, pos, facingRad);
     this.refreshPresentationAssets();
     return ship;
   }
 
   public switchPlayerShip(shipId: string): void {
+    if (this.state === 'disposed') return;
+    this.discardPendingTick();
     this.engine.switchPlayerShip(shipId);
     this.playerAI = new CapitalShipAI(this.engine.playerShip, this.engine.enemyShip);
     this.scheduler.reset();
     this.visualClock.reset();
     this.hudVisuals.reset();
+    this.cameraController.reset();
     this.renderer?.resetVisualState();
-    if (this.state !== 'disposed') this.state = 'running';
+    this.state = 'running';
     this.refreshPresentationAssets();
   }
 
   public setSeed(seed: number): void {
+    this.finishPendingTick();
     this.visualRandom.reseed(seed);
     this.engine.setSeed(seed);
   }
 
   public setCameraLocked(enabled: boolean): void {
     this.visualOptions.cameraLocked = enabled;
+    if (enabled) this.cameraController.reset();
   }
 
   public setDamageEnabled(enabled: boolean): void {
+    this.finishPendingTick();
     this.visualOptions.damage = enabled;
   }
 
@@ -489,6 +564,7 @@ export class CombatSession {
 
   public dispose(): void {
     if (this.state === 'disposed') return;
+    this.discardPendingTick();
     this.presentationGeneration++;
     this.preparationRevision++;
     this.assetsReady = false;

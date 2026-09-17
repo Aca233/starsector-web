@@ -6,9 +6,11 @@ import { Vector2 } from "../engine/math/Vector2";
 import { ShipPaperDoll } from "./hud/ShipPaperDoll";
 import { AuthenticTacticalConsole } from "./hud/AuthenticTacticalConsole";
 import { FloatingShipHUD } from "./hud/FloatingShipHUD";
+import { CombatContacts } from "./hud/CombatContacts";
 import { CombatRadar } from "./hud/CombatRadar";
 import { getHudDensity } from "./hud/HudLayout";
 import { TacticalMap } from "./tactical/TacticalMap";
+import { CombatNotifications } from './hud/CombatNotifications';
 import { TacticalHelpPanel } from "./TacticalHelpPanel";
 
 // 导出子组件，保持现有对外模块接口
@@ -125,27 +127,21 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
       data-hud-density={hudDensity}
       data-combat-input-block
     >
+      <CombatNotifications engine={engine} />
+      {engine.playerShip.isDead && !engine.battleResult && !engine.isTacticalMap && (
+        <div className="combat-observer-hint">旗舰已损失 · WASD / 方向键观察战场 · Tab 战术地图</div>
+      )}
       {engine.isTacticalMap && <TacticalMap engine={engine} paused={paused} onPausedChange={onPausedChange}
         autopilot={autopilot} onAutopilotChange={onAutopilotChange} inputBlocked={inputBlocked || showHelpDrawer}
         cameraPosRef={cameraPosRef} zoomRef={zoomRef} canvasRef={canvasRef} onOpenDeployment={onOpenDeployment} />}
 
       {!engine.isTacticalMap && <>
       {/* 2. 近空战况标牌（易读字体、阵营颜色和仪表尺寸） */}
-      {engine.capitalShips
-        .filter((ship) => !ship.isDead)
-        .map((ship) => (
-          <FloatingShipHUD
-            key={ship.id}
-            ship={ship}
-            isEnemy={!ship.isPlayer}
-            cameraPosRef={cameraPosRef}
-            zoomRef={zoomRef}
-            canvasRef={canvasRef}
-          />
-        ))}
+      <CombatContacts engine={engine} cameraPosRef={cameraPosRef} zoomRef={zoomRef} canvasRef={canvasRef}
+        scheduler={scheduler} paused={paused} blocked={inputBlocked || showHelpDrawer} />
 
       {/* 3. 左下角：战术武器控制台（完整布局仍需原版对照） */}
-      <div className="hud-console-anchor pointer-events-auto absolute z-20">
+      <div className="hud-console-anchor pointer-events-auto absolute z-20" inert={!!engine.battleResult}>
         <AuthenticTacticalConsole
           player={player}
           engine={engine}
@@ -176,8 +172,8 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
           defaultMouseSteering={defaultMouseSteering}
           onDefaultMouseSteeringChange={onDefaultMouseSteeringChange}
           hasSystem={player.system.available}
-          hasShield={player.shield.type !== "NONE"}
-          hasFighters={engine.fighterSystem.playerWings.length > 0}
+          hasShield={player.shield.type !== "NONE" || player.defenseSystem.type !== "NONE"}
+          hasFighters={[...engine.playerWings, ...engine.enemyWings].some(wing => wing.carrierId === player.id)}
           canRestart={canRestart}
           onClose={() => setShowHelpDrawer(false)}
         />

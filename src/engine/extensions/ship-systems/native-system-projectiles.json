@@ -1,0 +1,152 @@
+{
+  "motelauncher": {
+    "id": "motelauncher",
+    "nameKey": "weapon.motelauncher.name",
+    "systemOnly": true,
+    "type": "ENERGY",
+    "mountSize": "SMALL",
+    "aiHints": [
+      "SYSTEM"
+    ],
+    "isBeam": false,
+    "damagePerShot": 1,
+    "empPerShot": 1500,
+    "damagePerSecond": 0,
+    "fluxPerShot": 0,
+    "range": 500,
+    "refireDelay": 0.1,
+    "chargeTime": 0,
+    "projSpeed": 400,
+    "projRadius": 11,
+    "color": [
+      100,
+      165,
+      255
+    ],
+    "spawnType": "MISSILE",
+    "isRocket": true,
+    "isGuided": false,
+    "renderTargetIndicator": false,
+    "projSpriteUrl": "/game-assets/graphics/missiles/bomblet0.png",
+    "projLength": 4,
+    "projWidth": 4,
+    "launchSpeed": 200,
+    "flightTime": 10000,
+    "missileHp": 500,
+    "engineAcceleration": 650,
+    "missileDeceleration": 650,
+    "maxSpeed": 400,
+    "maxTurnRate": 6.981317007977318,
+    "maxTurnAcceleration": 10.471975511965978,
+    "missileEngineVisualSpec": {
+      "nozzleOffset": 0,
+      "width": 12,
+      "length": 35,
+      "color": [
+        100,
+        165,
+        255,
+        255
+      ]
+    },
+    "missileExplosionVisualSpec": {
+      "radius": 75,
+      "color": [
+        100,
+        100,
+        255,
+        255
+      ]
+    },
+    "onHitEffect": "com.fs.starfarer.api.impl.combat.MoteOnHitEffect",
+    "muzzleFlashSpec": {
+      "length": 30,
+      "spread": 5,
+      "particleSizeMin": 18,
+      "particleSizeRange": 24,
+      "particleDuration": 0.4,
+      "particleCount": 16,
+      "particleColor": [
+        100,
+        165,
+        255,
+        25
+      ]
+    }
+  },
+  "motelauncher_hf": {
+    "id": "motelauncher_hf",
+    "nameKey": "weapon.motelauncher_hf.name",
+    "systemOnly": true,
+    "type": "ENERGY",
+    "mountSize": "SMALL",
+    "aiHints": [
+      "SYSTEM"
+    ],
+    "isBeam": false,
+    "damagePerShot": 300,
+    "empPerShot": 1500,
+    "damagePerSecond": 0,
+    "fluxPerShot": 0,
+    "range": 500,
+    "refireDelay": 0.1,
+    "chargeTime": 0,
+    "projSpeed": 400,
+    "projRadius": 11,
+    "color": [
+      255,
+      100,
+      255
+    ],
+    "spawnType": "MISSILE",
+    "isRocket": true,
+    "isGuided": false,
+    "renderTargetIndicator": false,
+    "projSpriteUrl": "/game-assets/graphics/missiles/bomblet0.png",
+    "projLength": 4,
+    "projWidth": 4,
+    "launchSpeed": 200,
+    "flightTime": 10000,
+    "missileHp": 500,
+    "engineAcceleration": 650,
+    "missileDeceleration": 650,
+    "maxSpeed": 400,
+    "maxTurnRate": 6.981317007977318,
+    "maxTurnAcceleration": 10.471975511965978,
+    "missileEngineVisualSpec": {
+      "nozzleOffset": 0,
+      "width": 16,
+      "length": 40,
+      "color": [
+        255,
+        100,
+        255,
+        255
+      ]
+    },
+    "missileExplosionVisualSpec": {
+      "radius": 75,
+      "color": [
+        255,
+        100,
+        255,
+        255
+      ]
+    },
+    "onHitEffect": "com.fs.starfarer.api.impl.combat.MoteOnHitEffect",
+    "muzzleFlashSpec": {
+      "length": 30,
+      "spread": 5,
+      "particleSizeMin": 18,
+      "particleSizeRange": 24,
+      "particleDuration": 0.4,
+      "particleCount": 16,
+      "particleColor": [
+        255,
+        100,
+        255,
+        25
+      ]
+    }
+  }
+}

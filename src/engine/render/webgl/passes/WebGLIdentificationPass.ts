@@ -24,10 +24,10 @@ export function renderIdentificationIndicators(engine: CombatEngine, ctx: WebGLP
         HOSTILE_INDICATOR_COLOR, Math.floor(255 * IDENTIFICATION_ALPHA * brightness * indicator.alpha) / 255);
     }
   };
-  if (layers.has('hull')) for (const ship of engine.ships) draw(shipIdentification(ship, engine.playerShip.isPlayer, alpha, engine.combatTime));
+  if (layers.has('hull')) for (const ship of engine.ships) if (ship.isVisibleTo(engine.playerShip.teamId)) draw(shipIdentification(ship, engine.playerShip.teamId, alpha, engine.combatTime));
   if (layers.has('weapon')) {
     const mineAges = new Map(engine.mines.map(mine => [mine.id, mine.age]));
-    for (const projectile of engine.projectiles) draw(missileIdentification(projectile, engine.playerShip.isPlayer, alpha,
+    for (const projectile of engine.projectiles) draw(missileIdentification(projectile, engine.playerShip.teamId, alpha,
       projectile.isMine ? mineAges.get(projectile.id) ?? projectile.elapsedTime : projectile.elapsedTime));
   }
   if (started) {

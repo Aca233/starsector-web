@@ -14,6 +14,7 @@ export const zh_CN: Record<string, string> = {
   'hud.flux': '幅能水平',
   'hud.flux_soft': '软幅能',
   'hud.flux_hard': '硬幅能',
+  'combat.overloaded': '过载！',
   'hud.overloaded': '系统严重过载！正在强制冷却: {time}s',
   'hud.venting': '正在紧急排散幅能... {progress}%',
   'hud.system_burn_drive': '冲刺推进系统 (Burn Drive)',

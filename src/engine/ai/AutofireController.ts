@@ -1,3 +1,4 @@
+import { sameTeam, combatTeam } from "../simulation/CombatTeams";
 import { nativeAutofireAim } from './NativeAim';
 import { Vector2 } from '../math/Vector2';
 import { signedAngle } from '../math/Angles';
@@ -5,6 +6,7 @@ import { segmentCircleEntry } from '../math/Geometry';
 import { SimulationRandom } from '../simulation/SimulationRandom';
 import { combatWeaponRange, combatProjectileSpeed } from '../simulation/WeaponRange';
 import type { Ship } from '../simulation/Ship';
+import { shieldCenterOffset } from '../simulation/collision/ShieldCollisionGeometry';
 import type { Projectile, WeaponMount, WeaponSpec } from '../simulation/Weapon';
 import type { Asteroid } from '../simulation/CombatTypes';
 import { interceptTimeComponents, shipSegmentEntry, weaponMuzzle } from './FireControlGeometry';
@@ -45,24 +47,30 @@ function targetRadius(target: FireControlTarget): number {
   if (target.kind === 'MISSILE') return target.entity.radius;
   const ship = target.entity;
   const shieldExtent = ship.shield.isActive && ship.shield.type !== 'NONE' && ship.shield.type !== 'PHASE'
-    ? ship.shield.radius + ship.getShieldCenter().distanceTo(ship.pos) : 0;
+    ? ship.shield.radius + shieldCenterOffset(ship) : 0;
   return Math.max(ship.spec.collisionRadius, shieldExtent);
 }
 
 function canTarget(ship: Ship, mount: WeaponMount, target: FireControlTarget, world: FireControlWorld, knownPresent = false): boolean {
   if (target.kind === 'MISSILE') {
     const p = target.entity;
+    if (p.collisionDisabled) return false;
     // Current guidance can lock ships only; ordinary missiles do not collide with missiles.
     // Do not invent a working anti-missile capability merely because a mod declares PD.
-    if (guided(mount) || (!mount.spec.isBeam && (mount.spec.isRocket || mount.spec.spawnType === 'MISSILE') && !mount.spec.proximityFuse)) return false;
-    const side = p.isPlayer ?? world.ships.find(s => s.id === p.sourceShipId)?.isPlayer;
-    return isPointDefense(mount) && side !== undefined && side !== ship.isPlayer
+    if (p.isFighterDecoy) {
+      if (hint(mount, 'PD_ONLY') && !hint(mount, 'ANTI_FTR')) return false;
+      if (mount.spec.passThroughFighters && !mount.spec.passThroughFightersOnlyWhenDestroyed) return false;
+      if (!isPointDefense(mount) && !hint(mount, 'ANTI_FTR') &&
+          (hint(mount, 'STRIKE') || (mount.spec.weaponType === 'MISSILE' && Number.isFinite(mount.ammo) && !hint(mount, 'DO_NOT_AIM')))) return false;
+    } else if (guided(mount) || (!mount.spec.isBeam && (mount.spec.isRocket || mount.spec.spawnType === 'MISSILE') && !mount.spec.proximityFuse)) return false;
+    const side = combatTeam(p) ?? world.ships.find(s => s.id === p.sourceShipId)?.teamId;
+    return (p.isFighterDecoy || isPointDefense(mount)) && side !== undefined && side !== ship.teamId
       && (knownPresent || world.missiles.includes(p)) && (p.hitpoints ?? 0) > 0
       && (p.flightTimeRemaining === undefined || p.flightTimeRemaining > 0)
       && !(p.isFlare && (hint(mount, 'IGNORES_FLARES') || ship.hullStats.pdIgnoresFlares > 0));
   }
   const other = target.entity;
-  if ((!knownPresent && !world.ships.includes(other)) || other.isDead || other.isPhased || other.isPlayer === ship.isPlayer) return false;
+  if ((!knownPresent && !world.ships.includes(other)) || other.isDead || !other.isVisibleTo(ship.teamId) || other.isCollisionless || sameTeam(other, ship)) return false;
   // Native private.java: PD_ONLY permits fighters only when ANTI_FTR is present.
   if (hint(mount, 'PD_ONLY') && !(hint(mount, 'ANTI_FTR') && fighter(other))) return false;
   if (fighter(other)) {
@@ -74,21 +82,45 @@ function canTarget(ship: Ship, mount: WeaponMount, target: FireControlTarget, wo
   return true;
 }
 
+interface AimQuery { origin: Vector2; delay: number; speed: number; range: number }
+/** One native acquisition scan is a read-only query batch, not a cross-frame cache. */
+function prepareAimQuery(ship: Ship, mount: WeaponMount): AimQuery {
+  return { origin: weaponMuzzle(ship, mount),
+    delay: mount.firingState === 'CHARGING' ? Math.max(0, mount.firingStateTimer)
+      : mount.firingState === 'IDLE' && mount.burstRemaining <= 0 ? (mount.spec.isBeam ? mount.spec.beamSourceChargeupTime ?? 0 : mount.spec.chargeTime ?? 0) : 0,
+    speed: guided(mount) ? mount.spec.maxSpeed ?? mount.spec.projSpeed : combatProjectileSpeed(ship, mount.spec),
+    range: combatWeaponRange(ship, mount.spec) };
+}
+/** Conservative acquisition bound: a valid constant-speed intercept cannot travel
+ * longer than (range + target extent) / speed. Native queries only; uncertain inputs fail open. */
+function outsideAcquisition(ship: Ship, mount: WeaponMount, target: FireControlTarget, query: AimQuery): boolean {
+  const e = target.entity;
+  const radius = targetRadius(target);
+  const limit = query.range + radius;
+  const horizon = query.delay + (mount.spec.isBeam ? 0 : limit / query.speed);
+  const speedBound = Math.abs(e.vel.x - ship.vel.x) + Math.abs(e.vel.y - ship.vel.y);
+  const reach = limit + speedBound * horizon;
+  const distance = Math.max(Math.abs(e.pos.x - query.origin.x), Math.abs(e.pos.y - query.origin.y));
+  const pad = 1e-6 * Math.max(1, Math.abs(e.pos.x), Math.abs(e.pos.y), Math.abs(query.origin.x), Math.abs(query.origin.y), Math.abs(reach));
+  return query.speed > 0 && query.delay >= 0 && limit >= 0 && horizon >= 0 && Number.isFinite(reach) && distance > reach + pad;
+}
+
 /** Constant-velocity interception in the shooter's frame, including pending charge time.
  * Guided missiles use rated speed for acquisition, not a fictitious instantaneous launch speed. */
-export function solveWeaponAim(ship: Ship, mount: WeaponMount, target: FireControlTarget): AimSolution | null {
-  const origin = weaponMuzzle(ship, mount);
-  const delay = mount.firingState === 'CHARGING' ? Math.max(0, mount.firingStateTimer)
+export function solveWeaponAim(ship: Ship, mount: WeaponMount, target: FireControlTarget, prepared?: AimQuery): AimSolution | null {
+  if (prepared && outsideAcquisition(ship, mount, target, prepared)) return null;
+  const origin = prepared?.origin ?? weaponMuzzle(ship, mount);
+  const delay = prepared ? prepared.delay : mount.firingState === 'CHARGING' ? Math.max(0, mount.firingStateTimer)
     : mount.firingState === 'IDLE' && mount.burstRemaining <= 0
       ? (mount.spec.isBeam ? mount.spec.beamSourceChargeupTime ?? 0 : mount.spec.chargeTime ?? 0) : 0;
-  const speed = guided(mount) ? mount.spec.maxSpeed ?? mount.spec.projSpeed : combatProjectileSpeed(ship, mount.spec);
+  const speed = prepared ? prepared.speed : guided(mount) ? mount.spec.maxSpeed ?? mount.spec.projSpeed : combatProjectileSpeed(ship, mount.spec);
   const vx = target.entity.vel.x - ship.vel.x, vy = target.entity.vel.y - ship.vel.y;
   const px = target.entity.pos.x - origin.x + vx * delay, py = target.entity.pos.y - origin.y + vy * delay;
   const time = mount.spec.isBeam ? 0 : interceptTimeComponents(px, py, vx, vy, speed);
   if (time === null) return null;
   // Keep clone/add/addScaled's arithmetic order, not targetPos + v * (delay + time).
   const point = new Vector2(origin.x + px + vx * time, origin.y + py + vy * time);
-  const range = combatWeaponRange(ship, mount.spec);
+  const range = prepared?.range ?? combatWeaponRange(ship, mount.spec);
   const directionX = point.x - origin.x, directionY = point.y - origin.y;
   const distance = Math.hypot(directionX, directionY);
   if (distance > range + targetRadius(target) || !Number.isFinite(distance)) return null;
@@ -124,7 +156,7 @@ export function shotObstruction(ship: Ship, mount: WeaponMount, solution: AimSol
   const travel = Vector2.fromAngle(angle, contact.distance);
   const start = new Vector2(), end = new Vector2();
   for (const other of world.ships) {
-    if (other === ship || other.isDead || other.isPhased || other.isPlayer !== ship.isPlayer) continue;
+    if (other === ship || other.isDead || other.isPhased || !sameTeam(other, ship)) continue;
     if (fighter(other) && mount.spec.passThroughFighters && !mount.spec.passThroughFightersOnlyWhenDestroyed) continue;
     const vx = ship.vel.x - other.vel.x, vy = ship.vel.y - other.vel.y;
     start.set(origin.x + vx * solution.delay, origin.y + vy * solution.delay);
@@ -190,21 +222,26 @@ export class AutofireController {
     if (mount.firingState !== 'IDLE' || mount.burstRemaining > 0 || mount.cooldownTimer > 0) { state.firingTime += dt; state.idleFireTime = 0; }
     else { state.idleFireTime += dt; if (state.idleFireTime > 3) state.firingTime = 0; }
     state.scanIn -= dt;
-    let current = state.target && canTarget(ship, mount, state.target, world) ? solveWeaponAim(ship, mount, state.target) : null;
+    // Unknown callbacks keep their original per-target stat reads.
+    let prepared: AimQuery | undefined;
+    const nativeBatch = world.ships.length >= 20 && ship.hasNativeThreatPhaseHooks;
+    const solve = (target: FireControlTarget) => solveWeaponAim(ship, mount, target,
+      nativeBatch ? prepared ??= prepareAimQuery(ship, mount) : undefined);
+    let current = state.target && canTarget(ship, mount, state.target, world) ? solve(state.target) : null;
     if (!current && state.target) { state.target = undefined; state.scanIn = 0; }
     if (state.scanIn <= 0) {
       const candidates: AimSolution[] = [];
       const add = (target: FireControlTarget) => {
         if (!canTarget(ship, mount, target, world, true)) return;
-        const solution = solveWeaponAim(ship, mount, target);
+        const solution = solve(target);
         if (solution) candidates.push(solution);
       };
-      if (isPointDefense(mount)) for (const p of world.missiles) add({ kind: 'MISSILE', entity: p });
+      for (const p of world.missiles) if (isPointDefense(mount) || p.isFighterDecoy) add({ kind: 'MISSILE', entity: p });
       for (const other of world.ships) add({ kind: 'SHIP', entity: other });
       const origin = weaponMuzzle(ship, mount);
       const priority = (s: AimSolution): number => {
         const pdFirst = isPointDefense(mount) && !hint(mount, 'PD_ALSO') && !hint(mount, 'STRIKE');
-        if (s.target.kind === 'MISSILE') return pdFirst ? 0 : 3;
+        if (s.target.kind === 'MISSILE') return s.target.entity.isFighterDecoy ? 2 : pdFirst ? 0 : 3;
         if (s.target.entity === ship.currentTargetShip) return 1;
         return 2;
       };
@@ -234,6 +271,7 @@ export class AutofireController {
     if (!sameTarget(previousTarget, current?.target)) { state.firingTime = 0; state.idleFireTime = 0; }
     if (current) current = { ...current, point: nativeAutofireAim(ship, mount, current, state.firingTime) };
     mount.fireControlTargetShipId = current?.target.kind === 'SHIP' ? current.target.entity.id : undefined;
+    mount.fireControlTargetProjectileId = current?.target.kind === 'MISSILE' ? current.target.entity.id : undefined;
     mount.fireControl = { targetId: current?.target.entity.id, targetKind: current?.target.kind, reason: current ? 'ALIGNING' : 'NO_TARGET' };
     return current;
   }

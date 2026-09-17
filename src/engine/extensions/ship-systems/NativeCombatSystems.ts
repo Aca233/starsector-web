@@ -1,3 +1,4 @@
+import { sameTeam } from "../../simulation/CombatTeams";
 import type { Ship } from '../../simulation/Ship';
 import type { ShipSystem } from '../../simulation/ShipSystem';
 import type { SystemAIContext, SystemModifiers, SystemWorld, SystemWeaponModifiers } from './Types';
@@ -40,6 +41,15 @@ const cryoflux = nativeSystem('cryoflux', { modifiers: () => omegaDamage, advanc
 function burnModifiers(system: ShipSystem, speed: number, acceleration: number): SystemModifiers {
   return { speedFlat: system.state === 'OUT' ? 0 : speed * system.effectLevel, accelerationFlat: acceleration * system.retainedEffectLevel };
 }
+const infernium = nativeSystem('inferniuminjector', {
+  description: '切换烈焰喷射：航速+50且+50%，加速度+800且+800%，转向加速度+400%，最大转速+50%；每秒1软幅能。保持原生noAccel限制，不擅自添加强制前进。',
+  canActivate: ship => !ship.engineController.isFlamedOut && ship.engineController.state !== 'DISABLED',
+  controls: {blockAcceleration:true,releaseOnOut:true}, visuals: {engineBoost:true},
+  modifiers: s => ({speedFlat:s.state === 'OUT'?0:50*s.effectLevel,speedPercent:s.state === 'OUT'?0:50*s.effectLevel,
+    accelerationFlat:800*s.retainedEffectLevel,accelerationPercent:800*s.retainedEffectLevel,
+    turnAccelerationPercent:400*s.retainedEffectLevel,turnRatePercent:s.state === 'OUT'?0:50*s.effectLevel}),
+  onAdvance: ship => { if (ship.engineController.isFlamedOut || ship.engineController.state === 'DISABLED') ship.system.deactivate(); },
+});
 const microburn = nativeSystem('microburn', { modifiers: system => burnModifiers(system, 600, 1200), advanceAI: driveAI });
 const microburnOmega = nativeSystem('microburn_omega', {
   initialize: (system, ship) => { if (['FRIGATE','DESTROYER','CRUISER'].includes(ship.spec.hullSize ?? '')) system.maxCharges = system.charges = 2; },
@@ -80,7 +90,7 @@ const forgeVatsStation = nativeSystem('forgevats_station', {
 
 /** Target eligibility shared by input, AI and execution. Never fall through an explicit invalid selection to a different ship. */
 function selectTarget(ship: Ship, range: number, filter: (target: Ship) => boolean): Ship | undefined {
-  const valid = (target: Ship) => alive(target) && target !== ship && target.isPlayer !== ship.isPlayer && !target.isPhased
+  const valid = (target: Ship) => alive(target) && target !== ship && !sameTeam(target, ship) && !target.isPhased && target.isVisibleTo(ship.teamId)
     && ship.pos.distanceTo(target.pos) <= range * ship.hullStats.systemRangeMultiplier + ship.spec.collisionRadius + target.spec.collisionRadius && filter(target);
   if (ship.currentTargetShip) return valid(ship.currentTargetShip) ? ship.currentTargetShip : undefined;
   const origin = ship.fireControlMode === 'MANUAL' ? ship.aimTargetWorld : ship.pos;
@@ -127,7 +137,7 @@ const interdictor = nativeSystem('interdictor', {
   onActive: (_ship, world, system) => {
     const target = system.activationTarget; if (!target || !alive(target)) return;
     const targets = target.spec.hullSize === 'FIGHTER' ? world.ships.filter(other => alive(other) && other.spec.hullSize === 'FIGHTER'
-      && other.isPlayer === target.isPlayer && other.pos.distanceTo(target.pos) <= 200) : [target];
+      && sameTeam(other, target) && other.pos.distanceTo(target.pos) <= 200) : [target];
     for (const other of targets) interdictEngines(other, world);
   }, advanceAI: targetedAI,
 });
@@ -144,5 +154,5 @@ const stationMineStrike = nativeSystem('mine_strike_station', {
   },
   description:'3500射程的传送感应空雷，7次储备，每秒恢复0.33次；不套用普通空雷的1000射程限制。',
 });
-export const nativeCombatSystems = [travelDrive, stationMineStrike,damper, damperOmega, cryoflux, microburn, microburnOmega, combatBurn, dynamicStabilizer,
+export const nativeCombatSystems = [infernium, travelDrive, stationMineStrike,damper, damperOmega, cryoflux, microburn, microburnOmega, combatBurn, dynamicStabilizer,
   temporalShell, fastMissileRacks, forgeVats, forgeVatsStation, entropyAmplifier, acausalDisruptor, interdictor];

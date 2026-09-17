@@ -1,0 +1,37 @@
+{
+  "assault_unit": [
+    213,
+    255,
+    237
+  ],
+  "attack_swarm": [
+    213,
+    255,
+    237
+  ],
+  "fabricator_unit": [
+    213,
+    255,
+    237
+  ],
+  "hive_unit": [
+    213,
+    255,
+    237
+  ],
+  "overseer_unit": [
+    213,
+    255,
+    237
+  ],
+  "skirmish_unit": [
+    213,
+    255,
+    237
+  ],
+  "standoff_unit": [
+    213,
+    255,
+    237
+  ]
+}

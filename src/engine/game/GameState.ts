@@ -6,12 +6,14 @@ import { decodeCombatOutcome, decodeCombatRequest, decodeFleetMember } from './G
 export interface FleetMember {
   id: string;
   hullId: string;
+  sourceVariantId?: string;
   status: 'ready' | 'destroyed';
   hullFraction: number;
   combatReadiness: number;
   armor: { cols: number; rows: number; fractions: number[] } | null;
   /** Omitted only in legacy saves: inherit the authored hull loadout. */
   hullMods?: string[];
+  sMods?: string[];
   captainSkills?: CombatSkillLoadout;
   fighterWings?: ShipSpec['fighterWings'];
   weaponGroups?: ShipSpec['defaultWeaponGroups'];
@@ -21,6 +23,10 @@ export interface FleetMember {
 export interface CombatRequest {
   id: string;
   kind: 'sandbox' | 'fleet';
+  /** Omitted defaults to each flagship first; remaining members are reserves. */
+  initialPlayerIds?: string[];
+  initialEnemyIds?: string[];
+  deploymentPointLimit?: number;
   seed: number;
   playerFleet: FleetMember[];
   enemyFleet: FleetMember[];

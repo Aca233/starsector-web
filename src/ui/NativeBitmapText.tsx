@@ -31,9 +31,19 @@ export function NativeBitmapText({ children: text, font = "action", color = "#aa
     return { placements, width, available };
   }, [asset, text]);
   const height = asset?.lineHeight ?? ({ action: 24, button: 20, caption: 16, body: 17 })[font];
+  const paintedRef = useRef<{
+    canvas: HTMLCanvasElement; asset: BitmapFont; placements: typeof placements; color: string;
+  } | null>(null);
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !asset || !available) return;
+    // currentColor can change through a parent's disabled/selected state even
+    // when this component's props are unchanged. Resolve it after every commit,
+    // but only repaint when the glyphs or their resolved color actually change.
+    const resolvedColor = color === "currentColor" ? getComputedStyle(canvas).color : color;
+    const painted = paintedRef.current;
+    if (painted?.canvas === canvas && painted.asset === asset &&
+        painted.placements === placements && painted.color === resolvedColor) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -42,13 +52,14 @@ export function NativeBitmapText({ children: text, font = "action", color = "#aa
       ctx.drawImage(asset.image, g.x, g.y, g.width, g.height, x + g.xoffset, g.yoffset, g.width, g.height);
     }
     ctx.globalCompositeOperation = "source-in";
-    ctx.fillStyle = color === "currentColor" ? getComputedStyle(canvas).color : color;
+    ctx.fillStyle = resolvedColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.globalCompositeOperation = "source-over";
     canvas.style.translate = "none";
     const rect = canvas.getBoundingClientRect();
     canvas.style.translate = `${Math.round(rect.x) - rect.x}px ${Math.round(rect.y) - rect.y}px`;
-  }, [asset, available, color, placements]);
+    paintedRef.current = { canvas, asset, placements, color: resolvedColor };
+  });
   return <span className="native-bitmap-text" data-font={font} data-bitmap-ready={available} style={{ height, color }}>
     <span className={available ? "native-bitmap-accessible" : "native-bitmap-fallback"}>{text}</span>
     {available && <canvas ref={canvasRef} aria-hidden="true" width={Math.max(1, Math.ceil(width))} height={height} style={{ width: Math.max(1, Math.ceil(width)), height }} />}

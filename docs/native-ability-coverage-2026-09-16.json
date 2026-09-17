@@ -3,23 +3,23 @@
   "complete": false,
   "counts": {
     "systems": 63,
-    "systemAdapters": 33,
+    "systemAdapters": 57,
     "phaseSlot": 1,
     "hullmods": 129,
-    "combatHullmods": 54,
-    "mixedHullmods": 14,
+    "combatHullmods": 88,
+    "mixedHullmods": 28,
     "currentCaptainCombatSkills": 14,
     "captainCombatSkillAdapters": 14
   },
   "limitations": [
-    "14/14项现行单舰舰长战斗技能均有战斗消费者，可在改装方案配置和试战；不是角色升级树或全部舰队/领导力技能。",
-    "系统为战斗适配，不意味着专用视觉/音效与原版AI全部移植",
-    "S-mod未实现",
-    "战役传感器、航行、船员、经营、打捞/回收未完整模拟",
-    "无人机闪现采用确定性安全落点，不包括原生25距离随机散布。",
-    "电子战已接双方部署舰ECM、原版惩罚公式及反制组件；传感干扰战场目标尚无占领机制。",
-    "后备部署采用Web甲板即时出击与到期返航，不包括原版逐架弹射动画；激光雷达阵列尚无雷达碟及装饰激光动画。",
-    "ECCM正制导加成已接原版通用预判消费者；各枚导弹的专用航线AI仍未全量移植。"
+    "仍未完成全部原版战斗能力：construction_swarm、fragment_volley、darkened_gaze、tenebrous_expulsion、shrouded_vortex仍未解禁。",
+    "能量之鞭的蜂群相位转换、威胁建造/回收与碎片武器依赖、渊幕实体和粒子机制仍缺失；不能把已有适配登记数当作全机制覆盖。",
+    "神经链接/切舰、模块舰体/分离/共享幅散及其他特殊舰体机制仍需补全；本轮已接真实殉爆与reduced_explosion。",
+    "S-mod框架与29条原生效果已接入；非战斗船员、补给、航行、殖民及回收不在当前用户要求范围。",
+    "新增光尘/感应无人机/镜像投射/终结指令/痉挛急扑通过内存仿真检查，但未完成全舰型浏览器实战与每种音效的人工验收。",
+    "共享视野采用连续圆形区域而不是原作500单位网格；引导、群集、抖动和部分粒子仍是明确标注的Web适配。",
+    "本次操作重构统一键鼠、HUD、联机权威端和Worker。操作一致性通过内存验证，先锋主/防御双槽及HUD快捷键通过正式构建浏览器验证；未把它计成新增舰船能力。",
+    "感应雷区两个原生型号已接源舰唯一性、候选筛选/安全落点/延迟、生命周期、拦截和爆炸；空雷转向制导沿用明确标注的Web适配，尚未做两种雷区的浏览器人工观感验收。"
   ],
   "systems": [
     {
@@ -50,7 +50,7 @@
       "id": "chiral_figment",
       "name": "镜像投射",
       "source": "com.fs.starfarer.api.impl.combat.ChiralFigmentStats",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "combat_burn",
@@ -68,7 +68,7 @@
       "id": "convulsive_lunge",
       "name": "痉挛急扑",
       "source": "com.fs.starfarer.api.impl.combat.dweller.ConvulsiveLungeSystemScript",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "cryoflux",
@@ -110,61 +110,61 @@
       "id": "displacer_threat",
       "name": "移位器",
       "source": "com.fs.starfarer.api.impl.combat.threat.DisplacerGlowScript",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "drone_borer",
       "name": "螟蜂无人机",
       "source": "DRONE_LAUNCHER",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "drone_pd",
       "name": "点防无人机",
       "source": "DRONE_LAUNCHER",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "drone_pd_x2",
       "name": "点防无人机",
       "source": "DRONE_LAUNCHER",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "drone_sensor",
       "name": "感应无人机",
       "source": "data.shipsystems.scripts.SensorDroneStats",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "drone_station_high",
       "name": "石像鬼无人机",
       "source": "DRONE_LAUNCHER",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "drone_station_lt",
       "name": "城齿无人机",
       "source": "DRONE_LAUNCHER",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "drone_station_mid",
       "name": "三角堡无人机",
       "source": "DRONE_LAUNCHER",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "drone_strike",
       "name": "终结指令",
       "source": "com.fs.starfarer.api.impl.combat.DroneStrikeStats",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "drone_terminator",
       "name": "终结者无人机",
       "source": "DRONE_LAUNCHER",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "dynamic_stabilizer",
@@ -176,19 +176,19 @@
       "id": "emp",
       "name": "EMP 发生器",
       "source": "EMP",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "energy_conversion",
       "name": "能量转换",
       "source": "DISPLACER",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "energy_lash",
       "name": "能量之鞭",
       "source": "com.fs.starfarer.api.impl.combat.threat.EnergyLashSystemScript",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "entropyamplifier",
@@ -200,7 +200,7 @@
       "id": "extraction_protocol",
       "name": "撤离协议",
       "source": "com.fs.starfarer.api.impl.combat.threat.ExtractionProtocolSystemScript",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "fastmissileracks",
@@ -224,13 +224,13 @@
       "id": "flarelauncher_fighter",
       "name": "诱饵发射器",
       "source": "WEAPON",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "flarelauncher_single",
       "name": "诱饵发射器 (单发)",
       "source": "WEAPON",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "forgevats",
@@ -266,13 +266,13 @@
       "id": "incursion_mode",
       "name": "入侵模式",
       "source": "com.fs.starfarer.api.impl.combat.threat.IncursionModeSystemScript",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "inferniuminjector",
       "name": "烈焰喷射",
       "source": "ENGINE_MOD",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "interdictor",
@@ -320,19 +320,19 @@
       "id": "mote_control",
       "name": "光尘吸引场",
       "source": "com.fs.starfarer.api.impl.combat.MoteControlScript",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "nova_burst",
       "name": "新星爆裂驱动器",
       "source": "com.fs.starfarer.api.impl.combat.NovaBurstStats",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "orion_device",
       "name": "猎户座装置",
       "source": "com.fs.starfarer.api.impl.combat.OrionDeviceStats",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "phasecloak",
@@ -356,7 +356,7 @@
       "id": "recalldevice",
       "name": "召回装置",
       "source": "com.fs.starfarer.api.impl.combat.RecallDeviceStats",
-      "status": "unimplemented"
+      "status": "combat-adapter"
     },
     {
       "id": "reservewing",
@@ -466,7 +466,7 @@
       "id": "andrada_mods",
       "name": "忠诚改装",
       "source": "com.fs.starfarer.api.impl.hullmods.AndradaMods",
-      "status": "unimplemented"
+      "status": "combat-implemented-campaign-not-simulated"
     },
     {
       "id": "armoredweapons",
@@ -478,13 +478,13 @@
       "id": "assault_package",
       "name": "突击套件",
       "source": "com.fs.starfarer.api.impl.hullmods.AssaultPackage",
-      "status": "unimplemented"
+      "status": "combat-implemented"
     },
     {
       "id": "augmentedengines",
       "name": "增强驱动场",
       "source": "data.hullmods.AugmentedEngines",
-      "status": "unimplemented"
+      "status": "campaign-only"
     },
     {
       "id": "automated",
@@ -514,7 +514,7 @@
       "id": "axialrotation",
       "name": "绕轴旋转",
       "source": "data.hullmods.AxialRotation",
-      "status": "unimplemented"
+      "status": "combat-implemented"
     },
     {
       "id": "ballistic_rangefinder",
@@ -526,13 +526,13 @@
       "id": "bdeck",
       "name": "后备甲板",
       "source": "com.fs.starfarer.api.impl.hullmods.BDeck",
-      "status": "unimplemented"
+      "status": "combat-implemented"
     },
     {
       "id": "blast_doors",
       "name": "防爆舱门",
       "source": "data.hullmods.BlastDoors",
-      "status": "mixed-combat-implemented",
+      "status": "combat-implemented-campaign-not-simulated",
       "support": {
         "scope": "mixed",
         "combat": "implemented",
@@ -544,19 +544,19 @@
       "id": "chassis_storage",
       "name": "战机底盘储备",
       "source": "com.fs.starfarer.api.impl.hullmods.FighterChassisStorage",
-      "status": "unimplemented"
+      "status": "combat-implemented"
     },
     {
       "id": "civgrade",
       "name": "民用级船体",
       "source": "data.hullmods.CivGrade",
-      "status": "unimplemented"
+      "status": "campaign-only"
     },
     {
       "id": "coherer",
       "name": "能量弹体同调器",
       "source": "com.fs.starfarer.api.impl.hullmods.EnergyBoltCoherer",
-      "status": "mixed-combat-implemented",
+      "status": "combat-implemented-campaign-not-simulated",
       "support": {
         "scope": "mixed",
         "combat": "implemented",
@@ -568,7 +568,7 @@
       "id": "comp_armor",
       "name": "受损装甲",
       "source": "data.hullmods.CompromisedArmor",
-      "status": "mixed-combat-implemented",
+      "status": "combat-implemented-campaign-not-simulated",
       "support": {
         "scope": "mixed",
         "combat": "implemented",
@@ -580,7 +580,7 @@
       "id": "comp_hull",
       "name": "受损船体",
       "source": "data.hullmods.CompromisedHull",
-      "status": "mixed-combat-implemented",
+      "status": "combat-implemented-campaign-not-simulated",
       "support": {
         "scope": "mixed",
         "combat": "implemented",
@@ -598,7 +598,7 @@
       "id": "comp_structure",
       "name": "结构损伤",
       "source": "com.fs.starfarer.api.impl.hullmods.CompromisedStructure",
-      "status": "mixed-combat-implemented",
+      "status": "combat-implemented-campaign-not-simulated",
       "support": {
         "scope": "mixed",
         "combat": "implemented",
@@ -610,31 +610,37 @@
       "id": "converted_bay",
       "name": "货舱改装",
       "source": "data.hullmods.ConvertedCargoBay",
-      "status": "unimplemented"
+      "status": "combat-implemented"
     },
     {
       "id": "converted_fighterbay",
       "name": "战机甲板改装",
       "source": "data.hullmods.ConvertedFighterBay",
-      "status": "unimplemented"
+      "status": "combat-implemented-campaign-not-simulated"
     },
     {
       "id": "converted_hangar",
       "name": "机库改装",
       "source": "com.fs.starfarer.api.impl.hullmods.ConvertedHangar",
-      "status": "unimplemented"
+      "status": "combat-implemented-campaign-not-simulated"
     },
     {
       "id": "damaged_deck",
       "name": "受损的飞行甲板",
       "source": "com.fs.starfarer.api.impl.hullmods.DamagedFlightDeck",
-      "status": "unimplemented"
+      "status": "combat-implemented-campaign-not-simulated",
+      "support": {
+        "scope": "mixed",
+        "combat": "implemented",
+        "campaign": "not-simulated",
+        "summary": "战机补充时间+30%；战役部署费用折扣未模拟。"
+      }
     },
     {
       "id": "damaged_mounts",
       "name": "武器位损坏",
       "source": "com.fs.starfarer.api.impl.hullmods.DamagedWeaponMounts",
-      "status": "mixed-combat-implemented",
+      "status": "combat-implemented-campaign-not-simulated",
       "support": {
         "scope": "mixed",
         "combat": "implemented",
@@ -652,13 +658,13 @@
       "id": "defective_manufactory",
       "name": "受损的制造工厂",
       "source": "com.fs.starfarer.api.impl.hullmods.DefectiveManufactory",
-      "status": "unimplemented"
+      "status": "combat-implemented-campaign-not-simulated"
     },
     {
       "id": "defensive_targeting_array",
       "name": "护航定位阵列",
       "source": "com.fs.starfarer.api.impl.hullmods.DefensiveTargetingArray",
-      "status": "unimplemented"
+      "status": "combat-implemented"
     },
     {
       "id": "degraded_drive_field",
@@ -670,7 +676,7 @@
       "id": "degraded_engines",
       "name": "老化引擎",
       "source": "data.hullmods.DegradedEngines",
-      "status": "mixed-combat-implemented",
+      "status": "combat-implemented-campaign-not-simulated",
       "support": {
         "scope": "mixed",
         "combat": "implemented",
@@ -688,7 +694,7 @@
       "id": "degraded_shields",
       "name": "护盾发生器老化",
       "source": "com.fs.starfarer.api.impl.hullmods.DegradedShields",
-      "status": "mixed-combat-implemented",
+      "status": "combat-implemented-campaign-not-simulated",
       "support": {
         "scope": "mixed",
         "combat": "implemented",
@@ -712,7 +718,7 @@
       "id": "design_compromises",
       "name": "权衡设计",
       "source": "com.fs.starfarer.api.impl.hullmods.DesignCompromises",
-      "status": "unimplemented"
+      "status": "combat-implemented-campaign-not-simulated"
     },
     {
       "id": "destroyed_mounts",
@@ -730,7 +736,7 @@
       "id": "do_not_back_off",
       "name": "取消后退",
       "source": "com.fs.starfarer.api.impl.hullmods.DoNotBackOff",
-      "status": "unimplemented"
+      "status": "combat-implemented"
     },
     {
       "id": "do_not_fire_through",
@@ -772,19 +778,19 @@
       "id": "erratic_injector",
       "name": "失常的燃料喷注器",
       "source": "com.fs.starfarer.api.impl.hullmods.ErraticInjector",
-      "status": "unimplemented"
+      "status": "combat-implemented-campaign-not-simulated"
     },
     {
       "id": "escort_package",
       "name": "护航套件",
       "source": "com.fs.starfarer.api.impl.hullmods.EscortPackage",
-      "status": "unimplemented"
+      "status": "combat-implemented"
     },
     {
       "id": "ex_phase_coils",
       "name": "实验性相位线圈",
       "source": "com.fs.starfarer.api.impl.hullmods.ExperimentalPhaseCoils",
-      "status": "unimplemented"
+      "status": "combat-implemented"
     },
     {
       "id": "expanded_cargo_holds",
@@ -796,7 +802,13 @@
       "id": "expanded_deck_crew",
       "name": "扩编飞行甲板人员",
       "source": "com.fs.starfarer.api.impl.hullmods.ExpandedDeckCrew",
-      "status": "unimplemented"
+      "status": "combat-implemented-campaign-not-simulated",
+      "support": {
+        "scope": "mixed",
+        "combat": "implemented",
+        "campaign": "not-simulated",
+        "summary": "补充率战损下降量×0.85，自然恢复速度+25%；每甲板增加20最低船员的战役人员需求未模拟。"
+      }
     },
     {
       "id": "extendedshieldemitter",
@@ -808,13 +820,13 @@
       "id": "faulty_auto",
       "name": "自动化系统损毁",
       "source": "com.fs.starfarer.api.impl.hullmods.FaultyAutomatedSystems",
-      "status": "unimplemented"
+      "status": "combat-implemented-campaign-not-simulated"
     },
     {
       "id": "faulty_grid",
       "name": "缺损电网",
       "source": "data.hullmods.FaultyPowerGrid",
-      "status": "mixed-combat-implemented",
+      "status": "combat-implemented-campaign-not-simulated",
       "support": {
         "scope": "mixed",
         "combat": "implemented",
@@ -856,7 +868,7 @@
       "id": "fragile_subsystems",
       "name": "不可靠子系统",
       "source": "com.fs.starfarer.api.impl.hullmods.FragileSubsystems",
-      "status": "mixed-combat-implemented",
+      "status": "combat-implemented-campaign-not-simulated",
       "support": {
         "scope": "mixed",
         "combat": "implemented",
@@ -892,7 +904,7 @@
       "id": "glitched_sensors",
       "name": "传感器阵列失灵",
       "source": "com.fs.starfarer.api.impl.hullmods.GlitchedSensorArray",
-      "status": "unimplemented"
+      "status": "combat-implemented-campaign-not-simulated"
     },
     {
       "id": "ground_support",
@@ -934,7 +946,7 @@
       "id": "high_frequency_attractor",
       "name": "感灵吸引场",
       "source": "com.fs.starfarer.api.combat.BaseHullMod",
-      "status": "unimplemented"
+      "status": "combat-implemented"
     },
     {
       "id": "high_maintenance",
@@ -952,13 +964,13 @@
       "id": "hiressensors",
       "name": "高精度传感器",
       "source": "com.fs.starfarer.api.impl.hullmods.HighResSensors",
-      "status": "unimplemented"
+      "status": "combat-implemented-campaign-not-simulated"
     },
     {
       "id": "ill_advised",
       "name": "不明智改装",
       "source": "data.hullmods.IllAdvised",
-      "status": "unimplemented"
+      "status": "combat-implemented"
     },
     {
       "id": "increased_maintenance",
@@ -970,7 +982,7 @@
       "id": "insulatedengine",
       "name": "引擎隔离性装配",
       "source": "data.hullmods.InsulatedEngines",
-      "status": "mixed-combat-implemented",
+      "status": "combat-implemented-campaign-not-simulated",
       "support": {
         "scope": "mixed",
         "combat": "implemented",
@@ -988,13 +1000,13 @@
       "id": "malfunctioning_comms",
       "name": "通讯系统故障",
       "source": "com.fs.starfarer.api.impl.hullmods.MalfunctioningComms",
-      "status": "unimplemented"
+      "status": "combat-implemented-campaign-not-simulated"
     },
     {
       "id": "militarized_subsystems",
       "name": "军事化子系统",
       "source": "com.fs.starfarer.api.impl.hullmods.MilitarizedSubsystems",
-      "status": "unimplemented"
+      "status": "combat-implemented-campaign-not-simulated"
     },
     {
       "id": "missile_autoloader",
@@ -1018,7 +1030,7 @@
       "id": "nav_relay",
       "name": "导航中继器",
       "source": "com.fs.starfarer.api.impl.hullmods.NavRelay",
-      "status": "unimplemented"
+      "status": "combat-implemented"
     },
     {
       "id": "neural_integrator",
@@ -1048,13 +1060,13 @@
       "id": "operations_center",
       "name": "作战中心",
       "source": "com.fs.starfarer.api.impl.hullmods.OperationsCenter",
-      "status": "unimplemented"
+      "status": "combat-implemented"
     },
     {
       "id": "phase_anchor",
       "name": "相位锚点",
       "source": "com.fs.starfarer.api.impl.hullmods.PhaseAnchor",
-      "status": "unimplemented"
+      "status": "combat-implemented"
     },
     {
       "id": "phasefield",
@@ -1078,13 +1090,13 @@
       "id": "reduced_explosion",
       "name": "爆炸减免",
       "source": "data.hullmods.ReducedExplosion",
-      "status": "unimplemented"
+      "status": "combat-implemented"
     },
     {
       "id": "reinforcedhull",
       "name": "强化舱壁",
       "source": "data.hullmods.ReinforcedBulkheads",
-      "status": "mixed-combat-implemented",
+      "status": "combat-implemented-campaign-not-simulated",
       "support": {
         "scope": "mixed",
         "combat": "implemented",
@@ -1132,7 +1144,7 @@
       "id": "shield_always_on",
       "name": "保持开盾",
       "source": "com.fs.starfarer.api.impl.hullmods.ShieldAlwaysOn",
-      "status": "unimplemented"
+      "status": "combat-implemented"
     },
     {
       "id": "shield_shunt",
@@ -1168,7 +1180,7 @@
       "id": "solar_shielding",
       "name": "恒星防护层",
       "source": "data.hullmods.SolarShielding",
-      "status": "mixed-combat-implemented",
+      "status": "combat-implemented-campaign-not-simulated",
       "support": {
         "scope": "mixed",
         "combat": "implemented",
@@ -1186,19 +1198,19 @@
       "id": "stealth_minefield",
       "name": "感应雷区",
       "source": "com.fs.starfarer.api.impl.hullmods.StealthMinefield",
-      "status": "unimplemented"
+      "status": "combat-implemented"
     },
     {
       "id": "stealth_minefield_lt",
       "name": "感应雷区 - 低端技术",
       "source": "com.fs.starfarer.api.impl.hullmods.StealthMinefieldLT",
-      "status": "unimplemented"
+      "status": "combat-implemented"
     },
     {
       "id": "supercomputer",
       "name": "目标定位巨型机",
       "source": "data.hullmods.TargetingSupercomputer",
-      "status": "unimplemented"
+      "status": "combat-implemented"
     },
     {
       "id": "surveying_equipment",
@@ -1216,7 +1228,7 @@
       "id": "terminator_core",
       "name": "终结者核心",
       "source": "com.fs.starfarer.api.impl.hullmods.TerminatorCore",
-      "status": "unimplemented"
+      "status": "combat-implemented"
     },
     {
       "id": "threat_hullmod",
@@ -1240,7 +1252,7 @@
       "id": "unstable_coils",
       "name": "不稳定相位线圈",
       "source": "data.hullmods.PhaseCoilInstability",
-      "status": "mixed-combat-implemented",
+      "status": "combat-implemented-campaign-not-simulated",
       "support": {
         "scope": "mixed",
         "combat": "implemented",
@@ -1258,7 +1270,7 @@
       "id": "vast_hangar",
       "name": "巨型机库",
       "source": "com.fs.starfarer.api.impl.hullmods.VastHangar",
-      "status": "unimplemented"
+      "status": "combat-implemented-campaign-not-simulated"
     },
     {
       "id": "vastbulk",

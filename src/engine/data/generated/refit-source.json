@@ -8115,7 +8115,6 @@
       "reasons": [
         "Unimplemented everyFrameEffect com.fs.starfarer.api.impl.combat.dweller.PseudoparticleJetEffect: special hook omitted; base damage/flux/trajectory retained.",
         "Unimplemented onHitEffect com.fs.starfarer.api.impl.combat.dweller.PseudoparticleJetEffect: special hook omitted; base damage/flux/trajectory retained.",
-        "Native negative hit-glow sentinel uses a disabled hit glow in Web.",
         "Native projectile collision class RAY is approximated by the Web projectile collision model.",
         "Native weapon unaffectedByProjectileSpeedBonuses=true is not represented by the base Web weapon adapter."
       ]
@@ -8187,7 +8186,6 @@
       "reasons": [
         "Unimplemented everyFrameEffect com.fs.starfarer.api.impl.combat.dweller.RiftLightningEffect: special hook omitted; base damage/flux/trajectory retained.",
         "Unimplemented onHitEffect com.fs.starfarer.api.impl.combat.dweller.RiftLightningEffect: special hook omitted; base damage/flux/trajectory retained.",
-        "Native negative hit-glow sentinel uses a disabled hit glow in Web.",
         "Native projectile collision class RAY_FIGHTER is approximated by the Web projectile collision model."
       ]
     },

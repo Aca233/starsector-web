@@ -1,6 +1,8 @@
 import { CombatEngine } from "../engine/simulation/CombatEngine";
 import { Ship } from "../engine/simulation/Ship";
 import { Vector2 } from "../engine/math/Vector2";
+import type { ShipSpec } from "../engine/content/ShipSpec";
+import { validateShipSpec } from "../engine/modding/ContentValidation";
 import type { Seat } from "./protocol";
 
 /** P1 presentation projection, NOT a resumable simulation checkpoint. Static specs and executable hooks remain local. */
@@ -20,16 +22,18 @@ const SKIP = new Set([
   "fireControlWorld",
   "statusEffects",
   "damageTakenModifiers",
+  "externalPhaseEffects",
+  "deployedWingCraft",
   "lowCRDamageSequence",
 ]);
 type Wire = any;
-function pack(value: any, seen = new Set<object>()): Wire {
+function pack(value: any, seen = new Set<object>(), refs = new Map<string, Ship>()): Wire {
   if (value === undefined) return { $undefined: 1 };
   if (typeof value === "number" && !Number.isFinite(value))
     return { $number: String(value) };
   if (value === null || typeof value !== "object")
     return typeof value === "function" ? { $undefined: 1 } : value;
-  if (value instanceof Ship) return { $ship: value.id };
+  if (value instanceof Ship) { refs.set(value.id, value); return { $ship: value.id }; }
   if (value instanceof Vector2) return { $vector: [value.x, value.y] };
   if (ArrayBuffer.isView(value))
     return { $typed: value.constructor.name, values: Array.from(value as any) };
@@ -39,17 +43,17 @@ function pack(value: any, seen = new Set<object>()): Wire {
   if (value instanceof Map)
     result = {
       $map: [...value.entries()].map(([k, v]) => [
-        pack(k, seen),
-        pack(v, seen),
+        pack(k, seen, refs),
+        pack(v, seen, refs),
       ]),
     };
   else if (value instanceof Set)
-    result = { $set: [...value].map((v) => pack(v, seen)) };
-  else if (Array.isArray(value)) result = value.map((v) => pack(v, seen));
+    result = { $set: [...value].map((v) => pack(v, seen, refs)) };
+  else if (Array.isArray(value)) result = value.map((v) => pack(v, seen, refs));
   else {
     result = {};
     for (const [k, v] of Object.entries(value))
-      if (!SKIP.has(k) && typeof v !== "function") result[k] = pack(v, seen);
+      if (!SKIP.has(k) && typeof v !== "function") result[k] = pack(v, seen, refs);
   }
   seen.delete(value);
   return result;
@@ -136,11 +140,16 @@ export interface CombatSound {
 }
 export interface CombatSnapshot {
   sounds?: CombatSound[];
+  deployment?: import("../engine/simulation/CombatDeployment").DeploymentState;
   tick: number;
-  acknowledged: [number, number];
+  acknowledged: Record<Seat, number>;
   ships: Array<{ id: string; state: Wire }>;
+  crafts: Array<{ id: string; kind: "fighter" | "bomber" | "drone" | "detached"; spec: number; state: Wire }>;
+  craftSpecs: ShipSpec[];
   world: Wire;
   simulationMs: number;
+  snapshotHz?: number;
+  captureMs?: number;
 }
 const WORLD_KEYS = [
   "combatTime",
@@ -158,53 +167,100 @@ const WORLD_KEYS = [
 export function captureCombat(
   engine: CombatEngine,
   tick: number,
-  acknowledged: [number, number],
+  acknowledged: Record<Seat, number>,
   simulationMs: number,
 ): CombatSnapshot {
   const world: Record<string, unknown> = {};
   for (const k of WORLD_KEYS) world[k] = engine[k];
-  return {
-    tick,
-    acknowledged,
-    simulationMs,
-    ships: engine.capitalShips.map((ship) => ({
-      id: ship.id,
-      state: pack({ ...ship }),
-    })),
-    world: pack(world),
-  };
+  const capitals = new Set(engine.allCapitalShips);
+  const refs = new Map(engine.ships.map(ship => [ship.id, ship]));
+  const project = (value: unknown) => pack(value, new Set(), refs);
+  // A reserve cannot change in simulation. Its frozen match loadout is already present on viewers;
+  // avoid resending every inactive weapon/controller/component at snapshot frequency.
+  const ships = engine.allCapitalShips.map(ship => ({id:ship.id,state:project(engine.deployment.isReserve(ship.id)
+    ? {id:ship.id,teamId:ship.teamId,isPlayer:ship.isPlayer,hullHp:ship.hullHp,currentCR:ship.currentCR,isDead:ship.isDead,isRetreated:ship.isRetreated}
+    : {...ship})}));
+  const projectedWorld = project(world);
+  const craftSpecs: ShipSpec[] = [], specs = new Map<string,number>();
+  const crafts: CombatSnapshot['crafts'] = [];
+  // Packing a hull/FX may discover a detached craft still referenced by wrecks or launchers.
+  for (const ship of refs.values()) {
+    if (capitals.has(ship)) continue;
+    const signature = JSON.stringify(ship.spec);
+    let spec = specs.get(signature);
+    if (spec === undefined) {spec=craftSpecs.length;specs.set(signature,spec);craftSpecs.push(ship.spec);}
+    const kind = engine.fighters.includes(ship) ? 'fighter' : engine.bombers.includes(ship) ? 'bomber' : engine.droneSystem.drones.includes(ship) ? 'drone' : 'detached';
+    crafts.push({id:ship.id,kind,spec,state:project({...ship})});
+  }
+  return {tick,acknowledged,simulationMs,ships,crafts,craftSpecs,world:projectedWorld, ...(engine.deployment.enabled ? {deployment:engine.deployment.snapshot()} : {})};
 }
+const displayCrafts = new WeakMap<CombatEngine, Map<string, Ship>>();
+const validatedSpecs = new WeakMap<CombatEngine, Set<string>>();
 /** Retains existing Ship/component prototypes and static definitions. Never calls fixedUpdate on a guest. */
 export function applyCombatSnapshot(
   engine: CombatEngine,
   frame: CombatSnapshot,
-  seat: Seat,
 ) {
   if (
     !frame ||
     !Number.isSafeInteger(frame.tick) ||
     !Array.isArray(frame.ships) ||
-    frame.ships.length !== 2
+    frame.ships.length !== engine.allCapitalShips.length ||
+    new Set(frame.ships.map((row) => row.id)).size !== frame.ships.length
   )
     throw Error("Invalid combat snapshot");
-  const ships = new Map(engine.capitalShips.map((s) => [s.id, s]));
-  for (const row of frame.ships) {
+  if (!Array.isArray(frame.crafts) || !Array.isArray(frame.craftSpecs))
+    throw Error('Invalid dynamic craft snapshot');
+  const ships = new Map(engine.allCapitalShips.map((s) => [s.id, s]));
+  const previous = displayCrafts.get(engine) ?? new Map([...engine.fighters,...engine.bombers,...engine.droneSystem.drones].map(s=>[s.id,s]));
+  const cache = validatedSpecs.get(engine) ?? new Set<string>();
+  for (const spec of frame.craftSpecs) {
+    const signature=JSON.stringify(spec);
+    if (!cache.has(signature)) {
+      validateShipSpec(spec,{allowExistingId:true,requireBundledAssets:true});
+      if(cache.size>512)cache.clear();
+      cache.add(signature);
+    }
+  }
+  validatedSpecs.set(engine,cache);
+  const next = new Map<string,Ship>();
+  for (const row of frame.crafts) {
+    if (typeof row.id !== 'string' || row.id.length > 256 || ships.has(row.id) || !['fighter','bomber','drone','detached'].includes(row.kind) || !Number.isInteger(row.spec) || !frame.craftSpecs[row.spec]) throw Error('Invalid craft identity');
+    const spec=frame.craftSpecs[row.spec];
+    const carrierId=row.state?.sourceCarrier?.$ship;
+    const carrier=carrierId ? ships.get(carrierId) : undefined;
+    const ship=previous.get(row.id) ?? new Ship(row.id,spec,!!row.state?.isPlayer,new Vector2(),0,undefined,undefined,carrier);
+    ships.set(row.id,ship);next.set(row.id,ship);
+  }
+  const fighters:Ship[]=[], bombers:Ship[]=[], drones:Ship[]=[];
+  for (const row of frame.crafts) {
+    const ship=ships.get(row.id)!;
+    if(row.kind==='fighter')fighters.push(ship);
+    if(row.kind==='bomber')bombers.push(ship);
+    if(row.kind==='drone')drones.push(ship);
+  }
+  engine.fighters.splice(0,engine.fighters.length,...fighters);
+  engine.bombers.splice(0,engine.bombers.length,...bombers);
+  engine.droneSystem.drones.splice(0,engine.droneSystem.drones.length,...drones);
+  displayCrafts.set(engine,next);
+  for (const row of [...frame.ships,...frame.crafts]) {
     const ship = ships.get(row.id);
     if (!ship) throw Error("Unknown ship");
+    const wasReserve=engine.deployment.isReserve(ship.id);
     const pos = ship.pos.clone(),
       angle = ship.facingRad;
     unpack(row.state, ship, ships);
-    ship.prevPos = pos;
-    ship.prevFacingRad = angle;
+    ship.prevPos = wasReserve ? ship.pos.clone() : pos;
+    ship.prevFacingRad = wasReserve ? ship.facingRad : angle;
   }
   // Only permit presentation fields, never methods or subsystem ownership from the wire.
   for (const key of WORLD_KEYS)
     if (Object.hasOwn(frame.world, key))
       (engine as any)[key] = unpack(frame.world[key], engine[key], ships);
-  const host = ships.get("player_ship")!,
-    guest = ships.get("enemy_ship")!;
-  engine.playerShip = seat === 0 ? host : guest;
-  engine.enemyShip = seat === 0 ? guest : host;
-  host.currentTargetShip = guest;
-  guest.currentTargetShip = host;
+  if (engine.deployment.enabled) { if (!frame.deployment) throw Error("Missing deployment snapshot"); engine.deployment.applySnapshot(frame.deployment); }
+  for (const ship of ships.values()) {
+    ship.combatShips = engine.ships;
+    ship.currentTargetShip = ship.fireControlMode === 'MANUAL'
+      ? ships.get(ship.playerTargetId ?? '') ?? null : engine.findHostile(ship) ?? null;
+  }
 }

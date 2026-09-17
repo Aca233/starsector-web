@@ -8,7 +8,7 @@ interface Props {
   spec: ShipSpec;
   selectedSlot?: string;
   onSelect?: (id: string) => void;
-  onHover?: (id: string | null) => void;
+  slotBindings?: (id: string) => React.ButtonHTMLAttributes<HTMLButtonElement>;
   onRemove?: (id: string) => void;
   highlightSlots?: string[];
   home?: boolean;
@@ -19,7 +19,7 @@ export function ShipStage({
   spec,
   selectedSlot,
   onSelect,
-  onHover,
+  slotBindings,
   onRemove,
   highlightSlots,
   home = false,
@@ -34,7 +34,7 @@ export function ShipStage({
   const arc = () => {
     if (!selected) return "";
     const p = point(selected),
-      r = pickingWeapon ? spec.spriteWidth * 0.48 : 105;
+      r = spec.spriteWidth * 0.48;
     // A single SVG arc with coincident endpoints draws nothing at 360 degrees.
     if (selected.arcDeg >= 359)
       return `M ${p.x + r} ${p.y} A ${r} ${r} 0 1 0 ${p.x - r} ${p.y} A ${r} ${r} 0 1 0 ${p.x + r} ${p.y}`;
@@ -133,6 +133,7 @@ export function ShipStage({
             className={"ship-arc " + (pickingWeapon ? "ship-arc-picker" : "")}
             viewBox={`0 0 ${spec.spriteWidth} ${spec.spriteHeight}`}
             aria-hidden="true"
+            data-type={selected.weaponType}
           >
             <path d={arc()} />
             <circle cx={point(selected).x} cy={point(selected).y} r="17" />
@@ -145,11 +146,14 @@ export function ShipStage({
               builtIn = isBuiltIn(spec.id, slot.slotId);
             return (
               <button
+                {...slotBindings?.(slot.slotId)}
                 type="button"
                 key={slot.slotId}
                 className={`studio-mount studio-mount--${slot.slotSize.toLowerCase()} ${selectedSlot === slot.slotId ? "is-selected" : ""} ${slot.defaultWeaponId ? "is-equipped" : ""} ${highlightSlots?.includes(slot.slotId) ? "is-grouped" : ""}`}
                 data-type={slot.weaponType}
                 data-slot-id={slot.slotId}
+                data-mount={slot.mountType}
+                data-built-in={builtIn}
                 style={{
                   left: `${(p.x / spec.spriteWidth) * 100}%`,
                   top: `${(p.y / spec.spriteHeight) * 100}%`,
@@ -157,15 +161,12 @@ export function ShipStage({
                 aria-label={`挂点 ${slot.slotId}，${sizes[slot.slotSize]}${types[slot.weaponType ?? "UNIVERSAL"]}，${slot.defaultWeaponId ? weaponName(slot.defaultWeaponId) : "空挂点"}${builtIn ? "，内置" : ""}`}
                 aria-pressed={selectedSlot === slot.slotId}
                 onClick={() => onSelect(slot.slotId)}
-                onMouseEnter={() => onHover?.(slot.slotId)}
-                onMouseLeave={() => onHover?.(null)}
                 onContextMenu={(e) => {
                   e.preventDefault();
                   onRemove?.(slot.slotId);
                 }}
-                title={`${slot.slotId} · ${slot.defaultWeaponId ? weaponName(slot.defaultWeaponId) : "空挂点"}${builtIn ? " / 内置" : ""}`}
               >
-                <span>
+                <span aria-hidden="true">
                   {builtIn
                     ? "·"
                     : slot.slotSize === "LARGE"

@@ -3,7 +3,7 @@
  * 核心机制:
  * 1. 软幅能 (Soft Flux): 开火消耗与护盾维持产热，护盾展开时只要净耗散大于产出仍可缓慢消散。
  * 2. 硬幅能 (Hard Flux): 护盾受到敌方实弹/能量攻击转化而成，护盾开启时【绝对无法消散】。
- * 3. 过载 (Overload): 总幅能达 100% 极限时系统暴走，护盾熄灭、武器宕机、进入长达数秒的强制过载。
+ * 3. 过载 (Overload): 护盾受击导致总幅能超过容量时系统暴走，护盾熄灭、武器宕机、进入长达数秒的强制过载。
  * 4. 主动排散 (Vent): 玩家主动关盾全功率散热，散热速度加倍，但短时间内丧失防御与火控。
  */
 import { sound } from '../audio/SoundManager';
@@ -17,12 +17,17 @@ export class FluxTracker {
   public overloadTimeMultiplier = 1;
   public timeSinceFluxIncrease = 0;
   public hullSize: HullSize;
+  public shieldSoftFluxConversion = 0;
+  public dissipationMultiplier = 1;
+  public get effectiveDissipation(): number { return this.baseDissipation * this.dissipationMultiplier; }
   public softFlux = 0;
   public hardFlux = 0;
   
   public isOverloaded = false;
   public overloadTimer = 0;
   public overloadDuration = 0;
+  /** Native notifyOverloadStarted: drop shield collision in the triggering hit. */
+  public onOverloadStarted?: () => void;
 
   public isVenting = false;
   public ventProgress = 0; // 0.0 ~ 1.0
@@ -52,21 +57,47 @@ export class FluxTracker {
    * @param isHard 是否为硬幅能 (护盾吸收实弹转为硬幅能)
    * @returns 是否导致了过载
    */
+  public increaseShieldFlux(amount: number, isHard: boolean): boolean {
+    if (this.isOverloaded) return true;
+    if (this.isVenting || !Number.isFinite(amount) || !(amount > 0)) return false;
+    this.timeSinceFluxIncrease = 0;
+    const soft = isHard ? Math.max(0, Math.min(1, this.shieldSoftFluxConversion)) : 1;
+    this.softFlux += amount * soft;
+    this.hardFlux += amount * (1 - soft);
+    // D.increaseFlux: exact capacity is not overload; only hard-flux hits add
+    // excess-duration penalty. Store at most capacity after calculating it.
+    const excess = this.totalFlux - this.maxFlux;
+    const overloaded = excess > 0 && this.triggerOverload(isHard ? excess : 0);
+    this.clampFlux();
+    return overloaded;
+  }
+
   public increaseFlux(amount: number, isHard: boolean): boolean {
     if (this.isOverloaded) return true;
+    if (this.isVenting || !Number.isFinite(amount)) return false;
+    // Native soft costs (weapons/upkeep) refuse an unaffordable increase;
+    // unlike shield damage, they must never force an overload.
+    if (!isHard && this.totalFlux + amount > this.maxFlux) return false;
     if (amount > 0) this.timeSinceFluxIncrease = 0;
+    if (isHard) this.hardFlux = Math.max(0, this.hardFlux + amount);
+    else this.softFlux = Math.max(0, this.softFlux + amount);
+    const excess = this.totalFlux - this.maxFlux;
+    const overloaded = excess > 0 && this.triggerOverload(excess);
+    this.clampFlux();
+    return overloaded;
+  }
 
-    if (isHard) {
-      this.hardFlux += amount;
-    } else {
-      this.softFlux += amount;
-    }
+  /** Native weapon deductEnergy success, separate from increaseFlux's overload result. */
+  public trySpendSoftFlux(amount: number): boolean {
+    if (this.isOverloaded || this.isVenting || !Number.isFinite(amount) || amount < 0
+      || this.totalFlux + amount > this.maxFlux) return false;
+    this.increaseFlux(amount, false);
+    return true;
+  }
 
-    if (this.totalFlux >= this.maxFlux) {
-      const excess = this.totalFlux - this.maxFlux;
-      return this.triggerOverload(excess);
-    }
-    return false;
+  private clampFlux(): void {
+    this.hardFlux = Math.max(0, Math.min(this.maxFlux, this.hardFlux));
+    this.softFlux = Math.max(0, Math.min(this.maxFlux - this.hardFlux, this.softFlux));
   }
 
   /**
@@ -78,6 +109,7 @@ export class FluxTracker {
     this.timeSinceFluxIncrease = 0;
     if (isHard) {
       this.hardFlux = Math.min(this.maxFlux, this.hardFlux + amount);
+      this.clampFlux();
     } else {
       const room = Math.max(0, this.maxFlux - this.hardFlux);
       this.softFlux = Math.min(room, this.softFlux + amount);
@@ -92,20 +124,22 @@ export class FluxTracker {
    */
   public triggerOverload(excessFlux = 0): boolean {
     const started = this.beginOverload(excessFlux);
-    if (started) sound.play('overload', 1.0);
+    if (started) { this.onOverloadStarted?.(); sound.play('overload', 1.0); }
     return started;
   }
 
   /** Native forceOverload adds seconds to the hull-size base, without normal hit audio. */
   public forceOverload(extraSeconds = 0): boolean {
-    return this.beginOverload(extraSeconds * 25);
+    const started = this.beginOverload(extraSeconds * 25);
+    if (started) this.onOverloadStarted?.();
+    return started;
   }
 
   /** AcausalDisruptor uses a total duration, not forceOverload's extra seconds. */
   public overloadFor(seconds: number): boolean {
     if (!Number.isFinite(seconds) || seconds <= 0 || !this.beginOverload(0)) return false;
     this.overloadDuration = this.overloadTimer = seconds * this.overloadTimeMultiplier;
-    sound.play('overload', 1);
+    this.onOverloadStarted?.();
     return true;
   }
 
@@ -141,7 +175,7 @@ export class FluxTracker {
    * 获取预计排散完毕剩余时长 (严格对齐 D.java: getTimeToVent)
    */
   public getTimeToVent(): number {
-    const ventRate = this.baseDissipation * 2.0 * this.ventRateMultiplier;
+    const ventRate = this.effectiveDissipation * 2.0 * this.ventRateMultiplier;
     return ventRate > 0 ? this.totalFlux / ventRate : 0;
   }
 
@@ -175,7 +209,7 @@ export class FluxTracker {
     // 1. 处理过载状态倒计时与过载散热 (D.java: getOverloadDissipationRate = dissipation * 0.5f)
     if (this.isOverloaded) {
       this.overloadTimer -= dt;
-      const overloadDissipation = this.baseDissipation * 0.5 * dt;
+      const overloadDissipation = allowDissipation ? this.effectiveDissipation * 0.5 * dt : 0;
       
       // 过载散热 (优先耗散软幅能，随后耗散硬幅能)
       let d = overloadDissipation;
@@ -199,7 +233,7 @@ export class FluxTracker {
 
     // 2. 主动排散 (D.java: getVentRate = dissipation * 2.0f)
     if (this.isVenting) {
-      const ventRate = this.baseDissipation * 2.0 * this.ventRateMultiplier * dt;
+      const ventRate = this.effectiveDissipation * 2.0 * this.ventRateMultiplier * dt;
       let d = ventRate;
       if (this.softFlux > 0) {
         const sub = Math.min(this.softFlux, d);
@@ -228,7 +262,7 @@ export class FluxTracker {
     }
 
     // 3. 常规被动耗散 (D.java: cfr_renamed_4)
-    let dissipation = allowDissipation ? this.baseDissipation * dt : 0;
+    let dissipation = allowDissipation ? this.effectiveDissipation * dt : 0;
     
     // 护盾开启时：硬幅能绝对无法消散，仅耗散软幅能
     if (shieldActive) {

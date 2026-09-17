@@ -1,5 +1,5 @@
 import { isImmutableMetadata } from '../extensions/Immutable';
-import { hullModRangePercent, hullModRangeFlat, hullModRangeBaseFlat, hullModRangeMultiplier, hullModRangeThresholdStats, hasOnlyNativeRangeModifiers } from '../extensions/HullMods';
+import { fighterWeaponRangeFlat, hullModRangePercent, hullModRangeFlat, hullModRangeBaseFlat, hullModRangeMultiplier, hullModRangeThresholdStats, hasOnlyNativeRangeModifiers } from '../extensions/HullMods';
 import type { ShipSpec } from '../content/ShipSpec';
 import type { Ship } from './Ship';
 import type { WeaponSpec } from './Weapon';
@@ -21,14 +21,14 @@ export function effectiveWeaponRange(ship: ShipSpec, weapon: WeaponSpec): number
 }
 /** Dynamic combat modifiers are never memoized against shared content definitions. */
 export function combatWeaponRange(ship: Ship, weapon: WeaponSpec): number {
-  return resolveWeaponRange(ship.spec, weapon, 1 - ship.ecmRangePenalty / 100, ship.system.getWeaponRangePercent(weapon.weaponType));
+  return resolveWeaponRange(ship.spec, weapon, 1 - ship.ecmRangePenalty / 100, ship.system.getWeaponRangePercent(weapon.weaponType), ship.sourceCarrier ? fighterWeaponRangeFlat(ship.sourceCarrier.spec, weapon) : 0);
 }
 export function combatProjectileSpeed(ship: Ship, weapon: WeaponSpec): number {
   const basePercent = weapon.projectileSpeedBonusPercent ?? 0;
   return weapon.projSpeed * (1 + (basePercent + ship.system.getProjectileSpeedPercent(weapon.weaponType)) / 100) / (1 + basePercent / 100);
 }
-function resolveWeaponRange(ship: ShipSpec, weapon: WeaponSpec, runtimeMultiplier: number, runtimePercent: number): number {
-  const dynamic = runtimeMultiplier !== 1 || runtimePercent !== 0;
+function resolveWeaponRange(ship: ShipSpec, weapon: WeaponSpec, runtimeMultiplier: number, runtimePercent: number, runtimeFlat = 0): number {
+  const dynamic = runtimeMultiplier !== 1 || runtimePercent !== 0 || runtimeFlat !== 0;
   let cache = dynamic ? null : rangeCaches.get(ship);
   if (cache === undefined && isImmutableMetadata(ship)) {
     cache = hasOnlyNativeRangeModifiers(ship) ? new WeakMap<WeaponSpec, RangeEntry>() : null;
@@ -47,7 +47,7 @@ function resolveWeaponRange(ship: ShipSpec, weapon: WeaponSpec, runtimeMultiplie
   // Weapon type, not projectile spawnType, controls missile exclusions (e.g. bombs).
   const baseRange = weapon.range + hullModRangeBaseFlat(ship, weapon);
   const range = (baseRange * (1 + (hullModRangePercent(ship, weapon) + runtimePercent) / 100) * hullModRangeMultiplier(ship, weapon) * runtimeMultiplier
-    + hullModRangeFlat(ship, weapon)) * (ship.weaponRangeMult ?? 1);
+    + hullModRangeFlat(ship, weapon) + runtimeFlat) * (ship.weaponRangeMult ?? 1);
   const stats = hullModRangeThresholdStats(ship);
   const value = Math.max(0, weapon.weaponType === 'MISSILE' || range <= stats.rangeThreshold ? range
     : stats.rangeThreshold + (range - stats.rangeThreshold) * stats.rangePastThresholdMultiplier);

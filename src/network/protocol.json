@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 16,
   "ships": [
     {
       "id": "onslaught",
@@ -9,5 +9,10 @@
       "id": "paragon",
       "name": "典范"
     }
-  ]
+  ],
+  "reconnectMs": 30000,
+  "maxPlayers": 10,
+  "defaultCapacity": 4,
+  "maxOptionsBytes": 1048576,
+  "maxSnapshotBytes": 16777216
 }

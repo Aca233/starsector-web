@@ -11446,7 +11446,7 @@
       50,
       50
     ],
-    "hitGlowRadius": 0,
+    "hitGlowRadius": -1,
     "projLength": 80,
     "projWidth": 60,
     "ammoRegenPerSec": 0,
@@ -12080,7 +12080,7 @@
       0,
       0
     ],
-    "hitGlowRadius": 0,
+    "hitGlowRadius": -1,
     "projLength": 1000000,
     "projWidth": 10,
     "ammoRegenPerSec": 0,

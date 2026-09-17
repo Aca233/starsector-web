@@ -1,3 +1,4 @@
+import { indexedPointContains, indexedSegmentEdges } from './PolygonQueryIndex';
 import { Vector2 } from './Vector2';
 
 export interface PolygonHitResult {
@@ -12,6 +13,8 @@ export interface PolygonHitResult {
  */
 export function isPointInPolygon(p: { x: number; y: number }, polygon: [number, number][]): boolean {
   if (!polygon || polygon.length < 3) return false;
+  const indexed = indexedPointContains(p, polygon);
+  if (indexed !== undefined) return indexed;
   let inside = false;
   const n = polygon.length;
   for (let i = 0, j = n - 1; i < n; j = i++) {
@@ -73,8 +76,9 @@ export function intersectSegmentWithPolygon(
   let hitNormal = new Vector2();
   let found = false;
 
-  const n = polygon.length;
-  for (let i = 0, j = n - 1; i < n; j = i++) {
+  const n = polygon.length, edges = indexedSegmentEdges(start, end, polygon);
+  for (let k = 0; k < (edges?.length ?? n); k++) {
+    const i = edges ? edges[k] : k, j = (i + n - 1) % n;
     const p3 = { x: polygon[j][0], y: polygon[j][1] };
     const p4 = { x: polygon[i][0], y: polygon[i][1] };
     const res = intersectSegments(start, end, p3, p4);
@@ -119,7 +123,9 @@ export function segmentPolygonEntry(
   if (!polygon || polygon.length < 3) return null;
   const dx1 = end.x - start.x, dy1 = end.y - start.y;
   let minT = 1.0, found = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+  const edges = indexedSegmentEdges(start, end, polygon), n = polygon.length;
+  for (let k = 0; k < (edges?.length ?? n); k++) {
+    const i = edges ? edges[k] : k, j = (i + n - 1) % n;
     const ax = polygon[j][0], ay = polygon[j][1];
     const dx2 = polygon[i][0] - ax, dy2 = polygon[i][1] - ay;
     const denom = dx1 * dy2 - dy1 * dx2;

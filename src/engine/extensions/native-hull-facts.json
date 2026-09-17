@@ -1,0 +1,1074 @@
+{
+  "afflictor": {
+    "deployCR": 30,
+    "builtInWings": 0
+  },
+  "afflictor_d_pirates": {
+    "deployCR": 30,
+    "builtInWings": 0
+  },
+  "anubis": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "apex": {
+    "deployCR": 15,
+    "builtInWings": 2
+  },
+  "apogee": {
+    "deployCR": 15,
+    "builtInWings": 0
+  },
+  "aspect": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "assault_unit": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "astral": {
+    "deployCR": 15,
+    "builtInWings": 0
+  },
+  "atlas": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "atlas2": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "attack_swarm": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "aurora": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "bastillon": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "berserker": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "brawler": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "brawler_LG": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "brawler_pather": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "brawler_tritachyon": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "brilliant": {
+    "deployCR": 15,
+    "builtInWings": 0
+  },
+  "broadsword": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "buffalo": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "buffalo2": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "buffalo_d": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "buffalo_hegemony": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "buffalo_luddic_church": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "buffalo_pirates": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "buffalo_tritachyon": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "centurion": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "centurion_LG": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "cerberus": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "cerberus_d": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "cerberus_d_pirates": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "cerberus_luddic_path": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "champion": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "claw": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "cobra": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "colossus": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "colossus2": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "colossus3": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "condor": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "conquest": {
+    "deployCR": 15,
+    "builtInWings": 0
+  },
+  "crig": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "dagger": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "defender": {
+    "deployCR": 5,
+    "builtInWings": 0
+  },
+  "dem_drone": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "derelict_mothership_bow_module": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "derelict_mothership_pod_engine_left": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "derelict_mothership_pod_m_left": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "derelict_mothership_pod_m_right": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "derelict_mothership_pod_s_right": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "derelict_mothership_sensor_mast": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "dominator": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "dominator_d": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "dominator_xiv": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "doom": {
+    "deployCR": 30,
+    "builtInWings": 0
+  },
+  "dram": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "drone_assault": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "drone_borer": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "drone_pd": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "drone_pd_midline": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "drone_sensor": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "drone_terminator": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "drover": {
+    "deployCR": 15,
+    "builtInWings": 0
+  },
+  "eagle": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "eagle_LG": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "eagle_d": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "eagle_xiv": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "enforcer": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "enforcer_d": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "enforcer_d_pirates": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "enforcer_xiv": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "eradicator": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "eradicator_pirates": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "executor": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "fabricator_unit": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "facet": {
+    "deployCR": 5,
+    "builtInWings": 0
+  },
+  "falcon": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "falcon_LG": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "falcon_d": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "falcon_p": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "falcon_xiv": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "flare": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "flash": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "fulgent": {
+    "deployCR": 15,
+    "builtInWings": 0
+  },
+  "fury": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "gargoyle": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "gemini": {
+    "deployCR": 8,
+    "builtInWings": 0
+  },
+  "gladius": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "glimmer": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "gremlin": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "gremlin_d_pirates": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "gremlin_luddic_path": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "grendel": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "gryphon": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "guardian": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "hammerhead": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "hammerhead_LG": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "hammerhead_d": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "harbinger": {
+    "deployCR": 30,
+    "builtInWings": 0
+  },
+  "hermes": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "hermes_d": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "heron": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "hive_unit": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "hoplon": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "hound": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "hound_d": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "hound_d_pirates": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "hound_hegemony": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "hound_luddic_church": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "hound_luddic_path": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "hyperion": {
+    "deployCR": 40,
+    "builtInWings": 0
+  },
+  "invictus": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "kite": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "kite_d": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "kite_hegemony": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "kite_luddic_path": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "kite_original": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "kite_pirates": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "lasher": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "lasher_d": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "lasher_luddic_church": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "lasher_pather": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "legion": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "legion_xiv": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "longbow": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "lumen": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "lux": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "manticore": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "manticore_luddic_path": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "manticore_pirates": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "medusa": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "mercury": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "mercury_d": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "merlon": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "mining_drone": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "module_armour1": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_armour2": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_armour3": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_armour4": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_armour5": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_bastion1_lowtech": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_bastion_pd1": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_blocker1": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_blocker2": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_blocker2b": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_blocker2c": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_citadel1_lowtech": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_decor_midline1": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_decor_midline2": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_hightech_armour": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_hightech_attack": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_hightech_attack_minelayer": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_hightech_citadel": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_hightech_decor": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "module_hightech_hangar": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_hightech_shield": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_hightech_strut": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_large1_lowtech": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_large2_lowtech": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_midline_bastion": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_midline_broadside": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_midline_citadel": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_midline_support": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_onslaught_armor_left": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "module_onslaught_armor_right": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "monitor": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "mora": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "mudskipper": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "mudskipper2": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "mule": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "mule_d": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "mule_d_pirates": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "nebula": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "nova": {
+    "deployCR": 15,
+    "builtInWings": 0
+  },
+  "odyssey": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "omen": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "onslaught": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "onslaught_mk1": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "onslaught_xiv": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "overseer_unit": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "ox": {
+    "deployCR": 40,
+    "builtInWings": 0
+  },
+  "paragon": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "pegasus": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "perdition": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "phaeton": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "phantom": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "picket": {
+    "deployCR": 5,
+    "builtInWings": 0
+  },
+  "piranha": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "platform1": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "prometheus": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "prometheus2": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "radiant": {
+    "deployCR": 15,
+    "builtInWings": 0
+  },
+  "rampart": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "ravelin": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "remnant_armour1": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "remnant_armour2": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "remnant_armour3": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "remnant_hangar1": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "remnant_shield1": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "remnant_shield2": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "remnant_station1": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "remnant_station2": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "remnant_weapon_platform1": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "remnant_weapon_platform2": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "remnant_weapon_platform3": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "retribution": {
+    "deployCR": 12,
+    "builtInWings": 0
+  },
+  "revenant": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "sarissa": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "scarab": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "scintilla": {
+    "deployCR": 15,
+    "builtInWings": 0
+  },
+  "sentry": {
+    "deployCR": 5,
+    "builtInWings": 0
+  },
+  "shade": {
+    "deployCR": 30,
+    "builtInWings": 0
+  },
+  "shade_d_pirates": {
+    "deployCR": 30,
+    "builtInWings": 0
+  },
+  "shard_left": {
+    "deployCR": 5,
+    "builtInWings": 0
+  },
+  "shard_right": {
+    "deployCR": 5,
+    "builtInWings": 0
+  },
+  "shepherd": {
+    "deployCR": 20,
+    "builtInWings": 1
+  },
+  "shrike": {
+    "deployCR": 15,
+    "builtInWings": 0
+  },
+  "shrike_pirates": {
+    "deployCR": 15,
+    "builtInWings": 0
+  },
+  "shrouded_ejecta": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "shrouded_eye": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "shrouded_maelstrom": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "shrouded_maw": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "shrouded_tendril": {
+    "deployCR": 1,
+    "builtInWings": 0
+  },
+  "shrouded_vortex": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "shuttlepod": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "skirmish_unit": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "spark": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "standoff_unit": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "starliner": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "station1": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "station1_hightech": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "station1_midline": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "station2": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "station2_hightech": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "station2_midline": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "station3": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "station3_hightech": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "station3_midline": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "station_derelict_survey_mothership": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "station_small": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "sunder": {
+    "deployCR": 15,
+    "builtInWings": 0
+  },
+  "sunder_LG": {
+    "deployCR": 15,
+    "builtInWings": 0
+  },
+  "sunder_d": {
+    "deployCR": 15,
+    "builtInWings": 0
+  },
+  "talon": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "talon_tritachyon": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "tarsus": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "tarsus_d": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "tempest": {
+    "deployCR": 20,
+    "builtInWings": 1
+  },
+  "tesseract": {
+    "deployCR": 5,
+    "builtInWings": 0
+  },
+  "thunder": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "trident": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "valkyrie": {
+    "deployCR": 15,
+    "builtInWings": 0
+  },
+  "vanguard": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "vanguard_pirates": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "venture": {
+    "deployCR": 10,
+    "builtInWings": 1
+  },
+  "venture_p": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "venture_pather": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "vigilance": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "warden": {
+    "deployCR": 5,
+    "builtInWings": 0
+  },
+  "warthog": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "wasp": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "wayfarer": {
+    "deployCR": 10,
+    "builtInWings": 0
+  },
+  "wolf": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "wolf_d": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "wolf_d_pirates": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "wolf_hegemony": {
+    "deployCR": 20,
+    "builtInWings": 0
+  },
+  "xyphos": {
+    "deployCR": 0,
+    "builtInWings": 0
+  },
+  "ziggurat": {
+    "deployCR": 50,
+    "builtInWings": 0
+  }
+}

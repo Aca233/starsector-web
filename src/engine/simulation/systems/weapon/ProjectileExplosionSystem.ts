@@ -1,3 +1,4 @@
+import { sameTeam } from "../../CombatTeams";
 import { damageToMissiles } from './DamageToMissiles';
 import { Vector2 } from '../../../math/Vector2';
 import type { Projectile, ProjectileExplosionSpec } from '../../Weapon';
@@ -50,20 +51,20 @@ export class ProjectileExplosionSystem {
     const noFriendlyFire = spec.collisionClass.endsWith('_NO_FF');
     const hitsSmall = ['MISSILE_FF','MISSILE_NO_FF','PROJECTILE_NO_FF','PROJECTILE_FF'].includes(spec.collisionClass);
     for (const ship of ctx.ships ?? [ctx.playerShip, ctx.enemyShip, ...ctx.fighters]) {
-      if (e.ships.has(ship.id) || ship.isDead || ship.isPhased || (ship.spec.hullSize === 'FIGHTER' && !hitsSmall) || (noFriendlyFire && ship.isPlayer === p.isPlayer)) continue;
+      if (e.ships.has(ship.id) || ship.isDead || ship.isCollisionless || (ship.spec.hullSize === 'FIGHTER' && !hitsSmall) || (noFriendlyFire && sameTeam(ship, p))) continue;
       const hit = getShipExplosionContact(ship, e.pos), damage = p.damage * scale(hit.distance) * projectileOutgoingMultiplier(p, ship, hit.point, ctx);
       if (hit.distance > spec.radius || damage <= 0) continue;
       e.ships.add(ship.id);
       if (hit.shield) {
         const taken = damage * ship.crDamageTakenMultiplier * ship.system.getShieldDamageMultiplier();
         const flux = ship.shield.absorbDamage(taken, p.damageType, hit.point.clone().sub(ship.getShieldCenter()).heading());
-        ship.flux.increaseFlux(flux, !p.softFlux);
+        ship.flux.increaseShieldFlux(flux, !p.softFlux);
         ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, p.damageType, taken * ship.shield.damageTakenMultiplierFor(p.damageType), 'SHIELD', 0, ship.isPlayer);
         ctx.fx.addFloatingDamage(hit.point, taken * ship.shield.damageTakenMultiplierFor(p.damageType), [80, 200, 255]);
       } else {
         const local = hit.point.clone().sub(ship.pos).rotate(-ship.facingRad);
         const result = ship.armor.takeDamage(local, damage * ship.crDamageTakenMultiplier, p.damageType, damage, false);
-        ship.hullHp = Math.max(0, ship.hullHp - result.hullDamage);
+        ship.applyHullDamage(result.hullDamage);
         applyComponentDamage(ship, local, result, 0, source);
         ctx.fx.spawnArmorDamageSparks(ship, local, result.armorDamage);
         ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, p.damageType, result.armorDamage, 'ARMOR', 0, ship.isPlayer);
@@ -78,15 +79,15 @@ export class ProjectileExplosionSystem {
       const projectiles = ctx.projectiles ?? [];
       for (let i = projectiles.length - 1; i >= 0; i--) {
         const missile = projectiles[i];
-        if (!missile.isRocket || missile.didDamage || e.missiles.has(missile.id) || (noFriendlyFire && missile.isPlayer === p.isPlayer)) continue;
+        if (missile.collisionDisabled || !missile.isRocket || missile.didDamage || e.missiles.has(missile.id) || (noFriendlyFire && sameTeam(missile, p))) continue;
         const distance = Math.max(0, missile.pos.distanceTo(e.pos) - missile.radius);
         if (distance > spec.radius) continue;
         e.missiles.add(missile.id);
-        const damage = damageToMissiles(p.damage * scale(distance) * projectileOutgoingMultiplier(p, undefined, missile.pos, ctx), p.sourceShipId, ctx, projectileSource(p, ctx));
+        const damage = damageToMissiles(p.damage * scale(distance) * projectileOutgoingMultiplier(p, undefined, missile.pos, ctx), p.sourceShipId, ctx, projectileSource(p, ctx), missile);
         missile.hitpoints = (missile.hitpoints ?? 100) - damage;
         if (missile.hitpoints <= 0) {
           ctx.contrailEngine?.detach(missile.id);
-          if (missile.isPlayer !== p.isPlayer) ctx.statsTracker?.recordMissileIntercepted(p.isPlayer ?? false);
+          if (!sameTeam(missile, p)) ctx.statsTracker?.recordMissileIntercepted(p.isPlayer ?? false);
           projectiles.splice(i, 1);
         }
       }

@@ -25,7 +25,7 @@ function emit(ship: Ship, slot: WeaponMountSlotConfig, world: SystemWorld): numb
   const delay = .25 + .75 * random.next();
   const source = native.projectile;
   const p: Projectile = {
-    id: random.next(),sourceShipId:ship.id,slotId:slot.slotId,isPlayer:ship.isPlayer,specId:native.weapon.id,
+    id: random.next(),sourceShipId:ship.id,slotId:slot.slotId,isPlayer: ship.isPlayer, teamId: ship.teamId,specId:native.weapon.id,
     pos,prevPos:pos.clone(),vel,facingRad:angle,angularVelocityRad:spin,
     damage:number('damage/shot') * ship.crDamageDealtMultiplier,baseDamage:number('damage/shot'),
     damageType:'HIGH_EXPLOSIVE',empDamage:0,radius:source.collisionRadius,

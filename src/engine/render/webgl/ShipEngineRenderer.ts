@@ -8,7 +8,7 @@ import { visualObjectRandom } from '../RenderDeterminism';
 export function renderShipEngines(ship: Ship, pos: Vector2, facing: number, ctx: WebGLPassContext, time: number): void {
   const { batcher, ribbonBatcher: ribbon, textures, hitGlowTex, alpha } = ctx;
   const phaseLevel = ship.shield.type === 'PHASE' ? ship.shield.phaseEffectLevel : 0;
-  const opacity = (1 - phaseLevel) * (1 - 0.75 * phaseLevel);
+  const opacity = (1 - phaseLevel) * ship.phaseVisualAlpha;
   if (opacity <= 0) return;
   const boost = ship.prevEngineBoostLevel + (ship.engineBoostLevel - ship.prevEngineBoostLevel) * alpha;
   const burn = ship.system.engineVisualLevel;

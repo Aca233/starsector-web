@@ -1,3 +1,4 @@
+import { sameTeam } from "../../CombatTeams";
 import { damageToMissiles } from './DamageToMissiles';
 import { combatWeaponRange } from '../../WeaponRange';
 import { applyComponentDamage } from './ComponentDamage';
@@ -188,7 +189,7 @@ export class BeamSimulationHandler {
 
       // 2. 光束射线与目标物理相交检测 (优先按发射距离由近至远测试障碍物)
       const targetShips = ships
-        .filter((s) => s.id !== b.sourceShipId && (b.isPlayer === undefined || s.isPlayer !== b.isPlayer) && !s.isDead && !s.isPhased)
+        .filter((s) => s.id !== b.sourceShipId && (b.isPlayer === undefined || !sameTeam(s, b)) && !s.isDead && !s.isCollisionless)
         .map((ship) => ({ ship, hitT: getBeamTargetIntersectionDistance(b.startPos, b.endPos, ship) }))
         .filter(({ hitT }) => Number.isFinite(hitT))
         .sort((a, bTarget) => a.hitT - bTarget.hitT)
@@ -200,7 +201,7 @@ export class BeamSimulationHandler {
       let missileIndex = -1, missileT = Infinity;
       for (let index = 0; index < (ctx.projectiles?.length ?? 0); index++) {
         const candidate = ctx.projectiles![index];
-        if (!candidate.isRocket || candidate.sourceShipId === b.sourceShipId || (b.isPlayer !== undefined && candidate.isPlayer === b.isPlayer)) continue;
+        if (candidate.collisionDisabled || !candidate.isRocket || candidate.sourceShipId === b.sourceShipId || (b.isPlayer !== undefined && sameTeam(candidate, b))) continue;
         const t = segmentCircleEntry(b.startPos, b.endPos, candidate.pos, candidate.radius);
         if (t !== null && t < missileT && t * rayLength < shipDistance) { missileT = t; missileIndex = index; }
       }
@@ -212,7 +213,7 @@ export class BeamSimulationHandler {
         shortenBeamGlow(b);
         if (sample && sample.damage > 0 && b.damageActive !== false) {
           if (!b.hasRecordedHit) { ctx.statsTracker?.recordShotHit(b.isPlayer ?? false); b.hasRecordedHit = true; }
-          const damage = damageToMissiles(sample.damage * outgoingDamageMultiplier(srcShip, undefined, sourceMount?.spec.weaponType, b.startPos, b.endPos), b.sourceShipId, ctx);
+          const damage = damageToMissiles(sample.damage * outgoingDamageMultiplier(srcShip, undefined, sourceMount?.spec.weaponType, b.startPos, b.endPos), b.sourceShipId, ctx, srcShip, missile);
           const dealt = Math.min(missile.hitpoints ?? 100, damage);
           missile.hitpoints = (missile.hitpoints ?? 100) - damage;
           recordBeamGlowDamage(b, { hullDamage: dealt });
@@ -280,7 +281,7 @@ export class BeamSimulationHandler {
               const fluxGain = ship.shield.absorbDamage(absorbedDmg, b.damageType, hitAngle);
               recordBeamGlowDamage(b, { shieldDamage: shieldHitGlowDamage(fluxGain,
                 ship.flux.maxFlux - ship.flux.totalFlux, ship.shield.efficiency) });
-              ship.flux.increaseFlux(fluxGain, sourceMount?.spec.beamDealsHardFlux === true);
+              ship.flux.increaseShieldFlux(fluxGain, sourceMount?.spec.beamDealsHardFlux === true);
               if (ctx.statsTracker) {
                 ctx.statsTracker.recordDamageDealt(b.isPlayer ?? false, b.damageType, absorbedDmg * ship.shield.damageTakenMultiplierFor(b.damageType), 'SHIELD');
               }
@@ -357,7 +358,7 @@ export class BeamSimulationHandler {
                   ctx.statsTracker.recordDamageDealt(b.isPlayer ?? false, b.damageType, result.hullDamage, 'HULL', empRecorded ? 0 : tickEmp);
                 }
               }
-              ship.hullHp = Math.max(0, ship.hullHp - result.hullDamage);
+              ship.applyHullDamage(result.hullDamage);
 
               applyComponentDamage(ship, localImpact, result, tickEmp, srcShip);
             }

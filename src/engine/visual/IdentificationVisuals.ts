@@ -1,3 +1,4 @@
+import { combatTeam } from "../simulation/CombatTeams";
 import type { Projectile } from '../simulation/Weapon';
 import type { Ship } from '../simulation/Ship';
 import { Vector2 } from '../math/Vector2';
@@ -15,8 +16,8 @@ export interface IdentificationDiamond {
 }
 
 /** Missile.render(FF_INDICATORS_LAYER): friendly missiles and flares are hidden. */
-export function missileIdentification(p: Projectile, playerSide: boolean, alpha: number, age = p.elapsedTime): IdentificationDiamond | null {
-  if (p.isPlayer === playerSide || p.isFlare || p.renderTargetIndicator === false
+export function missileIdentification(p: Projectile, playerSide: number | boolean, alpha: number, age = p.elapsedTime): IdentificationDiamond | null {
+  if (combatTeam(p) === (typeof playerSide === "boolean" ? (playerSide ? 0 : 1) : playerSide) || p.isFlare || p.renderTargetIndicator === false
     || !(p.isRocket || p.spawnType === 'MISSILE') || (p.hitpoints !== undefined && p.hitpoints <= 0)) return null;
   return {
     pos: Vector2.lerp(p.prevPos, p.pos, alpha),
@@ -27,8 +28,8 @@ export function missileIdentification(p: Projectile, playerSide: boolean, alpha:
 }
 
 /** Regular hull path in Ship.render(FF_INDICATORS_LAYER), independent of selected target. */
-export function shipIdentification(ship: Ship, playerSide: boolean, alpha: number, combatTime: number): IdentificationDiamond | null {
-  if (ship.isPlayer === playerSide || ship.isDead) return null;
+export function shipIdentification(ship: Ship, playerSide: number | boolean, alpha: number, combatTime: number): IdentificationDiamond | null {
+  if (ship.teamId === (typeof playerSide === "boolean" ? (playerSide ? 0 : 1) : playerSide) || ship.isDead) return null;
   const spec = ship.spec;
   const radius = Math.max(25, Math.min(Math.max(spec.shieldRadius * 0.9, 25), (spec.spriteWidth + spec.spriteHeight) * 0.5));
   const center = new Vector2(spec.shieldCenterX ?? 0, spec.shieldCenterY ?? 0).rotate(ship.interpolatedFacing(alpha));

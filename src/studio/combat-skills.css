@@ -1,8 +1,0 @@
-.combat-skill-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
-.combat-skill-row { padding: 12px 0; border-bottom: 1px solid #405355; }
-.combat-skill-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #b7d7ca; }
-.combat-skill-heading select { font: inherit; color: #b7d7ca; background: #152425; border: 1px solid #526c64; padding: 4px 8px; }
-.combat-skill-row p { font-size: 13px; line-height: 1.6; margin: 6px 0 0; }
-.combat-skill-row .combat-skill-elite { color: #899795; }
-.combat-skill-row .combat-skill-elite.active { color: #d7bd79; }
-@media (max-width: 720px) { .combat-skill-list { grid-template-columns: 1fr; } }

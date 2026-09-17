@@ -1,8 +1,10 @@
+import { sModInstallReason } from '../engine/extensions/HullMods';
+import { designHullSpec } from './DesignModel';
 import { currentImportReasons } from '../engine/data/SourceCapabilities';
 import { contentRegistry } from '../engine/content/ContentRegistry';
 import {
   createDesign, baseHull, compatibility, data, fluxLimit, isBuiltIn,
-  modReason, nativeRefit, weaponName, evaluate, builtInWingIds,
+  modReason, nativeRefit, weaponName, evaluate, builtInWingIds, designFighterBays,
 } from './DesignModel';
 import type { Design } from './DesignModel';
 
@@ -10,6 +12,7 @@ import type { Design } from './DesignModel';
 export function importNativeVariant(raw: Record<string, unknown>): { design: Design; warnings: string[] } {
   if (typeof raw.hullId !== 'string' || !baseHull(raw.hullId)) throw new Error('该方案的舰体尚不能进入 Web 改装。');
   const d = createDesign(raw.hullId, 'empty');
+  if (typeof raw.variantId === 'string' && /^[a-zA-Z0-9_-]{1,160}$/.test(raw.variantId)) d.sourceVariantId = raw.variantId;
   const hull = baseHull(d.hullId)!;
   const warnings: string[] = [];
   d.name = `${data.ships[d.hullId].name} · ${String(raw.displayName ?? raw.variantId ?? '原版方案')}`.slice(0, 48);
@@ -47,19 +50,25 @@ export function importNativeVariant(raw: Record<string, unknown>): { design: Des
     }
   });
   for (const [id, weapon] of Object.entries(d.weapons)) if (weapon && !d.groups.some(g => g.weaponSlotIds.includes(id))) d.groups[0].weaponSlotIds.push(id);
-  const mods = [...(Array.isArray(raw.hullMods) ? raw.hullMods : []), ...(Array.isArray(raw.permaMods) ? raw.permaMods : [])];
-  for (const id of new Set(mods)) {
-    if (typeof id !== 'string' || hull.builtInHullMods?.includes(id)) continue;
-    const reason = modReason(d, id);
-    if (reason) warnings.push(`未装入插件 ${id}：${reason}。`);
-    else d.hullMods.push(id);
+  const mods = [...(Array.isArray(raw.hullMods) ? raw.hullMods : []), ...(Array.isArray(raw.permaMods) ? raw.permaMods : []), ...(Array.isArray(raw.sMods) ? raw.sMods : [])];
+  // Prerequisite hullmods may appear after their dependants in native JSON.
+  const pending = new Set(mods.filter((id): id is string => typeof id === 'string' && !hull.builtInHullMods?.includes(id) && !d.hullMods.includes(id)));
+  for (let progress = true; progress && pending.size;) {
+    progress = false;
+    for (const id of pending) if (!modReason(d,id)) { d.hullMods.push(id); pending.delete(id); progress = true; }
   }
-  if (Array.isArray(raw.sMods) && raw.sMods.length) warnings.push('原版 S 插件强化效果与免费 OP 规则尚未移植；按普通已实现插件处理。');
+  for (const id of pending) warnings.push('未装入插件 ' + id + '：' + modReason(d,id) + '。');
+  for (const id of new Set([...(Array.isArray(raw.sMods) ? raw.sMods : []), ...(Array.isArray(raw.sModdedBuiltIns) ? raw.sModdedBuiltIns : [])])) {
+    if (typeof id !== 'string') { warnings.push('无效S-mod ID'); continue; }
+    const reason = sModInstallReason(designHullSpec(d), id);
+    if (reason) warnings.push('未固化 ' + id + '：' + reason);
+    else (d.sMods ??= []).push(id);
+  }
   d.wings = [...builtInWingIds(d.hullId)];
   if (Array.isArray(raw.wings)) for (const id of raw.wings) {
-    if (!id) { if (d.wings.length < (hull.fighterBays ?? 0)) d.wings.push(null); continue; }
-    if (typeof id !== 'string' || !nativeRefit.wings?.[id]) { warnings.push(`未装入舰载机联队 ${String(id)}：尚未适配。`); if (d.wings.length < (hull.fighterBays ?? 0)) d.wings.push(null); continue; }
-    if (d.wings.length >= (hull.fighterBays ?? 0)) { warnings.push(`舰载机联队 ${id} 超出机库数量。`); continue; }
+    if (!id) { if (d.wings.length < designFighterBays(d)) d.wings.push(null); continue; }
+    if (typeof id !== 'string' || !nativeRefit.wings?.[id]) { warnings.push(`未装入舰载机联队 ${String(id)}：尚未适配。`); if (d.wings.length < designFighterBays(d)) d.wings.push(null); continue; }
+    if (d.wings.length >= designFighterBays(d)) { warnings.push(`舰载机联队 ${id} 超出机库数量。`); continue; }
     d.wings.push(id);
   }
   if (raw.modules && Object.keys(raw.modules as object).length) warnings.push('模块化舰体编组尚未移植。');

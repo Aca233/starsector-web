@@ -7,10 +7,10 @@ export function strafeAccelerationMultiplier(size: HullSize | undefined): number
   return size === 'CAPITAL_SHIP' ? .25 : size === 'CRUISER' ? .5 : size === 'DESTROYER' || size === 'FIGHTER' ? .75 : 1;
 }
 
-export function shipMotionStats(ship: Ship) {
+export function shipMotionStats(ship: Ship, excludedSystemSpeedFlat = 0) {
   const mult = ship.engineController.movementMultiplier * ship.terrainSpeedMult * ship.crMovementMultiplier;
   const boost = ship.flux.isEngineBoostActive;
-  let maxSpeed = (ship.spec.maxSpeed + ship.hullStats.speedBonus + ship.system.getSpeedFlatBonus() + (boost ? 50 : 0)) * (1 + ship.hullStats.speedPercent / 100) * ship.hullStats.speedMultiplier * mult;
+  let maxSpeed = (ship.spec.maxSpeed + ship.hullStats.speedBonus + ship.system.getSpeedFlatBonus() - excludedSystemSpeedFlat + (boost ? 50 + ship.hullStats.zeroFluxSpeedBonus : 0)) * (1 + (ship.hullStats.speedPercent + ship.fleetSpeedBonusPercent + ship.system.getSpeedPercentBonus()) / 100) * ship.hullStats.speedMultiplier * mult;
   if (ship.shield.type === 'PHASE' && ship.shield.isPhaseEngaged) {
     maxSpeed *= ship.shield.getPhaseSpeedMultiplier(ship.flux.maxFlux > 0 ? ship.flux.hardFlux / ship.flux.maxFlux : 0);
   }
@@ -18,9 +18,9 @@ export function shipMotionStats(ship: Ship) {
   const turnAcceleration = (disabled ? 1 : Math.max(1, (ship.spec.turnAccelerationDeg + ship.system.getTurnAccelerationFlatBonus()) * (1 + (ship.hullStats.turnAccelerationPercent + ship.system.getTurnAccelerationPercentBonus()) / 100) * ship.hullStats.turnAccelerationMultiplier * mult)) * Math.PI / 180;
   return {
     acceleration: disabled ? 1 : Math.max(1, (ship.spec.acceleration + ship.hullStats.accelerationBonus + ship.system.getAccelerationFlatBonus()) * (1 + (ship.hullStats.accelerationPercent + ship.system.getAccelerationPercentBonus()) / 100) * ship.hullStats.accelerationMultiplier * mult),
-    deceleration: disabled ? 1 : Math.max(1, (ship.spec.deceleration + ship.hullStats.decelerationBonus) * (1 + (ship.hullStats.decelerationPercent + ship.system.getDecelerationPercentBonus()) / 100) * ship.hullStats.decelerationMultiplier * mult),
+    deceleration: disabled ? 1 : Math.max(1, (ship.spec.deceleration + ship.hullStats.decelerationBonus + ship.system.getDecelerationFlatBonus()) * (1 + (ship.hullStats.decelerationPercent + ship.system.getDecelerationPercentBonus()) / 100) * ship.hullStats.decelerationMultiplier * mult),
     maxSpeed: disabled ? 1 : Math.max(1, maxSpeed),
-    maxTurnRate: (disabled ? 1 : Math.max(1, (ship.spec.maxTurnRateDeg + ship.system.getTurnRateFlatBonus() + (boost ? 10 : 0)) * (1 + (ship.hullStats.turnRatePercent + ship.system.getTurnRatePercentBonus()) / 100) * ship.hullStats.turnRateMultiplier * mult)) * Math.PI / 180,
+    maxTurnRate: (disabled ? 1 : Math.max(1, (ship.spec.maxTurnRateDeg + ship.system.getTurnRateFlatBonus() + (boost ? 10 * ship.hullStats.zeroFluxTurnMultiplier : 0)) * (1 + (ship.hullStats.turnRatePercent + ship.system.getTurnRatePercentBonus()) / 100) * ship.hullStats.turnRateMultiplier * mult)) * Math.PI / 180,
     turnAcceleration,
     turnDeceleration: turnAcceleration * .5,
     driftAcceleration: ship.engineController.driftAcceleration(turnAcceleration, ship.isEngineGlowExtended),
@@ -54,16 +54,16 @@ export function advanceShipMotion(ship: Ship, dt: number): { accelerating: boole
   }
   const stats = shipMotionStats(ship);
   const burnDrive = ship.system.forcesForward;
-  const turn = ship.system.locksTurning || ship.flux.isOverloaded ? 0 : ship.turnInput;
+  const turn = ship.system.locksTurning || ship.flux.isOverloaded ? 0 : ship.hullStats.forcedRightTurn > 0 ? 1 : ship.turnInput;
   const turning = Math.abs(turn) > .01;
   if (turning) ship.angularVelRad = advanceAngularVelocity(ship.angularVelRad, turn, dt, stats.turnAcceleration, stats.maxTurnRate);
   // Source order: commanded turn, damage drift, then passive braking only when
   // no turn command was accepted. Drift is not canceled by steering or throttle0.
   ship.angularVelRad += stats.driftAcceleration * dt;
   if (!turning) ship.angularVelRad = advanceAngularVelocity(ship.angularVelRad, 0, dt, stats.turnAcceleration, stats.maxTurnRate);
-  const brake = !burnDrive && ship.brakeInput;
-  const throttle = brake ? 0 : burnDrive ? 1 : Math.max(-1, Math.min(1, ship.throttle));
-  const strafe = brake || burnDrive ? 0 : Math.max(-1, Math.min(1, ship.strafeInput));
+  const brake = ship.system.forcesBraking || (!burnDrive && !ship.system.blocksAcceleration && ship.brakeInput);
+  const throttle = brake || ship.system.blocksAcceleration ? 0 : burnDrive ? 1 : Math.max(-1, Math.min(1, ship.throttle));
+  const strafe = brake || burnDrive || ship.system.blocksStrafing ? 0 : Math.max(-1, Math.min(1, ship.strafeInput));
   let accelerating = false, spreading = false, commanded = false;
 
   if (brake) {

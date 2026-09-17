@@ -2811,3 +2811,7 @@ select:focus-visible {
 .refit-campaign-mods { color: #97b8c8; font: 11px/1.5 var(--ui-font); margin: 5px 0; pointer-events: auto; text-align: right; }
 .refit-campaign-mods summary { cursor: pointer; }
 .refit-campaign-mods p { padding: 6px; background: #03131beb; text-align: left; }
+
+/* Character skills are a separate studio page, with a persistent refit entry. */
+.refit-skills-entry { position: absolute; right: calc(52 * var(--u)); top: calc(7 * var(--u)); height: calc(24 * var(--u)); }
+.refit-skills-entry .native-button { height: 100%; min-height: 0; padding: 0 12px; font-size: calc(14 * var(--u)); }

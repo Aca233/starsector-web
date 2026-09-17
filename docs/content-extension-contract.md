@@ -113,3 +113,38 @@ AI 回调是现有 Web AI 策略，并非原版 BasicShipAI 的复刻。原版�
 - FleetMember的hullMods/captainSkills/fighterWings/weaponGroups为可选原始配置，缺省兼容旧存档；派生结构/幅能/装甲不写入这些字段。先还原ShipSpec再构造Ship，不能仅替换武器数组而保留过期hullStats。
 - sourceHullTraits保留原生内置身份/提示但不赋予对应尚未实现舰装的能力。使用它判断automated/civgrade/CIVILIAN；不要把元数据身份登记为已实现插件。新导入数据保留源提示与机翼tags。
 - SystemWorld.deployReserveWing使用真实飞行甲板，补充战机均经同一spawnCraft入口，保持母舰/技能归属；额外编制有独立到期回收，不增加常态重建配额。
+
+
+### 系统无人机与机翼回收（2026-09-17）
+- 普通机翼属于FighterSystem；系统释放实体属于DroneSystem，不混用机翼补充队列。母舰/机翼归属必须明确，不按阵营或舰体ID猜测。
+- 系统无人机的原生配置与指定变体在ship-systems/native-drone-launchers.json，元数据本身不赋予完成状态。DroneLaunchers的库存命令不扣次数，DroneSystem实际生成时扣；派生状态不写共享ShipSpec。
+- SystemWorld.recoverWingCraft/advanceDroneLauncher由CombatEngine接实际生命周期，不能传仅做视觉或传送位置的假实现。
+- 外部相位用Ship.externalPhaseEffects独立source key，读者返回undefined即失效；不得覆写shield.isPhased。入坞实体必须从活动集合移除，并防止回收编制被当成战损重复补生。
+- 新船使用已有已登记系统不增加舰体分支；新无人机武器按指定variant的真实挂点构造，内置插件/幅能配置也必须保留。
+
+
+### 统一操作与世界舰装（2026-09-17）
+- CombatCommands分离按键解码、状态校验、实际执行；键鼠/HUD/LAN/Worker复用。新系统声明能力，不新增舰体专用键盘分支。
+- activationInput捕获指令边缘输入，延迟执行效果按定义选择固定落点或持续追踪；不要在共享定义中保存某艘船的鼠标。
+- HullModDefinition.advance负责舰体本地更新；advanceCombat(ship,dt,world)负责依赖战场实体的效果，dt为真实战斗时间。world.combatScope是每战唯一对象，重开必须更新；使用WeakMap隔离全场单源效果。
+- NativeMines按真实weaponId提供空雷规格，MineSystem统一拦截/引信/伤害，落点策略属于源能力。感应雷区与空雷突袭不能混用寿命、散布、声音。
+- 舰船殉爆独立于视觉爆炸，使用真实最大幅能和explosionDamageMultiplier/explosionRadiusMultiplier；isHullExplosion载荷不乘武器伤害监听，HITS_SHIPS_AND_ASTEROIDS不打战机/导弹。
+
+
+### 派生舰体身份（全项目审查，2026-09-17）
+- ContentRegistry 为新舰体规格建立 sourceHullId（默认原始 id）。改装、联机、模拟、系统变体复制规格后即使修改运行时 id，也必须保留 sourceHullId。
+- 查询原生舰体事实使用 sourceHullId ?? id；sourceVariantId 继续表示装配方案身份，不能代替舰体身份。自定义部署CR仍以 deploymentCRCost 显式字段为优先。
+
+
+### 后备舰队 / 局内增援（2026-09-17）
+- 战斗对象必须区分 allCapitalShips（完整身份名册）和 capitalShips / ships（活动战场）；禁止把待命舰加入 AI、碰撞、光环或补充循环。
+- 部署统一经 CombatDeployment 校验固定名册、队伍、状态和部署点；网络客户端不得自行构造主舰或传费用绕过校验。模拟目录仅放宽舰船来源，不放宽费用校验。
+- ShipSpec.deploymentPoints 是部署费用，不能以 OP 或舰级估算；原生导入读取 supplies/rec，旧内容用 sourceHullId 对应原生费用。新增可部署自定义舰必须声明有效费用。
+- 激活保留同一 Ship 状态，舰载机仅在实际入场后初始化；结算须覆盖完整名册，未出场舰原样返回。详见 reinforcement-deployment-2026-09-17.md。
+
+## 模拟器完整目录与双阵营批次
+
+- deployment-costs.json 使用原版目录已解析的皮肤继承/覆盖费用；新原生舰体不应只更新模拟器30项预设。
+- simulation-variants.json 保留特殊原版装配及来源路径；同ID不同源文件的方案必须保持独立运行时身份，原始 sourceVariantId 不变。
+- 模拟部署选择可同时包含友军和敌军，经 deploySimulationFleet 一次校验两边额度后提交。不能先部署一方，再发现另一方无效。
+- 查看目录不覆盖 studio-prototype；未适配条目明确给出原因，不通过删装备、猜部署费用或伪造方案掩盖。

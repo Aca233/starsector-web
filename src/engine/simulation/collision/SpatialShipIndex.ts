@@ -27,7 +27,7 @@ export class SpatialShipIndex {
 
     for (let index = 0; index < ships.length; index++) {
       const ship = ships[index];
-      if (ship.isDead || ship.isPhased) continue;
+      if (ship.isDead || ship.isCollisionless) continue;
 
       const hullExtent = ship.spec.bounds?.reduce(
         (maxRadius, [x, y]) => Math.max(maxRadius, Math.hypot(x, y)),

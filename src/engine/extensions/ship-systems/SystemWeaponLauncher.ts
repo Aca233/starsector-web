@@ -6,14 +6,14 @@ import type { ShipSystemDefinition, SystemWorld } from './Types';
 interface Burst { slot: WeaponMountSlotConfig; left: number; wait: number }
 interface LauncherState { serial: number; bursts: Burst[] }
 /** Native S weapon-system execution is independent of its charge tracker. */
-export function systemWeaponLauncher(shots: number, emit: (ship: Ship, slot: WeaponMountSlotConfig, world: SystemWorld) => number): Pick<ShipSystemDefinition,'isExecuting'|'canActivate'|'onActivate'|'onAdvance'|'advanceAI'> {
+export function systemWeaponLauncher(shots: number, emit: (ship: Ship, slot: WeaponMountSlotConfig, world: SystemWorld) => number): Pick<ShipSystemDefinition,'isExecuting'|'canActivate'|'onActivate'|'onAdvance'|'advanceAI'|'onReset'> {
   const states = new WeakMap<ShipSystem, LauncherState>();
   const executing = (system: ShipSystem) => {
     const state = states.get(system);
     return state?.serial === system.activationSerial && state.bursts.some(b => b.left > 0 || b.wait > 0);
   };
   return {
-    isExecuting: executing,
+    isExecuting: executing, onReset:system=>{states.delete(system);},
     canActivate: ship => !!ship.spec.systemWeaponSlots?.length && !ship.isPhased,
     onActivate: (ship, world, system) => {
       if (ship.isDead || ship.hullHp <= 0 || ship.flux.isOverloaded || ship.flux.isVenting || ship.isPhased) return;

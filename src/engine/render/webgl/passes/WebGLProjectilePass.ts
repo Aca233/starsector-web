@@ -171,7 +171,7 @@ export class WebGLProjectilePass {
 
         const rocketTex = textures.getTexture(p.projSpriteUrl || '/game-assets/graphics/missiles/missile_harpoon.png');
         batcher.setBlendMode('NORMAL');
-        batcher.drawSprite(rocketTex, pPos.x, pPos.y, wid, len, pAngle + Math.PI / 2, 0, 0, 1.0, 1.0, 1.0, 1 - (p.fadeProgress ?? 0));
+        batcher.drawSprite(rocketTex, pPos.x, pPos.y, wid, len, pAngle + Math.PI / 2, 0, 0, 1.0, 1.0, 1.0, (1 - (p.fadeProgress ?? 0)) * (p.spriteAlphaOverride ?? 1));
       }
       // 4.5 其余标准投射物
       else {

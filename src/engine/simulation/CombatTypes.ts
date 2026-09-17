@@ -180,12 +180,16 @@ export interface ShieldRipple {
 }
 
 export interface SpatialMine {
+  weaponId?: import('../extensions/NativeMines').NativeMineWeapon;
+  fadeInSeconds?: number;
+  sourceDamageMultiplier?: number;
   id: number;
   pos: Vector2;
   vel: Vector2;
   sourceShipId: string;
   // 部署时的阵营快照；发射舰被击毁后仍可据此判定引信敌我 (对齐 MISSILE_NO_FF)
   sourceIsPlayer?: boolean;
+  teamId?: number;
   age: number;
   windupPlayed: boolean;
   detonatingTimer: number;
@@ -274,9 +278,11 @@ export interface FlightDeckWing {
   carrierId?: string;
   role?: 'FIGHTER' | 'BOMBER';
   rebuildSeconds?: number;
+  range?: number;
   name: string;
   specId: string;
   isPlayer: boolean;
+  teamId?: number;
   maxCrafts: number;
   crr: number; // 战备率 0.25 ~ 1.0
   rebuildQueue: {

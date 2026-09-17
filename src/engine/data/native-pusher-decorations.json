@@ -1,0 +1,38 @@
+{
+  "nova": [
+    {
+      "id": "WS 015",
+      "x": -116,
+      "y": 0,
+      "angleDeg": -180,
+      "spriteUrl": "/game-assets/graphics/weapons/decorative/pusher_plate_nova.png",
+      "tags": [
+        "pusherplate"
+      ]
+    }
+  ],
+  "retribution": [
+    {
+      "id": "WS 019",
+      "x": -122,
+      "y": 0,
+      "angleDeg": -180,
+      "spriteUrl": "/game-assets/graphics/weapons/decorative/pusher_plate_large.png",
+      "tags": [
+        "pusherplate"
+      ]
+    }
+  ],
+  "venture_pather": [
+    {
+      "id": "WS 011",
+      "x": -45,
+      "y": 0,
+      "angleDeg": -180,
+      "spriteUrl": "/game-assets/graphics/weapons/decorative/pusher_plate_small.png",
+      "tags": [
+        "pusherplate"
+      ]
+    }
+  ]
+}

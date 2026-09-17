@@ -1,0 +1,647 @@
+{
+  "ablative_armor": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.AblativeArmor"
+  },
+  "adaptive_coils": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.AdaptivePhaseCoils"
+  },
+  "adaptiveshields": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.OmniShieldEmitter"
+  },
+  "additional_berthing": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "com.fs.starfarer.api.impl.hullmods.AdditionalBerthing"
+  },
+  "advanced_ground_support": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.AdvancedGroundSupport"
+  },
+  "advancedcore": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.AdvancedTargetingCore"
+  },
+  "advancedoptics": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.AdvancedOptics"
+  },
+  "advancedshieldemitter": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.AcceleratedShieldEmitter"
+  },
+  "always_detaches": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.AlwaysDetaches"
+  },
+  "anchorrotation": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.AnchorRotation"
+  },
+  "andrada_mods": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.AndradaMods"
+  },
+  "armoredweapons": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.ArmoredWeapons"
+  },
+  "assault_package": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.AssaultPackage"
+  },
+  "augmentedengines": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.AugmentedEngines"
+  },
+  "automated": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.Automated"
+  },
+  "autorepair": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.AutomatedRepairUnit"
+  },
+  "auxiliary_fuel_tanks": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "com.fs.starfarer.api.impl.hullmods.AuxiliaryFuelTanks"
+  },
+  "auxiliarythrusters": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.AuxiliaryThrusters"
+  },
+  "axialrotation": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.AxialRotation"
+  },
+  "ballistic_rangefinder": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.BallisticRangefinder"
+  },
+  "bdeck": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.BDeck"
+  },
+  "blast_doors": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.BlastDoors"
+  },
+  "chassis_storage": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.FighterChassisStorage"
+  },
+  "civgrade": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.CivGrade"
+  },
+  "coherer": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.EnergyBoltCoherer"
+  },
+  "comp_armor": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.CompromisedArmor"
+  },
+  "comp_hull": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.CompromisedHull"
+  },
+  "comp_storage": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.CompromisedStorage"
+  },
+  "comp_structure": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.CompromisedStructure"
+  },
+  "converted_bay": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.ConvertedCargoBay"
+  },
+  "converted_fighterbay": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.ConvertedFighterBay"
+  },
+  "converted_hangar": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "com.fs.starfarer.api.impl.hullmods.ConvertedHangar"
+  },
+  "damaged_deck": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.DamagedFlightDeck"
+  },
+  "damaged_mounts": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.DamagedWeaponMounts"
+  },
+  "dedicated_targeting_core": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.DedicatedTargetingCore"
+  },
+  "defective_manufactory": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.DefectiveManufactory"
+  },
+  "defensive_targeting_array": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "com.fs.starfarer.api.impl.hullmods.DefensiveTargetingArray"
+  },
+  "degraded_drive_field": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.DegradedDriveField"
+  },
+  "degraded_engines": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.DegradedEngines"
+  },
+  "degraded_life_support": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.DegradedLifeSupport"
+  },
+  "degraded_shields": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.DegradedShields"
+  },
+  "delicate": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.DelicateMachinery"
+  },
+  "design_compromises": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.DesignCompromises"
+  },
+  "destroyed_mounts": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.DestroyedWeaponMounts"
+  },
+  "distributed_fire_control": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.DistributedFireControl"
+  },
+  "do_not_back_off": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.DoNotBackOff"
+  },
+  "do_not_fire_through": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.DoNotFireThrough"
+  },
+  "drive_field_stabilizer": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.DriveFieldStabilizer"
+  },
+  "dweller_hullmod": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.combat.dweller.DwellerHullmod"
+  },
+  "eccm": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.ECCMPackage"
+  },
+  "ecm": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.ECMPackage"
+  },
+  "efficiency_overhaul": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "com.fs.starfarer.api.impl.hullmods.EfficiencyOverhaul"
+  },
+  "erratic_injector": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.ErraticInjector"
+  },
+  "escort_package": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "com.fs.starfarer.api.impl.hullmods.EscortPackage"
+  },
+  "ex_phase_coils": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.ExperimentalPhaseCoils"
+  },
+  "expanded_cargo_holds": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "com.fs.starfarer.api.impl.hullmods.ExpandedCargoHolds"
+  },
+  "expanded_deck_crew": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.ExpandedDeckCrew"
+  },
+  "extendedshieldemitter": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.ExtendedShieldEmitter"
+  },
+  "faulty_auto": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.FaultyAutomatedSystems"
+  },
+  "faulty_grid": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.FaultyPowerGrid"
+  },
+  "fluxbreakers": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.FluxBreakers"
+  },
+  "fluxcoil": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.FluxCoilAdjunct"
+  },
+  "fluxdistributor": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.FluxDistributor"
+  },
+  "fluxshunt": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.FluxShunt"
+  },
+  "fourteenth": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.Fourteenth"
+  },
+  "fragile_subsystems": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.FragileSubsystems"
+  },
+  "fragment_coordinator": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "com.fs.starfarer.api.impl.combat.threat.FragmentCoordinatorHullmod"
+  },
+  "fragment_swarm": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "com.fs.starfarer.api.impl.combat.threat.FragmentSwarmHullmod"
+  },
+  "frontemitter": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.FrontShieldEmitter"
+  },
+  "frontshield": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.FrontShieldGenerator"
+  },
+  "glitched_sensors": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.GlitchedSensorArray"
+  },
+  "ground_support": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.GroundSupport"
+  },
+  "hardened_subsystems": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.HardenedSubsystems"
+  },
+  "hardenedshieldemitter": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.HardenedShieldEmitter"
+  },
+  "hbi": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.HeavyBallisticsIntegration"
+  },
+  "heavyarmor": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.HeavyArmor"
+  },
+  "heg_militarized": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.Militarized"
+  },
+  "high_frequency_attractor": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.combat.BaseHullMod"
+  },
+  "high_maintenance": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.HighMaintenance"
+  },
+  "high_scatter_amp": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "com.fs.starfarer.api.impl.hullmods.HighScatterAmp"
+  },
+  "hiressensors": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "com.fs.starfarer.api.impl.hullmods.HighResSensors"
+  },
+  "ill_advised": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.IllAdvised"
+  },
+  "increased_maintenance": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.IncreasedMaintenance"
+  },
+  "insulatedengine": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.InsulatedEngines"
+  },
+  "magazines": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.ExpandedMagazines"
+  },
+  "malfunctioning_comms": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.MalfunctioningComms"
+  },
+  "militarized_subsystems": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "com.fs.starfarer.api.impl.hullmods.MilitarizedSubsystems"
+  },
+  "missile_autoloader": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "com.fs.starfarer.api.impl.hullmods.MissileAutoloader"
+  },
+  "missile_reload": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.PeriodicMissileReload"
+  },
+  "missleracks": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.ExpandedMissileRacks"
+  },
+  "nav_relay": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.NavRelay"
+  },
+  "neural_integrator": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "com.fs.starfarer.api.impl.hullmods.NeuralIntegrator"
+  },
+  "neural_interface": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "com.fs.starfarer.api.impl.hullmods.NeuralInterface"
+  },
+  "never_detaches": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.NeverDetaches"
+  },
+  "no_weapon_flux": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.NoWeaponFlux"
+  },
+  "operations_center": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.OperationsCenter"
+  },
+  "phase_anchor": {
+    "allowed": false,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.PhaseAnchor"
+  },
+  "phasefield": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.PhaseField"
+  },
+  "pointdefenseai": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.IntegratedPointDefenseAI"
+  },
+  "recovery_shuttles": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "com.fs.starfarer.api.impl.hullmods.RecoveryShuttles"
+  },
+  "reduced_explosion": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.ReducedExplosion"
+  },
+  "reinforcedhull": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.ReinforcedBulkheads"
+  },
+  "repair_gantry": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.campaign.RepairGantry"
+  },
+  "rugged": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.RuggedConstruction"
+  },
+  "safetyoverrides": {
+    "allowed": false,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.SafetyOverrides"
+  },
+  "secondary_fabricator": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "com.fs.starfarer.api.impl.combat.threat.SecondaryFabricatorHullmod"
+  },
+  "shard_spawner": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.ShardSpawner"
+  },
+  "shared_flux_sink": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.SharedFluxSink"
+  },
+  "shield_always_on": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.ShieldAlwaysOn"
+  },
+  "shield_shunt": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "com.fs.starfarer.api.impl.hullmods.ShieldShunt"
+  },
+  "shielded_holds": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.ShieldedCargoHolds"
+  },
+  "shrouded_lens": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.combat.dweller.ShroudedLensHullmod"
+  },
+  "shrouded_mantle": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "com.fs.starfarer.api.impl.combat.dweller.ShroudedMantleHullmod"
+  },
+  "shrouded_thunderhead": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.combat.dweller.ShroudedThunderheadHullmod"
+  },
+  "solar_shielding": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.SolarShielding"
+  },
+  "stabilizedshieldemitter": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.StabilizedShieldEmitter"
+  },
+  "stealth_minefield": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.StealthMinefield"
+  },
+  "stealth_minefield_lt": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.StealthMinefieldLT"
+  },
+  "supercomputer": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.TargetingSupercomputer"
+  },
+  "surveying_equipment": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.SurveyingEquipment"
+  },
+  "targetingunit": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.IntegratedTargetingUnit"
+  },
+  "terminator_core": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.TerminatorCore"
+  },
+  "threat_hullmod": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.combat.threat.ThreatHullmod"
+  },
+  "tow_cable": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.campaign.TowCable"
+  },
+  "turretgyros": {
+    "allowed": true,
+    "hasSpecialEffect": true,
+    "source": "data.hullmods.AdvancedTurretGyros"
+  },
+  "unstable_coils": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.PhaseCoilInstability"
+  },
+  "unstable_injector": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.UnstableInjector"
+  },
+  "vast_hangar": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "com.fs.starfarer.api.impl.hullmods.VastHangar"
+  },
+  "vastbulk": {
+    "allowed": true,
+    "hasSpecialEffect": false,
+    "source": "data.hullmods.VastBulk"
+  }
+}

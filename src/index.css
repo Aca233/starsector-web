@@ -127,7 +127,6 @@
   .combat-console-body { width: min(320px, calc(100vw - 24px)); }
   .hud-console-anchor { max-height: 44dvh; overflow-y: auto; overflow-x: hidden; }
   .hud-radar-anchor { top: 48px; bottom: auto; scale: 0.55; transform-origin: right top; }
-  .hud-floating-tag { display: none !important; }
   .visual-lab-panel { top: 48px; max-width: calc(100vw - 148px); max-height: 42dvh; }
   .visual-lab-panel input[type='range'] { display: block; width: 100%; margin-left: 0; }
   .visual-lab-panel select { min-width: 0; max-width: 100%; }

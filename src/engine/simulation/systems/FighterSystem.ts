@@ -1,3 +1,7 @@
+import { sameTeam } from "../CombatTeams";
+import { dispatchShipCommand } from '../../runtime/CombatCommands';
+import wingRanges from '../../extensions/native-wing-ranges.json';
+import { combatWeaponRange } from '../WeaponRange';
 import { Vector2 } from '../../math/Vector2';
 import { FighterAIState, BomberAIState, TacticalOrder, ContrailParticle, FlightDeckWing } from '../CombatTypes';
 import { Ship } from '../Ship';
@@ -35,13 +39,14 @@ export class FighterSystem {
   public fighterAIModes: Map<string, FighterAIState> = new Map();
   public bombers: Ship[] = [];
   public bomberAIModes: Map<string, BomberAIState> = new Map();
-  public isFighterRecall = false;
 
   public playerWings: FlightDeckWing[] = [];
   public enemyWings: FlightDeckWing[] = [];
   private carriers = new Map<string, Ship>();
+  private readonly reserveDeckUsed = new Set<Ship>();
   private readonly reserveCraft = new Map<Ship, number>();
   private readonly dockedReserve = new Set<Ship>();
+  private readonly recoveredCraft = new Map<string, { timer: number; reserveRemaining?: number }[]>();
 
   constructor(
     private readonly random = new SimulationRandom(),
@@ -53,10 +58,12 @@ export class FighterSystem {
     this.bombers = [];
     this.fighterAIModes.clear();
     this.bomberAIModes.clear();
-    this.isFighterRecall = false;
     this.playerWings = [];
     this.enemyWings = [];
+    for (const carrier of this.carriers.values()) { carrier.deployedWingCraft.clear(); carrier.fighterRecall = false; }
     this.carriers.clear();
+    this.reserveDeckUsed.clear();
+    this.recoveredCraft.clear();
     this.reserveCraft.clear();
     this.dockedReserve.clear();
     this.addCarrier(playerShip, scenarioWings?.player);
@@ -65,7 +72,7 @@ export class FighterSystem {
 
   public addCarrier(carrier: Ship, scenarioWings?: FighterWingSpec[]): void {
     if (this.carriers.has(carrier.id)) return;
-    const specs = scenarioWings ?? (carrier.spec.fighterWings ?? []).slice(0, Math.max(0, carrier.spec.fighterBays ?? 0));
+    const specs = scenarioWings ?? (carrier.spec.fighterWings ?? []).slice(0, carrier.hullStats.fighterBays);
     for (const spec of specs) {
       if (modManager.getShip(spec.specId)?.hullSize !== 'FIGHTER') throw new Error(`Invalid flight deck craft: ${spec.specId}`);
     }
@@ -74,7 +81,7 @@ export class FighterSystem {
       const wing: FlightDeckWing = {
         wingId: `${carrier.id}:wing:${index}`, carrierId: carrier.id,
         name: spec.specId, specId: spec.specId, role: spec.role, tags: spec.tags,
-        rebuildSeconds: spec.rebuildSeconds, isPlayer: carrier.isPlayer,
+        rebuildSeconds: spec.rebuildSeconds, range: spec.range ?? (wingRanges as Record<string, number>)[spec.specId + '#' + spec.count], isPlayer: carrier.isPlayer, teamId: carrier.teamId,
         maxCrafts: spec.count, crr: 1, rebuildQueue: []
       };
       (carrier.isPlayer ? this.playerWings : this.enemyWings).push(wing);
@@ -89,9 +96,10 @@ export class FighterSystem {
     const pointDefense = carrier.spec.captainSkills?.point_defense;
     const craftSpec = pointDefense ? { ...spec, captainSkills: { ...spec.captainSkills, point_defense: pointDefense } } : spec;
     const craft = new Ship(this.random.nextId(`${carrier.id}_craft`), craftSpec, carrier.isPlayer,
-      carrier.pos.clone().add(offset), carrier.facingRad, this.random, this.visualRandom);
+      carrier.pos.clone().add(offset), carrier.facingRad, this.random, this.visualRandom, carrier);
     craft.flightDeckWingId = wing.wingId;
     craft.sourceCarrier = carrier;
+    carrier.deployedWingCraft.add(craft);
     craft.vel.copy(carrier.vel);
     if (wing.role === 'BOMBER') {
       this.bombers.push(craft);
@@ -105,12 +113,13 @@ export class FighterSystem {
 
   /** ReserveWingStats: fill to twice nominal strength once, not an endless replenishment buff. */
   public deployReserveWing(carrier: Ship): void {
-    if (carrier.isDead || this.carriers.get(carrier.id) !== carrier) return;
+    if ((carrier.isDead || carrier.isRetreated) || this.carriers.get(carrier.id) !== carrier) return;
     for (const wing of [...this.playerWings, ...this.enemyWings]) {
       if (wing.carrierId !== carrier.id || wing.tags?.includes('rd_no_extra_craft')) continue;
       const alive = [...this.fighters, ...this.bombers].filter(c => c.flightDeckWingId === wing.wingId && !c.isDead && !this.dockedReserve.has(c));
-      const add = Math.max(0, wing.maxCrafts * 2 - alive.length);
-      const fillNormal = Math.max(0, wing.maxCrafts - alive.length);
+      const docked = this.recoveredCraft.get(wing.wingId)?.length ?? 0;
+      const add = Math.max(0, wing.maxCrafts * 2 - alive.length - docked);
+      const fillNormal = Math.max(0, wing.maxCrafts - alive.length - docked);
       // Fast normal replacements consume queued losses, so they cannot respawn twice.
       wing.rebuildQueue.splice(0, Math.min(add, fillNormal));
       for (let i = 0; i < add; i++) {
@@ -120,11 +129,35 @@ export class FighterSystem {
     }
   }
 
+  /** RecallDeviceStats -> FighterLaunchBay.land, with a fast serial launch interval.
+   * Docking removes the entity; it is neither a kill nor a CRR replacement loss. */
+  public recoverWingCraft(carrier: Ship, craft: Ship): void {
+    if ((carrier.isDead || carrier.isRetreated) || carrier.hullHp <= 0 || craft.isDead || craft.hullHp <= 0 || craft.isDocked
+      || craft.sourceCarrier !== carrier || this.carriers.get(carrier.id) !== carrier) return;
+    const wing = [...this.playerWings, ...this.enemyWings].find(w => w.wingId === craft.flightDeckWingId && w.carrierId === carrier.id);
+    const list = wing?.role === 'BOMBER' ? this.bombers : this.fighters;
+    const index = list.indexOf(craft);
+    if (!wing || index < 0) return;
+    craft.isDocked = true;
+    craft.clearInput();
+    carrier.deployedWingCraft.delete(craft);
+    list.splice(index, 1);
+    this.fighterAIModes.delete(craft.id);
+    this.bomberAIModes.delete(craft.id);
+    const reserveRemaining = this.reserveCraft.get(craft);
+    this.reserveCraft.delete(craft);
+    this.dockedReserve.delete(craft);
+    if (reserveRemaining !== undefined && reserveRemaining <= 0) return;
+    const queue = this.recoveredCraft.get(wing.wingId) ?? [];
+    queue.push({ timer: .3 + this.random.next() * .3, reserveRemaining });
+    this.recoveredCraft.set(wing.wingId, queue);
+  }
+
   private returnReserve(craft: Ship, carrier: Ship, dt: number, target: Ship,
     spawnProj: (p: Projectile) => void, spawnBeam: (b: Beam) => void,
     spawnFlash: (pos: Vector2, angleRad: number, size: number, color: [number, number, number]) => void): boolean {
     const left = this.reserveCraft.get(craft);
-    if (left === undefined || left > 0 || carrier.isDead) return false;
+    if (left === undefined || left > 0 || (carrier.isDead || carrier.isRetreated)) return false;
     craft.isFiringMain = false;
     craft.fireControlMode = 'MANUAL';
     for (const group of craft.weaponGroups) group.isAutofire = false;
@@ -137,25 +170,65 @@ export class FighterSystem {
     craft.strafeInput = 0;
     craft.brakeInput = false;
     craft.update(dt, target, spawnProj, spawnBeam, spawnFlash);
-    if (delta.length() <= carrier.spec.collisionRadius + 35) this.dockedReserve.add(craft);
+    if (delta.length() <= carrier.spec.collisionRadius + 35) {
+      this.dockedReserve.add(craft);
+      carrier.deployedWingCraft.delete(craft);
+    }
     return true;
   }
 
+  private wingFor(craft: Ship): FlightDeckWing | undefined {
+    return [...this.playerWings, ...this.enemyWings].find(w => w.wingId === craft.flightDeckWingId);
+  }
+  public detachWingCraft(carrier: Ship, craft: Ship): boolean {
+    if (craft.sourceCarrier !== carrier || !craft.flightDeckWingId || craft.isDead || craft.isDocked) return false;
+    const collection = this.fighters.includes(craft) ? this.fighters : this.bombers;
+    const index = collection.indexOf(craft);if(index<0)return false;
+    collection.splice(index,1);carrier.deployedWingCraft.delete(craft);
+    this.fighterAIModes.delete(craft.id);this.bomberAIModes.delete(craft.id);
+    this.reserveCraft.delete(craft);this.dockedReserve.delete(craft);
+    craft.flightDeckWingId=undefined;craft.clearInput();return true;
+  }
+  private wingRange(craft: Ship, carrier: Ship): number {
+    return carrier.hullStats.fighterWingRangeMultiplier <= 0 ? 0 : (this.wingFor(craft)?.range ?? Infinity) * carrier.hullStats.fighterWingRangeMultiplier;
+  }
+  /** Hold a real formation station without preventing in-range defensive fire. */
+  private guardCarrier(craft: Ship, carrier: Ship, target: Ship, index: number): void {
+    const station = carrier.pos.clone().add(new Vector2(carrier.spec.collisionRadius + 120, (index % 3 - 1) * 80).rotate(carrier.facingRad));
+    const targetKnown = !target.isDead && target.isVisibleTo(craft.teamId);
+    const delta = station.sub(craft.pos), desired = delta.length() > 100 ? delta.heading() : targetKnown ? target.pos.clone().sub(craft.pos).heading() : carrier.facingRad;
+    const angle = Math.atan2(Math.sin(desired - craft.facingRad), Math.cos(desired - craft.facingRad));
+    craft.turnInput = Math.max(-1, Math.min(1, angle * 3));
+    craft.throttle = Math.abs(angle) < .7 ? Math.min(1, delta.length()/200) : 0;
+    craft.brakeInput = delta.length() < 50; craft.strafeInput = 0;
+    craft.aimTargetWorld.copy(targetKnown ? target.pos : carrier.pos);
+    const range = Math.max(0, ...craft.weapons.map(w => combatWeaponRange(craft,w.spec)));
+    craft.isFiringMain = targetKnown && craft.pos.distanceTo(target.pos) <= range + target.spec.collisionRadius;
+  }
   private carrierFor(craft: Ship, fallback: Ship): Ship {
     const wing = [...this.playerWings, ...this.enemyWings].find(w => w.wingId === craft.flightDeckWingId);
     return (wing?.carrierId && this.carriers.get(wing.carrierId)) || fallback;
   }
 
-  public toggleRecall(
-    addRadioMessage: (sender: string, faction: 'PLAYER' | 'ENEMY' | 'HQ', text: string, color: [number, number, number]) => void
-  ) {
-    this.isFighterRecall = !this.isFighterRecall;
-    if (this.isFighterRecall) {
-      sound.play('fighter_recall', 0.85);
-      addRadioMessage('舰载机调度台', 'PLAYER', '全编队注意！立即停止交战，全速返航母舰甲板！', [100, 220, 255]);
-    } else {
-      sound.play('fighter_deploy', 0.85);
-      addRadioMessage('舰载机调度台', 'PLAYER', '解除召回限制！全机中队自主锁定敌机与敌舰自由猎杀！', [120, 255, 160]);
+  public toggleRecall(carrier: Ship): boolean {
+    if (carrier.isDead || carrier.isRetreated || ![...this.playerWings, ...this.enemyWings].some(w => w.carrierId === carrier.id)) return false;
+    return dispatchShipCommand(carrier, { kind: 'recall' }).accepted;
+  }
+
+  private applyReserveDecks(): void {
+    for (const carrier of this.carriers.values()) {
+      if ((carrier.isDead || carrier.isRetreated) || !carrier.hullStats.reserveDeck || this.reserveDeckUsed.has(carrier)) continue;
+      const wings = [...this.playerWings, ...this.enemyWings].filter(w => w.carrierId === carrier.id);
+      if (!wings.length || wings.reduce((n,w) => n + w.crr,0) / wings.length > .4) continue;
+      this.reserveDeckUsed.add(carrier);
+      for (const wing of wings) {
+        wing.crr = 1;
+        const alive = [...carrier.deployedWingCraft].filter(c => !c.isDead && c.flightDeckWingId === wing.wingId).length;
+        const queue = this.recoveredCraft.get(wing.wingId) ?? [];
+        wing.rebuildQueue.length = 0;
+        for (let n = alive + queue.length; n < wing.maxCrafts; n++) queue.push({timer:.3 + this.random.next()*.3});
+        this.recoveredCraft.set(wing.wingId, queue);
+      }
     }
   }
 
@@ -174,24 +247,39 @@ export class FighterSystem {
     }
     for (let i = this.fighters.length - 1; i >= 0; i--) {
       if (!this.fighters[i].isDead && !this.dockedReserve.has(this.fighters[i])) continue;
+      this.fighters[i].sourceCarrier?.deployedWingCraft.delete(this.fighters[i]);
       this.dockedReserve.delete(this.fighters[i]);
       this.fighterAIModes.delete(this.fighters[i].id);
       this.fighters.splice(i, 1);
     }
     for (let i = this.bombers.length - 1; i >= 0; i--) {
       if (!this.bombers[i].isDead && !this.dockedReserve.has(this.bombers[i])) continue;
+      this.bombers[i].sourceCarrier?.deployedWingCraft.delete(this.bombers[i]);
       this.dockedReserve.delete(this.bombers[i]);
       this.bomberAIModes.delete(this.bombers[i].id);
       this.bombers.splice(i, 1);
     }
 
+    // Observe the threshold before natural recovery can move exactly 40% above it.
+    this.applyReserveDecks();
     for (const wing of [...this.playerWings, ...this.enemyWings]) {
       const carrier = (wing.carrierId && this.carriers.get(wing.carrierId)) || (wing.isPlayer ? playerShip : enemyShip);
+      const recovered = this.recoveredCraft.get(wing.wingId) ?? [];
+      if ((carrier.isDead || carrier.isRetreated)) { recovered.length = 0; this.recoveredCraft.delete(wing.wingId); }
+      let elapsed = dt;
+      while (recovered.length && elapsed > 0) {
+        const item = recovered[0], used = Math.min(elapsed, item.timer);
+        elapsed -= used; item.timer -= used;
+        if (item.timer > 1e-9) break;
+        recovered.shift();
+        const craft = this.spawnCraft(carrier, wing, 0);
+        if (item.reserveRemaining !== undefined) this.reserveCraft.set(craft, item.reserveRemaining);
+      }
       const aliveList = [...this.fighters, ...this.bombers].filter(c => c.flightDeckWingId === wing.wingId && !c.isDead);
-      const totalCrafts = aliveList.length + wing.rebuildQueue.length;
+      const totalCrafts = aliveList.length + wing.rebuildQueue.length + recovered.length;
       let missing = wing.maxCrafts - totalCrafts;
 
-      while (missing > 0 && !carrier.isDead) {
+      while (missing > 0 && !(carrier.isDead || carrier.isRetreated)) {
         const baseTime = wing.rebuildSeconds ?? 12;
         const rebuildTime = baseTime * carrier.hullStats.fighterRefitTimeMultiplier / Math.max(0.3, wing.crr);
         wing.rebuildQueue.push({
@@ -200,20 +288,20 @@ export class FighterSystem {
           maxTimer: rebuildTime
         });
         // 损失战机导致 CRR 战备率轻微衰减
-        wing.crr = Math.max(0.3, wing.crr - 0.04);
+        wing.crr = Math.max(0.3, wing.crr - 0.04 * carrier.hullStats.replacementRateDecreaseMultiplier);
         missing--;
       }
 
       // 甲板空闲或满编时，战备率缓慢自然回升
       if (wing.rebuildQueue.length === 0) {
-        wing.crr = Math.min(1.0, wing.crr + 0.015 * dt);
+        wing.crr = Math.min(1.0, wing.crr + 0.015 * dt * (1 + carrier.hullStats.replacementRateIncreasePercent / 100) * carrier.hullStats.replacementRateIncreaseMultiplier);
       }
 
       // 更新机库重建倒计时
       for (let i = wing.rebuildQueue.length - 1; i >= 0; i--) {
         const item = wing.rebuildQueue[i];
         item.timer -= dt;
-        if (item.timer <= 0 && !carrier.isDead) {
+        if (item.timer <= 0 && !(carrier.isDead || carrier.isRetreated)) {
           wing.rebuildQueue.splice(i, 1);
           this.spawnCraft(carrier, wing, aliveList.length);
           fx.recordFighterRebuilt(wing.isPlayer);
@@ -221,6 +309,7 @@ export class FighterSystem {
         }
       }
     }
+    this.applyReserveDecks();
   }
 
   /**
@@ -246,7 +335,9 @@ export class FighterSystem {
       const ftr = this.fighters[i];
       if (ftr.isDead) continue;
 
+      ftr.brakeInput = false; ftr.strafeInput = 0;
       const isPlayer = ftr.isPlayer;
+      const teamId = ftr.teamId;
       const friendlyCapital = this.carrierFor(ftr, isPlayer ? playerShip : enemyShip);
       if (this.returnReserve(ftr, friendlyCapital, dt, isPlayer ? enemyShip : playerShip, spawnProj, spawnBeam, spawnFlash)) continue;
 
@@ -263,15 +354,16 @@ export class FighterSystem {
       const fleetOrder = isPlayer ? fx.getOrder('fleet') : undefined;
       const activeOrder = specificOrder || fleetOrder;
       const hostileCapital = fx.findHostile?.(ftr, activeOrder?.targetShipId) ?? (isPlayer ? enemyShip : playerShip);
-      ftr.currentTargetShip = hostileCapital.isDead ? null : hostileCapital;
+      const hostileKnown = !hostileCapital.isDead && hostileCapital.isVisibleTo(ftr.teamId);
+      ftr.currentTargetShip = hostileKnown ? hostileCapital : null;
 
       // 敌方来袭重型导弹检测 (点防近程威胁)
       const nearbyHostileMissile = projectiles.find(
-        (p) => p.isRocket && p.isPlayer !== isPlayer && p.pos.distanceTo(ftr.pos) < 680
+        (p) => p.isRocket && !sameTeam(p, ftr) && p.pos.distanceTo(ftr.pos) < 680
       );
 
       // 敌方航空中队检测 (空战咬尾目标)
-      const opposingCrafts = [...this.fighters, ...this.bombers].filter(f => f.isPlayer !== isPlayer && !f.isDead);
+      const opposingCrafts = [...this.fighters, ...this.bombers].filter(f => f.teamId !== teamId && !f.isDead && f.isVisibleTo(teamId));
 
       let closestOpposingCraft: Ship | null = null;
       let minOpposingDist = 950;
@@ -284,7 +376,14 @@ export class FighterSystem {
       }
 
       // 1. 点防威胁最高优先：拦截威胁母舰与战机编队的导弹
-      if (nearbyHostileMissile) {
+      const range = this.wingRange(ftr, friendlyCapital);
+      const mustGuard = !friendlyCapital.isDead && (range <= 0 || ftr.pos.distanceTo(friendlyCapital.pos) > range
+        || (hostileCapital.pos.distanceTo(friendlyCapital.pos) > range && !nearbyHostileMissile && !closestOpposingCraft));
+      if (mustGuard || (!hostileKnown && !nearbyHostileMissile && !closestOpposingCraft && !activeOrder)) {
+        modeData.state = 'ESCORT';
+        this.guardCarrier(ftr, friendlyCapital, closestOpposingCraft ?? hostileCapital, i);
+        if (nearbyHostileMissile) { ftr.aimTargetWorld.copy(nearbyHostileMissile.pos); ftr.isFiringMain = true; }
+      } else if (nearbyHostileMissile) {
         modeData.state = 'INTERCEPT';
         const toM = nearbyHostileMissile.pos.clone().sub(ftr.pos);
         ftr.aimTargetWorld = nearbyHostileMissile.pos.clone();
@@ -298,7 +397,7 @@ export class FighterSystem {
         ftr.throttle = toM.length() > 200 ? 1.0 : 0.4;
       }
       // 2. 玩家召回令：强制返航母舰护卫
-      else if (isPlayer && this.isFighterRecall) {
+      else if (friendlyCapital.fighterRecall) {
         modeData.state = 'ESCORT';
         const escortSlot = formationOffsets[i % formationOffsets.length];
         const targetWorldPos = friendlyCapital.pos.clone().add(escortSlot.clone().rotate(friendlyCapital.facingRad));
@@ -371,7 +470,7 @@ export class FighterSystem {
         }
       }
       // 5. 敌舰在攻击范围内：发起俯冲扫射突击 (Attack Run)
-      else if (!hostileCapital.isDead && ftr.pos.distanceTo(hostileCapital.pos) < 1800) {
+      else if (hostileKnown && ftr.pos.distanceTo(hostileCapital.pos) < 1800) {
         modeData.state = 'ATTACK';
         const toHostile = hostileCapital.pos.clone().sub(ftr.pos);
         const dist = toHostile.length();
@@ -422,7 +521,7 @@ export class FighterSystem {
         }
       }
 
-      ftr.update(dt, hostileCapital, spawnProj, spawnBeam, spawnFlash);
+      ftr.update(dt, hostileKnown ? hostileCapital : null, spawnProj, spawnBeam, spawnFlash);
 
       // 战机尾气推进火焰粒子
       if (Math.abs(ftr.throttle) > 0.1 && this.visualRandom.next() < 0.6) {
@@ -475,7 +574,8 @@ export class FighterSystem {
       if (bmr.isDead) continue;
       const friendlyCapital = this.carrierFor(bmr, bmr.isPlayer ? playerShip : enemyShip);
       if (this.returnReserve(bmr, friendlyCapital, dt, bmr.isPlayer ? enemyShip : playerShip, spawnProj, spawnBeam, spawnFlash)) continue;
-      const recalled = bmr.isPlayer && this.isFighterRecall;
+      bmr.brakeInput = false; bmr.strafeInput = 0;
+      const recalled = friendlyCapital.fighterRecall;
 
       let mode = this.bomberAIModes.get(bmr.id);
       if (!mode) {
@@ -500,7 +600,8 @@ export class FighterSystem {
       const fleetOrder = bmr.isPlayer ? fx.getOrder('fleet') : undefined;
       const activeOrder = specificOrder || fleetOrder;
       const hostileCapital = fx.findHostile?.(bmr, activeOrder?.targetShipId) ?? (bmr.isPlayer ? enemyShip : playerShip);
-      bmr.currentTargetShip = hostileCapital.isDead ? null : hostileCapital;
+      const hostileKnown = !hostileCapital.isDead && hostileCapital.isVisibleTo(bmr.teamId);
+      bmr.currentTargetShip = hostileKnown ? hostileCapital : null;
       bmr.isFiringMain = false;
       if (mode.state === 'DOCKED' && friendlyCapital.isDead) mode.state = 'RETURN_TO_REARM';
 
@@ -531,7 +632,7 @@ export class FighterSystem {
 
         if (dist < 70 && !mode.hasTorpedo && !friendlyCapital.isDead) {
           mode.state = 'DOCKED';
-          mode.timer = 3.2;
+          mode.timer = 3.2 + (this.wingFor(bmr)?.rebuildSeconds ?? 0) * friendlyCapital.hullStats.fighterRearmTimeFraction;
           fx.addFloatingText(bmr.pos, 'DOCKING & REARMING...', [120, 210, 255], 12, 1.5);
         } else {
           const targetAngle = toDock.heading();
@@ -542,6 +643,9 @@ export class FighterSystem {
           bmr.throttle = Math.min(1.0, dist / 180);
           bmr.isFiringMain = false;
         }
+      } else if (!friendlyCapital.isDead && (this.wingRange(bmr, friendlyCapital) <= 0 || hostileCapital.pos.distanceTo(friendlyCapital.pos) > this.wingRange(bmr, friendlyCapital))) {
+        mode.state = 'ESCORT';
+        this.guardCarrier(bmr, friendlyCapital, hostileCapital, i);
       } else if (activeOrder && activeOrder.type === 'WAYPOINT' && activeOrder.targetPos) {
         // 执行战术航路点机动
         const toWp = activeOrder.targetPos.clone().sub(bmr.pos);
@@ -559,7 +663,7 @@ export class FighterSystem {
           bmr.turnInput = Math.sign(angleDiff);
           bmr.throttle = 1.0;
         }
-      } else if (!hostileCapital.isDead && mode.hasTorpedo) {
+      } else if (hostileKnown && mode.hasTorpedo) {
         // 发起鱼雷突袭攻击循环 (Torpedo Attack Run)
         mode.state = 'ATTACK_RUN';
         const targetShip = hostileCapital;
@@ -612,7 +716,9 @@ export class FighterSystem {
         }
       }
 
-      bmr.update(dt, hostileCapital, spawnProj, spawnBeam, spawnFlash);
+      bmr.update(dt, hostileKnown ? hostileCapital : null, spawnProj, spawnBeam, spawnFlash);
+      const finiteLaunchers = bmr.weapons.filter(w => w.spec.weaponType === 'MISSILE' && Number.isFinite(w.ammo));
+      if (mode.state !== 'DOCKED' && finiteLaunchers.length && finiteLaunchers.every(w => w.ammo <= 0 && w.burstRemaining <= 0)) { mode.hasTorpedo = false; mode.state = 'RETURN_TO_REARM'; }
 
       // 校验鱼雷是否真的离管：有限弹药挂点看弹药消耗，无限弹药挂点看冷却/连发/开火周期推进
       if (launchRequested) {

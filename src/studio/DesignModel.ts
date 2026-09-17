@@ -1,3 +1,5 @@
+import { randomId } from "../shared/RandomId";
+import { validCaptainProfile, type CaptainProfile } from "./CaptainProfile";
 import { combatSkillErrors } from "../engine/extensions/CombatSkills";
 import type { CombatSkillLoadout } from "../engine/extensions/CombatSkills";
 import { weaponFitsSlotType } from "../engine/content/WeaponCompatibility";
@@ -12,7 +14,7 @@ import type {
 } from "../engine/content/ShipSpec";
 import type { WeaponSpec } from "../engine/simulation/Weapon";
 import type { HullModSupport } from "../engine/extensions/HullMods";
-import { hullModDefinitions, hullModInstallReason, hullModLoadoutErrors, hullModOPCost, effectiveWeaponOP } from "../engine/extensions/HullMods";
+import { effectiveFighterBays, hullModDefinitions, hullModInstallReason, hullModLoadoutErrors, hullModOPCost, effectiveWeaponOP } from "../engine/extensions/HullMods";
 import { i18n } from "../engine/i18n/LocalizationManager";
 
 export interface RefitWing {
@@ -96,9 +98,12 @@ export interface Design {
   id: string;
   name: string;
   hullId: string;
+  sourceVariantId?: string;
   weapons: Record<string, string | null>;
   hullMods: string[];
+  sMods?: string[];
   captainSkills?: CombatSkillLoadout;
+  captainProfile?: CaptainProfile;
   /** Omitted only in legacy saves: retain their original fixed fighter decks. */
   /** Null is an empty deck; other decks keep their original positions. */
   wings?: (string | null)[];
@@ -137,7 +142,7 @@ export function compatibility(
   return null;
 }
 export function designHullSpec(d: Design): ShipSpec {
-  return { ...baseHull(d.hullId)!, hullMods: d.hullMods, captainSkills: d.captainSkills };
+  return { ...baseHull(d.hullId)!, hullMods: d.hullMods, sMods: d.sMods ?? [], captainSkills: d.captainSkills };
 }
 export function modReason(d: Design, id: string): string | null {
   if (!editableMods.includes(id)) return "当前版本不支持外装该插件";
@@ -153,16 +158,17 @@ export function weaponOPCost(d: Design, id: string): number {
 export function builtInWingIds(hullId: string): string[] {
   return (nativeRefit.sourceBuiltInWings?.[hullId] ?? []).filter(id => nativeRefit.wings?.[id]).slice(0, baseHull(hullId)?.fighterBays ?? 0);
 }
+export function designFighterBays(d: Design): number { return effectiveFighterBays(designHullSpec(d)); }
 export function designWingSlots(d: Design): (string | null)[] {
   const hull = baseHull(d.hullId)!;
   const legacy = () => (hull.fighterWings ?? []).map(wing => Object.entries(nativeRefit.wings ?? {})
     .find(([, entry]) => entry.specId === wing.specId && entry.count === wing.count)?.[0] ?? null);
   const configured = d.wings ?? legacy();
   const builtins = builtInWingIds(d.hullId);
-  return Array.from({length: hull.fighterBays ?? 0}, (_, index) => builtins[index] ?? configured[index] ?? null);
+  return Array.from({length: designFighterBays(d)}, (_, index) => builtins[index] ?? configured[index] ?? null);
 }
 export function withWing(d: Design, index: number, id: string | null): Design {
-  if (!Number.isInteger(index) || index < 0 || index >= (baseHull(d.hullId)?.fighterBays ?? 0)) throw new Error('战机甲板不存在。');
+  if (!Number.isInteger(index) || index < 0 || index >= designFighterBays(d)) throw new Error('战机甲板不存在。');
   if (index < builtInWingIds(d.hullId).length) throw new Error('内置联队不能更换或卸下。');
   if (id !== null && !nativeRefit.wings?.[id]) throw new Error('该舰载机联队尚未适配。');
   const wings = designWingSlots(d);
@@ -219,11 +225,12 @@ export function createDesign(
   }
   const d: Design = {
     version: 1,
-    id: crypto.randomUUID(),
+    id: randomId(),
     name: `${data.ships[hullId].name} · 方案 01`,
     hullId,
     weapons: equipped,
     hullMods: (hull.hullMods ?? []).filter((id) => editableMods.includes(id)),
+    sMods: [...(hull.sMods ?? [])],
     wings: (hull.fighterWings ?? []).flatMap(wing => {
       const match = Object.entries(nativeRefit.wings ?? {}).find(([, entry]) => entry.specId === wing.specId && entry.count === wing.count);
       return match ? [match[0]] : [];
@@ -258,6 +265,7 @@ export function createDesign(
     if (!isBuiltIn(hullId, slot.slotId)) d.weapons[slot.slotId] = null;
   }
   d.hullMods = [];
+  d.sMods = [];
   d.wings = [...builtInWingIds(hullId)];
   if (mode === "standard") {
     d.hullMods =
@@ -368,14 +376,16 @@ export function evaluate(d: Design): {
   spec.fluxDissipation =
     nativeHull(d.hullId).fluxDissipation + d.vents * data.dissipationPerVent;
   spec.shieldUpkeepBaseDissipation = nativeHull(d.hullId).fluxDissipation;
+  spec.sourceVariantId = d.sourceVariantId;
   spec.hullMods = [...d.hullMods];
+  spec.sMods = [...(d.sMods ?? [])];
   spec.captainSkills = structuredClone(d.captainSkills ?? {});
-  if (d.wings !== undefined && (!Array.isArray(d.wings) || d.wings.length > (hull.fighterBays ?? 0))) errors.push("舰载机联队超出机库数量");
+  if (d.wings !== undefined && (!Array.isArray(d.wings) || d.wings.length > designFighterBays(d))) errors.push("舰载机联队超出机库数量");
   spec.fighterWings = designWingSlots(d).flatMap(id => {
     if (id === null) return [];
     const wing = nativeRefit.wings?.[id];
     if (!wing) { errors.push("舰载机联队尚未适配：" + id); return []; }
-    return [{specId: wing.specId, role: wing.role, count: wing.count, rebuildSeconds: wing.rebuildSeconds, tags: wing.tags}];
+    return [{specId: wing.specId, role: wing.role, count: wing.count, rebuildSeconds: wing.rebuildSeconds, range: wing.range ?? undefined, tags: wing.tags}];
   });
   spec.weaponSlots = spec.weaponSlots.map((slot) => {
     const id = d.weapons[slot.slotId];
@@ -419,6 +429,7 @@ export function decodeDesign(input: unknown): Design {
   if (!input || typeof input !== "object")
     throw new Error("方案不是有效对象。");
   const d = input as Design;
+  if (d.sourceVariantId !== undefined && (typeof d.sourceVariantId !== "string" || !/^[a-zA-Z0-9_-]{1,160}$/.test(d.sourceVariantId))) throw new Error("原生方案身份无效。");
   if (
     d.version !== 1 ||
     typeof d.id !== "string" ||
@@ -466,7 +477,8 @@ export function decodeDesign(input: unknown): Design {
     new Set(d.hullMods).size !== d.hullMods.length
   )
     throw new Error("舰船插件无效。");
-  if (d.wings !== undefined && (!Array.isArray(d.wings) || d.wings.length > (hull.fighterBays ?? 0) || d.wings.some(id => id !== null && (typeof id !== "string" || !nativeRefit.wings?.[id])))) throw new Error("舰载机配置无效。");
+  if (d.sMods !== undefined && (!Array.isArray(d.sMods) || d.sMods.some(id => typeof id !== "string") || new Set(d.sMods).size !== d.sMods.length)) throw new Error("S-mod配置无效。");
+  if (d.wings !== undefined && (!Array.isArray(d.wings) || d.wings.length > designFighterBays(d) || d.wings.some(id => id !== null && (typeof id !== "string" || !nativeRefit.wings?.[id])))) throw new Error("舰载机配置无效。");
   if (!Array.isArray(d.groups) || ![5, 7].includes(d.groups.length))
     throw new Error("武器组无效。");
   const assigned = new Set<string>();
@@ -488,6 +500,7 @@ export function decodeDesign(input: unknown): Design {
   }
   for (const [slot, id] of Object.entries(d.weapons))
     if (id && !assigned.has(slot)) throw new Error("已安装武器未分配武器组。");
+  if (d.captainProfile !== undefined && !validCaptainProfile(d.captainProfile)) throw new Error("舰长姓名或头像无效。");
   const skillErrors = combatSkillErrors(d.captainSkills);
   if (skillErrors.length) throw new Error(skillErrors.join("；"));
   const modErrors = hullModLoadoutErrors(designHullSpec(d));
@@ -508,15 +521,18 @@ export function readLibrary(): {
   library: DesignLibrary;
   error: string | null;
   protected: boolean;
+  /** Exact observed bytes for write-before-overwrite conflict detection. */
+  observedRaw: string | null;
 } {
   const fresh = () => ({
     version: 1 as const,
     draft: createDesign(),
     designs: [],
   });
+  let raw: string | null = null;
   try {
-    const raw = localStorage.getItem(storageKey);
-    if (!raw) return { library: fresh(), error: null, protected: false };
+    raw = localStorage.getItem(storageKey);
+    if (raw === null) return { library: fresh(), error: null, protected: false, observedRaw: raw };
     if (raw.length > 2_000_000) throw new Error("方案库过大");
     const value = JSON.parse(raw);
     if (
@@ -541,15 +557,31 @@ export function readLibrary(): {
       library: { version: 1, draft, designs, baseline },
       error: null,
       protected: false,
+      observedRaw: raw,
     };
   } catch (e) {
     return {
       library: fresh(),
       error: `未覆盖原方案数据：${e instanceof Error ? e.message : String(e)}。当前仅在内存编辑，可导出方案备份。`,
       protected: true,
+      observedRaw: raw,
     };
   }
 }
+export class DesignLibraryConflictError extends Error {
+  constructor() { super('另一页面修改了方案库。本页已暂停写入，请先导出当前方案，再刷新。'); }
+}
+
+/** Detect stale readers even before the browser delivers its storage event.
+ * This is an optimistic guard, not a cross-process atomic transaction. */
+export function writeLibrary(library: DesignLibrary, observedRaw: string | null): string {
+  const raw = JSON.stringify(library);
+  if (raw.length > 2_000_000 || library.designs.length > 100) throw new Error('方案库超过保存上限，请先导出备份。');
+  if (localStorage.getItem(storageKey) !== observedRaw) throw new DesignLibraryConflictError();
+  localStorage.setItem(storageKey, raw);
+  return raw;
+}
+
 export const builtInModName = (id: string) =>
   hullModDefinitions.get(id)?.name ?? id;
 

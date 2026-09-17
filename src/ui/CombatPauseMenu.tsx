@@ -1,3 +1,4 @@
+import { LocalBattleSizeSettings } from "./BattleSizeControl";
 import { effectiveHullStats } from '../engine/extensions/HullMods';
 import { useState } from "react";
 import type { ShipSpec } from "../engine/content/ShipSpec";
@@ -100,6 +101,7 @@ export function CombatSettingsMenu({
         footer={<NativeButton onClick={onClose}>返回</NativeButton>}
       >
         <div className="combat-settings">
+          <LocalBattleSizeSettings/>
           <h3>操纵</h3>
           <label>
             <span>默认鼠标转向</span>

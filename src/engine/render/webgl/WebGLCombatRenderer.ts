@@ -317,7 +317,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
 
     if (frame.layers.has('hull')) {
       for (const ship of engine.ships) {
-        if (!ship.isDead) renderShipPhase(ship, ship.interpolatedPos(alpha), ship.interpolatedFacing(alpha), ctx);
+        if (!ship.isDead && ship.isVisibleTo(engine.playerShip.teamId)) renderShipPhase(ship, ship.interpolatedPos(alpha), ship.interpolatedFacing(alpha), ctx);
       }
     }
 

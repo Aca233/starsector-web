@@ -1,5 +1,23 @@
 import { Vector2 } from '../../math/Vector2';
-import type { Ship } from '../Ship';
+import { nativeGetShieldCenter, type Ship } from '../Ship';
+
+interface ShieldOffsetMemo { x: number; y: number; facing: number; cx: number | undefined; cy: number | undefined; offset: number }
+const shieldOffsets = new WeakMap<Ship, ShieldOffsetMemo>();
+/** Exact offset length, including world-coordinate rounding. Invalidate on every source
+ * scalar; collision responses and same-step motion must not leave a stale extent. */
+export function shieldCenterOffset(ship: Ship): number {
+  if (ship.getShieldCenter !== nativeGetShieldCenter) return ship.getShieldCenter().distanceTo(ship.pos);
+  let memo = shieldOffsets.get(ship);
+  const x = ship.pos.x, y = ship.pos.y, facing = ship.facingRad;
+  const cx = ship.spec.shieldCenterX, cy = ship.spec.shieldCenterY;
+  if (!memo || !Object.is(memo.x, x) || !Object.is(memo.y, y) || !Object.is(memo.facing, facing)
+    || !Object.is(memo.cx, cx) || !Object.is(memo.cy, cy)) {
+    const offset = ship.getShieldCenter().distanceTo(ship.pos);
+    if (memo) Object.assign(memo, { x, y, facing, cx, cy, offset });
+    else { memo = { x, y, facing, cx, cy, offset }; shieldOffsets.set(ship, memo); }
+  }
+  return memo.offset;
+}
 
 const EPSILON = 1e-6;
 
@@ -201,14 +219,22 @@ export function getShieldCircleContact(
 }
 
 /** Distance to the actual deployed shield arc, not its full-circle broadphase.
- * Points outside the angular span may still be near a real arc endpoint. */
-export function distanceToDeployedShield(ship: Ship, worldPoint: Vector2): number {
+ * Points outside the angular span may still be near a real arc endpoint.
+ * With a finite limit, a proven out-of-range result may be Infinity instead of the exact distance. */
+export function distanceToDeployedShield(ship: Ship, worldPoint: Vector2, limit = Infinity): number {
   if (!isShieldCollisionActive(ship)) return Number.POSITIVE_INFINITY;
   const center = ship.getShieldCenter();
   const radial = worldPoint.clone().sub(center);
   const radius = ship.shield.radius;
   const facing = ship.shield.type === 'FRONT' ? ship.facingRad : ship.shield.facingAngleRad;
   const halfArc = Math.min(360, ship.shield.currentArcDeg) * Math.PI / 360;
+  // Optional distance-limited query: an enclosing square can prove that the
+  // exact arc is farther than limit. Near/exceptional cases use the original math.
+  const scale = Math.max(1, Math.abs(worldPoint.x), Math.abs(worldPoint.y), Math.abs(center.x), Math.abs(center.y), radius, limit);
+  if (limit >= 0 && radius >= 0 && scale <= 1e100 && Number.isFinite(facing) && Number.isFinite(halfArc)) {
+    const reach = radius + limit + 1e-7 * scale;
+    if (Math.abs(radial.x) > reach || Math.abs(radial.y) > reach) return Infinity;
+  }
   const angle = Math.atan2(radial.y, radial.x);
   const diff = Math.atan2(Math.sin(angle - facing), Math.cos(angle - facing));
   if (Math.abs(diff) <= halfArc) return Math.abs(radial.length() - radius);

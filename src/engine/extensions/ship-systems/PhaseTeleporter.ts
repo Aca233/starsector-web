@@ -1,3 +1,4 @@
+import { sameTeam } from "../../simulation/CombatTeams";
 import { Vector2 } from '../../math/Vector2';
 import type { Ship } from '../../simulation/Ship';
 import type { ShipSystem } from '../../simulation/ShipSystem';
@@ -48,15 +49,15 @@ export function findTeleportDestination(ship: Ship, desired: Vector2, range: num
   return null;
 }
 
-function facingAfterJump(ship: Ship, destination: Vector2, world: SystemWorld, displacer: boolean): number {
-  const selected = ship.currentTargetShip;
-  if (selected && !selected.isDead && destination.distanceTo(selected.pos) < 1500) return selected.pos.clone().sub(destination).heading();
+function facingAfterJump(ship: Ship, destination: Vector2, world: SystemWorld, displacer: boolean, input: ShipSystem['activationInput']): number {
+  const selected = input ? input.target : ship.currentTargetShip;
+  if (selected && !selected.isDead && selected.isVisibleTo(ship.teamId) && destination.distanceTo(selected.pos) < 1500) return selected.pos.clone().sub(destination).heading();
   // Native player skimmers fall back to the cursor direction at the departure point.
-  if (displacer && ship.fireControlMode === 'MANUAL') return ship.aimTargetWorld.clone().sub(ship.pos).heading();
+  if (displacer && ship.fireControlMode === 'MANUAL') return (input?.point??ship.aimTargetWorld).clone().sub(input?.origin??ship.pos).heading();
   let nearest: Ship | undefined;
   let distance = 1000;
   for (const other of world.ships) {
-    if (other === ship || other.isDead || other.isPlayer === ship.isPlayer || other.spec.hullSize === 'FIGHTER') continue;
+    if (other === ship || other.isDead || sameTeam(other, ship) || other.spec.hullSize === 'FIGHTER' || !other.isVisibleTo(ship.teamId)) continue;
     const current = destination.distanceTo(other.pos);
     if (current < distance) { nearest = other; distance = current; }
   }
@@ -65,33 +66,35 @@ function facingAfterJump(ship: Ship, destination: Vector2, world: SystemWorld, d
   return displacer || delta.length() <= 10 ? ship.facingRad : delta.heading();
 }
 
-function teleportDefinition(id: string, sourceId: string, name: string, range: number, charges?: number, regen?: number): ShipSystemDefinition {
+export function teleportDefinition(id: string, sourceId: string, name: string, range: number, charges?: number, regen?: number): ShipSystemDefinition {
   const skimmer = sourceId !== 'phaseteleporter';
   return {
     id, sourceIds: [sourceId], name,
     description: skimmer
       ? `沿当前速度方向闪现最多 ${range} 距离（低速时向前）；短暂相位免疫，储存 ${charges} 次，恢复速率 ${regen}/秒。`
       : '向瞄准点传送最多 1500 距离，传送后速度减半；预热时可受击，退相位期间免疫，冷却 15 秒。',
-    implementationDetails: '按原版时序、方向、相位窗口与速度规则执行；用首个调度帧锁定目的地，到达前复查舰船/小行星。沿用圆形净空与确定性环搜索，限制最大跳距；无安全落点则原地消耗次数/冷却，不使用原版随机重叠回退。系统期间禁止武器/护盾；Web AI，无专用残影/镜头/音效。',
+    implementationDetails: '按原版时序、方向、相位窗口与速度规则执行；用接受指令时的输入锁定目的地，到达前复查舰船/小行星。沿用圆形净空与确定性环搜索，限制最大跳距；无安全落点则原地消耗次数/冷却，不使用原版随机重叠回退。系统期间禁止武器/护盾；Web AI，无专用残影/镜头/音效。',
     chargeUp: skimmer ? .25 : .5, active: 0, chargeDown: skimmer ? .25 : .5, cooldown: skimmer ? 0 : 15,
     ...(skimmer ? { charges, chargeRegen: regen } : {}),
     hardFlux: true,
     phase: { vulnerableChargeUp: !skimmer, vulnerableChargeDown: false },
     controls: { blockWeapons: true, blockShields: true, blockFluxDissipation: skimmer },
-    onActivate: (ship, world) => {
+    onActivate: (ship, world, system) => {
       const effectiveRange = range * ship.hullStats.systemRangeMultiplier;
-      plans.delete(ship.system);
+      plans.delete(system);
+      const input=system.activationInput;
       let desired: Vector2;
       if (skimmer) {
-        const direction = ship.vel.length() > 5 ? ship.vel.heading() : ship.facingRad;
-        desired = ship.pos.clone().add(Vector2.fromAngle(direction, effectiveRange));
-      } else desired = ship.aimTargetWorld.clone();
+        const velocity=input?.velocity??ship.vel;
+        const direction = velocity.length() > 5 ? velocity.heading() : input?.facing??ship.facingRad;
+        desired = (input?.origin??ship.pos).clone().add(Vector2.fromAngle(direction, effectiveRange));
+      } else desired = (input?.point??ship.aimTargetWorld).clone();
       const destination = findTeleportDestination(ship, desired, effectiveRange, world);
-      if (destination) plans.set(ship.system, { destination, facing: facingAfterJump(ship, destination, world, skimmer) });
+      if (destination) plans.set(system, { destination, facing: facingAfterJump(ship, destination, world, skimmer, input) });
     },
-    onActive: (ship, world) => {
-      const plan = plans.get(ship.system);
-      plans.delete(ship.system);
+    onActive: (ship, world, system) => {
+      const plan = plans.get(system);
+      plans.delete(system);
       if (!plan || ship.isDead || ship.hullHp <= 0 || ship.flux.isOverloaded || ship.flux.isVenting) return;
       // Ships and asteroids can move during charge-up. Never trust a stale clearance result.
       const destination = findTeleportDestination(ship, plan.destination, range * ship.hullStats.systemRangeMultiplier, world);

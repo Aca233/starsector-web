@@ -15,7 +15,8 @@ const classes = [
 ] as const;
 
 /** Filter/scroll state belongs to StudioApp, so choosing a hull never resets the browser. */
-export function HullRoster({ draft, spec, filter, onFilter, readScrollPosition, writeScrollPosition, onHull, inert }: {
+export function HullRoster({ draft, spec, filter, onFilter, readScrollPosition, writeScrollPosition, onHull, inert, unavailableReason }: {
+  unavailableReason?: (spec: ShipSpec) => string | null;
   draft: Design; spec: ShipSpec; filter: HullFilter; onFilter: (value: HullFilter) => void;
   readScrollPosition: () => number; writeScrollPosition: (value: number) => void; onHull: (id: string) => void; inert: boolean;
 }) {
@@ -65,11 +66,14 @@ export function HullRoster({ draft, spec, filter, onFilter, readScrollPosition, 
     <div className="refit-roster-results" ref={list} onScroll={e => {if (!inert) writeScrollPosition(e.currentTarget.scrollTop);}}>
       {(inert ? [spec] : shown).map(h => {
         const active = h.id === draft.hullId;
+        const unavailable = unavailableReason?.(h);
         return <button type="button" key={h.id} data-hull-id={h.id} className={'refit-roster-ship ' + (active ? 'is-current' : '')}
+          disabled={!!unavailable} title={unavailable ?? undefined}
           aria-pressed={active} aria-label={'改装' + data.ships[h.id].name + '级'} onClick={() => {if (!active) onHull(h.id);}}>
           {/* Keep one image and sizing rule across selection; the detailed fitted ship belongs to the central stage. */}
           <img loading="lazy" draggable={false} className="refit-roster-thumbnail" src={runtimeAssetUrl(h.spriteUrl)} alt="" />
           <span><strong>{data.ships[h.id].name}</strong><small>{data.ships[h.id].designation}{active ? ' · 改装中' : ''}</small>
+            {unavailable && <small className="refit-approx-label">{unavailable}</small>}
             {nativeRefit.shipStatus[h.id]?.level === 'approximate' && <small className="refit-approx-label">基础模拟</small>}
           </span>
         </button>;

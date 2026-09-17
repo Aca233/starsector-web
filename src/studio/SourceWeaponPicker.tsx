@@ -1,14 +1,14 @@
+import { WeaponInformation, WeaponIcon } from "./WeaponInformation";
+import { weaponMetadata as metadata, formatWeaponNumber as number } from "./WeaponTooltipData";
 import { NativeBitmapText } from "../ui/NativeBitmapText";
 import { NativeBorder } from "../ui/NativeChrome";
 import { NativeButton } from "../ui/NativeChrome";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Modal } from "../ui/core/UI";
 import { contentRegistry } from "../engine/content/ContentRegistry";
-import { runtimeAssetUrl } from "../engine/runtime/RuntimePaths";
 import type { WeaponMountSlotConfig } from "../engine/content/ShipSpec";
 import type { WeaponSpec } from "../engine/simulation/Weapon";
 import {
-  nativeRefit,
   compatibility,
   designHullSpec,
   weaponOPCost,
@@ -16,97 +16,16 @@ import {
   isBuiltIn,
   sizes,
   types,
-  weaponFluxPerSecond,
   weaponName,
   weapons,
 } from "./DesignModel";
 import type { Design } from "./DesignModel";
-import { effectiveHullModWeaponSpec } from "../engine/extensions/HullMods";
 import { effectiveWeaponRange } from "../engine/simulation/WeaponRange";
-import tooltipData from "./weapon-tooltip-data.json";
-import importedTooltips from "../engine/data/generated/refit-weapon-tooltips.json";
 import { matchesRefitSearch, refitSearchRank } from "./RefitSearch";
 import { FactionFilter } from "./FactionFilter";
 import { factionIndex, matchesFaction } from "./FactionModel";
 
-const metadata = { ...Object.fromEntries(Object.entries(nativeRefit.weapons).map(([id, w]) => [id, {manufacturer: w.manufacturer ?? "", role: w.role ?? "", accuracy: w.accuracy ?? "", turnRate: w.turnRate ?? "", description: w.description ?? ""}])), ...importedTooltips, ...tooltipData } as Record<
-  string,
-  {
-    manufacturer: string;
-    role: string;
-    accuracy: string;
-    turnRate: string;
-    description: string;
-  }
->;
-const damageIcons: Record<string, string> = {
-  KINETIC: "/game-assets/graphics/ui/icons/damagetype_kinetic.png",
-  ENERGY: "/game-assets/graphics/ui/icons/damagetype_energy.png",
-  HIGH_EXPLOSIVE:
-    "/game-assets/graphics/ui/icons/damagetype_high_explosive.png",
-  FRAGMENTATION: "/game-assets/graphics/ui/icons/damagetype_fragmentation.png",
-};
-const damageEffects: Record<string, string> = {
-  KINETIC: "200% vs 护盾，50% vs 装甲",
-  ENERGY: "100% vs 护盾，装甲，和结构",
-  HIGH_EXPLOSIVE: "50% vs 护盾，200% vs 装甲",
-  FRAGMENTATION: "25% vs 护盾，25% vs 装甲",
-};
-// BaseWeaponSpec / Oo0O: original display-name thresholds, not invented descriptions.
-const accuracyName = (w: WeaponSpec) => {
-  const spread = w.maxSpread ?? 0;
-  return w.isBeam || spread <= 0 ? "完美" : spread <= 2 ? "优秀" : spread <= 5 ? "良好" : spread <= 10 ? "中等" : spread <= 15 ? "较差" : spread <= 20 ? "很差" : "极差";
-};
-const turnRateName = (w: WeaponSpec) => {
-  const rate = w.turnRateDegPerSec ?? 0;
-  return rate <= 0 ? "无" : rate <= 5 ? "非常慢" : rate <= 15 ? "较慢" : rate <= 25 ? "中等" : rate <= 35 ? "较快" : rate <= 50 ? "非常快" : "优秀";
-};
 const weaponTypes = ["BALLISTIC", "ENERGY", "MISSILE"];
-const number = (value: number) => Number(value.toFixed(1)).toString();
-function cycleSeconds(w: WeaponSpec) {
-  return w.isBeam
-    ? (w.beamSourceChargeupTime ?? 0) +
-        (w.beamDuration ?? 0) +
-        (w.beamSourceChargedownTime ?? 0) +
-        (w.beamBurstDelay ?? 0)
-    : Math.max(
-        0.05,
-        w.refireDelay +
-          (w.chargeTime ?? 0) +
-          (Math.max(1, w.burstSize ?? 1) - 1) * (w.burstDelay ?? 0),
-      );
-}
-function dps(w: WeaponSpec) {
-  if (!w.isBeam)
-    return (w.damagePerShot * Math.max(1, w.burstSize ?? 1)) / cycleSeconds(w);
-  if (w.beamVisualMode !== "BURST") return w.damagePerSecond;
-  return (
-    (w.damagePerSecond *
-      ((w.beamSourceChargeupTime ?? 0) + (w.beamDuration ?? 0))) /
-    Math.max(0.001, cycleSeconds(w))
-  );
-}
-function WeaponIcon({ weapon }: { weapon: WeaponSpec }) {
-  return (
-    <span
-      className="source-weapon-icon"
-      data-type={weapon.weaponType}
-      aria-hidden="true"
-    >
-      <span>
-        <img
-          src={runtimeAssetUrl(
-            weapon.turretSpriteUrl ?? weapon.hardpointSpriteUrl ?? "",
-          )}
-          alt=""
-        />
-        {weapon.turretGunSpriteUrl && (
-          <img src={runtimeAssetUrl(weapon.turretGunSpriteUrl)} alt="" />
-        )}
-      </span>
-    </span>
-  );
-}
 
 /** WeaponPickerDialog: mount-anchored list with an interactive, row-anchored hover/focus tooltip. */
 export function SourceWeaponPicker({
@@ -130,7 +49,6 @@ export function SourceWeaponPicker({
   const [showFitted, setShowFitted] = useState(false);
   const costOf = (w: WeaponSpec) => locked ? 0 : weaponOPCost(draft, w.id);
   const rangeOf = (w: WeaponSpec) => showFitted ? effectiveWeaponRange(hullSpec, w) : w.range;
-  const fitted = (w: WeaponSpec) => showFitted ? effectiveHullModWeaponSpec(hullSpec, w) : w;
   const compatible = weapons.filter((w) => !compatibility(selected, w));
   const [search, setSearch] = useState("");
   const [advanced, setAdvanced] = useState(false);
@@ -187,7 +105,6 @@ export function SourceWeaponPicker({
     ? (preview.id === installed?.id ? installed : available.find(w => w.id === preview.id))
     : undefined;
   const candidateId = candidate?.id;
-  const meta = candidate ? metadata[candidate.id] : undefined;
   const isCurrent = candidate?.id === installed?.id;
   const compare = !!comparing && !!installed && !!candidate && !isCurrent;
   const toggleType = (type: string) => {
@@ -372,20 +289,6 @@ export function SourceWeaponPicker({
       </button>
     );
   };
-  const stat = (label: string, read: (weapon: WeaponSpec) => number | string) =>
-    candidate && (
-      <div
-        className="source-weapon-detail-stat"
-        key={label}
-        data-compare={compare}
-      >
-        <dt>{label}</dt>
-        {compare && (
-          <dd className="source-weapon-compare">{read(installed!)}</dd>
-        )}
-        <dd>{read(candidate)}</dd>
-      </div>
-    );
   return (
     <>
       <Modal
@@ -461,93 +364,9 @@ export function SourceWeaponPicker({
             <aside ref={detailsRef} id={detailsId} className="source-weapon-details" aria-label="武器详细参数"
               onMouseEnter={cancelHide} onMouseLeave={scheduleHide} onFocus={cancelHide} onBlur={scheduleHide}>
               <NativeBorder />
-              <h3>
-                <NativeBitmapText font="body" color="currentColor">{weaponName(candidate.id)}</NativeBitmapText>
-                {isCurrent && <em> - 当前安装</em>}
-              </h3>
-              <p className="source-weapon-manufacturer">
-                设计类型：<span>{meta?.manufacturer ?? "普通"}</span>
-              </p>
-              <p className="source-weapon-description">
-                {meta?.description.split("\n\n")[0]}
-              </p>
-              {meta?.description.includes("\n\n") && <p className="source-weapon-attribution">{meta.description.split("\n\n").slice(1).join("\n\n")}</p>}
-              <h4 className="source-weapon-stat-title"><button onClick={() => setShowFitted(value => !value)} title="点击切换原始数据 / 当前舰船插件加成后的数据">{showFitted ? "舰装后数据" : "原始数据"}{compare && <span>（当前安装 / 预览）</span>}</button></h4>
-              <div className="source-weapon-primary">
-                <WeaponIcon weapon={candidate} />
-                <dl>
-                  {stat(
-                    "战术应用",
-                    (w) => metadata[w.id]?.role || damageNames[w.type],
-                  )}
-                  {stat(
-                    "安装类型",
-                    (w) =>
-                      `${sizes[w.mountSize]}，${types[w.mountTypeOverride ?? w.weaponType ?? "ENERGY"]}`,
-                  )}
-                  {stat("装配点数", w => showFitted ? costOf(w) : nativeRefit.weapons[w.id]?.op ?? costOf(w))}
-                  <div className="source-weapon-stat-gap" />
-                  {stat("武器射程", (w) => number(rangeOf(w)))}
-                  {stat(
-                    "伤害",
-                    (w) =>
-                      number(w.isBeam ? w.damagePerSecond : w.damagePerShot) +
-                      (w.isBeam ? "/秒" : ""),
-                  )}
-                  {stat("伤害 / 秒", (w) => number(dps(w)))}
-                  <div className="source-weapon-stat-gap" />
-                  {stat("幅能 / 秒", (w) => number(weaponFluxPerSecond(fitted(w))))}
-                  {stat("幅能 / 每发射弹", (w) =>
-                    w.isBeam ? "—" : number(fitted(w).fluxPerShot),
-                  )}
-                  {stat("幅能 / 伤害", (w) =>
-                    dps(w) ? number(weaponFluxPerSecond(fitted(w)) / dps(w)) : "—",
-                  )}
-                </dl>
-              </div>
-              <h4>辅助数据</h4>
-              <div className="source-weapon-secondary">
-                <img
-                  className="source-damage-icon"
-                  src={runtimeAssetUrl(damageIcons[candidate.type])}
-                  alt=""
-                />
-                <dl>
-                  {stat("伤害类型", (w) => damageNames[w.type])}
-                  <div className="source-damage-effect">
-                    {damageEffects[candidate.type]}
-                  </div>
-                  <div className="source-weapon-stat-gap" />
-                  {stat(
-                    "精确度",
-                    (w) =>
-                      (!showFitted ? metadata[w.id]?.accuracy || accuracyName(w) : w.isBeam ? "精确"
-                        : `${number(w.minSpread ?? 0)}° - ${number(fitted(w).maxSpread ?? 0)}°`),
-                  )}
-                  {stat(
-                    "转向速度",
-                    (w) =>
-                      !showFitted ? metadata[w.id]?.turnRate || turnRateName(w) :
-                      showFitted && selected.mountType === "HARDPOINT" ? "固定挂点" :
-                      `${number(fitted(w).turnRateDegPerSec ?? 0)}°/秒`,
-                  )}
-                  <div className="source-weapon-stat-gap" />
-                  {stat("开火间隔 (秒)", (w) =>
-                    w.isBeam && w.beamVisualMode !== "BURST"
-                      ? "持续"
-                      : number(cycleSeconds(w)),
-                  )}
-                  {candidate.maxAmmo !== undefined &&
-                    stat("弹药容量", (w) => fitted(w).maxAmmo ?? "无限")}
-                </dl>
-              </div>
-              <button
-                type="button"
-                className="source-weapon-codex"
-                onClick={() => setEncyclopedia(candidate ?? null)}
-              >
-                按 <kbd>F2</kbd> 打开数据百科
-              </button>
+              <WeaponInformation candidate={candidate} installed={installed} draft={draft} selected={selected}
+                compare={compare} isCurrent={isCurrent} showFitted={showFitted}
+                onToggleFitted={() => setShowFitted(value => !value)} onOpenCodex={setEncyclopedia} />
             </aside>
           )}
         </div>

@@ -1,4 +1,4 @@
-import mineSpec from '../../../data/generated/mine-spec.json';
+import { nativeMineSpec } from '../../../extensions/NativeMines';
 import { visualRandom, visualObjectRandom } from '../../RenderDeterminism';
 import { CombatEngine } from '../../../simulation/CombatEngine';
 import { WebGLPassContext } from '../WebGLPassContext';
@@ -34,11 +34,12 @@ export class WebGLFXPass {
 
     // 1. 绘制折跃空间水雷 (Spatial Mines)
     if (renderExplosionLayer && engine.mines.length > 0) {
-      const mineBase = textures.getTexture('/game-assets/' + mineSpec.sprite);
-      const mineGlow = textures.getTexture('/game-assets/' + mineSpec.glowSprite);
       for (const m of engine.mines) {
+        const mineSpec = nativeMineSpec(m.weaponId);
+        const mineBase = textures.getTexture('/game-assets/' + mineSpec.sprite);
+        const mineGlow = textures.getTexture('/game-assets/' + mineSpec.glowSprite);
         batcher.setBlendMode('NORMAL');
-        const alpha = Math.min(1, m.age / 0.5);
+        const alpha = Math.min(1, m.age / Math.max(.001, m.fadeInSeconds ?? .5));
         batcher.drawSprite(mineBase, m.pos.x, m.pos.y, ...mineSpec.size as [number, number], m.rotation, 0, 0, 1, 1, 1, alpha);
 
         batcher.setBlendMode('ADDITIVE');
@@ -57,7 +58,7 @@ export class WebGLFXPass {
 
     if (renderShieldLayer) {
       for (const ship of engine.ships) {
-        if (ship.isDead) continue;
+        if (ship.isDead || !ship.isVisibleTo(engine.playerShip.teamId)) continue;
         const facing = ship.interpolatedFacing(ctx.alpha);
         const center = ship.getShieldCenter(ship.interpolatedPos(ctx.alpha), facing);
         const mainShieldTex = textures.getTexture(ship.shield.radius >= 128

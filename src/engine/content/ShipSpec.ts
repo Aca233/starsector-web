@@ -35,11 +35,14 @@ export interface FighterWingSpec {
   role: 'FIGHTER' | 'BOMBER';
   count: number;
   rebuildSeconds: number;
+  range?: number;
 }
 
 export interface ShipSpec {
   visualProfile?: ShipVisualProfile;
   debrisColor?: [number, number, number];
+  /** Source hull_styles overloadColor; omitted uses native [150,150,255]. */
+  overloadColor?: [number, number, number];
   id: string;
   nameKey: string;
   descKey: string;
@@ -86,12 +89,18 @@ export interface ShipSpec {
   shieldUpkeepBaseDissipation?: number;
   phaseCost?: number;
   phaseUpkeep?: number;
+  /** Source loadout identity survives refits; special systems never guess it from the hull name. */
+  sourceVariantId?: string;
+  /** Stable base hull identity; refit, simulation and LAN runtime IDs may change. */
+  sourceHullId?: string;
   systemType: ShipSystemType;
   /** Independent right-button defense slot; phase cloak is still owned by Shield. */
   defenseSystemType?: ShipSystemType;
   weaponSlots: WeaponMountSlotConfig[];
   /** Dedicated native SYSTEM launchers, never ordinary refit weapon slots. */
   systemWeaponSlots?: WeaponMountSlotConfig[];
+  /** Non-firing artwork stays outside the editable/targetable weapon collection. */
+  decorativeWeapons?: { id: string; x: number; y: number; angleDeg: number; spriteUrl: string; tags?: string[] }[];
   engineSlots: EngineSlotConfig[];
   /** Explicit custom multiplier; native hullmods are applied separately. */
   weaponRangeMult?: number;
@@ -99,8 +108,14 @@ export interface ShipSpec {
   sourceHullTraits?: string[];
   builtInHullMods?: string[];
   hullMods?: string[];
+  /** Built-in improvements or externally fitted permanent hullmods; never duplicate normal effects. */
+  sMods?: string[];
   /** Explicit piloted-ship combat preset; never campaign skill progression. */
   captainSkills?: import("../extensions/CombatSkills").CombatSkillLoadout;
+  /** Fractional per-deployment CR cost for custom ships and persistent combat events. */
+  deploymentCRCost?: number;
+  /** Native deployment points; required for custom hulls absent from the source cost catalog. */
+  deploymentPoints?: number;
   fighterBays?: number;
   fighterWings?: FighterWingSpec[];
   bounds: [number, number][];

@@ -1,9 +1,10 @@
 import weaponSounds from '../data/generated/weapon-sounds.json';
 import systemSounds from '../data/generated/system-sounds.json';
+import extraSystemSounds from './native-extra-system-sounds.json';
 import { assetManager } from '../assets/AssetResolver';
 import { immutableCopy } from '../extensions/Immutable';
 export interface SoundSample { file: string; pitch: number; volume: number }
-const nativeWeaponSounds: Record<string, readonly SoundSample[]> = {...weaponSounds,...systemSounds};
+const nativeWeaponSounds: Record<string, readonly SoundSample[]> = {...weaponSounds,...systemSounds,...extraSystemSounds};
 const paths: Record<string, string> = {
     // 武器开火
     tpc_fire: 'sounds/sfx_wpn_energy/thermal_pulse_cannon_fire_01.ogg',

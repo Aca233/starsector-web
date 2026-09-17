@@ -13,12 +13,13 @@ export class ShipDefenseController {
   public update(ship:Ship,threat:ThreatAssessment):{ventSafe:boolean;state:'UP'|'DOWN'|'PHASE'|'VENTING'} {
     ship.defenseFacingRad=threat.facing??undefined;
     const committed=ship.weapons.some(m=>m.burstRemaining>0 || m.firingState==='CHARGING' || (m.spec.isBeam&&m.spec.beamVisualMode==='BURST'&&m.firingState==='ACTIVE'));
-    const ventSafe=this.safeVentFor>=policy.calmBeforeLowering && ship.flux.baseDissipation>0 && !committed;
+    const ventSafe=this.safeVentFor>=policy.calmBeforeLowering && ship.flux.baseDissipation>0 && !committed && !ship.system.preventsAIVenting;
     if(ship.flux.isVenting)return {ventSafe,state:'VENTING'};
     if(ventSafe&&ship.flux.fluxPercent>=policy.ventFluxFraction&&!ship.shield.isPhaseEngaged&&!ship.flux.isOverloaded){
       if(ship.startVenting())return {ventSafe,state:'VENTING'};
     }
     if(!ship.canUseShields()) {ship.shield.setActive(false);return {ventSafe,state:'DOWN'};}
+    if(ship.shield.toggleLocked){ship.shield.setActive(true);return {ventSafe:false,state:'UP'};}
     const room=ship.flux.maxFlux-ship.flux.totalFlux;
     if(ship.shield.type==='PHASE'){
       const activation=ship.shield.isActive?0:ship.shield.phaseActivationCost;

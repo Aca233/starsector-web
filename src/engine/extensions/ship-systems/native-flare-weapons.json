@@ -351,5 +351,379 @@
       ],
       "type": "GLOW"
     }
+  },
+  "flarelauncher_fighter": {
+    "weapon": {
+      "id": "flarelauncher2",
+      "specClass": "projectile",
+      "type": "SYSTEM",
+      "size": "SMALL",
+      "turretSprite": "",
+      "hardpointSprite": "",
+      "hardpointOffsets": [
+        0,
+        0
+      ],
+      "turretOffsets": [
+        0,
+        0
+      ],
+      "hardpointAngleOffsets": [
+        0
+      ],
+      "turretAngleOffsets": [
+        0
+      ],
+      "barrelMode": "ALTERNATING",
+      "animationType": "SMOKE",
+      "interruptibleBurst": false,
+      "smokeSpec": {
+        "particleSizeMin": 10,
+        "particleSizeRange": 10,
+        "cloudParticleCount": 3,
+        "cloudDuration": 1,
+        "cloudRadius": 10,
+        "blowbackParticleCount": 0,
+        "blowbackDuration": 2,
+        "blowbackLength": 30,
+        "blowbackSpread": 10,
+        "particleColor": [
+          100,
+          100,
+          100,
+          150
+        ]
+      },
+      "projectileSpecId": "flare_fighter",
+      "fireSoundTwo": "launch_flare_1"
+    },
+    "row": {
+      "name": "诱饵发射器",
+      "id": "flarelauncher2",
+      "tier": "",
+      "rarity": "",
+      "base value": "",
+      "range": "200",
+      "damage/second": "",
+      "damage/shot": "10",
+      "emp": "0",
+      "impact": "",
+      "turn rate": "",
+      "OPs": "",
+      "ammo": "",
+      "ammo/sec": "0",
+      "reload size": "",
+      "type": "ENERGY",
+      "energy/shot": "0",
+      "energy/second": "0",
+      "chargeup": "0",
+      "chargedown": "0.1",
+      "burst size": "3",
+      "burst delay": "0.4",
+      "min spread": "30",
+      "max spread": "30",
+      "spread/shot": "0",
+      "spread decay/sec": "0",
+      "beam speed": "",
+      "proj speed": "200",
+      "launch speed": "100",
+      "flight time": "5",
+      "proj hitpoints": "500",
+      "autofireAccBonus": "",
+      "extraArcForAI": "",
+      "hints": "SYSTEM",
+      "tags": "",
+      "groupTag": "",
+      "tech/manufacturer": "",
+      "for weapon tooltip>>": "",
+      "primaryRoleStr": "",
+      "speedStr": "",
+      "trackingStr": "",
+      "turnRateStr": "",
+      "accuracyStr": "",
+      "customPrimary": "",
+      "customPrimaryHL": "",
+      "customAncillary": "",
+      "customAncillaryHL": "",
+      "noDPSInTooltip": "",
+      "number": "37"
+    },
+    "projectile": {
+      "id": "flare_fighter",
+      "specClass": "missile",
+      "missileType": "FLARE_JAMMER",
+      "sprite": "graphics/missiles/bomblet0.png",
+      "size": [
+        4,
+        4
+      ],
+      "center": [
+        2,
+        2
+      ],
+      "collisionRadius": 5,
+      "collisionClass": "FIGHTER",
+      "explosionColor": [
+        255,
+        125,
+        25,
+        255
+      ],
+      "explosionRadius": 75,
+      "flameoutTime": 1,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "behaviorSpec": {
+        "behavior": "CUSTOM",
+        "effectRange": 300,
+        "effectChance": 0.2
+      },
+      "engineSpec": {
+        "turnAcc": 600,
+        "turnRate": 400,
+        "acc": 750,
+        "dec": 0
+      },
+      "engineSlots": [
+        {
+          "id": "ES1",
+          "loc": [
+            0,
+            0
+          ],
+          "style": "CUSTOM",
+          "styleSpec": {
+            "engineColor": [
+              255,
+              125,
+              25,
+              255
+            ],
+            "contrailParticleSizeMult": 8,
+            "contrailParticleDuration": 2,
+            "contrailParticleFinalSizeMult": 0.5,
+            "contrailMaxSpeedMult": 0.1,
+            "contrailAngularVelocityMult": 0,
+            "contrailColor": [
+              55,
+              55,
+              55,
+              100
+            ],
+            "type": "SMOKE"
+          },
+          "width": 15,
+          "length": 15,
+          "angle": 180
+        }
+      ]
+    },
+    "engineStyle": {
+      "engineColor": [
+        255,
+        125,
+        25,
+        255
+      ],
+      "contrailParticleSizeMult": 8,
+      "contrailParticleDuration": 2,
+      "contrailParticleFinalSizeMult": 0.5,
+      "contrailMaxSpeedMult": 0.1,
+      "contrailAngularVelocityMult": 0,
+      "contrailColor": [
+        55,
+        55,
+        55,
+        100
+      ],
+      "type": "SMOKE"
+    }
+  },
+  "flarelauncher_single": {
+    "weapon": {
+      "id": "flarelauncher21",
+      "specClass": "projectile",
+      "type": "SYSTEM",
+      "size": "SMALL",
+      "turretSprite": "",
+      "hardpointSprite": "",
+      "hardpointOffsets": [
+        0,
+        0
+      ],
+      "turretOffsets": [
+        0,
+        0
+      ],
+      "hardpointAngleOffsets": [
+        0
+      ],
+      "turretAngleOffsets": [
+        0
+      ],
+      "barrelMode": "ALTERNATING",
+      "animationType": "SMOKE",
+      "interruptibleBurst": false,
+      "smokeSpec": {
+        "particleSizeMin": 10,
+        "particleSizeRange": 10,
+        "cloudParticleCount": 3,
+        "cloudDuration": 1,
+        "cloudRadius": 10,
+        "blowbackParticleCount": 0,
+        "blowbackDuration": 2,
+        "blowbackLength": 30,
+        "blowbackSpread": 10,
+        "particleColor": [
+          100,
+          100,
+          100,
+          150
+        ]
+      },
+      "projectileSpecId": "flare_fighter",
+      "fireSoundTwo": "launch_flare_1"
+    },
+    "row": {
+      "name": "诱饵发射器 (单发)",
+      "id": "flarelauncher21",
+      "tier": "",
+      "rarity": "",
+      "base value": "",
+      "range": "200",
+      "damage/second": "",
+      "damage/shot": "10",
+      "emp": "0",
+      "impact": "",
+      "turn rate": "",
+      "OPs": "",
+      "ammo": "",
+      "ammo/sec": "0",
+      "reload size": "",
+      "type": "ENERGY",
+      "energy/shot": "0",
+      "energy/second": "0",
+      "chargeup": "0",
+      "chargedown": "0.1",
+      "burst size": "1",
+      "burst delay": "",
+      "min spread": "30",
+      "max spread": "30",
+      "spread/shot": "0",
+      "spread decay/sec": "0",
+      "beam speed": "",
+      "proj speed": "200",
+      "launch speed": "100",
+      "flight time": "5",
+      "proj hitpoints": "500",
+      "autofireAccBonus": "",
+      "extraArcForAI": "",
+      "hints": "SYSTEM",
+      "tags": "",
+      "groupTag": "",
+      "tech/manufacturer": "",
+      "for weapon tooltip>>": "",
+      "primaryRoleStr": "",
+      "speedStr": "",
+      "trackingStr": "",
+      "turnRateStr": "",
+      "accuracyStr": "",
+      "customPrimary": "",
+      "customPrimaryHL": "",
+      "customAncillary": "",
+      "customAncillaryHL": "",
+      "noDPSInTooltip": "",
+      "number": "37"
+    },
+    "projectile": {
+      "id": "flare_fighter",
+      "specClass": "missile",
+      "missileType": "FLARE_JAMMER",
+      "sprite": "graphics/missiles/bomblet0.png",
+      "size": [
+        4,
+        4
+      ],
+      "center": [
+        2,
+        2
+      ],
+      "collisionRadius": 5,
+      "collisionClass": "FIGHTER",
+      "explosionColor": [
+        255,
+        125,
+        25,
+        255
+      ],
+      "explosionRadius": 75,
+      "flameoutTime": 1,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "behaviorSpec": {
+        "behavior": "CUSTOM",
+        "effectRange": 300,
+        "effectChance": 0.2
+      },
+      "engineSpec": {
+        "turnAcc": 600,
+        "turnRate": 400,
+        "acc": 750,
+        "dec": 0
+      },
+      "engineSlots": [
+        {
+          "id": "ES1",
+          "loc": [
+            0,
+            0
+          ],
+          "style": "CUSTOM",
+          "styleSpec": {
+            "engineColor": [
+              255,
+              125,
+              25,
+              255
+            ],
+            "contrailParticleSizeMult": 8,
+            "contrailParticleDuration": 2,
+            "contrailParticleFinalSizeMult": 0.5,
+            "contrailMaxSpeedMult": 0.1,
+            "contrailAngularVelocityMult": 0,
+            "contrailColor": [
+              55,
+              55,
+              55,
+              100
+            ],
+            "type": "SMOKE"
+          },
+          "width": 15,
+          "length": 15,
+          "angle": 180
+        }
+      ]
+    },
+    "engineStyle": {
+      "engineColor": [
+        255,
+        125,
+        25,
+        255
+      ],
+      "contrailParticleSizeMult": 8,
+      "contrailParticleDuration": 2,
+      "contrailParticleFinalSizeMult": 0.5,
+      "contrailMaxSpeedMult": 0.1,
+      "contrailAngularVelocityMult": 0,
+      "contrailColor": [
+        55,
+        55,
+        55,
+        100
+      ],
+      "type": "SMOKE"
+    }
   }
 }

@@ -175,6 +175,7 @@ export class StarsectorDataLoader {
       spriteUrl: assetResolver.url(spriteRel),
       phaseHighlightSpriteUrl: phaseSprite(phaseSpec?.phaseHighlight),
       phaseDiffuseSpriteUrl: phaseSprite(phaseSpec?.phaseDiffuse),
+      overloadColor: hullStyle?.overloadColor?.slice(0, 3),
       explosionColor: hullStyle?.combatExplosionNonFlashColorOverride?.slice(0, 3),
       explosionFlashColor: hullStyle?.baseCombatExplosionColor?.slice(0, 3),
       spriteWidth,
@@ -184,6 +185,8 @@ export class StarsectorDataLoader {
       collisionRadius: shipJson.collisionRadius,
       mass,
       hullSize: shipJson.hullSize,
+      // Native DP is supplies-to-recover, not fleet strength or ordnance points.
+      deploymentPoints: Number(row['supplies/rec']) > 0 ? Number(row['supplies/rec']) : undefined,
       fighterBays: Number(row['fighter bays'] || 0),
       sourceHullTraits: [...(shipJson.builtInMods ?? []), ...(row.hints ?? '').split(/[,\s]+/).filter(Boolean)],
       builtInHullMods: shipJson.builtInMods ?? [],
@@ -267,11 +270,9 @@ export class StarsectorDataLoader {
       options.reportApproximation('Negative native visual recoil is not rendered; recoil animation disabled.');
       wpnJson.visualRecoil = 0;
     }
-    if (material.hitGlowRadius < 0) {
-      if (!options.reportApproximation) throw new Error(weaponId + ': negative hit glow radius');
-      options.reportApproximation('Native negative hit-glow sentinel uses a disabled hit glow in Web.');
-      material.hitGlowRadius = 0;
-    }
+    // Preserve native hit-glow sentinels: a negative projectile radius disables
+    // ordinary hit particles; zero requests an automatic radius from shot length.
+    // Converting -1 to 0 can turn a scripted moving ray into a map-sized flash.
     if (wpnJson.muzzleFlashSpec?.length < 0) {
       if (!options.reportApproximation) throw new Error(weaponId + ': negative muzzle flash length');
       options.reportApproximation('Native reverse-length muzzle flash is not rendered; muzzle particle flash omitted.');

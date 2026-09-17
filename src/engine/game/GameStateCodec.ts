@@ -34,6 +34,8 @@ export function decodeFleetMember(value: unknown): FleetMember {
   if (combatSkillErrors(raw.captainSkills).length) fail('舰长战斗技能');
   const skills = raw.captainSkills as CombatSkillLoadout | undefined;
   return {
+    ...(raw.sourceVariantId === undefined ? {} : {sourceVariantId:text(raw.sourceVariantId, '原生方案 ID')}),
+    ...(raw.sMods === undefined ? {} : { sMods: unique(array(raw.sMods, 'S-mod').map(id => text(id, 'S-mod ID')), id => id, '重复S-mod') }),
     ...(raw.hullMods === undefined ? {} : { hullMods: unique(array(raw.hullMods, '舰装').map(id => text(id, '舰装 ID')), id => id, '重复舰装') }),
     ...(skills === undefined ? {} : { captainSkills: { ...skills } }),
     ...(raw.fighterWings === undefined ? {} : { fighterWings: array(raw.fighterWings, '舰载机联队').map(input => {
@@ -42,6 +44,7 @@ export function decodeFleetMember(value: unknown): FleetMember {
       const count = integer(wing.count, '联队数量', 100), rebuildSeconds = number(wing.rebuildSeconds, '补充时间');
       if (!count || rebuildSeconds <= 0) fail('联队数量或补充时间');
       return { specId: text(wing.specId, '舰载机舰体'), role: wing.role as 'FIGHTER' | 'BOMBER', count, rebuildSeconds,
+        ...(wing.range === undefined ? {} : {range: number(wing.range, '联队交战范围')}),
         ...(wing.tags === undefined ? {} : {tags: array(wing.tags, '联队标记').map(t => text(t, '联队标记'))}) };
     }) }),
     ...(raw.weaponGroups === undefined ? {} : { weaponGroups: unique(array(raw.weaponGroups, '武器组').map(input => {
@@ -75,6 +78,13 @@ export function decodeCombatRequest(value: unknown): CombatRequest {
     id: text(raw.id, '出击 ID'), kind: kind(raw.kind), seed: integer(raw.seed, '随机种子', 0xffffffff),
     playerFleet: roster(raw.playerFleet), enemyFleet: roster(raw.enemyFleet)
   };
+  if(raw.deploymentPointLimit!==undefined){result.deploymentPointLimit=number(raw.deploymentPointLimit,'部署上限',20000);if(!result.deploymentPointLimit)fail('部署上限');}
+  for(const [key,fleet] of [['initialPlayerIds',result.playerFleet],['initialEnemyIds',result.enemyFleet]] as const){
+    if(raw[key]===undefined)continue;
+    const ids=unique(array(raw[key],'首发名单').map(id=>text(id,'首发舰船')),id=>id,'重复首发舰船');
+    if(!ids.includes(fleet[0].id)||ids.some(id=>!fleet.some(s=>s.id===id)))fail('首发名单必须包含旗舰且属于本方舰队');
+    result[key]=ids;
+  }
   const all = [...result.playerFleet, ...result.enemyFleet];
   unique(all, s => s.id, '敌我舰船 ID 冲突');
   if (all.some(s => s.status !== 'ready')) fail('战沉舰船不能出击');

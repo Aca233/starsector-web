@@ -12,6 +12,7 @@ export const en_US: Record<string, string> = {
   'hud.flux': 'Flux Level',
   'hud.flux_soft': 'Soft Flux',
   'hud.flux_hard': 'Hard Flux',
+  'combat.overloaded': 'OVERLOADED!',
   'hud.overloaded': 'SYSTEM OVERLOADED! Cooling down: {time}s',
   'hud.venting': 'Venting flux... {progress}%',
   'hud.system_burn_drive': 'Burn Drive System',

@@ -1,0 +1,12 @@
+.battle-size-control { min-width: 0; }
+.battle-size-control h3 { margin: 12px 0; }
+.battle-size-control label { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.battle-size-control select { max-width: 100%; color: var(--native-text, #b8c8c4); background: #0c171b; border: 1px solid #456365; padding: 6px 10px; font: inherit; }
+.battle-size-control input[type="range"] { display: block; width: 100%; margin: 16px 0; accent-color: #95c2bc; }
+.battle-size-control p, .battle-size-note { font-size: 13px; line-height: 1.65; color: #9aaead; }
+.battle-size-control .battle-size-budget { color: #c9dfd9; }
+.battle-size-control .battle-size-warning { color: #d9b46e; }
+.battle-size-control :disabled { opacity: .65; cursor: default; }
+
+.lan-room-settings .battle-size-control label { display: flex; text-align: left; }
+.lan-room-settings .battle-size-control select { width: auto; }

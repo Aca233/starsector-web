@@ -70,7 +70,7 @@ export function advanceTachyonLance(beam: Beam, target: Ship | undefined, ctx: W
   ctx.fx.spawnNativeEmpArc(from, end, target, beam.width + 5,
     beam.fringeColor ?? [...beam.color, 255], beam.coreColor ?? [255, 255, 255, 255]);
   const result = target.armor.takeDamage(point.local, damage * target.crDamageTakenMultiplier, 'ENERGY');
-  target.hullHp = Math.max(0, target.hullHp - result.hullDamage);
+  target.applyHullDamage(result.hullDamage);
   ctx.fx.spawnArmorDamageSparks(target, point.local, result.armorDamage);
   const source = (ctx.ships ?? [ctx.playerShip, ctx.enemyShip, ...ctx.fighters]).find(s => s.id === beam.sourceShipId);
   applyComponentDamage(target, point.local, result, emp, source);

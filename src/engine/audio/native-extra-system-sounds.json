@@ -1,0 +1,225 @@
+{
+  "system_orion_device_fire": [
+    {
+      "file": "sounds/sfx_systems/orion_device_charge_1.ogg",
+      "pitch": 1,
+      "volume": 1
+    }
+  ],
+  "system_nova_burst_fire": [
+    {
+      "file": "sounds/sfx_systems/nova_burst_charge_1.ogg",
+      "pitch": 1,
+      "volume": 0.5
+    },
+    {
+      "file": "sounds/sfx_systems/nova_burst_charge_2.ogg",
+      "pitch": 1,
+      "volume": 0.5
+    },
+    {
+      "file": "sounds/sfx_systems/nova_burst_charge_3.ogg",
+      "pitch": 1,
+      "volume": 0.5
+    }
+  ],
+  "system_orion_device_explosion": [
+    {
+      "file": "sounds/sfx_systems/orion_device_detonate_1.ogg",
+      "pitch": 1,
+      "volume": 1
+    }
+  ],
+  "system_nova_burst_explosion": [
+    {
+      "file": "sounds/sfx_systems/nova_burst_detonate_1.ogg",
+      "pitch": 1,
+      "volume": 1
+    },
+    {
+      "file": "sounds/sfx_systems/nova_burst_detonate_2.ogg",
+      "pitch": 1,
+      "volume": 1
+    },
+    {
+      "file": "sounds/sfx_systems/nova_burst_detonate_3.ogg",
+      "pitch": 1,
+      "volume": 1
+    }
+  ],
+  "system_emp_emitter_activate": [
+    {
+      "file": "sounds/sfx_systems/emp_emitter_activate.ogg",
+      "pitch": 1,
+      "volume": 0.5
+    }
+  ],
+  "system_emp_emitter_loop": [
+    {
+      "file": "sounds/sfx_systems/emp_emitter_loop.ogg",
+      "pitch": 1,
+      "volume": 0.4
+    }
+  ],
+  "system_emp_emitter_impact": [
+    {
+      "file": "sounds/sfx_systems/emp_emitter_impact_01.ogg",
+      "pitch": 1,
+      "volume": 0.4
+    },
+    {
+      "file": "sounds/sfx_systems/emp_emitter_impact_02.ogg",
+      "pitch": 1,
+      "volume": 0.4
+    },
+    {
+      "file": "sounds/sfx_systems/emp_emitter_impact_03.ogg",
+      "pitch": 1,
+      "volume": 0.4
+    }
+  ],
+  "phase_anchor_vanish": [
+    {
+      "file": "sounds/sfx_systems/phase_teleporter_oneshot.ogg",
+      "pitch": 0.75,
+      "volume": 1
+    }
+  ],
+  "system_termination_sequence": [
+    {
+      "file": "sounds/sfx_systems/termination_sequence_activate.ogg",
+      "pitch": 1,
+      "volume": 1
+    }
+  ],
+  "system_interdictor": [
+    {
+      "file": "sounds/sfx_systems/interdictor_array.ogg",
+      "pitch": 1,
+      "volume": 1
+    }
+  ],
+  "drone_launch": [
+    {
+      "file": "sounds/sfx_systems/drone_launch.ogg",
+      "pitch": 0.97,
+      "volume": 0.6
+    },
+    {
+      "file": "sounds/sfx_systems/drone_launch.ogg",
+      "pitch": 0.98,
+      "volume": 0.6
+    },
+    {
+      "file": "sounds/sfx_systems/drone_launch.ogg",
+      "pitch": 0.99,
+      "volume": 0.6
+    },
+    {
+      "file": "sounds/sfx_systems/drone_launch.ogg",
+      "pitch": 1,
+      "volume": 0.6
+    }
+  ],
+  "mote_attractor_system_activated": [
+    {
+      "file": "sounds/sfx_systems/mote_attractor_activation.ogg",
+      "pitch": 1,
+      "volume": 0.5
+    }
+  ],
+  "mote_attractor_launch_mote": [
+    {
+      "file": "sounds/sfx_systems/mote_attractor_spawn_01.ogg",
+      "pitch": 1,
+      "volume": 0.4
+    }
+  ],
+  "mote_attractor_targeted_ship": [
+    {
+      "file": "sounds/sfx_systems/mote_attractor_targeted_ship_01.ogg",
+      "pitch": 0.8,
+      "volume": 0.6
+    },
+    {
+      "file": "sounds/sfx_systems/mote_attractor_targeted_ship_02.ogg",
+      "pitch": 0.8,
+      "volume": 0.6
+    }
+  ],
+  "mote_attractor_impact_emp_arc": [
+    {
+      "file": "sounds/sfx_systems/emp_emitter_impact_01.ogg",
+      "pitch": 1.5,
+      "volume": 0.3
+    },
+    {
+      "file": "sounds/sfx_systems/emp_emitter_impact_02.ogg",
+      "pitch": 1.5,
+      "volume": 0.3
+    },
+    {
+      "file": "sounds/sfx_systems/emp_emitter_impact_03.ogg",
+      "pitch": 1.5,
+      "volume": 0.3
+    }
+  ],
+  "mote_attractor_impact_normal": [
+    {
+      "file": "sounds/sfx_systems/mote_attractor_impact_light_01.ogg",
+      "pitch": 1,
+      "volume": 0.4
+    },
+    {
+      "file": "sounds/sfx_systems/mote_attractor_impact_light_02.ogg",
+      "pitch": 1,
+      "volume": 0.4
+    },
+    {
+      "file": "sounds/sfx_systems/mote_attractor_impact_light_03.ogg",
+      "pitch": 1,
+      "volume": 0.4
+    },
+    {
+      "file": "sounds/sfx_systems/mote_attractor_impact_light_04.ogg",
+      "pitch": 1,
+      "volume": 0.4
+    }
+  ],
+  "mote_attractor_impact_damage": [
+    {
+      "file": "sounds/sfx_systems/mote_attractor_impact_heavy_01.ogg",
+      "pitch": 1,
+      "volume": 0.5
+    },
+    {
+      "file": "sounds/sfx_systems/mote_attractor_impact_heavy_02.ogg",
+      "pitch": 1,
+      "volume": 0.5
+    },
+    {
+      "file": "sounds/sfx_systems/mote_attractor_impact_heavy_03.ogg",
+      "pitch": 1,
+      "volume": 0.5
+    },
+    {
+      "file": "sounds/sfx_systems/mote_attractor_impact_heavy_04.ogg",
+      "pitch": 1,
+      "volume": 0.5
+    }
+  ],
+  "system_convulsive_lunge": [
+    {
+      "file": "sounds/sfx_systems/dweller_convulsive_lunge.ogg",
+      "pitch": 1,
+      "volume": 0.6
+    }
+  ],
+  "mine_spawn": [
+    {
+      "file": "sounds/sfx_interface/ui_radar_detect_mine.ogg",
+      "pitch": 1,
+      "volume": 0.6
+    }
+  ]
+}

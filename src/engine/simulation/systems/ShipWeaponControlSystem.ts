@@ -101,6 +101,10 @@ export class ShipWeaponControlSystem {
         }
       ];
     }
+    // Native variants may start with an empty group. Never spawn with an invisible
+    // selected group while all visible weapon rows appear unselected.
+    const occupied = this.weaponGroups.findIndex(g => g.weaponSlotIds.some(id => this.weapons.some(w => w.slotId === id)));
+    this.selectedGroupIndex = Math.max(0, occupied);
   }
 
   private resolveGroupArrayIndex(declaredIndex: number): number {
@@ -168,7 +172,7 @@ export class ShipWeaponControlSystem {
     fireControlWorld?: FireControlWorld
   ) {
     const world: FireControlWorld = fireControlWorld ?? { ships: targetShip ? [ship, targetShip] : [ship], missiles: [], asteroids: [] };
-    const manualControl = ship.fireControlMode === 'MANUAL';
+    const manualControl = ship.fireControlMode === 'MANUAL' && !ship.system.forcesAutofire;
     const hullTurn = signedAngle(ship.facingRad - this.previousHullFacingRad);
     this.previousHullFacingRad = ship.facingRad;
     for (const mount of this.weapons) mount.currentAngleRad += hullTurn;
@@ -193,7 +197,7 @@ export class ShipWeaponControlSystem {
         if (mount.cooldownTimer < 1e-9) mount.cooldownTimer = 0;
       }
       if (Number.isFinite(mount.ammo) && mount.spec.maxAmmo !== undefined && mount.spec.ammoRegenPerSec) {
-        mount.ammoRechargeProgress += mount.spec.ammoRegenPerSec * dt;
+        mount.ammoRechargeProgress += mount.spec.ammoRegenPerSec * ship.system.getAmmoRegenMultiplier(mount.spec.weaponType) * dt;
         while (mount.ammoRechargeProgress >= 1 && mount.ammo < mount.spec.maxAmmo) {
           mount.ammo++;
           mount.ammoRechargeProgress -= 1;
@@ -538,6 +542,7 @@ export class ShipWeaponControlSystem {
     const cost = this.weaponFluxPerShot(mount, ship) * (mount.spec.interruptibleBurst ? 1 : Math.max(1, mount.spec.burstSize ?? 1));
     if (ship.flux.maxFlux - ship.flux.totalFlux < cost) return false;
     mount.cycleTargetShipId = mount.fireControl ? mount.fireControlTargetShipId : ship.currentTargetShip?.id;
+    mount.cycleTargetProjectileId = mount.fireControl ? mount.fireControlTargetProjectileId : undefined;
     mount.firingState = 'CHARGING';
     mount.firingStateTimer = mount.spec.chargeTime ?? 0;
 
@@ -571,7 +576,7 @@ export class ShipWeaponControlSystem {
       id: this.random.next(),
       sourceShipId: ship.id,
       slotId: mount.slotId,
-      isPlayer: ship.isPlayer,
+      isPlayer: ship.isPlayer, teamId: ship.teamId,
       specId: mount.spec.id,
       startPos: firePos,
       endPos: firePos.clone(),
@@ -695,7 +700,10 @@ export class ShipWeaponControlSystem {
         this.enterBeamChargedown(mount, ship, spawnBeam, false);
         return;
       }
-      if (mount.spec.fluxPerSecond) ship.flux.increaseFlux(mount.spec.fluxPerSecond * ship.system.getWeaponFluxCostMultiplier(mount.spec.weaponType) * dt, false);
+      if (mount.spec.fluxPerSecond && !ship.flux.trySpendSoftFlux(mount.spec.fluxPerSecond * ship.system.getWeaponFluxCostMultiplier(mount.spec.weaponType) * dt)) {
+        this.enterBeamChargedown(mount, ship, spawnBeam, true);
+        return;
+      }
       mount.firingStateTimer -= dt;
       const chargeup = Math.max(0.001, mount.spec.beamSourceChargeupTime ?? 0.001);
       mount.glowAlpha = Math.max(mount.glowAlpha, 1 - Math.max(0, mount.firingStateTimer) / chargeup);
@@ -716,7 +724,10 @@ export class ShipWeaponControlSystem {
         this.enterBeamChargedown(mount, ship, spawnBeam, true);
         return;
       }
-      if (mount.spec.fluxPerSecond) ship.flux.increaseFlux(mount.spec.fluxPerSecond * ship.system.getWeaponFluxCostMultiplier(mount.spec.weaponType) * dt, false);
+      if (mount.spec.fluxPerSecond && !ship.flux.trySpendSoftFlux(mount.spec.fluxPerSecond * ship.system.getWeaponFluxCostMultiplier(mount.spec.weaponType) * dt)) {
+        this.enterBeamChargedown(mount, ship, spawnBeam, true);
+        return;
+      }
       if (isBurstBeam) {
         mount.firingStateTimer -= dt;
         if (mount.firingStateTimer <= 0) this.enterBeamChargedown(mount, ship, spawnBeam, true);
@@ -849,7 +860,7 @@ export class ShipWeaponControlSystem {
         id: this.random.next(),
         sourceShipId: ship.id,
         slotId: mount.slotId,
-        isPlayer: ship.isPlayer,
+        isPlayer: ship.isPlayer, teamId: ship.teamId,
         specId: mount.spec.id,
         startPos: firePos,
         endPos: endPos,
@@ -895,7 +906,7 @@ export class ShipWeaponControlSystem {
         id: this.random.next(),
         sourceShipId: ship.id,
         slotId: mount.slotId,
-        isPlayer: ship.isPlayer,
+        isPlayer: ship.isPlayer, teamId: ship.teamId,
         specId: mount.spec.id,
         pos: firePos.clone(),
         prevPos: firePos.clone(),
@@ -942,6 +953,7 @@ export class ShipWeaponControlSystem {
         eccmChance: mount.spec.eccmChanceBonus,
         guidanceBonus: mount.spec.missileGuidanceBonus,
         targetShipId: mount.cycleTargetShipId,
+        targetProjectileId: mount.cycleTargetProjectileId,
         facingRad: fireAngleRad,
         flightTimeRemaining: mount.spec.flightTime === undefined ? undefined : mount.spec.flightTime * (1 - ship.ecmRangePenalty / 100),
         maxFlightTime: mount.spec.flightTime === undefined ? undefined : mount.spec.flightTime * (1 - ship.ecmRangePenalty / 100),

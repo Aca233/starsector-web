@@ -3,6 +3,9 @@ import { Vector2 } from '../engine/math/Vector2';
 import { Ship } from '../engine/simulation/Ship';
 import { sound } from '../engine/audio/SoundManager';
 import { CombatSession } from '../engine/runtime/CombatSession';
+import { clientToCombatWorld, zoomCombatView } from '../engine/runtime/PlayerControls';
+import { isCombatTextEntry, isCombatPointerUi, hasCombatModal, hasCombatInputFocus } from '../engine/runtime/CombatInputFocus';
+import { dispatchShipCommand, flightKey, shipCommandForKey, type ShipCommand } from '../engine/runtime/CombatCommands';
 
 export interface UseCombatInputParams {
   sessionRef: React.MutableRefObject<CombatSession>;
@@ -13,24 +16,10 @@ export interface UseCombatInputParams {
   inputBlockedRef: React.MutableRefObject<boolean>;
   keysPressed: React.MutableRefObject<{ [key: string]: boolean }>;
   mouseScreenPos: React.MutableRefObject<Vector2>;
+  mouseAimActiveRef: React.MutableRefObject<boolean>;
   isMouseDown: React.MutableRefObject<boolean>;
   setIsAutopilot: React.Dispatch<React.SetStateAction<boolean>>;
-  onActivateSystem: () => void;
   onTogglePause: () => void;
-}
-
-function isEditableTarget(target: EventTarget | null): boolean {
-  const element = target instanceof HTMLElement ? target : null;
-  if (!element) return false;
-  return element.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(element.tagName);
-}
-
-function isInteractiveUiTarget(target: EventTarget | null): boolean {
-  const element = target instanceof Element ? target : null;
-  if (!element) return false;
-  return !!element.closest(
-    'button, a, input, textarea, select, [contenteditable="true"], [role="button"], [data-combat-input-block]'
-  );
 }
 
 function resetInputState(keys: React.MutableRefObject<Record<string, boolean>>, mouse: React.MutableRefObject<boolean>, ship: Ship): void {
@@ -48,18 +37,14 @@ export function useCombatInput({
   inputBlockedRef,
   keysPressed,
   mouseScreenPos,
+  mouseAimActiveRef,
   isMouseDown,
   setIsAutopilot,
-  onActivateSystem,
   onTogglePause
 }: UseCombatInputParams) {
-  const onActivateSystemRef = useRef(onActivateSystem);
   const onTogglePauseRef = useRef(onTogglePause);
   useEffect(() => { onTogglePauseRef.current = onTogglePause; }, [onTogglePause]);
 
-  useEffect(() => {
-    onActivateSystemRef.current = onActivateSystem;
-  }, [onActivateSystem]);
 
 
   useEffect(() => {
@@ -70,27 +55,52 @@ export function useCombatInput({
       resetInputState(keysPressed, isMouseDown, sessionRef.current.engine.playerShip);
     };
 
-    const blocked = (target: EventTarget | null) => (
+    const loseFocus = () => {
+      mouseAimActiveRef.current = false;
+      clearTransientInput();
+      sessionRef.current.cameraController.suspendPointer();
+    };
+
+    const blocked = (target: EventTarget | null, pointer = false) => (
       inputBlockedRef.current
-      || !!document.querySelector('[role="dialog"], [role="alertdialog"]')
+      || hasCombatModal()
       || !sessionRef.current.isPresentationReady()
-      || isEditableTarget(target)
-      || isInteractiveUiTarget(target)
+      || isCombatTextEntry(target)
+      || (pointer && isCombatPointerUi(target))
     );
 
     const unsubscribePresentation = sessionRef.current.subscribePresentation((state) => {
-      if (state.status !== 'ready') clearTransientInput();
+      if (state.status !== 'ready') loseFocus();
     });
-    if (!sessionRef.current.isPresentationReady()) clearTransientInput();
+    if (!sessionRef.current.isPresentationReady()) loseFocus();
 
+    const command = (action: ShipCommand) => {
+      const engine = sessionRef.current.engine;
+      if (engine.battleResult) return;
+      if (isAutopilotRef.current && ['system', 'shield', 'vent'].includes(action.kind)) {
+        engine.addFloatingText(engine.playerShip.pos.clone(), '自动驾驶中，按 U 接管', [255, 190, 90], 13, 1.3);
+        return;
+      }
+      const aim = clientToCombatWorld(mouseScreenPos.current, canvas, cameraPosRef.current, zoomRef.current);
+      const result = dispatchShipCommand(engine.playerShip, action, mouseAimActiveRef.current ? aim : undefined, engine.ships);
+      if (!result.accepted && result.reason) engine.addFloatingText(engine.playerShip.pos.clone(), result.reason, [255, 190, 90], 13, 1.3);
+    };
     const onMouseMove = (e: MouseEvent) => {
-      if (inputBlockedRef.current || !sessionRef.current.isPresentationReady()) return;
-      if (e.target !== canvas) return;
+      if (inputBlockedRef.current || !hasCombatInputFocus() || !sessionRef.current.isPresentationReady()) { loseFocus(); return; }
+      if (e.target !== canvas) {
+        mouseAimActiveRef.current = false;
+        sessionRef.current.cameraController.suspendPointer();
+        isMouseDown.current = false;
+        sessionRef.current.engine.playerShip.isFiringMain = false;
+        return;
+      }
       mouseScreenPos.current.set(e.clientX, e.clientY);
+      mouseAimActiveRef.current = !sessionRef.current.engine.isTacticalMap;
+      if (mouseAimActiveRef.current) sessionRef.current.cameraController.samplePointer(e.clientX, e.clientY);
     };
 
     const onMouseDown = (e: MouseEvent) => {
-      if (blocked(e.target) || e.target !== canvas) return;
+      if (blocked(e.target, true) || e.target !== canvas || e.ctrlKey || e.altKey || e.metaKey) return;
       canvas.focus({ preventScroll: true });
       mouseScreenPos.current.set(e.clientX, e.clientY);
       void sound.preloadSounds();
@@ -100,18 +110,15 @@ export function useCombatInput({
 
       // The tactical chart owns its independent projection and pointer handlers.
       if (engine.isTacticalMap) return;
+      mouseAimActiveRef.current = true;
+      sessionRef.current.cameraController.samplePointer(e.clientX, e.clientY);
 
       if (e.button === 0) {
+        if (engine.battleResult || engine.playerShip.isDead || sessionRef.current.state !== 'running' || isAutopilotRef.current) return;
         isMouseDown.current = true;
-        engine.playerShip.isFiringMain = true;
       } else if (e.button === 2) {
         e.preventDefault();
-        const player = engine.playerShip;
-        if (player.defenseSystem.type !== 'NONE') { player.activateDefenseSystem(); return; }
-        if (!player.canUseShields()) return;
-        const active = player.shield.toggle();
-        if (player.shield.type === 'PHASE') sound.play(active ? 'phase_activate' : 'phase_deactivate', 0.9);
-        else sound.play(active ? 'shield_up' : 'shield_down', 0.65);
+        command({ kind: 'shield' });
       }
     };
 
@@ -122,58 +129,66 @@ export function useCombatInput({
     };
 
     const onContextMenu = (e: MouseEvent) => {
-      if (!blocked(e.target)) e.preventDefault();
+      if (e.target === canvas) e.preventDefault();
     };
 
     const onWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.altKey || e.metaKey || blocked(e.target) || sessionRef.current.engine.isTacticalMap) return;
+      if (e.target !== canvas || e.ctrlKey || e.altKey || e.metaKey || blocked(e.target, true) || sessionRef.current.engine.isTacticalMap) return;
       e.preventDefault();
-      const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
-      zoomRef.current = Math.max(0.3, Math.min(1.5, zoomRef.current * zoomFactor));
+      zoomRef.current = zoomCombatView(zoomRef.current, e.deltaY);
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.isComposing || blocked(e.target)) return;
       const engine = sessionRef.current.engine;
-      const digitMatch = e.code.match(/^(?:Digit|Numpad)([1-7])$/);
-      // Browser/OS chords are not bare flight keys. Only Ctrl+1..7 is a
-      // deliberate combat chord; Shift remains available for mouse steering.
+      const action = shipCommandForKey(e);
       if (e.ctrlKey || e.altKey || e.metaKey) {
-        if (!engine.isTacticalMap && e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && digitMatch) {
+        if (action && !engine.isTacticalMap) {
           e.preventDefault();
-          if (!e.repeat) engine.playerShip.toggleAutofire(Number(digitMatch[1]) - 1);
-        } else if (!/^(Control|Alt|Meta)(Left|Right)$/.test(e.code)) {
-          clearTransientInput();
-        }
+          if (!e.repeat) command(action);
+        } else clearTransientInput();
         return;
       }
-      // The live mode owns Tab even during the HUD's mount/unmount interval.
-      // Once mounted, the chart capture handler consumes it before this one.
       if (e.code === 'Tab') {
         e.preventDefault();
-        if (!e.repeat) { clearTransientInput(); engine.toggleTacticalMap(); }
+        if (!e.repeat) { loseFocus(); engine.toggleTacticalMap(); }
         return;
       }
       if (engine.isTacticalMap) return;
-      keysPressed.current[e.code] = true;
-      if (e.repeat) {
-        if (e.code === 'Tab' || e.code === 'Space') e.preventDefault();
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (!e.repeat) { clearTransientInput(); onTogglePauseRef.current(); }
         return;
       }
-      void sound.preloadSounds();
-      if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
-      if (e.code === 'KeyZ') engine.toggleFighterRecall();
-      if (e.code === 'KeyU') { setIsAutopilot((prev) => !prev); sound.play('autofire_toggle', 0.8); }
-      if (e.code === 'Space') { clearTransientInput(); onTogglePauseRef.current(); return; }
-      if (e.code === 'KeyV') engine.playerShip.startVenting();
-      if (e.code === 'KeyF') onActivateSystemRef.current();
-
-      if (digitMatch) engine.playerShip.selectWeaponGroup(Number(digitMatch[1]) - 1);
+      if (e.code === 'KeyU') {
+        if (engine.battleResult || engine.playerShip.isDead || engine.playerShip.isRetreated) return;
+        if (!e.repeat) {
+          clearTransientInput();
+          isAutopilotRef.current = !isAutopilotRef.current;
+          setIsAutopilot(isAutopilotRef.current);
+          sound.play('autofire_toggle', .8);
+        }
+        return;
+      }
+      if (action) {
+        e.preventDefault();
+        if (!e.repeat) command(action);
+        return;
+      }
+      if (flightKey(e.code)) {
+        e.preventDefault();
+        if (engine.battleResult || engine.playerShip.isDead || engine.playerShip.isRetreated
+          || (!isAutopilotRef.current && sessionRef.current.state === 'running')) keysPressed.current[e.code] = true;
+      }
     };
 
     const onKeyUp = (e: KeyboardEvent) => { keysPressed.current[e.code] = false; };
-    const onVisibility = () => { if (document.hidden) clearTransientInput(); };
+    const onVisibility = () => { if (document.hidden) loseFocus(); };
+    const onFocus = (event: FocusEvent) => { if (isCombatTextEntry(event.target) || hasCombatModal()) loseFocus(); };
+    const onPointerLeave = () => { mouseAimActiveRef.current = false; sessionRef.current.cameraController.suspendPointer(); isMouseDown.current = false; sessionRef.current.engine.playerShip.isFiringMain = false; };
 
+    document.addEventListener('focusin', onFocus);
+    canvas.addEventListener('mouseleave', onPointerLeave);
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mousedown', onMouseDown);
     window.addEventListener('mouseup', onMouseUp);
@@ -181,12 +196,14 @@ export function useCombatInput({
     window.addEventListener('wheel', onWheel, { passive: false });
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
-    window.addEventListener('blur', clearTransientInput);
+    window.addEventListener('blur', loseFocus);
     document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
       clearTransientInput();
       unsubscribePresentation();
+      document.removeEventListener('focusin', onFocus);
+      canvas.removeEventListener('mouseleave', onPointerLeave);
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mousedown', onMouseDown);
       window.removeEventListener('mouseup', onMouseUp);
@@ -194,8 +211,8 @@ export function useCombatInput({
       window.removeEventListener('wheel', onWheel);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
-      window.removeEventListener('blur', clearTransientInput);
+      window.removeEventListener('blur', loseFocus);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [sessionRef, canvasRef, cameraPosRef, zoomRef, isAutopilotRef, inputBlockedRef, keysPressed, mouseScreenPos, isMouseDown, setIsAutopilot]);
+  }, [sessionRef, canvasRef, cameraPosRef, zoomRef, isAutopilotRef, inputBlockedRef, keysPressed, mouseScreenPos, mouseAimActiveRef, isMouseDown, setIsAutopilot]);
 }

@@ -1,3 +1,6 @@
+import { readBattleSize } from '../runtime/BattleSizeSettings';
+import { battleTeamLimit } from '../../shared/battle-size.mjs';
+import { randomId } from "../../shared/RandomId";
 import { DEFAULT_PLAYER_HULL, defaultOpponent } from '../data/SandboxDefaults';
 import { CombatSession } from '../runtime/CombatSession';
 import { CombatHandoff, createFleetMember, validateMemberContent } from './CombatHandoff';
@@ -24,7 +27,7 @@ export class GameSession {
   ) {
     // CombatSession initializes bundled content through the existing composition root.
     this.combat = new CombatSession(initialHullId, ephemeral && opponentId ? opponentId : defaultOpponent(initialHullId));
-    const fresh = () => createGameState(crypto.randomUUID(), createFleetMember(this.combat.engine.playerShip.spec.id, 'flagship'));
+    const fresh = () => createGameState(randomId(), createFleetMember(this.combat.engine.playerShip.spec.id, 'flagship'));
     const loaded = ephemeral ? null : store?.load();
     let state = loaded ?? fresh();
     try {
@@ -110,7 +113,7 @@ export class GameSession {
     this.startSandbox(this.combat.engine.playerShip.spec.id);
   }
 
-  public startFleetCombat(memberIds: string[], enemyHullId = defaultOpponent(this.state.fleet[0].hullId)): void {
+  public startFleetCombat(memberIds: string[], enemyHullId = defaultOpponent(this.state.fleet[0].hullId), initialPlayerIds: string[] = memberIds.slice(0,1), deploymentPointLimit = battleTeamLimit(readBattleSize())): void {
     if (this.ephemeral) throw new Error('视觉实验室不能启动持久舰队出击。');
     if (!memberIds.length || new Set(memberIds).size !== memberIds.length) throw new Error('请选择不重复的参战舰船。');
     const playerFleet = memberIds.map(id => {
@@ -120,7 +123,7 @@ export class GameSession {
     });
     this.launch({
       id: `${this.state.gameId}:${this.state.nextEncounter}`, kind: 'fleet', seed: this.state.nextEncounter >>> 0,
-      playerFleet, enemyFleet: [createFleetMember(enemyHullId, 'encounter-enemy')]
+      playerFleet, enemyFleet: [createFleetMember(enemyHullId, 'encounter-enemy')], initialPlayerIds, deploymentPointLimit
     });
   }
 
@@ -144,7 +147,7 @@ export class GameSession {
 
   /** UI must explicitly confirm this destructive replacement. */
   public newGame(hullId: string): void {
-    const next = createGameState(crypto.randomUUID(), createFleetMember(hullId, 'flagship'));
+    const next = createGameState(randomId(), createFleetMember(hullId, 'flagship'));
     const request = this.sandboxRequest(next, hullId);
     const state = freezeGameState(beginCombat(next, request));
     const handoff = new CombatHandoff(request);

@@ -1,0 +1,51 @@
+/* Native-style weapon rings stay visible without painting over fitted sprites. */
+.refit-vessel .studio-mount, .refit-vessel .ship-arc { --mount-color: #37b8e5; }
+.refit-vessel [data-type="BALLISTIC"] { --mount-color: #e6c84d; }
+.refit-vessel [data-type="MISSILE"] { --mount-color: #a5ce55; }
+.refit-vessel [data-type="UNIVERSAL"] { --mount-color: #d4eaf0; }
+.refit-vessel [data-type="HYBRID"] { --mount-color: #b7a1ef; }
+.refit-vessel [data-type="SYNERGY"] { --mount-color: #62d0be; }
+.refit-vessel [data-type="COMPOSITE"] { --mount-color: #d0d57e; }
+.refit-vessel .studio-ship .studio-mount {
+  --mount-size: 22px;
+  width: calc(var(--mount-size) / var(--ship-zoom)); height: calc(var(--mount-size) / var(--ship-zoom)); min-width: 0; min-height: 0;
+  opacity: .85; border: calc(1.5px / var(--ship-zoom)) solid var(--mount-color); border-radius: 50%;
+  background: transparent; color: var(--mount-color); cursor: pointer;
+  box-shadow: 0 0 0 1px #020b10c9, inset 0 0 0 1px #020b1080;
+}
+.refit-vessel .studio-ship .studio-mount--medium { --mount-size: 30px; }
+.refit-vessel .studio-ship .studio-mount--large { --mount-size: 40px; }
+.refit-vessel .studio-ship .studio-mount[data-mount="HARDPOINT"] { border-radius: 4px; }
+.refit-vessel .studio-ship .studio-mount:not(.is-equipped) {
+  border-style: dashed; background: #06162280;
+}
+.refit-vessel .studio-ship .studio-mount:not(.is-equipped) > span {
+  display: block; color: var(--mount-color); font: 10px/1 var(--ui-mono); text-shadow: 0 1px 2px #000;
+}
+.refit-vessel .studio-ship .studio-mount.is-grouped { border-color: #b6f564; background: #8bdd2233; opacity: 1; }
+.refit-vessel .studio-ship .studio-mount:hover,
+.refit-vessel .studio-ship .studio-mount:focus-visible,
+.refit-vessel .studio-ship .studio-mount.is-selected {
+  opacity: 1; border: calc(2px / var(--ship-zoom)) solid var(--mount-color); background: #2caad21a;
+  box-shadow: 0 0 0 1px #020c12, 0 0 0 3px #b8e9ff55, 0 0 9px #34bce888;
+  outline: none; z-index: 4;
+}
+.refit-vessel .ship-arc { opacity: .9; }
+.refit-vessel .ship-arc path {
+  fill: #37b8e508; stroke: var(--mount-color); stroke-width: 1.25;
+  stroke-dasharray: none; vector-effect: non-scaling-stroke;
+}
+.refit-vessel .ship-arc circle { display: none; }
+.equipment-tooltip.source-weapon-details.refit-weapon-tooltip {
+  z-index: 220; width: min(420px, calc(100vw - 16px)); max-height: calc(100dvh - 16px);
+  padding: 8px 10px; background: #000f10f5; font: 14px/17px var(--native-font-body);
+}
+.refit-weapon-tooltip .source-weapon-description { font-style: normal; }
+.refit-weapon-tooltip .source-weapon-stat-gap { height: 9px; }
+.refit-weapon-tooltip .refit-weapon-mount-info { margin-top: 5px; padding-top: 6px; border-top: 1px solid #29505c; color: #9bc8d9; font-size: 12px; }
+.refit-weapon-encyclopedia.source-weapon-details { position: static; width: auto; max-width: none; max-height: none; overflow: visible; border: 0; box-shadow: none; }
+
+/* Keep the short native description in the hover card; the full lore stays in F2. */
+.refit-weapon-tooltip .source-weapon-attribution { display: none; }
+.refit-weapon-tooltip .source-weapon-primary > .source-weapon-icon { width: 44px; height: 44px; align-self: center; justify-self: center; }
+.refit-weapon-tooltip .source-weapon-manufacturer span { color: #c5cbd0; }

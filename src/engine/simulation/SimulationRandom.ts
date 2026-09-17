@@ -22,6 +22,10 @@ export class SimulationRandom {
     return ((t ^ (t >>> 14)) >>> 0) / 0x100000000;
   }
 
+  public shuffle<T>(values: T[]): void {
+    for (let i=values.length-1;i>0;i--) { const j=Math.floor(this.next()*(i+1)); [values[i],values[j]]=[values[j],values[i]]; }
+  }
+
   public nextNumericId(): number {
     this.idCounter += 1;
     return this.idCounter;

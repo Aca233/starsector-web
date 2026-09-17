@@ -1,3 +1,4 @@
+import type { FleetPlan, FleetRole, FleetTask } from './FleetTactics';
 import type { WeaponThreatEnvelope } from './WeaponThreatEnvelope';
 import type { ProjectileThreatIndex } from './ProjectileThreatIndex';
 import type { Ship } from '../simulation/Ship';
@@ -5,6 +6,9 @@ import type { Projectile, Beam } from '../simulation/Weapon';
 import type { Asteroid } from '../simulation/CombatTypes';
 
 export interface TacticalWorld {
+  fleetPlan?: FleetPlan;
+  /** Owner-only conservative dependency recorder; absent in ordinary serial combat. */
+  noteNavigationObstacle?: (ship: Ship, other: Ship, horizon: number) => void;
   /** Only supplied inside an audited, synchronous native AI phase. */
   projectileThreatIndex?: ProjectileThreatIndex;
   weaponThreatEnvelope?: WeaponThreatEnvelope;
@@ -29,6 +33,11 @@ export const tacticalPolicy = Object.freeze({
 });
 export interface TacticalDiagnostics {
   mode: 'ENGAGE' | 'WITHDRAW' | 'WAYPOINT' | 'IDLE' | 'DEFEND' | 'ESCORT' | 'AVOID';
+  fleetRole?: FleetRole;
+  fleetTask?: FleetTask;
+  targetScore?: number;
+  pressureRatio?: number;
+  assignedPower?: number;
   desiredRange: number;
   desiredFacing: number;
   availableFirepower: number;

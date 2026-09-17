@@ -29,8 +29,8 @@ export class FleetCommandSystem {
   }
 
   /** settings.json: baseSecondsPerCommandPoint=120; initial points are not a cap. */
-  public advance(dt: number) {
-    this.recoveryElapsed += Math.max(0, dt);
+  public advance(dt: number, rateFlat = 0) {
+    this.recoveryElapsed += Math.max(0, dt) * Math.max(0, 1 + rateFlat);
     const recovered = Math.floor(this.recoveryElapsed / 120);
     if (recovered) { this.commandPoints += recovered; this.recoveryElapsed -= recovered * 120; }
   }

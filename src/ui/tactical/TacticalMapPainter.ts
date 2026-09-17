@@ -1,6 +1,7 @@
+import { sameTeam } from '../../engine/simulation/CombatTeams';
 import type { CombatEngine } from '../../engine/simulation/CombatEngine';
 import type { Ship } from '../../engine/simulation/Ship';
-import { tacticalContactVisible, tacticalObservers, TACTICAL_SIGHT_RADIUS } from './TacticalVisibility';
+import { tacticalContactVisible, tacticalObservers } from './TacticalVisibility';
 import { Vector2 } from '../../engine/math/Vector2';
 import { runtimeAssetUrl } from '../../engine/runtime/RuntimePaths';
 import { NEBULA_SPRITE_SIZE } from '../../engine/simulation/systems/NebulaSystem';
@@ -87,7 +88,7 @@ export class TacticalMapPainter {
       fog.globalCompositeOperation = 'destination-out';
       const mask = this.image('graphics/fx/fog_circle2.png');
       for (const observer of observers) {
-        const p = mapPoint(observer.pos, view, size, height), radius = (TACTICAL_SIGHT_RADIUS + 250) * 1.05 * scale;
+        const p = mapPoint(observer.pos, view, size, height), radius = (observer.sightRadius + 250) * 1.05 * scale;
         if (mask) fog.drawImage(mask, p.x - radius, p.y - radius, radius * 2, radius * 2);
         else { const gradient = fog.createRadialGradient(p.x, p.y, radius * .87, p.x, p.y, radius); gradient.addColorStop(0, '#000'); gradient.addColorStop(1, 'transparent'); fog.fillStyle = gradient; fog.beginPath(); fog.arc(p.x, p.y, radius, 0, Math.PI * 2); fog.fill(); }
       }
@@ -114,7 +115,7 @@ export class TacticalMapPainter {
     const cw = camera.width / camera.zoom * scale, ch = camera.height / camera.zoom * scale;
     this.brackets(ctx, cam, cw / 2, ch / 2, '#90dcff', 8);
     for (const ship of living) {
-      const order = engine.orders.get(ship.id) ?? (ship.isPlayer ? engine.orders.get('fleet') : undefined);
+      const order = engine.orders.get(ship.id) ?? (sameTeam(ship,engine.playerShip) ? engine.orders.get('fleet') : undefined);
       const target = order && ['ENGAGE', 'ESCORT', 'AVOID'].includes(order.type) ? engine.ships.find(s => s.id === order.targetShipId && tacticalContactVisible(s, observers))?.pos
         : order?.type === 'WAYPOINT' || order?.type === 'DEFEND' ? order.targetPos : undefined;
       if (!target) continue;
@@ -136,14 +137,14 @@ export class TacticalMapPainter {
       if (!tacticalContactVisible(fighter, observers)) continue;
       const p = mapPoint(fighter.pos, view, size, height);
       ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(fighter.facingRad);
-      ctx.fillStyle = fighter.isPlayer ? '#63bc45' : '#e94128';
+      ctx.fillStyle = sameTeam(fighter,engine.playerShip) ? '#63bc45' : '#e94128';
       ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(-3, -2.5); ctx.lineTo(-2, 0); ctx.lineTo(-3, 2.5); ctx.closePath(); ctx.fill(); ctx.restore();
     }
     for (const ship of living) {
       const p = mapPoint(ship.pos, view, size, height), r = mapShipRadius(ship, view, size);
       if (p.x < -r || p.y < -r || p.x > size + r || p.y > height + r) continue;
-      const selected = engine.selectedUnitId === ship.id || (engine.selectedUnitId === 'fleet' && ship.isPlayer);
-      const color = ship.isPlayer ? '#98bc51' : '#bc641e';
+      const selected = engine.selectedUnitId === ship.id || (engine.selectedUnitId === 'fleet' && sameTeam(ship,engine.playerShip));
+      const color = sameTeam(ship,engine.playerShip) ? '#98bc51' : '#bc641e';
       const image = this.image(ship.spec.spriteUrl);
       ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(ship.facingRad + Math.PI / 2);
       if (image) {
@@ -153,7 +154,7 @@ export class TacticalMapPainter {
       } else { ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(0, -r / 2); ctx.lineTo(-r / 3, r / 2); ctx.lineTo(r / 3, r / 2); ctx.fill(); }
       ctx.restore();
       ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.globalAlpha = .85;
-      if (ship.isPlayer) ctx.strokeRect(p.x - r, p.y - r, r * 2, r * 2);
+      if (sameTeam(ship,engine.playerShip)) ctx.strokeRect(p.x - r, p.y - r, r * 2, r * 2);
       else { ctx.beginPath(); ctx.moveTo(p.x, p.y - r * 1.35); ctx.lineTo(p.x + r * 1.35, p.y); ctx.lineTo(p.x, p.y + r * 1.35); ctx.lineTo(p.x - r * 1.35, p.y); ctx.closePath(); ctx.stroke(); }
       ctx.globalAlpha = 1;
       if (selected || hoveredId === ship.id || inspectedId === ship.id) this.brackets(ctx, p, r + 5, r + 5, selected ? '#c5f29a' : '#a1d7e9', 5);

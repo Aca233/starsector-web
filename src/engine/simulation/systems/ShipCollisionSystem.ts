@@ -5,6 +5,7 @@ import { Ship } from '../Ship';
 import { sound } from '../../audio/SoundManager';
 import {
   isShieldCollisionActive,
+  shieldCenterOffset,
   getDirectionalHullCollisionExtent,
   getDirectionalShieldCollisionExtent,
   getShieldToShieldContact
@@ -43,7 +44,7 @@ function contactBroadphaseRadius(ship: Ship): number {
   }
   let radius = Math.max(hullRadius, Math.max(0, ship.spec.collisionRadius));
   if (isShieldCollisionActive(ship)) {
-    radius = Math.max(radius, ship.getShieldCenter().distanceTo(ship.pos) + ship.shield.radius);
+    radius = Math.max(radius, shieldCenterOffset(ship) + ship.shield.radius);
   }
   return radius;
 }
@@ -68,8 +69,9 @@ function findShipPairCollisionContact(s1: Ship, s2: Ship): ShipPairCollisionCont
 
   const delta = s2.pos.clone().sub(s1.pos);
   const dist = delta.length();
-  if (dist <= 0.001) return null;
-  const normal = delta.scale(1 / dist);
+  // Spawn/teleport overlap has no geometric direction. Stable IDs make the
+  // fallback deterministic and symmetric when the pair order is reversed.
+  const normal = dist > 1e-12 ? delta.scale(1 / dist) : new Vector2(s1.id < s2.id ? 1 : -1, 0);
 
   const s1Hull = getDirectionalHullCollisionExtent(s1, normal);
   const s2Hull = getDirectionalHullCollisionExtent(s2, normal.clone().scale(-1));
@@ -102,7 +104,7 @@ function findShipPairCollisionContact(s1: Ship, s2: Ship): ShipPairCollisionCont
  */
 export class ShipCollisionSystem {
   public resolveShipToShipCollision(s1: Ship, s2: Ship, fx: CollisionFXCallbacks, _dt: number) {
-    if (s1.isDead || s2.isDead || s1.isPhased || s2.isPhased) return;
+    if (s1.isDead || s2.isDead || s1.isCollisionless || s2.isCollisionless) return;
 
     const contact = findShipPairCollisionContact(s1, s2);
     if (contact) {
@@ -149,7 +151,7 @@ export class ShipCollisionSystem {
           s1ShieldDmg = s1RamDmg * s1.system.getShieldDamageMultiplier() * s1.crDamageTakenMultiplier;
           const fluxGain = s1.shield.absorbDamage(s1ShieldDmg, 'KINETIC', hitAngle);
           s1ShieldDmg *= s1.shield.damageTakenMultiplier;
-          s1.flux.increaseFlux(fluxGain, true);
+          s1.flux.increaseShieldFlux(fluxGain, true);
         } else {
           const contact1 = contactPoint.clone().sub(s1.pos).rotate(-s1.facingRad);
           // CR 只修正实际承伤，hitStrength 保持碰撞原始强度，避免装甲减伤被二次放大。
@@ -158,7 +160,7 @@ export class ShipCollisionSystem {
           applyComponentDamage(s1, contact1, result1, 0, s2);
           fx.spawnArmorDamageSparks(s1, contact1, result1.armorDamage);
           // 装甲网格被击穿后溢出的伤害必须结入船体 HP，否则冲撞永远无法击沉目标。
-          s1.hullHp = Math.max(0, s1.hullHp - result1.hullDamage);
+          s1.applyHullDamage(result1.hullDamage);
           s1ArmorDmg = result1.armorDamage;
           s1HullDmg = result1.hullDamage;
         }
@@ -169,14 +171,14 @@ export class ShipCollisionSystem {
           s2ShieldDmg = s2RamDmg * s2.system.getShieldDamageMultiplier() * s2.crDamageTakenMultiplier;
           const fluxGain = s2.shield.absorbDamage(s2ShieldDmg, 'KINETIC', hitAngle);
           s2ShieldDmg *= s2.shield.damageTakenMultiplier;
-          s2.flux.increaseFlux(fluxGain, true);
+          s2.flux.increaseShieldFlux(fluxGain, true);
         } else {
           const contact2 = contactPoint.clone().sub(s2.pos).rotate(-s2.facingRad);
           const takenDamage = s2RamDmg * s2.crDamageTakenMultiplier;
           const result2 = s2.armor.takeDamage(contact2, takenDamage, 'KINETIC', s2RamDmg, false);
           applyComponentDamage(s2, contact2, result2, 0, s1);
           fx.spawnArmorDamageSparks(s2, contact2, result2.armorDamage);
-          s2.hullHp = Math.max(0, s2.hullHp - result2.hullDamage);
+          s2.applyHullDamage(result2.hullDamage);
           s2ArmorDmg = result2.armorDamage;
           s2HullDmg = result2.hullDamage;
         }

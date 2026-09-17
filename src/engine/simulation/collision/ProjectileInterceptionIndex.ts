@@ -2,7 +2,7 @@ import type { Projectile } from '../Weapon';
 import type { Vector2 } from '../../math/Vector2';
 
 type CellBounds = readonly [number, number, number, number];
-interface Entry { projectile: Projectile; order: number; cells: CellBounds | null }
+interface Entry { projectile: Projectile; order: number; cells: CellBounds | null; generation: number }
 
 /** Transient missile broadphase, owned by one ordered projectile update.
  * Ordinary motion/removal updates individual entries. Unknown effect mutations
@@ -15,6 +15,7 @@ export class ProjectileInterceptionIndex {
   private source: Projectile[] | null = null;
   private sourceLength = -1;
   private linearOnly = false;
+  private generation = 0;
   private readonly cellSize = 256;
 
   public invalidate(): void { this.sourceLength = -1; }
@@ -88,16 +89,30 @@ export class ProjectileInterceptionIndex {
   }
 
   private rebuild(projectiles: Projectile[]): void {
-    this.rows.clear(); this.entries.clear(); this.unbounded.clear();
+    // Invalidations still inspect every authoritative missile, including same-length
+    // replacements and effect-driven pose/radius changes. Retain unchanged buckets
+    // instead of allocating and reinserting the whole grid after every impact.
+    const generation = ++this.generation;
     this.source = projectiles; this.sourceLength = projectiles.length; this.linearOnly = false;
     for (let order = 0; order < projectiles.length; order++) {
       const projectile = projectiles[order];
       if (!projectile.isRocket) continue;
       // An extension may insert the same object twice. Do not merge its array
       // positions or rely on a single movement/removal entry in that case.
-      if (this.entries.has(projectile)) { this.linearOnly = true; continue; }
-      const entry = { projectile, order, cells: this.missileCells(projectile) };
-      this.entries.set(projectile, entry); this.insert(entry);
+      const entry = this.entries.get(projectile);
+      if (entry?.generation === generation) { this.linearOnly = true; continue; }
+      if (entry) {
+        entry.order = order;
+        entry.generation = generation;
+        this.update(projectile);
+      } else {
+        const added = { projectile, order, cells: this.missileCells(projectile), generation };
+        this.entries.set(projectile, added); this.insert(added);
+      }
+    }
+    for (const [projectile, entry] of this.entries) {
+      if (entry.generation === generation) continue;
+      this.unlink(entry); this.entries.delete(projectile);
     }
   }
 

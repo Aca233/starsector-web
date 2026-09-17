@@ -53,6 +53,8 @@ export function createProjectileHitGlows(projectile: Projectile, pos: Vector2, t
   const missileSpec = projectile.missileExplosionVisualSpec;
   if (missile && (!missileSpec || missileSpec.useHitGlowWhenDealingDamage === false)) return [];
   let base = missile ? missileSpec!.radius : (projectile.hitGlowRadius ?? 0);
+  // Only zero means automatic. Negative native sentinels must stay disabled,
+  // especially scripted moving rays whose nominal length can be enormous.
   if (!missile && base === 0) {
     base = (projectile.projLength ?? 0) * (projectile.spawnType === 'BALLISTIC_AS_BEAM' ? 0.5 : 2);
   }

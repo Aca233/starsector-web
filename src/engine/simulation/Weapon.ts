@@ -111,6 +111,7 @@ export interface ProjectileExplosionSpec {
 }
 
 export interface WeaponSpec {
+  systemOnly?: boolean;
   /** Source DO_NOT_AIM / GUIDED_POOR: accept manual trigger regardless of cursor arc. */
   alwaysFire?: boolean;
   /** Source weapon_data.csv hints; unknown hints remain metadata, never ID-specific AI branches. */
@@ -194,6 +195,8 @@ export interface WeaponSpec {
   fringeColor?: [number, number, number, number];
   coreColor?: [number, number, number, number];
   glowColor?: [number, number, number, number];
+  /** Native radius: projectile < 0 disables, 0/omitted derives from length;
+   * beams use width-derived glow for any nonpositive/omitted value. */
   hitGlowRadius?: number;
   glowRadius?: number;
   coreWidthMult?: number;
@@ -255,8 +258,10 @@ export interface WeaponMount {
   /** Per-mount targeting, independent of the ship target used by orders/HUD. */
   fireControl?: { targetId?: string | number; targetKind?: 'SHIP' | 'MISSILE'; reason: string };
   fireControlTargetShipId?: string;
+  fireControlTargetProjectileId?: number;
   /** Captured at charge start so later retargeting cannot redirect an in-flight burst. */
   cycleTargetShipId?: string;
+  cycleTargetProjectileId?: number;
   healthTracker?: import('./systems/weapon/WeaponComponentHealth').WeaponHealthTracker;
   isPermanentlyDisabled?: boolean;
   slotId: string;
@@ -317,6 +322,8 @@ export interface WeaponGroup {
 }
 
 export interface Projectile {
+  /** Hull-reactor blast: not a weapon shot and never gains offensive weapon/skill scaling. */
+  isHullExplosion?: boolean;
   /** Original weapon category and immutable launch point for hit-time damage listeners. */
   sourceWeaponType?: WeaponSpec['weaponType'];
   spawnLocation?: Vector2;
@@ -326,6 +333,7 @@ export interface Projectile {
   sourceShipId: string;
   slotId?: string;
   isPlayer?: boolean;
+  teamId?: number;
   specId: string;
   pos: Vector2;
   prevPos: Vector2; // 用于插值
@@ -338,6 +346,10 @@ export interface Projectile {
   unfadedDamage?: number;
   unfadedEmp?: number;
   didDamage?: boolean;
+  /** Attached drone entities supply the body; missile engine/trail remain visible. */
+  spriteAlphaOverride?: number;
+  interceptsMissiles?: boolean;
+  mote?: { age:number; turnSign:number; scanRemaining:number; };
   onHitEffect?: string;
   passThroughMissiles?: boolean;
   passThroughFighters?: boolean;
@@ -351,6 +363,9 @@ export interface Projectile {
   damage: number;
   damageType: DamageType;
   empDamage?: number;
+  empResistance?: number;
+  /** Disabled warhead drifts without guiding, thrust, contact or proximity damage. */
+  isDisarmed?: boolean;
   radius: number;
   rangeRemaining: number;
   totalRange: number;
@@ -367,6 +382,8 @@ export interface Projectile {
   fringeColor?: [number, number, number, number];
   coreColor?: [number, number, number, number];
   glowColor?: [number, number, number, number];
+  /** Native radius: projectile < 0 disables, 0/omitted derives from length;
+   * beams use width-derived glow for any nonpositive/omitted value. */
   hitGlowRadius?: number;
   glowRadius?: number;
   coreWidthMult?: number;
@@ -424,7 +441,15 @@ export interface Projectile {
   isFlare?: boolean;
   flareLife?: number;
   flareMaxLife?: number;
-  flareBehavior?: { mode: 'STANDARD' | 'SEEKER'; effectRange: number; effectChance: number; flameoutTime: number; noEngineGlowTime: number; fadeTime: number };
+  /** Native FLARE_JAMMER uses FIGHTER collision/targeting, not missile spoofing. */
+  isFighterDecoy?: boolean;
+  /** Collision NONE is distinct from harmless/fizzling: EMP-resistant pulse bombs cannot be shot. */
+  collisionDisabled?: boolean;
+  systemFuseSeconds?: number;
+  systemFadeInSeconds?: number;
+  systemFuseTriggered?: boolean;
+  systemExplosionSound?: string;
+  flareBehavior?: { mode: 'STANDARD' | 'SEEKER' | 'JAMMER'; effectRange: number; effectChance: number; flameoutTime: number; noEngineGlowTime: number; fadeTime: number };
   flareFizzling?: boolean;
 }
 
@@ -433,6 +458,7 @@ export interface Beam {
   sourceShipId: string;
   slotId?: string;
   isPlayer?: boolean;
+  teamId?: number;
   specId: string;
   startPos: Vector2;
   endPos: Vector2;
@@ -467,6 +493,8 @@ export interface Beam {
   fringeColor?: [number, number, number, number];
   coreColor?: [number, number, number, number];
   glowColor?: [number, number, number, number];
+  /** Native radius: projectile < 0 disables, 0/omitted derives from length;
+   * beams use width-derived glow for any nonpositive/omitted value. */
   hitGlowRadius?: number;
   isHitting?: boolean;
   hitGlowBrightenDuration?: number;

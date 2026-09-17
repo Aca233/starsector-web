@@ -161,8 +161,8 @@ export class SoundManager {
       this.initContext();
     }
     const now = this.ctx ? this.ctx.currentTime : performance.now() / 1000;
-    const last = this.lastPlayTimes.get(key) || 0;
-    if (now - last < intervalSeconds) return;
+    const last = this.lastPlayTimes.get(key);
+    if (last !== undefined && now - last < intervalSeconds) return;
     this.lastPlayTimes.set(key, now);
     this.play(key, volume, playbackRate);
   }

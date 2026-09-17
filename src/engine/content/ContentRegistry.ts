@@ -20,7 +20,7 @@ export class ContentRegistry {
     validateShipSpec(spec, {registry:this, allowExistingId, requireBundledAssets});
     for (const wing of spec.fighterWings ?? []) if (this.ships.get(wing.specId)?.hullSize !== 'FIGHTER') throw new Error('Invalid wing craft: ' + wing.specId);
     if (spec.hullSize !== 'FIGHTER' && this.getAllShips().some(s=>s.fighterWings?.some(w=>w.specId === spec.id))) throw new Error('Cannot replace referenced fighter with a non-fighter: ' + spec.id);
-    this.ships.set(spec.id, immutableCopy(structuredClone(spec))); this.currentRevision++;
+    this.ships.set(spec.id, immutableCopy(structuredClone({ ...spec, sourceHullId: spec.sourceHullId ?? spec.id }))); this.currentRevision++;
   }
   registerWeapon(spec: WeaponSpec, requireBundledAssets = assetManager.isLoaded): void {
     if (this.weapons.has(spec.id)) throw new Error(`Duplicate weapon: ${spec.id}`);
@@ -37,6 +37,7 @@ export class ContentRegistry {
       stagedWeapons.set(spec.id, immutableCopy(spec));
     }
     for (const spec of copies.ships) {
+      spec.sourceHullId ??= spec.id;
       if (stagedShips.has(spec.id)) throw new Error('Duplicate ship: ' + spec.id);
       stagedShips.set(spec.id, immutableCopy(spec));
     }

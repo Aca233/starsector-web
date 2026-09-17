@@ -1,3 +1,4 @@
+import { lockedCombatTarget } from '../../../runtime/CombatTargeting';
 import { combatWeaponRange } from '../../../simulation/WeaponRange';
 import { CombatEngine } from '../../../simulation/CombatEngine';
 import { WebGLPassContext } from '../WebGLPassContext';
@@ -7,7 +8,7 @@ import { SpriteBatcher } from '../SpriteBatcher';
 /**
  * 战术 HUD 与仪表叠加通道 (WebGLTacticalOverlayPass)
  * 职责:
- * 1. 战术锁定四角红色方括号 [ ] 与导引前置量瞄准点 (Target Brackets & Lead Pip)
+ * 1. R 锁定目标的导引前置量瞄准点（详情与菱形框由 HUD 绘制）
  * 2. 官方原版战术武器射界与测距弧圈 (1:1 _super.java & E.java: 同心测距圈、边界射线与散布准星括号)
  * 3. 舰载原生环形硬/软幅能槽 (In-World Radial Flux Arc)
  * 4. 战舰浮动血条与幅能条 (Floating Overhead HUD)
@@ -23,34 +24,9 @@ export class WebGLTacticalOverlayPass {
     arcAnimProgress: number
   ) {
     const { batcher, textures, whiteTex } = ctx;
-    const target = engine.findHostile(engine.playerShip);
-    const enemyPos = target?.interpolatedPos(ctx.alpha);
-
-    // 1. 战术锁定目标经典四角红色括号 [ ] (Starsector Official Style)
-    if (target && enemyPos) {
-      const shipW = target.spec.spriteWidth;
-      const shipH = target.spec.spriteHeight;
-      const halfW = Math.max(shipW, shipH) * 0.45;
-      const halfH = halfW;
-      const corner = Math.min(28, Math.max(16, halfW * 0.25));
-      const thick = 2.5;
-
-      batcher.setBlendMode('NORMAL');
-      const cx = enemyPos.x;
-      const cy = enemyPos.y;
-      // 左上
-      batcher.drawSprite(whiteTex, cx - halfW + corner * 0.5, cy - halfH, corner, thick, 0, 0, 0, 0.95, 0.25, 0.25, 0.95);
-      batcher.drawSprite(whiteTex, cx - halfW, cy - halfH + corner * 0.5, thick, corner, 0, 0, 0, 0.95, 0.25, 0.25, 0.95);
-      // 右上
-      batcher.drawSprite(whiteTex, cx + halfW - corner * 0.5, cy - halfH, corner, thick, 0, 0, 0, 0.95, 0.25, 0.25, 0.95);
-      batcher.drawSprite(whiteTex, cx + halfW, cy - halfH + corner * 0.5, thick, corner, 0, 0, 0, 0.95, 0.25, 0.25, 0.95);
-      // 左下
-      batcher.drawSprite(whiteTex, cx - halfW + corner * 0.5, cy + halfH, corner, thick, 0, 0, 0, 0.95, 0.25, 0.25, 0.95);
-      batcher.drawSprite(whiteTex, cx - halfW, cy + halfH - corner * 0.5, thick, corner, 0, 0, 0, 0.95, 0.25, 0.25, 0.95);
-      // 右下
-      batcher.drawSprite(whiteTex, cx + halfW - corner * 0.5, cy + halfH, corner, thick, 0, 0, 0, 0.95, 0.25, 0.25, 0.95);
-      batcher.drawSprite(whiteTex, cx + halfW, cy + halfH - corner * 0.5, thick, corner, 0, 0, 0, 0.95, 0.25, 0.25, 0.95);
-    }
+    // Inspection diamonds are drawn by TargetShipHUD. Lead assistance must use
+    // the explicit R lock, never silently select the nearest hostile contact.
+    const target = lockedCombatTarget(engine.ships, engine.playerShip);
 
     // 1.1 射击前置量指示星标 (Target Lead Pip)
     if (!engine.playerShip.isDead && target) {

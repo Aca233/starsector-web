@@ -1,3 +1,4 @@
+import { sameTeam, combatTeam } from "../simulation/CombatTeams";
 import { Vector2 } from '../math/Vector2';
 import { signedAngle } from '../math/Angles';
 import { segmentCircleEntry } from '../math/Geometry';
@@ -46,8 +47,8 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
   };
   const projectiles = world.projectileThreatIndex?.query(world.projectiles, ship, center, radius, horizon) ?? world.projectiles;
   for (const p of projectiles) {
-    const owner = p.isPlayer ?? world.ships.find(s=>s.id===p.sourceShipId)?.isPlayer;
-    if (owner === undefined || owner === ship.isPlayer || p.isFlare || p.didDamage || !(p.damage > 0)) continue;
+    const owner = combatTeam(p) ?? world.ships.find(s => s.id === p.sourceShipId)?.teamId;
+    if (owner === undefined || owner === ship.teamId || p.isFlare || p.didDamage || !(p.damage > 0)) continue;
     let lifetime = horizon;
     if (p.flightTimeRemaining !== undefined) lifetime = Math.min(lifetime,p.flightTimeRemaining);
     else if (p.rangeRemaining !== undefined) lifetime = Math.min(lifetime,Math.max(0,p.rangeRemaining)/Math.max(1,p.sourceMoveSpeed ?? p.vel.length())+Math.max(0,(p.fadeTime??0)*(1-(p.fadeProgress??0))));
@@ -77,7 +78,7 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
   const activeBeams = new Set<string>();
   for (const b of world.beams) {
     const source = world.ships.find(s=>s.id===b.sourceShipId);
-    if (!source || source.isPlayer===ship.isPlayer || source.isDead || b.damageActive===false || b.duration<=0) continue;
+    if (!source || sameTeam(source, ship) || source.isDead || b.damageActive===false || b.duration<=0) continue;
     if (segmentCircleEntry(b.startPos,b.endPos,center,radius) === null) continue;
     activeBeams.add(b.sourceShipId+'/'+b.slotId);
     const duration = Math.min(defenseWindow,b.duration);
@@ -86,7 +87,7 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
   const weaponEnvelopes = world.weaponThreatEnvelope && finiteHorizon && horizon >= 0 && ship.hasNativeThreatPhaseHooks
     ? world.weaponThreatEnvelope : undefined;
   for (const enemy of world.ships) {
-    if (enemy===ship || enemy.isDead || enemy.isPlayer===ship.isPlayer) continue;
+    if (enemy===ship || enemy.isDead || !enemy.isVisibleTo(ship.teamId) || sameTeam(enemy, ship)) continue;
     const recovery = Math.max(enemy.flux.isOverloaded ? enemy.flux.overloadTimer : 0,
       enemy.flux.isVenting ? enemy.flux.getTimeToVent() : 0,
       enemy.isPhased ? enemy.shield.phaseChargeDownDuration : 0,
@@ -140,7 +141,15 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
           if (distanceFromOrigin > reach+pad) continue;
         }
       }
-      const muzzle = weaponMuzzle(enemy,m,forecastMuzzle), delta = forecastDelta.set(center.x-muzzle.x,center.y-muzzle.y), distance = delta.length();
+      // Reuse only inside the audited synchronous phase already owning this envelope.
+      // No eager all-pairs work: far/disabled weapons never populate this lazy cache.
+      const cachedMuzzleX = envelope?.muzzleX[preparedIndex];
+      const muzzle = cachedMuzzleX === undefined ? weaponMuzzle(enemy,m,forecastMuzzle)
+        : forecastMuzzle.set(cachedMuzzleX, envelope!.muzzleY[preparedIndex]);
+      if (envelope && cachedMuzzleX === undefined) {
+        envelope.muzzleX[preparedIndex] = muzzle.x; envelope.muzzleY[preparedIndex] = muzzle.y;
+      }
+      const delta = forecastDelta.set(center.x-muzzle.x,center.y-muzzle.y), distance = delta.length();
       range ??= weaponRange(enemy,m);
       // Outside range is not automatically safe: a hostile can close while this ship vents.
       // Keep Vector2.normalize's near-zero rule and the original arithmetic order.
@@ -173,11 +182,19 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
   // Pick the shield sector covering the largest weighted threat, not the fleet's attack target.
   let facing: number|null = null, best = -1;
   const halfArc = ship.shield.maxArcDeg*Math.PI/360;
+  const weights = imminent.map(t => t.shieldFlux / (1 + t.eta));
   for (const candidate of imminent) {
     let weight = 0;
     // Preserve accumulation order and ties without an array per candidate sector.
-    for (const t of imminent) {
-      if (Math.abs(signedAngle(t.direction-candidate.direction))<=halfArc) weight += t.shieldFlux/(1+t.eta);
+    for (let i = 0; i < imminent.length; i++) {
+      const difference = imminent[i].direction - candidate.direction;
+      const absolute = Math.abs(difference), separation = absolute <= Math.PI ? absolute : Math.PI * 2 - absolute;
+      // Directions come from atan2. Away from the boundary, a wrapped difference
+      // gives the same predicate without three transcendental calls per pair.
+      // Keep original evaluation at rounding-sensitive seams and exceptional inputs.
+      const covered = absolute <= Math.PI * 2 && Math.abs(separation - halfArc) > 1e-12
+        ? separation <= halfArc : Math.abs(signedAngle(difference)) <= halfArc;
+      if (covered) weight += weights[i];
     }
     if (weight>best) { best=weight;facing=candidate.direction; }
   }
