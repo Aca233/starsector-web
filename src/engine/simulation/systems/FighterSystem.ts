@@ -2,7 +2,7 @@ import { Vector2 } from '../../math/Vector2';
 import { FighterAIState, BomberAIState, TacticalOrder, ContrailParticle, FlightDeckWing } from '../CombatTypes';
 import { Ship } from '../Ship';
 import { Projectile, Beam, WeaponMount } from '../Weapon';
-import { modManager } from '../../modding/ModManager';
+import { modManager, type FighterWingSpec } from '../../modding/ModManager';
 import { sound } from '../../audio/SoundManager';
 import { SimulationRandom } from '../SimulationRandom';
 
@@ -15,16 +15,17 @@ export interface FighterFXCallbacks {
   addRadioMessage: (sender: string, faction: 'PLAYER' | 'ENEMY' | 'HQ', text: string, color: [number, number, number]) => void;
   cancelOrder: (unitId: string) => void;
   getOrder: (unitId: string) => TacticalOrder | undefined;
+  findHostile?: (ship: Ship, targetId?: string) => Ship | undefined;
   getPlayerPos: () => Vector2;
-  recordFighterDestroyed: (isPlayerCraft: boolean) => void;
+  handleShipDestruction: (ship: Ship) => void;
   recordFighterRebuilt: (isPlayerCraft: boolean) => void;
   destructionSideEffectsEnabled: () => boolean;
 }
 
 /**
- * 远行星号官方舰载机联队与机库甲板系统 (FighterSystem)
+ * Web 舰载机联队与机库适配（未完整移植原版补充流程） (FighterSystem)
  * 深度实现:
- * 1. 官方航母机库甲板 (Flight Decks) 与战备重建率 (Carrier Replacement Rate - CRR)
+ * 1. 航母机库甲板 (Flight Decks) 与战备重建率 (Carrier Replacement Rate - CRR)
  * 2. 战机战损进入机库队列倒计时重建，倒计时结束从母舰机库弹射出击
  * 3. 敌我双方航空中队全自主空战 AI：拦截导弹 (INTERCEPT)、咬尾缠斗 (DOGFIGHT)、掠袭战舰 (ATTACK) 与伴随护航 (ESCORT)
  * 4. 鱼雷轰炸机突击发射与返航甲板补给装填循环
@@ -38,108 +39,111 @@ export class FighterSystem {
 
   public playerWings: FlightDeckWing[] = [];
   public enemyWings: FlightDeckWing[] = [];
+  private carriers = new Map<string, Ship>();
+  private readonly reserveCraft = new Map<Ship, number>();
+  private readonly dockedReserve = new Set<Ship>();
 
   constructor(
     private readonly random = new SimulationRandom(),
     private readonly visualRandom = new SimulationRandom(0xf17e7a11)
   ) {}
 
-  public init(playerShip: Ship, enemyShip?: Ship) {
+  public init(playerShip: Ship, enemyShip?: Ship, scenarioWings?: { player: FighterWingSpec[]; enemy: FighterWingSpec[] }) {
     this.fighters = [];
     this.bombers = [];
     this.fighterAIModes.clear();
     this.bomberAIModes.clear();
     this.isFighterRecall = false;
+    this.playerWings = [];
+    this.enemyWings = [];
+    this.carriers.clear();
+    this.reserveCraft.clear();
+    this.dockedReserve.clear();
+    this.addCarrier(playerShip, scenarioWings?.player);
+    if (enemyShip) this.addCarrier(enemyShip, scenarioWings?.enemy);
+  }
 
-    // 只有配备机库甲板或改装机库的舰船才搭载联队 (典范与厄运为纯战列/相位舰，无机库)
-    const hasPlayerFlightDecks = playerShip.spec.id === 'onslaught' || (playerShip.spec.fighterBays && playerShip.spec.fighterBays > 0);
+  public addCarrier(carrier: Ship, scenarioWings?: FighterWingSpec[]): void {
+    if (this.carriers.has(carrier.id)) return;
+    const specs = scenarioWings ?? (carrier.spec.fighterWings ?? []).slice(0, Math.max(0, carrier.spec.fighterBays ?? 0));
+    for (const spec of specs) {
+      if (modManager.getShip(spec.specId)?.hullSize !== 'FIGHTER') throw new Error(`Invalid flight deck craft: ${spec.specId}`);
+    }
+    this.carriers.set(carrier.id, carrier);
+    specs.forEach((spec, index) => {
+      const wing: FlightDeckWing = {
+        wingId: `${carrier.id}:wing:${index}`, carrierId: carrier.id,
+        name: spec.specId, specId: spec.specId, role: spec.role, tags: spec.tags,
+        rebuildSeconds: spec.rebuildSeconds, isPlayer: carrier.isPlayer,
+        maxCrafts: spec.count, crr: 1, rebuildQueue: []
+      };
+      (carrier.isPlayer ? this.playerWings : this.enemyWings).push(wing);
+      for (let i = 0; i < wing.maxCrafts; i++) this.spawnCraft(carrier, wing, i);
+    });
+  }
 
-    // 1. 初始化玩家航母甲板联队
-    if (hasPlayerFlightDecks) {
-      this.playerWings = [
-        {
-          wingId: 'player_broadsword_wing',
-          name: '阔剑重型战斗机中队',
-          specId: 'broadsword',
-          isPlayer: true,
-          maxCrafts: 3,
-          crr: 1.0,
-          rebuildQueue: []
-        },
-        {
-          wingId: 'player_dagger_wing',
-          name: '匕首鱼雷轰炸机中队',
-          specId: 'dagger',
-          isPlayer: true,
-          maxCrafts: 2,
-          crr: 1.0,
-          rebuildQueue: []
-        }
-      ];
+  private spawnCraft(carrier: Ship, wing: FlightDeckWing, index: number): Ship {
+    const spec = modManager.getShip(wing.specId);
+    if (!spec) throw new Error(`Unknown flight deck craft: ${wing.specId}`);
+    const offset = new Vector2(-100 - index * 45, (index % 2 ? -1 : 1) * (70 + index * 30)).rotate(carrier.facingRad);
+    const pointDefense = carrier.spec.captainSkills?.point_defense;
+    const craftSpec = pointDefense ? { ...spec, captainSkills: { ...spec.captainSkills, point_defense: pointDefense } } : spec;
+    const craft = new Ship(this.random.nextId(`${carrier.id}_craft`), craftSpec, carrier.isPlayer,
+      carrier.pos.clone().add(offset), carrier.facingRad, this.random, this.visualRandom);
+    craft.flightDeckWingId = wing.wingId;
+    craft.sourceCarrier = carrier;
+    craft.vel.copy(carrier.vel);
+    if (wing.role === 'BOMBER') {
+      this.bombers.push(craft);
+      this.bomberAIModes.set(craft.id, { state: 'ESCORT', timer: 0, hasTorpedo: true });
     } else {
-      this.playerWings = [];
+      this.fighters.push(craft);
+      this.fighterAIModes.set(craft.id, { state: 'ESCORT', timer: 0 });
     }
+    return craft;
+  }
 
-    // 2. 初始化敌方航母甲板联队 (3 架敌方阔剑拦截机)
-    this.enemyWings = [
-      {
-        wingId: 'enemy_broadsword_wing',
-        name: '敌方拦截机中队',
-        specId: 'broadsword',
-        isPlayer: false,
-        maxCrafts: 3,
-        crr: 1.0,
-        rebuildQueue: []
-      }
-    ];
-
-    const ftrSpec = modManager.getShip('broadsword');
-    if (ftrSpec) {
-      // 部署 3 架玩家阔剑重型战斗机伴随旗舰 (仅限搭载机库的旗舰)
-      if (hasPlayerFlightDecks) {
-        const playerOffsets = [
-          new Vector2(-100, 90),
-          new Vector2(-150, 150),
-          new Vector2(-150, -150)
-        ];
-        for (let i = 0; i < 3; i++) {
-          const spawnPos = playerShip.pos.clone().add(playerOffsets[i]);
-          const ftr = new Ship(`player_ftr_${i}`, ftrSpec, true, spawnPos, playerShip.facingRad, this.random);
-          this.fighters.push(ftr);
-          this.fighterAIModes.set(ftr.id, { state: 'ESCORT', timer: this.random.next() * 2 });
-        }
-      }
-
-      // 部署 3 架敌方阔剑拦截机护卫敌舰
-      if (enemyShip) {
-        const enemyOffsets = [
-          new Vector2(-100, 90).rotate(Math.PI),
-          new Vector2(-150, 150).rotate(Math.PI),
-          new Vector2(-150, -150).rotate(Math.PI)
-        ];
-        for (let i = 0; i < 3; i++) {
-          const spawnPos = enemyShip.pos.clone().add(enemyOffsets[i]);
-          const eFtr = new Ship(`enemy_ftr_${i}`, ftrSpec, false, spawnPos, enemyShip.facingRad, this.random);
-          this.fighters.push(eFtr);
-          this.fighterAIModes.set(eFtr.id, { state: 'ESCORT', timer: this.random.next() * 2 });
-        }
+  /** ReserveWingStats: fill to twice nominal strength once, not an endless replenishment buff. */
+  public deployReserveWing(carrier: Ship): void {
+    if (carrier.isDead || this.carriers.get(carrier.id) !== carrier) return;
+    for (const wing of [...this.playerWings, ...this.enemyWings]) {
+      if (wing.carrierId !== carrier.id || wing.tags?.includes('rd_no_extra_craft')) continue;
+      const alive = [...this.fighters, ...this.bombers].filter(c => c.flightDeckWingId === wing.wingId && !c.isDead && !this.dockedReserve.has(c));
+      const add = Math.max(0, wing.maxCrafts * 2 - alive.length);
+      const fillNormal = Math.max(0, wing.maxCrafts - alive.length);
+      // Fast normal replacements consume queued losses, so they cannot respawn twice.
+      wing.rebuildQueue.splice(0, Math.min(add, fillNormal));
+      for (let i = 0; i < add; i++) {
+        const craft = this.spawnCraft(carrier, wing, alive.length + i);
+        if (i >= fillNormal) this.reserveCraft.set(craft, 30);
       }
     }
+  }
 
-    const bmrSpec = modManager.getShip('dagger');
-    if (bmrSpec && hasPlayerFlightDecks) {
-      // 部署 2 架匕首级鱼雷轰炸机
-      const bmrOffsets = [
-        new Vector2(-190, 70),
-        new Vector2(-190, -70)
-      ];
-      for (let i = 0; i < 2; i++) {
-        const spawnPos = playerShip.pos.clone().add(bmrOffsets[i]);
-        const bmr = new Ship(`player_bmr_${i}`, bmrSpec, true, spawnPos, playerShip.facingRad, this.random);
-        this.bombers.push(bmr);
-        this.bomberAIModes.set(bmr.id, { state: 'ESCORT', timer: this.random.next() * 2, hasTorpedo: true });
-      }
-    }
+  private returnReserve(craft: Ship, carrier: Ship, dt: number, target: Ship,
+    spawnProj: (p: Projectile) => void, spawnBeam: (b: Beam) => void,
+    spawnFlash: (pos: Vector2, angleRad: number, size: number, color: [number, number, number]) => void): boolean {
+    const left = this.reserveCraft.get(craft);
+    if (left === undefined || left > 0 || carrier.isDead) return false;
+    craft.isFiringMain = false;
+    craft.fireControlMode = 'MANUAL';
+    for (const group of craft.weaponGroups) group.isAutofire = false;
+    const delta = carrier.pos.clone().sub(craft.pos);
+    let turn = delta.heading() - craft.facingRad;
+    while (turn > Math.PI) turn -= Math.PI * 2;
+    while (turn < -Math.PI) turn += Math.PI * 2;
+    craft.turnInput = Math.max(-1, Math.min(1, turn * 3));
+    craft.throttle = Math.abs(turn) < .8 ? 1 : .25;
+    craft.strafeInput = 0;
+    craft.brakeInput = false;
+    craft.update(dt, target, spawnProj, spawnBeam, spawnFlash);
+    if (delta.length() <= carrier.spec.collisionRadius + 35) this.dockedReserve.add(craft);
+    return true;
+  }
+
+  private carrierFor(craft: Ship, fallback: Ship): Ship {
+    const wing = [...this.playerWings, ...this.enemyWings].find(w => w.wingId === craft.flightDeckWingId);
+    return (wing?.carrierId && this.carriers.get(wing.carrierId)) || fallback;
   }
 
   public toggleRecall(
@@ -164,40 +168,39 @@ export class FighterSystem {
     enemyShip: Ship,
     fx: FighterFXCallbacks
   ) {
-    const ftrSpec = modManager.getShip('broadsword');
-    const bmrSpec = modManager.getShip('dagger');
-
+    for (const [craft, remaining] of this.reserveCraft) {
+      if (craft.isDead || this.dockedReserve.has(craft)) this.reserveCraft.delete(craft);
+      else this.reserveCraft.set(craft, remaining - dt);
+    }
     for (let i = this.fighters.length - 1; i >= 0; i--) {
-      if (!this.fighters[i].isDead) continue;
+      if (!this.fighters[i].isDead && !this.dockedReserve.has(this.fighters[i])) continue;
+      this.dockedReserve.delete(this.fighters[i]);
       this.fighterAIModes.delete(this.fighters[i].id);
       this.fighters.splice(i, 1);
     }
     for (let i = this.bombers.length - 1; i >= 0; i--) {
-      if (!this.bombers[i].isDead) continue;
+      if (!this.bombers[i].isDead && !this.dockedReserve.has(this.bombers[i])) continue;
+      this.dockedReserve.delete(this.bombers[i]);
       this.bomberAIModes.delete(this.bombers[i].id);
       this.bombers.splice(i, 1);
     }
 
-    // 1. 处理玩家母舰甲板联队
-    for (const wing of this.playerWings) {
-      const isBroadsword = wing.specId === 'broadsword';
-      const aliveList = isBroadsword
-        ? this.fighters.filter(f => f.isPlayer && !f.isDead)
-        : this.bombers.filter(b => b.isPlayer && !b.isDead);
-
+    for (const wing of [...this.playerWings, ...this.enemyWings]) {
+      const carrier = (wing.carrierId && this.carriers.get(wing.carrierId)) || (wing.isPlayer ? playerShip : enemyShip);
+      const aliveList = [...this.fighters, ...this.bombers].filter(c => c.flightDeckWingId === wing.wingId && !c.isDead);
       const totalCrafts = aliveList.length + wing.rebuildQueue.length;
       let missing = wing.maxCrafts - totalCrafts;
 
-      while (missing > 0 && !playerShip.isDead) {
-        const baseTime = isBroadsword ? 12.0 : 16.0;
-        const rebuildTime = baseTime / Math.max(0.25, wing.crr);
+      while (missing > 0 && !carrier.isDead) {
+        const baseTime = wing.rebuildSeconds ?? 12;
+        const rebuildTime = baseTime * carrier.hullStats.fighterRefitTimeMultiplier / Math.max(0.3, wing.crr);
         wing.rebuildQueue.push({
           craftId: this.random.nextId('p_rebuild'),
           timer: rebuildTime,
           maxTimer: rebuildTime
         });
         // 损失战机导致 CRR 战备率轻微衰减
-        wing.crr = Math.max(0.25, wing.crr - 0.04);
+        wing.crr = Math.max(0.3, wing.crr - 0.04);
         missing--;
       }
 
@@ -210,64 +213,11 @@ export class FighterSystem {
       for (let i = wing.rebuildQueue.length - 1; i >= 0; i--) {
         const item = wing.rebuildQueue[i];
         item.timer -= dt;
-        if (item.timer <= 0 && !playerShip.isDead) {
+        if (item.timer <= 0 && !carrier.isDead) {
           wing.rebuildQueue.splice(i, 1);
-          // 从母舰机库弹射升空
-          const spawnPos = playerShip.pos.clone().add(new Vector2(-60, (this.random.next() - 0.5) * 40).rotate(playerShip.facingRad));
-          if (isBroadsword && ftrSpec) {
-            const newFtr = new Ship(this.random.nextId('player_ftr_rep'), ftrSpec, true, spawnPos, playerShip.facingRad, this.random);
-            newFtr.vel = playerShip.vel.clone().add(Vector2.fromAngle(playerShip.facingRad, 140));
-            this.fighters.push(newFtr);
-            this.fighterAIModes.set(newFtr.id, { state: 'ESCORT', timer: 2.0 });
-            fx.recordFighterRebuilt(true);
-          } else if (!isBroadsword && bmrSpec) {
-            const newBmr = new Ship(this.random.nextId('player_bmr_rep'), bmrSpec, true, spawnPos, playerShip.facingRad, this.random);
-            newBmr.vel = playerShip.vel.clone().add(Vector2.fromAngle(playerShip.facingRad, 120));
-            this.bombers.push(newBmr);
-            this.bomberAIModes.set(newBmr.id, { state: 'ESCORT', timer: 2.0, hasTorpedo: true });
-            fx.recordFighterRebuilt(true);
-          }
-
-          sound.play('fighter_deploy', 0.85);
-          fx.addFloatingText(playerShip.pos.clone(), `${wing.name} 补充出击!`, [120, 255, 180], 13, 2.0);
-          fx.addRadioMessage('机库调度台', 'PLAYER', `新造 ${wing.name} 机体已完成甲板检修并弹射出击！`, [120, 255, 180]);
-        }
-      }
-    }
-
-    // 2. 处理敌方母舰甲板联队
-    for (const wing of this.enemyWings) {
-      const aliveList = this.fighters.filter(f => !f.isPlayer && !f.isDead);
-      const totalCrafts = aliveList.length + wing.rebuildQueue.length;
-      let missing = wing.maxCrafts - totalCrafts;
-
-      while (missing > 0 && !enemyShip.isDead) {
-        const baseTime = 13.0;
-        const rebuildTime = baseTime / Math.max(0.25, wing.crr);
-        wing.rebuildQueue.push({
-          craftId: this.random.nextId('e_rebuild'),
-          timer: rebuildTime,
-          maxTimer: rebuildTime
-        });
-        wing.crr = Math.max(0.25, wing.crr - 0.04);
-        missing--;
-      }
-
-      if (wing.rebuildQueue.length === 0) {
-        wing.crr = Math.min(1.0, wing.crr + 0.015 * dt);
-      }
-
-      for (let i = wing.rebuildQueue.length - 1; i >= 0; i--) {
-        const item = wing.rebuildQueue[i];
-        item.timer -= dt;
-        if (item.timer <= 0 && !enemyShip.isDead && ftrSpec) {
-          wing.rebuildQueue.splice(i, 1);
-          const spawnPos = enemyShip.pos.clone().add(new Vector2(-60, (this.random.next() - 0.5) * 40).rotate(enemyShip.facingRad));
-          const newEFtr = new Ship(this.random.nextId('enemy_ftr_rep'), ftrSpec, false, spawnPos, enemyShip.facingRad, this.random);
-          newEFtr.vel = enemyShip.vel.clone().add(Vector2.fromAngle(enemyShip.facingRad, 140));
-          this.fighters.push(newEFtr);
-          this.fighterAIModes.set(newEFtr.id, { state: 'ESCORT', timer: 2.0 });
-          fx.recordFighterRebuilt(false);
+          this.spawnCraft(carrier, wing, aliveList.length);
+          fx.recordFighterRebuilt(wing.isPlayer);
+          sound.playAtPos('fighter_deploy', carrier.pos, fx.getPlayerPos(), 0.6);
         }
       }
     }
@@ -297,8 +247,8 @@ export class FighterSystem {
       if (ftr.isDead) continue;
 
       const isPlayer = ftr.isPlayer;
-      const friendlyCapital = isPlayer ? playerShip : enemyShip;
-      const hostileCapital = isPlayer ? enemyShip : playerShip;
+      const friendlyCapital = this.carrierFor(ftr, isPlayer ? playerShip : enemyShip);
+      if (this.returnReserve(ftr, friendlyCapital, dt, isPlayer ? enemyShip : playerShip, spawnProj, spawnBeam, spawnFlash)) continue;
 
       let modeData = this.fighterAIModes.get(ftr.id);
       if (!modeData) {
@@ -312,6 +262,8 @@ export class FighterSystem {
       const specificOrder = fx.getOrder(ftr.id);
       const fleetOrder = isPlayer ? fx.getOrder('fleet') : undefined;
       const activeOrder = specificOrder || fleetOrder;
+      const hostileCapital = fx.findHostile?.(ftr, activeOrder?.targetShipId) ?? (isPlayer ? enemyShip : playerShip);
+      ftr.currentTargetShip = hostileCapital.isDead ? null : hostileCapital;
 
       // 敌方来袭重型导弹检测 (点防近程威胁)
       const nearbyHostileMissile = projectiles.find(
@@ -319,9 +271,7 @@ export class FighterSystem {
       );
 
       // 敌方航空中队检测 (空战咬尾目标)
-      const opposingCrafts = isPlayer
-        ? this.fighters.filter(f => !f.isPlayer && !f.isDead)
-        : [...this.fighters.filter(f => f.isPlayer && !f.isDead), ...this.bombers.filter(b => !b.isDead)];
+      const opposingCrafts = [...this.fighters, ...this.bombers].filter(f => f.isPlayer !== isPlayer && !f.isDead);
 
       let closestOpposingCraft: Ship | null = null;
       let minOpposingDist = 950;
@@ -371,7 +321,8 @@ export class FighterSystem {
         const dist = toWp.length();
         if (dist < 90) {
           // 抵达航路点：消耗指令（舰队级指令按存储键注销，避免残留指令把战机钉在航路点上）
-          fx.cancelOrder(specificOrder ? ftr.id : 'fleet');
+          if (specificOrder) fx.cancelOrder(ftr.id);
+          ftr.clearInput();
         } else {
           // 转场期间不主动追击敌人：仅当原瞄准点仍处于有效射界内时才保留开火状态
           const prevAim = ftr.aimTargetWorld.clone().sub(ftr.pos);
@@ -486,17 +437,13 @@ export class FighterSystem {
             maxSize: 12 + this.visualRandom.next() * 5,
             alpha: 0.45,
             rotation: this.visualRandom.next() * Math.PI * 2,
-            color: isPlayer ? [240, 180, 100] : [255, 100, 80]
+            color: [255, 125, 25]
           });
         }
       }
 
       if (ftr.hullHp <= 0 && !ftr.isDead && fx.destructionSideEffectsEnabled()) {
-        ftr.isDead = true;
-        fx.recordFighterDestroyed(ftr.isPlayer);
-        sound.playAtPos('explosion', ftr.pos, fx.getPlayerPos(), 0.45);
-        fx.spawnAuthenticExplosion(ftr.pos, 42, [255, 180, 50], true);
-        fx.spawnDebris(ftr.pos, 8, [130, 115, 100], 100);
+        fx.handleShipDestruction(ftr);
         if (isPlayer) {
           fx.addRadioMessage('编队损管', 'PLAYER', '注意！友方阔剑战机被凌空击坠！机库准备重构！', [255, 120, 80]);
         } else {
@@ -526,6 +473,9 @@ export class FighterSystem {
     for (let i = 0; i < this.bombers.length; i++) {
       const bmr = this.bombers[i];
       if (bmr.isDead) continue;
+      const friendlyCapital = this.carrierFor(bmr, bmr.isPlayer ? playerShip : enemyShip);
+      if (this.returnReserve(bmr, friendlyCapital, dt, bmr.isPlayer ? enemyShip : playerShip, spawnProj, spawnBeam, spawnFlash)) continue;
+      const recalled = bmr.isPlayer && this.isFighterRecall;
 
       let mode = this.bomberAIModes.get(bmr.id);
       if (!mode) {
@@ -547,12 +497,16 @@ export class FighterSystem {
 
       // 检查战术地图对轰炸机的特定指令 (Tactical Orders)
       const specificOrder = fx.getOrder(bmr.id);
-      const fleetOrder = fx.getOrder('fleet');
+      const fleetOrder = bmr.isPlayer ? fx.getOrder('fleet') : undefined;
       const activeOrder = specificOrder || fleetOrder;
+      const hostileCapital = fx.findHostile?.(bmr, activeOrder?.targetShipId) ?? (bmr.isPlayer ? enemyShip : playerShip);
+      bmr.currentTargetShip = hostileCapital.isDead ? null : hostileCapital;
+      bmr.isFiringMain = false;
+      if (mode.state === 'DOCKED' && friendlyCapital.isDead) mode.state = 'RETURN_TO_REARM';
 
       // 1. 召回模式或正在重载修理
       if (mode.state === 'DOCKED') {
-        bmr.hullHp = Math.min(bmr.spec.hitpoints, bmr.hullHp + 60 * dt);
+        bmr.hullHp = Math.min(bmr.maxHullHp, bmr.hullHp + 60 * dt);
         bmr.throttle = 0;
         bmr.turnInput = 0;
         bmr.vel.scale(0.8);
@@ -563,19 +517,19 @@ export class FighterSystem {
             mount.ammo = mount.spec.maxAmmo;
             mount.ammoRechargeProgress = 0;
           }
-          mode.state = this.isFighterRecall ? 'ESCORT' : 'ATTACK_RUN';
+          mode.state = recalled ? 'ESCORT' : 'ATTACK_RUN';
           mode.timer = 12.0;
           fx.addFloatingText(bmr.pos, 'DAGGER ARMED & LAUNCHING', [100, 220, 255], 13, 1.8);
           sound.playAtPos('fighter_deploy', bmr.pos, fx.getPlayerPos(), 0.6);
-          fx.addRadioMessage('匕首轰炸分队', 'PLAYER', '重型鱼雷补充完毕，重新出击！', [100, 220, 255]);
+          fx.addRadioMessage('匕首轰炸分队', bmr.isPlayer ? 'PLAYER' : 'ENEMY', '重型鱼雷补充完毕，重新出击！', [100, 220, 255]);
         }
-      } else if (this.isFighterRecall || mode.state === 'RETURN_TO_REARM' || !mode.hasTorpedo) {
+      } else if (recalled || mode.state === 'RETURN_TO_REARM' || !mode.hasTorpedo) {
         // 返航母舰甲板
-        const dockPoint = playerShip.pos.clone().add(new Vector2(-120, 0).rotate(playerShip.facingRad));
+        const dockPoint = friendlyCapital.pos.clone().add(new Vector2(-120, 0).rotate(friendlyCapital.facingRad));
         const toDock = dockPoint.sub(bmr.pos);
         const dist = toDock.length();
 
-        if (dist < 70 && !mode.hasTorpedo) {
+        if (dist < 70 && !mode.hasTorpedo && !friendlyCapital.isDead) {
           mode.state = 'DOCKED';
           mode.timer = 3.2;
           fx.addFloatingText(bmr.pos, 'DOCKING & REARMING...', [120, 210, 255], 12, 1.5);
@@ -595,7 +549,8 @@ export class FighterSystem {
         if (dist < 90) {
           // 抵达航路点：注销真正持有该指令的键 (舰队级指令挂在 'fleet' 上)，
           // 否则注销单位 id 不会移除舰队指令，轰炸机会被永久钉在航点上。
-          fx.cancelOrder(specificOrder ? bmr.id : 'fleet');
+          if (specificOrder) fx.cancelOrder(bmr.id);
+          bmr.clearInput();
         } else {
           const targetAngle = toWp.heading();
           let angleDiff = targetAngle - bmr.facingRad;
@@ -604,10 +559,10 @@ export class FighterSystem {
           bmr.turnInput = Math.sign(angleDiff);
           bmr.throttle = 1.0;
         }
-      } else if (!enemyShip.isDead && mode.hasTorpedo) {
+      } else if (!hostileCapital.isDead && mode.hasTorpedo) {
         // 发起鱼雷突袭攻击循环 (Torpedo Attack Run)
         mode.state = 'ATTACK_RUN';
-        const targetShip = enemyShip;
+        const targetShip = hostileCapital;
         const toEnemy = targetShip.pos.clone().sub(bmr.pos);
         const dist = toEnemy.length();
         bmr.aimTargetWorld = targetShip.pos.clone();
@@ -638,7 +593,7 @@ export class FighterSystem {
         // 巡航编队护卫
         mode.state = 'ESCORT';
         const slot = escortSlots[i % escortSlots.length];
-        const targetWorld = playerShip.pos.clone().add(slot.clone().rotate(playerShip.facingRad));
+        const targetWorld = friendlyCapital.pos.clone().add(slot.clone().rotate(friendlyCapital.facingRad));
         const toSlot = targetWorld.sub(bmr.pos);
         const dist = toSlot.length();
         if (dist > 70) {
@@ -649,15 +604,15 @@ export class FighterSystem {
           bmr.turnInput = Math.sign(angleDiff);
           bmr.throttle = Math.min(1.0, dist / 180);
         } else {
-          let angleDiff = playerShip.facingRad - bmr.facingRad;
+          let angleDiff = friendlyCapital.facingRad - bmr.facingRad;
           while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
           while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
           bmr.turnInput = Math.sign(angleDiff) * 0.4;
-          bmr.throttle = playerShip.throttle * 0.8;
+          bmr.throttle = friendlyCapital.throttle * 0.8;
         }
       }
 
-      bmr.update(dt, enemyShip, spawnProj, spawnBeam, spawnFlash);
+      bmr.update(dt, hostileCapital, spawnProj, spawnBeam, spawnFlash);
 
       // 校验鱼雷是否真的离管：有限弹药挂点看弹药消耗，无限弹药挂点看冷却/连发/开火周期推进
       if (launchRequested) {
@@ -676,7 +631,7 @@ export class FighterSystem {
           mode.state = 'RETURN_TO_REARM';
           fx.addFloatingText(bmr.pos, 'ATROPOS TORPEDO LAUNCHED!', [255, 140, 40], 14, 2.0);
           fx.addCameraShake(3, 0.2);
-          fx.addRadioMessage('匕首轰炸分队', 'PLAYER', '阿特罗波斯重型鱼雷已齐射！脱离攻击航线！', [255, 180, 60]);
+          fx.addRadioMessage('匕首轰炸分队', bmr.isPlayer ? 'PLAYER' : 'ENEMY', '阿特罗波斯重型鱼雷已齐射！脱离攻击航线！', [255, 180, 60]);
         }
       }
 
@@ -699,11 +654,7 @@ export class FighterSystem {
       }
 
       if (bmr.hullHp <= 0 && !bmr.isDead && fx.destructionSideEffectsEnabled()) {
-        bmr.isDead = true;
-        fx.recordFighterDestroyed(bmr.isPlayer);
-        sound.playAtPos('fighter_explosion', bmr.pos, fx.getPlayerPos(), 0.5);
-        fx.spawnAuthenticExplosion(bmr.pos, 50, [255, 120, 50], true);
-        fx.spawnDebris(bmr.pos, 10, [140, 160, 190], 120);
+        fx.handleShipDestruction(bmr);
       }
     }
   }

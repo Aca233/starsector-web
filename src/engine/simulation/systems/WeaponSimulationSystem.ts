@@ -1,3 +1,7 @@
+import { ProjectileInterceptionIndex } from '../collision/ProjectileInterceptionIndex';
+import { requireWeaponEffect } from '../../extensions/weapon-effects/Registry';
+import { ProjectileExplosionSystem } from './weapon/ProjectileExplosionSystem';
+import { advanceSourceProjectile, hasSourceProjectileLifecycle, markSourceProjectileImpact } from './weapon/SourceProjectileLifecycle';
 import { Projectile, Beam } from '../Weapon';
 import { Ship } from '../Ship';
 import { WeaponSimContext } from './weapon/WeaponSimContext';
@@ -18,6 +22,7 @@ export type { WeaponSimContext } from './weapon/WeaponSimContext';
 export class WeaponSimulationSystem {
   public projectiles: Projectile[] = [];
   public beams: Beam[] = [];
+  public readonly explosions = new ProjectileExplosionSystem();
 
   public readonly missileGuidance = new MissileGuidanceHandler();
   public readonly collisionHandler = new ProjectileCollisionHandler();
@@ -28,15 +33,32 @@ export class WeaponSimulationSystem {
   public clear() {
     this.projectiles = [];
     this.beams = [];
+    this.explosions.active = [];
   }
 
   public update(dt: number, ctx: WeaponSimContext) {
+    for (const ship of ctx.ships ?? [ctx.playerShip,ctx.enemyShip,...ctx.fighters]) if (!ship.isDead) for (const mount of ship.weapons) {
+      if (mount.spec.everyFrameEffect) requireWeaponEffect(mount.spec.everyFrameEffect, 'advance', mount.spec.id).advance!(ship, mount, dt, ctx);
+    }
     this.updateProjectiles(dt, ctx);
     this.updateBeams(dt, ctx);
   }
 
   public updateProjectiles(dt: number, ctx: WeaponSimContext) {
-    const allShips = [ctx.playerShip, ctx.enemyShip, ...ctx.fighters];
+    const interceptionIndex = new ProjectileInterceptionIndex();
+    const removeProjectileAt = (index: number) => {
+      const removed = this.projectiles.splice(index, 1);
+      if (removed.length) interceptionIndex.remove(removed[0]);
+    };
+    ctx = { ...ctx, spawnProjectileExplosion: (p, point, shipId, asteroidId) => {
+      // Contacts can run arbitrary on-hit effects before reaching this boundary.
+      // Explosions can also remove missiles or spawn further entities.
+      interceptionIndex.invalidate();
+      this.explosions.spawn(p, point, ctx, shipId, asteroidId);
+    } };
+    this.explosions.update(dt, ctx);
+    const allShips = ctx.ships ?? [ctx.playerShip, ctx.enemyShip, ...ctx.fighters];
+    const hasMissiles = this.projectiles.some(projectile => projectile.isRocket);
     this.collisionHandler.prepareShipCollisionFrame(allShips);
     const batchedCollisionProjectiles: Projectile[] = [];
     // 射程在本帧耗尽的弹丸必须先把最后一段位移交给碰撞检测，再决定是否移除。
@@ -49,6 +71,9 @@ export class WeaponSimulationSystem {
         ctx
       );
       batchedCollisionProjectiles.length = 0;
+      // Missile checks may flush a single shot at a time. A miss with no range
+      // expiry has nothing to remove; avoid rescanning the entire live array.
+      if (consumedIds.size === 0 && expiredProjectileIds.size === 0) return;
 
       // Pending batches contain only already-visited (higher-index) projectiles,
       // so removing them here preserves the descending iteration cursor while
@@ -56,15 +81,22 @@ export class WeaponSimulationSystem {
       for (let j = this.projectiles.length - 1; j >= 0; j--) {
         const candidate = this.projectiles[j];
         if (!consumedIds.has(candidate.id) && !expiredProjectileIds.has(candidate.id)) continue;
+        if (consumedIds.has(candidate.id) && markSourceProjectileImpact(candidate)) continue;
         if (candidate.isRocket) ctx.contrailEngine?.detach(candidate.id);
-        this.projectiles.splice(j, 1);
+        removeProjectileAt(j);
       }
       expiredProjectileIds.clear();
     };
 
+    let previousProjectile: Projectile | undefined;
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
+      // Publish the preceding missile's final pose, including fading impact
+      // remnants. Removed entries stay removed. This covers every continue path.
+      if (previousProjectile) interceptionIndex.update(previousProjectile);
       const p = this.projectiles[i];
+      previousProjectile = p;
       if (!this.collisionHandler.canBatchShipCollision(p)) flushBatchedCollisions();
+      if (p.isMine) continue; // Interceptable missile, lifecycle owned by MineSystem.
       p.elapsedTime += dt;
       p.prevPos.copy(p.pos);
       if (p.armingTimeRemaining !== undefined) {
@@ -74,21 +106,23 @@ export class WeaponSimulationSystem {
         p.flightTimeRemaining -= dt;
         if (p.flightTimeRemaining <= 0) {
           if (p.isRocket) ctx.contrailEngine?.detach(p.id);
-          this.projectiles.splice(i, 1);
+          removeProjectileAt(i);
           continue;
         }
       }
 
       // 0. 诱饵热焰弹全生命周期模拟 (Decoy Flares)
       if (p.isFlare) {
-        if (this.missileGuidance.updateFlare(p, dt, ctx)) {
-          this.projectiles.splice(i, 1);
+        if (this.missileGuidance.updateFlare(p, dt, ctx, this.projectiles)) {
+          ctx.contrailEngine?.detach(p.id);
+          removeProjectileAt(i);
+          continue;
         }
-        continue;
       }
 
       // 1. 导弹自主航行与比例导引制导
-      if (p.isRocket) {
+      if (p.angularVelocityRad) p.facingRad = (p.facingRad ?? p.vel.heading()) + p.angularVelocityRad * dt;
+      if (p.isRocket && !p.inertialFlight && !p.isFlare) {
         const spoofedOrDetonated = this.missileGuidance.updateMissile(
           p,
           dt,
@@ -97,28 +131,43 @@ export class WeaponSimulationSystem {
           allShips
         );
         if (spoofedOrDetonated) {
+          interceptionIndex.invalidate(); // MIRV may append children before parent removal.
           ctx.contrailEngine?.detach(p.id);
-          this.projectiles.splice(i, 1);
+          removeProjectileAt(i);
           continue;
         }
       }
 
-      // 位移更新与剩余射程计算
-      const moveStep = p.vel.clone().scale(dt);
-      p.pos.add(moveStep);
-      p.rangeRemaining -= moveStep.length();
+      if (hasSourceProjectileLifecycle(p)) {
+        if (advanceSourceProjectile(p, dt)) { removeProjectileAt(i); continue; }
+        if (p.didDamage) continue; // Fading impact remnants never collide/deal damage twice.
+      } else {
+        const moveStep = p.vel.clone().scale(dt);
+        p.pos.add(moveStep);
+        p.rangeRemaining -= moveStep.length();
+      }
+
+      // Fizzling source decoys drift/fade but no longer attract or deal impact damage.
+      if (p.flareFizzling) continue;
 
       // 尾迹缎带点与等离子余烬微粒采样
       this.missileGuidance.updateParticlesAndContrail(p, ctx);
 
       // 弹道射程是否在本帧耗尽。注意此处只记录、不立即删除：最后一段位移
       // 仍然必须参与碰撞检测，否则近距离的最后一击会被直接吞掉。
-      const isRangeExpired = p.rangeRemaining <= 0 && p.flightTimeRemaining === undefined;
+      const isRangeExpired = !p.flareBehavior && !hasSourceProjectileLifecycle(p) && p.rangeRemaining <= 0 && p.flightTimeRemaining === undefined;
 
       // 2. 高射炮近炸引信与凌空殉爆判定 (Proximity Fuse Airburst PD)
+      if (p.fizzleAtRange && p.rangeRemaining <= 0) {
+        ctx.contrailEngine?.detach(p.id); removeProjectileAt(i); continue;
+      }
       if (p.proximityFuse) {
-        const burst = this.collisionHandler.checkProximityFuse(p, ctx, this.projectiles);
+        // Publish this round's movement before sharing the live missile grid.
+        interceptionIndex.update(p);
+        const burst = this.collisionHandler.checkProximityFuse(p, ctx, this.projectiles,
+          interceptionIndex.queryRadius(p.pos, p.proximityFuse.range, this.projectiles));
         if (burst) {
+          interceptionIndex.invalidate(); // Fuse damage may splice several other missiles.
           if (p.isRocket) ctx.contrailEngine?.detach(p.id);
 
           // checkProximityFuse() may destroy multiple hostile missiles by splicing
@@ -126,36 +175,39 @@ export class WeaponSimulationSystem {
           // the stale outer-loop index, then re-anchor the descending cursor.
           const burstIndex = this.projectiles.findIndex((projectile) => projectile.id === p.id);
           if (burstIndex >= 0) {
-            this.projectiles.splice(burstIndex, 1);
+            if (!markSourceProjectileImpact(p)) removeProjectileAt(burstIndex);
             i = burstIndex;
           }
           continue;
         }
       }
 
-      // 3. 轻型机枪点防拦截导弹 (Light MG PD)
-      if (p.specId === 'lightmg') {
-        const interception = this.collisionHandler.checkLightMGInterception(p, ctx, this.projectiles);
-        if (interception) {
-          if (interception.targetDestroyed) {
-            const targetIndex = this.projectiles.findIndex((projectile) => projectile.id === interception.targetProjectileId);
-            if (targetIndex >= 0) this.projectiles.splice(targetIndex, 1);
+      // Source projectile/missile swept contacts; TPC may pierce several missiles.
+      let intercepted = false;
+      if ((!p.isRocket || p.targetProjectileId !== undefined) && hasMissiles) {
+        flushBatchedCollisions();
+        interceptionIndex.update(p); // A rocket pursuing a flare queries after its own movement.
+        for (let remaining = this.projectiles.length; remaining > 0; remaining--) {
+          const hit = this.collisionHandler.checkMissileInterception(p, ctx, interceptionIndex.query(p, this.projectiles));
+          if (!hit) break;
+          interceptionIndex.invalidate(); // Damage hooks/explosions may mutate other missiles.
+          if (hit.targetDestroyed) {
+            const targetIndex = this.projectiles.findIndex(candidate => candidate.id === hit.targetProjectileId);
+            if (targetIndex >= 0) removeProjectileAt(targetIndex);
           }
-
-          // 删除拦截弹后把外层游标重新锚定到它的当前索引。若前方/后方导弹刚被移除，
-          // 下一次 i-- 仍会落在“尚未处理”的原始弹丸上，不会重复更新或误删邻居。
-          const interceptorIndex = this.projectiles.findIndex((projectile) => projectile.id === p.id);
-          if (interceptorIndex >= 0) {
-            this.projectiles.splice(interceptorIndex, 1);
-            i = interceptorIndex;
+          i = this.projectiles.findIndex(candidate => candidate.id === p.id);
+          if (hit.consumesProjectile) {
+            if (i >= 0 && !markSourceProjectileImpact(p)) removeProjectileAt(i);
+            intercepted = true;
+            break;
           }
-          continue;
         }
       }
+      if (intercepted) continue;
 
       // 4. 舰船残骸阻挡弹道
       if (this.collisionHandler.checkHulkCollision(p, ctx)) {
-        this.projectiles.splice(i, 1);
+        if (!markSourceProjectileImpact(p)) removeProjectileAt(i);
         continue;
       }
 
@@ -168,12 +220,14 @@ export class WeaponSimulationSystem {
       if (asteroidImpact) {
         const shipHitT = this.findShipHitParameter(p, allShips);
         if (shipHitT === null || asteroidImpact.t <= shipHitT) {
+          const asteroidId = ctx.asteroids?.[asteroidImpact.asteroidIndex]?.id;
           ctx.commitAsteroidImpact?.(p, asteroidImpact);
+          ctx.spawnProjectileExplosion?.(p, asteroidImpact.point, undefined, asteroidId);
           if (canBatch) {
             const batchIndex = batchedCollisionProjectiles.indexOf(p);
             if (batchIndex >= 0) batchedCollisionProjectiles.splice(batchIndex, 1);
           }
-          this.projectiles.splice(i, 1);
+          if (!markSourceProjectileImpact(p, asteroidImpact.point)) removeProjectileAt(i);
           continue;
         }
       }
@@ -188,16 +242,18 @@ export class WeaponSimulationSystem {
       const hit = this.collisionHandler.checkShipCollision(p, allShips, ctx);
       if (hit) {
         if (p.isRocket) ctx.contrailEngine?.detach(p.id);
-        this.projectiles.splice(i, 1);
+        if (!markSourceProjectileImpact(p)) removeProjectileAt(i);
         continue;
       }
 
       // 6. 最后一段位移未命中任何目标，射程耗尽才真正移除。
       if (isRangeExpired) {
         if (p.isRocket) ctx.contrailEngine?.detach(p.id);
-        this.projectiles.splice(i, 1);
+        removeProjectileAt(i);
       }
     }
+
+    if (previousProjectile) interceptionIndex.update(previousProjectile);
 
     // Flush the final contiguous ordinary-ballistic run. Damage/effects are
     // still applied in the same descending projectile order as the legacy loop.
@@ -222,6 +278,6 @@ export class WeaponSimulationSystem {
   }
 
   public updateBeams(dt: number, ctx: WeaponSimContext) {
-    this.beamHandler.update(dt, ctx, this.beams);
+    this.beamHandler.update(dt, { ...ctx, projectiles: this.projectiles }, this.beams);
   }
 }

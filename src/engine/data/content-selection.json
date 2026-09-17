@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "hulls": [
+    "onslaught",
+    "paragon",
+    "doom",
+    "broadsword",
+    "dagger"
+  ],
+  "weapons": [
+    "tpc",
+    "tachyonlance",
+    "autopulse",
+    "mark9",
+    "heavymauler",
+    "hveldriver",
+    "annihilatorpod",
+    "gravitonbeam",
+    "taclaser",
+    "heavyblaster",
+    "typhoon",
+    "sabot",
+    "lightmg",
+    "pdburst",
+    "atropos_single",
+    "flak",
+    "dualflak"
+  ],
+  "sandbox": {
+    "player": "onslaught",
+    "opponents": [
+      "paragon",
+      "onslaught"
+    ]
+  },
+  "discovery": {
+    "allNative": true,
+    "allowApproximate": true
+  }
+}

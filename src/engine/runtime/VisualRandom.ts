@@ -15,7 +15,8 @@ export class VisualRandom {
     h ^= h >>> 15;
     h = Math.imul(h, 0x846ca68b) >>> 0;
     h ^= h >>> 16;
-    return h / 0x100000000;
+    // The final XOR is signed in JavaScript; coerce back before normalizing.
+    return (h >>> 0) / 0x100000000;
   }
 
   public signed(channel: string, index = 0): number { return this.sample(channel, index) * 2 - 1; }

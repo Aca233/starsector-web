@@ -16,7 +16,7 @@ export interface UseCombatInputParams {
   isMouseDown: React.MutableRefObject<boolean>;
   setIsAutopilot: React.Dispatch<React.SetStateAction<boolean>>;
   onActivateSystem: () => void;
-  onRestart: () => void;
+  onTogglePause: () => void;
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -33,6 +33,12 @@ function isInteractiveUiTarget(target: EventTarget | null): boolean {
   );
 }
 
+function resetInputState(keys: React.MutableRefObject<Record<string, boolean>>, mouse: React.MutableRefObject<boolean>, ship: Ship): void {
+  keys.current = {};
+  mouse.current = false;
+  ship.clearInput();
+}
+
 export function useCombatInput({
   sessionRef,
   canvasRef,
@@ -45,35 +51,28 @@ export function useCombatInput({
   isMouseDown,
   setIsAutopilot,
   onActivateSystem,
-  onRestart
+  onTogglePause
 }: UseCombatInputParams) {
   const onActivateSystemRef = useRef(onActivateSystem);
-  const onRestartRef = useRef(onRestart);
+  const onTogglePauseRef = useRef(onTogglePause);
+  useEffect(() => { onTogglePauseRef.current = onTogglePause; }, [onTogglePause]);
 
   useEffect(() => {
     onActivateSystemRef.current = onActivateSystem;
   }, [onActivateSystem]);
 
-  useEffect(() => {
-    onRestartRef.current = onRestart;
-  }, [onRestart]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const clearTransientInput = () => {
-      for (const key of Object.keys(keysPressed.current)) keysPressed.current[key] = false;
-      isMouseDown.current = false;
-      const player = sessionRef.current.engine.playerShip;
-      player.isFiringMain = false;
-      player.throttle = 0;
-      player.strafeInput = 0;
-      player.turnInput = 0;
+      resetInputState(keysPressed, isMouseDown, sessionRef.current.engine.playerShip);
     };
 
     const blocked = (target: EventTarget | null) => (
       inputBlockedRef.current
+      || !!document.querySelector('[role="dialog"], [role="alertdialog"]')
       || !sessionRef.current.isPresentationReady()
       || isEditableTarget(target)
       || isInteractiveUiTarget(target)
@@ -86,43 +85,21 @@ export function useCombatInput({
 
     const onMouseMove = (e: MouseEvent) => {
       if (inputBlockedRef.current || !sessionRef.current.isPresentationReady()) return;
+      if (e.target !== canvas) return;
       mouseScreenPos.current.set(e.clientX, e.clientY);
     };
 
     const onMouseDown = (e: MouseEvent) => {
-      if (blocked(e.target)) return;
+      if (blocked(e.target) || e.target !== canvas) return;
+      canvas.focus({ preventScroll: true });
       mouseScreenPos.current.set(e.clientX, e.clientY);
       void sound.preloadSounds();
       const engine = sessionRef.current.engine;
       const curCanvas = canvasRef.current;
       if (!curCanvas) return;
 
-      if (engine.isTacticalMap) {
-        const worldMouseX = (e.clientX - curCanvas.width / 2) / zoomRef.current + cameraPosRef.current.x;
-        const worldMouseY = (e.clientY - curCanvas.height / 2) / zoomRef.current + cameraPosRef.current.y;
-        const clickWorldPos = new Vector2(worldMouseX, worldMouseY);
-        const allUnits = [engine.playerShip, ...engine.fighters, ...engine.bombers];
-
-        if (e.button === 0) {
-          let clickedUnit: Ship | null = null;
-          for (const unit of allUnits) {
-            if (unit.isDead) continue;
-            if (clickWorldPos.distanceTo(unit.pos) < Math.max(50, unit.spec.collisionRadius * 1.5)) {
-              clickedUnit = unit;
-              break;
-            }
-          }
-          engine.selectUnit(clickedUnit?.id ?? null);
-        } else if (e.button === 2) {
-          e.preventDefault();
-          const selectedId = engine.selectedUnitId || 'fleet';
-          const targetEnemy = clickWorldPos.distanceTo(engine.enemyShip.pos) < Math.max(80, engine.enemyShip.spec.collisionRadius * 1.5) && !engine.enemyShip.isDead;
-          engine.issueOrder(selectedId, targetEnemy
-            ? { id: `order-${engine.combatTime.toFixed(4)}-${selectedId}`, type: 'ENGAGE', targetShipId: engine.enemyShip.id, issuedTime: engine.combatTime }
-            : { id: `waypoint-${engine.combatTime.toFixed(4)}-${selectedId}`, type: 'WAYPOINT', targetPos: clickWorldPos, issuedTime: engine.combatTime });
-        }
-        return;
-      }
+      // The tactical chart owns its independent projection and pointer handlers.
+      if (engine.isTacticalMap) return;
 
       if (e.button === 0) {
         isMouseDown.current = true;
@@ -130,6 +107,7 @@ export function useCombatInput({
       } else if (e.button === 2) {
         e.preventDefault();
         const player = engine.playerShip;
+        if (player.defenseSystem.type !== 'NONE') { player.activateDefenseSystem(); return; }
         if (!player.canUseShields()) return;
         const active = player.shield.toggle();
         if (player.shield.type === 'PHASE') sound.play(active ? 'phase_activate' : 'phase_deactivate', 0.9);
@@ -148,36 +126,49 @@ export function useCombatInput({
     };
 
     const onWheel = (e: WheelEvent) => {
-      if (blocked(e.target)) return;
+      if (e.ctrlKey || e.altKey || e.metaKey || blocked(e.target) || sessionRef.current.engine.isTacticalMap) return;
       e.preventDefault();
       const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
       zoomRef.current = Math.max(0.3, Math.min(1.5, zoomRef.current * zoomFactor));
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (blocked(e.target)) return;
+      if (e.defaultPrevented || e.isComposing || blocked(e.target)) return;
+      const engine = sessionRef.current.engine;
+      const digitMatch = e.code.match(/^(?:Digit|Numpad)([1-7])$/);
+      // Browser/OS chords are not bare flight keys. Only Ctrl+1..7 is a
+      // deliberate combat chord; Shift remains available for mouse steering.
+      if (e.ctrlKey || e.altKey || e.metaKey) {
+        if (!engine.isTacticalMap && e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && digitMatch) {
+          e.preventDefault();
+          if (!e.repeat) engine.playerShip.toggleAutofire(Number(digitMatch[1]) - 1);
+        } else if (!/^(Control|Alt|Meta)(Left|Right)$/.test(e.code)) {
+          clearTransientInput();
+        }
+        return;
+      }
+      // The live mode owns Tab even during the HUD's mount/unmount interval.
+      // Once mounted, the chart capture handler consumes it before this one.
+      if (e.code === 'Tab') {
+        e.preventDefault();
+        if (!e.repeat) { clearTransientInput(); engine.toggleTacticalMap(); }
+        return;
+      }
+      if (engine.isTacticalMap) return;
       keysPressed.current[e.code] = true;
+      if (e.repeat) {
+        if (e.code === 'Tab' || e.code === 'Space') e.preventDefault();
+        return;
+      }
       void sound.preloadSounds();
-      const session = sessionRef.current;
-      const engine = session.engine;
-
-      if (e.code === 'Tab') { e.preventDefault(); engine.toggleTacticalMap(); }
+      if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
       if (e.code === 'KeyZ') engine.toggleFighterRecall();
       if (e.code === 'KeyU') { setIsAutopilot((prev) => !prev); sound.play('autofire_toggle', 0.8); }
-      if (e.code === 'KeyV' || e.code === 'Space') engine.playerShip.startVenting();
+      if (e.code === 'Space') { clearTransientInput(); onTogglePauseRef.current(); return; }
+      if (e.code === 'KeyV') engine.playerShip.startVenting();
       if (e.code === 'KeyF') onActivateSystemRef.current();
-      if (e.code === 'KeyC') engine.launchCountermeasures();
-      if (e.code === 'KeyR') {
-        onRestartRef.current();
-        clearTransientInput();
-      }
 
-      const digitMatch = e.code.match(/^(?:Digit|Numpad)([1-5])$/);
-      if (digitMatch) {
-        const groupIndex = parseInt(digitMatch[1], 10) - 1;
-        if (e.ctrlKey) { e.preventDefault(); engine.playerShip.toggleAutofire(groupIndex); }
-        else engine.playerShip.selectWeaponGroup(groupIndex);
-      }
+      if (digitMatch) engine.playerShip.selectWeaponGroup(Number(digitMatch[1]) - 1);
     };
 
     const onKeyUp = (e: KeyboardEvent) => { keysPressed.current[e.code] = false; };

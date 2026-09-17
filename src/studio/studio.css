@@ -1,0 +1,2813 @@
+@font-face {
+  font-family: StarsectorLatin;
+  src: url("/game-assets/graphics/fonts/native-latin.ttf") format("truetype");
+  font-display: swap;
+}
+@font-face {
+  font-family: StarsectorCN;
+  src: url("/game-assets/graphics/fonts/native-zh.ttf") format("truetype");
+  font-display: swap;
+}
+@font-face {
+  font-family: StarsectorNumber;
+  src: url("/game-assets/graphics/fonts/native-numbers.ttf") format("truetype");
+  font-weight: 100 900;
+  font-display: swap;
+}
+:root {
+  --ui-font: StarsectorLatin, StarsectorCN, sans-serif;
+  --ui-mono: StarsectorNumber, StarsectorCN, monospace;
+  --ui-bg: #020709;
+  --ui-panel: #050d10;
+  --ui-raised: #153d49;
+  --ui-hover: #285767;
+  --ui-border: #477d8b;
+  --ui-divider: #163d49;
+  --ui-text: #dedede;
+  --ui-muted: #a6b7bc;
+  --ui-dim: #779096;
+  --ui-accent: #aadeff;
+  --ui-accent-bg: #1f5e70;
+  --ui-button-text: #aadeff;
+  --ui-highlight: #ffd200;
+  --ui-success: #9bff00;
+  --ui-warning: #ffd200;
+  --ui-danger: #ff8050;
+  --ui-radius: 0;
+  --ui-radius-sm: 0;
+}
+.native-refit-app,
+.native-home {
+  --u: clamp(0.85px, min(0.12642dvh, 0.09615vw), 1.35px);
+  width: 100%;
+  height: 100dvh;
+  position: relative;
+  isolation: isolate;
+  font-family: var(--ui-font);
+  font-size: calc(15 * var(--u));
+  color: #dcdcdc;
+  background: #010304 url("/game-assets/graphics/backgrounds/background4.jpg")
+    center/cover;
+}
+.native-refit-app *,
+.native-home * {
+  box-sizing: border-box;
+}
+.native-refit-app button,
+.native-refit-app input,
+.native-refit-app select,
+.native-home button {
+  font: inherit;
+}
+.native-refit-app button,
+.native-home button {
+  cursor: pointer;
+}
+.native-refit-app button:disabled {
+  cursor: default;
+}
+.native-refit-app h2,
+.native-refit-app p {
+  margin: 0;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 1px solid #ffd200;
+  outline-offset: 2px;
+}
+.native-numeric,
+.native-stat-three b,
+.native-flux-row b,
+.native-flux-row input,
+.refit-weapon-flux b,
+.refit-mod-row b {
+  font-family: StarsectorNumber, monospace;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #ffd200;
+}
+.native-green {
+  color: #9bff00 !important;
+}
+.native-dim {
+  color: #788f94;
+}
+.native-shortcut {
+  color: #ffd200;
+  font-family: StarsectorLatin, StarsectorCN, sans-serif;
+  white-space: nowrap;
+  margin-left: 0.35em;
+}
+/* Shared native frames/buttons are implemented in ui/native-chrome.css. */
+.ui-button--primary {
+  background-color: #225e71;
+  border: 0;
+  color: #b5e5ff;
+}
+.ui-button--primary:hover:not(:disabled) {
+  background-color: #387c94;
+}
+.ui-keycap {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #ffd200;
+}
+.ui-keycap:before {
+  content: "[";
+}
+.ui-keycap:after {
+  content: "]";
+}
+.ui-button svg {
+  width: 14px;
+  height: 14px;
+}
+/* Main menu uses the original title art, not a redesigned brand. */
+.native-home {
+  background-image:
+    linear-gradient(#0007, #0003),
+    url("/game-assets/graphics/backgrounds/background4.jpg");
+}
+.native-title-logo {
+  position: absolute;
+  top: 17%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(76vw, 770px);
+  height: auto;
+  image-rendering: auto;
+}
+.native-home-menu {
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  transform: translateX(-50%);
+  width: 260px;
+}
+.native-home-menu .native-button {
+  width: 100%;
+  height: 39px;
+  font-size: 20px;
+}
+.native-home-version {
+  position: absolute;
+  bottom: 22px;
+  left: 24px;
+  font-size: 12px;
+  color: #9db0b8;
+}
+.native-loading {
+  height: 100dvh;
+  background: #02080c;
+  display: grid;
+  place-content: center;
+  gap: 20px;
+  color: #aadeff;
+  font: 20px var(--ui-font);
+}
+/* Screenshot reference coordinates are based on the original 1040 x 791 window. */
+.native-screen-tab {
+  position: absolute;
+  left: 10px;
+  top: calc(9 * var(--u));
+  height: calc(22 * var(--u));
+  min-width: calc(179 * var(--u));
+  padding: calc(3 * var(--u)) calc(31 * var(--u));
+  color: #dcefff;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      #4d819155 0,
+      #4d819155 1px,
+      transparent 1px,
+      transparent 2px
+    ),
+    #376775;
+  clip-path: polygon(8px 0, calc(100% - 20px) 0, 100% 100%, 0 100%, 0 8px);
+  font-size: calc(14 * var(--u));
+  line-height: 1.15;
+}
+.native-screen-close {
+  position: absolute;
+  right: calc(15 * var(--u));
+  top: calc(9 * var(--u));
+  height: calc(22 * var(--u));
+  width: calc(30 * var(--u));
+  padding: 0;
+  border: 0;
+  clip-path: polygon(8px 0, 100% 0, 100% 100%, 0 100%, 0 8px);
+  background: #1e4656;
+  color: #aadeff;
+  line-height: 1;
+  font-family: Arial, sans-serif !important;
+  font-size: calc(27 * var(--u)) !important;
+}
+.refit-shell {
+  position: absolute;
+  inset: calc(31 * var(--u)) 12px calc(14 * var(--u)) 6px;
+  display: flex;
+  padding: 7px;
+  min-height: 0;
+}
+.refit-roster {
+  position: relative;
+  flex: 0 0 calc(208 * var(--u));
+  border-right: 1px solid #245868;
+  background: #000;
+  padding-right: 7px;
+  min-width: 0;
+}
+.refit-roster-ship {
+  height: calc(153 * var(--u));
+  width: 100%;
+  display: block;
+  position: relative;
+  text-align: left;
+  background: #11383d;
+  color: #ededed;
+  border: 0;
+  padding: 0;
+  overflow: visible;
+  text-shadow:
+    1px 1px #000,
+    -1px -1px #000;
+}
+.refit-roster-ship:before,
+.refit-roster-ship:after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  top: 2px;
+  height: 19px;
+  width: 1px;
+  background: #001014;
+}
+.refit-roster-ship:after {
+  right: 7px;
+}
+.refit-roster-ship > img {
+  position: absolute;
+  max-width: 70%;
+  height: 100%;
+  object-fit: contain;
+  top: 0;
+  left: 16%;
+}
+.refit-roster-ship > span {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  font-size: calc(14 * var(--u));
+  line-height: 1.05;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.refit-roster-ship strong {
+  font-family: StarsectorLatin, StarsectorCN, sans-serif;
+  font-weight: 400;
+  font-size: calc(13 * var(--u));
+  white-space: nowrap;
+}
+.refit-roster-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 2px;
+  right: 7px;
+  font-size: calc(11 * var(--u));
+  color: #657e82;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+.refit-roster:hover .refit-roster-hint {
+  opacity: 1;
+}
+.refit-grid {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background-color: #040f13;
+  background-image:
+    linear-gradient(#18404d66 1px, transparent 1px),
+    linear-gradient(90deg, #18404d66 1px, transparent 1px);
+  background-size: calc(25 * var(--u)) calc(25 * var(--u));
+}
+.refit-cr {
+  position: absolute;
+  left: calc(6 * var(--u));
+  top: calc(7 * var(--u));
+  width: calc(275 * var(--u));
+  height: calc(35 * var(--u));
+  z-index: 2;
+  display: flex;
+  gap: calc(10 * var(--u));
+  align-items: flex-start;
+}
+.native-cr-meter {
+  position: relative;
+  width: calc(213 * var(--u));
+  height: calc(12 * var(--u));
+  border: 1px solid #54c7d4;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 70% 80%, 70% 100%, 0 100%);
+  box-shadow:
+    inset 2px 0 #fff,
+    inset -2px 0 #469da9;
+  padding: 1px 3px;
+  background: #071017;
+}
+.native-cr-meter > i {
+  display: block;
+  width: 70%;
+  height: 100%;
+  background: linear-gradient(#e7ffff, #a2d8d8 45%, #3f8e93);
+  box-shadow: 0 0 5px #99d9e5;
+}
+.native-cr-meter > b {
+  position: absolute;
+  left: 70%;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: #061017;
+}
+.refit-cr > span {
+  font-size: calc(12 * var(--u));
+  padding-top: 1px;
+}
+.refit-cr > label {
+  position: absolute;
+  top: calc(15 * var(--u));
+  left: 0;
+  color: #b6d6de;
+  font-size: calc(15 * var(--u));
+}
+.refit-vessel {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.ship-stage {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  position: relative;
+  container-type: size;
+}
+.ship-stage-rings {
+  display: none;
+}
+.studio-ship {
+  position: relative;
+  width: min(42cqw, 50cqh * var(--ship-ratio));
+  transform: scale(var(--ship-zoom));
+  transform-origin: center;
+  pointer-events: auto;
+  isolation: isolate;
+}
+.studio-hull-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+.studio-weapon-image {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+  max-width: none;
+  height: auto;
+  z-index: 1;
+}
+.studio-mount {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 15px;
+  height: 15px;
+  border: 1px solid #85caffa0;
+  background: #0a1d24a0;
+  padding: 0;
+  z-index: 3;
+  opacity: 0;
+  color: #ffd200;
+  pointer-events: auto;
+}
+.studio-mount--medium {
+  width: 22px;
+  height: 22px;
+}
+.studio-mount--large {
+  width: 29px;
+  height: 29px;
+}
+.studio-mount > span {
+  display: none;
+}
+.studio-ship:hover .studio-mount,
+.show-all-mounts .studio-mount {
+  opacity: 0.55;
+}
+.studio-mount:hover,
+.studio-mount:focus-visible,
+.studio-mount.is-selected {
+  opacity: 1 !important;
+  border: 1px solid #ffd200;
+  box-shadow: 0 0 0 1px #07151c;
+  background: #0a263baa;
+}
+.studio-mount.is-grouped {
+  opacity: 1;
+  background: #9bff0040;
+  border-color: #9bff00;
+}
+.ship-arc {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0.45;
+}
+.ship-arc path {
+  fill: #6bb4da19;
+  stroke: #b8ecff;
+  stroke-width: 0.65;
+  stroke-dasharray: 3 3;
+}
+.ship-arc circle {
+  fill: none;
+  stroke: #ffd200;
+  stroke-width: 1;
+}
+.refit-stats {
+  position: absolute;
+  top: calc(3 * var(--u));
+  right: calc(5 * var(--u));
+  width: calc(294 * var(--u));
+  max-height: calc(100% - 145 * var(--u));
+  overflow: visible;
+  z-index: 4;
+  pointer-events: auto;
+}
+.refit-op-heading {
+  position: relative;
+}
+.native-help-button {
+  position: absolute;
+  right: calc(100% + 5 * var(--u));
+  top: calc(3 * var(--u));
+  width: calc(24 * var(--u));
+  height: calc(25 * var(--u));
+  padding: 0;
+  border: 0;
+  color: #97bfd0;
+  background: transparent;
+  font-size: calc(27 * var(--u)) !important;
+  font-family: StarsectorLatin !important;
+  line-height: 1;
+}
+.native-help-button:after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border: 1px solid #749eae;
+  border-radius: 2px;
+}
+.native-op-bar {
+  position: relative;
+  height: calc(30 * var(--u));
+  border: 1px solid #8adcf7;
+  background: linear-gradient(#122a3c, #07101c);
+  box-shadow:
+    inset 3px 0 #009ac5,
+    inset -3px 0 #54dfff,
+    0 0 0 2px #06131b;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.native-op-bar i {
+  position: absolute;
+  inset: 1px auto 1px 3px;
+  background: linear-gradient(
+    #154974,
+    #16bce5 35%,
+    #009de2 52%,
+    #085392 88%,
+    #062951
+  );
+  box-shadow:
+    inset 0 1px #a4ffff,
+    0 0 8px #268cff;
+}
+.native-op-bar strong {
+  font-family: StarsectorNumber;
+  position: relative;
+  color: #ffd200;
+  font-size: calc(15 * var(--u));
+  font-weight: 700;
+  text-shadow:
+    1px 1px #071017,
+    -1px -1px #071017;
+  line-height: 1;
+}
+.native-op-bar.over-budget strong {
+  color: #ff8050;
+}
+.native-op-bar.over-budget i {
+  background: linear-gradient(#b43116, #661e13);
+}
+.native-stat-three {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: calc(4 * var(--u));
+  text-align: right;
+  margin: calc(4 * var(--u)) 0;
+}
+.native-stat-three > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+}
+.native-stat-three small,
+.native-flux-row small,
+.refit-weapon-flux small {
+  font-family: StarsectorCN, StarsectorLatin, sans-serif;
+  font-size: calc(10 * var(--u));
+  line-height: 1.1;
+  color: #b7deea;
+  white-space: nowrap;
+}
+.native-stat-three b {
+  font-size: calc(16 * var(--u));
+}
+.native-flux-row {
+  display: grid;
+  grid-template-columns:
+    1fr calc(23 * var(--u)) calc(32 * var(--u)) calc(23 * var(--u))
+    calc(87 * var(--u));
+  align-items: center;
+  gap: calc(3 * var(--u));
+  margin-top: calc(6 * var(--u));
+}
+.native-flux-row > label {
+  text-align: right;
+  font-size: calc(16 * var(--u));
+  color: #b4d9e2;
+  white-space: nowrap;
+}
+.native-step {
+  width: calc(23 * var(--u));
+  height: calc(25 * var(--u));
+  padding: 0;
+  border: 0;
+  clip-path: polygon(
+    6px 0,
+    calc(100% - 6px) 0,
+    100% 7px,
+    100% calc(100% - 7px),
+    calc(100% - 6px) 100%,
+    6px 100%,
+    0 calc(100% - 7px),
+    0 7px
+  );
+  color: #aadeff;
+  background: #1c4d5c;
+  line-height: 1;
+  font-size: calc(22 * var(--u)) !important;
+}
+.native-step:hover:not(:disabled) {
+  background: #347285;
+  color: #e0f9ff;
+}
+.native-step:disabled {
+  background: #263e49;
+  color: #6b8792;
+}
+.native-flux-row input {
+  width: 100%;
+  min-width: 0;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: center;
+  font-size: calc(16 * var(--u));
+  appearance: textfield;
+}
+.native-flux-row input::-webkit-inner-spin-button,
+.native-flux-row input::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+.native-flux-row > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+}
+.native-flux-row b {
+  font-size: calc(16 * var(--u));
+}
+.refit-shields {
+  margin-top: calc(5 * var(--u));
+}
+.refit-shields > div:first-child {
+  padding-left: calc(16 * var(--u));
+}
+.refit-shields small {
+  font-size: calc(9 * var(--u));
+}
+.refit-weapon-flux {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-top: calc(3 * var(--u));
+}
+.refit-weapon-flux b {
+  font-size: calc(16 * var(--u));
+  color: #ffd200;
+}
+.refit-hullmods {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  margin-top: calc(12 * var(--u));
+  padding-left: calc(5 * var(--u));
+}
+.refit-hullmods h2 {
+  text-align: right;
+  color: #b6dae5;
+  font-size: calc(17 * var(--u));
+  font-weight: 400;
+  margin-bottom: calc(4 * var(--u));
+}
+.refit-mod-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: calc(5 * var(--u));
+  height: calc(36 * var(--u));
+  font-size: calc(15 * var(--u));
+  white-space: nowrap;
+  text-shadow: 1px 1px #000;
+}
+.refit-mod-row > span {
+  color: #d4d5d7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.refit-mod-row.builtin > span {
+  color: #969696;
+}
+.refit-mod-row > img {
+  height: calc(33 * var(--u));
+  width: calc(33 * var(--u));
+  object-fit: contain;
+  margin-left: calc(2 * var(--u));
+}
+.refit-mod-row > b {
+  font-size: calc(15 * var(--u));
+  font-weight: 500;
+}
+.refit-mod-row > small {
+  position: absolute;
+  right: calc(37 * var(--u));
+  bottom: 0;
+  font-size: calc(8 * var(--u));
+  color: #ba8768;
+}
+.refit-hullmods > .native-button {
+  align-self: flex-end;
+  margin-top: calc(6 * var(--u));
+  font-size: calc(16 * var(--u));
+  min-height: calc(25 * var(--u));
+  padding: 2px 7px;
+}
+.native-errors {
+  font-size: 13px;
+  color: #ff8050;
+  margin-top: 12px;
+  line-height: 1.5;
+}
+.native-locked {
+  color: #ffd200;
+  padding: 10px 0;
+  font-size: 15px;
+}
+.refit-bottom {
+  position: absolute;
+  left: calc(10 * var(--u));
+  bottom: calc(8 * var(--u));
+  right: calc(10 * var(--u));
+  z-index: 4;
+  pointer-events: none;
+}
+.refit-bottom > * {
+  pointer-events: auto;
+}
+.refit-role {
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  height: calc(24 * var(--u));
+  width: max-content;
+  font-size: calc(16 * var(--u));
+  margin-bottom: calc(7 * var(--u));
+}
+.refit-role > span {
+  width: calc(161 * var(--u));
+  height: calc(23 * var(--u));
+  line-height: calc(23 * var(--u));
+  text-align: center;
+  background: #0c2c35c9;
+  color: #b9dde9;
+  border: 1px solid #163e4b;
+}
+.refit-name {
+  height: calc(28 * var(--u));
+  display: flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  color: #e5e6e7;
+  font-size: calc(15 * var(--u));
+}
+.refit-name input {
+  background: none;
+  border: 0;
+  color: inherit;
+  max-width: calc(255 * var(--u));
+  width: auto;
+  field-sizing: content;
+  min-width: 60px;
+  padding: 0;
+  outline-offset: 0;
+  letter-spacing: 0.05em;
+}
+.refit-name small {
+  color: #ffd200;
+}
+.refit-actions {
+  display: grid;
+  grid-template-columns: repeat(3, calc(190 * var(--u)));
+  grid-template-rows: repeat(3, calc(25 * var(--u)));
+  gap: calc(3 * var(--u));
+  width: max-content;
+}
+.refit-actions .native-button {
+  font-size: calc(16 * var(--u));
+  height: 100%;
+  padding: 0 calc(5 * var(--u));
+  min-height: 0;
+}
+.refit-actions > .native-button:nth-child(1) {
+  grid-row: 1;
+  grid-column: 1;
+}
+.refit-actions > .native-button:nth-child(2) {
+  grid-row: 1;
+  grid-column: 2;
+}
+.refit-actions > .native-button:nth-child(3) {
+  grid-row: 2;
+  grid-column: 1;
+}
+.refit-actions > .native-button:nth-child(4) {
+  grid-row: 2;
+  grid-column: 2;
+}
+.refit-actions > .native-button:nth-child(5) {
+  grid-row: 3;
+  grid-column: 1;
+}
+.refit-actions > .native-button:nth-child(6) {
+  grid-row: 3;
+  grid-column: 2;
+}
+.refit-next {
+  grid-row: 3;
+  grid-column: 3;
+}
+.refit-warning {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: calc(156 * var(--u));
+  z-index: 5;
+  border: 1px solid #856326;
+  background: #231b09ef;
+  color: #ffd200;
+  font-size: 13px;
+  padding: 7px 10px;
+}
+.native-error-toast {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(680px, 95vw);
+  background: #151009f5;
+  border: 1px solid #d99937;
+  color: #ffcb81;
+  z-index: 180;
+  padding: 10px 14px;
+  display: flex;
+  gap: 15px;
+  font: 15px var(--ui-font);
+}
+.native-error-toast button {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  color: #aadeff;
+  cursor: pointer;
+}
+/* The refit dialogs keep native framing, fonts, controls, and compact density. */
+.ui-modal-backdrop {
+  background: #0009;
+  backdrop-filter: none;
+}
+.ui-modal {
+  border: 1px solid #86b1b8;
+  outline: 1px solid #123544;
+  border-top-color: #b4e1ed;
+  background: #030c10;
+  box-shadow:
+    inset 0 0 0 2px #153440,
+    0 3px 30px #000;
+  max-width: 820px;
+}
+.ui-modal--small {
+  max-width: 510px;
+}
+.ui-modal--wide {
+  max-width: 1100px;
+}
+.ui-modal-header {
+  background: #102e3a;
+  border-bottom: 1px solid #456b79;
+  padding: 11px 15px;
+}
+.ui-modal-header h2 {
+  font: 19px var(--ui-font);
+  color: #c7e2f0;
+}
+.ui-eyebrow {
+  font: 12px var(--ui-font);
+  color: #8eafb8;
+  letter-spacing: 0;
+}
+.ui-modal-footer {
+  background: #030a0f;
+  padding: 10px 15px;
+  gap: 5px;
+}
+.ui-modal-body {
+  padding: 15px;
+  scrollbar-color: #265562 #050d11;
+}
+.ui-section-heading h3 {
+  font-family: var(--ui-font);
+  font-weight: 400;
+}
+.native-modal-note {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #93a5ad;
+  margin: 15px 0 0;
+}
+.native-help {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-size: 16px;
+  line-height: 1.7;
+}
+.native-help label {
+  color: #aadeff;
+}
+.native-help input {
+  margin-right: 10px;
+  accent-color: #9bff00;
+}
+.native-hull-picker {
+  display: flex;
+  gap: 12px;
+}
+.native-hull-choice {
+  flex: 1;
+  min-width: 0;
+  background: #061c25;
+  border: 1px solid #326176;
+  color: #d4e3ea;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  padding: 13px 8px;
+  cursor: pointer;
+  gap: 7px;
+}
+.native-hull-choice:hover,
+.native-hull-choice[aria-pressed="true"] {
+  border-color: #aadeff;
+  background: #173c48;
+}
+.native-hull-choice img {
+  height: 180px;
+  width: 100%;
+  object-fit: contain;
+}
+.native-hull-choice strong {
+  font: 20px var(--ui-font);
+}
+.native-hull-choice span {
+  font-size: 14px;
+  color: #a2bbc7;
+}
+.native-hull-choice b {
+  font: 14px var(--ui-mono);
+  color: #ffd200;
+}
+.native-weapon-picker {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 20px;
+  max-height: 62dvh;
+  min-height: 290px;
+}
+.native-weapon-picker > div {
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.native-search {
+  width: 100%;
+  background: #071c25;
+  border: 1px solid #315c70;
+  color: #e6edf0;
+  padding: 8px 10px;
+  font: 15px var(--ui-font);
+  margin-bottom: 8px;
+}
+.native-weapon-choice {
+  width: 100%;
+  border: 1px solid transparent;
+  border-bottom-color: #153542;
+  background: #061017;
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  color: #b6d6e9;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.native-weapon-choice:hover,
+.native-weapon-choice[aria-pressed="true"] {
+  background: #173d4d;
+  border-color: #5b9bb0;
+}
+.native-weapon-choice img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+.native-weapon-choice > span {
+  font: 16px var(--ui-font);
+  flex: 1;
+}
+.native-weapon-choice small {
+  display: block;
+  font-size: 12px;
+  color: #829faa;
+}
+.native-weapon-choice > b {
+  font: 12px var(--ui-mono);
+  color: #ffd200;
+}
+.native-weapon-details {
+  border-left: 1px solid #245061;
+  padding-left: 18px;
+  color: #a5c6d9;
+}
+.native-weapon-details h3 {
+  font: 19px var(--ui-font);
+  color: #ffd200;
+}
+.native-weapon-details dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  font-size: 15px;
+  margin: 22px 0;
+}
+.native-weapon-details dd {
+  margin: 0;
+  text-align: right;
+  color: #ffd200;
+  font-family: var(--ui-mono);
+  font-size: 13px;
+}
+.native-weapon-details p {
+  color: #839ba8;
+  line-height: 1.8;
+  margin-top: 22px;
+  font-size: 14px;
+}
+.native-weapon-details label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.native-weapon-details select,
+.native-group-weapons select {
+  border: 1px solid #40768b;
+  color: #ffd200;
+  background: #0b2532;
+  padding: 3px 10px;
+  font-family: var(--ui-font);
+}
+.native-mod-choice {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 13px 2px;
+  border-bottom: 1px solid #285569;
+}
+.native-mod-choice > img {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+}
+.native-mod-choice > div {
+  flex: 1;
+  min-width: 0;
+}
+.native-mod-choice h3 {
+  font: 18px var(--ui-font);
+  color: #bbd9ed;
+}
+.native-mod-choice h3 b {
+  font: 12px var(--ui-mono);
+  color: #ffd200;
+  white-space: nowrap;
+  margin-left: 8px;
+}
+.native-mod-choice p {
+  font: 14px/1.6 var(--ui-font);
+  margin: 6px 0;
+  color: #9eb0bc;
+}
+.native-mod-choice .native-errors {
+  color: #ffaf66;
+}
+.native-mod-choice .native-button {
+  min-width: 72px;
+}
+.native-group-picker {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+.native-group-picker > section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid #285163;
+  padding: 8px;
+  background: #051823;
+}
+.native-group-title {
+  border: 0;
+  border-bottom: 1px solid #507581;
+  color: #ffd200;
+  background: #163847;
+  font: 18px var(--ui-font);
+  padding: 6px;
+  cursor: pointer;
+}
+.native-group-weapons {
+  flex: 1;
+  min-height: 130px;
+  max-height: 330px;
+  overflow: auto;
+}
+.native-group-weapons > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  font: 14px var(--ui-font);
+  padding: 7px 0;
+  border-bottom: 1px solid #24404f;
+  color: #c9e0ec;
+}
+.native-group-weapons > div > span {
+  width: 100%;
+}
+.native-group-weapons small {
+  font-size: 10px;
+  color: #8ea5b2;
+}
+.native-group-weapons select {
+  margin-left: auto;
+  padding: 0 2px;
+}
+.native-group-picker label {
+  font-size: 14px;
+  color: #bcd7e5;
+  white-space: nowrap;
+}
+.native-group-picker input {
+  accent-color: #9bff00;
+  margin-right: 7px;
+}
+.native-design-library {
+  max-height: 48dvh;
+  overflow: auto;
+  min-height: 70px;
+}
+.native-design-row {
+  display: flex;
+  border-bottom: 1px solid #2b5467;
+  align-items: center;
+  padding: 4px 0;
+}
+.native-design-row > button:first-child {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  text-align: left;
+  gap: 18px;
+  background: none;
+  border: 0;
+  color: #c9e1ee;
+  cursor: pointer;
+  padding: 7px;
+  font: 17px var(--ui-font);
+}
+.native-design-row > button:first-child:hover {
+  background: #133645;
+}
+.native-design-row img {
+  width: 50px;
+  height: 65px;
+  object-fit: contain;
+}
+.native-design-row span {
+  overflow-wrap: anywhere;
+}
+.native-design-row small {
+  display: block;
+  color: #85a5b6;
+  font-size: 13px;
+}
+.native-design-row > .native-button {
+  margin-right: 10px;
+}
+/* Combat returns to the existing original-style tactical HUD. */
+.studio-combat-identity {
+  position: absolute;
+  left: 18px;
+  top: 18px;
+  max-width: 32vw;
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+  color: #aadeff;
+  font: 14px var(--ui-font);
+  pointer-events: none;
+}
+.studio-combat-identity > span {
+  color: #94bcce;
+  font-size: 12px;
+}
+.studio-combat-identity > strong {
+  font-weight: 400;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.studio-combat-identity > small {
+  display: none;
+}
+@media (max-width: 1000px) {
+  .native-refit-app {
+    --u: clamp(0.78px, 0.118dvh, 1.1px);
+  }
+  .refit-actions {
+    grid-template-columns: repeat(3, calc(175 * var(--u)));
+  }
+  .refit-stats {
+    width: calc(280 * var(--u));
+  }
+  .refit-roster {
+    flex-basis: calc(175 * var(--u));
+  }
+}
+@media (max-width: 760px) {
+  .native-refit-app {
+    overflow: auto;
+    min-width: 0;
+  }
+  .refit-shell {
+    min-height: 600px;
+    min-width: 700px;
+    width: calc(100% - 18px);
+    right: auto;
+  }
+  .native-group-picker {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .native-hull-choice img {
+    height: 120px;
+  }
+  .native-hull-choice strong {
+    font-size: 16px;
+  }
+  .native-weapon-picker {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .native-weapon-details {
+    padding-left: 10px;
+  }
+  .native-mod-choice {
+    flex-wrap: wrap;
+  }
+  .native-mod-choice > div {
+    flex-basis: 60%;
+  }
+  .native-screen-close {
+    right: 16px;
+  }
+  .native-home-version {
+    font-size: 11px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .native-refit-app *,
+  .native-home * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+.native-engine-idle {
+  position: absolute;
+  pointer-events: none;
+  z-index: 2;
+  transform-origin: 50% 20%;
+  background: radial-gradient(
+    ellipse at 50% 26%,
+    #f4ffff 0%,
+    #d4f9ff 10%,
+    #4fbfffaa 30%,
+    #1398ff44 50%,
+    #0088ff11 65%,
+    transparent 75%
+  );
+}
+
+.native-screen-close,
+.native-step,
+.native-help-button {
+  display: grid;
+  place-items: center;
+  line-height: 1 !important;
+}
+.native-refit-app .native-button {
+  line-height: 1.15;
+}
+/* Refit interactions: all editing entry points remain visible, never behind a hover-only hint. */
+
+.native-refit-app,
+.native-home {
+  font-synthesis: none;
+}
+.native-refit-app strong {
+  font-weight: 400;
+}
+.refit-roster {
+  display: flex;
+  flex-direction: column;
+}
+.refit-roster-ship {
+  flex: 0 0 calc(153 * var(--u));
+}
+.refit-roster-ship > span {
+  font-family: var(--ui-font);
+}
+.refit-roster-tools {
+  display: flex;
+  gap: 4px;
+  padding: 11px 2px 7px;
+}
+.refit-roster-tools .native-button {
+  flex: 1;
+  min-width: 0;
+  font-size: calc(12 * var(--u));
+  padding: 5px 3px;
+}
+.refit-roster-heading {
+  margin: 4px 0;
+  padding: 4px 2px;
+  font: calc(12 * var(--u)) / 1.2 var(--ui-font);
+  color: #8db2bf;
+  border-bottom: 1px solid #17333d;
+}
+.refit-roster-heading span {
+  float: right;
+  color: #d4c57b;
+}
+.refit-roster-other {
+  display: flex;
+  align-items: center;
+  text-align: left;
+  gap: 7px;
+  flex: 0 0 calc(65 * var(--u));
+  padding: 2px;
+  color: #d0d7d9;
+  background: #02090c;
+  border: 0;
+  border-bottom: 1px solid #102933;
+  font-size: calc(14 * var(--u)) !important;
+}
+.refit-roster-other:hover {
+  background: #143540;
+}
+.refit-roster-other img {
+  width: calc(53 * var(--u));
+  height: calc(60 * var(--u));
+  object-fit: contain;
+}
+.refit-roster-other small {
+  display: block;
+  color: #7e9aa4;
+  font-size: calc(10 * var(--u));
+  margin-top: 6px;
+}
+.refit-mount-list {
+  flex: 1;
+  min-height: 80px;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #295766 #030709;
+}
+.refit-mount-list button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: calc(25 * var(--u));
+  padding: 4px 3px;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid #0b2029;
+  background: transparent;
+  color: #a9bfc8;
+  text-align: left;
+  font-size: calc(12 * var(--u));
+}
+.refit-mount-list button:hover,
+.refit-mount-list button[aria-pressed="true"] {
+  color: #e3f5ff;
+  background: #153641;
+}
+.refit-mount-list small {
+  white-space: nowrap;
+  color: #6e8994;
+  font-size: calc(10 * var(--u));
+}
+.refit-mount-list i {
+  font-style: normal;
+  color: #dcbb75;
+  margin-left: 3px;
+}
+.refit-mount-list i[data-type="ENERGY"] {
+  color: #bc9af4;
+}
+.refit-mount-list i[data-type="MISSILE"] {
+  color: #9dcd8b;
+}
+.refit-mount-list em {
+  font-style: normal;
+  font-size: 9px;
+  color: #756e58;
+}
+.refit-storage-status {
+  flex-shrink: 0;
+  border-top: 1px solid #1e424d;
+  padding: 9px 4px 4px;
+  min-height: 43px;
+  color: #bdd194;
+  font-size: calc(12 * var(--u));
+}
+.refit-storage-status small {
+  display: block;
+  color: #738a92;
+  margin-top: 3px;
+  font-size: calc(10 * var(--u));
+}
+.refit-edit-hint {
+  position: absolute;
+  left: calc(7 * var(--u));
+  top: calc(44 * var(--u));
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: calc(10 * var(--u));
+  color: #74949f;
+}
+.refit-edit-hint button {
+  background: #102d37;
+  border: 1px solid #2f5968;
+  color: #a8c9d5;
+  padding: 3px 6px;
+  width: max-content;
+}
+.refit-edit-hint button[aria-pressed="true"] {
+  border-color: #759cac;
+}
+.refit-hover-info {
+  position: absolute;
+  top: calc(105 * var(--u));
+  left: calc(10 * var(--u));
+  z-index: 5;
+  background: #020b10ed;
+  border: 1px solid #436776;
+  padding: 10px 12px;
+  font-size: calc(13 * var(--u));
+  max-width: calc(240 * var(--u));
+  pointer-events: none;
+}
+.refit-hover-info span,
+.refit-hover-info small {
+  display: block;
+  color: #8baab8;
+  margin-top: 5px;
+  font-size: calc(11 * var(--u));
+}
+.studio-mount {
+  border-radius: 50%;
+  border-color: #8c6ecc;
+  background: #11101d66;
+}
+.studio-mount[data-type="BALLISTIC"] {
+  border-color: #cbb176;
+}
+.studio-mount[data-type="MISSILE"] {
+  border-color: #9dc98b;
+}
+.studio-mount[data-type="UNIVERSAL"] {
+  border-color: #ccc;
+}
+.studio-mount:not(.is-equipped) {
+  opacity: 0.8;
+  border-style: dashed;
+}
+.show-all-mounts .studio-mount {
+  opacity: 0.45;
+}
+.show-all-mounts .studio-mount:not(.is-equipped) {
+  opacity: 0.85;
+}
+.studio-ship:hover .studio-mount {
+  opacity: 0.8;
+}
+.studio-mount:hover {
+  background: #1e597177;
+}
+.studio-mount--small {
+  min-width: 19px;
+  min-height: 19px;
+}
+.native-filter-tabs {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 10px;
+}
+.native-filter-tabs button {
+  flex: 1;
+  border: 1px solid #244a59;
+  background: #0b212b;
+  padding: 5px;
+  color: #88a5b5;
+  font: 13px var(--ui-font);
+  cursor: pointer;
+}
+.native-filter-tabs button[aria-pressed="true"] {
+  color: #ffdb50;
+  border-color: #728c90;
+}
+.native-large-weapon {
+  height: 100px;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 24px, #21455266 24px 25px),
+    repeating-linear-gradient(90deg, #06141c 0 24px, #21455266 24px 25px);
+  display: grid;
+  place-items: center;
+  border: 1px solid #1d414e;
+}
+.native-large-weapon img {
+  height: 75px;
+  max-width: 90%;
+  object-fit: contain;
+}
+.native-weapon-details .native-button {
+  display: block;
+  width: 100%;
+  margin: 7px 0;
+  font-size: 14px;
+  padding: 7px;
+}
+.native-weapon-details h4 {
+  color: #9ab3c0;
+  margin: 19px 0 8px;
+  font: 14px var(--ui-font);
+  border-top: 1px solid #244957;
+  padding-top: 10px;
+}
+.native-weapon-details p {
+  margin-top: 10px;
+}
+.native-weapon-details dl {
+  margin: 12px 0;
+  gap: 5px;
+  font-size: 13px;
+}
+.native-group-matrix {
+  min-width: 520px;
+}
+.native-group-matrix > div {
+  display: grid;
+  grid-template-columns: minmax(230px, 1fr) repeat(5, 57px);
+  align-items: center;
+}
+.native-group-matrix button {
+  cursor: pointer;
+  font: 14px var(--ui-font);
+  color: #96b2c1;
+  background: #0b222b;
+  border: 1px solid #203f4d;
+  padding: 6px 2px;
+}
+.native-group-matrix button:hover {
+  background: #214754;
+}
+.native-group-matrix button[aria-pressed="true"] {
+  color: #ffe055;
+  background: #214855;
+}
+.native-group-matrix-header {
+  color: #bed9e5;
+  margin-bottom: 5px;
+}
+.native-group-matrix-header button {
+  font: 18px var(--ui-mono);
+}
+.native-group-mode {
+  min-height: 29px;
+  font: 13px var(--ui-font);
+  color: #8dacb8;
+}
+.native-group-mode input {
+  justify-self: center;
+  accent-color: #d2c362;
+}
+.native-group-matrix-row {
+  border-bottom: 1px solid #153641;
+  min-height: 34px;
+}
+.native-group-matrix-row > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #bdcdd4;
+  font: 13px var(--ui-font);
+}
+.native-group-matrix-row img {
+  height: 28px;
+  width: 24px;
+  object-fit: contain;
+}
+.native-group-matrix-row small {
+  margin-left: auto;
+  padding-right: 14px;
+  color: #668594;
+  font-size: 10px;
+}
+.native-group-matrix-row button {
+  font-family: Arial, sans-serif;
+  background: #061923;
+  font-size: 20px;
+  padding: 1px;
+}
+.native-preset-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  border: 1px solid #315564;
+  background: #0a212b;
+  padding: 14px;
+}
+.native-preset-row strong {
+  color: #d7e8ef;
+  font-weight: 400;
+}
+.native-preset-row p {
+  color: #8ba6b3;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 6px 0 0;
+}
+.native-preset-row .native-button {
+  margin-left: auto;
+}
+.native-library-heading {
+  font: 15px var(--ui-font);
+  color: #a7c6d5;
+  border-bottom: 1px solid #244450;
+  padding-bottom: 7px;
+}
+.native-save-feedback {
+  color: #afd577;
+  font-size: 14px;
+}
+.ui-modal-body {
+  min-height: 0;
+  overflow: auto;
+}
+@media (max-width: 760px) {
+  .native-refit-app {
+    --u: 0.85px;
+  }
+  .refit-edit-hint span {
+    max-width: 140px;
+    line-height: 1.5;
+  }
+  .native-preset-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+.refit-quick-fit {
+  flex-shrink: 0;
+  margin: 0 2px 6px;
+  font-size: calc(12 * var(--u)) !important;
+  min-height: calc(23 * var(--u));
+}
+/* Transparent statistic rows must not intercept the right-hand weapon mounts. */
+.refit-stats {
+  pointer-events: none;
+}
+.refit-stats button,
+.refit-stats input,
+.refit-stats .native-op-bar,
+.refit-mod-row > span,
+.refit-mod-row > img {
+  pointer-events: auto;
+}
+
+.refit-roster-ship .ship-stage {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.refit-roster-ship .studio-ship {
+  width: calc(153 * var(--u) * var(--ship-ratio));
+  max-width: 95%;
+  transform: none;
+  pointer-events: none;
+}
+.refit-roster-ship > span {
+  z-index: 2;
+}
+/* Source reference: refit/Q.java, WeaponPickerDialog.java, wgd2/WeaponGroupDialogV2.java. */
+.refit-roster {
+  display: block;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.refit-roster-ship {
+  height: calc(153 * var(--u));
+  flex: none;
+  background: #000;
+  margin-bottom: 3px;
+}
+.refit-roster-ship.is-current {
+  background: #11383d;
+}
+.refit-roster-ship:hover:not(.is-current) {
+  background: #071e24;
+}
+.refit-roster-ship .studio-ship {
+  max-width: 75%;
+}
+.studio-mount:not(.is-equipped) {
+  opacity: 0;
+}
+.studio-ship:hover .studio-mount:not(.is-equipped),
+.show-all-mounts .studio-mount:not(.is-equipped) {
+  opacity: 0.8;
+}
+.ui-modal:has(.source-variant-current) {
+  width: 560px;
+}
+.source-variant-current {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+}
+.source-variant-current label {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  gap: 5px;
+  white-space: nowrap;
+}
+.source-variant-current input {
+  min-width: 0;
+  width: 100%;
+  background: #061b26;
+  border: 1px solid #476d7f;
+  padding: 5px;
+  color: #c0deed;
+  font: 12px var(--ui-font);
+}
+.source-variant-current .native-button {
+  font-size: 12px;
+  padding: 5px 8px;
+}
+.ui-modal:has(.source-variant-current) .native-design-row {
+  min-height: 29px;
+  padding: 3px 0;
+  gap: 4px;
+}
+.ui-modal:has(.source-variant-current) .native-design-row button {
+  font-size: 12px;
+  min-height: 24px;
+  padding: 3px 7px;
+}
+.ui-modal:has(.source-variant-current) .native-design-row small {
+  display: inline;
+  color: #7194a4;
+  margin-left: 5px;
+}
+@media (max-width: 970px) {
+  .source-weapon-tooltip {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .source-weapon-groups {
+    min-width: 735px;
+  }
+}
+/* WeaponGroupDialogV2 — user reference: 842px frame, 21px rows, 7 square columns. */
+.ui-modal-backdrop:has(.source-weapon-groups) {
+  background: #0009;
+}
+.ui-modal:has(.source-weapon-groups) {
+  position: relative;
+  width: 842px;
+  max-width: calc(100vw - 24px);
+  padding: 14px;
+  background: #000;
+  border: 1px solid #88a9ad;
+  border-radius: 0;
+  gap: 0;
+  isolation: isolate;
+  overflow: visible;
+}
+.ui-modal:has(.source-weapon-groups) .ui-modal-header {
+  flex: none;
+  height: 20px;
+  min-height: 20px;
+  padding: 0;
+  border: 0;
+  background: #163e4b;
+  justify-content: center;
+  text-align: center;
+  margin-bottom: 7px;
+}
+.ui-modal:has(.source-weapon-groups) .ui-modal-header h2 {
+  font: 15px/20px var(--ui-font);
+  color: #b9ddf0;
+  text-shadow: 1px 1px #000;
+  margin: 0;
+}
+.ui-modal:has(.source-weapon-groups) .ui-modal-header .ui-eyebrow,
+.ui-modal:has(.source-weapon-groups) .ui-modal-header > button {
+  display: none;
+}
+.ui-modal:has(.source-weapon-groups) .ui-modal-body {
+  padding: 0;
+  overflow: auto;
+}
+.ui-modal:has(.source-weapon-groups) .source-group-frame {
+  position: absolute;
+  inset: 0;
+  background: none;
+  pointer-events: none;
+  z-index: 2;
+}
+.ui-modal:has(.source-weapon-groups) .ui-modal-footer {
+  flex: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  margin-top: 15px;
+  gap: 11px;
+}
+.ui-modal:has(.source-weapon-groups) .ui-modal-footer .native-button {
+  width: 143px;
+  height: 25px;
+  min-height: 0;
+  padding: 0;
+  font: 16px/25px var(--ui-font);
+  background: #173f4b;
+}
+.ui-modal:has(.source-weapon-groups) .ui-modal-footer .source-auto-assign {
+  width: 184px;
+  margin-right: auto;
+}
+.ui-modal:has(.source-weapon-groups) .native-button:hover {
+  background: #23586a;
+}
+.source-weapon-groups {
+  display: grid;
+  grid-template-columns: minmax(0, 492fr) minmax(0, 298fr);
+  gap: 20px;
+  color: #b3d8ec;
+  font: 14px/1.2 var(--ui-font);
+}
+.source-group-assignments {
+  min-width: 0;
+}
+.source-group-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(7, 23px);
+  align-items: center;
+  height: 21px;
+  gap: 0;
+}
+.source-group-autofire {
+  margin-bottom: 3px;
+}
+.source-group-autofire > span {
+  text-align: right;
+  padding-right: 7px;
+  font-size: 16px;
+}
+.source-group-header {
+  height: 20px;
+  margin-bottom: 2px;
+}
+.source-group-header > * {
+  margin-right: 3px;
+  border: 1px solid #19434d;
+  height: 20px;
+  text-align: center;
+  line-height: 18px;
+}
+.source-group-header > b {
+  font-family: StarsectorLatin, sans-serif;
+  font-weight: 400;
+}
+.source-group-scroll {
+  overflow-y: auto;
+  max-height: calc(100dvh - 200px);
+  scrollbar-width: thin;
+  scrollbar-color: #78aab9 #071418;
+}
+.source-group-weapon,
+.source-group-summary-row {
+  --row: #12313e;
+  --arc: #499dbc;
+}
+.source-group-weapon[data-type="BALLISTIC"],
+.source-group-summary-row[data-type="BALLISTIC"] {
+  --row: #423800;
+  --arc: #b2a127;
+}
+.source-group-weapon[data-type="MISSILE"],
+.source-group-summary-row[data-type="MISSILE"] {
+  --row: #2a4000;
+  --arc: #91b700;
+}
+.source-group-weapon {
+  background: var(--row);
+  border-bottom: 1px solid #000;
+}
+.source-group-weapon-label {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  padding: 0 3px;
+  white-space: nowrap;
+  color: #dedcda;
+  text-shadow: 1px 1px #000;
+}
+.source-group-weapon-label > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.source-group-weapon-label em {
+  font-style: normal;
+  color: #ffdb00;
+  flex: none;
+}
+.source-group-arc {
+  width: 17px;
+  height: 17px;
+  flex: none;
+}
+.source-group-arc circle {
+  fill: color-mix(in srgb, var(--arc) 55%, #000);
+  stroke: var(--arc);
+  stroke-width: 0.5px;
+}
+.source-group-arc path {
+  fill: var(--arc);
+}
+.source-group-row .source-group-cell {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin: 0 auto;
+  border: 3px double #d3ced0;
+  border-radius: 2px;
+  background: repeating-linear-gradient(
+    0deg,
+    #33211e 0px,
+    #33211e 1px,
+    #140e0d 1px,
+    #140e0d 2px
+  );
+  box-shadow: 0 0 0 1px #5a4b45;
+  cursor: pointer;
+}
+.source-group-row .source-group-cell[aria-pressed="true"],
+.source-group-row .source-group-cell[aria-checked="true"] {
+  background: repeating-linear-gradient(
+    0deg,
+    #83e5f7 0px,
+    #83e5f7 1px,
+    #5bc8e3 1px,
+    #5bc8e3 2px
+  );
+  border-color: #d4f2ef;
+  box-shadow:
+    0 0 0 1px #57777d,
+    inset 0 0 2px 1px #057493;
+}
+.source-group-cell:hover {
+  filter: brightness(1.35);
+}
+.source-group-cell:focus-visible {
+  outline: 1px solid #ffdd23;
+  outline-offset: 1px;
+}
+.source-group-summary {
+  padding-top: 24px;
+}
+.source-group-summary-row {
+  display: grid;
+  grid-template-columns: minmax(0, 130fr) minmax(0, 100fr) minmax(0, 61fr);
+  align-items: center;
+  height: 21px;
+  font: 14px/20px var(--ui-font);
+}
+.source-group-summary-header {
+  margin-bottom: 2px;
+  height: 20px;
+  text-align: center;
+}
+.source-group-summary-header > span {
+  border: 1px solid #19434d;
+  margin-right: 3px;
+  height: 20px;
+}
+.source-group-summary-header > span:last-child {
+  margin-right: 0;
+}
+.source-group-summary-table {
+  border: 1px solid #19434d;
+  padding: 0 3px 3px;
+}
+.source-group-summary-table .source-group-summary-row {
+  background: var(--row);
+  border-bottom: 1px solid #000;
+}
+.source-group-summary-table .source-group-summary-row > span {
+  padding-left: 7px;
+}
+.source-group-summary-row button {
+  color: #ffdd00;
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.source-group-summary-row button:hover:not(:disabled) {
+  text-shadow: 0 0 5px #ffcd0055;
+  text-decoration: underline;
+}
+.source-group-summary-row b {
+  text-align: center;
+  color: #ffe000;
+  font:
+    14px "Microsoft YaHei",
+    sans-serif;
+}
+.source-group-summary-row[data-type="EMPTY"] {
+  background: #000;
+  color: #888;
+}
+.source-group-summary-row[data-type="EMPTY"] button,
+.source-group-summary-row[data-type="EMPTY"] b {
+  color: #777;
+  cursor: default;
+}
+.source-group-summary dl {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  margin: 14px 23px;
+  gap: 0;
+  font: 14px/18px var(--ui-font);
+  color: #d6d5d1;
+}
+.source-group-summary dt,
+.source-group-summary dd {
+  margin: 0;
+}
+.source-group-summary dd {
+  text-align: right;
+  color: #ffde00;
+  font-family: "Microsoft YaHei", sans-serif;
+}
+
+/* ModPickerDialogV3 — left-side refit expansion; the right stats are not a modal background. */
+.mods-expanded .refit-roster {
+  opacity: 0.16;
+}
+.mods-expanded .refit-roster-ship:not(.is-current) {
+  visibility: hidden;
+}
+.mods-expanded .refit-vessel {
+  opacity: 0.25;
+}
+.mods-expanded .refit-vessel,
+.mods-expanded .refit-vessel * {
+  pointer-events: none;
+}
+.mods-expanded .refit-cr,
+.mods-expanded .refit-bottom,
+.mods-expanded .refit-hover-info {
+  visibility: hidden;
+}
+.mods-expanded .refit-grid {
+  background-color: #000608;
+  background-image:
+    linear-gradient(#12313b44 1px, transparent 1px),
+    linear-gradient(90deg, #12313b44 1px, transparent 1px);
+}
+.source-mod-picker {
+  position: absolute;
+  top: calc(10 * var(--u));
+  left: calc(11 * var(--u));
+  right: calc(337 * var(--u) + 7px);
+  bottom: 7px;
+  z-index: 6;
+  outline: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  color: #bddbec;
+  font: calc(14 * var(--u))/1.2 var(--ui-font);
+}
+.source-mod-table {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.source-mod-row {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 300fr) minmax(0, 180fr) minmax(0, 60fr)
+    minmax(0, 120fr);
+}
+.source-mod-heading {
+  gap: 3px;
+  flex: none;
+  height: calc(21 * var(--u));
+  margin-bottom: 2px;
+}
+.source-mod-heading > div {
+  min-width: 0;
+}
+.source-mod-heading button {
+  width: 100%;
+  height: 100%;
+  border: 1px solid #1b414e;
+  padding: 0 calc(15 * var(--u)) 0 0;
+  background: #000b;
+  color: #b2dbee;
+  font: inherit;
+  position: relative;
+}
+.source-mod-heading i {
+  position: absolute;
+  top: calc(6 * var(--u));
+  right: calc(3 * var(--u));
+  width: calc(13 * var(--u));
+  height: calc(9 * var(--u));
+  clip-path: polygon(0 0, 100% 0, 100% 30%, 60% 100%, 40% 100%, 0 30%);
+  background: linear-gradient(#b6e3f5, #49768b);
+}
+.source-mod-heading i.ascending-arrow {
+  transform: rotate(180deg);
+}
+.source-mod-heading button:hover {
+  background: #173c4b;
+}
+.source-mod-scroll {
+  height: calc(510 * var(--u));
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #93becf #08212a;
+  border: 1px solid #18333b;
+}
+.source-mod-scroll > .source-mod-row {
+  position: relative;
+  min-height: calc(36 * var(--u));
+  background: #0b252d99;
+  cursor: pointer;
+}
+.source-mod-scroll > .source-mod-row:nth-child(even) {
+  background: #0a202888;
+}
+.source-mod-scroll > .source-mod-row.is-installed {
+  background: #0009;
+}
+.source-mod-scroll > .source-mod-row:hover {
+  background: #153e4ab3;
+}
+.source-mod-scroll > .source-mod-row > div {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #929393;
+}
+.source-mod-select {
+  display: flex;
+  align-items: center;
+  gap: calc(9 * var(--u));
+  width: 100%;
+  height: calc(36 * var(--u));
+  padding: 0 calc(4 * var(--u));
+  border: 0;
+  background: none;
+  font: inherit;
+  color: #bddbee;
+  text-align: left;
+  cursor: pointer;
+}
+.source-mod-select img {
+  width: calc(32 * var(--u));
+  height: calc(32 * var(--u));
+  object-fit: contain;
+  flex: none;
+}
+.source-mod-select > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.source-mod-row.is-installed .source-mod-select {
+  color: #ffdb00;
+}
+.source-mod-scroll .source-mod-row .source-mod-cost {
+  color: #ff7900;
+  font-family: StarsectorLatin, sans-serif;
+}
+.source-mod-scroll .source-mod-row.is-installed .source-mod-cost {
+  color: #8d9092;
+}
+.source-mod-status {
+  padding: 0 3px;
+  font-size: calc(12 * var(--u));
+}
+.source-mod-check {
+  color: #ffdf00;
+  font:
+    calc(26 * var(--u))/1 Arial,
+    sans-serif;
+}
+.source-mod-empty {
+  padding: 16px;
+  color: #82969c;
+}
+.source-mod-filters {
+  flex: none;
+  padding: calc(10 * var(--u)) calc(7 * var(--u));
+}
+.source-mod-design-filters,
+.source-mod-type-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(3 * var(--u));
+}
+.source-mod-design-filters {
+  margin-bottom: calc(10 * var(--u));
+}
+.source-mod-design-filters button {
+  width: calc(98 * var(--u));
+}
+.source-mod-design-filters button:first-child,
+.source-mod-type-filters button:first-child {
+  width: calc(129 * var(--u));
+}
+.source-mod-type-filters button {
+  width: calc(94 * var(--u));
+}
+.source-mod-type-filters button:last-child {
+  width: calc(128 * var(--u));
+}
+.source-mod-type-filters {
+  max-width: calc(625 * var(--u));
+}
+.source-mod-filters button {
+  min-height: calc(24 * var(--u));
+  padding: calc(2 * var(--u)) calc(15 * var(--u));
+  background: #123b49;
+  color: #bfdce9;
+  border: 1px solid #497a89;
+  outline: 1px solid #000;
+  box-shadow: inset 0 0 0 1px #000;
+  font: calc(14 * var(--u))/1.2 var(--ui-font);
+  text-shadow: 1px 1px #000;
+  white-space: nowrap;
+}
+.source-mod-filters button:hover:not(:disabled),
+.source-mod-filters button[aria-pressed="true"] {
+  background: #1c5261;
+  border-color: #77b4c8;
+}
+.source-mod-filters button:disabled {
+  color: #5c737b;
+  border-color: #29444d;
+  background: #0a1b22;
+  cursor: default;
+}
+.source-mod-availability {
+  display: block;
+  color: #56747d;
+  font-size: calc(11 * var(--u));
+  margin-top: calc(13 * var(--u));
+}
+@media (max-height: 680px) {
+  .source-mod-scroll {
+    height: calc(100dvh - 235px);
+  }
+}
+
+.mods-expanded .native-screen-tab,
+.mods-expanded .native-screen-close {
+  opacity: 0.55;
+}
+.refit-hullmods > .native-button {
+  width: calc(150 * var(--u));
+  background: #173f4b;
+}
+.source-mod-select {
+  font-size: calc(15 * var(--u));
+}
+.source-mod-heading {
+  font-size: calc(15 * var(--u));
+}
+/* Native WeaponPickerDialog reference: mount-anchored list plus the separate left tooltip. */
+.ui-modal-backdrop:has(.source-weapon-picker) {
+  background: transparent;
+}
+.ui-modal:has(.source-weapon-picker) {
+  position: fixed;
+  left: var(--weapon-picker-left, 60vw);
+  top: var(--weapon-picker-top, 40px);
+  width: 380px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - var(--weapon-picker-top, 40px) - 18px);
+  padding: 0;
+  border: 1px solid #48a0b5;
+  outline: 1px solid #021317;
+  box-shadow:
+    -3px 0 #06161b,
+    -4px 0 #28707c;
+  background: #000;
+  overflow: visible;
+}
+.ui-modal:has(.source-weapon-picker) .ui-modal-header {
+  height: 21px;
+  min-height: 21px;
+  padding: 0 5px;
+  border: 0;
+  background: #02090d;
+  flex: none;
+}
+.ui-modal:has(.source-weapon-picker) .ui-modal-header h2 {
+  font: 14px/20px var(--ui-font);
+  color: #b9e4f0;
+  margin: 0;
+}
+.ui-modal:has(.source-weapon-picker) .ui-eyebrow,
+.ui-modal:has(.source-weapon-picker) .ui-modal-header > button {
+  display: none;
+}
+.ui-modal:has(.source-weapon-picker) .ui-modal-body {
+  padding: 0;
+  overflow: visible;
+  min-height: 0;
+}
+.source-weapon-picker {
+  color: #dedddb;
+  font: 14px/1.2 var(--ui-font);
+}
+.source-weapon-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  min-height: 78px;
+  padding: 4px 9px 4px 16px;
+  border: 0;
+  background: #000;
+  color: #dfdfdf;
+  font: 14px/18px var(--ui-font);
+  text-align: left;
+  cursor: pointer;
+}
+.source-equipped-weapon {
+  background: #142c35;
+  border: 1px solid #397180;
+  min-height: 77px;
+}
+.source-weapon-row:hover,
+.source-weapon-row:focus-visible {
+  background: #142c35;
+}
+.source-weapon-row[aria-disabled="true"] {
+  cursor: default;
+}
+.source-weapon-row[aria-disabled="true"] .source-weapon-op b,
+.source-weapon-row[aria-disabled="true"] .source-weapon-stock {
+  color: #8b7e11;
+}
+.source-weapon-row-info {
+  flex: 1;
+  min-width: 0;
+}
+.source-weapon-row-info strong {
+  font: inherit;
+  font-size: 15px;
+  display: block;
+  color: #dbdbdb;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.source-weapon-row-info > span {
+  display: block;
+  color: #ffe200;
+}
+.source-weapon-row-info .source-weapon-stock {
+  color: #d7d7d7;
+}
+.source-weapon-row-info small,
+.source-weapon-op small {
+  display: block;
+  font-size: 11px;
+  line-height: 12px;
+  color: #808485;
+}
+.source-weapon-op {
+  position: absolute;
+  right: 9px;
+  bottom: 5px;
+  text-align: right;
+}
+.source-weapon-op b {
+  color: #ffe000;
+  font: 19px/20px var(--ui-mono);
+}
+.source-equipped-weapon .source-weapon-op b {
+  color: #a5f700;
+}
+.source-weapon-icon {
+  display: inline-flex;
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border: 3px solid #d4be00;
+  padding: 4px;
+  background: #000;
+  flex: none;
+}
+.source-weapon-icon > span {
+  display: block;
+  position: relative;
+  border: 1px solid #625b17;
+  width: 100%;
+  height: 100%;
+  background: #151914;
+}
+.source-weapon-icon img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.source-weapon-icon[data-type="ENERGY"] {
+  border-color: #2595b2;
+  border-radius: 50%;
+}
+.source-weapon-icon[data-type="ENERGY"] > span {
+  border-radius: 50%;
+  border-color: #3b5d67;
+}
+.source-weapon-icon[data-type="MISSILE"] {
+  border-color: #8fd600;
+  transform: rotate(45deg) scale(0.82);
+}
+.source-weapon-icon[data-type="MISSILE"] > span {
+  border-color: #46651b;
+  transform: rotate(-45deg);
+  border: 0;
+  background: none;
+}
+.source-type-filters,
+.source-ownership-filters {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 0 2px;
+}
+.source-type-filters {
+  margin-top: 3px;
+  margin-bottom: 2px;
+}
+.source-ownership-filters {
+  margin-bottom: 2px;
+}
+.source-type-filters button,
+.source-ownership-filters button {
+  height: 24px;
+  border: 1px solid #43636e;
+  padding: 0;
+  font: 13px var(--ui-font);
+  box-shadow: inset 0 0 0 1px #000;
+  background: #183b4a;
+  color: #b9d8e6;
+}
+.source-type-filters button[data-type="BALLISTIC"] {
+  background: #413600;
+  border-color: #7f6900;
+  color: #ffe331;
+}
+.source-type-filters button[data-type="MISSILE"] {
+  background: #243d00;
+  border-color: #617e1b;
+  color: #d8ff75;
+}
+.source-type-filters button[aria-pressed="false"],
+.source-type-filters button:disabled {
+  filter: brightness(0.5);
+}
+.source-type-filters button:hover:not(:disabled) {
+  filter: brightness(1.3);
+  cursor: pointer;
+}
+.source-type-filters kbd,
+.source-ownership-filters kbd {
+  color: #ffdf00;
+  font: inherit;
+}
+.source-ownership-filters button:nth-child(2) {
+  background: #423800;
+  border-color: #665707;
+  color: #9d912b;
+}
+.source-ownership-filters button:nth-child(3) {
+  background: #422002;
+  border-color: #6b400e;
+  color: #a27840;
+}
+.source-ownership-filters button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+.source-weapon-list {
+  max-height: min(468px, calc(100dvh - var(--weapon-picker-top, 40px) - 180px));
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #6795a4 #07191f;
+}
+.source-weapon-empty-mount,
+.source-weapon-empty {
+  padding: 18px 12px;
+  color: #8dabb6;
+  margin: 0;
+}
+.source-weapon-details {
+  position: fixed;
+  left: var(--weapon-detail-left, 24px);
+  top: var(--weapon-picker-top, 40px);
+  width: var(--weapon-detail-width, 420px);
+  max-height: calc(100dvh - var(--weapon-picker-top, 40px) - 18px);
+  overflow-y: auto;
+  padding: 5px 8px 0;
+  border-left: 1px solid #4cabb8;
+  border-right: 1px solid #4cabb8;
+  box-shadow:
+    -2px 0 #10323a,
+    2px 0 #10323a;
+  background: #000e;
+  color: #d7d9d8;
+  font: 14px/1.25 var(--ui-font);
+  scrollbar-width: thin;
+}
+.source-weapon-details h3 {
+  margin: 0 0 9px;
+  color: #b9e4f0;
+  font: 15px var(--ui-font);
+}
+.source-weapon-details h3 em {
+  font-style: normal;
+  color: #ffe000;
+}
+.source-weapon-manufacturer {
+  color: #8e9696;
+  margin: 0 0 9px;
+}
+.source-weapon-description {
+  margin: 0 0 10px;
+  white-space: pre-wrap;
+}
+.source-weapon-details h4 {
+  text-align: center;
+  background: #173e4b;
+  color: #bee0ed;
+  margin: 0 0 10px;
+  height: 20px;
+  font: 15px/20px var(--ui-font);
+}
+.source-weapon-details h4 > span {
+  font-size: 12px;
+}
+.source-weapon-primary,
+.source-weapon-secondary {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 10px;
+  padding-bottom: 12px;
+}
+.source-weapon-primary > .source-weapon-icon {
+  width: 60px;
+  height: 60px;
+  justify-self: center;
+  margin-top: 8px;
+}
+.source-weapon-details dl {
+  margin: 0;
+  min-width: 0;
+}
+.source-weapon-detail-stat {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 18px;
+  column-gap: 6px;
+}
+.source-weapon-detail-stat[data-compare="true"] {
+  grid-template-columns: minmax(90px, 1fr) auto auto;
+}
+.source-weapon-detail-stat dt,
+.source-weapon-detail-stat dd {
+  margin: 0;
+}
+.source-weapon-detail-stat dd {
+  color: #ffe100;
+  text-align: right;
+  white-space: nowrap;
+  font:
+    14px/18px "Microsoft YaHei",
+    sans-serif;
+}
+.source-weapon-detail-stat .source-weapon-compare {
+  color: #86afc0;
+  margin-right: 7px;
+}
+.source-weapon-stat-gap {
+  height: 17px;
+}
+.source-damage-icon {
+  width: 90px;
+  height: 90px;
+  object-fit: contain;
+}
+.source-damage-effect {
+  color: #ffe000;
+  text-align: right;
+  margin-top: 3px;
+  font-size: 13px;
+}
+.source-weapon-codex {
+  background: #000;
+  border: 0;
+  border-top: 1px solid #17404b;
+  color: #8c969a;
+  padding: 5px 0;
+  font: 14px var(--ui-font);
+  cursor: pointer;
+}
+.source-weapon-codex kbd {
+  color: #ffe000;
+  font: inherit;
+}
+.source-weapon-encyclopedia {
+  white-space: pre-wrap;
+  font: 15px/1.8 var(--ui-font);
+  color: #c4d7df;
+}
+.source-weapon-encyclopedia small {
+  display: block;
+  margin-top: 16px;
+  color: #7e9ba6;
+}
+@media (max-width: 849px) {
+  .ui-modal:has(.source-weapon-picker) {
+    overflow: auto;
+  }
+  .ui-modal:has(.source-weapon-picker) .ui-modal-body {
+    overflow: visible;
+  }
+  .source-weapon-details {
+    position: static;
+    width: 100%;
+    max-height: none;
+    margin-top: 12px;
+    border: 0;
+  }
+  .source-weapon-list {
+    max-height: 35dvh;
+  }
+  .source-weapon-primary,
+  .source-weapon-secondary {
+    grid-template-columns: 65px minmax(0, 1fr);
+    gap: 5px;
+  }
+  .source-damage-icon {
+    width: 65px;
+    height: 65px;
+  }
+}
+
+.source-weapon-icon img {
+  transform: rotate(45deg);
+}
+.ship-arc.ship-arc-picker {
+  opacity: 0.7;
+}
+.ship-arc-picker path {
+  fill: none;
+  stroke: #c6d2d3;
+  stroke-dasharray: none;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.ship-arc-picker circle {
+  stroke: #fff;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+/* Full native-content navigation. Keep heavy mount previews on the selected hull only. */
+.native-content-count { color: #89aaa9; font-size: 13px; text-align: center; margin: 8px 0; }
+.native-home-menu { gap: 12px; }
+.refit-catalog-tools { position: sticky; top: 0; z-index: 5; display: grid; gap: 7px; background: #031216f5; padding: 10px; border-bottom: 1px solid #36616c; }
+.refit-catalog-tools label { color: #a5dedd; font-size: 13px; }
+.refit-catalog-tools small { color: #769a9f; font-size: 11px; }
+.refit-catalog-tools input, .refit-catalog-tools select, .refit-opponent-select select, .refit-weapon-search input { width: 100%; min-width: 0; padding: 7px; border: 1px solid #43636b; background: #07181d; color: #d4f3f1; font: inherit; font-size: 13px; border-radius: 2px; }
+.refit-catalog-tools .native-button { width: 100%; min-height: 30px; font-size: 12px; padding: 6px; }
+.refit-roster-ship > .refit-roster-thumbnail { position: absolute; inset: 8px auto 8px 8px; width: 65%; height: calc(100% - 16px); object-fit: contain; opacity: .9; }
+.refit-roster-ship .refit-approx-label { display: block; margin-top: 5px; color: #cea373; font-size: 10px; }
+.refit-import-warning { font-size: 12px; line-height: 1.55; color: #e4ba81; border-left: 2px solid #a87b43; background: #25201ace; padding: 6px 8px; margin: 6px 0; overflow-wrap: anywhere; }
+.refit-import-warning summary { cursor: pointer; }
+.refit-import-warning ul { padding-left: 16px; max-height: 150px; overflow-y: auto; }
+.refit-import-warning p { margin: 6px 0; }
+.refit-opponent-select { display: grid; gap: 8px; color: #9fd6d8; }
+.refit-opponent-preview { display: flex; align-items: center; gap: 24px; margin: 16px 0; }
+.refit-opponent-preview img { width: 100px; height: 125px; object-fit: contain; }
+.refit-weapon-search { display: grid; gap: 4px; padding: 5px 10px; color: #8cbcc2; font-size: 12px; }
+.refit-catalog-tools input:focus-visible, .refit-catalog-tools select:focus-visible, .refit-opponent-select select:focus-visible, .refit-weapon-search input:focus-visible { outline: 2px solid #84c6cd; outline-offset: 1px; }
+.ui-modal-header .ui-muted { white-space: pre-line; max-height: 35vh; overflow-y: auto; overflow-wrap: anywhere; }
+.refit-wing-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid #29444a; padding: 10px 0; color: #c5e7e9; }
+/* Refit filtering: direct choices, readable controls, and a stable results list. */
+.refit-roster.refit-roster-filtered { display: flex; flex-direction: column; flex-basis: clamp(218px, calc(232 * var(--u)), 280px); overflow: hidden; }
+.refit-roster-filters { flex: none; display: grid; gap: 9px; padding: 10px 6px 10px 0; background: #030d11; border-bottom: 1px solid #36515c; }
+.refit-filter-heading { display: flex; align-items: baseline; justify-content: space-between; color: #cee4e8; font-size: 15px; gap: 8px; }
+.refit-filter-heading > span { color: #8caeb7; font-size: 12px; white-space: nowrap; }
+.refit-search-field { position: relative; display: flex; min-width: 0; }
+.refit-search-field input[type="search"] { width: 100%; min-width: 0; height: 37px; padding: 8px 30px 8px 9px; border: 1px solid #456573; border-radius: 0; background: #08181f; color: #e3f2f4; font: 14px/1.3 var(--ui-font); appearance: none; }
+.refit-search-field input[type="search"]::-webkit-search-cancel-button { display: none; }
+.refit-search-field input::placeholder { color: #7fa2b0; opacity: 1; }
+.refit-search-field input:focus-visible { outline: 1px solid #b7d9de; outline-offset: 1px; border-color: #b7d9de; }
+.refit-search-clear { position: absolute; right: 1px; top: 1px; bottom: 1px; width: 29px; border: 0; background: transparent; color: #c3e2e6; font: 21px/1 Arial, sans-serif; cursor: pointer; }
+.refit-class-chips { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; }
+.refit-class-chips .native-button { min-width: 0; min-height: 33px; width: 100%; padding: 6px 2px; font-size: 12px; }
+.refit-class-chips .native-button[aria-pressed="true"], .refit-type-chips .native-button[aria-pressed="true"] { background: #274853; color: #efffff; box-shadow: inset 0 -2px 0 #9bc9d5; }
+.refit-filter-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.refit-filter-actions button, .refit-weapon-filter-meta > button { padding: 2px 0; border: 0; background: transparent; color: #99cbd6; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font: 12px/1.5 var(--ui-font); }
+.refit-roster-filters > .native-button { min-height: 30px; padding: 4px; }
+.refit-roster-results { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: #4c6b76 #071216; overscroll-behavior: contain; }
+.refit-roster-filtered .refit-roster-ship { height: 111px; min-height: 111px; margin: 0; border-bottom: 1px solid #20353f; overflow: hidden; }
+.refit-roster-filtered .refit-roster-ship > span { left: 8px; right: 6px; bottom: 8px; line-height: 1.4; }
+.refit-roster-filtered .refit-roster-ship strong { display: block; font-size: 15px; }
+.refit-roster-filtered .refit-roster-ship small { display: block; font-size: 12px; color: #adc8d2; }
+.refit-roster-filtered .refit-roster-ship small.refit-approx-label { display: inline; margin: 0; font-size: 10px; color: #bbaa85; }
+.refit-roster-filtered .refit-roster-ship > .refit-roster-thumbnail { left: auto; right: 4px; top: 5px; width: 64%; height: 92px; opacity: .72; }
+.refit-roster-filtered .refit-roster-ship.is-current > .refit-roster-thumbnail { opacity: 1; }
+.refit-filter-empty { padding: 24px 12px; text-align: center; color: #c2d7df; font-size: 13px; }
+.refit-filter-empty p { color: #8aabb7; line-height: 1.6; }
+.refit-filter-empty .native-button { min-width: 0; width: 100%; }
+.refit-weapon-filters { display: grid; gap: 8px; padding: 10px; background: #04131b; }
+.source-type-filters.refit-type-chips { display: flex; padding: 0; gap: 5px; }
+.refit-type-chips .native-button { flex: 1; min-width: 0; padding: 6px; min-height: 31px; }
+.refit-weapon-filter-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: #c1d6df; }
+.refit-weapon-filter-meta label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.refit-weapon-filter-meta input { margin: 0; accent-color: #8ec6d4; width: 15px; height: 15px; }
+.refit-weapon-result-count { margin: 0; font-size: 12px; color: #91afbd; }
+.refit-class-chips button:focus-visible, .refit-filter-actions button:focus-visible, .refit-search-clear:focus-visible { outline: 2px solid #b7d9de; outline-offset: -2px; }
+.mods-expanded .refit-roster-filters { display: none; }
+.mods-expanded .refit-roster-results { overflow: hidden; }
+@media (max-width: 849px) { .refit-roster.refit-roster-filtered { flex-basis: 218px; } }
+
+/* Let the results shrink to the viewport instead of running under the frame. */
+.ui-modal:has(.source-weapon-picker) .ui-modal-header { height: auto; min-height: 30px; padding: 4px 7px; align-items: center; gap: 4px; }
+.ui-modal:has(.source-weapon-picker) .ui-modal-header > button { display: inline-flex; flex: none; width: 24px; height: 24px; padding: 0; align-items: center; justify-content: center; }
+.ui-modal:has(.source-weapon-picker) .ui-modal-header h2 .native-bitmap-text { max-width: 100%; }
+.ui-modal:has(.source-weapon-picker) .ui-modal-body { display: flex; flex-direction: column; }
+.source-weapon-picker { display: flex; flex-direction: column; min-height: 0; max-height: calc(100dvh - var(--weapon-picker-top, 40px) - 58px); }
+.source-weapon-picker > .source-equipped-weapon, .source-weapon-picker > .source-weapon-empty-mount, .refit-weapon-filters { flex: none; }
+.source-weapon-list { flex: 0 1 auto; min-height: 80px; max-height: 468px; }
+.refit-weapon-empty-reset.native-button { margin: 0 10px 12px; width: calc(100% - 20px); min-width: 0; min-height: 33px; }
+@media (max-width: 849px) {
+  .ui-modal:has(.source-weapon-picker) .ui-modal-body { overflow-y: auto; display: block; }
+  .source-weapon-picker { display: block; max-height: none; }
+  .source-weapon-list { max-height: 35dvh; }
+}
+
+.refit-faction-filter { display: flex; align-items: center; gap: 8px; min-width: 0; color: #a5c9d3; font: 13px/1.4 var(--ui-font); }
+.refit-faction-filter > span { flex: none; }
+.refit-faction-filter select { flex: 1; min-width: 0; width: 100%; min-height: 35px; padding: 5px 23px 5px 8px; color: #d4e9ee; background: #0a202b; border: 1px solid #426775; border-radius: 0; font: inherit; color-scheme: dark; cursor: pointer; }
+.refit-faction-filter select:focus-visible { outline: 2px solid #b7d9de; outline-offset: 1px; }
+
+.refit-system-readiness, .refit-missing-mods { margin: 5px 0; padding: 6px 8px; border: 1px solid #3c6572; background: #091921; color: #9fc8d2; font: 12px/1.5 var(--ui-font); }
+.refit-system-readiness summary, .refit-missing-mods summary { cursor: pointer; }
+.refit-system-readiness p, .refit-missing-mods p { margin: 6px 0; }
+.refit-system-readiness[data-available="false"], .refit-missing-mods { color: #ceb48a; border-color: #655437; }
+.refit-missing-mods ul { margin: 5px 0; padding-left: 18px; }
+
+.refit-mod-search { display: flex; align-items: center; gap: 12px; flex: none; padding: 8px 0; font-size: 12px; color: #a9cbd6; }
+.refit-mod-search > .refit-search-field { width: min(340px, 55%); }
+.refit-mod-search > button { color: #b2dbe5; cursor: pointer; background: transparent; border: 0; text-decoration: underline; }
+
+/* Keep the workbench edge-to-edge; only the native title strip reserves space. */
+@media (min-width: 850px) {
+  .native-refit-app { --u: clamp(.9px, min(.12642dvh, .09615vw), 1.35px); }
+  .native-refit-app .refit-shell { inset: calc(31 * var(--u)) 6px 6px; width: auto; height: auto; }
+  .native-refit-app .native-screen-tab { left: 10px; top: calc(9 * var(--u)); }
+  .native-refit-app .native-screen-close { right: 10px; top: calc(9 * var(--u)); }
+}
+
+.refit-campaign-mods { color: #97b8c8; font: 11px/1.5 var(--ui-font); margin: 5px 0; pointer-events: auto; text-align: right; }
+.refit-campaign-mods summary { cursor: pointer; }
+.refit-campaign-mods p { padding: 6px; background: #03131beb; text-align: left; }

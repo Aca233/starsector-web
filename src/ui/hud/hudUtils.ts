@@ -64,3 +64,8 @@ export function summarizeGroupAmmo(mounts: WeaponMount[]): GroupAmmoSummary {
     allEmpty
   };
 }
+
+export function updateHudMeter(node: HTMLElement, width: number, value: number, minimum?: number): void {
+  node.style.setProperty('--meter-fill', `${(width - 1) * Math.min(1, Math.max(0, value))}px`);
+  if (minimum !== undefined) node.style.setProperty('--meter-minimum', `${Math.max(0, width * Math.min(1, Math.max(0, minimum)) - 3)}px`);
+}

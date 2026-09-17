@@ -1,0 +1,949 @@
+{
+  "advancedshieldemitter": {
+    "name": "敏捷护盾",
+    "cost": {
+      "FRIGATE": 3,
+      "DESTROYER": 6,
+      "CRUISER": 9,
+      "CAPITAL_SHIP": 15
+    },
+    "uiTags": [
+      "护盾"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/accelerated_shields.png",
+    "source": "data.hullmods.AcceleratedShieldEmitter",
+    "builtInOnly": false
+  },
+  "advancedoptics": {
+    "name": "先进光学器件",
+    "cost": {
+      "FRIGATE": 5,
+      "DESTROYER": 10,
+      "CRUISER": 15,
+      "CAPITAL_SHIP": 25
+    },
+    "uiTags": [
+      "武器"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/advanced_optics.png",
+    "source": "data.hullmods.AdvancedOptics",
+    "builtInOnly": false
+  },
+  "turretgyros": {
+    "name": "高级炮塔陀螺仪",
+    "cost": {
+      "FRIGATE": 2,
+      "DESTROYER": 4,
+      "CRUISER": 6,
+      "CAPITAL_SHIP": 10
+    },
+    "uiTags": [
+      "武器"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/advanced_turret_gyros.png",
+    "source": "data.hullmods.AdvancedTurretGyros",
+    "builtInOnly": false
+  },
+  "armoredweapons": {
+    "name": "炮塔装甲",
+    "cost": {
+      "FRIGATE": 3,
+      "DESTROYER": 6,
+      "CRUISER": 9,
+      "CAPITAL_SHIP": 15
+    },
+    "uiTags": [
+      "武器",
+      "防御"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/armored_weapon_emplacements.png",
+    "source": "data.hullmods.ArmoredWeapons",
+    "builtInOnly": false
+  },
+  "autorepair": {
+    "name": "自动修复单元",
+    "cost": {
+      "FRIGATE": 3,
+      "DESTROYER": 6,
+      "CRUISER": 9,
+      "CAPITAL_SHIP": 15
+    },
+    "uiTags": [
+      "防御"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/automated_repair_unit.png",
+    "source": "data.hullmods.AutomatedRepairUnit",
+    "builtInOnly": false
+  },
+  "auxiliarythrusters": {
+    "name": "辅助推进器",
+    "cost": {
+      "FRIGATE": 4,
+      "DESTROYER": 8,
+      "CRUISER": 12,
+      "CAPITAL_SHIP": 20
+    },
+    "uiTags": [
+      "引擎"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/auxilliary_thrusters.png",
+    "source": "data.hullmods.AuxiliaryThrusters",
+    "builtInOnly": false
+  },
+  "dedicated_targeting_core": {
+    "name": "专注型目标锁定核心",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 15,
+      "CAPITAL_SHIP": 25
+    },
+    "uiTags": [
+      "武器"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/targeting_core.png",
+    "source": "data.hullmods.DedicatedTargetingCore",
+    "builtInOnly": false
+  },
+  "magazines": {
+    "name": "扩展弹仓",
+    "cost": {
+      "FRIGATE": 3,
+      "DESTROYER": 5,
+      "CRUISER": 7,
+      "CAPITAL_SHIP": 10
+    },
+    "uiTags": [
+      "武器"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/expanded_magazines2.png",
+    "source": "data.hullmods.ExpandedMagazines",
+    "builtInOnly": false
+  },
+  "missleracks": {
+    "name": "扩展发射架",
+    "cost": {
+      "FRIGATE": 8,
+      "DESTROYER": 12,
+      "CRUISER": 20,
+      "CAPITAL_SHIP": 30
+    },
+    "uiTags": [
+      "武器"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/expanded_missile_racks.png",
+    "source": "data.hullmods.ExpandedMissileRacks",
+    "builtInOnly": false
+  },
+  "extendedshieldemitter": {
+    "name": "扩展护盾",
+    "cost": {
+      "FRIGATE": 4,
+      "DESTROYER": 8,
+      "CRUISER": 12,
+      "CAPITAL_SHIP": 20
+    },
+    "uiTags": [
+      "护盾"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/extended_shields.png",
+    "source": "data.hullmods.ExtendedShieldEmitter",
+    "builtInOnly": false
+  },
+  "fluxcoil": {
+    "name": "附加幅能线圈",
+    "cost": {
+      "FRIGATE": 4,
+      "DESTROYER": 8,
+      "CRUISER": 12,
+      "CAPITAL_SHIP": 20
+    },
+    "uiTags": [
+      "特殊"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/flux_coil_adjunct.png",
+    "source": "data.hullmods.FluxCoilAdjunct",
+    "builtInOnly": false
+  },
+  "fluxdistributor": {
+    "name": "幅能配送器",
+    "cost": {
+      "FRIGATE": 4,
+      "DESTROYER": 8,
+      "CRUISER": 12,
+      "CAPITAL_SHIP": 20
+    },
+    "uiTags": [
+      "特殊"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/flux_distributor.png",
+    "source": "data.hullmods.FluxDistributor",
+    "builtInOnly": false
+  },
+  "hardenedshieldemitter": {
+    "name": "强化护盾",
+    "cost": {
+      "FRIGATE": 5,
+      "DESTROYER": 10,
+      "CRUISER": 15,
+      "CAPITAL_SHIP": 25
+    },
+    "uiTags": [
+      "护盾"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/hardened_shields.png",
+    "source": "data.hullmods.HardenedShieldEmitter",
+    "builtInOnly": false
+  },
+  "heavyarmor": {
+    "name": "重型装甲",
+    "cost": {
+      "FRIGATE": 8,
+      "DESTROYER": 15,
+      "CRUISER": 20,
+      "CAPITAL_SHIP": 40
+    },
+    "uiTags": [
+      "防御"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/heavy_armor.png",
+    "source": "data.hullmods.HeavyArmor",
+    "builtInOnly": false
+  },
+  "targetingunit": {
+    "name": "目标定位系统",
+    "cost": {
+      "FRIGATE": 4,
+      "DESTROYER": 8,
+      "CRUISER": 15,
+      "CAPITAL_SHIP": 25
+    },
+    "uiTags": [
+      "武器"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/integrated_targeting_unit.png",
+    "source": "data.hullmods.IntegratedTargetingUnit",
+    "builtInOnly": false
+  },
+  "stabilizedshieldemitter": {
+    "name": "稳定护盾",
+    "cost": {
+      "FRIGATE": 3,
+      "DESTROYER": 6,
+      "CRUISER": 9,
+      "CAPITAL_SHIP": 15
+    },
+    "uiTags": [
+      "护盾"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/stabilized_shields.png",
+    "source": "data.hullmods.StabilizedShieldEmitter",
+    "builtInOnly": false
+  },
+  "hbi": {
+    "name": "重弹集成",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/ballistics_integration.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.HeavyBallisticsIntegration",
+    "builtInOnly": true
+  },
+  "fluxbreakers": {
+    "name": "幅散管道扩容",
+    "cost": {
+      "FRIGATE": 3,
+      "DESTROYER": 6,
+      "CRUISER": 9,
+      "CAPITAL_SHIP": 15
+    },
+    "uiTags": [
+      "特殊",
+      "防御"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/resistant_flux_conduits.png",
+    "source": "data.hullmods.FluxBreakers",
+    "builtInOnly": false
+  },
+  "advancedcore": {
+    "name": "先进目标定位核心",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/advanced_targeting_core.png",
+    "source": "data.hullmods.AdvancedTargetingCore",
+    "builtInOnly": true
+  },
+  "phasefield": {
+    "name": "相位场",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/phase_field.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.PhaseField",
+    "builtInOnly": true,
+    "support": {
+      "scope": "campaign-only",
+      "combat": "not-applicable",
+      "campaign": "not-simulated",
+      "summary": "仅战役传感器效果；当前无战役模拟，不属于战斗效果未实现。"
+    }
+  },
+  "delicate": {
+    "name": "精密机械",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/delicate_machinery.png",
+    "source": "data.hullmods.DelicateMachinery",
+    "builtInOnly": true,
+    "support": {
+      "scope": "combat",
+      "combat": "implemented",
+      "campaign": "not-applicable",
+      "summary": "峰值时间耗尽后的 CR 衰减速率 +50%，已接入舰船真实统计及战斗生命周期。"
+    }
+  },
+  "fourteenth": {
+    "name": "第十四战斗群",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/fourteenth.png",
+    "source": "data.hullmods.Fourteenth",
+    "builtInOnly": true
+  },
+  "distributed_fire_control": {
+    "name": "分布式火控系统",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/distributed_fire_control2.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.DistributedFireControl",
+    "builtInOnly": true
+  },
+  "no_weapon_flux": {
+    "name": "零幅能武器",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "",
+    "source": "data.hullmods.NoWeaponFlux",
+    "builtInOnly": true
+  },
+  "fluxshunt": {
+    "name": "磁通分流",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/flux_shunt.png",
+    "source": "data.hullmods.FluxShunt",
+    "builtInOnly": true
+  },
+  "hardened_subsystems": {
+    "name": "硬化子系统",
+    "cost": {
+      "FRIGATE": 5,
+      "DESTROYER": 10,
+      "CRUISER": 15,
+      "CAPITAL_SHIP": 25
+    },
+    "uiTags": [
+      "特殊"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/hardened_subsystems.png",
+    "source": "data.hullmods.HardenedSubsystems",
+    "builtInOnly": false
+  },
+  "safetyoverrides": {
+    "name": "安全协议超驰",
+    "cost": {
+      "FRIGATE": 15,
+      "DESTROYER": 30,
+      "CRUISER": 45,
+      "CAPITAL_SHIP": 70
+    },
+    "uiTags": [
+      "特殊",
+      "引擎"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/safety_overrides.png",
+    "source": "data.hullmods.SafetyOverrides",
+    "builtInOnly": false
+  },
+  "unstable_injector": {
+    "name": "不稳定喷射器",
+    "cost": {
+      "FRIGATE": 5,
+      "DESTROYER": 10,
+      "CRUISER": 15,
+      "CAPITAL_SHIP": 25
+    },
+    "uiTags": [
+      "引擎"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/unstable_injector.png",
+    "source": "data.hullmods.UnstableInjector",
+    "builtInOnly": false
+  },
+  "ballistic_rangefinder": {
+    "name": "弹道测距仪",
+    "cost": {
+      "FRIGATE": 5,
+      "DESTROYER": 10,
+      "CRUISER": 15,
+      "CAPITAL_SHIP": 25
+    },
+    "uiTags": [
+      "武器"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/ballistic_rangefinder.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.BallisticRangefinder",
+    "builtInOnly": false
+  },
+  "shield_shunt": {
+    "name": "护盾分流",
+    "cost": {
+      "FRIGATE": 3,
+      "DESTROYER": 5,
+      "CRUISER": 7,
+      "CAPITAL_SHIP": 10
+    },
+    "uiTags": [
+      "特殊",
+      "护盾"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/shield_shunt.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.ShieldShunt",
+    "builtInOnly": false
+  },
+  "frontemitter": {
+    "name": "固化护盾转化器",
+    "cost": {
+      "FRIGATE": 3,
+      "DESTROYER": 5,
+      "CRUISER": 8,
+      "CAPITAL_SHIP": 12
+    },
+    "uiTags": [
+      "护盾"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/front_shield_emitter.png",
+    "source": "data.hullmods.FrontShieldEmitter",
+    "builtInOnly": false
+  },
+  "adaptiveshields": {
+    "name": "全角护盾转化器",
+    "cost": {
+      "FRIGATE": 3,
+      "DESTROYER": 5,
+      "CRUISER": 8,
+      "CAPITAL_SHIP": 12
+    },
+    "uiTags": [
+      "护盾"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/omni_shield_emitter_mod.png",
+    "source": "data.hullmods.OmniShieldEmitter",
+    "builtInOnly": false
+  },
+  "frontshield": {
+    "name": "临时护盾发生器",
+    "cost": {
+      "FRIGATE": 5,
+      "DESTROYER": 10,
+      "CRUISER": 15,
+      "CAPITAL_SHIP": 25
+    },
+    "uiTags": [
+      "护盾"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/front_shield_generator.png",
+    "source": "data.hullmods.FrontShieldGenerator",
+    "builtInOnly": false
+  },
+  "adaptive_coils": {
+    "name": "自适应相位线圈",
+    "cost": {
+      "FRIGATE": 5,
+      "DESTROYER": 10,
+      "CRUISER": 15,
+      "CAPITAL_SHIP": 25
+    },
+    "uiTags": [
+      "相位"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/phase_field.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.AdaptivePhaseCoils",
+    "builtInOnly": false
+  },
+  "ablative_armor": {
+    "name": "烧蚀装甲",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/ablative_armor.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.AblativeArmor",
+    "builtInOnly": true
+  },
+  "pointdefenseai": {
+    "name": "整合点防御 AI",
+    "cost": {
+      "FRIGATE": 3,
+      "DESTROYER": 6,
+      "CRUISER": 9,
+      "CAPITAL_SHIP": 15
+    },
+    "uiTags": [
+      "武器",
+      "防御"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/integrated_point_defense_ai.png",
+    "source": "data.hullmods.IntegratedPointDefenseAI",
+    "builtInOnly": false
+  },
+  "high_scatter_amp": {
+    "name": "高散射增幅器",
+    "cost": {
+      "FRIGATE": 4,
+      "DESTROYER": 8,
+      "CRUISER": 12,
+      "CAPITAL_SHIP": 20
+    },
+    "uiTags": [
+      "武器"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/high_scatter_amp.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.HighScatterAmp",
+    "builtInOnly": false
+  },
+  "missile_autoloader": {
+    "name": "导弹自动装填器",
+    "cost": {
+      "FRIGATE": 8,
+      "DESTROYER": 12,
+      "CRUISER": 20,
+      "CAPITAL_SHIP": 30
+    },
+    "uiTags": [
+      "武器"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/missile_autoloader.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.MissileAutoloader",
+    "builtInOnly": false
+  },
+  "missile_reload": {
+    "name": "导弹自动工厂",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/expanded_missile_racks.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.PeriodicMissileReload",
+    "builtInOnly": false
+  },
+  "reinforcedhull": {
+    "name": "强化舱壁",
+    "cost": {
+      "FRIGATE": 5,
+      "DESTROYER": 10,
+      "CRUISER": 15,
+      "CAPITAL_SHIP": 30
+    },
+    "uiTags": [
+      "防御"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/reinforced_bulkheads.png",
+    "source": "data.hullmods.ReinforcedBulkheads",
+    "builtInOnly": false,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "战斗结构与碎裂效果已接入；战役回收概率未模拟。"
+    }
+  },
+  "insulatedengine": {
+    "name": "引擎隔离性装配",
+    "cost": {
+      "FRIGATE": 3,
+      "DESTROYER": 6,
+      "CRUISER": 9,
+      "CAPITAL_SHIP": 15
+    },
+    "uiTags": [
+      "引擎",
+      "后勤",
+      "防御",
+      "需要船坞"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/insulated_engine_assembly.png",
+    "source": "data.hullmods.InsulatedEngines",
+    "builtInOnly": false,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "战斗结构、引擎耐久已接入；战役传感器截面未模拟。"
+    }
+  },
+  "degraded_engines": {
+    "name": "老化引擎",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/degraded_engines.png",
+    "source": "data.hullmods.DegradedEngines",
+    "builtInOnly": true,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "战斗损伤惩罚已接入（无舰长损伤控制技能时）；战役部署补给折扣等效果未模拟。"
+    }
+  },
+  "degraded_shields": {
+    "name": "护盾发生器老化",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/degraded_shields.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.DegradedShields",
+    "builtInOnly": true,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "战斗损伤惩罚已接入（无舰长损伤控制技能时）；战役部署补给折扣等效果未模拟。"
+    }
+  },
+  "faulty_grid": {
+    "name": "缺损电网",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/faulty_power_grid.png",
+    "source": "data.hullmods.FaultyPowerGrid",
+    "builtInOnly": true,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "战斗损伤惩罚已接入（无舰长损伤控制技能时）；战役部署补给折扣等效果未模拟。"
+    }
+  },
+  "fragile_subsystems": {
+    "name": "不可靠子系统",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/fragile_subsystems.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.FragileSubsystems",
+    "builtInOnly": true,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "战斗损伤惩罚已接入（无舰长损伤控制技能时）；战役部署补给折扣等效果未模拟。"
+    }
+  },
+  "comp_structure": {
+    "name": "结构损伤",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/structural_damage.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.CompromisedStructure",
+    "builtInOnly": true,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "战斗损伤惩罚已接入（无舰长损伤控制技能时）；战役部署补给折扣等效果未模拟。"
+    }
+  },
+  "damaged_mounts": {
+    "name": "武器位损坏",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/damaged_weapon_mounts.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.DamagedWeaponMounts",
+    "builtInOnly": true,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "战斗损伤惩罚已接入（无舰长损伤控制技能时）；战役部署补给折扣等效果未模拟。"
+    }
+  },
+  "blast_doors": {
+    "name": "防爆舱门",
+    "cost": {
+      "FRIGATE": 4,
+      "DESTROYER": 8,
+      "CRUISER": 12,
+      "CAPITAL_SHIP": 20
+    },
+    "uiTags": [
+      "防御"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/blast_doors.png",
+    "source": "data.hullmods.BlastDoors",
+    "builtInOnly": false,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "结构加成已接入；船员伤亡与S-mod减伤效果未模拟。"
+    }
+  },
+  "comp_armor": {
+    "name": "受损装甲",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/compromised_armor.png",
+    "source": "data.hullmods.CompromisedArmor",
+    "builtInOnly": true,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "战斗损伤惩罚已接入（无舰长损伤控制技能时）；部署补给折扣未模拟。"
+    }
+  },
+  "comp_hull": {
+    "name": "受损船体",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/compromised_hull.png",
+    "source": "data.hullmods.CompromisedHull",
+    "builtInOnly": true,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "战斗损伤惩罚已接入（无舰长损伤控制技能时）；部署补给折扣未模拟。"
+    }
+  },
+  "unstable_coils": {
+    "name": "不稳定相位线圈",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/phase_coil_instability.png",
+    "source": "data.hullmods.PhaseCoilInstability",
+    "builtInOnly": true,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "战斗损伤惩罚已接入（无舰长损伤控制技能时）；部署补给折扣未模拟。"
+    }
+  },
+  "solar_shielding": {
+    "name": "恒星防护层",
+    "cost": {
+      "FRIGATE": 3,
+      "DESTROYER": 6,
+      "CRUISER": 9,
+      "CAPITAL_SHIP": 15
+    },
+    "uiTags": [
+      "防御",
+      "后勤",
+      "需要船坞"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/solar_shielding2.png",
+    "source": "data.hullmods.SolarShielding",
+    "builtInOnly": false,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "战斗中的能量伤害减免已接入；不模拟战役星冕或超空间危害。"
+    }
+  },
+  "ecm": {
+    "name": "电子对抗组件",
+    "cost": {
+      "FRIGATE": 6,
+      "DESTROYER": 12,
+      "CRUISER": 18,
+      "CAPITAL_SHIP": 24
+    },
+    "uiTags": [
+      "武器",
+      "支援"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/ecm_package.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.ECMPackage",
+    "builtInOnly": false
+  },
+  "coherer": {
+    "name": "能量弹体同调器",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/coherer.png",
+    "source": "com.fs.starfarer.api.impl.hullmods.EnergyBoltCoherer",
+    "builtInOnly": true,
+    "support": {
+      "scope": "mixed",
+      "combat": "implemented",
+      "campaign": "not-simulated",
+      "summary": "战斗基础射程同调已接入；有人舰船员伤亡增加50%的人员结算未模拟。"
+    }
+  },
+  "eccm": {
+    "name": "电子反对抗组件",
+    "cost": {
+      "FRIGATE": 5,
+      "DESTROYER": 8,
+      "CRUISER": 15,
+      "CAPITAL_SHIP": 20
+    },
+    "uiTags": [
+      "武器"
+    ],
+    "manufacturer": "通用",
+    "icon": "graphics/hullmods/eccm_package.png",
+    "source": "data.hullmods.ECCMPackage",
+    "builtInOnly": false
+  }
+}

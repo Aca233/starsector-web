@@ -31,13 +31,74 @@ function stripComments(input: string): string {
 }
 
 export function parseStarsectorJson(rawText: string): unknown {
-  let cleaned = stripComments(rawText);
-  cleaned = cleaned.replace(/:\s*([A-Za-z_][A-Za-z0-9_]*)\s*([,}\]])/g, (_m, token: string, tail: string) => {
-    if (token === 'true' || token === 'false' || token === 'null') return `: ${token}${tail}`;
-    return `: "${token}"${tail}`;
-  });
-  cleaned = cleaned.replace(/,\s*([}\]])/g, '$1');
-  return JSON.parse(cleaned);
+  const text = stripComments(rawText).replace(/^\uFEFF/, '');
+  let cursor = 0;
+  const skipSpace = () => { while (/\s/.test(text[cursor] ?? '') && cursor < text.length) cursor++; };
+  const fail = (): never => { throw new SyntaxError(`Invalid Starsector data at offset ${cursor}`); };
+  const string = (): string => {
+    const start = cursor++;
+    while (cursor < text.length) {
+      const ch = text[cursor++];
+      if (ch === '\\') cursor++;
+      else if (ch === '"') return JSON.parse(text.slice(start, cursor)) as string;
+    }
+    return fail();
+  };
+  const value = (depth: number): unknown => {
+    if (depth > 128) return fail();
+    skipSpace();
+    const ch = text[cursor];
+    if (ch === '"') return string();
+    if (ch === '{' || ch === '[') {
+      const isObject = ch === '{';
+      const close = isObject ? '}' : ']';
+      const entries: [string, unknown][] = [];
+      const items: unknown[] = [];
+      cursor++;
+      skipSpace();
+      while (text[cursor] !== close) {
+        if (cursor >= text.length) return fail();
+        if (isObject) {
+          skipSpace();
+          const key = text[cursor] === '"' ? string() : bareToken();
+          skipSpace();
+          if (text[cursor++] !== ':') return fail();
+          entries.push([key, value(depth + 1)]);
+        } else items.push(value(depth + 1));
+        skipSpace();
+        if (text[cursor] === close) break;
+        if (text[cursor] !== ',' && text[cursor] !== ';') return fail();
+        cursor++;
+        skipSpace();
+      }
+      cursor++;
+      return isObject ? Object.fromEntries(entries) : items;
+    }
+    const start = cursor;
+    while (cursor < text.length && !/[\s,;\]}]/.test(text[cursor])) cursor++;
+    const token = text.slice(start, cursor);
+    if (token === 'true') return true;
+    if (token === 'false') return false;
+    if (token === 'null') return null;
+    if (/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?[fFdD]?$/.test(token)) {
+      const number = Number(token.replace(/[fFdD]$/, ''));
+      if (!Number.isFinite(number)) return fail();
+      return number;
+    }
+    if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(token)) return token;
+    return fail();
+  };
+  const bareToken = (): string => {
+    const start = cursor;
+    while (cursor < text.length && /[A-Za-z0-9_]/.test(text[cursor])) cursor++;
+    if (cursor === start) return fail();
+    return text.slice(start, cursor);
+  };
+  const result = value(0);
+  skipSpace();
+  if (text[cursor] === ',' || text[cursor] === ';') { cursor++; skipSpace(); }
+  if (cursor !== text.length) return fail();
+  return result;
 }
 
 export function parseStarsectorCsv(csvText: string): Record<string, string>[] {

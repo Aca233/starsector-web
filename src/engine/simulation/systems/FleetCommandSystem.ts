@@ -11,7 +11,7 @@ export interface CommandFXCallbacks {
 
 export class FleetCommandSystem {
   public commandPoints = 5;
-  public maxCommandPoints = 5;
+  private recoveryElapsed = 0;
   public selectedUnitId: string | null = null;
   public orders: Map<string, TacticalOrder> = new Map();
   public radioMessages: RadioMessage[] = [];
@@ -21,10 +21,18 @@ export class FleetCommandSystem {
 
   public clear() {
     this.commandPoints = 5;
+    this.recoveryElapsed = 0;
     this.selectedUnitId = null;
     this.orders.clear();
     this.radioMessages = [];
     this.isTacticalMap = false;
+  }
+
+  /** settings.json: baseSecondsPerCommandPoint=120; initial points are not a cap. */
+  public advance(dt: number) {
+    this.recoveryElapsed += Math.max(0, dt);
+    const recovered = Math.floor(this.recoveryElapsed / 120);
+    if (recovered) { this.commandPoints += recovered; this.recoveryElapsed -= recovered * 120; }
   }
 
   public toggleTacticalMap() {
@@ -86,7 +94,13 @@ export class FleetCommandSystem {
     this.commandPoints--;
     this.orders.set(unitId, order);
 
-    if (order.type === 'ENGAGE') {
+    if (order.type === 'ASSAULT') {
+      sound.play('command_engage', 0.85);
+      this.addRadioMessage('战术指挥', 'PLAYER', unitId === 'fleet' ? '全舰解除原有任务，自主选择敌舰进攻。' : '该舰解除原有任务，自主选择敌舰进攻。', [160, 230, 140], combatTime);
+    } else if (order.type === 'DEFEND' || order.type === 'ESCORT' || order.type === 'AVOID') {
+      sound.play('command_waypoint', 0.85);
+      this.addRadioMessage('战术指挥', 'PLAYER', order.type === 'DEFEND' ? '保持指定防守位置。' : order.type === 'ESCORT' ? '护航舰已派出。' : '与指定敌舰拉开距离。', [120, 220, 255], combatTime);
+    } else if (order.type === 'ENGAGE') {
       sound.play('command_engage', 0.85);
       fx.addFloatingText(fx.getPlayerPos(), 'DIRECT ENGAGE ORDER ISSUED', [255, 100, 100], 15, 1.6);
       this.addRadioMessage('战术指挥', 'PLAYER', '已向编队下达集火强袭指令！', [255, 120, 120], combatTime);
@@ -101,9 +115,8 @@ export class FleetCommandSystem {
   public cancelOrder(unitId: string, fx: CommandFXCallbacks, combatTime = 0) {
     if (this.orders.has(unitId)) {
       this.orders.delete(unitId);
-      this.commandPoints = Math.min(this.maxCommandPoints, this.commandPoints + 1);
       sound.play('command_refund', 0.8);
-      fx.addFloatingText(fx.getPlayerPos(), 'ORDER CANCELLED (CP REFUNDED)', [160, 230, 140], 14, 1.5);
+      fx.addFloatingText(fx.getPlayerPos(), 'ORDER CANCELLED', [160, 230, 140], 14, 1.5);
       this.addRadioMessage('战术指挥', 'PLAYER', '已取消指定战术部署命令。', [160, 230, 140], combatTime);
     }
   }

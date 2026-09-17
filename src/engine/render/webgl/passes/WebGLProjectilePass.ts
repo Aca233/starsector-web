@@ -1,15 +1,16 @@
-import { visualRandom } from '../../RenderDeterminism';
+import { renderMissileEngines, type MissileEngineRenderItem } from '../MissileEngineRenderer';
 import { CombatEngine } from '../../../simulation/CombatEngine';
 import { WebGLPassContext } from '../WebGLPassContext';
 import { Vector2 } from '../../../math/Vector2';
 import { getWeaponVisualProfile } from '../../../visual/VisualProfiles';
-import { beamVisualTime, selectRenderableBeams } from '../../BeamVisuals';
+import { beamGlowAlpha, beamHitGlowRadius } from '../../../visual/BeamVisuals';
+import { getMovingRaySourceRenderState, getMovingRayVisualState } from '../../MovingRayVisuals';
 
 /**
  * 弹药与光束渲染通道 (WebGLProjectilePass)
  * 职责:
  * 1. 导弹连续烟雾缎带网格 (Contrail Ribbon Strips - 1:1 ContrailEngine.java)
- * 2. 持续高能光束 (Continuous Beams - 1:1 L.java: 双层差速 UV 滚动与三层星芒透镜耀斑)
+ * 2. 持续光束 (L.java 束端几何、双层 UV 与 BeamWeaponRay 接触辉光)
  * 3. 枪口开火平滑粒子暴风 (Muzzle Flash Particles - 1:1 _class.java & SmoothParticle.java)
  * 4. 诱饵热焰弹 (Decoy Flares)
  * 5. 等离子束脉冲弹丸 (BALLISTIC_AS_BEAM / TPC / Autopulse - 双重白热核心与 UV 滚动)
@@ -42,95 +43,32 @@ export class WebGLProjectilePass {
    * 绘制高能持续光束与死光射线 (位于舰体上方 LAYER_ABOVE_SHIPS_AND_ASTEROIDS - 1:1 BeamWeaponRay.java)
    */
   public renderBeams(engine: CombatEngine, ctx: WebGLPassContext) {
-    const { batcher, textures, hitGlowTex } = ctx;
-
-    // 绘制高能持续光束 (1:1 L.java & BeamWeaponRay.java)
-    if (engine.beams.length > 0) {
+    const { batcher, ribbonBatcher, textures, hitGlowTex } = ctx;
+    if (engine.beams.length === 0) return;
+    const roughFringe = textures.getTexture('/game-assets/graphics/fx/beam_rough2_fringe.png', true);
+    const smoothFringe = textures.getTexture('/game-assets/graphics/fx/beam_laser_fringe.png', true);
+    const roughCore = textures.getTexture('/game-assets/graphics/fx/beam_rough2_core.png', true);
+    const smoothCore = textures.getTexture('/game-assets/graphics/fx/beam_laser_core.png', true);
+    // One authoritative beam per mounted firing cycle; don't hide duplicate simulation entities.
+    for (const beam of engine.beams) {
+      if (beam.startPos.distanceTo(beam.endPos) <= 0 || (beam.brightness ?? 1) <= 0) continue;
+      const rough = beam.textureType === 'ROUGH';
+      batcher.flush();
+      ribbonBatcher.begin(batcher.currentViewProj);
+      ribbonBatcher.drawBeam(rough ? roughFringe : smoothFringe, rough ? roughCore : smoothCore,
+        beam.startPos, beam.endPos, beam);
+      ribbonBatcher.end();
+      batcher.resumeProgram();
       batcher.setBlendMode('ADDITIVE');
-      const roughFringe = textures.getTexture('/game-assets/graphics/fx/beam_rough2_fringe.png', true);
-      const smoothFringe = textures.getTexture('/game-assets/graphics/fx/beam_laser_fringe.png', true);
-      const roughCore = textures.getTexture('/game-assets/graphics/fx/beam_rough2_core.png', true);
-      const smoothCore = textures.getTexture('/game-assets/graphics/fx/beam_laser_core.png', true);
-
-      for (const b of selectRenderableBeams(engine.beams)) {
-        const beamDir = b.endPos.clone().sub(b.startPos);
-        const beamLen = beamDir.length();
-        if (beamLen < 1) continue;
-        const angle = beamDir.heading();
-
-        const [fr, fg, fb, fa = 255] = b.fringeColor || [...b.color, 255];
-        const [cr, cg, cb, ca = 255] = b.coreColor || [255, 255, 255, 255];
-        const [gr, gg, gb, ga = 255] = b.glowColor || [fr, fg, fb, 255];
-        const visual = getWeaponVisualProfile(b.specId, 'BEAM', false, true);
-        const bAlpha = Math.min(1.0, b.duration / Math.max(visual.fadeSeconds, 0.01));
-        const width = b.width * visual.trailScale;
-        const isRough = b.textureType === 'ROUGH' || b.specId === 'tachyonlance';
-        const sourceGeometry = b.pixelsPerTexel !== undefined;
-        const phaseTime = beamVisualTime(b, engine.combatTime);
-
-        // 1. 动态高速流动羽流层 (Fringe UV Scroll: 1:1 L.java:56, 377)
-        const scrollSpeed = b.textureScrollSpeed ?? 292;
-        const fringeScroll = (phaseTime * scrollSpeed) / 128.0;
-        const repeatWorldSpan = 128.0 * (b.pixelsPerTexel ?? (isRough ? 5.0 : 1.0));
-        const repeatCount = beamLen / repeatWorldSpan;
-
-        const fringeTex = isRough ? roughFringe : smoothFringe;
-        batcher.drawSprite(
-          fringeTex,
-          b.startPos.x,
-          b.startPos.y,
-          beamLen,
-          sourceGeometry ? width : width * (isRough ? 1.25 : 1.0) * visual.glowScale,
-          angle,
-          -0.5,
-          0,
-          Math.min(1, fr / 255 * visual.brightness),
-          Math.min(1, fg / 255 * visual.brightness),
-          Math.min(1, fb / 255 * visual.brightness),
-          (sourceGeometry ? 1.0 : 0.95) * bAlpha * (fa / 255),
-          -fringeScroll,
-          0,
-          -fringeScroll + repeatCount,
-          1
-        );
-
-        // 2. 白热高能流动核心。来源 .wpn 只有一组 width/scroll；纹理自身 alpha 足迹负责收窄核心。
-        const coreTex = isRough ? roughCore : smoothCore;
-        const coreScroll = sourceGeometry ? fringeScroll : fringeScroll * 1.35;
-        batcher.drawSprite(
-          coreTex,
-          b.startPos.x,
-          b.startPos.y,
-          beamLen,
-          sourceGeometry ? width : width * visual.coreScale,
-          angle,
-          -0.5,
-          0,
-          cr / 255,
-          cg / 255,
-          cb / 255,
-          1.0 * bAlpha * (ca / 255),
-          -coreScroll,
-          0,
-          -coreScroll + repeatCount,
-          1
-        );
-
-        // 3. 炮口紧凑真实辉光 (1:1 BeamWeaponRay: 紧贴炮管口部，严禁百像素刺眼球体)
-        const muzzleGlowSize = Math.max(10, width * 1.2) * visual.muzzleScale;
-        batcher.drawSprite(hitGlowTex, b.startPos.x, b.startPos.y, muzzleGlowSize, muzzleGlowSize, 0, 0, 0, gr / 255, gg / 255, gb / 255, 0.55 * bAlpha * (ga / 255));
-
-        // 4. 目标受击装甲/护盾灼烧光斑 (1:1 BeamWeaponRay.java:124-144)
-        // 严格遵循原版机制：仅当光束实际命中目标时才在碰撞点绘制受击光晕
-        if (b.isHitting) {
-          const hitRadius = (b.hitGlowRadius || Math.max(14, width * 1.8)) * visual.impactScale;
-          const brighten = b.hitGlowBrightenDuration && b.hitGlowBrightenDuration > 0
-            ? Math.min(1, b.elapsedTime / b.hitGlowBrightenDuration)
-            : 1;
-          batcher.drawSprite(hitGlowTex, b.endPos.x, b.endPos.y, hitRadius * 2.0, hitRadius * 2.0, 0, 0, 0, fr / 255, fg / 255, fb / 255, 0.85 * bAlpha * brighten * (fa / 255));
-          batcher.drawSprite(hitGlowTex, b.endPos.x, b.endPos.y, hitRadius * 0.6, hitRadius * 0.6, 0, 0, 0, cr / 255, cg / 255, cb / 255, 1.0 * bAlpha * brighten * (ca / 255));
-        }
-      }
+      // The glow can outlive contact and moves to the ray's current endpoint, as BeamWeaponRay does.
+      if ((beam.hitGlowBrightness ?? 0) <= 0) continue;
+      const radius = beamHitGlowRadius(beam) * (beam.scaleGlowBasedOnDamageEffectiveness === false ? 1 : (beam.hitGlowSizeMult ?? 1));
+      const fringe = beam.fringeColor ?? [...beam.color, 255];
+      const core = beam.useGlowColorForHitGlow ? (beam.glowColor ?? [255, 255, 255, 255]) : (beam.coreColor ?? [255, 255, 255, 255]);
+      batcher.drawSprite(hitGlowTex, beam.endPos.x, beam.endPos.y, radius * 2, radius * 2,
+        0, 0, 0, fringe[0] / 255, fringe[1] / 255, fringe[2] / 255, beamGlowAlpha(beam, fringe[3]));
+      batcher.drawSprite(hitGlowTex, beam.endPos.x, beam.endPos.y, radius * 0.5, radius * 0.5,
+        0, 0, 0, core[0] / 255, core[1] / 255, core[2] / 255, beamGlowAlpha(beam, core[3]));
     }
   }
 
@@ -138,7 +76,7 @@ export class WebGLProjectilePass {
    * 绘制上图层投射物与枪口粒子 (位于舰体上方)
    */
   public renderProjectilesAndMuzzle(engine: CombatEngine, ctx: WebGLPassContext) {
-    const { batcher, textures, hitGlowTex, alpha } = ctx;
+    const { batcher, ribbonBatcher, textures, hitGlowTex, alpha } = ctx;
 
     // 3. 绘制枪口开火粒子与火光 (1:1 _class.java:29-54 & SmoothParticle.java)
     if (engine.muzzleParticles && engine.muzzleParticles.length > 0) {
@@ -172,56 +110,23 @@ export class WebGLProjectilePass {
     const roughCore = textures.getTexture('/game-assets/graphics/fx/beam_rough2_core.png', true);
     const smoothCore = textures.getTexture('/game-assets/graphics/fx/beamcore.png', true);
     const projTrailTex = textures.getTexture('/game-assets/graphics/fx/projtrail.png', true);
+    const ballisticProjectiles: { projectile: (typeof engine.projectiles)[number]; pos: Vector2 }[] = [];
     const projBodyTex = textures.getTexture('/game-assets/graphics/fx/projbody.png', true);
-    const rocketFlameTex = textures.getTexture('/game-assets/graphics/fx/engineflame32.png');
+    const missileEngines: MissileEngineRenderItem[] = [];
+
+    const movingRayProjectiles: Array<{ projectile: (typeof engine.projectiles)[number]; pos: Vector2 }> = [];
 
     for (const p of engine.projectiles) {
+      if (p.isMine) continue; // Native mine sprite/glow are drawn once in the FX pass.
       const pPos = Vector2.lerp(p.prevPos, p.pos, alpha);
       const pAngle = p.facingRad !== undefined ? p.facingRad : p.vel.heading();
       const fwd = Vector2.fromAngle(pAngle);
       const visualSpawnType = p.visualSpawnType ?? p.spawnType;
       const visual = getWeaponVisualProfile(p.specId, visualSpawnType, !!p.isRocket, false);
 
-      // 4.1 诱饵热焰弹 (Decoy Flare)
-      if (p.isFlare) {
-        batcher.setBlendMode('ADDITIVE');
-        const flicker = 0.75 + visualRandom('webgl/passes/WebGLProjectilePass.ts#1') * 0.5;
-        batcher.drawSprite(hitGlowTex, pPos.x, pPos.y, 42 * flicker, 42 * flicker, 0, 0, 0, 1.0, 0.7, 0.28, Math.min(1.0, 0.85 * flicker));
-        batcher.drawSprite(hitGlowTex, pPos.x, pPos.y, 14 * flicker, 14 * flicker, 0, 0, 0, 1.0, 0.98, 0.95, 0.95);
-      }
-      // 4.2 等离子束 / 脉冲类投射物 (BALLISTIC_AS_BEAM / TPC / Autopulse: 1:1 MovingRay.java & N.java & _if.java)
-      else if (visualSpawnType === 'BALLISTIC_AS_BEAM' || p.specId === 'tpc' || p.specId === 'autopulse') {
-        const isRough = p.textureType === 'ROUGH' || p.specId === 'tpc';
-        const len = (p.projLength || (p.specId === 'tpc' ? 100 : 50)) * visual.trailScale;
-        const wid = (p.projWidth || (p.specId === 'tpc' ? 35 : 20)) * visual.glowScale;
-        const [fr, fg, fb, fa = 255] = p.fringeColor || (p.specId === 'tpc' ? [255, 0, 0, 255] : [0, 0, 255, 255]);
-        const [cr, cg, cb, ca = 255] = p.coreColor || [255, 255, 255, 255];
-
-        const scrollSpeed = p.textureScrollSpeed ?? -256;
-        const scrollTime = p.elapsedTime ?? engine.combatTime;
-        const scroll = (scrollTime * scrollSpeed) / 128.0;
-        // 现有纹理周期基准为 128 texel；原版 pixelsPerTexel=5 对应旧 rough 路径 640，
-        // TPC/Autopulse 的来源值为 1，因此不应继续固定套用 640。
-        const texelSpan = 128.0 * (p.pixelsPerTexel ?? (isRough ? 5.0 : 1.0));
-        const repeatCount = len / texelSpan;
-
-        batcher.setBlendMode('ADDITIVE');
-        const fTex = isRough ? roughFringe : smoothFringe;
-        const fringeAlphaScale = p.pixelsPerTexel !== undefined ? 1.0 : 0.95;
-        batcher.drawSprite(fTex, pPos.x, pPos.y, len, wid, pAngle, 0, 0, fr / 255, fg / 255, fb / 255, fringeAlphaScale * (fa / 255), -scroll, 0, -scroll + repeatCount, 1);
-
-        const cTex = isRough ? roughCore : smoothCore;
-        // .proj 只提供一组 length/width/textureScrollSpeed；core 纹理自身的 alpha
-        // 已经定义了更窄的亮芯，因此这里与 fringe 使用同一几何尺寸和 UV 速度。
-        batcher.drawSprite(cTex, pPos.x, pPos.y, len, wid, pAngle, 0, 0, cr / 255, cg / 255, cb / 255, ca / 255, -scroll, 0, -scroll + repeatCount, 1);
-
-        // Source .proj glowRadius/glowColor are an independent in-flight halo.
-        // Keep this separate from hitGlowRadius, which belongs to impact FX only.
-        if ((p.glowRadius ?? 0) > 0 && p.glowColor) {
-          const [gr, gg, gb, ga = 255] = p.glowColor;
-          const glowDiameter = p.glowRadius! * 2;
-          batcher.drawSprite(hitGlowTex, pPos.x, pPos.y, glowDiameter, glowDiameter, 0, 0, 0, gr / 255, gg / 255, gb / 255, ga / 255);
-        }
+      // Source flares use their missile sprite and authored engine geometry, not fixed-size halos.
+      if (!p.projSpriteUrl && (visualSpawnType === 'BALLISTIC_AS_BEAM' || p.specId === 'tpc' || p.specId === 'autopulse')) {
+        movingRayProjectiles.push({ projectile: p, pos: pPos });
       }
       // 4.3 动能 / 高爆实弹 (BALLISTIC: 1:1 BallisticProjectile.java & N.java & _if.java)
       else if (p.projSpriteUrl && !p.isRocket) {
@@ -233,16 +138,8 @@ export class WebGLProjectilePass {
 
         batcher.setBlendMode('ADDITIVE');
         if (sourceGeometry) {
-          const scrollTime = p.elapsedTime ?? engine.combatTime;
-          const scrollSpeed = p.textureScrollSpeed ?? 0;
-          const trailTextureWidth = 64.0;
-          const bodyTextureWidth = 32.0;
-          const trailScroll = (scrollTime * scrollSpeed) / trailTextureWidth;
-          const bodyScroll = (scrollTime * scrollSpeed) / bodyTextureWidth;
-          const trailRepeat = len / (trailTextureWidth * p.pixelsPerTexel!);
-          const bodyRepeat = len / (bodyTextureWidth * p.pixelsPerTexel!);
-          batcher.drawSprite(projTrailTex, pPos.x, pPos.y, len, wid, pAngle, 0, 0, fr / 255, fg / 255, fb / 255, fa / 255, -trailScroll, 0, -trailScroll + trailRepeat, 1);
-          batcher.drawSprite(projBodyTex, pPos.x, pPos.y, len, wid, pAngle, 0, 0, cr / 255, cg / 255, cb / 255, ca / 255, -bodyScroll, 0, -bodyScroll + bodyRepeat, 1);
+          ballisticProjectiles.push({ projectile: p, pos: pPos });
+          continue;
         } else {
           const tracerLen = len * 1.5 * visual.trailScale;
           const tracerCenter = pPos.clone().addScaled(fwd, -tracerLen * 0.5);
@@ -270,29 +167,11 @@ export class WebGLProjectilePass {
       else if (p.isRocket) {
         const len = p.projLength || 32;
         const wid = p.projWidth || 14;
-        const sourceEngine = p.missileEngineVisualSpec;
-        const flameRgba = sourceEngine?.color ?? [...(p.engineFlameColor || [255, 140, 40]), 255] as [number, number, number, number];
-        const flameColor: [number, number, number] = [flameRgba[0], flameRgba[1], flameRgba[2]];
-
-        batcher.setBlendMode('ADDITIVE');
-        const flameLen = sourceEngine?.length ?? ((18 + visualRandom('webgl/passes/WebGLProjectilePass.ts#2') * 8) * visual.trailScale);
-        const flameWid = sourceEngine?.width ?? (wid * 0.75 * visual.glowScale);
-        const flamePos = pPos.clone().addScaled(fwd, sourceEngine?.nozzleOffset ?? -len * 0.5);
-        const flameAlpha = 0.9 * (flameRgba[3] / 255);
-        batcher.drawSprite(rocketFlameTex, flamePos.x, flamePos.y, flameLen, flameWid, pAngle + Math.PI, -0.5, 0, flameColor[0] / 255, flameColor[1] / 255, flameColor[2] / 255, flameAlpha);
-        batcher.drawSprite(rocketFlameTex, flamePos.x, flamePos.y, flameLen * 0.55, flameWid * 0.4, pAngle + Math.PI, -0.5, 0, 1.0, 1.0, 0.9, Math.min(0.95, flameAlpha + 0.05));
-
-        const starSize = sourceEngine?.glowSizeMult !== undefined
-          ? flameWid * sourceEngine.glowSizeMult * 2
-          : 36 * visual.glowScale;
-        batcher.drawSprite(hitGlowTex, flamePos.x, flamePos.y, starSize, starSize, 0, 0, 0, flameColor[0] / 255, flameColor[1] / 255, flameColor[2] / 255, 0.95 * (flameRgba[3] / 255));
-        const coreStarSize = starSize * 0.45;
-        const alt = sourceEngine?.glowAlternateColor;
-        batcher.drawSprite(hitGlowTex, flamePos.x, flamePos.y, coreStarSize, coreStarSize, 0, 0, 0, (alt?.[0] ?? 255) / 255, (alt?.[1] ?? 255) / 255, (alt?.[2] ?? 255) / 255, (alt?.[3] ?? 255) / 255);
+        missileEngines.push({ projectile: p, pos: pPos });
 
         const rocketTex = textures.getTexture(p.projSpriteUrl || '/game-assets/graphics/missiles/missile_harpoon.png');
         batcher.setBlendMode('NORMAL');
-        batcher.drawSprite(rocketTex, pPos.x, pPos.y, wid, len, pAngle + Math.PI / 2, 0, 0, 1.0, 1.0, 1.0, 1.0);
+        batcher.drawSprite(rocketTex, pPos.x, pPos.y, wid, len, pAngle + Math.PI / 2, 0, 0, 1.0, 1.0, 1.0, 1 - (p.fadeProgress ?? 0));
       }
       // 4.5 其余标准投射物
       else {
@@ -300,6 +179,129 @@ export class WebGLProjectilePass {
         batcher.setBlendMode('ADDITIVE');
         batcher.drawSprite(hitGlowTex, pPos.x, pPos.y, p.radius * 4 * visual.glowScale, p.radius * 2 * visual.glowScale, pAngle, 0, 0, r / 255, g / 255, b / 255, 0.9);
         batcher.drawSprite(hitGlowTex, pPos.x, pPos.y, p.radius * 2 * visual.coreScale, p.radius * visual.coreScale, pAngle, 0, 0, 1.0, 1.0, 1.0, 0.95);
+      }
+    }
+
+    renderMissileEngines(missileEngines, ctx);
+
+    if (ballisticProjectiles.length > 0) {
+      batcher.flush();
+      ribbonBatcher.begin(batcher.currentViewProj);
+      ribbonBatcher.setAlphaDensityScale(1);
+      for (const { projectile: p, pos } of ballisticProjectiles) {
+        const sprite = textures.getTextureInfo(p.projSpriteUrl!);
+        if (sprite.width <= 0 || sprite.height <= 0) continue;
+        const width = p.projWidth ?? 7.5;
+        const tail = p.ballisticTail
+          ? Vector2.lerp(p.prevBallisticTail ?? p.ballisticTail, p.ballisticTail, ctx.alpha)
+          : pos.clone().addScaled(Vector2.fromAngle(p.facingRad ?? p.vel.heading()),
+            -Math.min(p.projLength ?? 0, p.elapsedTime * p.vel.length()));
+        const fade = (p.prevFadeProgress ?? p.fadeProgress ?? 0) * (1 - alpha) + (p.fadeProgress ?? 0) * alpha;
+        const brightness = (1 - fade) * Math.min(1, pos.distanceTo(tail) / Math.max(.001, p.projLength ?? 0));
+        const phase = getMovingRaySourceRenderState(0, width, brightness, p.elapsedTime, p.textureScrollSpeed ?? 0).texturePhase;
+        ribbonBatcher.drawBallisticProjectile(sprite.texture, projTrailTex, pos, tail, width,
+          sprite.height / sprite.width * width, p.coreWidthMult ?? 1,
+          p.fringeColor ?? [...p.color, 255], p.coreColor ?? [255, 255, 255, 255], brightness, phase);
+      }
+      ribbonBatcher.end();
+      batcher.resumeProgram();
+    }
+
+    for (const { projectile: p, pos } of ballisticProjectiles) {
+      if ((p.glowRadius ?? 0) <= 0 || !p.glowColor) continue;
+      const length = p.ballisticTail ? pos.distanceTo(p.ballisticTail) : p.projLength ?? 0;
+      const brightness = (1 - (p.fadeProgress ?? 0)) * Math.min(1, length / Math.max(.001, p.projLength ?? 0));
+      const [r, g, b, a] = p.glowColor;
+      batcher.setBlendMode('ADDITIVE');
+      batcher.drawSprite(hitGlowTex, pos.x, pos.y, p.glowRadius! * 2, p.glowRadius! * 2,
+        0, 0, 0, r / 255, g / 255, b / 255, a / 255 * brightness);
+    }
+
+    // 5. Source-faithful BALLISTIC_AS_BEAM mesh pass (MovingRay.java -> renderers/N.java).
+    // TPC keeps its authored 100x35 data; tapering, transparent half-width ends and a twice-drawn
+    // white core are what make the original projectile read as a sharp red energy needle.
+    if (movingRayProjectiles.length > 0 || engine.fxSystem.movingRayFades.length > 0) {
+      batcher.flush();
+      ribbonBatcher.begin(batcher.currentViewProj);
+      ribbonBatcher.setAlphaDensityScale(1.0);
+
+      for (const { projectile: p, pos: pPos } of movingRayProjectiles) {
+        const pAngle = p.facingRad !== undefined ? p.facingRad : p.vel.heading();
+        const fwd = Vector2.fromAngle(pAngle);
+        const visual = getWeaponVisualProfile(p.specId, p.visualSpawnType ?? p.spawnType, !!p.isRocket, false);
+        const authoredLen = (p.projLength || (p.specId === 'tpc' ? 100 : 50)) * visual.trailScale;
+        const width = (p.projWidth || (p.specId === 'tpc' ? 35 : 20)) * visual.glowScale;
+        const ray = getMovingRayVisualState(authoredLen, p.elapsedTime ?? 0, p.movingRayMoveSpeed ?? p.vel.length());
+        if (ray.length <= 0.1) continue;
+
+        const tail = p.ballisticTail ? Vector2.lerp(p.prevBallisticTail ?? p.ballisticTail, p.ballisticTail, alpha)
+          : pPos.clone().addScaled(fwd, -ray.length);
+        const fade = (p.prevFadeProgress ?? p.fadeProgress ?? 0) * (1 - alpha) + (p.fadeProgress ?? 0) * alpha;
+        ray.length = pPos.distanceTo(tail);
+        ray.brightness = (1 - fade) * Math.min(1, ray.length / Math.max(.001, authoredLen));
+        const sourceState = getMovingRaySourceRenderState(
+          ray.length,
+          width,
+          ray.brightness,
+          p.elapsedTime ?? engine.combatTime,
+          p.textureScrollSpeed ?? -256
+        );
+        const fringe = p.fringeColor || (p.specId === 'tpc' ? [255, 0, 0, 255] : [0, 0, 255, 255]);
+        const core = p.coreColor || [255, 255, 255, 255];
+        const isRough = p.textureType === 'ROUGH' || p.specId === 'tpc';
+        ribbonBatcher.drawMovingRayPulse(
+          isRough ? roughFringe : smoothFringe,
+          isRough ? roughCore : smoothCore,
+          pPos,
+          tail,
+          width,
+          fringe,
+          core,
+          ray.brightness,
+          sourceState.texturePhase
+        );
+      }
+
+      // Solid impacts keep the head at contact while the tail catches up. MovingRay.render()
+      // also multiplies brightness by currentLength/maxPulseLength as the segment collapses.
+      for (const fade of engine.fxSystem.movingRayFades) {
+        const len = fade.headPos.distanceTo(fade.tailPos);
+        if (len <= 0.1) continue;
+        const lifeBrightness = Math.max(0, Math.min(1, fade.life / fade.maxLife));
+        const lengthBrightness = Math.min(1, len / Math.max(0.1, fade.maxPulseLength));
+        const brightness = lifeBrightness * lengthBrightness;
+        const sourceState = getMovingRaySourceRenderState(
+          len,
+          fade.width,
+          brightness,
+          fade.elapsedTime,
+          fade.textureScrollSpeed
+        );
+        const isRough = fade.textureType === 'ROUGH';
+        ribbonBatcher.drawMovingRayPulse(
+          isRough ? roughFringe : smoothFringe,
+          isRough ? roughCore : smoothCore,
+          fade.headPos,
+          fade.tailPos,
+          fade.width,
+          fade.fringeColor,
+          fade.coreColor,
+          brightness,
+          sourceState.texturePhase
+        );
+      }
+
+      ribbonBatcher.end();
+      batcher.resumeProgram();
+
+      // Source glowRadius is a separate head halo; TPC itself does not define one.
+      for (const { projectile: p, pos: pPos } of movingRayProjectiles) {
+        if ((p.glowRadius ?? 0) <= 0 || !p.glowColor) continue;
+        const ray = getMovingRayVisualState(p.projLength ?? 0, p.elapsedTime ?? 0, p.movingRayMoveSpeed ?? p.vel.length());
+        const [gr, gg, gb, ga = 255] = p.glowColor;
+        const glowDiameter = p.glowRadius! * 2;
+        batcher.setBlendMode('ADDITIVE');
+        batcher.drawSprite(hitGlowTex, pPos.x, pPos.y, glowDiameter, glowDiameter, 0, 0, 0, gr / 255, gg / 255, gb / 255, (ga / 255) * ray.brightness * (1 - (p.fadeProgress ?? 0)));
       }
     }
   }

@@ -199,3 +199,23 @@ export function getShieldCircleContact(
 
   return { center, point, normal, penetration };
 }
+
+/** Distance to the actual deployed shield arc, not its full-circle broadphase.
+ * Points outside the angular span may still be near a real arc endpoint. */
+export function distanceToDeployedShield(ship: Ship, worldPoint: Vector2): number {
+  if (!isShieldCollisionActive(ship)) return Number.POSITIVE_INFINITY;
+  const center = ship.getShieldCenter();
+  const radial = worldPoint.clone().sub(center);
+  const radius = ship.shield.radius;
+  const facing = ship.shield.type === 'FRONT' ? ship.facingRad : ship.shield.facingAngleRad;
+  const halfArc = Math.min(360, ship.shield.currentArcDeg) * Math.PI / 360;
+  const angle = Math.atan2(radial.y, radial.x);
+  const diff = Math.atan2(Math.sin(angle - facing), Math.cos(angle - facing));
+  if (Math.abs(diff) <= halfArc) return Math.abs(radial.length() - radius);
+  let distance = Number.POSITIVE_INFINITY;
+  for (const endAngle of [facing - halfArc, facing + halfArc]) {
+    distance = Math.min(distance, Math.hypot(radial.x - Math.cos(endAngle) * radius,
+      radial.y - Math.sin(endAngle) * radius));
+  }
+  return distance;
+}

@@ -85,17 +85,34 @@ export class SpriteBatcher {
   private instanceData: Float32Array;
   private spriteCount = 0;
 
+  private readonly batchTextures: WebGLTexture[] = [];
+  private currentTextureSlot = 0;
+  private readonly samplerUnits = new Int32Array([0, 1, 2, 3]);
   private currentTexture: WebGLTexture | null = null;
   private currentBlendMode: 'NORMAL' | 'ADDITIVE' = 'NORMAL';
   public currentViewProj: Float32Array = new Float32Array(9);
   public drawCalls = 0;
 
-  constructor(gl: WebGL2RenderingContext) {
+  constructor(gl: WebGL2RenderingContext, private readonly textureSlots: 1 | 4 = 1) {
     this.gl = gl;
-    this.program = WebGLShaderUtil.createProgram(gl, VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
+    // Four-sampler mode is confined to the FX pass; other passes retain the
+    // original single-texture shader and ordering. Slot uses existing padding.
+    const vertexSource = textureSlots === 1 ? VERTEX_SHADER_SOURCE : VERTEX_SHADER_SOURCE
+      .replace('out vec2 v_uv;', 'layout(location = 7) in float a_textureSlot;\nflat out int v_textureSlot;\nout vec2 v_uv;')
+      .replace('  v_color = a_color;', '  v_color = a_color;\n  v_textureSlot = int(a_textureSlot);');
+    const fragmentSource = textureSlots === 1 ? FRAGMENT_SHADER_SOURCE : FRAGMENT_SHADER_SOURCE
+      .replace('uniform sampler2D u_texture;', 'uniform sampler2D u_textures[4];\nflat in int v_textureSlot;')
+      .replace('  vec4 texColor = texture(u_texture, v_uv);',
+        '  vec2 dx = dFdx(v_uv), dy = dFdy(v_uv);\n' +
+        '  vec4 texColor;\n' +
+        '  if (v_textureSlot == 0) texColor = textureGrad(u_textures[0], v_uv, dx, dy);\n' +
+        '  else if (v_textureSlot == 1) texColor = textureGrad(u_textures[1], v_uv, dx, dy);\n' +
+        '  else if (v_textureSlot == 2) texColor = textureGrad(u_textures[2], v_uv, dx, dy);\n' +
+        '  else texColor = textureGrad(u_textures[3], v_uv, dx, dy);');
+    this.program = WebGLShaderUtil.createProgram(gl, vertexSource, fragmentSource);
 
     this.uViewProjLoc = gl.getUniformLocation(this.program, 'u_viewProj')!;
-    this.uTextureLoc = gl.getUniformLocation(this.program, 'u_texture')!;
+    this.uTextureLoc = gl.getUniformLocation(this.program, textureSlots === 1 ? 'u_texture' : 'u_textures[0]')!;
 
     this.instanceData = new Float32Array(SpriteBatcher.MAX_SPRITES * SpriteBatcher.FLOATS_PER_SPRITE);
 
@@ -159,6 +176,11 @@ export class SpriteBatcher {
     gl.enableVertexAttribArray(6);
     gl.vertexAttribPointer(6, 4, gl.FLOAT, false, stride, 11 * 4);
     gl.vertexAttribDivisor(6, 1);
+    if (textureSlots === 4) {
+      gl.enableVertexAttribArray(7);
+      gl.vertexAttribPointer(7, 1, gl.FLOAT, false, stride, 15 * 4);
+      gl.vertexAttribDivisor(7, 1);
+    }
 
     gl.bindVertexArray(null);
   }
@@ -179,12 +201,21 @@ export class SpriteBatcher {
       tx,  ty,  1
     ]);
     gl.uniformMatrix3fv(this.uViewProjLoc, false, this.currentViewProj);
-    gl.uniform1i(this.uTextureLoc, 0);
+    if (this.textureSlots === 1) gl.uniform1i(this.uTextureLoc, 0);
+    else gl.uniform1iv(this.uTextureLoc, this.samplerUnits);
 
     gl.enable(gl.BLEND);
-    this.setBlendMode('NORMAL');
+    // A new/restored context (or another batcher) need not share our cached mode.
+    // begin owns the GL blend state even when no logical mode transition occurs.
+    if (this.currentBlendMode === 'NORMAL') {
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    } else {
+      this.setBlendMode('NORMAL');
+    }
     this.spriteCount = 0;
     this.currentTexture = null;
+    this.batchTextures.length = 0;
+    this.currentTextureSlot = 0;
     this.drawCalls = 0;
   }
 
@@ -193,7 +224,8 @@ export class SpriteBatcher {
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vao);
     gl.uniformMatrix3fv(this.uViewProjLoc, false, this.currentViewProj);
-    gl.uniform1i(this.uTextureLoc, 0);
+    if (this.textureSlots === 1) gl.uniform1i(this.uTextureLoc, 0);
+    else gl.uniform1iv(this.uTextureLoc, this.samplerUnits);
     gl.enable(gl.BLEND);
     if (this.currentBlendMode === 'ADDITIVE') {
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
@@ -232,9 +264,26 @@ export class SpriteBatcher {
     u1 = 1.0,
     v1 = 1.0
   ) {
-    if (this.currentTexture !== texture || this.spriteCount >= SpriteBatcher.MAX_SPRITES) {
-      this.flush();
-      this.currentTexture = texture;
+    if (this.textureSlots === 1) {
+      if (this.currentTexture !== texture || this.spriteCount >= SpriteBatcher.MAX_SPRITES) {
+        this.flush();
+        this.currentTexture = texture;
+      }
+    } else {
+      if (this.spriteCount >= SpriteBatcher.MAX_SPRITES) this.flush();
+      if (this.currentTexture !== texture) {
+        let slot = this.batchTextures.indexOf(texture);
+        if (slot < 0) {
+          if (this.batchTextures.length === this.textureSlots) {
+            this.flush();
+            this.batchTextures.length = 0;
+          }
+          slot = this.batchTextures.length;
+          this.batchTextures.push(texture);
+        }
+        this.currentTexture = texture;
+        this.currentTextureSlot = slot;
+      }
     }
 
     const offset = this.spriteCount * SpriteBatcher.FLOATS_PER_SPRITE;
@@ -254,7 +303,7 @@ export class SpriteBatcher {
     data[offset + 12] = g;
     data[offset + 13] = b;
     data[offset + 14] = a;
-    data[offset + 15] = 0; // padding
+    data[offset + 15] = this.currentTextureSlot; // padding in single-texture mode
 
     this.spriteCount++;
   }
@@ -263,11 +312,21 @@ export class SpriteBatcher {
     if (this.spriteCount === 0 || !this.currentTexture) return;
 
     const gl = this.gl;
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.currentTexture);
+    if (this.textureSlots === 1) {
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, this.currentTexture);
+    } else {
+      for (let slot = 0; slot < this.textureSlots; slot++) {
+        gl.activeTexture(gl.TEXTURE0 + slot);
+        gl.bindTexture(gl.TEXTURE_2D, this.batchTextures[slot] ?? this.batchTextures[0]);
+      }
+      // Texture managers and other passes upload/bind on unit zero.
+      gl.activeTexture(gl.TEXTURE0);
+    }
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceVBO);
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.instanceData.subarray(0, this.spriteCount * SpriteBatcher.FLOATS_PER_SPRITE));
+    // WebGL2 accepts a source range without allocating a typed-array view per flush.
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.instanceData, 0, this.spriteCount * SpriteBatcher.FLOATS_PER_SPRITE);
 
     // 核心调用：单次 GPU 实例化绘制所有精灵
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, this.spriteCount);

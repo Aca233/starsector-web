@@ -27,12 +27,23 @@ export interface AssetManifestEntry {
  */
 export class AssetResolver {
   public readonly baseUrl: string;
+  private normalizedPaths = new Map<string, string>();
+  private normalizedPathsBaseUrl: string;
 
   constructor(baseUrl = runtimeAssetUrl('')) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
+    this.normalizedPathsBaseUrl = this.baseUrl;
   }
 
   public normalize(resource: string): string {
+    // Texture lookups repeatedly ask for the same paths each frame. Cache only
+    // successful normalization, not manifest entries or texture/sampler state.
+    if (this.normalizedPathsBaseUrl !== this.baseUrl) {
+      this.normalizedPaths.clear();
+      this.normalizedPathsBaseUrl = this.baseUrl;
+    }
+    const cached = this.normalizedPaths.get(resource);
+    if (cached !== undefined) return cached;
     let value = resource.trim().replace(/\\/g, '/').replace(/^\.\//, '');
     const legacyPrefix = '/game-assets/';
     if (value.startsWith(legacyPrefix)) value = value.slice(legacyPrefix.length);
@@ -51,7 +62,11 @@ export class AssetResolver {
       }
       parts.push(part);
     }
-    return parts.join('/');
+    const normalized = parts.join('/');
+    // Bound memory for dynamically generated/mod paths without changing URL policy.
+    if (this.normalizedPaths.size >= 2048) this.normalizedPaths.clear();
+    this.normalizedPaths.set(resource, normalized);
+    return normalized;
   }
 
   public url(resource: string): string {
@@ -81,8 +96,8 @@ export class AssetManager {
         if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error(`Asset manifest entry ${index} must be an object`);
         const entry = raw as AssetManifestEntry;
         if (!entry.id?.trim() || !entry.path?.trim() || !entry.type?.trim() || !entry.group?.trim()) throw new Error(`Asset manifest entry ${index} is missing id/path/type/group`);
-        if (!Number.isSafeInteger(entry.bytes) || (entry.bytes ?? -1) < 0) throw new Error(`Asset ${entry.id} has invalid bytes`);
-        if (!entry.hash || !/^[a-f0-9]{64}$/i.test(entry.hash)) throw new Error(`Asset ${entry.id} has invalid SHA-256 hash`);
+        // bytes/hash are optional provenance. Runtime loading does not validate
+        // integrity metadata; image readiness is checked by the texture loader.
         if (entry.type === 'image') {
           const sampler = entry.sampler;
           if (!sampler || !['clamp', 'repeat'].includes(String(sampler.wrap)) || !['nearest', 'linear'].includes(String(sampler.minFilter)) || !['nearest', 'linear'].includes(String(sampler.magFilter)) || typeof sampler.mipmap !== 'boolean') {

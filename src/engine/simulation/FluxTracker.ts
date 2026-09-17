@@ -13,6 +13,9 @@ export type HullSize = 'FIGHTER' | 'FRIGATE' | 'DESTROYER' | 'CRUISER' | 'CAPITA
 export class FluxTracker {
   public maxFlux: number;
   public baseDissipation: number;
+  public ventRateMultiplier = 1;
+  public overloadTimeMultiplier = 1;
+  public timeSinceFluxIncrease = 0;
   public hullSize: HullSize;
   public softFlux = 0;
   public hardFlux = 0;
@@ -51,6 +54,7 @@ export class FluxTracker {
    */
   public increaseFlux(amount: number, isHard: boolean): boolean {
     if (this.isOverloaded) return true;
+    if (amount > 0) this.timeSinceFluxIncrease = 0;
 
     if (isHard) {
       this.hardFlux += amount;
@@ -60,8 +64,7 @@ export class FluxTracker {
 
     if (this.totalFlux >= this.maxFlux) {
       const excess = this.totalFlux - this.maxFlux;
-      this.triggerOverload(excess);
-      return true;
+      return this.triggerOverload(excess);
     }
     return false;
   }
@@ -72,6 +75,7 @@ export class FluxTracker {
    */
   public increaseFluxClamped(amount: number, isHard: boolean): void {
     if (!(amount > 0)) return;
+    this.timeSinceFluxIncrease = 0;
     if (isHard) {
       this.hardFlux = Math.min(this.maxFlux, this.hardFlux + amount);
     } else {
@@ -86,10 +90,29 @@ export class FluxTracker {
    * CAPITAL_SHIP: 10.0s, CRUISER: 8.0s, DESTROYER: 6.0s, FRIGATE: 4.0s, FIGHTER: 10.0s
    * 超量幅能惩罚: f3 += excess / 25.0f (最大上限 15.0s)
    */
-  public triggerOverload(excessFlux = 0) {
+  public triggerOverload(excessFlux = 0): boolean {
+    const started = this.beginOverload(excessFlux);
+    if (started) sound.play('overload', 1.0);
+    return started;
+  }
+
+  /** Native forceOverload adds seconds to the hull-size base, without normal hit audio. */
+  public forceOverload(extraSeconds = 0): boolean {
+    return this.beginOverload(extraSeconds * 25);
+  }
+
+  /** AcausalDisruptor uses a total duration, not forceOverload's extra seconds. */
+  public overloadFor(seconds: number): boolean {
+    if (!Number.isFinite(seconds) || seconds <= 0 || !this.beginOverload(0)) return false;
+    this.overloadDuration = this.overloadTimer = seconds * this.overloadTimeMultiplier;
+    sound.play('overload', 1);
+    return true;
+  }
+
+  private beginOverload(excessFlux: number): boolean {
+    // D.beginOverload never restarts an existing overload or interrupts venting.
+    if (this.isOverloaded || this.isVenting) return false;
     this.isOverloaded = true;
-    this.isVenting = false;
-    sound.play('overload', 1.0);
 
     let baseDuration = 5.0;
     switch (this.hullSize) {
@@ -103,12 +126,13 @@ export class FluxTracker {
     if (excessFlux > 0) {
       baseDuration += excessFlux / 25.0;
     }
-    baseDuration = Math.min(15.0, baseDuration);
+    baseDuration = Math.min(15.0, baseDuration) * this.overloadTimeMultiplier;
 
     this.overloadDuration = baseDuration;
     this.overloadTimer = baseDuration;
     this.zeroFluxTimer = 0;
     this.isEngineBoostActive = false;
+    return true;
   }
 
   public initialVentFlux = 0;
@@ -117,7 +141,7 @@ export class FluxTracker {
    * 获取预计排散完毕剩余时长 (严格对齐 D.java: getTimeToVent)
    */
   public getTimeToVent(): number {
-    const ventRate = this.baseDissipation * 2.0;
+    const ventRate = this.baseDissipation * 2.0 * this.ventRateMultiplier;
     return ventRate > 0 ? this.totalFlux / ventRate : 0;
   }
 
@@ -146,7 +170,8 @@ export class FluxTracker {
    * @param dt 步长时间 (秒)
    * @param shieldActive 护盾是否开启
    */
-  public update(dt: number, shieldActive: boolean) {
+  public update(dt: number, shieldActive: boolean, allowDissipation = true) {
+    if (dt > 0) this.timeSinceFluxIncrease = this.isOverloaded || this.isVenting ? 0 : this.timeSinceFluxIncrease + dt;
     // 1. 处理过载状态倒计时与过载散热 (D.java: getOverloadDissipationRate = dissipation * 0.5f)
     if (this.isOverloaded) {
       this.overloadTimer -= dt;
@@ -174,7 +199,7 @@ export class FluxTracker {
 
     // 2. 主动排散 (D.java: getVentRate = dissipation * 2.0f)
     if (this.isVenting) {
-      const ventRate = this.baseDissipation * 2.0 * dt;
+      const ventRate = this.baseDissipation * 2.0 * this.ventRateMultiplier * dt;
       let d = ventRate;
       if (this.softFlux > 0) {
         const sub = Math.min(this.softFlux, d);
@@ -203,7 +228,7 @@ export class FluxTracker {
     }
 
     // 3. 常规被动耗散 (D.java: cfr_renamed_4)
-    let dissipation = this.baseDissipation * dt;
+    let dissipation = allowDissipation ? this.baseDissipation * dt : 0;
     
     // 护盾开启时：硬幅能绝对无法消散，仅耗散软幅能
     if (shieldActive) {

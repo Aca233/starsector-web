@@ -3,12 +3,22 @@
  * 支持纯函数计算与零垃圾回收 (Zero Allocation) 内存复用
  */
 export class Vector2 {
-  public x: number;
-  public y: number;
+  declare public x: number;
+  declare public y: number;
 
   constructor(x = 0, y = 0) {
-    this.x = x;
-    this.y = y;
+    // The constructor owns initialization. Type-only declarations avoid emitting
+    // two undefined class-field writes before these final coordinates.
+    // Preserve own writable data fields even on subclasses/prototype accessors.
+    if ('x' in (this as object) || 'y' in (this as object)) {
+      Object.defineProperties(this, {
+        x: { value: x, writable: true, enumerable: true, configurable: true },
+        y: { value: y, writable: true, enumerable: true, configurable: true }
+      });
+    } else {
+      this.x = x;
+      this.y = y;
+    }
   }
 
   public set(x: number, y: number): this {

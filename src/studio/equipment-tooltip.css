@@ -1,0 +1,21 @@
+.equipment-tooltip { position: fixed; z-index: 220; width: min(390px, calc(100vw - 16px)); max-height: calc(100dvh - 16px); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 7px 9px; border: 1px solid #5493a5; border-left: 3px double #7abbd0; border-right: 3px double #7abbd0; background: #000b0eed; box-shadow: 0 0 0 1px #061318, 0 5px 16px #0007; color: #d9dcdc; text-align: left; font: 14px/1.35 var(--native-font-body); pointer-events: auto; scrollbar-width: thin; scrollbar-color: #436b7b #061017; }
+.equipment-tooltip h3 { margin: 0 0 7px; color: #bceaf5; font-size: 15px; font-weight: normal; }
+.equipment-tooltip p { margin: 6px 0; }
+.equipment-tooltip mark, .hullmod-encyclopedia mark { color: #ffe000; background: none; }
+.equipment-tooltip .equipment-design { color: #aaa; }
+.equipment-tooltip .equipment-state { color: #859eaa; font-size: 12px; }
+.equipment-tooltip .equipment-smod h4, .hullmod-encyclopedia .equipment-smod h4 { margin: 8px -8px 6px; background: #522400c9; text-align: center; color: #ff9700; font-size: 14px; font-weight: normal; }
+.equipment-tooltip .equipment-smod small { display: block; color: #aab5bb; }
+.equipment-tooltip .equipment-encyclopedia { display: block; padding: 2px 0 0; background: none; border: 0; color: #879298; font: inherit; cursor: pointer; text-align: left; }
+.equipment-tooltip .equipment-encyclopedia:hover { color: #c4efff; }
+.equipment-tooltip kbd { color: #ffe000; font: inherit; }
+.refit-mod-row { pointer-events: auto; }
+.refit-mod-row:focus-visible { outline: 1px solid #8ccee1; outline-offset: 2px; }
+.hullmod-encyclopedia { font: 15px/1.6 var(--native-font-body); color: #cdd8dd; }
+.hullmod-encyclopedia > img { float: right; width: 64px; height: 64px; }
+.hullmod-encyclopedia code { color: #8db5c9; }
+.equipment-tooltip table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.equipment-tooltip th { text-align: left; font-weight: normal; }
+.equipment-tooltip th, .equipment-tooltip td { padding: 4px 2px; border-bottom: 1px solid #17303a; }
+.equipment-tooltip td { text-align: right; color: #ffe000; font-family: var(--ui-mono); }
+.equipment-tooltip td[data-changed="true"] { color: #aeea00; }

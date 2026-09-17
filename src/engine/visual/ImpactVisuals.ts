@@ -1,3 +1,4 @@
+import { contentRegistry } from '../content/ContentRegistry';
 import type { DamageType } from '../simulation/ArmorGrid';
 
 export type ProjectileImpactSurface = 'SHIELD' | 'ARMOR' | 'HULL' | 'AIRBURST' | 'MISSILE_INTERCEPT';
@@ -15,37 +16,28 @@ export interface ProjectileImpactVisualProfile {
   family: ProjectileImpactFamily;
   soundKey: string;
   soundVolume: number;
-  sparkCount: number;
-  shieldRippleRadius: number;
   cameraShake: number;
 }
 
 /**
- * W07 impact routing. These are conservative Web presentation defaults, not
- * claims of source-runtime pixel parity. The key invariant is semantic: a
- * shield contact never creates a hull/missile fireball, projectile hit glow is
- * not an explosion radius, and visual size never feeds collision or damage.
+ * Remaining Web audio/camera presentation defaults, not source-runtime parity.
+ * Native hit-particle/shield visuals are handled separately; missile hit-particle
+ * pairs are valid on shields too. Visual dimensions never feed collision/damage.
  */
 export function getProjectileImpactVisualProfile(input: ProjectileImpactVisualInput): ProjectileImpactVisualProfile {
-  const heavyTorpedo = input.specId === 'typhoon';
-  const family: ProjectileImpactFamily = heavyTorpedo
-    ? 'HEAVY_TORPEDO'
-    : input.isRocket
+  const family: ProjectileImpactFamily = contentRegistry.getWeapon(input.specId)?.impactFamily ?? (input.isRocket
       ? 'ROCKET'
       : input.damageType === 'ENERGY'
         ? 'ENERGY'
         : input.damageType === 'FRAGMENTATION'
           ? 'FRAGMENTATION'
-          : 'BALLISTIC';
+          : 'BALLISTIC');
 
   if (input.surface === 'SHIELD') {
-    const sparkCount = family === 'HEAVY_TORPEDO' ? 28 : family === 'ROCKET' ? 20 : family === 'ENERGY' ? 10 : 15;
     return {
       family,
       soundKey: 'shield_hit',
       soundVolume: 0.45,
-      sparkCount,
-      shieldRippleRadius: input.damage > 200 ? 75 : 45,
       cameraShake: family === 'HEAVY_TORPEDO' ? 4 : family === 'ROCKET' ? 3 : 2
     };
   }
@@ -56,8 +48,6 @@ export function getProjectileImpactVisualProfile(input: ProjectileImpactVisualIn
     family,
     soundKey,
     soundVolume,
-    sparkCount: input.isRocket ? 0 : (input.surface === 'HULL' && family === 'ENERGY' ? 24 : 20),
-    shieldRippleRadius: 0,
     cameraShake: Math.min(15, input.damage * 0.04)
   };
 }

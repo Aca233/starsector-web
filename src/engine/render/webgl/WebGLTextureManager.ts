@@ -12,6 +12,7 @@ export interface TextureManagerStats {
 export class WebGLTextureManager {
   private gl: WebGL2RenderingContext;
   private textures: Map<string, WebGLTexture> = new Map();
+  private canvasTextureRevisions: Map<string, string | number> = new Map();
   private pending = new Map<string, { img: HTMLImageElement; onLoad: () => void; onError: () => void }>();
   private whiteTexture: WebGLTexture;
   private transparentTexture: WebGLTexture;
@@ -108,6 +109,36 @@ export class WebGLTextureManager {
     return this.getTexture(url, forceRepeat);
   }
 
+  /** Uploads/replaces a caller-owned canvas texture only when its semantic revision changes. */
+  public getCanvasTexture(cacheId: string, canvas: HTMLCanvasElement, revision: string | number): WebGLTexture {
+    if (this.disposed) return this.transparentTexture;
+    const key = `@canvas:${cacheId}`;
+    const existing = this.textures.get(key);
+    if (existing && this.canvasTextureRevisions.get(key) === revision) return existing;
+    if (existing) this.gl.deleteTexture(existing);
+
+    const sampler: Required<NonNullable<AssetManifestEntry['sampler']>> = {
+      wrap: 'clamp',
+      minFilter: 'linear',
+      magFilter: 'linear',
+      mipmap: false
+    };
+    const uploaded = this.uploadCanvas(canvas, sampler);
+    this.textures.set(key, uploaded);
+    this.canvasTextureRevisions.set(key, revision);
+    return uploaded;
+  }
+
+  public retainCanvasTextures(activeIds: ReadonlySet<string>): void {
+    for (const key of this.canvasTextureRevisions.keys()) {
+      if (activeIds.has(key.slice('@canvas:'.length))) continue;
+      const texture = this.textures.get(key);
+      if (texture) this.gl.deleteTexture(texture);
+      this.textures.delete(key);
+      this.canvasTextureRevisions.delete(key);
+    }
+  }
+
   private uploadCanvas(canvas: HTMLCanvasElement, sampler: Required<NonNullable<AssetManifestEntry['sampler']>>): WebGLTexture {
     const tex = this.gl.createTexture();
     if (!tex) throw new Error('Failed to create WebGL texture');
@@ -169,6 +200,7 @@ export class WebGLTextureManager {
     this.cancelPending();
     this.textures.clear();
     this.invalidations++;
+    this.canvasTextureRevisions.clear();
   }
 
   public getStats(): TextureManagerStats {
@@ -183,6 +215,7 @@ export class WebGLTextureManager {
     for (const texture of this.textures.values()) this.gl.deleteTexture(texture);
     this.textures.clear();
     this.gl.deleteTexture(this.whiteTexture);
+    this.canvasTextureRevisions.clear();
     this.gl.deleteTexture(this.transparentTexture);
   }
 }

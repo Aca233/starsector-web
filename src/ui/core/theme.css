@@ -1,0 +1,138 @@
+/* Original-game references, read-only: starsector-core/data/config/settings.json
+   buttonBg=70,222,255; buttonBgDark=31,94,112; buttonText=170,222,255;
+   buttonShortcut/hColor=255,210,0; textFriendColor=155,255,0;
+   widgetBorderColorDark=100,200,255; standardTextColor=220,220,220.
+   Panels/buttons also reference graphics/ui/campaign_infowidget3.png and buttons/button_up.png.
+   Modern readable typography is intentional; no bitmap font or asset importer is used. */
+:root {
+  --ui-font: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+  --ui-mono: "Cascadia Code", Consolas, monospace;
+  --ui-bg: #030709; --ui-panel: #070e12; --ui-raised: #102c36; --ui-hover: #1f5e70;
+  --ui-border: #356477; --ui-divider: #203f4b;
+  --ui-text: #dcdcdc; --ui-muted: #aeb8bc; --ui-dim: #8b9da5;
+  --ui-accent: #46deff; --ui-accent-bg: #1f5e70; --ui-button-text: #aadeff; --ui-highlight: #ffd200; --ui-friendly: #9bff00;
+  --ui-success: #9bff00; --ui-warning: #ffd200; --ui-danger: #ff8050;
+  --ui-radius: 0px; --ui-radius-sm: 0px;
+  --ui-shadow: 0 10px 32px #000b;
+  --ui-space-1: 4px; --ui-space-2: 8px; --ui-space-3: 12px; --ui-space-4: 16px; --ui-space-6: 24px;
+  --ui-z-dialog: 100; --ui-z-toast: 120;
+}
+body, button, input, textarea, select { font-family: var(--ui-font); }
+button, input, textarea, select { font-variant-numeric: tabular-nums; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; }
+.ui-muted { color: var(--ui-muted); font-size: 13px; line-height: 1.65; }
+.ui-caption { color: var(--ui-dim); font-size: 12px; line-height: 1.65; }
+.ui-code { font-family: var(--ui-mono); font-size: 12px; overflow-wrap: anywhere; }
+.ui-eyebrow { color: var(--ui-accent); font-size: 11px; letter-spacing: .12em; font-weight: 600; margin-bottom: 5px; }
+.ui-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 32px; padding: 6px 12px; border: 1px solid var(--ui-border); border-radius: var(--ui-radius-sm); background: var(--ui-raised); color: var(--ui-button-text); box-shadow: inset 0 1px #64c8ff33, inset 0 -1px #0008; font: 500 13px/1.35 var(--ui-font); text-decoration: none; white-space: nowrap; transition: background 120ms, border-color 120ms, color 120ms; }
+.ui-button:hover:not(:disabled) { background: var(--ui-hover); border-color: #64dcff; }
+.ui-button:active:not(:disabled) { background: #254559; }
+.ui-button:disabled { opacity: .42; }
+.ui-button--primary { background: var(--ui-accent-bg); border-color: #64c8ff; color: #aadeff; }
+.ui-button--primary:hover:not(:disabled) { background: #287489; border-color: var(--ui-accent); }
+.ui-button--ghost { background: transparent; border-color: transparent; box-shadow: none; color: var(--ui-button-text); }
+.ui-button--danger { color: var(--ui-danger); background: #3b1c0e; border-color: #94562b; }
+.ui-button--danger:hover:not(:disabled) { background: #552b13; border-color: var(--ui-danger); }
+.ui-button--sm { min-height: 30px; padding: 4px 8px; font-size: 12px; }
+.ui-button svg { width: 16px; height: 16px; flex: none; }
+.ui-button[aria-pressed="true"] { border-color: #64c8ff; background: var(--ui-accent-bg); color: var(--ui-accent); }
+.ui-keycap { display: inline-flex; justify-content: center; align-items: center; min-width: 20px; padding: 1px 5px; border: 1px solid var(--ui-border); border-radius: 0; background: transparent; color: var(--ui-highlight); font: 11px/18px var(--ui-font); white-space: nowrap; }
+.ui-badge { display: inline-flex; gap: 6px; align-items: center; padding: 2px 0; border: 0; border-radius: 0; font-size: 11px; white-space: nowrap; background: transparent; }
+.ui-tone--neutral { color: var(--ui-text); }.ui-tone--info { color: var(--ui-accent); }.ui-tone--success { color: var(--ui-success); }.ui-tone--warning { color: var(--ui-warning); }.ui-tone--danger { color: var(--ui-danger); }
+.ui-modal-backdrop { position: fixed; inset: 0; z-index: var(--ui-z-dialog); padding: 24px; display: flex; align-items: center; justify-content: center; background: #000a; backdrop-filter: none; color: var(--ui-text); font: 14px/1.5 var(--ui-font); -webkit-font-smoothing: antialiased; }
+.ui-modal-backdrop[inert] { pointer-events: none; }
+.ui-modal { display: flex; flex-direction: column; width: 100%; max-width: 880px; max-height: calc(100dvh - 48px); min-height: 0; border: 1px solid var(--ui-border); border-top-color: #64c8ff; border-radius: var(--ui-radius); background: var(--ui-panel); box-shadow: var(--ui-shadow); overflow: hidden; }
+.ui-modal--wide { max-width: 1120px; }.ui-modal--small { max-width: 510px; }
+.ui-modal-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 16px 20px 14px; border-bottom: 1px solid var(--ui-divider); flex: none; }
+.ui-modal-header h2 { color: var(--ui-text); font-size: 19px; font-weight: 600; line-height: 1.4; margin: 0; }
+.ui-modal-header p { margin-top: 5px; max-width: 65ch; }
+.ui-modal-body { padding: 20px; overflow-y: auto; overscroll-behavior: contain; min-height: 0; scrollbar-width: thin; scrollbar-color: var(--ui-border) transparent; }
+.ui-modal-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--ui-divider); background: #03090d; flex: none; }
+.ui-modal-footer .ui-footer-start { margin-right: auto; }
+.ui-stack { display: flex; flex-direction: column; gap: 16px; }
+.ui-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ui-section { min-width: 0; }.ui-section + .ui-section { margin-top: 22px; }
+.ui-section-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.ui-section-heading h3 { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; color: #cbf5ff; }
+.ui-section-heading svg { color: var(--ui-accent); width: 16px; height: 16px; }
+.ui-notice { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; font: 13px/1.6 var(--ui-font); border: 1px solid color-mix(in srgb, currentColor 27%, transparent); border-radius: var(--ui-radius-sm); background: color-mix(in srgb, currentColor 5%, var(--ui-bg)); }
+.ui-notice > svg { flex: none; margin-top: 2px; }.ui-notice > div { flex: 1; min-width: 0; }.ui-notice > button { margin: -3px -5px -3px 0; }
+.ui-damage-bar { display: flex; height: 7px; overflow: hidden; border-radius: 0; background: var(--ui-raised); margin: 14px 0; }.ui-damage-bar span { min-width: 0; }
+.ui-help-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 24px; }.ui-help-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--ui-divider); font-size: 13px; }.ui-help-row span { color: var(--ui-muted); }
+.ui-toolbar { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 5px; background: #050d12ed; border: 1px solid var(--ui-border); border-radius: var(--ui-radius-sm); box-shadow: 0 3px 16px #0004; color: var(--ui-text); text-shadow: none; }
+.ui-toolbar-label { display: flex; align-items: center; gap: 8px; padding: 0 9px; border-right: 1px solid var(--ui-border); font-size: 12px; color: var(--ui-muted); }
+.ui-toast { position: fixed; top: 62px; left: 50%; transform: translateX(-50%); z-index: var(--ui-z-toast); width: min(620px,calc(100vw - 24px)); box-shadow: var(--ui-shadow); }
+@media(max-width:760px) {
+  .ui-modal-backdrop { padding: 12px; }.ui-modal { max-height: calc(100dvh - 24px); }.ui-modal-header,.ui-modal-body { padding: 18px; }.ui-modal-header h2 { font-size: 19px; }.ui-modal-footer { padding: 12px 18px; }.ui-help-grid { grid-template-columns: minmax(0,1fr); }.ui-row > .ui-button { margin-left: auto; }.ui-toolbar .ui-keycap { display: none; }.ui-toolbar-label { display: none; }.hud-quickbar-anchor { max-width: calc(100vw - 24px); }
+}
+@media(max-width:420px) {.ui-modal-footer .ui-footer-start { width: 100%; margin-right: 0; } }
+@media(prefers-reduced-motion:reduce) { .ui-button { transition: none; } }
+
+.ui-font { font-family: var(--ui-font); }
+.ui-grid > .ui-section + .ui-section { margin-top: 0; }
+.ui-badge::before { content: '['; opacity: .65; margin-right: -3px; }.ui-badge::after { content: ']'; opacity: .65; margin-left: -3px; }
+.ui-modal-header { background: linear-gradient(90deg,#16323f88,transparent 65%); }
+.ui-eyebrow { color: var(--ui-dim); letter-spacing: .06em; font-size: 10px; }
+.ui-section-heading { border-bottom: 1px solid var(--ui-divider); padding-bottom: 6px; }
+.ui-tactical-chrome { --ui-accent: #9bff00; --ui-button-text: #9bff00; --ui-accent-bg: #1c310e; --ui-raised: #0e170c; --ui-hover: #23391b; --ui-border: #405927; }
+.ui-toolbar { box-shadow: none; }.ui-tactical-chrome .ui-button:hover:not(:disabled) { border-color: #9bff00; }.ui-tactical-chrome .ui-button[aria-pressed="true"] { border-color: #9bff00; color: #ffd200; }
+.ui-workbench { color: var(--ui-text); background: var(--ui-panel); border: 1px solid var(--ui-border); font: 12px/1.5 var(--ui-font); padding: 12px; }
+.ui-workbench :is(select,input[type="number"]) { background: var(--ui-bg); color: var(--ui-text); border: 1px solid var(--ui-border); padding: 3px; }.ui-workbench input { accent-color: var(--ui-accent); }
+.ui-workbench summary { color: var(--ui-button-text); cursor: pointer; }.ui-workbench .text-cyan-300,.ui-workbench .text-cyan-200 { color: var(--ui-button-text); }
+.ui-workbench .text-slate-400 { color: var(--ui-muted); }
+
+.ui-stack > .ui-section + .ui-section { margin-top: 0; }
+@media(max-width:760px) { }
+
+.ui-hud-panel { background: #050d12ed; border: 1px solid var(--ui-border); border-radius: 0; font-family: var(--ui-font); }
+/* Layout reference: https://starsector.wiki.gg/wiki/File:FS_screenshot_refit.jpg
+   The console uses a ship roster, central blueprint and right-hand readouts; not stacked web cards. */
+.ui-modal--console { max-width: 1260px; width: calc(100vw - 64px); height: min(800px,calc(100dvh - 64px)); background: #061218f5; border: 1px solid #386775; }
+.ui-modal--console .ui-modal-header { padding: 10px 16px; background: #112b3499; border-bottom: 2px solid #3e788a; align-items: center; }
+.ui-modal--console .ui-modal-header .ui-eyebrow { display: none; }
+.ui-modal--console .ui-modal-header h2 { font-size: 16px; color: #b1dce6; font-weight: 500; }
+.ui-modal--console .ui-modal-header p { display: none; }
+.ui-modal--console .ui-modal-body { padding: 0; flex: 1; overflow: hidden; }
+.ui-modal--console .ui-modal-footer { padding: 8px 12px; gap: 6px; background: #0b1b20; }
+.native-console { height: 100%; display: grid; grid-template-columns: 185px minmax(240px,1fr) 280px; min-height: 0; }
+.native-roster { border-right: 2px solid #244b5a; background: #0008; overflow: auto; padding: 9px 8px; scrollbar-width: thin; }
+.native-roster-heading { color: #759eaa; padding: 2px 7px 10px; font-size: 12px; }
+.native-roster-item { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; min-height: 84px; background: transparent; border: 1px solid transparent; padding: 9px 5px; color: #93a8aa; }
+.native-roster-item img { width: 54px; height: 64px; object-fit: contain; opacity: .72; }
+.native-roster-item strong { font-size: 12px; line-height: 1.4; font-weight: 400; display: block; }.native-roster-item small { display: block; font-size: 10px; color: #708487; margin-top: 4px; }
+.native-roster-item:hover,.native-roster-item[aria-pressed="true"] { background: #143a4680; border-color: #408197; color: #c5e5eb; }.native-roster-item[aria-pressed="true"] img { opacity: 1; }
+.native-ship-stage { container-type: size; position: relative; min-width: 0; min-height: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; padding: 58px 26px 52px;
+  background-color: #071820; background-image: linear-gradient(#24647727 1px,transparent 1px),linear-gradient(90deg,#24647727 1px,transparent 1px),radial-gradient(ellipse at 55% 44%,#16495a50,transparent 72%); background-size: 20px 20px,20px 20px,100% 100%; }
+.native-stage-caption { position: absolute; left: 16px; top: 12px; color: #b0d3dc; font-size: 13px; font-weight: 500; }.native-stage-caption small { display: block; font-size: 11px; font-weight: 400; color: #658c99; margin-top: 4px; }
+.native-ship-art { position: relative; width: min(82%,380px,calc(100cqh * var(--ship-aspect))); flex: none; }
+.native-ship-art > img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 6px 9px #000b); }
+.native-mount { position: absolute; transform: translate(-50%,-50%); width: 13px; height: 13px; padding: 0; border: 1px solid #ffffffbd; background: #09171c90; cursor: pointer; }.native-mount--medium { width: 18px; height: 18px; }.native-mount--large { width: 24px; height: 24px; }.native-mount:hover,.native-mount[aria-pressed="true"] { border: 2px solid #ffd200; background: #ffd20044; box-shadow: 0 0 0 3px #ffd20027; }
+.native-stage-footer { position: absolute; bottom: 0; left: 0; right: 0; padding: 9px 12px; display: flex; justify-content: space-between; color: #73a6b8; font-size: 11px; background: #071116cb; border-top: 1px solid #1c4251; }
+.native-side { border-left: 2px solid #244b5a; background: #020a0fbb; padding: 12px 12px 16px; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #346274 transparent; }
+.native-side h3 { font-size: 12px; color: #b4dce5; background: #173a4799; padding: 4px 7px; margin: 14px -4px 9px; font-weight: 400; }.native-side h3:first-child { margin-top: 0; }
+.native-readout { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 7px 0; font-size: 12px; line-height: 1.45; }.native-readout > span { color: #94afb8; }.native-readout > strong { font-weight: 400; color: #ffd200; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; min-width: 0; }
+.native-condition { margin: 8px 0 13px; }.native-condition-track { height: 8px; border: 1px solid #366575; background: #040c12; padding: 1px; }.native-condition-track span { height: 100%; display: block; background: #78b6b6; }.native-condition--cr span { background: #a8ccb8; }
+.native-side .ui-caption { font-size: 11px; color: #78969f; }.native-side .ui-button { width: 100%; margin-top: 8px; }.native-side .ui-code { font-size: 10px; }
+.native-side .ui-notice { border: 0; background: transparent; padding: 8px 0; font-size: 11px; }.native-side .ui-notice > svg { width: 13px; }
+.native-history { color: #94afb8; font-size: 11px; }.native-history > div { padding: 8px 0; border-bottom: 1px solid #193441; }.native-history strong { color: #9bff00; font-weight: 400; }.native-history .loss { color: #ff6400; }
+.native-brief { color: #96aeb8; font-size: 12px; line-height: 1.7; margin: 10px 0; }
+.native-blueprint { height: 100%; overflow: auto; padding: 16px 20px; }.native-blueprint textarea.ui-input { min-height: 290px; }
+.native-statusline { font-size: 11px; color: #7198a5; margin-right: auto; max-width: 45%; }.native-statusline .ui-tone--success { color: #a8ccb8; }
+.ui-toolbar { background: transparent; border: 0; padding: 0; }.ui-toolbar .ui-button { min-height: 24px; font-size: 11px; padding: 2px 6px; }.ui-toolbar .ui-keycap { border: 0; padding: 0; }.ui-toolbar .ui-keycap::before { content:'['; }.ui-toolbar .ui-keycap::after { content:']'; }.ui-toolbar .ui-button--ghost { color: #94ff00; opacity: .6; }.ui-toolbar .ui-button--ghost:hover,.ui-toolbar .ui-button--ghost:focus-visible { opacity: 1; }
+@media(max-width:1050px) { .native-console { grid-template-columns: 155px minmax(190px,1fr) 245px; }.native-roster-item { flex-direction: column; align-items: flex-start; gap: 4px; }.native-roster-item img { align-self: center; }.native-ship-stage { padding-left: 10px; padding-right: 10px; } }
+@media(max-width:760px) { .ui-modal--console { width: 100%; height: calc(100dvh - 24px); }.ui-modal--console .ui-modal-body { overflow-y: auto; }.native-console { height: auto; display: grid; grid-template-columns: minmax(0,1fr); }.native-roster { display: flex; overflow-x: auto; border: 0; border-bottom: 1px solid #244b5a; }.native-roster-heading { display: none; }.native-roster-item { width: 130px; min-width: 130px; min-height: 72px; flex-direction: row; padding: 5px; }.native-roster-item img { width: 40px; height: 48px; }.native-ship-stage { min-height: 320px; height: 360px; }.native-ship-art { width: min(175px,calc(100cqh * var(--ship-aspect))); }.native-side { border: 0; overflow: visible; }.native-statusline { display: none; } }
+
+/* Compact records share the console readouts, not standalone statistic cards. */
+.native-report { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px 32px; }
+.native-report > .ui-section + .ui-section { margin-top: 0; }
+.native-report .ui-section-heading { margin-bottom: 10px; }
+.native-report-summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 18px; padding-bottom: 16px; margin-bottom: 20px; border-bottom: 1px solid var(--ui-divider); font-size: 12px; color: var(--ui-muted); }
+.native-report-summary > strong { font-size: 19px; font-weight: 500; }
+.native-report-summary > .ui-caption { margin-right: auto; }
+.native-report-summary b { color: var(--ui-highlight); font-size: 17px; font-weight: 500; }
+@media(max-width:600px) { .native-report { grid-template-columns: minmax(0,1fr); gap: 20px; } }
+
+/* Native renderers/M: colors encode compatible weapon types, never slot size. */
+.native-mount-type--ballistic { border-color:#ffd700; }.native-mount-type--energy { border-color:#46c8ff; }.native-mount-type--missile { border-color:#9bff00; }.native-mount-type--hybrid { border-color:#ffa500; }.native-mount-type--synergy { border-color:#00ffc8; }.native-mount-type--composite { border-color:#d7ff00; }

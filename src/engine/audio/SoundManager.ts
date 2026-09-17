@@ -4,120 +4,39 @@
  * 还原 TPC 重炮轰鸣、速子长矛电弧裂解、冲刺推进喷射与能量护盾偏振音效。
  */
 import { assetResolver } from '../assets/AssetResolver';
+import { soundPaths, soundVariants, soundBankRevision } from './SoundBank';
+type SoundVariant = { bufferKey: string; pitch: number; volume: number };
 
 export class SoundManager {
   private static instance: SoundManager;
   private ctx: AudioContext | null = null;
   private audioBuffers: Map<string, AudioBuffer> = new Map();
   private isMuted = false;
-  private preloadComplete = false;
+  private preloadedRevision = -1;
   private preloadPromise: Promise<void> | null = null;
   private loadingBuffers: Map<string, Promise<AudioBuffer | null>> = new Map();
 
   // 循环音效源 (冲刺推进 / 堡垒护盾 / 战役背景乐)
+  private sampleLoads = new Map<string, Promise<AudioBuffer | null>>();
   private loopingSources: Map<string, AudioBufferSourceNode> = new Map();
   private lastPlayTimes: Map<string, number> = new Map();
 
   // 官方音效资源映射表
-  public readonly SOUND_MAP: Record<string, string> = {
-    // 武器开火
-    tpc_fire: 'sounds/sfx_wpn_energy/thermal_pulse_cannon_fire_01.ogg',
-    tachyon_fire: 'sounds/sfx_wpn_energy/tachyon_lance_fire_01.ogg',
-    autopulse_fire: 'sounds/sfx_wpn_energy/autopulse_laser_fire_01.ogg',
-    mark9_fire: 'sounds/sfx_wpn_guns/autocannon_fire_01.ogg',
-    mauler_fire: 'sounds/sfx_wpn_guns/mauler_fire_01.ogg',
-    hveldriver_fire: 'sounds/sfx_wpn_guns/hypervel_driver_fire_01.ogg',
-    annihilator_fire: 'sounds/sfx_wpn_missiles/annihilator_fire_01.ogg',
-    
-    // 舰船战术系统
-    burn_drive_activate: 'sounds/sfx_systems/burn_drive_activate.ogg',
-    burn_drive_loop: 'sounds/sfx_systems/burn_drive_loop.ogg',
-    burn_drive_deactivate: 'sounds/sfx_systems/burn_drive_deactivate.ogg',
-    fortress_shield_loop: 'sounds/sfx_systems/fortress_shield_loop.ogg',
-
-    // 护盾与幅能
-    shield_up: 'sounds/sfx_shields/shields_up_large.ogg',
-    shield_down: 'sounds/sfx_shields/shields_down_large.ogg',
-    shield_hit: 'sounds/sfx_impacts/shield_hit_heavy_01.ogg',
-    overload: 'sounds/sfx_shields/shields_burnout_oneshot.ogg',
-    flux_vent: 'sounds/sfx_flux/flux_vent.ogg',
-    flux_flush_loop: 'sounds/sfx_flux/flux_flush_loop.ogg',
-
-    // 碰撞与爆炸
-    ship_collision: 'sounds/sfx_impacts/collision_ship_vs_ship_01.ogg',
-    explosion: 'sounds/sfx_impacts/explosion_01.ogg',
-
-    // UI与火控
-    autofire_toggle: 'sounds/sfx_interface/autofire_toggle_01.ogg',
-
-    // 发动机环境音
-    engine_lotek: 'sounds/sfx_engines/engine_01_lotek_04_capital.ogg',
-    engine_hitek: 'sounds/sfx_engines/engine_03_hitek_04_capital.ogg',
-
-    // 相位系统与水雷打击
-    phase_activate: 'sounds/sfx_systems/phase_cloak_activate.ogg',
-    phase_deactivate: 'sounds/sfx_systems/phase_cloak_deactivate.ogg',
-    mine_teleport: 'sounds/sfx_systems/mine_strike_teleport_01.ogg',
-    mine_ping: 'sounds/sfx_systems/mine_strike_pinged_01.ogg',
-    mine_windup: 'sounds/sfx_systems/mine_strike_windup_01.ogg',
-    mine_explosion: 'sounds/sfx_systems/mine_strike_explosion_01.ogg',
-
-    // 新增武器音效
-    heavyblaster_fire: 'sounds/sfx_wpn_energy/heavy_blaster_fire_01.ogg',
-    pdburst_fire: 'sounds/sfx_wpn_energy/burst_pd_fire_01.ogg',
-    sabot_fire: 'sounds/sfx_wpn_missiles/annihilator_fire_01.ogg',
-    typhoon_fire: 'sounds/sfx_wpn_missiles/annihilator_fire_01.ogg',
-    lightmg_fire: 'sounds/sfx_wpn_guns/light_machinegun_fire_01.ogg',
-    flak_fire: 'sounds/sfx_wpn_guns/flak_fire_01.ogg',
-    flak_explosion: 'sounds/sfx_systems/canister_flak_explosion_01.ogg',
-    flare_launch: 'sounds/sfx_systems/flare_launcher_active_triplet.ogg',
-    missile_warning: 'sounds/sfx_interface/ui_radar_detect_missile.ogg',
-    missile_explosion: 'sounds/sfx_impacts/explosion_missile_01.ogg',
-
-    // 战术地图与战机指令音效
-    map_open: 'sounds/sfx_interface/ui_command_select_command_ui_icon.ogg',
-    map_close: 'sounds/sfx_interface/ui_command_select_command_ui_icon.ogg',
-    radar_ping: 'sounds/sfx_interface/ui_radar_detect_vessel.ogg',
-    fighter_recall: 'sounds/sfx_interface/fighter_recall_activate.ogg',
-    fighter_deploy: 'sounds/sfx_interface/fighter_recall_deactivate.ogg',
-    command_engage: 'sounds/sfx_interface/ui_command_right_click_command_given.ogg',
-    command_waypoint: 'sounds/sfx_interface/ui_command_create_waypoint.ogg',
-    command_refund: 'sounds/sfx_interface/ui_command_refund_command_point.ogg',
-    command_out_of_cp: 'sounds/sfx_interface/ui_command_out_of_command_points.ogg',
-    command_deselect: 'sounds/sfx_interface/ui_command_selection_cleared.ogg',
-
-    // 小行星撞击与鱼雷
-    collision_asteroid_ship: 'sounds/sfx_impacts/collision_ship_vs_asteroid_01.ogg',
-    collision_asteroid_asteroid: 'sounds/sfx_impacts/collision_asteroid_vs_asteroid_01.ogg',
-    fighter_explosion: 'sounds/sfx_impacts/explosion_03_fighter.ogg',
-    atropos_fire: 'sounds/sfx_wpn_missiles/annihilator_fire_01.ogg',
-
-    // 引擎熄火故障与通讯日志
-    engine_flameout: 'sounds/sfx_systems/combat_readiness_malfunctions_engine_01.ogg',
-    flameout_alarm: 'sounds/sfx_interface/combat_readiness_malfunctions_alarm_flagship_01.ogg',
-    comm_radio: 'sounds/sfx_interface/ui_channel_comm_local_01.ogg',
-    comm_static: 'sounds/sfx_interface/ui_static01.ogg',
-
-    // 装甲实弹撞击、光束融蚀、次生殉爆与EMP放电
-    armor_hit_heavy: 'sounds/sfx_impacts/gun_hit_heavy_01.ogg',
-    armor_hit_solid: 'sounds/sfx_impacts/gun_hit_solid_01.ogg',
-    armor_hit_light: 'sounds/sfx_impacts/gun_hit_light_01.ogg',
-    beam_hit: 'sounds/sfx_impacts/beam_hit_01.ogg',
-    explosion_secondary: 'sounds/sfx_impacts/explosion_secondary_01.ogg',
-    emp_discharge: 'sounds/sfx_impacts/voltaic_discharge_impact_01.ogg',
-    emp_impact: 'sounds/sfx_systems/emp_emitter_impact_01.ogg',
-    disabled_large: 'sounds/sfx_systems/disabled_large.ogg',
-    ui_button_press: 'sounds/sfx_interface/ui_button_pressed.ogg',
-    weapon_malfunction_large: 'sounds/sfx_systems/combat_readiness_malfunctions_weapon_large_01.ogg',
-    weapon_malfunction_medium: 'sounds/sfx_systems/combat_readiness_malfunctions_weapon_medium_01.ogg',
-    weapon_malfunction_small: 'sounds/sfx_systems/combat_readiness_malfunctions_weapon_small_01.ogg'
-  };
+  public readonly SOUND_MAP = soundPaths;
 
   private masterGain: GainNode | null = null;
   private masterFilter: BiquadFilterNode | null = null;
   private isMuffled = false;
 
   private constructor() {}
+
+  /** Select actual sounds.json variants, not generic pitch jitter or substitute samples. */
+  private shotVariant(key: string): SoundVariant {
+    const variants = soundVariants(key);
+    if (!variants?.length) return { bufferKey: key, pitch: .95 + Math.random() * .1, volume: 1 };
+    const index = Math.floor(Math.random() * variants.length);
+    return { bufferKey: key + '@' + index, pitch: variants[index].pitch, volume: variants[index].volume };
+  }
 
   public static getInstance(): SoundManager {
     if (!SoundManager.instance) {
@@ -149,12 +68,13 @@ export class SoundManager {
 
   public preloadSounds(): Promise<void> {
     this.initContext();
-    if (this.preloadComplete) return Promise.resolve();
+    if (this.preloadedRevision === soundBankRevision()) return Promise.resolve();
     if (this.preloadPromise) return this.preloadPromise;
+    const revision = soundBankRevision();
     this.preloadPromise = Promise.all(
       Object.entries(this.SOUND_MAP).map(([key, relPath]) => this.loadBuffer(key, relPath))
     ).then(() => {
-      this.preloadComplete = true;
+      this.preloadedRevision = revision;
     }).finally(() => {
       this.preloadPromise = null;
     });
@@ -167,6 +87,8 @@ export class SoundManager {
     const inFlight = this.loadingBuffers.get(key);
     if (inFlight) return inFlight;
     if (!this.ctx) return Promise.resolve(null);
+    const shared = this.sampleLoads.get(relPath);
+    if (shared) return shared.then(buffer => { if (buffer) this.audioBuffers.set(key, buffer); return buffer; });
     const ctx = this.ctx;
     const request = (async () => {
       try {
@@ -183,6 +105,8 @@ export class SoundManager {
         this.loadingBuffers.delete(key);
       }
     })();
+    this.sampleLoads.set(relPath, request);
+    void request.then(buffer => { if (!buffer) this.sampleLoads.delete(relPath); });
     this.loadingBuffers.set(key, request);
     return request;
   }
@@ -191,92 +115,47 @@ export class SoundManager {
    * 播放单次原版音效
    */
   public play(key: string, volume = 0.8, playbackRate = 1.0) {
-    if (this.isMuted) return;
-    this.initContext();
-    if (!this.ctx) return;
-
-    const buffer = this.audioBuffers.get(key);
-    if (!buffer) {
-      // 延迟静默拉取
-      this.fetchAndPlay(key, volume, playbackRate);
-      return;
-    }
-
-    const source = this.ctx.createBufferSource();
-    source.buffer = buffer;
-    source.playbackRate.value = playbackRate * (0.95 + Math.random() * 0.1); // 微小音高晃动，还原真实枪炮多样感
-
-    const gainNode = this.ctx.createGain();
-    gainNode.gain.value = volume;
-
-    source.connect(gainNode);
-    if (this.masterGain) {
-      gainNode.connect(this.masterGain);
-    } else {
-      gainNode.connect(this.ctx.destination);
-    }
-    source.start(0);
+    this.playOneShot(key, volume, playbackRate);
   }
 
-  /**
-   * 空间立体双声道定位音效 (严格对齐 SoundPlayer.java)
-   * 根据声源与摄像机中心在屏幕横向位置进行立体声左右平移 (-1.0 左声道 ~ +1.0 右声道)，并进行指数距离衰减
-   */
-  public playAtPos(
-    key: string,
-    worldPos: { x: number; y: number },
-    listenerPos: { x: number; y: number },
-    volume = 0.8,
-    playbackRate = 1.0,
-    maxDist = 2800
-  ) {
-    if (this.isMuted) return;
-    this.initContext();
-    if (!this.ctx) return;
-
-    const buffer = this.audioBuffers.get(key);
-    if (!buffer) {
-      this.fetchAndPlay(key, volume, playbackRate);
-      return;
-    }
-
+  public playAtPos(key: string, worldPos: { x: number; y: number },
+    listenerPos: { x: number; y: number }, volume = 0.8, playbackRate = 1.0, maxDist = 2800) {
     const dx = worldPos.x - listenerPos.x;
-    const dy = worldPos.y - listenerPos.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > maxDist) return; // 超出听觉范围
-
-    const attenuation = Math.max(0.05, 1.0 - dist / maxDist);
-    const finalVolume = volume * attenuation;
-
-    const source = this.ctx.createBufferSource();
-    source.buffer = buffer;
-    source.playbackRate.value = playbackRate * (0.95 + Math.random() * 0.1);
-
-    const gainNode = this.ctx.createGain();
-    gainNode.gain.value = finalVolume;
-
-    // 立体声平移 (StereoPanner)
-    if (typeof (this.ctx as any).createStereoPanner === 'function') {
-      const panner = (this.ctx as any).createStereoPanner() as StereoPannerNode;
-      const pan = Math.max(-1.0, Math.min(1.0, dx / 1200));
-      panner.pan.value = pan;
-      source.connect(panner);
-      panner.connect(gainNode);
-    } else {
-      source.connect(gainNode);
-    }
-
-    if (this.masterGain) {
-      gainNode.connect(this.masterGain);
-    } else {
-      gainNode.connect(this.ctx.destination);
-    }
-    source.start(0);
+    const distance = Math.hypot(dx, worldPos.y - listenerPos.y);
+    if (distance > maxDist) return;
+    this.playOneShot(key, volume * Math.max(.05, 1 - distance / maxDist), playbackRate,
+      Math.max(-1, Math.min(1, dx / 1200)));
   }
 
-  /**
-   * 带最小时间间隔节流的音效播放 (防止 EMP 电弧、近防机枪等高频音效堆叠失真)
-   */
+  private playOneShot(key: string, volume: number, playbackRate: number, pan?: number) {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    const variant = this.shotVariant(key);
+    const emit = (buffer: AudioBuffer | null) => {
+      if (!buffer || !this.ctx || this.isMuted) return;
+      const source = this.ctx.createBufferSource();
+      source.buffer = buffer;
+      source.playbackRate.value = playbackRate * variant.pitch;
+      const gain = this.ctx.createGain();
+      gain.gain.value = volume * variant.volume;
+      if (pan !== undefined && this.ctx.createStereoPanner) {
+        const panner = this.ctx.createStereoPanner();
+        panner.pan.value = pan;
+        source.connect(panner);
+        panner.connect(gain);
+      } else source.connect(gain);
+      gain.connect(this.masterGain ?? this.ctx.destination);
+      source.start(0);
+    };
+    const buffer = this.audioBuffers.get(variant.bufferKey);
+    if (buffer) emit(buffer);
+    else if (this.SOUND_MAP[variant.bufferKey]) {
+      // Keep both the selected variant and positional attenuation after async loading.
+      void this.loadBuffer(variant.bufferKey, this.SOUND_MAP[variant.bufferKey]).then(emit);
+    }
+  }
+
   public playThrottled(key: string, intervalSeconds = 0.08, volume = 0.8, playbackRate = 1.0) {
     if (!this.ctx) {
       this.initContext();
@@ -306,13 +185,6 @@ export class SoundManager {
     }
   }
 
-  private async fetchAndPlay(key: string, volume: number, playbackRate: number) {
-    const relPath = this.SOUND_MAP[key];
-    if (!relPath || !this.ctx) return;
-    const buffer = await this.loadBuffer(key, relPath);
-    if (buffer && !this.isMuted) this.play(key, volume, playbackRate);
-  }
-
   /**
    * 播放循环音效 (如冲刺推进持续轰鸣 / 堡垒护盾蜂鸣)
    */
@@ -321,15 +193,20 @@ export class SoundManager {
     this.initContext();
     if (!this.ctx) return;
 
-    const buffer = this.audioBuffers.get(key);
-    if (!buffer) return;
+    const variant = this.shotVariant(key);
+    const buffer = this.audioBuffers.get(variant.bufferKey);
+    if (!buffer) {
+      if (this.SOUND_MAP[variant.bufferKey]) void this.loadBuffer(variant.bufferKey, this.SOUND_MAP[variant.bufferKey]);
+      return;
+    }
 
     const source = this.ctx.createBufferSource();
     source.buffer = buffer;
     source.loop = true;
+    source.playbackRate.value = soundVariants(key) ? variant.pitch : 1;
 
     const gainNode = this.ctx.createGain();
-    gainNode.gain.value = volume;
+    gainNode.gain.value = volume * (soundVariants(key) ? variant.volume : 1);
 
     source.connect(gainNode);
     if (this.masterGain) {
@@ -354,9 +231,10 @@ export class SoundManager {
     }
   }
 
-  public toggleMute(): boolean {
-    this.isMuted = !this.isMuted;
-    this.initContext();
+  public getMuted(): boolean { return this.isMuted; }
+
+  public setMuted(muted: boolean): void {
+    this.isMuted = muted;
     if (this.masterGain && this.ctx) {
       try {
         this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : 1, this.ctx.currentTime);
@@ -367,6 +245,10 @@ export class SoundManager {
     if (this.isMuted) {
       for (const key of Array.from(this.loopingSources.keys())) this.stopLoop(key);
     }
+  }
+
+  public toggleMute(): boolean {
+    this.setMuted(!this.isMuted);
     return this.isMuted;
   }
 }

@@ -1,0 +1,415 @@
+{
+  "ships": {
+    "onslaught": {
+      "visualProfile": {
+        "hullTint": [
+          1,
+          1,
+          1
+        ],
+        "phaseColor": [
+          0.34,
+          0.62,
+          1
+        ],
+        "overloadColor": [
+          0.3,
+          0.82,
+          1
+        ],
+        "shieldProfile": "lowTech",
+        "vent": {
+          "fringeColor": [
+            125,
+            0,
+            155
+          ],
+          "coreColor": [
+            255,
+            255,
+            255
+          ]
+        },
+        "explosion": {
+          "flash": 1.28,
+          "fireball": 1.18,
+          "shockwave": 1.22,
+          "smoke": 1.35,
+          "debris": 1.22
+        }
+      },
+      "debrisColor": [
+        125,
+        110,
+        95
+      ]
+    },
+    "paragon": {
+      "visualProfile": {
+        "hullTint": [
+          1,
+          1,
+          1
+        ],
+        "phaseColor": [
+          0.38,
+          0.58,
+          1
+        ],
+        "overloadColor": [
+          0.52,
+          0.66,
+          1
+        ],
+        "shieldProfile": "highTech",
+        "fortressShieldProfile": "fortress",
+        "vent": {
+          "fringeColor": [
+            125,
+            0,
+            155
+          ],
+          "coreColor": [
+            255,
+            255,
+            255
+          ]
+        },
+        "explosion": {
+          "flash": 1.2,
+          "fireball": 1.1,
+          "shockwave": 1.18,
+          "smoke": 1.1,
+          "debris": 1.08
+        }
+      },
+      "debrisColor": [
+        100,
+        130,
+        160
+      ]
+    },
+    "doom": {
+      "visualProfile": {
+        "hullTint": [
+          1,
+          1,
+          1
+        ],
+        "phaseColor": [
+          0.46,
+          0.3,
+          1
+        ],
+        "overloadColor": [
+          0.46,
+          0.72,
+          1
+        ],
+        "shieldProfile": "highTech",
+        "vent": {
+          "fringeColor": [
+            125,
+            0,
+            155
+          ],
+          "coreColor": [
+            255,
+            255,
+            255
+          ]
+        },
+        "explosion": {
+          "flash": 1.12,
+          "fireball": 1.06,
+          "shockwave": 1.08,
+          "smoke": 1.12,
+          "debris": 1.08
+        }
+      },
+      "debrisColor": [
+        100,
+        130,
+        160
+      ]
+    },
+    "broadsword": {
+      "visualProfile": {
+        "hullTint": [
+          1,
+          1,
+          1
+        ],
+        "phaseColor": [
+          0.34,
+          0.62,
+          1
+        ],
+        "overloadColor": [
+          0.35,
+          0.8,
+          1
+        ],
+        "shieldProfile": "highTech",
+        "vent": {
+          "fringeColor": [
+            125,
+            0,
+            155
+          ],
+          "coreColor": [
+            255,
+            255,
+            255
+          ]
+        },
+        "explosion": {
+          "flash": 1,
+          "fireball": 1,
+          "shockwave": 1,
+          "smoke": 1,
+          "debris": 1
+        }
+      },
+      "debrisColor": [
+        100,
+        130,
+        160
+      ]
+    },
+    "dagger": {
+      "visualProfile": {
+        "hullTint": [
+          1,
+          1,
+          1
+        ],
+        "phaseColor": [
+          0.34,
+          0.62,
+          1
+        ],
+        "overloadColor": [
+          0.35,
+          0.8,
+          1
+        ],
+        "shieldProfile": "highTech",
+        "vent": {
+          "fringeColor": [
+            125,
+            0,
+            155
+          ],
+          "coreColor": [
+            255,
+            255,
+            255
+          ]
+        },
+        "explosion": {
+          "flash": 1,
+          "fireball": 1,
+          "shockwave": 1,
+          "smoke": 1,
+          "debris": 1
+        }
+      },
+      "debrisColor": [
+        100,
+        130,
+        160
+      ]
+    }
+  },
+  "weapons": {
+    "tpc": {
+      "visualProfile": {
+        "muzzleScale": 1,
+        "glowScale": 1,
+        "trailScale": 1,
+        "impactScale": 1,
+        "coreScale": 1,
+        "brightness": 1,
+        "fadeSeconds": 0.18
+      }
+    },
+    "tachyonlance": {
+      "visualProfile": {
+        "muzzleScale": 0.82,
+        "glowScale": 1,
+        "trailScale": 1,
+        "impactScale": 1.22,
+        "coreScale": 1,
+        "brightness": 1,
+        "fadeSeconds": 0.1
+      }
+    },
+    "autopulse": {
+      "visualProfile": {
+        "muzzleScale": 1,
+        "glowScale": 1,
+        "trailScale": 1,
+        "impactScale": 1,
+        "coreScale": 1,
+        "brightness": 1,
+        "fadeSeconds": 0.18
+      }
+    },
+    "mark9": {
+      "visualProfile": {
+        "muzzleScale": 1,
+        "glowScale": 0.82,
+        "trailScale": 1,
+        "impactScale": 0.94,
+        "coreScale": 0.72,
+        "brightness": 1,
+        "fadeSeconds": 0.14
+      }
+    },
+    "heavymauler": {
+      "visualProfile": {
+        "muzzleScale": 1,
+        "glowScale": 0.82,
+        "trailScale": 1,
+        "impactScale": 0.94,
+        "coreScale": 0.72,
+        "brightness": 1,
+        "fadeSeconds": 0.14
+      }
+    },
+    "hveldriver": {
+      "visualProfile": {
+        "muzzleScale": 1,
+        "glowScale": 0.82,
+        "trailScale": 1,
+        "impactScale": 0.94,
+        "coreScale": 0.72,
+        "brightness": 1,
+        "fadeSeconds": 0.14
+      }
+    },
+    "annihilatorpod": {
+      "visualProfile": {
+        "muzzleScale": 0.95,
+        "glowScale": 1.16,
+        "trailScale": 1.2,
+        "impactScale": 1.34,
+        "coreScale": 0.62,
+        "brightness": 1.05,
+        "fadeSeconds": 0.24
+      }
+    },
+    "gravitonbeam": {
+      "visualProfile": {
+        "muzzleScale": 0.82,
+        "glowScale": 1,
+        "trailScale": 1,
+        "impactScale": 1.22,
+        "coreScale": 1,
+        "brightness": 1,
+        "fadeSeconds": 0.1
+      }
+    },
+    "taclaser": {
+      "visualProfile": {
+        "muzzleScale": 0.82,
+        "glowScale": 1,
+        "trailScale": 1,
+        "impactScale": 1.22,
+        "coreScale": 1,
+        "brightness": 1,
+        "fadeSeconds": 0.1
+      }
+    },
+    "heavyblaster": {
+      "visualProfile": {
+        "muzzleScale": 1.22,
+        "glowScale": 1,
+        "trailScale": 1,
+        "impactScale": 1.24,
+        "coreScale": 1,
+        "brightness": 1,
+        "fadeSeconds": 0.18
+      }
+    },
+    "typhoon": {
+      "visualProfile": {
+        "muzzleScale": 0.95,
+        "glowScale": 1.16,
+        "trailScale": 1.2,
+        "impactScale": 1.34,
+        "coreScale": 0.62,
+        "brightness": 1.05,
+        "fadeSeconds": 0.24
+      },
+      "impactFamily": "HEAVY_TORPEDO"
+    },
+    "sabot": {
+      "visualProfile": {
+        "muzzleScale": 0.95,
+        "glowScale": 1.16,
+        "trailScale": 1.2,
+        "impactScale": 1.34,
+        "coreScale": 0.62,
+        "brightness": 1.05,
+        "fadeSeconds": 0.24
+      }
+    },
+    "lightmg": {
+      "visualProfile": {
+        "muzzleScale": 1,
+        "glowScale": 1,
+        "trailScale": 1,
+        "impactScale": 1.24,
+        "coreScale": 0.52,
+        "brightness": 1.15,
+        "fadeSeconds": 0.18
+      }
+    },
+    "pdburst": {
+      "visualProfile": {
+        "muzzleScale": 0.82,
+        "glowScale": 1,
+        "trailScale": 1,
+        "impactScale": 1.22,
+        "coreScale": 1,
+        "brightness": 1,
+        "fadeSeconds": 0.1
+      }
+    },
+    "atropos_single": {
+      "visualProfile": {
+        "muzzleScale": 0.95,
+        "glowScale": 1.16,
+        "trailScale": 1.2,
+        "impactScale": 1.34,
+        "coreScale": 0.62,
+        "brightness": 1.05,
+        "fadeSeconds": 0.24
+      }
+    },
+    "flak": {
+      "visualProfile": {
+        "muzzleScale": 1,
+        "glowScale": 0.82,
+        "trailScale": 1,
+        "impactScale": 0.94,
+        "coreScale": 0.72,
+        "brightness": 1,
+        "fadeSeconds": 0.14
+      }
+    },
+    "dualflak": {
+      "visualProfile": {
+        "muzzleScale": 1,
+        "glowScale": 0.82,
+        "trailScale": 1,
+        "impactScale": 0.94,
+        "coreScale": 0.72,
+        "brightness": 1,
+        "fadeSeconds": 0.14
+      }
+    }
+  }
+}

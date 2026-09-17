@@ -1,19 +1,20 @@
-import { visualRandom } from '../../RenderDeterminism';
+import mineSpec from '../../../data/generated/mine-spec.json';
+import { visualRandom, visualObjectRandom } from '../../RenderDeterminism';
 import { CombatEngine } from '../../../simulation/CombatEngine';
 import { WebGLPassContext } from '../WebGLPassContext';
-import { Ship } from '../../../simulation/Ship';
 import { Vector2 } from '../../../math/Vector2';
-import { getExplosionVisualProfile, getShipVisualProfile, SHIELD_VISUAL_PROFILES } from '../../../visual/VisualProfiles';
+import { getExplosionVisualProfile } from '../../../visual/VisualProfiles';
+import { hitParticleDuration } from '../../../visual/ExplosionVisuals';
 
 /**
  * 特效与护盾渲染通道 (WebGLFXPass)
  * 职责:
  * 1. 折跃空间水雷 (Spatial Mines)
- * 2. 能量护盾极坐标着色器 (WebGLShieldShader: 极坐标扇区剪裁与受击动态涟漪)
- * 3. 护盾受击扩张光环与冲击波 (Shield Impact Ripples & Global Ripples)
+ * 2. 能量护盾扇形网格 (WebGLShieldShader: 分段受击亮度与纹理边缘)
+ * 3. 武器接触闪光与冲击效果 (Weapon Contact FX)
  * 4. EMP 闪电电弧 (EMP Arcs)
  * 5. 粒子与火星 (Sparks & Dust Particles)
- * 6. 原版官方爆炸翻页书火球与白热冲击波环 (Explosions & Shockwaves)
+ * 6. 固定纹理爆炸粒子、闪光与冲击波 (Explosions & Shockwaves)
  * 7. 金属装甲战损碎片 (Debris Particles)
  */
 export class WebGLFXPass {
@@ -21,10 +22,10 @@ export class WebGLFXPass {
     engine: CombatEngine,
     ctx: WebGLPassContext,
     nowSec: number,
-    enemyPos: Vector2,
-    enemyFacing: number,
-    playerPos: Vector2,
-    playerFacing: number,
+    _enemyPos: Vector2,
+    _enemyFacing: number,
+    _playerPos: Vector2,
+    _playerFacing: number,
     layers: { shield: boolean; explosion: boolean } = { shield: true, explosion: true }
   ) {
     const { batcher, textures, shieldShader, hitGlowTex, whiteTex } = ctx;
@@ -33,57 +34,43 @@ export class WebGLFXPass {
 
     // 1. 绘制折跃空间水雷 (Spatial Mines)
     if (renderExplosionLayer && engine.mines.length > 0) {
-      const mineBase = textures.getTexture('/game-assets/graphics/missiles/heavy_mine2.png');
-      const mineGlow = textures.getTexture('/game-assets/graphics/missiles/heavy_mine2_glow.png');
+      const mineBase = textures.getTexture('/game-assets/' + mineSpec.sprite);
+      const mineGlow = textures.getTexture('/game-assets/' + mineSpec.glowSprite);
       for (const m of engine.mines) {
         batcher.setBlendMode('NORMAL');
-        batcher.drawSprite(mineBase, m.pos.x, m.pos.y, 48, 48, m.rotation, 0, 0);
+        const alpha = Math.min(1, m.age / 0.5);
+        batcher.drawSprite(mineBase, m.pos.x, m.pos.y, ...mineSpec.size as [number, number], m.rotation, 0, 0, 1, 1, 1, alpha);
 
         batcher.setBlendMode('ADDITIVE');
-        const glowAlpha = m.isDetonating ? 0.95 : 0.65;
-        batcher.drawSprite(mineGlow, m.pos.x, m.pos.y, 48, 48, m.rotation, 0, 0, 1.0, 0.35, 0.35, glowAlpha);
+        const c = mineSpec.glowColor;
+        const primedAge = mineSpec.behaviorSpec.delay - m.detonatingTimer;
+        const progress = 1 - Math.max(0.1, m.detonatingTimer) / mineSpec.behaviorSpec.delay;
+        // GuidedProximityFuseAI source flash function; no unrelated idle pulse.
+        const flash = m.isDetonating ? Math.max(0, Math.min(1, 2 * Math.cos(progress * progress * 100) * Math.min(1, primedAge / 0.5))) : 0;
+        batcher.drawSprite(mineGlow, m.pos.x, m.pos.y, ...mineSpec.size as [number, number], m.rotation, 0, 0, c[0] / 255, c[1] / 255, c[2] / 255, alpha * (m.isDetonating ? flash : 1));
       }
     }
 
-    // 2. 绘制能量护盾 (Shields: 专用 GPU 极坐标扇区剪裁 Shader)
+    // 2. 绘制能量护盾 (Shields: 分段扇形网格与纹理边缘)
     batcher.flush();
-    const mainShieldTex = textures.getTexture('/game-assets/graphics/fx/shields256.png');
-
-    const enemyShieldPos = engine.enemyShip.getShieldCenter(enemyPos, enemyFacing);
-    const playerShieldPos = engine.playerShip.getShieldCenter(playerPos, playerFacing);
+    const shieldRimTex = textures.getTexture('/game-assets/graphics/hud/line8x8.png');
 
     if (renderShieldLayer) {
-      shieldShader.renderShield(batcher.currentViewProj, engine.enemyShip, enemyShieldPos, enemyFacing, mainShieldTex, nowSec);
-      shieldShader.renderShield(batcher.currentViewProj, engine.playerShip, playerShieldPos, playerFacing, mainShieldTex, nowSec);
+      for (const ship of engine.ships) {
+        if (ship.isDead) continue;
+        const facing = ship.interpolatedFacing(ctx.alpha);
+        const center = ship.getShieldCenter(ship.interpolatedPos(ctx.alpha), facing);
+        const mainShieldTex = textures.getTexture(ship.shield.radius >= 128
+          ? '/game-assets/graphics/fx/shields256.png'
+          : ship.shield.radius >= 64 ? '/game-assets/graphics/fx/shields128c.png' : '/game-assets/graphics/fx/shields64.png');
+        shieldShader.renderShield(batcher.currentViewProj, ship, center, facing, mainShieldTex, nowSec, shieldRimTex);
+      }
     }
 
     // 恢复 SpriteBatcher 程序与 VAO 状态
     batcher.resumeProgram();
 
-    // 3. 护盾受击接触能量闪光 (1:1 Starsector Official: hit_glow.png 闪光耀斑与粒子，严禁盖章全尺寸圆环)
-    const renderShieldImpacts = (ship: Ship, sCenter: Vector2) => {
-      const shield = ship.shield;
-      if (!shield.isActive || shield.radius <= 0) return;
-      const shipVisual = getShipVisualProfile(ship.spec.id);
-      const isFortress = ship.system.type === 'FORTRESS_SHIELD' && ship.system.isActive;
-      const shieldVisual = SHIELD_VISUAL_PROFILES[isFortress ? (shipVisual.fortressShieldProfile ?? 'fortress') : shipVisual.shieldProfile];
-      batcher.setBlendMode('ADDITIVE');
-      for (const rip of shield.ripples) {
-        const hx = sCenter.x + Math.cos(rip.angle) * shield.radius;
-        const hy = sCenter.y + Math.sin(rip.angle) * shield.radius;
-        const [rr, rg, rb] = rip.color || [255, 200, 100];
-        const gSize = 35 * shieldVisual.hitFlash * (0.8 + rip.intensity * 0.6);
-
-        // 外层能量耀斑
-        batcher.drawSprite(hitGlowTex, hx, hy, gSize * 1.5, gSize * 1.5, 0, 0, 0, rr / 255, rg / 255, rb / 255, rip.intensity * 0.85);
-        // 白热碰撞核心
-        batcher.drawSprite(hitGlowTex, hx, hy, gSize * 0.6, gSize * 0.6, 0, 0, 0, 1.0, 1.0, 1.0, rip.intensity);
-      }
-    };
-    if (renderShieldLayer) {
-      renderShieldImpacts(engine.enemyShip, enemyShieldPos);
-      renderShieldImpacts(engine.playerShip, playerShieldPos);
-    }
+    // Shield-local response is already in the surface mesh; weapon contact FX remain below.
 
     // 4. 全局护盾冲击波 (Global Shield Ripples: 柔和光晕扩散)
     if (renderShieldLayer && engine.shieldRipples.length > 0) {
@@ -100,6 +87,25 @@ export class WebGLFXPass {
     if (renderExplosionLayer && engine.empArcs.length > 0) {
       batcher.setBlendMode('ADDITIVE');
       for (const arc of engine.empArcs) {
+        if (arc.native) {
+          const state = arc.native;
+          batcher.flush();
+          ctx.ribbonBatcher.begin(batcher.currentViewProj);
+          ctx.ribbonBatcher.drawNativeEmpArc(
+            textures.getTexture('/game-assets/graphics/fx/beamfringeb.png', true),
+            textures.getTexture('/game-assets/graphics/fx/beamcoreb.png', true), arc);
+          ctx.ribbonBatcher.end();
+          batcher.resumeProgram();
+          batcher.setBlendMode('ADDITIVE');
+          const glow = (point: Vector2, diameter: number, white: boolean) => {
+            const color = white ? [255, 255, 255, 255] : state.fringe;
+            batcher.drawSprite(hitGlowTex, point.x, point.y, diameter, diameter, 0, 0, 0,
+              color[0] / 255, color[1] / 255, color[2] / 255, Math.trunc(color[3] * state.brightness) / 255);
+          };
+          glow(arc.endPos, 100, false); glow(arc.endPos, 25, true);
+          glow(arc.startPos, 50, false); glow(arc.startPos, 12.5, true);
+          continue;
+        }
         const progress = Math.max(0, Math.min(1.0, arc.life / (arc.maxLife || 0.22)));
         const flicker = 0.72 + visualRandom('webgl/passes/WebGLFXPass.ts#1') * 0.28;
         const arcAlpha = progress * flicker;
@@ -139,14 +145,46 @@ export class WebGLFXPass {
       }
     }
 
-    // 6. 绘制粒子与火星 (1:1 SmoothParticle.java: 必须使用柔和高斯光晕贴图与加色混合，严禁使用硬边单色白方块)
+    // 6. 通用现代粒子层：按材质分组以减少纹理/Blend 切换，并让火花、辉光、烟尘拥有不同的形状语义。
     if (renderExplosionLayer && engine.particles && engine.particles.length > 0) {
-      batcher.setBlendMode('ADDITIVE');
       const sparkTex = textures.getTexture('/game-assets/graphics/fx/particlealpha32sq.png');
+      const smokeTex = textures.getTexture('/game-assets/graphics/fx/contrail64b.png');
+
+      // 6.1 柔光能量团：单独成批，避免和高速火花来回切 hit_glow 纹理。
+      batcher.setBlendMode('ADDITIVE');
       for (const part of engine.particles) {
+        if (part.material !== 'GLOW' || part.alpha <= 0.001) continue;
         const [r, g, b] = part.color;
-        const pSize = part.size * 2.5;
-        batcher.drawSprite(sparkTex, part.pos.x, part.pos.y, pSize, pSize, 0, 0, 0, r / 255, g / 255, b / 255, part.alpha);
+        const size = part.size * 2.15;
+        batcher.drawSprite(hitGlowTex, part.pos.x, part.pos.y, size, size, part.rotation ?? 0, 0, 0, r / 255, g / 255, b / 255, part.alpha);
+      }
+
+      // 6.2 火花/旧粒子：高速粒子沿速度方向拉伸，并叠一条更细的白热芯。
+      // 这比增加粒子数量更能提升细节，同时仍保持一个纹理批次。
+      for (const part of engine.particles) {
+        if (part.material === 'GLOW' || part.material === 'SMOKE' || part.alpha <= 0.001) continue;
+        const [r, g, b] = part.color;
+        if (part.material === 'SPARK') {
+          const speed = part.vel.length();
+          const angle = speed > 0.001 ? part.vel.heading() : (part.rotation ?? 0);
+          const width = Math.max(1, part.size * 1.25);
+          const stretch = part.stretch ?? 1;
+          const length = width * Math.min(8.5, 1.25 + speed * 0.012 * stretch);
+          batcher.drawSprite(sparkTex, part.pos.x, part.pos.y, length, width, angle, 0, 0, r / 255, g / 255, b / 255, part.alpha);
+          batcher.drawSprite(sparkTex, part.pos.x, part.pos.y, length * 0.58, Math.max(0.8, width * 0.34), angle, 0, 0, 1, 1, 1, part.alpha * 0.86);
+        } else {
+          // Native SmoothParticle renders exactly its authored size, without stretch or a white core.
+          const pSize = part.material === 'SOURCE_SMOOTH' ? part.size : part.size * 2.5;
+          batcher.drawSprite(sparkTex, part.pos.x, part.pos.y, pSize, pSize, part.rotation ?? 0, 0, 0, r / 255, g / 255, b / 255, part.alpha);
+        }
+      }
+
+      // 6.3 烟尘使用 source-over；生命周期曲线已经在 CombatFXSystem 中完成，渲染层只负责批量采样。
+      batcher.setBlendMode('NORMAL');
+      for (const part of engine.particles) {
+        if (part.material !== 'SMOKE' || part.alpha <= 0.001) continue;
+        const [r, g, b] = part.color;
+        batcher.drawSprite(smokeTex, part.pos.x, part.pos.y, part.size, part.size, part.rotation ?? 0, 0, 0, r / 255, g / 255, b / 255, part.alpha);
       }
     }
 
@@ -177,14 +215,15 @@ export class WebGLFXPass {
       }
     }
 
-    // 6.75 来源投射物命中辉光：独立于 explosion 翻页书，半径直接来自 .proj hitGlowRadius。
+    // Native addHitParticle: independent constant-size sprites with linear, byte-quantized alpha.
     if (renderExplosionLayer && engine.hitGlows.length > 0) {
       batcher.setBlendMode('ADDITIVE');
       for (const glow of engine.hitGlows) {
-        const alpha = Math.max(0, glow.life / glow.maxLife);
+        const remaining = Math.max(0, glow.life / glow.maxLife);
+        const alpha = Math.trunc(glow.peakAlpha * 255 * remaining) / 255;
         const [r, g, b] = glow.color;
-        const diameter = glow.radius * 2;
-        batcher.drawSprite(hitGlowTex, glow.pos.x, glow.pos.y, diameter, diameter, 0, 0, 0, r / 255, g / 255, b / 255, alpha);
+        batcher.drawSprite(hitGlowTex, glow.pos.x, glow.pos.y, glow.diameter, glow.diameter,
+          0, 0, 0, r / 255, g / 255, b / 255, alpha);
       }
     }
 
@@ -194,6 +233,51 @@ export class WebGLFXPass {
     for (const exp of renderExplosionLayer ? engine.explosions : []) {
       const progress = Math.max(0, Math.min(1.0, 1.0 - exp.life / exp.maxLife));
       const [er, eg, eb] = exp.color;
+      const elapsed = exp.maxLife - exp.life;
+      if (exp.puffs) {
+        batcher.setBlendMode('ADDITIVE');
+        const puffDuration = exp.puffDuration ?? exp.maxLife;
+        const puffProgress = Math.min(1, elapsed / puffDuration);
+        for (const puff of puffProgress < 1 ? exp.puffs : []) {
+          const tex = puff.texture === 3 ? expRingTex : textures.getTexture(`/game-assets/graphics/fx/explosion${puff.texture}.png`);
+          const size = puff.startSize + (puff.endSize - puff.startSize) * puffProgress;
+          batcher.drawSprite(tex, exp.pos.x + puff.offset.x + puff.velocity.x * elapsed,
+            exp.pos.y + puff.offset.y + puff.velocity.y * elapsed, size, size, puff.rotation,
+            0, 0, er / 255, eg / 255, eb / 255, (1 - puffProgress) * 50 / 255);
+        }
+        if (exp.flash && elapsed < exp.flash.duration) {
+          const flash = exp.flash;
+          batcher.drawSprite(hitGlowTex, exp.pos.x + flash.velocity.x * elapsed, exp.pos.y + flash.velocity.y * elapsed,
+            flash.diameter, flash.diameter, 0, 0, 0, flash.color[0] / 255, flash.color[1] / 255, flash.color[2] / 255,
+            1 - elapsed / flash.duration);
+          if (flash.coreDiameter) {
+            batcher.drawSprite(hitGlowTex, exp.pos.x + flash.velocity.x * elapsed, exp.pos.y + flash.velocity.y * elapsed,
+              flash.coreDiameter, flash.coreDiameter, 0, 0, 0, 1, 1, 1, 1 - elapsed / flash.duration);
+          }
+        }
+        if (exp.flare && elapsed < 2.25) {
+          const flare = exp.flare;
+          const brightness = elapsed < 0.25 ? Math.sqrt(elapsed / 0.25) : Math.pow(1 - (elapsed - 0.25) / 2, 2);
+          const tex = textures.getTexture('/game-assets/graphics/fx/starburst_glow1.png');
+          const x = exp.pos.x + flare.velocity.x * elapsed;
+          const y = exp.pos.y + flare.velocity.y * elapsed;
+          batcher.drawSprite(tex, x, y, flare.width, flare.height, 0, 0, 0,
+            flare.color[0] / 255, flare.color[1] / 255, flare.color[2] / 255, brightness);
+          batcher.drawSprite(tex, x, y, flare.width, flare.height * 0.33, 0, 0, 0, 1, 1, 1, brightness);
+        }
+        continue;
+      }
+      if (exp.sourceAuthored) {
+        // Missile.explode -> ship/A/class.java: colored diameter 2r, white diameter .5r.
+        const diameter = exp.maxRadius * 2;
+        const core = exp.maxRadius * 0.5;
+        batcher.setBlendMode('ADDITIVE');
+        batcher.drawSprite(hitGlowTex, exp.pos.x, exp.pos.y, diameter, diameter, 0, 0, 0,
+          er / 255, eg / 255, eb / 255, Math.max(0, 1 - elapsed / hitParticleDuration(diameter)));
+        batcher.drawSprite(hitGlowTex, exp.pos.x, exp.pos.y, core, core, 0, 0, 0,
+          1, 1, 1, Math.max(0, 1 - elapsed / hitParticleDuration(core)));
+        continue;
+      }
       const explosionVisual = exp.sourceAuthored
         ? { flash: 1, fireball: 1, shockwave: 0, smoke: 0, debris: 0 }
         : getExplosionVisualProfile(exp.maxRadius, exp.visualKind ?? 'impact', exp.sourceShipId);
@@ -205,6 +289,34 @@ export class WebGLFXPass {
         batcher.setBlendMode('ADDITIVE');
         batcher.drawSprite(hitGlowTex, exp.pos.x, exp.pos.y, flashSize, flashSize, 0, 0, 0, er / 255, eg / 255, eb / 255, flashAlpha);
         batcher.drawSprite(hitGlowTex, exp.pos.x, exp.pos.y, flashSize * 0.55, flashSize * 0.55, 0, 0, 0, 1.0, 1.0, 1.0, flashAlpha * 0.8);
+      }
+
+      // 7.2 冲击波环      }
+
+      // 7.15 多层爆炸簇：主翻页书负责识别度，程序层负责热气、碎片和二次膨胀。
+      // 所有随机量来自稳定 seed，避免 render 帧率影响视觉。
+      if (exp.clusterSeed !== undefined && progress < 0.95) {
+        const cluster = exp.clusterSeed;
+        const fireAlpha = (1 - progress) * 0.5;
+        batcher.setBlendMode('ADDITIVE');
+        const inner = exp.maxRadius * (0.28 + progress * 0.18);
+        batcher.drawSprite(hitGlowTex, exp.pos.x, exp.pos.y, inner * 2, inner * 2, 0, 0, 0, er / 255, eg / 255, eb / 255, fireAlpha);
+
+        for (let i = 0; i < (exp.debrisCount ?? 0); i++) {
+          const angle = exp.rotation + i * 2.399 + visualObjectRandom(`cluster-${cluster}-${i}`) * 0.5;
+          const distance = exp.maxRadius * progress * (0.35 + visualObjectRandom(`cluster-speed-${cluster}-${i}`) * 0.8);
+          const px = exp.pos.x + Math.cos(angle) * distance;
+          const py = exp.pos.y + Math.sin(angle) * distance;
+          const size = 2 + exp.maxRadius * 0.018;
+          batcher.drawSprite(hitGlowTex, px, py, size, size, angle, 0, 0, 1, 0.62, 0.25, fireAlpha * 0.8);
+        }
+
+        if ((exp.smokeDensity ?? 0) > 0 && progress > 0.18) {
+          batcher.setBlendMode('NORMAL');
+          const smokeAlpha = Math.sin(Math.min(1, (progress - 0.18) / 0.82) * Math.PI) * exp.smokeDensity * 0.2;
+          const smokeSize = exp.maxRadius * (0.8 + progress * 0.8);
+          batcher.drawSprite(expSmokeTex, exp.pos.x, exp.pos.y, smokeSize, smokeSize, exp.rotation + progress, 0, 0, 0.12, 0.1, 0.08, smokeAlpha);
+        }
       }
 
       // 7.2 冲击波环
@@ -224,7 +336,7 @@ export class WebGLFXPass {
           batcher.setBlendMode('NORMAL');
           for (let i = 0; i < 4; i++) {
             const phase = exp.rotation + i * Math.PI * 0.5;
-            const wobble = 0.82 + visualRandom(`m3-explosion-smoke-${exp.id}-${i}`) * 0.36;
+            const wobble = 0.82 + visualObjectRandom(`m3-explosion-smoke-${exp.id}-${i}`) * 0.36;
             const offset = exp.maxRadius * (0.08 + progress * 0.18) * wobble;
             const sx = exp.pos.x + Math.cos(phase) * offset;
             const sy = exp.pos.y + Math.sin(phase) * offset;
@@ -238,8 +350,8 @@ export class WebGLFXPass {
       if (progress < 0.58 && explosionVisual.debris > 0) {
         batcher.setBlendMode('ADDITIVE');
         for (let i = 0; i < 6; i++) {
-          const phase = exp.rotation + i * Math.PI / 3 + visualRandom(`m3-explosion-debris-angle-${exp.id}-${i}`) * 0.35;
-          const travel = exp.maxRadius * progress * (0.45 + visualRandom(`m3-explosion-debris-speed-${exp.id}-${i}`) * 0.7);
+          const phase = exp.rotation + i * Math.PI / 3 + visualObjectRandom(`m3-explosion-debris-angle-${exp.id}-${i}`) * 0.35;
+          const travel = exp.maxRadius * progress * (0.45 + visualObjectRandom(`m3-explosion-debris-speed-${exp.id}-${i}`) * 0.7);
           const dx = exp.pos.x + Math.cos(phase) * travel;
           const dy = exp.pos.y + Math.sin(phase) * travel;
           const spark = 5 + exp.maxRadius * 0.025;

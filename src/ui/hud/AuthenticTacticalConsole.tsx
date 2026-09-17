@@ -3,118 +3,93 @@ import { Ship } from '../../engine/simulation/Ship';
 import { CombatEngine } from '../../engine/simulation/CombatEngine';
 import { i18n } from '../../engine/i18n/LocalizationManager';
 import { ShipPaperDoll } from './ShipPaperDoll';
-import { summarizeGroupAmmo } from './hudUtils';
+import { buildWeaponHudGroups, weaponHudHeight } from './WeaponHudModel';
+import type { WeaponGroupControls } from './WeaponGroupConsole';
+import { WeaponGroupConsole } from './WeaponGroupConsole';
+import type { CombatHudVisuals } from '../../engine/visual/CombatHudVisuals';
+import { HudMeter } from './HudMeter';
+import { runtimeAssetUrl } from '../../engine/runtime/RuntimePaths';
 
 export interface AuthenticTacticalConsoleProps {
   player: Ship;
   combatTime?: number;
   engine?: CombatEngine;
+  hudVisuals?: CombatHudVisuals;
+  weaponControls?: WeaponGroupControls;
 }
 
-/**
- * 1:1 原版左下角战术控制台 (AuthenticTacticalConsole)
- * 严格对齐官方实机原版照片 (media_1789200834134.png & hud_crop.png):
- * - 纯净荧光绿 (#94ff00) 军规 CRT 终端风格
- * - 左侧为 2D 舰船结构/装甲纸娃娃 (holo_status.png、航速、装甲网格动态受损、舰名铭牌)
- * - 右侧为核心控制台:
- *   - 顶部状态增益/减益浮标 (幅能排空/过载/零幅能加速/战备)
- *   - 第一行: 幅能 : [槽位与限位竖线]       0
- *   - 第二行: 结构 : [实心生命槽]           18000
- *   - 第三行: 战术系统 ----                 | 就绪
- *   - 45 度军规折角分隔线
- *   - 武器组标题
- *   - 1 ~ 5 号武器组 (组号、武器图标、名称、齐射/交替、伤害类型、自动开火: ■)
- *   - 逐门武器就绪与冷却指示器
- *   - 航母机库甲板中队战备
- */
-export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> = ({ player, engine }) => {
+/** Readable system text (user preference) and source meters; full layout is still being reconciled. */
+export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> = ({ player, engine, hudVisuals, weaponControls }) => {
   const isZeroFlux = player.flux.totalFlux <= 0 && !player.shield.isActive && !player.flux.isOverloaded;
   const speed = player.vel.length().toFixed(1);
-  const totalFlux = Math.round(player.flux.totalFlux);
-  const maxFlux = player.spec.maxFlux || 10000;
+  const totalFlux = Math.trunc(player.flux.totalFlux);
+  const maxFlux = player.flux.maxFlux || 10000;
   const fluxRatio = Math.min(1.0, Math.max(0, player.flux.totalFlux / maxFlux));
-  const hullHp = Math.round(player.hullHp);
-  const maxHull = player.spec.hitpoints || 15000;
+  const hullHp = Math.trunc(player.hullHp);
+  const maxHull = player.maxHullHp || 15000;
   const hullRatio = Math.min(1.0, Math.max(0, player.hullHp / maxHull));
 
   // 战术系统名称与状态
-  const systemName =
-    player.system.type === 'BURN_DRIVE'
-      ? '冲刺推进'
-      : player.system.type === 'FORTRESS_SHIELD'
-      ? '堡垒护盾'
-      : player.system.type === 'MINE_STRIKE'
-      ? '空雷突袭'
-      : '相位潜航';
+  const systemStatus = (system: typeof player.system) => !system.available ? '未接入 · 不可激活' : player.isDead || system.disabled ? '离线'
+    : system.state === 'IN' ? '启动中' : system.state === 'OUT' ? '关闭中' : system.isActive ? '运行中'
+    : system.isCoolingDown ? '冷却中 (' + system.cooldownTimer.toFixed(1) + 's)' : system.charges <= 0 ? '充能耗尽' : '就绪';
 
-  const systemStatus = player.system.isActive
-    ? '激活运行中'
-    : player.system.isCoolingDown
-    ? `冷却中 (${player.system.cooldownTimer.toFixed(1)}s)`
-    : '就绪';
-
-  // 1:1 原版战备与敌情感知 (RepairTracker.java & C.java)
-  const hasEnemiesInRange = player.areSignificantEnemiesInRange(2500, engine?.enemyShip);
+  // 原版参考战备与敌情感知 (RepairTracker.java & C.java)
+  const hasEnemiesInRange = player.areSignificantEnemiesInRange(2500, engine?.findHostile(player));
   const remainingPPT = Math.max(0, Math.ceil(player.peakPerformanceRemaining));
   const crPercent = Math.round(player.currentCR * 100);
   const isFlameout = player.getFlameoutRatio() > 0.05;
 
-  const damageTypeLabel = (type: string) => {
-    switch (type) {
-      case 'KINETIC': return '动能';
-      case 'HIGH_EXPLOSIVE': return '高爆';
-      case 'ENERGY': return '能量';
-      case 'FRAGMENTATION': return '破片';
-      default: return '能量';
-    }
-  };
+  const groups = buildWeaponHudGroups(player);
+  const groupHeight = Math.max(50, weaponHudHeight(groups));
+  const wingBand = engine?.playerWings.length ? 58 : 0;
+  // _return.setShip: pivot.x = 150 + contentHeight/2 + 1.5; anchor is at x=3.
+  const consolePivot = 148.5 + (groupHeight + wingBand) * 0.5;
 
   // 当前选中武器组的各门武器
   const activeGroup = player.weaponGroups[player.selectedGroupIndex];
   const activeMounts = activeGroup ? player.weapons.filter(w => activeGroup.weaponSlotIds.includes(w.slotId)) : [];
 
   return (
-    <div className="pointer-events-auto flex items-end font-mono select-none text-[#94ff00] text-[11px] leading-tight tracking-tight drop-shadow-[0_0_2px_rgba(148,255,0,0.6)]">
+    <div className="combat-console pointer-events-auto flex items-end ui-font select-none text-[#9bff00] text-[12px] leading-[15px]" style={{ '--console-pivot': `${consolePivot}px` } as React.CSSProperties}>
       {/* 1. 舰船结构与装甲纸娃娃 (Ship Structure Paper Doll & Hull Status) */}
-      <div className="flex flex-col items-start mr-3.5 pb-1 select-none">
+      <div className="combat-paperdoll flex flex-col items-start mr-3.5 pb-1 select-none">
         {/* 航速指示 */}
-        <div className="w-full pb-0.5 border-b border-[#94ff00]/60 mb-1 text-[11px] font-bold">
+        <div className="w-full pb-0.5 border-b border-[#9bff00]/60 mb-1 text-[11px] font-bold"><span className="hud-text">
           航速 &nbsp;{speed}
-        </div>
+        </span></div>
 
-        {/* 舰船结构/装甲纸娃娃画布 (1:1 官方 holo_status.png 同心准星与装甲损耗) */}
+        {/* 舰船结构/装甲纸娃娃画布 (原版参考 holo_status.png 同心准星与装甲损耗) */}
         <div className="w-[135px] h-[135px] relative flex items-center justify-center">
           <ShipPaperDoll ship={player} isEnemy={false} size={135} />
         </div>
 
         {/* 舰船铭牌与型号 */}
-        <div className="text-[10px] mt-1 space-y-0.5">
-          <div className="font-bold text-[#b4ff32] tracking-wider">
+        <div className="text-[10px] mt-1 space-y-0.5 w-[135px] break-words">
+          <div className="font-bold text-[#9bff00] tracking-wider"><span className="hud-text">
             {player.shipName}
-          </div>
-          <div className="text-[#94ff00] text-[10px]">
-            {i18n.t(player.spec.nameKey).split(' ')[0]}级
-          </div>
-          <div className="text-[#94ff00]/80 text-[9px]">
-            {player.spec.designation || (player.spec.designationKey ? i18n.t(player.spec.designationKey) : '战列舰')}
-          </div>
+          </span></div>
+
+          <div className="text-[#9bff00]/80 text-[9px]"><span className="hud-text">
+            {player.spec.designation || (player.spec.designationKey ? i18n.t(player.spec.designationKey) : '')}
+          </span></div>
         </div>
       </div>
 
       {/* 2. 核心战术控制台主体 (幅能、结构、系统、军规折线、武器组火控列表) */}
-      <div className="flex flex-col w-[320px]">
+      <div className="combat-console-body flex flex-col w-[340px]">
         {/* 顶部动态状态增益/减益浮标 (仅在异常/激活时于幅能槽上方显现) */}
         <div className="flex flex-col gap-1 pb-1 text-[10px]">
           {/* 幅能排空 (Active Venting) */}
           {player.flux.isVenting && (
             <div className="flex items-center gap-1.5 animate-pulse text-cyan-300">
               <img
-                src="/game-assets/graphics/icons/tactical/venting_flux2.png"
+                src={runtimeAssetUrl('graphics/icons/tactical/venting_flux2.png')}
                 alt=""
                 className="w-4 h-4 object-contain"
               />
-              <span className="font-bold">幅能排空</span>
-              <span className="text-[#94ff00]/90">({Math.ceil(player.flux.getTimeToVent())}s 剩余)</span>
+              <span className="font-bold"><span className="hud-text">幅能排空</span></span>
+              <span className="text-[#9bff00]/90"><span className="hud-text">({Math.ceil(player.flux.getTimeToVent())}s 剩余)</span></span>
             </div>
           )}
 
@@ -122,12 +97,12 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
           {player.flux.isOverloaded && (
             <div className="flex items-center gap-1.5 animate-pulse text-red-400">
               <img
-                src="/game-assets/graphics/icons/tactical/overloaded.png"
+                src={runtimeAssetUrl('graphics/icons/tactical/overloaded.png')}
                 alt=""
                 className="w-4 h-4 object-contain"
               />
-              <span className="font-bold">深度过载</span>
-              <span className="text-red-300/90">({Math.ceil(player.flux.overloadTimer)}s 后恢复)</span>
+              <span className="font-bold"><span className="hud-text">深度过载</span></span>
+              <span className="text-red-300/90"><span className="hud-text">({Math.ceil(player.flux.overloadTimer)}s 后恢复)</span></span>
             </div>
           )}
 
@@ -135,12 +110,12 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
           {isZeroFlux && !player.flux.isVenting && !player.flux.isOverloaded && (
             <div className="flex items-center gap-1.5 text-amber-300">
               <img
-                src="/game-assets/graphics/icons/tactical/engine_boost2.png"
+                src={runtimeAssetUrl('graphics/icons/tactical/engine_boost2.png')}
                 alt=""
                 className="w-3.5 h-3.5 object-contain"
               />
-              <span className="font-bold">零幅能加速</span>
-              <span className="text-[#94ff00]/80">(+50 航速)</span>
+              <span className="font-bold"><span className="hud-text">零幅能加速</span></span>
+              <span className="text-[#9bff00]/80"><span className="hud-text">(+50 航速)</span></span>
             </div>
           )}
 
@@ -148,12 +123,12 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
           {isFlameout && (
             <div className="flex items-center gap-1.5 text-orange-400">
               <img
-                src="/game-assets/graphics/icons/tactical/engine_damage.png"
+                src={runtimeAssetUrl('graphics/icons/tactical/engine_damage.png')}
                 alt=""
                 className="w-3.5 h-3.5 object-contain"
               />
-              <span className="font-bold">引擎受损</span>
-              <span className="text-[#94ff00]/80">({Math.round((1 - player.getFlameoutRatio()) * 100)}% 剩余)</span>
+              <span className="font-bold"><span className="hud-text">引擎受损</span></span>
+              <span className="text-[#9bff00]/80"><span className="hud-text">({Math.round((1 - player.getFlameoutRatio()) * 100)}% 剩余)</span></span>
             </div>
           )}
 
@@ -161,179 +136,74 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
           {hasEnemiesInRange && remainingPPT <= 0 && (
             <div className="flex items-center gap-1.5 text-amber-400 animate-pulse">
               <img
-                src="/game-assets/graphics/icons/tactical/cr_tactical3.png"
+                src={runtimeAssetUrl('graphics/icons/tactical/cr_tactical3.png')}
                 alt=""
                 className="w-3.5 h-3.5 object-contain"
               />
-              <span className="font-bold">战备衰减</span>
-              <span className="text-amber-300/90">({crPercent}%)</span>
+              <span className="font-bold"><span className="hud-text">战备衰减</span></span>
+              <span className="text-amber-300/90"><span className="hud-text">({crPercent}%)</span></span>
             </div>
           )}
         </div>
 
-        {/* 第一行: 幅能 : [槽位 |] 0 */}
-        <div className="flex items-center justify-between h-[15px]">
-          <span className="font-bold w-12 text-[#94ff00]">幅能&nbsp;:</span>
-          <div className="relative flex-1 h-[8px] mx-2 bg-black/70 border border-[#94ff00]/60 overflow-hidden">
-            <div
-              className={`h-full transition-all duration-75 ${
-                player.flux.isOverloaded
-                  ? 'bg-red-500 animate-pulse'
-                  : 'bg-[#94ff00]'
-              }`}
-              style={{ width: `${fluxRatio * 100}%` }}
-            />
-            {/* 右端 100% 幅能限位竖线 */}
-            <div className="absolute right-0 top-0 bottom-0 w-[1.5px] bg-[#94ff00]" />
-          </div>
-          <span className="w-14 text-right font-bold text-[12px] text-[#94ff00]">
-            {totalFlux}
-          </span>
+        {/* _return: 45px labels, 3px gap, 80x7 meters, 104px right-aligned values. */}
+        <div className="hud-console-meter-row">
+          <span className="hud-text">幅能</span>
+          <HudMeter readFlash={hudVisuals?.readFluxFlash} label="幅能" value={fluxRatio} minimum={player.flux.hardFlux / maxFlux} />
+          <span className="hud-meter-number"><span className="hud-text">{totalFlux}</span></span>
+        </div>
+        <div className="hud-console-meter-row">
+          <span className="hud-text">结构</span>
+          <HudMeter label="结构" value={hullRatio} />
+          <span className="hud-meter-number"><span className="hud-text">{hullHp}</span></span>
         </div>
 
-        {/* 第二行: 结构 : [实心生命槽] 18000 */}
-        <div className="flex items-center justify-between h-[15px] mt-[1px]">
-          <span className="font-bold w-12 text-[#94ff00]">结构&nbsp;:</span>
-          <div className="relative flex-1 h-[8px] mx-2 bg-black/70 border border-[#94ff00]/60 overflow-hidden">
-            <div
-              className="h-full bg-[#94ff00] transition-all duration-75"
-              style={{ width: `${hullRatio * 100}%` }}
-            />
-          </div>
-          <span className="w-14 text-right font-bold text-[12px] text-[#94ff00]">
-            {hullHp}
-          </span>
-        </div>
-
-        {/* 第三行: 堡垒护盾 ---- | 就绪 */}
-        <div className="flex items-center justify-between h-[15px] mt-[1px] text-[11px]">
-          <span className="font-bold text-[#94ff00]">{systemName}</span>
+        {/* Only installed systems have a status row. */}
+        {[{ system: player.system, key: 'F' }, { system: player.defenseSystem, key: '右键' }].filter(s => s.system.type !== 'NONE').map(({system, key}) => <div key={key} className="flex items-center justify-between h-[15px] mt-[1px] text-[11px]">
+          <span className="font-bold text-[#9bff00]"><span className="hud-text">{system.name} [{key}]</span></span>
           <div className="flex items-center gap-2">
-            <span className="text-[#94ff00]/70 font-mono tracking-widest">----</span>
-            <span className="text-[#94ff00]">|&nbsp;{systemStatus}</span>
+            {system.maxCharges > 1 && <span>{system.charges}/{system.maxCharges}</span>}
+            <span className="text-[#9bff00]"><span className="hud-text">|&nbsp;{systemStatus(system)}</span></span>
           </div>
-        </div>
+        </div>)}
 
-        {/* 军规折角分隔横线 (45 度左侧上挑转水平线，1:1 hud_crop.png) */}
+        {/* 军规折角分隔横线 (45 度左侧上挑转水平线，Web 布局（尚待原版对齐）) */}
         <svg className="w-[320px] h-[12px] my-[1px] overflow-visible pointer-events-none">
           <polyline
             points="0,11 11,1 320,1"
-            stroke="#94ff00"
+            stroke="#9bff00"
             strokeWidth="1.5"
             fill="none"
           />
         </svg>
 
-        {/* 武器组标题 */}
-        <div className="font-bold text-[#94ff00] text-[11px] pl-3 mb-[2px]">
-          武器组
-        </div>
-
-        {/* 武器组列表 (1 ~ 5) */}
-        <div className="space-y-[2px]">
-          {player.weaponGroups.map((group, gIdx) => {
-            const isSelected = player.selectedGroupIndex === gIdx;
-            const mounts = player.weapons.filter(w => group.weaponSlotIds.includes(w.slotId));
-            const first = mounts[0];
-            const rawName = first ? i18n.t(first.spec.nameKey) : '空置挂点';
-            const weaponName = rawName.split(' ')[0];
-            const count = mounts.length;
-            const dmgType = first ? damageTypeLabel(first.spec.type) : '能量';
-            const fireMode = group.mode === 'LINKED' ? '齐射' : '交替';
-            const isAutofire = group.isAutofire;
-            // 有限弹药武器 (火箭/导弹/点防连发) 的剩余弹数，实弹与能量武器不显示
-            const ammo = summarizeGroupAmmo(mounts);
-
-            return (
-              <div
-                key={group.index}
-                onClick={() => player.selectWeaponGroup(group.index)}
-                className={`px-1.5 py-[1px] cursor-pointer transition select-none ${
-                  isSelected
-                    ? 'text-white font-bold drop-shadow-[0_0_2px_#94ff00]'
-                    : 'text-[#94ff00] hover:text-white'
-                }`}
-              >
-                {/* 第一行: 组号 + 武器图标 + 数量与名称 + 射击模式 */}
-                <div className="flex items-center justify-between text-[11px]">
-                  <div className="flex items-center gap-1 flex-1 min-w-0">
-                    <span className="font-bold text-[12px]">{group.index + 1}.</span>
-                    {first?.spec.turretSpriteUrl && (
-                      <img
-                        src={first.spec.turretSpriteUrl}
-                        alt=""
-                        className="w-3.5 h-3.5 object-contain rotate-[-90deg] inline-block filter brightness-150"
-                      />
-                    )}
-                    <span className="truncate tracking-tight">
-                      {count > 1 ? `${count}X ` : ''}{weaponName}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-[#94ff00]/90 ml-2">
-                    {fireMode}
-                  </span>
-                </div>
-
-                {/* 第二行: 伤害类型 + 剩余弹药 + 自动开火开关 */}
-                <div className="flex items-center justify-between pl-4 text-[10px] text-[#94ff00]/85">
-                  <span>伤害类型:&nbsp;{dmgType}</span>
-                  {ammo.limited && (
-                    <span
-                      className={`font-bold ${
-                        ammo.allEmpty
-                          ? 'text-red-400 animate-pulse'
-                          : ammo.lowest <= 2
-                          ? 'text-amber-300'
-                          : 'text-amber-200/90'
-                      }`}
-                      title="该编组剩余弹药 / 弹药上限"
-                    >
-                      {ammo.allEmpty ? '弹尽' : `弹药 ${ammo.remaining}/${ammo.capacity}`}
-                    </span>
-                  )}
-                  <div
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      player.toggleAutofire(gIdx);
-                    }}
-                    className="flex items-center gap-1 cursor-pointer hover:text-white"
-                    title={`[Ctrl+${gIdx + 1}] 切换自动开火`}
-                  >
-                    <span>自动开火:</span>
-                    <span className="font-bold text-[12px] text-[#94ff00]">
-                      {isAutofire ? '■' : '□'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <div className="hud-weapon-layout">
+        <WeaponGroupConsole player={player} groups={groups} {...weaponControls} />
 
         {/* 当前选中武器组的逐门武器冷却就绪状态 (Tickers) */}
         {activeMounts.length > 0 && (
-          <div className="pt-1 mt-1 border-t border-[#94ff00]/30 space-y-0.5 text-[10px]">
-            {activeMounts.slice(0, 4).map((m, mIdx) => {
-              const name = i18n.t(m.spec.nameKey).split(' ')[0];
+          <div className="hud-mount-status pt-1 mt-1 border-t border-[#9bff00]/30 space-y-0.5 text-[10px]" role="list" aria-label="选中组武器状态">
+            {activeMounts.map((m) => {
+              const name = i18n.t(m.spec.nameKey).split(' (')[0];
               const isCooling = m.cooldownTimer > 0;
               const limitedAmmo = Number.isFinite(m.ammo);
               const maxAmmo = m.spec.maxAmmo ?? m.ammo;
               return (
-                <div key={mIdx} className="flex items-center justify-between text-[10px]">
-                  <span className="text-[#94ff00]/90">{name}</span>
-                  <span className="flex items-center gap-1.5">
+                <div key={m.slotId} role="listitem" data-slot-id={m.slotId} title={`${name} · ${m.slotId}`} className="flex items-center justify-between text-[10px]">
+                  <span className="hud-mount-name text-[#9bff00]/90"><span className="hud-text">{name}</span></span>
+                  <span className="hud-mount-readout flex items-center gap-1.5">
                     {limitedAmmo && (
                       <span
                         className={`font-bold ${
                           m.ammo < 1 ? 'text-red-400 animate-pulse' : m.ammo <= 2 ? 'text-amber-300' : 'text-amber-200/90'
                         }`}
-                      >
+                      ><span className="hud-text">
                         {m.ammo < 1 ? '弹尽' : `弹药 ${m.ammo}/${maxAmmo}`}
-                      </span>
+                      </span></span>
                     )}
-                    <span className="text-[#94ff00]/70 font-mono">
-                      {isCooling ? `---- (${m.cooldownTimer.toFixed(1)}s)` : '---- |'}
-                    </span>
+                    <span className={m.isDisabled ? "text-red-400" : "text-[#9bff00]/70 ui-font"}><span className="hud-text">
+                      {m.isDisabled ? (m.isPermanentlyDisabled ? '永久故障' : `故障 ${Math.ceil(m.disabledTimer * player.combatWeaponRepairTimeMultiplier)}s`) : isCooling ? `---- (${m.cooldownTimer.toFixed(1)}s)` : '---- |'}
+                    </span></span>
                   </span>
                 </div>
               );
@@ -341,33 +211,32 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
           </div>
         )}
 
+        </div>
+
         {/* 航母机库甲板状态 (若有舰载联队) */}
         {engine && engine.playerWings && engine.playerWings.length > 0 && (
-          <div className="pt-1 mt-1 border-t border-[#94ff00]/40 space-y-0.5 text-[10px]">
+          <div className="pt-1 mt-1 border-t border-[#9bff00]/40 space-y-0.5 text-[10px]">
             <div className="flex items-center justify-between font-bold text-[10px] pb-0.5">
-              <span>机库甲板 ({engine.playerWings.length} 联队)</span>
+              <span><span className="hud-text">机库甲板 ({engine.playerWings.length} 联队)</span></span>
               <span
                 onClick={(e) => {
                   e.stopPropagation();
                   engine.toggleFighterRecall();
                 }}
-                className="cursor-pointer hover:text-white text-[9px] text-[#94ff00]/80"
-              >
+                className="cursor-pointer hover:text-white text-[9px] text-[#9bff00]/80"
+              ><span className="hud-text">
                 [Z] {engine.isFighterRecall ? '全员召回' : '自由交火'}
-              </span>
+              </span></span>
             </div>
             {engine.playerWings.map((wing) => {
-              const isBroadsword = wing.specId === 'broadsword';
-              const aliveCount = isBroadsword
-                ? engine.fighters.filter(f => f.isPlayer && !f.isDead).length
-                : engine.bombers.filter(b => b.isPlayer && !b.isDead).length;
+              const aliveCount = engine.ships.filter(craft => craft.flightDeckWingId === wing.wingId && !craft.isDead).length;
 
               return (
                 <div key={wing.wingId} className="flex items-center justify-between text-[9px]">
-                  <span>{wing.name.replace('中队', '')}</span>
-                  <span className="font-mono font-bold text-[#b4ff32]">
+                  <span><span className="hud-text">{wing.name.replace('中队', '')}</span></span>
+                  <span className="ui-font font-bold text-[#9bff00]"><span className="hud-text">
                     {aliveCount}/{wing.maxCrafts} (CRR {Math.round(wing.crr * 100)}%)
-                  </span>
+                  </span></span>
                 </div>
               );
             })}

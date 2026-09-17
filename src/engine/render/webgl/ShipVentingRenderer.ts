@@ -1,32 +1,33 @@
-import { visualNowMs } from '../RenderDeterminism';
 import type { VisualRandom } from '../../runtime/VisualRandom';
 import { Vector2 } from '../../math/Vector2';
-import { Ship } from '../../simulation/Ship';
-import { SpriteBatcher } from './SpriteBatcher';
-import { RibbonBatcher } from './RibbonBatcher';
-import { WebGLTextureManager } from './WebGLTextureManager';
+import type { Ship } from '../../simulation/Ship';
+import type { SpriteBatcher } from './SpriteBatcher';
+import type { RibbonBatcher } from './RibbonBatcher';
+import type { WebGLTextureManager } from './WebGLTextureManager';
 import { getShipVisualProfile } from '../../visual/VisualProfiles';
-import { sampleShipHullSurface } from '../../simulation/collision/HullGeometry';
+import { getVentExtent, getVentTargetingRadius } from '../../visual/VentingVisuals';
 
 interface VentParticle {
   pos: Vector2;
   vel: Vector2;
+  brakeDirection: Vector2;
+  brakeBudget: number;
+  initialBrakeBudget: number;
   life: number;
   maxLife: number;
-  size: number;
-  maxSize: number;
+  sizeScale: number;
+  age: number;
   rotation: number;
   spin: number;
-  u0: number;
-  v0: number;
-  u1: number;
-  v1: number;
+  column: number;
+  row: number;
 }
 
 interface VentEmitter {
-  perimeterT: number;
+  angle: number;
+  localPos: Vector2;
   interval: number;
-  timer: number;
+  elapsed: number;
   spawnIndex: number;
 }
 
@@ -34,317 +35,173 @@ export interface VentVisualState {
   particleCount: number;
   emitterCount: number;
   faderIn: number;
-  startPulse: number;
+  faderSize: number;
+  radialTime: number;
 }
 
 /**
- * 1:1 原版幅能排散渲染引擎 (ShipVentingRenderer)
- * 严格对齐 Starsector 0.98a 官方源码:
- * 1. com/fs/starfarer/renderers/oOoOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO_cfr_46.java (ventingAnimation)
- * 2. com/fs/starfarer/renderers/float.java (_float radial halo)
- * 3. data/config/hull_styles.json:
- *    - fluxVentTextureSheet: graphics/fx/nebula_colorless.png (4x4 粒子图集)
- *    - fluxVentRadialTexture: graphics/fx/radial_fx.png (放射状能量光晕环)
- *    - fluxVentFringeColor: [125, 0, 155, 255] (皇家紫光晕边缘)
- *    - fluxVentCoreColor: [255, 255, 255, 255] (白炽等离子核心)
+ * Source-backed standard vent path: renderers/ventingAnimation, float.java and
+ * hull_styles.json. Seeded visual randomness replaces Java's global randomness;
+ * matched original captures are still needed for final appearance acceptance.
  */
 export class ShipVentingRenderer {
   private particles: VentParticle[] = [];
   private emitters: VentEmitter[] = [];
-  private faderIn = 0; // 排散刚启动时的能量爆发淡入系数 (0.0 ~ 1.0)
-  private startPulse = 0; // 手动排散按下瞬间的短促能量爆发
+  private faderIn = 0;
+  private faderSize = 0;
+  private radialTime = 0;
   private wasVenting = false;
   private initializedForShipId: string | null = null;
 
-  // 预载原版贴图路径
   public static readonly NEBULA_TEX = '/game-assets/graphics/fx/nebula_colorless.png';
   public static readonly RADIAL_TEX = '/game-assets/graphics/fx/radial_fx.png';
 
-  constructor() {}
-
-  /**
-   * 按舰级初始化环绕舰体周边的排散喷口 (严格对齐 oOoOOO..._cfr_46.java: n2)
-   */
   private initEmittersIfNeeded(ship: Ship, random: VisualRandom) {
-    if (this.initializedForShipId === ship.id && this.emitters.length > 0) return;
+    if (this.initializedForShipId === ship.id) return;
     this.initializedForShipId = ship.id;
-    this.emitters = [];
-
-    // 主力舰: 18 个喷口 (每 20°); 巡洋舰: 18 个; 驱逐/护卫: 12 个; 战机: 4 个
-    let count = 18;
-    const size = ship.flux.hullSize;
-    if (size === 'CAPITAL_SHIP' || size === 'CRUISER') {
-      count = 18;
-    } else if (size === 'DESTROYER' || size === 'FRIGATE') {
-      count = 12;
-    } else if (size === 'FIGHTER') {
-      count = 4;
-    }
-
-    for (let i = 0; i < count; i++) {
-      this.emitters.push({
-        perimeterT: i / count,
-        interval: 0.08 + random.sample(`${ship.id}:vent-interval`, i) * 0.12,
-        timer: random.sample(`${ship.id}:vent-phase`, i) * 0.1,
-        spawnIndex: 0
-      });
-    }
+    const count = ship.flux.hullSize === 'CAPITAL_SHIP' ? 18 : ship.flux.hullSize === 'FIGHTER' ? 4 : 12;
+    const inset = Math.max(0, Math.min(50, (ship.spec.collisionRadius - 50) * 0.33));
+    this.emitters = Array.from({ length: count }, (_, i) => {
+      const angle = i * Math.PI * 2 / count;
+      const radius = getVentTargetingRadius(ship.spec, angle);
+      return {
+        angle, localPos: Vector2.fromAngle(angle, radius - Math.min(radius * 0.2, inset)),
+        interval: 0.1 + random.sample(ship.id + ':vent-interval:' + i, 0) * 0.1,
+        elapsed: 0, spawnIndex: 0
+      };
+    });
   }
 
-  /**
-   * 重置/清空状态
-   */
   public reset() {
     this.particles = [];
     this.emitters = [];
     this.initializedForShipId = null;
-    this.faderIn = 0;
-    this.startPulse = 0;
+    this.faderIn = this.faderSize = this.radialTime = 0;
     this.wasVenting = false;
   }
 
   public getVisualState(): VentVisualState {
     return {
-      particleCount: this.particles.length,
-      emitterCount: this.emitters.length,
-      faderIn: this.faderIn,
-      startPulse: this.startPulse
+      particleCount: this.particles.length, emitterCount: this.emitters.length,
+      faderIn: this.faderIn, faderSize: this.faderSize, radialTime: this.radialTime
     };
   }
 
-  /**
-   * 60Hz 步长更新喷涌粒子逻辑
-   */
   public update(dt: number, ship: Ship, random: VisualRandom) {
     this.initEmittersIfNeeded(ship, random);
-    const ventVisual = getShipVisualProfile(ship.spec.id).vent;
+    const venting = ship.flux.isVenting && !ship.isDead;
+    if (!venting) {
+      // Ship.java neither advances nor draws the animation after venting stops.
+      // Discard invisible particles early; a new vent clears them in the source.
+      this.particles = [];
+      this.wasVenting = false;
+      return;
+    }
+    if (!this.wasVenting) {
+      this.particles = [];
+      this.faderIn = this.faderSize = 0;
+    }
+    this.wasVenting = true;
+    const amount = Math.max(0, dt) * 1.24;
+    this.faderIn = Math.min(1, this.faderIn + amount / 0.3);
+    this.faderSize = Math.min(1, this.faderSize + amount / 0.6);
+    this.radialTime += amount;
+    const extent = getVentExtent(ship.spec);
+    const speed = extent * 0.75;
+    const fluxLevel = ship.flux.fluxPercent;
 
-    const ventingStarted = ship.flux.isVenting && !this.wasVenting;
-    if (ship.flux.isVenting) {
-      // 原版主动排散按下时立刻有可读的能量喷发；不能等异步贴图或随机 emitter phase 才出现第一帧反馈。
-      if (ventingStarted) {
-        this.faderIn = Math.max(this.faderIn, 0.5);
-        this.startPulse = 1.0;
-        for (const emitter of this.emitters) emitter.timer = 0;
-      } else {
-        this.faderIn = Math.min(1.0, this.faderIn + dt * 3.3);
-      }
-    } else {
-      this.faderIn = Math.max(0.0, this.faderIn - dt * 2.5);
+    for (let i = 0; i < this.emitters.length; i++) {
+      const emitter = this.emitters[i];
+      emitter.elapsed += amount;
+      if (emitter.elapsed < emitter.interval) continue;
+      const sample = (channel: string) => random.sample(ship.id + ':vent-' + channel + ':' + i, emitter.spawnIndex);
+      const offset = emitter.localPos.clone().rotate(ship.facingRad);
+      const angle = emitter.angle + ship.facingRad;
+      const radialVelocity = Vector2.fromAngle(angle, speed);
+      const turnSpeed = Math.min(offset.length() * Math.abs(ship.angularVelRad), Math.min(Math.max(speed, 50), 100)) * 3;
+      const tangent = Vector2.fromAngle(angle + Math.sign(ship.angularVelRad) * Math.PI / 2, turnSpeed);
+      const outwardVelocity = radialVelocity.clone().add(tangent);
+      const brakeBudget = outwardVelocity.length();
+      const life = (1.5 + sample('life')) * Math.max(0.5, Math.min(extent / 250, 1))
+        * 0.5 * (0.5 + 0.5 * fluxLevel);
+      this.particles.push({
+        pos: ship.pos.clone().add(offset), vel: outwardVelocity.clone().add(ship.vel),
+        brakeDirection: outwardVelocity.clone().scale(-1 / Math.max(0.001, brakeBudget)),
+        brakeBudget, initialBrakeBudget: brakeBudget,
+        life, maxLife: life, age: 0, sizeScale: 0.7 + 0.6 * sample('size'),
+        rotation: sample('rotation') * Math.PI * 2,
+        spin: Math.sign(sample('spin-sign') - 0.5) * Math.PI / 6 * sample('spin'),
+        column: Math.floor(sample('column') * 4), row: Math.floor(sample('row') * 4)
+      });
+      emitter.spawnIndex++;
+      // IntervalUtil rerolls and discards overshoot after each event; no burst catch-up.
+      emitter.elapsed = 0;
+      emitter.interval = 0.1 + random.sample(ship.id + ':vent-interval:' + i, emitter.spawnIndex) * 0.1;
     }
 
-    // 1. 若处于排散中，从真实 authored hull bounds 周边向外喷射等离子气团。
-    if (ship.flux.isVenting) {
-      const fluxLevel = ship.flux.fluxPercent;
-      const emitterJitter = this.emitters.length > 0 ? 0.35 / this.emitters.length : 0;
-
-      for (let emitterIndex = 0; emitterIndex < this.emitters.length; emitterIndex++) {
-        const emitter = this.emitters[emitterIndex];
-        emitter.timer -= dt;
-        if (emitter.timer <= 0) {
-          emitter.timer = emitter.interval;
-          const sample = (channel: string) => random.sample(`${ship.id}:${channel}`, emitterIndex * 1_000_003 + emitter.spawnIndex);
-
-          const surface = sampleShipHullSurface(
-            ship,
-            emitter.perimeterT + (sample('vent-edge-jitter') - 0.5) * emitterJitter
-          );
-          const normalRad = surface.outward.heading();
-          // 从舰体外轮廓线外侧 2px 起喷，让白热喷口不会被舰体贴图吞掉。
-          const spawnX = surface.point.x + surface.outward.x * 2;
-          const spawnY = surface.point.y + surface.outward.y * 2;
-
-          // 喷射初速度: 沿真实 hull edge outward normal 向外爆发。
-          const ventSpeed = (80 + sample('vent-speed') * 95) * (0.7 + fluxLevel * 0.45);
-          const spreadAngle = normalRad + (sample('vent-spread') - 0.5) * 0.3;
-          const velX = Math.cos(spreadAngle) * ventSpeed + ship.vel.x * 0.5;
-          const velY = Math.sin(spreadAngle) * ventSpeed + ship.vel.y * 0.5;
-
-          // 随机选取 4x4 nebula_colorless 粒子切片
-          const cellX = Math.floor(sample('vent-cell-x') * 4);
-          const cellY = Math.floor(sample('vent-cell-y') * 4);
-          const u0 = cellX * 0.25;
-          const v0 = cellY * 0.25;
-          const u1 = (cellX + 1) * 0.25;
-          const v1 = (cellY + 1) * 0.25;
-
-          const baseSize = (ship.spec.collisionRadius * 0.2 + 14) * ventVisual.particleScale;
-          const initSize = baseSize * (0.65 + sample('vent-size') * 0.35);
-          const maxSize = baseSize * (1.7 + sample('vent-max-size') * 0.6);
-          const life = 0.7 + sample('vent-life') * 0.4;
-
-          this.particles.push({
-            pos: new Vector2(spawnX, spawnY),
-            vel: new Vector2(velX, velY),
-            life,
-            maxLife: life,
-            size: initSize,
-            maxSize,
-            rotation: sample('vent-rotation') * Math.PI * 2,
-            spin: (sample('vent-spin') - 0.5) * 1.8,
-            u0,
-            v0,
-            u1,
-            v1
-          });
-          emitter.spawnIndex++;
-        }
-      }
-    }
-
-    this.startPulse = Math.max(0, this.startPulse - dt * 2.4);
-    this.wasVenting = ship.flux.isVenting;
-
-    // 2. 更新活跃粒子物理与生命周期
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
-      p.life -= dt;
-      if (p.life <= 0) {
-        this.particles.splice(i, 1);
-        continue;
+      p.sizeScale += 3 / p.maxLife * amount;
+      p.pos.x += p.vel.x * amount;
+      p.pos.y += p.vel.y * amount;
+      if (p.brakeBudget > 0) {
+        const decrement = Math.min(p.brakeBudget, p.initialBrakeBudget * amount / p.maxLife) * 0.5;
+        p.vel.x += p.brakeDirection.x * decrement;
+        p.vel.y += p.brakeDirection.y * decrement;
+        p.brakeBudget -= decrement;
       }
-      p.pos.x += p.vel.x * dt;
-      p.pos.y += p.vel.y * dt;
-      // 太空等离子急速减速扩散阻尼
-      p.vel.scale(Math.max(0, 1 - dt * 2.8));
-      p.rotation += p.spin * dt;
+      p.rotation += p.spin * amount;
+      p.age += amount;
+      p.life -= amount;
+      if (p.life <= -0.1) this.particles.splice(i, 1);
     }
   }
 
-  /**
-   * 绘制舰体周边 1:1 原版放射状能量脉动光晕环 (严格对齐 float.java: o00000)
-   * 位于舰体底层，展现核心高压热量外溢
-   */
   public renderRadialHalo(
-    batcher: SpriteBatcher,
-    ribbonBatcher: RibbonBatcher,
-    textures: WebGLTextureManager,
-    ship: Ship,
-    shipPos: Vector2,
-    shipFacing: number
+    batcher: SpriteBatcher, ribbonBatcher: RibbonBatcher, textures: WebGLTextureManager,
+    ship: Ship, shipPos: Vector2, shipFacing: number, alphaMult = 1
   ) {
-    if (!ship.flux.isVenting && this.faderIn <= 0.01) return;
-
-    const radialTex = textures.getTexture(ShipVentingRenderer.RADIAL_TEX);
-    if (!radialTex || this.faderIn <= 0.02) return;
-
-    const fluxLevel = ship.flux.fluxPercent;
-    const nowSec = visualNowMs() * 0.001;
-    const ventVisual = getShipVisualProfile(ship.spec.id).vent;
-
+    if (!ship.flux.isVenting || ship.isDead || ship.flux.hullSize === 'FIGHTER' || this.faderIn <= 0) return;
+    const profile = getShipVisualProfile(ship.spec).vent;
+    const color = profile.fringeColor.map((c, i) => Math.floor(c * 0.4 + profile.coreColor[i] * 0.6)) as [number, number, number];
+    const extent = getVentExtent(ship.spec);
     batcher.flush();
     ribbonBatcher.begin(batcher.currentViewProj);
-    // 外层皇家紫高能晕光 (fluxVentFringeColor: [125, 0, 155])
-    const haloAlpha = Math.min(0.95,
-      this.faderIn * (0.42 + 0.2 * Math.sin(nowSec * 14.0)) * (0.58 + fluxLevel * 0.42)
-      + this.startPulse * 0.38
-    );
-    ribbonBatcher.drawRadialHalo(
-      radialTex,
-      shipPos,
-      shipFacing,
-      ship.spec.collisionRadius * ventVisual.haloScale * (1.0 + Math.sin(nowSec * 9.0) * 0.05),
-      ventVisual.fringeColor,
-      haloAlpha,
-      nowSec * 0.8
-    );
-    // 内层炽白等离子核心环 (fluxVentCoreColor: [255, 255, 255])
-    const coreAlpha = Math.min(0.72,
-      this.faderIn * 0.3 * (0.62 + fluxLevel * 0.38) + this.startPulse * 0.28
-    );
-    ribbonBatcher.drawRadialHalo(
-      radialTex,
-      shipPos,
-      shipFacing,
-      ship.spec.collisionRadius * 0.85 * ventVisual.haloScale,
-      ventVisual.coreColor,
-      coreAlpha,
-      -nowSec * 0.6
-    );
+    ribbonBatcher.drawRadialHalo(textures.getTexture(ShipVentingRenderer.RADIAL_TEX, true),
+      shipPos, shipFacing, ship.spec, extent * 0.25, extent * (0.25 + 0.75 * this.faderSize),
+      color, alphaMult * this.faderIn * 0.6, this.radialTime);
     ribbonBatcher.end();
     batcher.resumeProgram();
   }
 
-  /**
-   * 绘制高速向外喷涌的等离子气团 (1:1 oOoOOO..._cfr_46.java 双层加色渲染)
-   * 位于舰体与挂点上层，展现排散喷口向太空喷吐的白色炽热离子与紫色电浆气团
-   */
-  public renderVentPlumes(
-    batcher: SpriteBatcher,
-    textures: WebGLTextureManager,
-    ship: Ship
-  ) {
-    if (this.particles.length === 0) return;
-
-    const nebulaTex = textures.getTexture(ShipVentingRenderer.NEBULA_TEX);
-    if (!nebulaTex) return;
-
+  public renderVentPlumes(batcher: SpriteBatcher, textures: WebGLTextureManager, ship: Ship, alphaMult = 1) {
+    if (!ship.flux.isVenting || ship.isDead || this.particles.length === 0) return;
+    const texture = textures.getTexture(ShipVentingRenderer.NEBULA_TEX);
+    const profile = getShipVisualProfile(ship.spec).vent;
     const fluxLevel = ship.flux.fluxPercent;
+    const baseSize = Math.max(25, getVentExtent(ship.spec) * 0.25 * (0.25 + 0.75 * this.faderIn));
+    const shipAlpha = alphaMult * (ship.flux.hullSize === 'FIGHTER' ? 1 : 0.9);
     batcher.setBlendMode('ADDITIVE');
-    const ventVisual = getShipVisualProfile(ship.spec.id).vent;
-
     for (const p of this.particles) {
-      const progress = Math.max(0, Math.min(1.0, 1.0 - p.life / p.maxLife));
-      const curSize = (p.size + (p.maxSize - p.size) * Math.sin(progress * Math.PI * 0.5))
-        * ventVisual.plumeScale * (1 + this.startPulse * 0.16);
-
-      // 迅速淡入 (前 15%)，随后平滑散逸消逝 (后 85%)
-      const fade = progress < 0.15 ? (progress / 0.15) : Math.max(0, (1.0 - progress) / 0.85);
-      const alphaMult = Math.min(1, fade * (0.5 + fluxLevel * 0.5) * (1 + this.startPulse * 0.24));
-      if (alphaMult <= 0.01) continue;
-
-      // 通道 1: 外层皇家紫/洋红高能离子光晕 (fluxVentFringeColor: [125, 0, 155])
-      batcher.drawSprite(
-        nebulaTex,
-        p.pos.x,
-        p.pos.y,
-        curSize,
-        curSize,
-        p.rotation,
-        0,
-        0,
-        ventVisual.fringeColor[0] / 255,
-        ventVisual.fringeColor[1] / 255,
-        ventVisual.fringeColor[2] / 255,
-        alphaMult * 0.72,
-        p.u0,
-        p.v0,
-        p.u1,
-        p.v1
-      );
-
-      // 通道 2: 白炽核心等离子团 (fluxVentCoreColor: [255, 255, 255])
-      const coreSize = curSize * 0.55;
-      batcher.drawSprite(
-        nebulaTex,
-        p.pos.x,
-        p.pos.y,
-        coreSize,
-        coreSize,
-        p.rotation,
-        0,
-        0,
-        ventVisual.coreColor[0] / 255,
-        ventVisual.coreColor[1] / 255,
-        ventVisual.coreColor[2] / 255,
-        alphaMult * 0.88,
-        p.u0,
-        p.v0,
-        p.u1,
-        p.v1
-      );
+      const fadeOutDuration = Math.min(1.5, p.maxLife * 0.75);
+      const opacity = shipAlpha * Math.min(1, p.age / 0.2) * Math.max(0, Math.min(1, p.life / fadeOutDuration));
+      if (opacity <= 0) continue;
+      const size = baseSize * p.sizeScale;
+      const u = p.column / 4;
+      const v = p.row / 4;
+      const draw = (color: [number, number, number], alpha: number) => batcher.drawSprite(
+        texture, p.pos.x, p.pos.y, size, size, p.rotation, 0, 0,
+        color[0] / 255, color[1] / 255, color[2] / 255, alpha, u, v, u + 0.25, v + 0.25);
+      draw(profile.fringeColor, opacity * (0.35 + fluxLevel * 0.2));
+      draw(profile.coreColor, opacity * (0.15 + fluxLevel * 0.1));
     }
   }
 
   public render(
-    batcher: SpriteBatcher,
-    ribbonBatcher: RibbonBatcher,
-    textures: WebGLTextureManager,
-    ship: Ship,
-    shipPos: Vector2,
-    shipFacing: number
+    batcher: SpriteBatcher, ribbonBatcher: RibbonBatcher, textures: WebGLTextureManager,
+    ship: Ship, shipPos: Vector2, shipFacing: number, alphaMult = 1
   ) {
-    this.renderRadialHalo(batcher, ribbonBatcher, textures, ship, shipPos, shipFacing);
-    this.renderVentPlumes(batcher, textures, ship);
+    this.renderRadialHalo(batcher, ribbonBatcher, textures, ship, shipPos, shipFacing, alphaMult);
+    this.renderVentPlumes(batcher, textures, ship, alphaMult);
   }
 }

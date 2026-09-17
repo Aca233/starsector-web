@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./ui/core/theme.css";
 
 @layer base {
   html, body, #root {
@@ -9,7 +10,7 @@
     overflow: hidden;
     background-color: #030712;
     color: #f8fafc;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-family: var(--ui-font);
   }
 }
 
@@ -22,18 +23,19 @@
   pointer-events: none;
   color: #94ff00;
   text-rendering: geometricPrecision;
-  -webkit-font-smoothing: none;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: 0;
 }
 
 .hud-overlay[data-hud-density='compact'] {
-  --hud-panel-scale: 0.88;
-  --hud-tag-scale: 0.9;
+  --hud-panel-scale: 1;
+  --hud-tag-scale: 1;
   --hud-safe-inset: 10px;
 }
 
 .hud-overlay[data-hud-density='expanded'] {
-  --hud-panel-scale: 1.08;
-  --hud-tag-scale: 1.06;
+  --hud-panel-scale: 1;
+  --hud-tag-scale: 1;
   --hud-safe-inset: 18px;
 }
 
@@ -42,7 +44,7 @@
   bottom: var(--hud-safe-inset);
   scale: var(--hud-panel-scale);
   transform-origin: left bottom;
-  filter: drop-shadow(0 0 5px rgba(148, 255, 0, 0.12));
+  text-shadow: 0 1px 1px #000;
 }
 
 .hud-quickbar-anchor {
@@ -111,5 +113,96 @@
 .hud-overlay button,
 .hud-overlay input,
 .hud-overlay select {
-  text-shadow: 0 0 3px rgba(148, 255, 0, 0.18);
+  text-shadow: 0 1px 1px #000;
+}
+
+.hud-overlay * { letter-spacing: 0; }
+.visual-lab-panel { max-width: calc(100vw - 24px); max-height: calc(100dvh - 470px); }
+.hud-help-anchor { max-width: calc(100vw - 28px); max-height: calc(100dvh - 80px); overflow: auto; }
+.hud-tactical-bar { max-width: calc(100vw - 24px); flex-wrap: wrap; white-space: normal; }
+.combat-console-body { min-width: 0; }
+
+@media (max-width: 700px) {
+  .combat-paperdoll { display: none; }
+  .combat-console-body { width: min(320px, calc(100vw - 24px)); }
+  .hud-console-anchor { max-height: 44dvh; overflow-y: auto; overflow-x: hidden; }
+  .hud-radar-anchor { top: 48px; bottom: auto; scale: 0.55; transform-origin: right top; }
+  .hud-floating-tag { display: none !important; }
+  .visual-lab-panel { top: 48px; max-width: calc(100vw - 148px); max-height: 42dvh; }
+  .visual-lab-panel input[type='range'] { display: block; width: 100%; margin-left: 0; }
+  .visual-lab-panel select { min-width: 0; max-width: 100%; }
+  .visual-lab-panel > div { flex-wrap: wrap; }
+}
+
+@media (max-height: 650px) and (min-width: 701px) {
+  .visual-lab-panel { max-height: 40dvh; width: 310px; }
+  .hud-console-anchor { max-height: 48dvh; overflow-y: auto; }
+}
+
+/* Readability is an intentional exception to original-game typography. */
+.hud-text {
+  font-family: var(--ui-font);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 15px;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: auto;
+  text-rendering: optimizeLegibility;
+}
+.hud-floating-tag .hud-text { font-size: 11px; line-height: 13px; }
+.hud-meter { display: inline-block; position: relative; flex: none; filter: drop-shadow(1px 1px 0 #000); }
+.hud-meter-fill { position: absolute; inset: 0 auto 0 0; width: var(--meter-fill); background: currentColor; }
+.hud-meter-cap { position: absolute; inset: 0 0 0 auto; width: 1px; background: currentColor; }
+.hud-meter-minimum { position: absolute; left: var(--meter-minimum); top: -1px; bottom: -1px; width: 3px; border-top: 1px solid; border-bottom: 1px solid; }
+.hud-console-meter-row { display: grid; grid-template-columns: 45px 83px 104px; align-items: center; height: 15px; }
+.hud-console-meter-row > .hud-meter { margin-left: 3px; transform: translateY(1px); }
+.hud-console-meter-row .hud-meter-number { text-align: right; }
+.hud-floating-content { line-height: 13px; }
+.hud-floating-meter-row { display: grid; grid-template-columns: 25px 60px; column-gap: 3px; align-items: center; height: 13px; }
+.hud-floating-meter-row > .hud-meter { transform: translateY(2px); }
+.hud-floating-status-row { display: grid; grid-template-columns: 50px 65px; margin-top: 1px; height: 13px; }
+
+.hud-autofire-indicator { display: inline-block; width: 7px; height: 7px; border: 1px solid currentColor; }
+.hud-autofire-indicator[data-active="true"] { background: currentColor; }
+
+.hud-meter-ink { position: absolute; inset: 0; }
+
+/* F.java stacks groups diagonally by half of the previous group's height. */
+.hud-weapon-groups { min-height: 50px; }
+.hud-weapon-heading { height: 18px; }
+.hud-weapon-group { position: relative; transform: translateX(calc(-1 * var(--group-shift))); color: #9bff00; }
+.hud-weapon-select { display: grid; grid-template-columns: 15px minmax(0, 224px); text-align: left; width: 239px; height: 100%; opacity: var(--group-opacity); cursor: pointer; }
+.hud-group-number { align-self: start; }
+.hud-weapon-entry { display: grid; grid-template-columns: 26px minmax(0, 1fr); grid-template-rows: 15px 15px; column-gap: 3px; height: 30px; }
+.hud-weapon-icon { grid-row: 1 / 3; display: flex; align-items: center; justify-content: center; }
+.hud-weapon-icon img { object-fit: contain; }
+.hud-weapon-name, .hud-weapon-damage { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.hud-weapon-damage { padding-left: 16px; }
+.hud-group-mode, .hud-group-autofire { position: absolute; left: 239px; white-space: nowrap; cursor: pointer; }
+.hud-group-mode { top: 0; opacity: var(--group-opacity); }
+.hud-group-autofire { top: 15px; display: inline-flex; align-items: center; gap: 3px; }
+.hud-weapon-group .hud-autofire-indicator { width: 9px; height: 9px; border: 0; background: currentColor; }
+.hud-weapon-group .hud-autofire-indicator[data-active="false"] { opacity: 0.5; }
+.hud-weapon-group button:focus-visible { outline: 1px solid currentColor; outline-offset: 2px; }
+.hud-weapon-group button:hover { opacity: 1 !important; }
+@media (min-width: 901px) {
+  .hud-console-anchor { left: 3px; bottom: 3px; }
+  .combat-paperdoll { width: 135px; flex: none; margin-right: calc(var(--console-pivot) - 135px); }
+}
+/* Small-screen adaptation: no diagonal overlap or offscreen controls. */
+@media (max-width: 900px) {
+  .combat-paperdoll { display: none; }
+  .combat-console-body { width: min(340px, calc(100vw - 24px)); }
+  .hud-weapon-group { transform: none; }
+  .hud-weapon-select { width: calc(100% - 88px); grid-template-columns: 15px minmax(0, 1fr); }
+  .hud-group-mode, .hud-group-autofire { left: calc(100% - 88px); }
+}
+
+.hud-weapon-layout { position: relative; }
+.hud-mount-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.hud-mount-readout { flex: none; white-space: nowrap; }
+@media (min-width: 1201px) {
+  /* oOOO is rightOfBottom(F, 13), not a truncated list below the groups. */
+  .combat-console-body { margin-right: 313px; }
+  .hud-mount-status { position: absolute; left: 353px; bottom: 0; width: 300px; margin: 0; padding: 0; border: 0; }
 }

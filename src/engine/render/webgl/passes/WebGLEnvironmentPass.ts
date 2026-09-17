@@ -1,5 +1,5 @@
 import { CombatEngine } from '../../../simulation/CombatEngine';
-import type { NebulaCloud } from '../../../simulation/CombatTypes';
+import { NEBULA_SPRITE_SIZE } from '../../../simulation/systems/NebulaSystem';
 import { Vector2 } from '../../../math/Vector2';
 import { VisualRandom } from '../../../runtime/VisualRandom';
 import { WebGLPassContext } from '../WebGLPassContext';
@@ -13,16 +13,17 @@ interface StarParticle {
 }
 
 /**
- * Deep-space environment pass. V09 explicitly separates opaque/far terrain from
- * foreground translucent occlusion so layer toggles are meaningful and tactical
- * overlays can remain readable above world-space haze.
+ * Screen-space combat background and the source's single, below-ship cloud layer.
+ * Extra stars are still an optional sandbox overlay, disabled by default.
  */
 export class WebGLEnvironmentPass {
   private readonly starfield: StarParticle[] = [];
+  private readonly backgroundCrop: readonly [number, number];
   private static readonly PARALLAX_FACTORS = [0.02, 0.05, 0.08];
 
   constructor() {
     const random = new VisualRandom(0x0e9b71a);
+    this.backgroundCrop = [random.sample('background-crop-x'), random.sample('background-crop-y')];
     for (let i = 0; i < 450; i++) {
       this.starfield.push({
         x: (random.sample('environment-star-x', i) - 0.5) * 5200,
@@ -34,17 +35,26 @@ export class WebGLEnvironmentPass {
     }
   }
 
-  public renderBackground(ctx: WebGLPassContext, actualCam: Vector2): void {
-    const { batcher, textures, whiteTex, viewport } = ctx;
-    const bgTex = textures.getTexture('/game-assets/graphics/backgrounds/background1.jpg');
-    const pFactor = 0.05;
-    const bgX = actualCam.x * (1 - pFactor);
-    const bgY = actualCam.y * (1 - pFactor);
+  public renderBackground(ctx: WebGLPassContext, actualCam: Vector2, environment: CombatEngine['environment']): void {
+    const { batcher, textures, whiteTex, viewport, canvas, zoom } = ctx;
 
     batcher.setBlendMode('NORMAL');
-    batcher.drawSprite(bgTex, bgX, bgY, 4800, 3600, 0, 0, 0, 0.92, 0.94, 1.0, 1.0);
+    if (environment.backgroundUrl) {
+      const info = textures.getTextureInfo(environment.backgroundUrl);
+      // CombatEngine.replaceBackground only enlarges images to cover the screen;
+      // CombatState.renderBG uses a separate, unzoomed projection. Convert those
+      // pixel dimensions into world coordinates here so camera/zoom cancel out.
+      const cover = Math.max(1, canvas.width / Math.max(1, info.width), canvas.height / Math.max(1, info.height));
+      const pixelWidth = info.width * cover;
+      const pixelHeight = info.height * cover;
+      const width = pixelWidth / zoom;
+      const height = pixelHeight / zoom;
+      const x = actualCam.x + (pixelWidth - canvas.width) * (0.5 - this.backgroundCrop[0]) / zoom;
+      const y = actualCam.y + (pixelHeight - canvas.height) * (0.5 - this.backgroundCrop[1]) / zoom;
+      batcher.drawSprite(info.texture, x, y, width, height);
+    }
 
-    for (const star of this.starfield) {
+    for (const star of this.starfield.slice(0, environment.starCount)) {
       const starParallax = WebGLEnvironmentPass.PARALLAX_FACTORS[star.layer];
       // SpriteBatcher later subtracts the camera. Adding (1-p)*camera here leaves
       // exactly p*camera movement on screen instead of double-subtracting it.
@@ -55,34 +65,19 @@ export class WebGLEnvironmentPass {
     }
   }
 
-  public renderNebulae(engine: CombatEngine, ctx: WebGLPassContext, depths: readonly NebulaCloud['depth'][]): void {
-    if (engine.nebulae.length === 0) return;
+  public renderNebulae(engine: CombatEngine, ctx: WebGLPassContext): void {
     const { batcher, textures } = ctx;
-    const depthSet = new Set(depths);
-
+    // terrain/A.renderBelow: white modulation, SRC_ALPHA/ONE_MINUS_SRC_ALPHA.
+    // Cloud.render: one unrotated 4x4 atlas tile, 312.5 world units at smallClouds.
+    batcher.setBlendMode('NORMAL');
     for (const neb of engine.nebulae) {
-      if (!depthSet.has(neb.depth)) continue;
-      const diameter = neb.radius * 2 * neb.scale;
-      if (!this.circleVisible(ctx, neb.pos, diameter * 0.55)) continue;
-
-      const nebTex = textures.getTexture(neb.spriteUrl);
-      const tint = neb.type === 'AMBER' ? [1.0, 0.72, 0.42] as const : [0.42, 0.68, 1.0] as const;
-      const baseAlpha = neb.depth === 'FOREGROUND'
-        ? (neb.type === 'AMBER' ? 0.13 : 0.15)
-        : neb.depth === 'MIDGROUND'
-          ? (neb.type === 'AMBER' ? 0.2 : 0.24)
-          : (neb.type === 'AMBER' ? 0.17 : 0.2);
-
-      // Source-over style pass provides actual translucent occlusion rather than
-      // making every cloud a purely additive light source.
-      batcher.setBlendMode('NORMAL');
-      batcher.drawSprite(nebTex, neb.pos.x, neb.pos.y, diameter, diameter, neb.rotation, 0, 0, tint[0], tint[1], tint[2], baseAlpha);
-
-      // A restrained glow preserves the ionized-cloud highlight without washing
-      // out silhouettes. Foreground haze intentionally gets the weakest glow.
-      batcher.setBlendMode('ADDITIVE');
-      const glowAlpha = neb.depth === 'FOREGROUND' ? 0.025 : 0.055;
-      batcher.drawSprite(nebTex, neb.pos.x, neb.pos.y, diameter * 1.02, diameter * 1.02, -neb.rotation * 0.7, 0, 0, tint[0], tint[1], tint[2], glowAlpha);
+      if (!this.circleVisible(ctx, neb.pos, NEBULA_SPRITE_SIZE / 2)) continue;
+      const u = neb.atlasColumn / 4;
+      const v = neb.atlasRow / 4;
+      const opacity = Math.floor(255 * Math.max(0, Math.min(1, neb.thickness))) / 255;
+      batcher.drawSprite(textures.getTexture(neb.spriteUrl), neb.pos.x, neb.pos.y,
+        NEBULA_SPRITE_SIZE, NEBULA_SPRITE_SIZE, 0, 0, 0, 1, 1, 1, opacity,
+        u, v, u + 0.25, v + 0.25);
     }
   }
 

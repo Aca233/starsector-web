@@ -1,6 +1,10 @@
 # starsector-web
 
-A self-contained React + TypeScript + Vite combat sandbox inspired by Starsector combat presentation. The browser runtime is independent from a Starsector installation: all runtime images, audio and packaged content are served from this repository.
+A self-contained React + TypeScript + Vite ship-design studio and combat sandbox inspired by Starsector. The browser runtime is independent from a Starsector installation: all runtime images, audio and packaged content are served from this repository.
+
+Current fidelity and verification status: [Visual Fidelity Audit](docs/visual-fidelity-audit.md).
+Historical M3/M4 completion records do not establish original-game visual parity.
+Project test files and the test runner were removed at the user's request. Do not recreate them or perform manual asset hash/size audits unless explicitly requested.
 
 ## Requirements
 
@@ -8,14 +12,13 @@ A self-contained React + TypeScript + Vite combat sandbox inspired by Starsector
 - npm
 - A modern browser with WebGL2 for combat rendering. Canvas2D remains in use for HUD/offscreen texture work, but it is not a combat fallback.
 
-A Starsector installation is **not** required to build, test, preview, or play the packaged project. It is only needed if a developer intentionally regenerates the curated asset bundle with the offline import script.
+A Starsector installation is **not** required to build, preview, or play the packaged project. It is only needed if a developer intentionally regenerates the native content and asset bundle with the offline import scripts.
 
-## Install, test and run
+## Install, build and run
 
 ```powershell
 npm ci
 npm run typecheck
-npm test
 npm run lint
 npm run build
 npm run preview
@@ -29,7 +32,68 @@ npm run dev
 
 The production build is written to `dist/`. There is no `/api/asset` endpoint and Vite is not allowed to read the parent directory.
 
+## LAN multiplayer preview
+
+The main menu now includes **局域网联机**. From this project’s local dev/preview service, choose **创建房间** to start the LAN backend invisibly and create the room automatically; merely entering LAN mode does not start it. Guests use **连接房主** or the host’s shared URL and do not start a server. Existing compatible backends are reused. Only a same-origin loopback request may launch a backend; arbitrary static hosting cannot launch local processes. n2n/Radmin-style virtual LANs can work when the host’s virtual IP and TCP port 3001 are reachable (not physically tested here).
+
+For manual/dedicated hosting, run `npm run lan` (Node.js 22+) to build and start the LAN server on port 3001, or `npm run lan:serve` after building. Other players open the LAN address printed by the server, connect, and join a six-character room code. Only the room creator runs the combat simulation in a browser Worker; the Node server relays messages.
+
+This first preview supports two players with the built-in Onslaught/Paragon presets, shared combat results, and another round from the room. It preserves single-player saves. It does **not** yet support ten-player fleets, custom fits, client prediction, reconnect, or host migration. See [LAN setup, limits and verification](docs/lan-multiplayer.md) and [implementation plan](docs/multiplayer-plan.md).
+
+## Tactical chart
+
+### In-combat simulation deployment
+
+The refit **模拟战斗 / N** action now enters the live combat scene directly, initially paused with the tactical map and native-style deployment window open. There is no outside-the-battle enemy dropdown. Q/W switch allied/enemy rosters; select silhouettes, then 部署 adds actual fitted ships and carrier wings to this same encounter. G reopens the window from the chart and pauses the encounter. Closing/deploying preserves that pause; Space resumes and Tab returns to piloting. Restarting a design trial returns to this empty deployment phase without changing its prototype or saved design. Use Esc → 重新模拟 → confirm; bare R no longer restarts piloting, while R in an enemy map context still sets the target.
+
+The 30 stock choices come from native `data/campaign/sim_opponents.csv`, costs from `ship_data.csv` supplies/rec, and fitted loadouts from imported native variants. Rebuild this snapshot with `pwsh -File scripts/import-simulation-roster.ps1`. Native ordering is civilian-last, hull size, deployment cost, then hull name. The validated refit adapter still reports incomplete effect support; loadout import does not mean native AI/effect parity. Simulation specs use separate IDs and never overwrite the user's prototype.
+
+Each side starts with a 240-point live-deployment budget (the flagship occupies its native cost). Selecting all may exceed it; deployment is then blocked until selection or budget is adjusted. Advanced controls provide real search, hull-size filters and 120/240/400 budgets, not the original campaign officer/unlock options. A wave is validated and constructed before entering the world, spends no command points, and refreshes combat presentation assets. Empty initialization excludes the legacy enemy placeholder and its wings from the battlefield; no phantom destruction or victory is generated.
+
+Combat starts with allies below enemies, bows facing each other. Simulation reinforcements retain this top/bottom formation with horizontal rows and collision-safe depth spacing. Piloting, radar and tactical chart all use +X right / +Y down, including map picking, panning, heading and the camera footprint; the chart no longer rotates a sideways battle by 90 degrees.
+
+Tab opens the full-height tactical chart. Native warroom icons and fonts form separate friendly/enemy context docks at bottom right; the flagship's fixed bow-up holographic armor silhouette and live flux/hull/CR meters stay at bottom left. Hover or keyboard-focus an icon for its action and any unavailable reason. No right-side text roster is used.
+
+- Left-click a contact to inspect it. Selecting an enemy retains the friendly command recipient. Right-click an enemy to engage, or empty space to move. A selects the fleet; Delete cancels its assignment. Orders involving the flagship enable autopilot, including after closing the chart; U returns it to manual. One command point is spent per assignment (including an escort group); points regenerate every 120 seconds of simulation time. Fleet assignments supersede individual friendly orders.
+- Friendly context: D holds that ship's current position and engages; L/M/H dispatch available nearby escorts (one frigate, one frigate/destroyer, or up to two main ships); S resumes autonomous attack; F centers the map; Delete cancels. Enemy context: R sets the flagship's target without spending CP; V sends recipient main ships away from the enemy; E issues focused engagement; the cross closes the context. F2 shows ship information and chart controls. These are Web AI policies, not a port of the native task planner. Escort follows a collision-safe station behind its moving target; defend persists until cancelled. Carrier wings retain their own behavior for the new main-ship orders.
+- Drag/arrow keys pan; wheel or +/- zoom; Home fits visible contacts; C centers the flagship only outside enemy context. The rectangular chart projection, picking, camera footprint and zoom anchor share the same coordinates and never change combat-camera zoom. Space and the left play/pause controls use the existing pause owner; Esc opens the game menu with dialog input priority. Keyboard routing checks the live chart flag even between HUD renders, so rapid Tab/H/M transitions cannot open piloting panels behind the map, and rapid Tab/Tab remains reversible. Browser Ctrl/Alt/Meta chords and modified wheel events do not issue flight actions; only Ctrl+1–7 is reserved for weapon-group autofire. Shift steering is unchanged.
+- Chart visibility follows combat/new/T.java's native base sight radius of 3000, live friendly main ships and one living leader per wing, the original fog_circle2 texture, feather margin and fog color. The same visibility predicate gates enemy sprites, picking, information and new chart orders. This uses continuous circles rather than the native 500-unit visibility cells, has no sight-radius modifiers, and does not change combat AI sensors, weapon targeting or the underlying combat renderer. It is chart visibility, not full combat fog-of-war parity.
+- In design simulations the deployed counter reports live allied deployment points, and G opens the real simulator deployment window. Other battle modes retain the live main-ship count. Retreat settlement, flagship transfer, harassment AI and independent wing-strike tasks remain unavailable with explicit reasons.
+
+## Ship design entry
+
+The default page opens the native-style homepage with a single **舰船设计** entry. The full source catalog remains available through the developer URL `?view=catalog`, not a separate homepage button.
+
+The refit roster supports ship-name/source-ID search, one-click hull-class filters, an original-faction selector, clearing/resetting, and locating the current hull. Search and scroll position survive hull changes. Weapon selection searches compatible weapons, prioritizes affordable choices, and offers faction and optional OP-budget filters. Faction membership follows native known equipment pools and explicit faction variants; shared equipment can appear under multiple factions. Unassigned equipment remains accessible under All / Unassigned.
+
+The refit screen explicitly identifies unavailable active systems and unimplemented native built-in mods; catalog presence is not proof of gameplay support. The hullmod list searches implemented effect descriptions as well as names/IDs.
+The refit shell fills the browser workspace again (no 1020 × 746 centered window cap). Carriers show a vertical flight-deck strip inside the left edge of the grid: actual fighter sprites, per-wing OP, empty slots, and click-to-replace / right-click-to-remove. Empty deck positions persist in designs, built-in wings are locked, and the evaluated loadout drives the actual trial flight decks. Phase Field is explicitly campaign-only (no campaign sensor simulation); Delicate Machinery now increases post-peak CR loss by 50%.
+Equipment descriptions are hover/focus cards rather than persistent sidebars. Fitted hullmods and the install table share a black/cyan card with highlighted values and a working F2 data view. Weapon selection keeps native/effective stats and Ctrl comparison in its hover card. Fighter selection uses the compact deck-anchored original-style list (interceptor/fighter/bomber tabs, actual formations, current-wing removal and OP); its card appears only over a row. S-mod reference text is explicitly not an implemented solidification bonus, and campaign purchases remain disabled.
+The workbench lets you choose a supported hull, fit weapons to its original mounts,
+allocate OP/flux, set seven weapon groups, save designs, and trial the actual configuration.
+This is a refit workflow, not freeform hull construction. The UI now follows the user-provided original-game refit screenshot: native fonts and border/title/icon assets, a black roster, cyan grid, central hull, right-side statistics and bottom action rows. Fresh libraries start with Paragon.
+
+- Native hulls, skins and weapons are discovered from the local core installation rather than a five-hull allowlist. Search/filter the refit roster and weapon picker; the original Onslaught, Paragon and Doom curated fits remain available.
+- The full-content browser includes ships, weapons, fighter wings, hullmods, systems, variants and projectiles, with source data, links and explicit runtime support status. Open it directly with `?view=catalog`.
+- **Imported data is not a claim of original-engine parity.** Basic approximations and missing Java-driven mechanics are listed on the affected ship/weapon and before simulation. Unsupported objects remain inspectable rather than silently disappearing. Hullmods are installable only when their effects are actually implemented.
+- Refit follows the native screenshot and local source UI: ship-only roster, mount-anchored weapon list with a left-side native-data tooltip, seven-group assignment table with Q/W/T confirm/cancel, left-expanded hullmod filtering/sorting while right-side stats stay live, and variant saving through 装配方案. Clear the fit to start from an empty hull. No custom sidebar tools or suggested-fit buttons. The simulation action directly opens in-combat deployment using the original 30-entry simulator roster.
+- Design library, draft and its edit baseline use base-path-scoped browser storage. Untouched ships switch without confirmation; genuine edits remain protected, including after refresh. Import/export uses .design.json files.
+- Design trials are ephemeral: no fleet-save reads/writes, settlement, or damage written back to the design.
+- Combat has no top-right toolbar. **Esc** opens the screenshot-matched pause menu: current ship, **游戏设置**, **结束模拟**, **返回游戏**. Settings expose working mouse steering/audio controls and help. Closing preserves the pre-menu pause state; ending a trial returns to refit with the design intact.
+- Explicit developer routes remain: ?view=combat for the previous sandbox and ?view=visual-lab for the Visual Lab.
+- Keyboard/mouse and WebGL2 are required for combat. The original desktop layout uses scrolling on very narrow screens; there are no new touch combat controls.
+
+See [Ship design studio](docs/ship-design-studio.md) for behavior, limitations and verification.
+
 ## Runtime architecture
+
+For combat (including the explicit legacy route), the application-level owner is `GameSession`: it retains the combat session,
+versioned persistent fleet/inventory data, and explicit combat request/outcome
+boundaries. On the legacy combat route, **Esc → 游戏设置 → 舰队 / 存档** separates free sandbox battles from fleet
+sorties that carry damage, CR and ammunition into the next battle. Saves restore
+pre-battle checkpoints, **not** mid-combat simulation snapshots; the Visual Lab
+never reads or writes them. See [Game architecture](docs/game-architecture.md) for
+ownership, save failure behavior, and the intentionally unimplemented campaign layers.
 
 The main lifecycle is owned by `CombatSession` rather than React renders. A session owns the `CombatEngine`, `FixedTimestepScheduler`, renderer, player AI, `VisualClock`, deterministic `VisualRandom`, performance counters and disposable GPU resources.
 
@@ -56,9 +120,41 @@ Runtime assets live in:
 
 `ContentRegistry` is the authoritative ship/weapon registry. Built-in and imported weapons use the same lookup path, so a dynamically registered weapon can be equipped by a ship slot.
 
-Original `.ship`, `.wpn` and CSV parsing is import tooling, not a runtime filesystem dependency. The parser preserves JSON primitives and quoted `//` text and supports quoted CSV fields.
+Original `.ship`, `.wpn`, `.proj` and CSV parsing is import tooling, not a runtime filesystem dependency. The parser preserves JSON primitives and quoted `//` text, accepts bare enum values in arrays, and supports quoted CSV fields.
 
-### Regenerating the curated game-asset bundle
+Built-in hull/weapon data comes from `src/engine/data/generated/ships.json` and
+`weapons.json`. The complete, lossless native catalog is in `native-catalog.json`;
+`refit-source.json` and `runtime-import-report.json` describe runtime availability
+and per-item limitations. Existing curated loadouts remain separate from source
+hull specifications. Imported native variants are identified by provenance.
+
+Regenerate the full local bundle (defaults to the sibling `starsector-core`):
+
+```powershell
+npm run import:all
+# Or use an explicit installation:
+npm run import:content -- 'C:\path\to\starsector-core'
+npm run import:catalog -- 'C:\path\to\starsector-core'
+npm run build
+```
+
+The native-catalog importer discovers recursive definitions and skin inheritance,
+retains original source fields, and copies related graphics/audio into the local
+bundle. It never runs original Java code, exposes the parent directory, or reads
+saved games. See [Full content port](docs/full-content-web-port.md) and the
+machine-readable import reports for coverage and unresolved dependencies.
+
+`ModManager` validates and registers runtime content; it does not define the
+built-in data. `CombatSession.addShip()` includes new ships and configured flight
+decks in presentation preparation. Direct engine changes outside the session
+must be followed by `refreshPresentationAssets()`.
+
+Combat entity iteration covers registered main ships, fighters and bombers.
+Ships without flight bays do not receive automatic wings. VIS-11/VIS-12 use
+explicit synthetic wings solely for controlled visual scenes. Default combat
+remains a configurable two-ship sandbox, not a campaign or fleet deployment UI.
+
+### Legacy curated asset importer
 
 Use a legally available Starsector `starsector-core` directory only as an explicit developer input:
 
@@ -66,7 +162,7 @@ Use a legally available Starsector `starsector-core` directory only as an explic
 ./scripts/import-game-assets.ps1 -StarsectorCore 'C:\path\to\starsector-core'
 ```
 
-The script scans the current source for referenced graphics/audio, copies only that closure, rejects source-root traversal and regenerates SHA-256/size/type/sampler metadata. It does **not** copy the whole game installation. Once generated, the application builds and runs without the source installation.
+The legacy script scans only the current source for referenced graphics/audio; prefer `npm run import:catalog` for the full catalog. It copies only that closure, rejects source-root traversal and regenerates SHA-256/size/type/sampler metadata. It does **not** copy the whole game installation. Once generated, the application builds and runs without the source installation.
 
 ## Visual Lab
 
@@ -93,13 +189,21 @@ The M2 acceptance-scene catalog follows the project plan exactly:
 | VIS-09 | Complete vent cycle |
 | VIS-10 | Small impact and ship explosion |
 | VIS-11 | Frozen HUD state |
-| VIS-12 | Two ships plus fighters/bombers integration |
+| VIS-12 | Scripted two-ship/fighter integration with live shield timing |
+| VIS-13 | Phase entry, coil trails, exit and cooldown |
 
 `VisualScenarioController` rebuilds a scenario from its seed and absolute timestamp, so seek/replay does not depend on the path taken to reach that frame. Renderer-owned evolving state such as vent particles and tactical-arc fades is advanced from `updateVisual()` and reset on restart/ship change; `render()` samples the current `VisualClock` without advancing those effects.
 
 Ship, engine, shield, weapon-family and explosion visual profiles are centralized under `src/engine/visual/VisualProfiles.ts`. The existing shield shader remains in place; its colors/animation now consume the profile layer rather than requiring a shader rewrite.
 
 The HUD has responsive density rules for 1280×720, 1920×1080 and 2560×1440-class viewports. The project intentionally does not claim pixel-perfect parity without a controlled reference-capture set; Visual Lab is the deterministic comparison surface for that future work.
+
+Mark IX and Hypervelocity Driver now use native textured ballistic heads with muzzle-grown rear trails instead of stretched centered sprites. HVD carries its source 400 EMP, both use the source 3.75 collision radius, and their firing audio follows the native sound entries. Full ballistic end-of-life fading and broader weapon parity remain open.
+
+HUD typography is intentionally a readable system font (Segoe UI / Microsoft YaHei), not the original bitmap font, by user preference. Weapon groups support declared indices 0–6: keys 1–7 select, Ctrl+1–7 toggles autofire, and the HUD mode button switches linked/alternating fire. Mixed groups show separate weapon-type rows; empty groups are hidden. Desktop groups use source-style diagonal stacking and per-mount status to the right; narrow layouts stack these sections without hiding controls.
+
+Destroyed hulls retain their weapon and damage composition. Normal wrecks no longer fade away on a 180-second timer; fighters use the source retention chance and 10-second wait before fading. Breakup now reads the source piece-count limits (Onslaught/Paragon 2–4, Doom 2–3), cuts the actual collision outline with a shared jagged seam, and renders polygon-masked pieces with their retained mounts and damage. Armor damage now uses pivot-aligned native square cells, persistent per-cell decals and source-style cooling/electrical flicker. Breakup clears armor and retains the existing decal pattern inside each piece, without inventing a hot seam. Newly disabled large hulls also receive the source internal armor-damage sequence, including when they do not split. Armor hits emit short source-sized sparks based on actual armor loss; the generic continuous damage smoke has been removed. Full native wreck physics, independently evolving piece damage/overkill and offscreen reclamation still remain open. The Web result modal waits for the ship explosion to finish, with battle statistics frozen during this visual tail.
+
 
 ## Rendering lifecycle and metrics
 
@@ -148,25 +252,13 @@ The repository-owned engineering gaps identified during final audit are now addr
 
 Production validation covers both the normal build and a nested `/starsector/` base. The nested production preview served the application, both manifests, and the bundled collision Wasm successfully. The App no longer uses a 100 ms global render tick for HUD state; mutable combat presentation refresh is contained inside the HUD subtree while battle-result state is polled separately.
 
-Two visual-acceptance inputs remain external to this standalone repository: standardized native-StarSector reference captures for the paired original-vs-web comparison, and an original font/bitmap-font glyph source if exact native glyph-atlas comparison is required. The repository does not fabricate either asset. `HudGlyphSample` therefore remains a clearly labelled current-HUD typography sample until a legally available reference is supplied. See `docs/final-closeout.md` for the detailed boundary and validation record.
+Standardized native-Starsector reference captures for a paired original-vs-web comparison remain an external visual-acceptance input. Native bitmap-font parity is explicitly excluded by user preference; readable system fonts are retained. Direct projectile contacts now use independently moving, constant-size native hit-particle pairs and source shield segment reactions instead of an extra generic shield burst; beam contact brightening, the continuous-beam mesh, brightness-squared .1s damage batches and source-speed front growth from the last shortened endpoint are source-derived. Same-cycle charging/chargedown retains the ray and damage clock. Tachyon now uses the source interval/previous-endpoint shield rule, distance-weighted component targets, extra energy/EMP damage and native textured arc geometry. Graviton now tracks distinct weapon identities for its one-second 5%/8%/10% shield-vulnerability effect, using current-endpoint full-brightness DPS pulses and target-side listener timing. Weapon component health now uses source turret/hardpoint HP, delayed zero-HP checks, incremental full-health repairs and permanent disable state. Direct projectiles, beams and Tachyon arcs share the source 21-cell armor/hull/EMP transfer; mine, flak, ship-ram and asteroid hull hits now use the same component map for their actual armor/hull loss. Engine health now initializes at installation and uses weighted disable fractions, delayed cascade/repair states, permanent damage and queued nozzle flashes. Source-derived motion, damaged-nozzle drift and short flame-command interlocks are implemented for the current Web controls. Low-CR weapon/engine failures now sample per eligible component health interval, with conditional critical failures, permanent-disable limits and critical self-damage. Shield failures now require recent real shield damage and high flux, sample source-randomized intervals and force a hull-size-base overload; fighters are excluded from CR module failures and defense lockouts. The deployment-only LowCRShipDamageSequence now captures initial CR, delays and schedules permanent critical damage with dynamic target pruning, independently of later combat CR decay and phase-time scaling. Complete motion/glow/system/API integration, remaining weapon-plugin variants, time/beam-speed stat modifiers, multi-ray convergence and missile secondary explosions remain incomplete. `HudGlyphSample` is a current-HUD typography sample, not a native-glyph comparison. The current scope and remaining gaps are recorded in `docs/visual-fidelity-audit.md`; older closeout notes do not override that audit.
 
-## Regression coverage
+## Development checks
 
-`npm test` covers:
-
-- Starsector JSON comments/primitives/quoted URLs
-- quoted/escaped CSV fields
-- armor damage clamp (100/1000/10000 effective armor cases)
-- imported weapon registration and equipment
-- scheduler behavior at 30/60/144 Hz
-- preservation of scaled backlog rather than dropping it
-- 20 repeated ship switches resetting timing/cooldowns/settlement
-- seeded visual random replay
-- nested weapon-definition rejection before registration
-- cosmetic RNG isolation from authoritative combat RNG
-- asset-root traversal rejection
-- spatial-grid collision candidate pruning
-- swept hull collision and shield-before-hull fallback behavior
+Use typechecking, lint, production builds and direct runtime inspection. There is
+no automated test suite or test command. Older test results in historical project
+reports describe removed checks, not current regression coverage.
 
 ## Production verification checklist
 
@@ -174,7 +266,6 @@ Before release:
 
 ```powershell
 npm run typecheck
-npm test
 npm run lint
 npm run build
 ```
@@ -190,3 +281,25 @@ Then verify:
 6. restart / ship switch can be repeated without stale battle state.
 
 The original-format importer and asset regeneration script are explicit developer tools; they are not invoked by normal build or runtime code.
+
+### Motion controls
+
+W applies forward thrust; S applies reverse thrust; A/D strafe; X brakes along the current velocity. Releasing thrust preserves below-limit momentum. Overspeed recovers gradually rather than snapping to the speed cap. Mouse steering and AI braking use the same effective motion stats as the ship.
+
+
+### Latest cross-weapon fidelity sweep (2026-09-16)
+
+All17 currently registered weapon contracts were checked against their CSV/.wpn/.proj
+sources without running hash-producing importers. Source charge/autocharge and full
+burst-flux semantics, adapter-free native radii, per-source sound variants/beam loops,
+projectile tail/range/impact fade with damage/EMP decay, Heavy Blaster/lightMG/Sabot
+textured bullet presentation, Sabot secondary behavior, swept missile contacts,
+beam missile interception and source-duration Reaper/Atropos splash damage are now
+implemented. Built-in adapters can no longer silently override source gameplay or
+material fields. All17 existing WPN presentation scenes reached ready/GL0; build,
+typecheck, lint and bounded memory-only firing/lifetime/collision checks passed.
+
+This supersedes the earlier ordinary-ballistic end-of-life gap, but not all missile
+arming/fizzle, point-defense AI, beam environment occlusion, detailed explosion
+visuals, mutable weapon APIs or paired-native acceptance gaps. See the chronological
+cross-weapon section in docs/visual-fidelity-audit.md for precise scope and evidence.

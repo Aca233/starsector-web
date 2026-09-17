@@ -12,7 +12,10 @@ import { WebGLShipPass } from './passes/WebGLShipPass';
 import { WebGLProjectilePass } from './passes/WebGLProjectilePass';
 import { WebGLFXPass } from './passes/WebGLFXPass';
 import { WebGLTacticalOverlayPass } from './passes/WebGLTacticalOverlayPass';
+import { renderIdentificationIndicators } from './passes/WebGLIdentificationPass';
+import { renderShipPhase } from './ShipPhaseRenderer';
 import { ESSENTIAL_TEXTURE_URLS } from '../TextureCache';
+import { collectCombatTextureUrls } from '../../assets/CombatAssetClosure';
 import type { ICombatRenderer, RendererResourceStats } from '../ICombatRenderer';
 
 export interface WebGLRendererLifecycle {
@@ -25,13 +28,14 @@ export interface WebGLRendererLifecycle {
 /**
  * 远行星号 WebGL2 硬件级 GPU 实例化渲染中枢 (WebGLCombatRenderer)
  * 采用分通道架构 (Pass-based Architecture)，协调环境、光束缎带、战舰挂点、弹丸粒子、护盾特效与战术 HUD
- * 将 2000+ 次 CPU 立即模式绘制合并为 < 10 次 GPU Instanced Draw Calls
+ * 保持通道与透明混合顺序；按纹理、容量与混合边界批量提交，绘制次数由实际场景决定。
  */
 export class WebGLCombatRenderer implements ICombatRenderer {
   public readonly canvas: HTMLCanvasElement;
   public gl: WebGL2RenderingContext;
   public textures: WebGLTextureManager;
   public batcher: SpriteBatcher;
+  public effectBatcher: SpriteBatcher;
   public ribbonBatcher: RibbonBatcher;
   public shieldShader: WebGLShieldShader;
 
@@ -54,6 +58,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
   private lastGpuTimeMs: number | null = null;
   private restoreGeneration = 0;
   private disposed = false;
+  private requiredTextures: readonly string[] = ESSENTIAL_TEXTURE_URLS;
   private readonly lifecycle: WebGLRendererLifecycle;
 
   private readonly onContextLost = (event: Event) => {
@@ -77,15 +82,18 @@ export class WebGLCombatRenderer implements ICombatRenderer {
     this.lifecycle = lifecycle;
     let textures: WebGLTextureManager | null = null;
     let batcher: SpriteBatcher | null = null;
+    let effectBatcher: SpriteBatcher | null = null;
     let ribbonBatcher: RibbonBatcher | null = null;
     let shieldShader: WebGLShieldShader | null = null;
     try {
       textures = new WebGLTextureManager(gl);
       batcher = new SpriteBatcher(gl);
+      effectBatcher = new SpriteBatcher(gl, 4);
       ribbonBatcher = new RibbonBatcher(gl);
       shieldShader = new WebGLShieldShader(gl);
       this.textures = textures;
       this.batcher = batcher;
+      this.effectBatcher = effectBatcher;
       this.ribbonBatcher = ribbonBatcher;
       this.shieldShader = shieldShader;
     } catch (error) {
@@ -93,6 +101,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
         shieldShader?.dispose();
         ribbonBatcher?.dispose();
         batcher?.dispose();
+        effectBatcher?.dispose();
         textures?.dispose();
       }
       throw error;
@@ -115,6 +124,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
 
     let nextTextures: WebGLTextureManager | null = null;
     let nextBatcher: SpriteBatcher | null = null;
+    let nextEffectBatcher: SpriteBatcher | null = null;
     let nextRibbonBatcher: RibbonBatcher | null = null;
     let nextShieldShader: WebGLShieldShader | null = null;
     let nextGl: WebGL2RenderingContext | null = null;
@@ -130,14 +140,16 @@ export class WebGLCombatRenderer implements ICombatRenderer {
 
       nextTextures = new WebGLTextureManager(nextGl);
       nextBatcher = new SpriteBatcher(nextGl);
+      nextEffectBatcher = new SpriteBatcher(nextGl, 4);
       nextRibbonBatcher = new RibbonBatcher(nextGl);
       nextShieldShader = new WebGLShieldShader(nextGl);
-      await nextTextures.preload(ESSENTIAL_TEXTURE_URLS);
+      await nextTextures.preload(this.requiredTextures);
 
       if (this.disposed || generation !== this.restoreGeneration || nextGl.isContextLost()) {
         if (!nextGl.isContextLost()) {
           nextTextures.dispose();
           nextBatcher.dispose();
+          nextEffectBatcher.dispose();
           nextRibbonBatcher.dispose();
           nextShieldShader.dispose();
         }
@@ -147,6 +159,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
       this.gl = nextGl;
       this.textures = nextTextures;
       this.batcher = nextBatcher;
+      this.effectBatcher = nextEffectBatcher;
       this.ribbonBatcher = nextRibbonBatcher;
       this.shieldShader = nextShieldShader;
       this.gpuTimerExt = nextGl.getExtension('EXT_disjoint_timer_query_webgl2');
@@ -159,6 +172,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
       if (nextGl && !nextGl.isContextLost()) {
         nextTextures?.dispose();
         nextBatcher?.dispose();
+        nextEffectBatcher?.dispose();
         nextRibbonBatcher?.dispose();
         nextShieldShader?.dispose();
       }
@@ -168,8 +182,9 @@ export class WebGLCombatRenderer implements ICombatRenderer {
     }
   }
 
-  public prepareAssets(): Promise<void> {
-    return this.textures.preload(ESSENTIAL_TEXTURE_URLS);
+  public prepareAssets(engine?: CombatEngine): Promise<void> {
+    if (engine) this.requiredTextures = collectCombatTextureUrls(engine);
+    return this.textures.preload(this.requiredTextures);
   }
 
   public updateVisual(engine: CombatEngine, dt: number, frame: RenderFrameContext): void {
@@ -216,6 +231,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
   }
 
   public resetVisualState(): void {
+    this.textures.retainCanvasTextures(new Set());
     this.shipPass.resetVisualState();
     this.arcActiveGroupIndex = 0;
     this.arcTargetGroupIndex = 0;
@@ -274,10 +290,13 @@ export class WebGLCombatRenderer implements ICombatRenderer {
 
     // 4. 开启批处理器
     this.batcher.begin(actualCam, zoom, width, height);
+    this.ribbonBatcher.drawCalls = 0;
+    this.effectBatcher.drawCalls = 0;
+    this.shieldShader.drawCalls = 0;
 
     // 4.1 通道 1: 深空背景、远景/中景星云与小行星。V09 将三类环境层独立开关。
-    if (frame.layers.has('background')) this.environmentPass.renderBackground(ctx, actualCam);
-    if (frame.layers.has('nebula')) this.environmentPass.renderNebulae(engine, ctx, ['BACKGROUND', 'MIDGROUND']);
+    if (frame.layers.has('background')) this.environmentPass.renderBackground(ctx, actualCam, engine.environment);
+    if (frame.layers.has('nebula')) this.environmentPass.renderNebulae(engine, ctx);
     if (frame.layers.has('asteroid')) this.environmentPass.renderAsteroids(engine, ctx);
 
     // 4.2 通道 2: 导弹连续尾迹缎带 (严格对齐 Starsector 原版: LAYER_BELOW_SHIPS 位于战舰底层)
@@ -296,16 +315,29 @@ export class WebGLCombatRenderer implements ICombatRenderer {
     if (frame.layers.has('weapon')) this.projectilePass.renderProjectilesAndMuzzle(engine, ctx);
     if (frame.layers.has('beam')) this.projectilePass.renderBeams(engine, ctx);
 
+    if (frame.layers.has('hull')) {
+      for (const ship of engine.ships) {
+        if (!ship.isDead) renderShipPhase(ship, ship.interpolatedPos(alpha), ship.interpolatedFacing(alpha), ctx);
+      }
+    }
+
     // 4.5 通道 5: 折跃水雷、极坐标护盾 Shader、护盾涟漪、EMP 闪电与火球爆炸碎片
     if (frame.layers.has('shield') || frame.layers.has('explosion')) {
-      this.fxPass.render(engine, ctx, nowSec, enemyPos, enemyFacing, playerPos, playerFacing, {
+      // Preserve pass/primitive/blend order while avoiding a flush for each
+      // alternating explosion texture. Do not enable multi-texture work globally.
+      this.batcher.flush();
+      this.effectBatcher.begin(actualCam, zoom, width, height);
+      this.fxPass.render(engine, { ...ctx, batcher: this.effectBatcher }, nowSec, enemyPos, enemyFacing, playerPos, playerFacing, {
         shield: frame.layers.has('shield'),
         explosion: frame.layers.has('explosion')
       });
+      this.effectBatcher.end();
+      this.batcher.resumeProgram();
     }
 
-    // 4.5.5 前景透明星云对世界对象产生柔和遮挡，但不盖住战术标记/HUD。
-    if (frame.layers.has('nebula')) this.environmentPass.renderNebulae(engine, ctx, ['FOREGROUND']);
+    // Default combat nebula is drawn once in CLOUD_LAYER, below ships.
+
+    renderIdentificationIndicators(engine, ctx, frame.layers);
 
     // 4.6 通道 6: 战术锁定方括号、前置瞄准点、武器射界与测距弧 (1:1 原版 _super.java & E.java)
     this.tacticalOverlayPass.render(engine, ctx, nowSec, enemyPos, playerPos, this.arcActiveGroupIndex, this.arcAnimProgress);
@@ -359,7 +391,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
     return {
       ...this.textures.getStats(),
       resourceRecreations: this.resourceRecreations,
-      drawCalls: this.batcher.drawCalls + this.ribbonBatcher.drawCalls,
+      drawCalls: this.batcher.drawCalls + this.effectBatcher.drawCalls + this.ribbonBatcher.drawCalls + this.shieldShader.drawCalls,
       gpuTimerAvailable: !!this.gpuTimerExt,
       gpuTimeMs: this.lastGpuTimeMs
     };
@@ -376,6 +408,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
       this.pendingGpuQueries = [];
       this.textures.dispose();
       this.batcher.dispose();
+      this.effectBatcher.dispose();
       this.ribbonBatcher.dispose();
       this.shieldShader.dispose();
     }

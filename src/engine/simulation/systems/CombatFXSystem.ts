@@ -1,9 +1,15 @@
+import { createNativeEmpArc, advanceNativeEmpArc } from '../../visual/EmpArcVisuals';
+import { DEBRIS_TEXTURES } from '../../assets/CombatFXAssets';
 import { Vector2 } from '../../math/Vector2';
+import { updateHulkBreakups } from '../../visual/HulkVisuals';
+import { createArmorDamageParticles } from '../../visual/ArmorImpactVisuals';
+import type { Ship } from '../Ship';
 import {
   Particle,
   ContrailParticle,
   ExplosionAnimation,
   HitGlowAnimation,
+  MovingRayFade,
   EmpArc,
   EmpArcBranch,
   MuzzleFlash,
@@ -13,8 +19,10 @@ import {
   ShieldRipple,
   HulkFragment
 } from '../CombatTypes';
-import { LauncherSmokeSpec, MissileExplosionVisualSpec, MuzzleFlashSpec } from '../Weapon';
+import { LauncherSmokeSpec, MissileExplosionVisualSpec, MuzzleFlashSpec, Projectile } from '../Weapon';
+import { createProjectileHitGlows, type HitGlowDamageResult } from '../../visual/HitGlowVisuals';
 import { SimulationRandom } from '../SimulationRandom';
+import { createExplosionPuffs, hitParticleDuration } from '../../visual/ExplosionVisuals';
 
 function fastRemoveAt<T>(arr: T[], index: number) {
   const last = arr.pop();
@@ -23,28 +31,52 @@ function fastRemoveAt<T>(arr: T[], index: number) {
   }
 }
 
-const DEBRIS_TEXTURES = {
-  small: [
-    'graphics/debris/debris_sml0.png',
-    'graphics/debris/debris_sml1.png',
-    'graphics/debris/debris_sml2.png',
-    'graphics/debris/debris_sml3.png'
-  ],
-  medium: [
-    'graphics/debris/debris_med0.png',
-    'graphics/debris/debris_med1.png'
-  ],
-  large: [
-    'graphics/debris/debris_lrg0.png',
-    'graphics/debris/debris_lrg1.png'
-  ]
-};
+type ParticlePriority = 'LOW' | 'NORMAL' | 'HIGH';
+
+const PARTICLE_HARD_CAP = 720;
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function smoothstep01(value: number): number {
+  const t = clamp01(value);
+  return t * t * (3 - 2 * t);
+}
+
+function smoothstepRange(edge0: number, edge1: number, value: number): number {
+  if (edge1 <= edge0) return value >= edge1 ? 1 : 0;
+  return smoothstep01((value - edge0) / (edge1 - edge0));
+}
+
+function particleEnvelope(progress: number, rampUpFraction: number, fadeOutFraction: number): number {
+  const t = clamp01(progress);
+  const ramp = rampUpFraction <= 0 ? 1 : smoothstepRange(0, rampUpFraction, t);
+  const fade = fadeOutFraction <= 0 ? 1 : 1 - smoothstepRange(1 - fadeOutFraction, 1, t);
+  return clamp01(ramp * fade);
+}
+
+function mixRgb(
+  from: [number, number, number],
+  to: [number, number, number],
+  amount: number
+): [number, number, number] {
+  const t = clamp01(amount);
+  return [
+    from[0] + (to[0] - from[0]) * t,
+    from[1] + (to[1] - from[1]) * t,
+    from[2] + (to[2] - from[2]) * t
+  ];
+}
+
+
 
 export class CombatFXSystem {
   public particles: Particle[] = [];
   public contrails: ContrailParticle[] = [];
   public explosions: ExplosionAnimation[] = [];
   public hitGlows: HitGlowAnimation[] = [];
+  public movingRayFades: MovingRayFade[] = [];
   public empArcs: EmpArc[] = [];
   public muzzleFlashes: MuzzleFlash[] = [];
   public muzzleParticles: MuzzleParticle[] = [];
@@ -60,6 +92,7 @@ export class CombatFXSystem {
     this.contrails = [];
     this.explosions = [];
     this.hitGlows = [];
+    this.movingRayFades = [];
     this.empArcs = [];
     this.muzzleFlashes = [];
     this.muzzleParticles = [];
@@ -74,6 +107,7 @@ export class CombatFXSystem {
     this.updateContrails(dt);
     this.updateExplosions(dt);
     this.updateHitGlows(dt);
+    this.updateMovingRayFades(dt);
     this.updateEmpArcs(dt);
     this.updateMuzzleFlashes(dt);
     this.updateMuzzleParticles(dt);
@@ -88,7 +122,28 @@ export class CombatFXSystem {
       const p = this.particles[i];
       p.life -= dt;
       p.pos.addScaled(p.vel, dt);
-      p.alpha = Math.max(0, p.life / p.maxLife);
+
+      if (p.material === 'SOURCE_SMOOTH') {
+        // BaseParticle's default cutoff=1: constant size/velocity and linear one-second brightness.
+        p.alpha = Math.max(0, p.life / p.maxLife);
+      } else if (p.material) {
+        if (p.drag && p.drag > 0) p.vel.scale(Math.exp(-p.drag * dt));
+        if (p.angularVel) p.rotation = (p.rotation ?? 0) + p.angularVel * dt;
+
+        const progress = clamp01(1 - p.life / Math.max(0.0001, p.maxLife));
+        const startSize = p.startSize ?? p.size;
+        const endSize = p.endSize ?? startSize;
+        p.size = startSize + (endSize - startSize) * smoothstep01(progress);
+        p.alpha = (p.peakAlpha ?? 1) * particleEnvelope(
+          progress,
+          p.rampUpFraction ?? 0,
+          p.fadeOutFraction ?? 0.7
+        );
+      } else {
+        // Backward-compatible path for existing bespoke visual systems.
+        p.alpha = Math.max(0, p.life / p.maxLife);
+      }
+
       if (p.life <= 0) {
         fastRemoveAt(this.particles, i);
       }
@@ -115,7 +170,7 @@ export class CombatFXSystem {
       const exp = this.explosions[i];
       exp.life -= dt;
       const progress = Math.max(0, Math.min(1.0, 1.0 - exp.life / exp.maxLife));
-      exp.frame = Math.min(6, Math.floor(progress * 7));
+      if (!exp.puffs && !exp.sourceAuthored) exp.frame = Math.min(6, Math.floor(progress * 7));
       exp.radius = exp.maxRadius * (0.3 + 0.7 * Math.sin(progress * Math.PI * 0.5));
       if (exp.hasShockwaveRing) {
         exp.shockwaveRadius += dt * (exp.maxShockwaveRadius / (exp.maxLife * 0.45));
@@ -128,14 +183,64 @@ export class CombatFXSystem {
 
   public updateHitGlows(dt: number) {
     for (let i = this.hitGlows.length - 1; i >= 0; i--) {
-      this.hitGlows[i].life -= dt;
-      if (this.hitGlows[i].life <= 0) fastRemoveAt(this.hitGlows, i);
+      const glow = this.hitGlows[i];
+      glow.life -= dt;
+      glow.pos.addScaled(glow.vel, dt);
+      if (glow.life <= 0) fastRemoveAt(this.hitGlows, i);
     }
+  }
+
+  public updateMovingRayFades(dt: number) {
+    for (let i = this.movingRayFades.length - 1; i >= 0; i--) {
+      const fade = this.movingRayFades[i];
+      fade.life -= dt;
+      fade.elapsedTime += dt;
+      const remaining = fade.headPos.distanceTo(fade.tailPos);
+      const advance = Math.min(remaining, fade.moveSpeed * dt);
+      fade.tailPos.addScaled(fade.direction, advance);
+      if (fade.life <= 0 || fade.headPos.distanceTo(fade.tailPos) <= 0.1) {
+        fastRemoveAt(this.movingRayFades, i);
+      }
+    }
+  }
+
+  /** MovingRay impact: freeze the head at contact while the tail catches up and fades. */
+  public spawnMovingRayImpactFade(projectile: Projectile, impactPos: Vector2) {
+    if (projectile.spawnType !== 'BALLISTIC_AS_BEAM' || projectile.sourceMoveSpeed !== undefined) return;
+    const fadeTime = projectile.fadeTime ?? 0;
+    const authoredLength = projectile.projLength ?? 0;
+    const moveSpeed = projectile.movingRayMoveSpeed ?? projectile.vel.length();
+    if (fadeTime <= 0 || authoredLength <= 0 || moveSpeed <= 0) return;
+
+    const currentLength = Math.min(authoredLength, Math.max(0, projectile.elapsedTime) * moveSpeed);
+    if (currentLength <= 0.1) return;
+    const angle = projectile.facingRad ?? projectile.vel.heading();
+    const direction = Vector2.fromAngle(angle);
+    const headPos = impactPos.clone();
+    const tailPos = headPos.clone().addScaled(direction, -currentLength);
+    this.movingRayFades.push({
+      id: this.random.next(),
+      headPos,
+      tailPos,
+      direction,
+      moveSpeed,
+      life: fadeTime,
+      maxLife: fadeTime,
+      elapsedTime: projectile.elapsedTime,
+      maxPulseLength: authoredLength,
+      width: projectile.projWidth ?? projectile.radius * 2,
+      textureType: projectile.textureType ?? 'SMOOTH',
+      textureScrollSpeed: projectile.textureScrollSpeed ?? -256,
+      pixelsPerTexel: projectile.pixelsPerTexel ?? 1,
+      fringeColor: projectile.fringeColor ?? [...projectile.color, 255],
+      coreColor: projectile.coreColor ?? [255, 255, 255, 255]
+    });
   }
 
   public updateEmpArcs(dt: number) {
     for (let i = this.empArcs.length - 1; i >= 0; i--) {
-      this.empArcs[i].life -= dt;
+      if (this.empArcs[i].native) advanceNativeEmpArc(this.empArcs[i], dt, this.random);
+      else this.empArcs[i].life -= dt;
       if (this.empArcs[i].life <= 0) {
         fastRemoveAt(this.empArcs, i);
       }
@@ -269,110 +374,134 @@ export class CombatFXSystem {
   }
 
   public updateHulkFragments(dt: number) {
+    const cooledShips = new Set<Ship>();
     for (let i = this.hulkFragments.length - 1; i >= 0; i--) {
       const frag = this.hulkFragments[i];
-      frag.life -= dt;
-      if (frag.life <= 0) {
+      frag.age += dt;
+      if (frag.sourceShip.spec.hullSize === 'FIGHTER' && frag.age >= 10.5) {
         this.hulkFragments.splice(i, 1);
         continue;
       }
-
       frag.pos.addScaled(frag.vel, dt);
       frag.facingRad += frag.angularVel * dt;
-      frag.vel.scale(Math.pow(0.85, dt));
-      frag.angularVel *= Math.pow(0.9, dt);
-
-      // 浓密黑烟与裂口火星
-      if (this.random.next() < dt * 6) {
-        const off = new Vector2(
-          (this.random.next() - 0.5) * frag.collisionRadius * 1.1,
-          (this.random.next() - 0.5) * frag.collisionRadius * 1.1
-        ).rotate(frag.facingRad);
-        const smokePos = frag.pos.clone().add(off);
-
-        this.contrails.push({
-          pos: smokePos,
-          vel: Vector2.fromAngle(frag.facingRad + Math.PI + (this.random.next() - 0.5) * 1.5, 15).addScaled(frag.vel, 0.2),
-          life: 1.2 + this.random.next() * 0.8,
-          maxLife: 2.0,
-          size: 12 + this.random.next() * 10,
-          maxSize: 36 + this.random.next() * 16,
-          alpha: 0.65,
-          rotation: this.random.next() * Math.PI * 2,
-          color: [30, 30, 35]
-        });
-
-        if (this.random.next() < 0.4) {
-          this.particles.push({
-            pos: smokePos,
-            vel: Vector2.fromAngle(this.random.next() * Math.PI * 2, 30).addScaled(frag.vel, 0.3),
-            life: 0.2 + this.random.next() * 0.2,
-            maxLife: 0.4,
-            size: 3 + this.random.next() * 3,
-            color: [255, 130 + this.random.next() * 80, 20],
-            alpha: 0.9
-          });
-        }
+      if (!cooledShips.has(frag.sourceShip)) {
+        cooledShips.add(frag.sourceShip);
+        frag.sourceShip.updateScorchMarks(dt);
+        frag.sourceShip.shield.update(dt, frag.facingRad, frag.facingRad);
+        frag.sourceShip.system.update(dt);
       }
     }
+    updateHulkBreakups(this.hulkFragments, dt, this.random);
+    // Non-fighter wrecks do not fade just because time passes. Native offscreen/FOW
+    // reclamation is still open. Continuous random hulk smoke is not a source-backed effect.
+  }
+
+  private reserveParticleSlots(requested: number, priority: ParticlePriority = 'NORMAL'): number {
+    if (requested <= 0) return 0;
+    const available = Math.max(0, PARTICLE_HARD_CAP - this.particles.length);
+    if (available <= 0) return 0;
+
+    // Soft degradation keeps large fleet fights readable and bounded without abruptly
+    // disabling high-value hit flashes. No camera dependency is required, so simulation
+    // determinism is preserved across render rates.
+    const load = this.particles.length / PARTICLE_HARD_CAP;
+    let density = load < 0.55 ? 1 : load < 0.75 ? 0.78 : load < 0.9 ? 0.5 : 0.25;
+    if (priority === 'HIGH') density = Math.min(1, density * 1.2);
+    if (priority === 'LOW') density *= 0.7;
+
+    const minimumVisible = priority === 'HIGH' ? Math.min(requested, 2) : priority === 'NORMAL' ? 1 : 0;
+    const scaled = Math.max(minimumVisible, Math.floor(requested * density));
+    return Math.min(requested, available, scaled);
+  }
+
+  public spawnArmorDamageSparks(ship: Ship, localImpact: Vector2, armorDamage: number): void {
+    if (ship.damageDecals.suppressed) return;
+    const pos = ship.pos.clone().add(localImpact.clone().rotate(ship.facingRad));
+    // Do not apply the modern burst's minimum count or load-based soft density to source particles.
+    this.particles.push(...createArmorDamageParticles(pos, armorDamage, this.random));
   }
 
   public spawnSparks(pos: Vector2, count = 15, color: [number, number, number] = [255, 200, 100]) {
-    if (this.particles.length >= 450) return;
-    const actualCount = Math.min(count, 450 - this.particles.length);
+    const actualCount = this.reserveParticleSlots(count, 'NORMAL');
     for (let i = 0; i < actualCount; i++) {
       const angle = this.random.next() * Math.PI * 2;
-      const speed = 50 + this.random.next() * 200;
+      const speed = 70 + this.random.next() * 230;
+      const life = 0.22 + this.random.next() * 0.34;
+      const size = 1.5 + this.random.next() * 2.8;
       this.particles.push({
         pos: pos.clone(),
         vel: Vector2.fromAngle(angle, speed),
-        life: 0.2 + this.random.next() * 0.3,
-        maxLife: 0.5,
-        size: 2 + this.random.next() * 3,
-        color,
-        alpha: 1.0
+        life,
+        maxLife: life,
+        size,
+        startSize: size,
+        endSize: size * (0.35 + this.random.next() * 0.25),
+        color: mixRgb(color, [255, 255, 255], 0.12 + this.random.next() * 0.28),
+        alpha: 1,
+        peakAlpha: 0.72 + this.random.next() * 0.28,
+        rampUpFraction: 0.015,
+        fadeOutFraction: 0.74,
+        drag: 0.8 + this.random.next() * 1.5,
+        material: 'SPARK',
+        rotation: angle,
+        stretch: 1.4 + this.random.next() * 1.8
       });
     }
   }
 
   public spawnExplosion(pos: Vector2, count = 60) {
-    if (this.particles.length >= 450) return;
-    const actualCount = Math.min(count, 450 - this.particles.length);
+    const actualCount = this.reserveParticleSlots(count, 'HIGH');
     for (let i = 0; i < actualCount; i++) {
+      const ratio = actualCount > 1 ? i / (actualCount - 1) : 0;
       const angle = this.random.next() * Math.PI * 2;
-      const speed = 40 + this.random.next() * 350;
-      this.particles.push({
-        pos: pos.clone(),
-        vel: Vector2.fromAngle(angle, speed),
-        life: 0.6 + this.random.next() * 0.8,
-        maxLife: 1.4,
-        size: 4 + this.random.next() * 12,
-        color: [255, 120 + this.random.next() * 80, 30],
-        alpha: 1.0
-      });
+
+      if (ratio < 0.62) {
+        const speed = 110 + this.random.next() * 320;
+        const life = 0.32 + this.random.next() * 0.48;
+        const size = 1.8 + this.random.next() * 3.4;
+        this.particles.push({
+          pos: pos.clone(), vel: Vector2.fromAngle(angle, speed), life, maxLife: life,
+          size, startSize: size, endSize: size * 0.38,
+          color: [255, 150 + this.random.next() * 80, 45 + this.random.next() * 45],
+          alpha: 1, peakAlpha: 0.9, rampUpFraction: 0.01, fadeOutFraction: 0.68,
+          drag: 0.7 + this.random.next() * 1.2, material: 'SPARK', rotation: angle,
+          stretch: 1.8 + this.random.next() * 2.5
+        });
+      } else if (ratio < 0.82) {
+        const speed = 20 + this.random.next() * 90;
+        const life = 0.38 + this.random.next() * 0.42;
+        const size = 7 + this.random.next() * 9;
+        this.particles.push({
+          pos: pos.clone(), vel: Vector2.fromAngle(angle, speed), life, maxLife: life,
+          size, startSize: size, endSize: size * (2 + this.random.next() * 0.8),
+          color: [255, 100 + this.random.next() * 90, 25], alpha: 0,
+          peakAlpha: 0.56 + this.random.next() * 0.26, rampUpFraction: 0.06, fadeOutFraction: 0.82,
+          drag: 1.5 + this.random.next(), material: 'GLOW', rotation: angle
+        });
+      } else {
+        const speed = 8 + this.random.next() * 38;
+        const life = 0.9 + this.random.next() * 0.9;
+        const size = 12 + this.random.next() * 14;
+        this.particles.push({
+          pos: pos.clone(), vel: Vector2.fromAngle(angle, speed), life, maxLife: life,
+          size, startSize: size, endSize: size * (1.8 + this.random.next() * 0.7),
+          color: [42 + this.random.next() * 20, 35 + this.random.next() * 16, 32 + this.random.next() * 14],
+          alpha: 0, peakAlpha: 0.28 + this.random.next() * 0.18, rampUpFraction: 0.12, fadeOutFraction: 0.72,
+          drag: 1.4 + this.random.next() * 0.8, material: 'SMOKE', rotation: angle,
+          angularVel: (this.random.next() - 0.5) * 1.1
+        });
+      }
     }
   }
 
-  public spawnHitGlow(
-    pos: Vector2,
-    radius: number,
-    color: [number, number, number],
-    life = 0.18
-  ) {
-    if (radius <= 0 || life <= 0) return;
-    this.hitGlows.push({
-      id: this.random.next(),
-      pos: pos.clone(),
-      radius,
-      life,
-      maxLife: life,
-      color: [...color]
-    });
+  public spawnProjectileHitGlows(projectile: Projectile, pos: Vector2, target: Ship, result: HitGlowDamageResult) {
+    this.hitGlows.push(...createProjectileHitGlows(projectile, pos, target.vel, result, this.random));
   }
 
   public spawnSourceMissileExplosion(pos: Vector2, spec: MissileExplosionVisualSpec) {
     if (spec.radius <= 0) return;
     const [r, g, b] = spec.color;
+    const duration = hitParticleDuration(spec.radius * 2);
     this.explosions.push({
       id: this.random.next(),
       visualKind: 'missile',
@@ -380,8 +509,8 @@ export class CombatFXSystem {
       pos: pos.clone(),
       radius: spec.radius * 0.4,
       maxRadius: spec.radius,
-      life: 0.35,
-      maxLife: 0.35,
+      life: duration,
+      maxLife: duration,
       frame: 0,
       rotation: this.random.next() * Math.PI * 2,
       color: [r, g, b],
@@ -397,8 +526,11 @@ export class CombatFXSystem {
     color: [number, number, number] = [255, 160, 50],
     hasShockwave = true,
     visualKind: 'impact' | 'missile' | 'ship' = 'impact',
-    sourceShipId?: string
+    sourceShipId?: string,
+    duration = 2,
+    velocity = new Vector2()
   ) {
+    if (radius <= 0 || duration <= 0) return;
     this.explosions.push({
       id: this.random.next(),
       visualKind,
@@ -406,16 +538,21 @@ export class CombatFXSystem {
       pos: pos.clone(),
       radius: radius * 0.4,
       maxRadius: radius,
-      life: 0.35,
-      maxLife: 0.35,
+      life: duration,
+      maxLife: duration,
       frame: 0,
       rotation: this.random.next() * Math.PI * 2,
       color,
       hasShockwaveRing: hasShockwave,
       shockwaveRadius: 6,
-      maxShockwaveRadius: radius * 1.6
+      maxShockwaveRadius: radius * 1.6,
+      puffs: createExplosionPuffs(radius * 2, this.random, hasShockwave, velocity)
     });
-    this.spawnSparks(pos, Math.floor(radius * 0.35), color);
+  }
+
+  public spawnNativeEmpArc(from: Vector2, to: Vector2, target: Ship, width: number,
+    fringe: [number, number, number, number], core: [number, number, number, number]): void {
+    this.empArcs.push(createNativeEmpArc(from, to, target, width, fringe, core, this.random));
   }
 
   public spawnEmpArc(

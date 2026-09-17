@@ -14,7 +14,7 @@ export interface RendererResourceStats {
 }
 
 export interface ICombatRenderer {
-  prepareAssets(): Promise<void>;
+  prepareAssets(engine?: CombatEngine): Promise<void>;
   updateVisual(engine: CombatEngine, dt: number, frame: RenderFrameContext): void;
   render(engine: CombatEngine, alpha: number, cameraPos: Vector2, zoom: number, frame: RenderFrameContext): void;
   getResourceStats(): RendererResourceStats;

@@ -1,0 +1,151 @@
+/* Shared native UI skin. Source: class/I.java, class/o0oo_0.java, ui/u_0.java.
+ * Geometry and behavior belong to callers; this module owns fonts and material. */
+@font-face {
+  font-family: StarsectorHeadingCN;
+  src: url("/game-assets/graphics/fonts/native-heading-zh.ttf") format("truetype");
+  font-display: swap;
+}
+html:root {
+  --native-font-body: StarsectorLatin, StarsectorCN, sans-serif;
+  --native-font-heading: StarsectorNumber, StarsectorHeadingCN, sans-serif;
+  --ui-font: var(--native-font-body);
+  --native-button-bg: rgb(31 94 112 / 68.63%);
+  --native-button-hover: rgb(54 131 153 / 85%);
+  --native-button-text: #aadeff;
+  --native-noise-color: #2898b0;
+}
+:where(.native-chrome) { position: relative; }
+.native-frame.native-chrome[data-native-surface], .ui-modal.native-chrome[data-native-surface] {
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  box-shadow: none;
+  background: transparent;
+  isolation: isolate;
+}
+.native-chrome::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 3px;
+}
+.native-chrome[data-native-surface="solid"]::before { background: #000; }
+.native-chrome[data-native-surface="glass"]::before {
+  background: repeating-linear-gradient(0deg, #0000007d 0 1px, #000000af 1px 2px);
+}
+.native-chrome-border {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+.native-chrome-tile {
+  position: absolute;
+  display: block;
+  width: 8px;
+  height: 8px;
+  background-repeat: repeat;
+  image-rendering: pixelated;
+}
+.native-chrome-tile-n { top: 0; left: 8px; right: 8px; width: auto; }
+.native-chrome-tile-s { bottom: 0; left: 8px; right: 8px; width: auto; }
+.native-chrome-tile-w { top: 8px; bottom: 8px; left: 0; height: auto; }
+.native-chrome-tile-e { top: 8px; bottom: 8px; right: 0; height: auto; }
+.native-chrome-tile-nw { top: 0; left: 0; }
+.native-chrome-tile-ne { top: 0; right: 0; }
+.native-chrome-tile-sw { bottom: 0; left: 0; }
+.native-chrome-tile-se { bottom: 0; right: 0; }
+.native-chrome-tile-n { background-image: url("/game-assets/graphics/ui/bgs/ui_border1_n.png"); }
+.native-chrome-tile-s { background-image: url("/game-assets/graphics/ui/bgs/ui_border1_s.png"); }
+.native-chrome-tile-e { background-image: url("/game-assets/graphics/ui/bgs/ui_border1_e.png"); }
+.native-chrome-tile-w { background-image: url("/game-assets/graphics/ui/bgs/ui_border1_w.png"); }
+.native-chrome-tile-nw { background-image: url("/game-assets/graphics/ui/bgs/ui_border1_nw.png"); }
+.native-chrome-tile-ne { background-image: url("/game-assets/graphics/ui/bgs/ui_border1_ne.png"); }
+.native-chrome-tile-sw { background-image: url("/game-assets/graphics/ui/bgs/ui_border1_sw.png"); }
+.native-chrome-tile-se { background-image: url("/game-assets/graphics/ui/bgs/ui_border1_se.png"); }
+.native-chrome-material {
+  position: absolute;
+  inset: 3px;
+  z-index: 8;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 3px;
+  background: repeating-linear-gradient(0deg, transparent 0 1px, #0000000c 1px 2px);
+}
+.native-chrome-material::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--native-noise-color);
+  mask: url("/game-assets/graphics/fx/noise.png") repeat;
+  opacity: 0.065;
+  mix-blend-mode: screen;
+}
+.native-chrome[data-native-surface="solid"] > .native-chrome-material { opacity: 0.5; }
+.native-chrome[data-native-surface="none"] > .native-chrome-material { display: none; }
+.native-button.native-action, .ui-button.native-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  gap: 3px;
+  min-height: 24px;
+  padding: 3px 10px;
+  white-space: nowrap;
+  cursor: pointer;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  text-shadow: none;
+  color: var(--native-button-text);
+  background: var(--native-button-bg);
+  font-family: var(--native-font-heading);
+  font-weight: 400;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+.native-action[data-native-align="right"] { justify-content: flex-end; }
+.native-action[data-native-align="left"] { justify-content: flex-start; }
+.native-button.native-action:hover:not(:disabled), .ui-button.native-action:hover:not(:disabled),
+.native-button.native-action:focus-visible, .ui-button.native-action:focus-visible {
+  outline: none;
+  background: var(--native-button-hover);
+}
+.native-action:hover:not(:disabled) > .native-bitmap-text, .native-action:focus-visible > .native-bitmap-text { filter: brightness(1.22); }
+.native-button.native-action:disabled, .ui-button.native-action:disabled {
+  background: rgb(37 60 68 / 70%);
+  color: #69828b;
+}
+.native-action:disabled > .native-bitmap-text { filter: grayscale(0.6) brightness(0.65); }
+.ui-button.native-action.ui-button--danger { --native-button-text: #ff8050; --native-button-bg: #481f18bf; --native-button-hover: #693125d9; }
+.native-bitmap-text {
+  display: inline-block;
+  position: relative;
+  flex: 0 1 auto;
+  vertical-align: middle;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  line-height: 1;
+}
+.native-bitmap-text canvas { display: block; max-width: none; image-rendering: pixelated; }
+.native-bitmap-accessible {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.native-bitmap-fallback { font: 20px/24px var(--native-font-heading); }
+.native-bitmap-text[data-font="caption"] .native-bitmap-fallback { font-size: 16px; line-height: 16px; }
+.native-bitmap-text[data-font="button"] .native-bitmap-fallback { font-size: 18px; line-height: 20px; }
+.native-bitmap-text[data-font="body"] .native-bitmap-fallback { font: 15px/17px var(--native-font-body); }
+.ui-modal.native-chrome .ui-modal-header h2 { font-family: var(--native-font-heading); font-weight: 400; }
+.ui-modal.native-chrome .ui-modal-footer { background: transparent; }
+
+.native-action:disabled { cursor: default; }
+.native-action:disabled .native-shortcut { color: #69828b; }
+.ui-button.native-action.ui-button--primary { --native-button-bg: rgb(31 94 112 / 90%); }

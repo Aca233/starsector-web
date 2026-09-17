@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "ships": [
+    {
+      "id": "onslaught",
+      "name": "攻势"
+    },
+    {
+      "id": "paragon",
+      "name": "典范"
+    }
+  ]
+}

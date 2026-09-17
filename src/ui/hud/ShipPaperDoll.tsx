@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { Ship } from '../../engine/simulation/Ship';
 import { getCachedImage } from './hudUtils';
+import { drawShipDamageDecals, shipLocalToSpritePixel } from '../../engine/render/ShipDamageVisuals';
 
 export interface ShipPaperDollProps {
   ship: Ship;
@@ -29,6 +30,7 @@ export const ShipPaperDoll: React.FC<ShipPaperDollProps> = ({ ship, isEnemy = fa
     // 离屏装甲网格缓冲贴图
     const offCanvas = document.createElement('canvas');
     let lastRenderedVersion = -1;
+    let lastDamageVersion = -1;
     let lastDrawW = 0;
     let lastDrawH = 0;
 
@@ -46,7 +48,7 @@ export const ShipPaperDoll: React.FC<ShipPaperDollProps> = ({ ship, isEnemy = fa
 
       // 1. 绘制舰体机械结构底图
       offCtx.save();
-      offCtx.globalAlpha = Math.max(0.2, ship.hullHp / ship.spec.hitpoints);
+      offCtx.globalAlpha = Math.max(0.2, ship.hullHp / ship.maxHullHp);
       offCtx.drawImage(shipImg, 0, 0, offW, offH);
       offCtx.restore();
 
@@ -57,8 +59,14 @@ export const ShipPaperDoll: React.FC<ShipPaperDollProps> = ({ ship, isEnemy = fa
       const armor = ship.armor;
       const cols = armor.cols;
       const rows = armor.rows;
-      const cellW = offW / cols;
-      const cellH = offH / rows;
+      const sourceW = Math.max(1, ship.spec.spriteWidth);
+      const sourceH = Math.max(1, ship.spec.spriteHeight);
+      const scaleX = offW / sourceW;
+      const scaleY = offH / sourceH;
+      // Armor cellWidth runs along ship-local +X (source-image vertical axis), while
+      // cellHeight runs along local +Y (source-image horizontal axis).
+      const cellPixelW = armor.cellHeight * scaleX;
+      const cellPixelH = armor.cellWidth * scaleY;
 
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
@@ -78,10 +86,17 @@ export const ShipPaperDoll: React.FC<ShipPaperDollProps> = ({ ship, isEnemy = fa
             fillColor = 'rgba(15, 20, 25, 0.9)';
           }
 
-          const cx = c * cellW;
-          const cy = r * cellH;
+          const localCenter = armor.getCellCenterLocal(c, r);
+          const spriteCenter = shipLocalToSpritePixel(ship.spec, localCenter);
+          const cx = spriteCenter.x * scaleX;
+          const cy = spriteCenter.y * scaleY;
           offCtx.fillStyle = fillColor;
-          offCtx.fillRect(cx, cy, cellW - 0.5, cellH - 0.5);
+          offCtx.fillRect(
+            cx - cellPixelW * 0.5,
+            cy - cellPixelH * 0.5,
+            Math.max(0.5, cellPixelW - 0.5),
+            Math.max(0.5, cellPixelH - 0.5)
+          );
         }
       }
       offCtx.restore();
@@ -92,6 +107,15 @@ export const ShipPaperDoll: React.FC<ShipPaperDollProps> = ({ ship, isEnemy = fa
       offCtx.globalAlpha = 0.28;
       offCtx.drawImage(shipImg, 0, 0, offW, offH);
       offCtx.restore();
+
+      // 4. 与主战斗画面共用同一组装甲格战损贴花和同一 local→sprite 变换。
+      // source-atop 让边缘贴花仍严格受舰体透明像素裁切。
+      if (ship.scorchMarks.length > 0) {
+        offCtx.save();
+        offCtx.globalCompositeOperation = 'source-atop';
+        drawShipDamageDecals(offCtx, ship, 'base', offW / sourceW, offH / sourceH);
+        offCtx.restore();
+      }
     };
 
     let lastRenderTime = 0;
@@ -122,9 +146,15 @@ export const ShipPaperDoll: React.FC<ShipPaperDollProps> = ({ ship, isEnemy = fa
           const drawW = (ship.spec.spriteWidth || ship.spec.collisionRadius * 2) * scale;
           const drawH = (ship.spec.spriteHeight || ship.spec.collisionRadius * 2) * scale;
 
-          if (lastRenderedVersion !== ship.armor.dirtyVersion || lastDrawW !== drawW || lastDrawH !== drawH) {
+          if (
+            lastRenderedVersion !== ship.armor.dirtyVersion
+            || lastDamageVersion !== ship.scorchMarkVersion
+            || lastDrawW !== drawW
+            || lastDrawH !== drawH
+          ) {
             updateOffscreenArmor(drawW, drawH, shipImg);
             lastRenderedVersion = ship.armor.dirtyVersion;
+            lastDamageVersion = ship.scorchMarkVersion;
             lastDrawW = drawW;
             lastDrawH = drawH;
           }

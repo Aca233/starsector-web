@@ -1,0 +1,1709 @@
+{
+  "source": "data/campaign/sim_opponents.csv + data/hulls/ship_data.csv supplies/rec + imported stock variants",
+  "roster": [
+    {
+      "variantId": "paragon_Elite",
+      "variant": {
+        "displayName": "精英",
+        "fluxCapacitors": 40,
+        "fluxVents": 50,
+        "goalVariant": true,
+        "hullId": "paragon",
+        "hullMods": [
+          "stabilizedshieldemitter",
+          "hardenedshieldemitter",
+          "fluxdistributor",
+          "magazines",
+          "advancedshieldemitter"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "paragon_Elite",
+        "weaponGroups": [
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 001": "autopulse",
+              "WS 002": "autopulse"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 012": "reaper",
+              "WS 014": "reaper",
+              "WS 018": "reaper",
+              "WS 020": "reaper"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 003": "tachyonlance",
+              "WS 004": "tachyonlance"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 005": "gravitonbeam",
+              "WS 006": "gravitonbeam",
+              "WS 009": "gravitonbeam",
+              "WS 010": "gravitonbeam",
+              "WS 013": "taclaser",
+              "WS 015": "taclaser",
+              "WS 019": "taclaser",
+              "WS 021": "taclaser"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 007": "heavyneedler",
+              "WS 008": "heavyneedler"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 011": "pdlaser",
+              "WS 016": "pdlaser",
+              "WS 017": "pdlaser",
+              "WS 022": "pdlaser",
+              "WS 023": "pdlaser"
+            }
+          }
+        ]
+      },
+      "cost": 60.0,
+      "civilian": false
+    },
+    {
+      "variantId": "onslaught_Standard",
+      "variant": {
+        "displayName": "标准",
+        "fluxCapacitors": 33,
+        "fluxVents": 50,
+        "goalVariant": true,
+        "hullId": "onslaught",
+        "hullMods": [
+          "insulatedengine",
+          "armoredweapons",
+          "dedicated_targeting_core",
+          "auxiliarythrusters",
+          "fluxdistributor"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "onslaught_Standard",
+        "weaponGroups": [
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 016": "tpc",
+              "WS 017": "tpc"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 021": "annihilatorpod",
+              "WS 022": "annihilatorpod",
+              "WS 023": "annihilatorpod",
+              "WS 024": "annihilatorpod"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 019": "mark9"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 008": "lightac",
+              "WS 009": "lightac",
+              "WS 014": "heavyac",
+              "WS 015": "heavyac"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 012": "hveldriver",
+              "WS 013": "hveldriver"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 018": "devastator",
+              "WS 020": "devastator"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 001": "flak",
+              "WS 002": "vulcan",
+              "WS 003": "flak",
+              "WS 004": "vulcan",
+              "WS 005": "vulcan",
+              "WS 006": "vulcan",
+              "WS 007": "dualflak",
+              "WS 010": "flak",
+              "WS 011": "flak"
+            }
+          }
+        ]
+      },
+      "cost": 40.0,
+      "civilian": false
+    },
+    {
+      "variantId": "conquest_Elite",
+      "variant": {
+        "displayName": "精英",
+        "fluxCapacitors": 44,
+        "fluxVents": 50,
+        "goalVariant": true,
+        "hullId": "conquest",
+        "hullMods": [
+          "targetingunit",
+          "blast_doors"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "conquest_Elite",
+        "weaponGroups": [
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 002": "squall"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 001": "hurricane"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 011": "mjolnir",
+              "WS 012": "mjolnir"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 013": "flak",
+              "WS 014": "flak",
+              "WS 015": "dualflak",
+              "WS 016": "dualflak",
+              "WS 017": "flak",
+              "WS 018": "flak"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 022": "ionpulser"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 003": "taclaser",
+              "WS 004": "taclaser",
+              "WS 005": "taclaser",
+              "WS 006": "taclaser",
+              "WS 007": "taclaser",
+              "WS 008": "taclaser",
+              "WS 009": "taclaser",
+              "WS 010": "taclaser",
+              "WS 023": "taclaser"
+            }
+          }
+        ]
+      },
+      "cost": 40.0,
+      "civilian": false
+    },
+    {
+      "variantId": "astral_Strike",
+      "variant": {
+        "displayName": "打击",
+        "fluxCapacitors": 41,
+        "fluxVents": 19,
+        "goalVariant": true,
+        "hullId": "astral",
+        "hullMods": [
+          "expanded_deck_crew"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "astral_Strike",
+        "weaponGroups": [
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 011": "squall",
+              "WS 012": "squall"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 013": "gravitonbeam",
+              "WS 014": "gravitonbeam",
+              "WS 015": "gravitonbeam",
+              "WS 023": "gravitonbeam",
+              "WS 024": "gravitonbeam"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 002": "pdlaser",
+              "WS 003": "pdlaser",
+              "WS 005": "pdlaser",
+              "WS 006": "pdlaser",
+              "WS 007": "pdlaser",
+              "WS 008": "pdlaser"
+            }
+          }
+        ],
+        "wings": [
+          "dagger_wing",
+          "dagger_wing",
+          "dagger_wing",
+          "longbow_wing",
+          "broadsword_wing",
+          "broadsword_wing"
+        ]
+      },
+      "cost": 50.0,
+      "civilian": false
+    },
+    {
+      "variantId": "champion_Assault",
+      "variant": {
+        "displayName": "突击",
+        "fluxCapacitors": 30,
+        "fluxVents": 30,
+        "goalVariant": true,
+        "hullId": "champion",
+        "hullMods": [
+          "dedicated_targeting_core"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "champion_Assault",
+        "weaponGroups": [
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 000": "ioncannon",
+              "WS 001": "ioncannon",
+              "WS 010": "ioncannon",
+              "WS 011": "ioncannon"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 009": "hammerrack"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 006": "heavyac",
+              "WS 007": "heavyac"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 008": "guardian"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 004": "pdburst",
+              "WS 005": "pdburst"
+            }
+          }
+        ]
+      },
+      "cost": 25.0,
+      "civilian": false
+    },
+    {
+      "variantId": "heron_Strike",
+      "variant": {
+        "displayName": "打击",
+        "fluxCapacitors": 7,
+        "fluxVents": 0,
+        "goalVariant": true,
+        "hullId": "heron",
+        "hullMods": [
+          "dedicated_targeting_core"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "heron_Strike",
+        "weaponGroups": [
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 005": "heavyneedler"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 004": "taclaser"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 001": "pdlaser",
+              "WS 002": "pdlaser",
+              "WS 003": "pdlaser",
+              "WS 009": "pdlaser",
+              "WS 010": "pdlaser"
+            }
+          }
+        ],
+        "wings": [
+          "dagger_wing",
+          "dagger_wing",
+          "broadsword_wing"
+        ]
+      },
+      "cost": 20.0,
+      "civilian": false
+    },
+    {
+      "variantId": "fury_Attack",
+      "variant": {
+        "displayName": "进攻",
+        "fluxCapacitors": 8,
+        "fluxVents": 30,
+        "goalVariant": true,
+        "hullId": "fury",
+        "hullMods": [
+          "hardenedshieldemitter",
+          "targetingunit",
+          "fluxdistributor"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "fury_Attack",
+        "weaponGroups": [
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 000": "heavyblaster"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 002": "sabotpod"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 001": "pulselaser"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 003": "pdburst",
+              "WS 004": "pdburst",
+              "WS 007": "pdlaser",
+              "WS 008": "pdlaser"
+            }
+          }
+        ]
+      },
+      "cost": 20.0,
+      "civilian": false
+    },
+    {
+      "variantId": "venture_Balanced",
+      "variant": {
+        "displayName": "平衡",
+        "fluxCapacitors": 0,
+        "fluxVents": 11,
+        "goalVariant": true,
+        "hullId": "venture",
+        "hullMods": [
+          "targetingunit",
+          "missleracks",
+          "militarized_subsystems"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "venture_Balanced",
+        "weaponGroups": [
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 005": "harpoonpod",
+              "WS 006": "harpoonpod"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 004": "sabot",
+              "WS 007": "sabot"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 001": "heavyac",
+              "WS 003": "heavyac"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 002": "gravitonbeam"
+            }
+          }
+        ],
+        "wings": []
+      },
+      "cost": 14.0,
+      "civilian": false
+    },
+    {
+      "variantId": "eagle_Assault",
+      "variant": {
+        "displayName": "突击",
+        "fluxCapacitors": 0,
+        "fluxVents": 29,
+        "goalVariant": true,
+        "hullId": "eagle",
+        "hullMods": [
+          "targetingunit",
+          "missile_autoloader"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "eagle_Assault",
+        "weaponGroups": [
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 007": "heavyneedler",
+              "WS 008": "heavyneedler"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 001": "atropos",
+              "WS 002": "atropos"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 013": "heavymortar"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 009": "ionbeam"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 005": "gravitonbeam",
+              "WS 006": "gravitonbeam"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 003": "pdlaser",
+              "WS 004": "pdlaser",
+              "WS 010": "pdburst",
+              "WS 012": "pdburst"
+            }
+          }
+        ]
+      },
+      "cost": 20.0,
+      "civilian": false
+    },
+    {
+      "variantId": "dominator_Assault",
+      "variant": {
+        "displayName": "突击",
+        "fluxCapacitors": 15,
+        "fluxVents": 30,
+        "goalVariant": true,
+        "hullId": "dominator",
+        "hullMods": [
+          "heavyarmor",
+          "dedicated_targeting_core"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "dominator_Assault",
+        "weaponGroups": [
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 012": "mark9"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 014": "typhoon",
+              "WS 015": "typhoon",
+              "WS 016": "typhoon"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 013": "hephag"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 001": "vulcan",
+              "WS 002": "vulcan",
+              "WS 003": "vulcan",
+              "WS 004": "vulcan",
+              "WS 005": "vulcan",
+              "WS 006": "vulcan",
+              "WS 007": "vulcan",
+              "WS 008": "vulcan",
+              "WS 009": "vulcan",
+              "WS 010": "flak",
+              "WS 011": "flak"
+            }
+          }
+        ]
+      },
+      "cost": 25.0,
+      "civilian": false
+    },
+    {
+      "variantId": "medusa_Attack",
+      "variant": {
+        "displayName": "进攻",
+        "fluxCapacitors": 10,
+        "fluxVents": 20,
+        "goalVariant": true,
+        "hullId": "medusa",
+        "hullMods": [
+          "hardenedshieldemitter",
+          "fluxbreakers"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "medusa_Attack",
+        "weaponGroups": [
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 008": "railgun",
+              "WS 009": "railgun"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 006": "heavyblaster",
+              "WS 007": "heavyblaster"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 002": "irpulse",
+              "WS 003": "irpulse"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 001": "pdlaser",
+              "WS 004": "pdlaser"
+            }
+          }
+        ]
+      },
+      "cost": 12.0,
+      "civilian": false
+    },
+    {
+      "variantId": "enforcer_Assault",
+      "variant": {
+        "displayName": "突击",
+        "fluxCapacitors": 19,
+        "fluxVents": 20,
+        "goalVariant": true,
+        "hullId": "enforcer",
+        "hullMods": [
+          "targetingunit",
+          "fluxdistributor"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "enforcer_Assault",
+        "weaponGroups": [
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 006": "sabot",
+              "WS 009": "sabot"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 007": "reaper",
+              "WS 008": "reaper"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 002": "heavyac",
+              "WS 004": "heavyac"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 003": "heavymortar"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 001": "flak",
+              "WS 005": "flak"
+            }
+          }
+        ]
+      },
+      "cost": 9.0,
+      "civilian": false
+    },
+    {
+      "variantId": "sunder_CS",
+      "variant": {
+        "displayName": "密接支援",
+        "fluxCapacitors": 11,
+        "fluxVents": 20,
+        "goalVariant": true,
+        "hullId": "sunder",
+        "hullMods": [
+          "targetingunit"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "sunder_CS",
+        "weaponGroups": [
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 003": "hil"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 001": "harpoon",
+              "WS 005": "harpoon"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 002": "pulselaser",
+              "WS 004": "pulselaser"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 006": "railgun",
+              "WS 007": "railgun",
+              "WS 008": "vulcan"
+            }
+          }
+        ]
+      },
+      "cost": 11.0,
+      "civilian": false
+    },
+    {
+      "variantId": "hammerhead_Balanced",
+      "variant": {
+        "displayName": "平衡",
+        "fluxCapacitors": 5,
+        "fluxVents": 20,
+        "goalVariant": true,
+        "hullId": "hammerhead",
+        "hullMods": [
+          "missleracks",
+          "blast_doors",
+          "targetingunit"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "hammerhead_Balanced",
+        "weaponGroups": [
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 001": "heavymortar",
+              "WS 002": "heavymortar"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 003": "harpoon",
+              "WS 004": "harpoon"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 005": "railgun",
+              "WS 006": "railgun"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 007": "pdlaser",
+              "WS 008": "pdlaser"
+            }
+          }
+        ]
+      },
+      "cost": 10.0,
+      "civilian": false
+    },
+    {
+      "variantId": "condor_Strike",
+      "variant": {
+        "displayName": "打击",
+        "fluxCapacitors": 6,
+        "fluxVents": 6,
+        "goalVariant": true,
+        "hullId": "condor",
+        "hullMods": [],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "condor_Strike",
+        "weaponGroups": [
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 001": "lightmg",
+              "WS 002": "lightmg"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 003": "pilum"
+            }
+          }
+        ],
+        "wings": [
+          "piranha_wing",
+          "piranha_wing"
+        ]
+      },
+      "cost": 10.0,
+      "civilian": false
+    },
+    {
+      "variantId": "condor_Attack",
+      "variant": {
+        "displayName": "进攻",
+        "fluxCapacitors": 7,
+        "fluxVents": 7,
+        "goalVariant": true,
+        "hullId": "condor",
+        "hullMods": [],
+        "permaMods": [],
+        "variantId": "condor_Attack",
+        "weaponGroups": [
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 003": "pilum"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 001": "vulcan",
+              "WS 002": "vulcan"
+            }
+          }
+        ],
+        "wings": [
+          "broadsword_wing",
+          "broadsword_wing"
+        ]
+      },
+      "cost": 10.0,
+      "civilian": false
+    },
+    {
+      "variantId": "condor_Support",
+      "variant": {
+        "displayName": "支援",
+        "fluxCapacitors": 12,
+        "fluxVents": 15,
+        "goalVariant": true,
+        "hullId": "condor",
+        "hullMods": [],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "condor_Support",
+        "weaponGroups": [
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 003": "salamanderpod"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 001": "lightac",
+              "WS 002": "lightac"
+            }
+          }
+        ],
+        "wings": [
+          "talon_wing",
+          "talon_wing"
+        ]
+      },
+      "cost": 10.0,
+      "civilian": false
+    },
+    {
+      "variantId": "mule_Standard",
+      "variant": {
+        "displayName": "标准",
+        "fluxCapacitors": 20,
+        "fluxVents": 20,
+        "goalVariant": true,
+        "hullId": "mule",
+        "hullMods": [
+          "heavyarmor"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "mule_Standard",
+        "weaponGroups": [
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 003": "heavyac"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 001": "heatseeker",
+              "WS 002": "heatseeker"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 004": "lightmg",
+              "WS 005": "lightmg",
+              "WS 006": "lightmg"
+            }
+          }
+        ]
+      },
+      "cost": 7.0,
+      "civilian": false
+    },
+    {
+      "variantId": "shrike_Attack",
+      "variant": {
+        "displayName": "进攻",
+        "fluxCapacitors": 11,
+        "fluxVents": 20,
+        "goalVariant": true,
+        "hullId": "shrike",
+        "hullMods": [
+          "unstable_injector"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "shrike_Attack",
+        "weaponGroups": [
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 003": "heavyblaster"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 005": "sabotpod"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 000": "irpulse",
+              "WS 001": "ioncannon",
+              "WS 002": "irpulse"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 006": "pdlaser",
+              "WS 007": "pdlaser"
+            }
+          }
+        ]
+      },
+      "cost": 8.0,
+      "civilian": false
+    },
+    {
+      "variantId": "buffalo2_FS",
+      "variant": {
+        "displayName": "支援",
+        "fluxCapacitors": 3,
+        "fluxVents": 20,
+        "goalVariant": true,
+        "hullId": "buffalo2",
+        "hullMods": [
+          "reinforcedhull"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "buffalo2_FS",
+        "weaponGroups": [
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 007": "amblaster"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 008": "pilum"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 001": "lrpdlaser",
+              "WS 002": "vulcan",
+              "WS 003": "vulcan"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 006": "swarmer"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 005": "swarmer"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 004": "swarmer"
+            }
+          }
+        ]
+      },
+      "cost": 4.0,
+      "civilian": false
+    },
+    {
+      "variantId": "tempest_Attack",
+      "variant": {
+        "displayName": "进攻",
+        "fluxCapacitors": 5,
+        "fluxVents": 10,
+        "goalVariant": true,
+        "hullId": "tempest",
+        "hullMods": [
+          "targetingunit",
+          "missile_autoloader"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "tempest_Attack",
+        "weaponGroups": [
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 001": "pulselaser"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 002": "gravitonbeam"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 003": "sabot"
+            }
+          }
+        ],
+        "wings": []
+      },
+      "cost": 8.0,
+      "civilian": false
+    },
+    {
+      "variantId": "wolf_CS",
+      "variant": {
+        "displayName": "密接支援",
+        "fluxCapacitors": 3,
+        "fluxVents": 10,
+        "goalVariant": true,
+        "hullId": "wolf",
+        "hullMods": [
+          "missleracks",
+          "advancedoptics"
+        ],
+        "permaMods": [],
+        "quality": 0.75,
+        "variantId": "wolf_CS",
+        "weaponGroups": [
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 004": "gravitonbeam"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 005": "harpoon",
+              "WS 006": "harpoon"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 001": "taclaser",
+              "WS 002": "taclaser",
+              "WS 003": "taclaser"
+            }
+          }
+        ]
+      },
+      "cost": 5.0,
+      "civilian": false
+    },
+    {
+      "variantId": "omen_PD",
+      "variant": {
+        "displayName": "电子战",
+        "fluxCapacitors": 10,
+        "fluxVents": 4,
+        "goalVariant": true,
+        "hullId": "omen",
+        "hullMods": [
+          "hardened_subsystems",
+          "auxiliarythrusters",
+          "missile_autoloader"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "omen_PD",
+        "weaponGroups": [
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 003": "swarmer"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 001": "pdlaser",
+              "WS 002": "pdlaser"
+            }
+          }
+        ]
+      },
+      "cost": 6.0,
+      "civilian": false
+    },
+    {
+      "variantId": "vigilance_FS",
+      "variant": {
+        "displayName": "火力支援",
+        "fluxCapacitors": 10,
+        "fluxVents": 6,
+        "goalVariant": true,
+        "hullId": "vigilance",
+        "hullMods": [
+          "extendedshieldemitter",
+          "hardenedshieldemitter"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "vigilance_FS",
+        "weaponGroups": [
+          {
+            "autofire": true,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 001": "hveldriver"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 002": "pilum"
+            }
+          }
+        ]
+      },
+      "cost": 5.0,
+      "civilian": false
+    },
+    {
+      "variantId": "brawler_Assault",
+      "variant": {
+        "displayName": "突击",
+        "fluxCapacitors": 8,
+        "fluxVents": 10,
+        "goalVariant": true,
+        "hullId": "brawler",
+        "hullMods": [
+          "fluxbreakers",
+          "reinforcedhull"
+        ],
+        "permaMods": [],
+        "quality": 0.25,
+        "variantId": "brawler_Assault",
+        "weaponGroups": [
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 001": "arbalest",
+              "WS 002": "arbalest"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 003": "annihilator",
+              "WS 004": "annihilator"
+            }
+          }
+        ]
+      },
+      "cost": 5.0,
+      "civilian": false
+    },
+    {
+      "variantId": "lasher_CS",
+      "variant": {
+        "displayName": "密接支援",
+        "fluxCapacitors": 7,
+        "fluxVents": 10,
+        "goalVariant": true,
+        "hullId": "lasher",
+        "hullMods": [
+          "blast_doors",
+          "fluxdistributor"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "lasher_CS",
+        "weaponGroups": [
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 002": "lightdualac",
+              "WS 003": "lightdualac"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 001": "harpoon",
+              "WS 004": "harpoon"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 005": "vulcan",
+              "WS 006": "vulcan",
+              "WS 007": "vulcan"
+            }
+          }
+        ]
+      },
+      "cost": 4.0,
+      "civilian": false
+    },
+    {
+      "variantId": "hound_Standard",
+      "variant": {
+        "displayName": "标准",
+        "fluxCapacitors": 9,
+        "fluxVents": 10,
+        "goalVariant": true,
+        "hullId": "hound",
+        "hullMods": [
+          "auxiliarythrusters"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "hound_Standard",
+        "weaponGroups": [
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 001": "chaingun"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 002": "lightdualmg"
+            }
+          }
+        ]
+      },
+      "cost": 3.0,
+      "civilian": false
+    },
+    {
+      "variantId": "afflictor_Strike",
+      "variant": {
+        "displayName": "打击",
+        "fluxCapacitors": 10,
+        "fluxVents": 7,
+        "goalVariant": true,
+        "hullId": "afflictor",
+        "hullMods": [
+          "hardened_subsystems",
+          "fluxcoil"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "afflictor_Strike",
+        "weaponGroups": [
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 002": "amblaster",
+              "WS 003": "amblaster"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 001": "sabot",
+              "WS 004": "sabot"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 006": "pdlaser"
+            }
+          }
+        ]
+      },
+      "cost": 12.0,
+      "civilian": false
+    },
+    {
+      "variantId": "shade_Assault",
+      "variant": {
+        "displayName": "突击",
+        "fluxCapacitors": 10,
+        "fluxVents": 10,
+        "goalVariant": true,
+        "hullId": "shade",
+        "hullMods": [
+          "fluxbreakers"
+        ],
+        "permaMods": [],
+        "quality": 0.75,
+        "variantId": "shade_Assault",
+        "weaponGroups": [
+          {
+            "autofire": false,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 004": "amblaster"
+            }
+          },
+          {
+            "autofire": false,
+            "mode": "ALTERNATING",
+            "weapons": {
+              "WS 001": "harpoon",
+              "WS 002": "harpoon"
+            }
+          },
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 003": "irpulse",
+              "WS 005": "irpulse"
+            }
+          }
+        ]
+      },
+      "cost": 8.0,
+      "civilian": false
+    },
+    {
+      "variantId": "atlas_Standard",
+      "variant": {
+        "displayName": "标准",
+        "fluxCapacitors": 20,
+        "fluxVents": 16,
+        "goalVariant": true,
+        "hullId": "atlas",
+        "hullMods": [
+          "auxiliarythrusters"
+        ],
+        "permaMods": [],
+        "sMods": [],
+        "variantId": "atlas_Standard",
+        "weaponGroups": [
+          {
+            "autofire": true,
+            "mode": "LINKED",
+            "weapons": {
+              "WS 001": "lightmg",
+              "WS 002": "lightmg",
+              "WS 003": "lightmg"
+            }
+          }
+        ]
+      },
+      "cost": 10.0,
+      "civilian": true
+    }
+  ],
+  "costs": {
+    "atlas": 10.0,
+    "warden": 3.0,
+    "facet": 12.0,
+    "shrouded_maelstrom": 20.0,
+    "valkyrie": 5.0,
+    "heron": 20.0,
+    "module_armour2": 0.0,
+    "module_bastion1_lowtech": 0.0,
+    "module_blocker2": 0.0,
+    "tesseract": 24.0,
+    "station2_hightech": 75.0,
+    "vanguard": 6.0,
+    "module_large1_lowtech": 0.0,
+    "station1": 50.0,
+    "eradicator": 22.0,
+    "doom": 35.0,
+    "vigilance": 5.0,
+    "legion": 40.0,
+    "hound": 3.0,
+    "lasher": 4.0,
+    "hyperion": 15.0,
+    "brilliant": 25.0,
+    "centurion": 4.0,
+    "colossus2": 9.0,
+    "guardian": 40.0,
+    "station3": 100.0,
+    "derelict_mothership_pod_s_right": 0.0,
+    "module_onslaught_armor_left": 0.0,
+    "station3_hightech": 100.0,
+    "module_hightech_strut": 0.0,
+    "module_blocker2c": 0.0,
+    "station1_midline": 50.0,
+    "derelict_mothership_sensor_mast": 0.0,
+    "module_bastion_pd1": 0.0,
+    "harbinger": 18.0,
+    "derelict_mothership_bow_module": 0.0,
+    "gremlin": 6.0,
+    "ox": 5.0,
+    "module_blocker1": 0.0,
+    "module_midline_citadel": 0.0,
+    "conquest": 40.0,
+    "module_blocker2b": 0.0,
+    "monitor": 6.0,
+    "buffalo": 3.0,
+    "remnant_weapon_platform2": 0.0,
+    "mudskipper": 2.0,
+    "falcon": 14.0,
+    "remnant_shield1": 0.0,
+    "shrouded_eye": 20.0,
+    "omen": 6.0,
+    "derelict_mothership_pod_m_left": 0.0,
+    "station2": 75.0,
+    "lumen": 4.0,
+    "hive_unit": 22.0,
+    "crig": 3.0,
+    "module_large2_lowtech": 0.0,
+    "remnant_station1": 50.0,
+    "mercury": 2.0,
+    "nova": 40.0,
+    "onslaught_mk1": 50.0,
+    "station_small": 50.0,
+    "onslaught": 40.0,
+    "remnant_shield2": 0.0,
+    "derelict_mothership_pod_engine_left": 0.0,
+    "module_armour1": 0.0,
+    "champion": 25.0,
+    "anubis": 18.0,
+    "module_hightech_hangar": 0.0,
+    "remnant_armour1": 0.0,
+    "station2_midline": 75.0,
+    "mora": 20.0,
+    "tarsus": 3.0,
+    "phantom": 10.0,
+    "brawler": 5.0,
+    "fury": 20.0,
+    "remnant_weapon_platform1": 0.0,
+    "sunder": 11.0,
+    "remnant_armour2": 0.0,
+    "radiant": 60.0,
+    "picket": 3.0,
+    "remnant_armour3": 0.0,
+    "nebula": 4.0,
+    "phaeton": 4.0,
+    "scintilla": 12.0,
+    "apogee": 20.0,
+    "module_hightech_citadel": 0.0,
+    "wolf": 5.0,
+    "fabricator_unit": 20.0,
+    "colossus3": 8.0,
+    "module_citadel1_lowtech": 0.0,
+    "module_armour3": 0.0,
+    "platform1": 0.0,
+    "module_hightech_armour": 0.0,
+    "station_derelict_survey_mothership": 50.0,
+    "starliner": 10.0,
+    "shepherd": 3.0,
+    "afflictor": 12.0,
+    "assault_unit": 10.0,
+    "grendel": 18.0,
+    "remnant_station2": 75.0,
+    "prometheus": 10.0,
+    "module_armour4": 0.0,
+    "fulgent": 10.0,
+    "rampart": 15.0,
+    "astral": 50.0,
+    "buffalo2": 4.0,
+    "apex": 30.0,
+    "wayfarer": 5.0,
+    "shrouded_maw": 40.0,
+    "aurora": 30.0,
+    "defender": 3.0,
+    "module_midline_bastion": 0.0,
+    "module_hightech_attack": 0.0,
+    "standoff_unit": 20.0,
+    "shade": 8.0,
+    "atlas2": 24.0,
+    "revenant": 15.0,
+    "dram": 2.0,
+    "glimmer": 5.0,
+    "module_onslaught_armor_right": 0.0,
+    "berserker": 6.0,
+    "gemini": 9.0,
+    "derelict_mothership_pod_m_right": 0.0,
+    "shard_left": 6.0,
+    "hammerhead": 10.0,
+    "scarab": 8.0,
+    "cerberus": 4.0,
+    "module_midline_broadside": 0.0,
+    "colossus": 6.0,
+    "condor": 10.0,
+    "drover": 12.0,
+    "overseer_unit": 8.0,
+    "bastillon": 6.0,
+    "tempest": 8.0,
+    "retribution": 35.0,
+    "manticore": 12.0,
+    "eagle": 20.0,
+    "hermes": 2.0,
+    "pegasus": 50.0,
+    "remnant_hangar1": 0.0,
+    "shard_right": 6.0,
+    "prometheus2": 30.0,
+    "mule": 7.0,
+    "sentry": 3.0,
+    "odyssey": 45.0,
+    "module_hightech_shield": 0.0,
+    "station1_hightech": 50.0,
+    "module_armour5": 0.0,
+    "medusa": 12.0,
+    "kite": 2.0,
+    "skirmish_unit": 4.0,
+    "gryphon": 20.0,
+    "dominator": 25.0,
+    "remnant_weapon_platform3": 0.0,
+    "module_decor_midline1": 0.0,
+    "enforcer": 9.0,
+    "module_midline_support": 0.0,
+    "shrike": 8.0,
+    "module_decor_midline2": 0.0,
+    "venture": 14.0,
+    "paragon": 60.0,
+    "ziggurat": 75.0,
+    "station3_midline": 100.0,
+    "invictus": 60.0,
+    "shrouded_tendril": 10.0
+  }
+}

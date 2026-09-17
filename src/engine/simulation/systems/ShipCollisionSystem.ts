@@ -1,7 +1,10 @@
+import { applyComponentDamage } from './weapon/ComponentDamage';
+import { isImmutableMetadata } from '../../extensions/Immutable';
 import { Vector2 } from '../../math/Vector2';
 import { Ship } from '../Ship';
 import { sound } from '../../audio/SoundManager';
 import {
+  isShieldCollisionActive,
   getDirectionalHullCollisionExtent,
   getDirectionalShieldCollisionExtent,
   getShieldToShieldContact
@@ -9,7 +12,7 @@ import {
 
 export interface CollisionFXCallbacks {
   addFloatingDamage: (pos: Vector2, amount: number, color: [number, number, number]) => void;
-  spawnSparks: (pos: Vector2, count?: number, color?: [number, number, number]) => void;
+  spawnArmorDamageSparks: (ship: Ship, localImpact: Vector2, armorDamage: number) => void;
   spawnDebris: (pos: Vector2, count?: number, color?: [number, number, number], baseSpeed?: number) => void;
   addCameraShake: (intensity: number, duration: number) => void;
   getPlayerPos: () => Vector2;
@@ -23,7 +26,35 @@ interface ShipPairCollisionContact {
   s2Surface: 'HULL' | 'SHIELD';
 }
 
+const immutableHullRadii = new WeakMap<object, number>();
+
+/** Enclosing radius only, never a substitute for the authored contact surface. */
+function contactBroadphaseRadius(ship: Ship): number {
+  const bounds = ship.spec.bounds;
+  let hullRadius = 0;
+  if (bounds && bounds.length >= 3) {
+    const cached = immutableHullRadii.get(bounds);
+    if (cached !== undefined) hullRadius = cached;
+    else {
+      for (const [x, y] of bounds) hullRadius = Math.max(hullRadius, Math.hypot(x, y));
+      // Only recursively copied metadata is immutable; mutable/refit polygons stay live.
+      if (isImmutableMetadata(bounds)) immutableHullRadii.set(bounds, hullRadius);
+    }
+  }
+  let radius = Math.max(hullRadius, Math.max(0, ship.spec.collisionRadius));
+  if (isShieldCollisionActive(ship)) {
+    radius = Math.max(radius, ship.getShieldCenter().distanceTo(ship.pos) + ship.shield.radius);
+  }
+  return radius;
+}
+
 function findShipPairCollisionContact(s1: Ship, s2: Ship): ShipPairCollisionContact | null {
+  const radius = contactBroadphaseRadius(s1) + contactBroadphaseRadius(s2);
+  // Inclusive, outward-padded axis rejection. Near/touching pairs still use the
+  // original narrow phase, including offset/partial shields and response ordering.
+  // Nonfinite inputs make these comparisons false and fall through conservatively.
+  const pad = 1e-7 * Math.max(1, radius, Math.abs(s1.pos.x), Math.abs(s1.pos.y), Math.abs(s2.pos.x), Math.abs(s2.pos.y));
+  if (Math.abs(s2.pos.x-s1.pos.x)>radius+pad || Math.abs(s2.pos.y-s1.pos.y)>radius+pad) return null;
   const shieldContact = getShieldToShieldContact(s1, s2);
   if (shieldContact) {
     return {
@@ -67,7 +98,7 @@ function findShipPairCollisionContact(s1: Ship, s2: Ship): ShipPairCollisionCont
 
 /**
  * 战舰刚体冲撞与物理弹性碰撞解算系统 (ShipCollisionSystem)
- * 严格对齐 Starsector 冲撞模型与攻势级冲刺推进撞击伤害机制。
+ * Web 质量加权碰撞适配；冲量和撞伤系数尚未完成原版逐项核验。
  */
 export class ShipCollisionSystem {
   public resolveShipToShipCollision(s1: Ship, s2: Ship, fx: CollisionFXCallbacks, _dt: number) {
@@ -79,71 +110,83 @@ export class ShipCollisionSystem {
       const s1ShieldContact = contact.s1Surface === 'SHIELD';
       const s2ShieldContact = contact.s2Surface === 'SHIELD';
 
-      s1.pos.addScaled(normal, -overlap * 0.5);
-      s2.pos.addScaled(normal, overlap * 0.5);
+      // Starsector 的碰撞结算会考虑实体质量：较重的一方更难被推开，也应承受更少的反冲损伤。
+      // 用对方质量占总质量的比例分配位置/速度响应；同质量时仍保持原来的 50/50 与 0.4v 行为。
+      const s1Mass = Math.max(1, s1.spec.mass);
+      const s2Mass = Math.max(1, s2.spec.mass);
+      const totalMass = s1Mass + s2Mass;
+      const s1ResponseShare = s2Mass / totalMass;
+      const s2ResponseShare = s1Mass / totalMass;
+
+      s1.pos.addScaled(normal, -overlap * s1ResponseShare);
+      s2.pos.addScaled(normal, overlap * s2ResponseShare);
 
       const relVel = s1.vel.clone().sub(s2.vel);
       const impactSpeed = relVel.dot(normal);
 
       if (impactSpeed > 20) {
         sound.playAtPos('ship_collision', s1.pos, fx.getPlayerPos(), 0.85);
-        s1.vel.addScaled(normal, -impactSpeed * 0.4);
-        s2.vel.addScaled(normal, impactSpeed * 0.4);
+        // 保留原实现 80% 的法向相对速度消解量，但按质量分配冲量。
+        s1.vel.addScaled(normal, -impactSpeed * 0.8 * s1ResponseShare);
+        s2.vel.addScaled(normal, impactSpeed * 0.8 * s2ResponseShare);
 
-        const ramDmg = impactSpeed * 8;
+        const baseRamDmg = impactSpeed * 8;
+        // 同质量时双方仍各吃 baseRamDmg；质量差越大，重舰承伤越低、轻舰承伤越高。
+        const s1RamDmg = baseRamDmg * 2 * s1ResponseShare;
+        const s2RamDmg = baseRamDmg * 2 * s2ResponseShare;
+        let s1ShieldDmg = 0;
+        let s2ShieldDmg = 0;
         let s1ArmorDmg = 0;
         let s1HullDmg = 0;
         let s2ArmorDmg = 0;
         let s2HullDmg = 0;
 
-        // 只有实际接触到已展开的护盾弧面时，撞击动能才转为硬幅能。
+        // 原版碰撞属于 KINETIC。护盾接触必须走统一 Shield.absorbDamage()，
+        // 这样动能对盾 2x、shield efficiency、Fortress Shield 与 CR 承伤倍率都会各应用一次。
         if (s1ShieldContact) {
-          // FortressShieldStats.java: shield damage mult = 1 - 0.9 * effectLevel，
-          // 堡垒护盾的减伤同样作用于冲撞动能转硬幅能。
-          s1.flux.increaseFlux(ramDmg * s1.system.getShieldDamageMultiplier() * 0.8, true);
           const s1ShieldCenter = s1.getShieldCenter();
-          s1.shield.ripples.push({
-            angle: Math.atan2(contactPoint.y - s1ShieldCenter.y, contactPoint.x - s1ShieldCenter.x),
-            intensity: Math.min(1.0, impactSpeed / 80),
-            life: 0.6,
-            color: [255, 200, 100]
-          });
+          const hitAngle = Math.atan2(contactPoint.y - s1ShieldCenter.y, contactPoint.x - s1ShieldCenter.x);
+          s1ShieldDmg = s1RamDmg * s1.system.getShieldDamageMultiplier() * s1.crDamageTakenMultiplier;
+          const fluxGain = s1.shield.absorbDamage(s1ShieldDmg, 'KINETIC', hitAngle);
+          s1ShieldDmg *= s1.shield.damageTakenMultiplier;
+          s1.flux.increaseFlux(fluxGain, true);
         } else {
-          const contact1 = normal.clone().scale(s1.spec.collisionRadius * 0.75).rotate(-s1.facingRad);
-          // CRPluginImpl.applyCRToStats(): 承伤倍率作用于冲撞的装甲/船体伤害。
-          const result1 = s1.armor.takeDamage(contact1, ramDmg * s1.crDamageTakenMultiplier, 'HIGH_EXPLOSIVE');
+          const contact1 = contactPoint.clone().sub(s1.pos).rotate(-s1.facingRad);
+          // CR 只修正实际承伤，hitStrength 保持碰撞原始强度，避免装甲减伤被二次放大。
+          const takenDamage = s1RamDmg * s1.crDamageTakenMultiplier;
+          const result1 = s1.armor.takeDamage(contact1, takenDamage, 'KINETIC', s1RamDmg, false);
+          applyComponentDamage(s1, contact1, result1, 0, s2);
+          fx.spawnArmorDamageSparks(s1, contact1, result1.armorDamage);
           // 装甲网格被击穿后溢出的伤害必须结入船体 HP，否则冲撞永远无法击沉目标。
           s1.hullHp = Math.max(0, s1.hullHp - result1.hullDamage);
-          s1.addScorchMark(contact1, result1.armorDamage || result1.hullDamage);
           s1ArmorDmg = result1.armorDamage;
           s1HullDmg = result1.hullDamage;
         }
 
         if (s2ShieldContact) {
-          s2.flux.increaseFlux(ramDmg * s2.system.getShieldDamageMultiplier() * 0.8, true);
           const s2ShieldCenter = s2.getShieldCenter();
-          s2.shield.ripples.push({
-            angle: Math.atan2(contactPoint.y - s2ShieldCenter.y, contactPoint.x - s2ShieldCenter.x),
-            intensity: Math.min(1.0, impactSpeed / 80),
-            life: 0.6,
-            color: [255, 200, 100]
-          });
+          const hitAngle = Math.atan2(contactPoint.y - s2ShieldCenter.y, contactPoint.x - s2ShieldCenter.x);
+          s2ShieldDmg = s2RamDmg * s2.system.getShieldDamageMultiplier() * s2.crDamageTakenMultiplier;
+          const fluxGain = s2.shield.absorbDamage(s2ShieldDmg, 'KINETIC', hitAngle);
+          s2ShieldDmg *= s2.shield.damageTakenMultiplier;
+          s2.flux.increaseFlux(fluxGain, true);
         } else {
-          const contact2 = normal.clone().scale(-s2.spec.collisionRadius * 0.75).rotate(-s2.facingRad);
-          const result2 = s2.armor.takeDamage(contact2, ramDmg * s2.crDamageTakenMultiplier, 'HIGH_EXPLOSIVE');
+          const contact2 = contactPoint.clone().sub(s2.pos).rotate(-s2.facingRad);
+          const takenDamage = s2RamDmg * s2.crDamageTakenMultiplier;
+          const result2 = s2.armor.takeDamage(contact2, takenDamage, 'KINETIC', s2RamDmg, false);
+          applyComponentDamage(s2, contact2, result2, 0, s1);
+          fx.spawnArmorDamageSparks(s2, contact2, result2.armorDamage);
           s2.hullHp = Math.max(0, s2.hullHp - result2.hullDamage);
-          s2.addScorchMark(contact2, result2.armorDamage || result2.hullDamage);
           s2ArmorDmg = result2.armorDamage;
           s2HullDmg = result2.hullDamage;
         }
 
-        // 浮伤数字按实际结算路径分色 (对齐 ProjectileCollisionHandler.applyShipCollisionHit)：
-        // 护盾接触不进入装甲网格，沿用原有的冲撞动能数值；装甲橙、船体红。
+        // 浮伤数字按实际结算路径分色：护盾蓝、装甲橙、船体红。
         if (s1ShieldContact || s1ArmorDmg > 0) {
           fx.addFloatingDamage(
             contactPoint.clone().add(new Vector2(-25, -25)),
-            s1ShieldContact ? ramDmg : s1ArmorDmg,
-            [255, 175, 40]
+            s1ShieldContact ? s1ShieldDmg : s1ArmorDmg,
+            s1ShieldContact ? [80, 200, 255] : [255, 175, 40]
           );
         }
         if (!s1ShieldContact && s1HullDmg > 0) {
@@ -152,15 +195,14 @@ export class ShipCollisionSystem {
         if (s2ShieldContact || s2ArmorDmg > 0) {
           fx.addFloatingDamage(
             contactPoint.clone().add(new Vector2(25, 25)),
-            s2ShieldContact ? ramDmg : s2ArmorDmg,
-            [255, 175, 40]
+            s2ShieldContact ? s2ShieldDmg : s2ArmorDmg,
+            s2ShieldContact ? [80, 200, 255] : [255, 175, 40]
           );
         }
         if (!s2ShieldContact && s2HullDmg > 0) {
           fx.addFloatingDamage(contactPoint.clone().add(new Vector2(25, 25)), s2HullDmg, [255, 55, 45]);
         }
 
-        fx.spawnSparks(contactPoint, 40, [255, 200, 100]);
         fx.spawnDebris(contactPoint, 16, [130, 115, 100], 120);
         fx.addCameraShake(Math.min(30, impactSpeed * 0.25), 0.35);
       }

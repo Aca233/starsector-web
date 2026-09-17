@@ -26,3 +26,8 @@ export function visualRandom(channel: string): number {
   const random = currentFrame?.random ?? fallbackRandom;
   return random.frame(channel, time, 60);
 }
+
+/** Random properties of an existing effect must not change with frame time. */
+export function visualObjectRandom(channel: string): number {
+  return (currentFrame?.random ?? fallbackRandom).sample(channel, 0);
+}

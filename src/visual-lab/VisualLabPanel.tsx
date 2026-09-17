@@ -1,3 +1,4 @@
+import { Button } from '../ui/core/UI';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { CombatSession } from '../engine/runtime/CombatSession';
 import { VISUAL_SCENARIOS, type VisualScenarioController } from './VisualScenarioController';
@@ -51,12 +52,14 @@ export const VisualLabPanel: React.FC<Props> = ({
   const initializedControllerRef = useRef<VisualScenarioController | null>(null);
 
   useEffect(() => {
-    initializeVisualLabControllerOnce(initializedControllerRef, assetsReady, controller, {
+    const initialized = initializeVisualLabControllerOnce(initializedControllerRef, assetsReady, controller, {
       sceneId: initial.id,
       seed: initialSeed,
       time: initialTime,
       previewShipId: initialPreviewShip || null
     });
+    // Initialization seeks after render; refresh the displayed timeline to the same frame.
+    if (initialized) force(value => value + 1);
   }, [assetsReady, controller, initial.id, initialSeed, initialPreviewShip, initialTime]);
 
   const refresh = () => {
@@ -99,9 +102,9 @@ export const VisualLabPanel: React.FC<Props> = ({
   const perfReport = session.getPerformanceReport();
 
   return (
-    <aside className="absolute top-3 left-3 z-[80] w-[390px] max-h-[94vh] overflow-auto rounded border border-cyan-400/50 bg-slate-950/95 p-3 font-mono text-[11px] text-slate-200 shadow-2xl pointer-events-auto">
+    <aside className="visual-lab-panel ui-workbench absolute top-14 left-3 z-30 w-[330px] overflow-auto pointer-events-auto">
       <div className="mb-2 flex items-center justify-between">
-        <strong className="text-cyan-300">Visual Lab · M4 final validation</strong>
+        <strong className="text-cyan-300">Visual Lab</strong>
         <span>{controller.time.toFixed(3)} / {activeScene.duration.toFixed(1)}s</span>
       </div>
 
@@ -121,9 +124,9 @@ export const VisualLabPanel: React.FC<Props> = ({
       <div className="mt-1 flex flex-wrap items-center gap-1 text-[10px] text-slate-400">
         <span>capture @</span>
         {activeScene.checkpoints.map((time) => (
-          <button key={time} disabled={!assetsReady} className="rounded border border-slate-700 bg-slate-900 px-1 text-cyan-200 disabled:opacity-40" onClick={() => seekTo(time)}>
+          <Button size="sm" key={time} disabled={!assetsReady}  onClick={() => seekTo(time)}>
             {time.toFixed(2)}s
-          </button>
+          </Button>
         ))}
       </div>
       {sceneId === 'VIS-11' && (
@@ -136,10 +139,10 @@ export const VisualLabPanel: React.FC<Props> = ({
       {assetsError && <div className="mt-1 text-red-300">asset error: {assetsError}</div>}
 
       <div className="mt-2 flex flex-wrap gap-1">
-        <button disabled={!assetsReady} className="bg-slate-800 px-2 py-1 disabled:opacity-40" onClick={() => { controller.play(); refresh(); }}>Play</button>
-        <button className="bg-slate-800 px-2 py-1" onClick={() => { controller.pause(); refresh(); }}>Pause</button>
-        <button disabled={!assetsReady} className="bg-slate-800 px-2 py-1 disabled:opacity-40" onClick={() => { controller.replay(); refresh(); }}>Replay</button>
-        <button disabled={!assetsReady} className="bg-slate-800 px-2 py-1 disabled:opacity-40" onClick={() => { controller.step(); refresh(); }}>Step 1/60</button>
+        <Button size="sm" disabled={!assetsReady}  onClick={() => { controller.play(); refresh(); }}>Play</Button>
+        <Button size="sm"  onClick={() => { controller.pause(); refresh(); }}>Pause</Button>
+        <Button size="sm" disabled={!assetsReady}  onClick={() => { controller.replay(); refresh(); }}>Replay</Button>
+        <Button size="sm" disabled={!assetsReady}  onClick={() => { controller.step(); refresh(); }}>Step 1/60</Button>
       </div>
 
       <label className="mt-2 block">
@@ -205,7 +208,8 @@ export const VisualLabPanel: React.FC<Props> = ({
         ))}
       </div>
 
-      <div className="mt-2 border-t border-slate-700 pt-2 text-[10px] text-slate-400">
+      <details className="mt-2 border-t border-slate-700 pt-2 text-[10px] text-slate-400">
+        <summary>Performance</summary>
         <div>sim {perf.simulationMs.toFixed(2)} ms · visual {perf.visualUpdateMs.toFixed(3)} ms</div>
         <div>prep {perf.renderPreparationMs.toFixed(3)} ms · submit {perf.drawSubmitMs.toFixed(2)} ms</div>
         <div>GPU {perf.gpuTimerAvailable && perf.gpuTimeMs != null ? `${perf.gpuTimeMs.toFixed(2)} ms` : 'timer unavailable'}</div>
@@ -216,8 +220,8 @@ export const VisualLabPanel: React.FC<Props> = ({
         <div>tex pending {perf.pendingTextureUploads} · uploads {perf.textureUploads} · invalidations {perf.textureInvalidations}</div>
         <div>backlog {(session.scheduler.backlogSeconds * 1000).toFixed(1)} ms · dropped {session.scheduler.droppedSimulationSeconds.toFixed(4)} s</div>
         <div>resource recreations {perf.resourceRecreations}{perf.memoryBytes != null ? ` · heap ${(perf.memoryBytes / 1048576).toFixed(1)} MiB` : ''}</div>
-        <button className="mt-1 rounded border border-slate-700 bg-slate-900 px-1 text-cyan-200" onClick={() => { session.resetPerformanceWindow(); refresh(); }}>reset perf window</button>
-      </div>
+        <Button size="sm" className="mt-1" onClick={() => { session.resetPerformanceWindow(); refresh(); }}>reset perf window</Button>
+      </details>
     </aside>
   );
 };

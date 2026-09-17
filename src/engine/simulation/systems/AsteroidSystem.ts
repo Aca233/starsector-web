@@ -1,3 +1,4 @@
+import { applyComponentDamage } from './weapon/ComponentDamage';
 import { Vector2 } from '../../math/Vector2';
 import { Asteroid } from '../CombatTypes';
 import { Ship } from '../Ship';
@@ -11,6 +12,7 @@ export interface AsteroidFXCallbacks {
   spawnShieldRipple: (pos: Vector2, maxRadius: number, color: [number, number, number]) => void;
   addFloatingDamage: (pos: Vector2, amount: number, color: [number, number, number]) => void;
   addFloatingText: (pos: Vector2, text: string, color: [number, number, number], size: number, duration: number) => void;
+  spawnArmorDamageSparks: (ship: Ship, localImpact: Vector2, armorDamage: number) => void;
   spawnSparks: (pos: Vector2, count: number, color: [number, number, number]) => void;
   spawnDebris: (pos: Vector2, count: number, color: [number, number, number], speed: number) => void;
   spawnAuthenticExplosion: (pos: Vector2, radius: number, color: [number, number, number], hasShockwave?: boolean) => void;
@@ -132,6 +134,7 @@ export class AsteroidSystem {
           const relVel = ast.vel.clone().sub(ship.vel);
           const impulse = Math.max(80, relVel.length() * (ast.mass / (ast.mass + ship.spec.mass * 20)));
           const fluxGain = impulse * 2.2;
+          ship.shield.recordDamageContact(fluxGain);
           ship.flux.increaseFlux(fluxGain, true);
           fx.spawnShieldRipple(shieldContact.point, 40 + ast.radius, [100, 200, 255]);
           fx.addFloatingDamage(shieldContact.point, fluxGain, [80, 200, 255]);
@@ -154,13 +157,13 @@ export class AsteroidSystem {
           const impactDmg = Math.min(600, 80 + ast.mass * 0.15);
           const localHit = ast.pos.clone().sub(ship.pos).rotate(-ship.facingRad);
           const res = ship.armor.takeDamage(localHit, impactDmg, 'KINETIC', impactDmg, false);
+          applyComponentDamage(ship, localHit, res, 0);
+          fx.spawnArmorDamageSparks(ship, localHit, res.armorDamage);
           ship.hullHp = Math.max(0, ship.hullHp - res.hullDamage);
-          ship.addScorchMark(localHit, res.armorDamage || res.hullDamage);
 
           if (res.armorDamage > 0) fx.addFloatingDamage(ast.pos, res.armorDamage, [255, 180, 50]);
           if (res.hullDamage > 0) fx.addFloatingDamage(ast.pos, res.hullDamage, [255, 60, 60]);
 
-          fx.spawnSparks(ast.pos, 15, [255, 170, 70]);
           fx.spawnDebris(ast.pos, 6, [140, 120, 100], 80);
           sound.playAtPos('collision_asteroid_ship', ast.pos, playerPos, 0.7);
 

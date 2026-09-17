@@ -1,173 +1,86 @@
-import { Ship } from '../simulation/Ship';
+import type { Ship } from '../simulation/Ship';
 import type { TacticalOrder } from '../simulation/CombatTypes';
 import { Vector2 } from '../math/Vector2';
+import { signedAngle } from '../math/Angles';
+import { combatProfile } from './ShipCombatProfile';
+import { assessThreats } from './ThreatAssessment';
+import { ShipDefenseController } from './ShipDefenseController';
+import { avoidCollisions, driveVelocity, forwardPathClear, rangeVelocity, velocityToPosition, yieldFireLane } from './TacticalNavigation';
+import { tacticalPolicy as policy, type TacticalWorld } from './TacticalWorld';
 
-/**
- * 战列舰专属战术 AI (CapitalShipAI)
- * 具备深刻理解《远行星号》主力舰战术的逻辑:
- * 1. 攻势级 AI: 侵略性肉搏风格，强行前压，寻找时机点火【冲刺推进】突破阵线，近距离 TPC + 重炮齐射摧毁敌舰。
- * 2. 典范级 AI: 距离控制大师，保持 800-1100 码最佳狙击距离，利用 360 度全向盾抗压；
- *    当幅能偏高或遭遇大爆发时果断展开【堡垒护盾】，吸收完火力后撤盾反击。
- */
+/** Composition of Web tactical policies. Not a full native BasicShipAI port.
+ * No hull-ID branches; movement, defense and system activation have separate owners. */
 export class CapitalShipAI {
-  public ship: Ship;
-  public targetShip: Ship;
+  private readonly defense=new ShipDefenseController();
+  private withdrawing=false;
+  constructor(public ship:Ship,public targetShip:Ship) {}
 
-  private ventCheckTimer = 0;
-  private thinkTimer = 0;
-
-  constructor(ship: Ship, targetShip: Ship) {
-    this.ship = ship;
-    this.targetShip = targetShip;
-  }
-
-  public update(dt: number, order: TacticalOrder | null = null) {
-    if (this.ship.isDead) return;
-    if (order?.type === 'WAYPOINT' && order.targetPos) {
-      this.navigateToWaypoint(order.targetPos);
-      return;
+  public update(dt:number,order:TacticalOrder|null=null,world?:TacticalWorld):void {
+    const ship=this.ship;
+    if(ship.fireControlMode!=='AI'){this.defense.reset();this.withdrawing=false;}
+    ship.fireControlMode='AI';ship.isFiringMain=false;
+    if(ship.isDead){ship.clearInput();ship.defenseFacingRad=undefined;ship.aiHoldOffensiveFire=false;ship.tacticalAI=undefined;return;}
+    const scene=world??{ships:[ship,this.targetShip],projectiles:[],beams:[],asteroids:[]};
+    ship.combatShips = scene.ships;
+    let target:Ship|undefined=this.targetShip;
+    if(target.isDead||target.isPlayer===ship.isPlayer||!scene.ships.includes(target)){
+      const candidates=scene.ships.filter(s=>!s.isDead&&s.isPlayer!==ship.isPlayer);
+      target=candidates.reduce<Ship|undefined>((nearest,s)=>!nearest||s.pos.distanceTo(ship.pos)<nearest.pos.distanceTo(ship.pos)?s:nearest,undefined);
     }
-    if (this.targetShip.isDead) return;
-
-    this.thinkTimer -= dt;
-    this.ventCheckTimer -= dt;
-
-    const toTarget = this.targetShip.pos.clone().sub(this.ship.pos);
-    const dist = toTarget.length();
-    const targetAngle = toTarget.heading();
-
-    // 默认瞄准敌舰中心
-    this.ship.aimTargetWorld.copy(this.targetShip.pos);
-
-    // 1. 转向控制：始终将最强火力弧面对敌方
-    let angleDiff = targetAngle - this.ship.facingRad;
-    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-
-    if (Math.abs(angleDiff) > 0.05) {
-      this.ship.turnInput = Math.sign(angleDiff);
-    } else {
-      this.ship.turnInput = 0;
+    if(target){this.targetShip=target;ship.currentTargetShip=target;ship.aimTargetWorld.copy(target.pos);}else ship.currentTargetShip=null;
+    const phase=ship.shield.type==='PHASE';
+    const defenseWindow=policy.imminentWindow+(phase?ship.shield.phaseChargeUpDuration:0);
+    // Native vent module accounts for the WHOLE vent plus defense recovery, not only its target.
+    const recovery=2+(phase?ship.shield.phaseChargeDownDuration+ship.shield.phaseCooldownDuration:ship.shield.unfoldDuration);
+    const horizon=Math.max(defenseWindow,ship.flux.getTimeToVent()+recovery);
+    const threat=assessThreats(ship,scene,horizon,defenseWindow);
+    this.defense.observe(dt,threat);
+    const profile=target?combatProfile(ship,target):{range:0,relativeBearing:0,firepower:0,weapons:0};
+    if(ship.flux.fluxPercent>=policy.retreatAt||!profile.weapons)this.withdrawing=!!target;
+    else if(ship.flux.fluxPercent<=policy.resumeAt)this.withdrawing=false;
+    ship.aiHoldOffensiveFire=this.withdrawing;
+    const escort=order?.type==='ESCORT'?scene.ships.find(other=>other.id===order.targetShipId&&other.isPlayer===ship.isPlayer&&!other.isDead&&other!==ship):undefined;
+    const defending=order?.type==='DEFEND';
+    const avoiding=order?.type==='AVOID';
+    const waypoint=order?.type==='WAYPOINT'||defending?order.targetPos:undefined;
+    let facing=ship.facingRad,desired=new Vector2();
+    if(escort){
+      // Web escort policy: follow behind the protected hull at collision-safe separation.
+      const separation=ship.spec.collisionRadius+escort.spec.collisionRadius+220;
+      const station=escort.pos.clone().add(new Vector2(-Math.cos(escort.facingRad)*separation,-Math.sin(escort.facingRad)*separation));
+      desired=velocityToPosition(ship,station,escort.vel,120);
+      facing=target?target.pos.clone().sub(ship.pos).heading()-profile.relativeBearing:escort.facingRad;
+    }else if(avoiding&&target){
+      const away=ship.pos.clone().sub(target.pos);if(away.length()<1)away.set(-1,0);
+      desired=away.scale(ship.getMotionStats().maxSpeed/away.length());
+      facing=target.pos.clone().sub(ship.pos).heading()-profile.relativeBearing;
+    }else if(waypoint){
+      const delta=new Vector2(waypoint.x,waypoint.y).sub(ship.pos);
+      if(defending&&target)facing=target.pos.clone().sub(ship.pos).heading()-profile.relativeBearing;
+      else if(delta.length()>policy.positionTolerance)facing=delta.heading();
+      desired=velocityToPosition(ship,new Vector2(waypoint.x,waypoint.y));
+    }else if(target){
+      facing=target.pos.clone().sub(ship.pos).heading()-profile.relativeBearing;
+      desired=rangeVelocity(ship,target,profile.range,this.withdrawing);
     }
-
-    // 2. 机动与战术系统逻辑差异化
-    if (this.ship.spec.id === 'onslaught') {
-      this.updateOnslaughtTactics(dist, angleDiff);
-    } else if (this.ship.spec.id === 'paragon') {
-      this.updateParagonTactics(dist, angleDiff);
-    } else if (this.ship.spec.id === 'doom') {
-      this.updateDoomTactics(dist, angleDiff);
+    const cooperation=waypoint||escort||avoiding||this.withdrawing?{velocity:desired,yielding:false}:yieldFireLane(ship,desired,scene);
+    const avoidance=avoidCollisions(ship,cooperation.velocity,scene);
+    driveVelocity(ship,avoidance.velocity,facing);
+    if(target&&!ship.flux.isVenting&&!ship.flux.isOverloaded){
+      // System callbacks decide activation only; they no longer rewrite stationkeeping or shield orders.
+      const modifiers=ship.system.definition.modifiers?.({...ship.system,state:'ACTIVE',effectLevel:1} as typeof ship.system,ship.flux.maxFlux);
+      const boostSpeed=ship.spec.maxSpeed+(modifiers?.speedFlat??0);
+      ship.system.definition.advanceAI?.({ship,target,distance:ship.pos.distanceTo(target.pos),angleDiff:signedAngle(facing-ship.facingRad),
+        tactical:{desiredRange:profile.range,withdrawing:this.withdrawing,waypoint:!!waypoint,avoidingCollision:avoidance.avoiding||cooperation.yielding,
+          forwardClear:forwardPathClear(ship,scene,Math.max(boostSpeed,ship.vel.length()),Math.max(policy.avoidanceLookahead,ship.system.chargeUpDuration+ship.system.chargeDownDuration)),
+          quietFor:this.defense.quietFor,threat}});
     }
-
-    // 3. 火控与射击决策
-    // 当敌舰位于前向有效火力扇面内且未相位潜航时，激活主火控
-    this.ship.isFiringMain = (Math.abs(angleDiff) < 0.45 && dist < 1200 && !this.ship.isPhased);
-
-    // 4. 主动散热排散决策
-    if (this.ventCheckTimer <= 0) {
-      this.ventCheckTimer = 1.0;
-      // 当敌舰过载，或者自身幅能高而距离远且敌舰未开火时，主动排散
-      if (this.ship.flux.fluxPercent > 0.8 && (dist > 1200 || this.targetShip.flux.isOverloaded)) {
-        this.ship.startVenting();
-      }
-    }
-  }
-
-  private navigateToWaypoint(targetPos: { x: number; y: number }) {
-    const toWaypoint = new Vector2(targetPos.x, targetPos.y).sub(this.ship.pos);
-    const dist = toWaypoint.length();
-    const targetAngle = toWaypoint.heading();
-    let angleDiff = targetAngle - this.ship.facingRad;
-    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-    this.ship.aimTargetWorld.set(targetPos.x, targetPos.y);
-    this.ship.turnInput = Math.abs(angleDiff) > 0.05 ? Math.sign(angleDiff) : 0;
-    this.ship.strafeInput = 0;
-    this.ship.throttle = dist > 90 ? 1 : 0;
-    this.ship.isFiringMain = false;
-  }
-
-  private updateOnslaughtTactics(dist: number, angleDiff: number) {
-    // 攻势级渴望贴脸肉搏
-    const idealDist = 550;
-    if (dist > idealDist + 100) {
-      this.ship.throttle = 1.0; // 往前冲
-    } else if (dist < idealDist - 100) {
-      this.ship.throttle = -0.3; // 保持身位
-    } else {
-      this.ship.throttle = 0.2;
-    }
-
-    // 冲刺推进系统 (Burn Drive) 触发时机:
-    // 朝向大致对准目标且距离在 700 ~ 1300 之间，立刻发动蛮牛冲撞！
-    if (
-      !this.ship.system.isActive &&
-      !this.ship.system.isCoolingDown &&
-      Math.abs(angleDiff) < 0.25 &&
-      dist > 750 &&
-      dist < 1400
-    ) {
-      this.ship.system.activate();
-    }
-
-    // 攻势护盾决策: Burn Drive 的 noShield 生命周期内不得反复尝试重新开盾。
-    if (this.ship.canUseShields() && this.ship.flux.fluxPercent < 0.85 && dist < 1200) {
-      this.ship.shield.setActive(true);
-    } else {
-      this.ship.shield.setActive(false);
-    }
-  }
-
-  private updateParagonTactics(dist: number, _angleDiff: number) {
-    // 典范级渴望保持 800 - 1000 码的最佳激光/长矛焦距
-    const idealDist = 900;
-    if (dist > idealDist + 80) {
-      this.ship.throttle = 1.0;
-    } else if (dist < idealDist - 80) {
-      this.ship.throttle = -0.7; // 稳健风筝倒车
-    } else {
-      this.ship.throttle = 0;
-    }
-
-    // 典范常态开启全向 360 度护盾
-    if (this.ship.canUseShields()) {
-      this.ship.shield.setActive(true);
-    }
-
-    // Fortress Shield is a source toggle: raise it under pressure and explicitly lower it when pressure clears.
-    const shouldFortress = this.ship.flux.fluxPercent > 0.65 || (this.targetShip.system.isActive && dist < 700);
-    if (shouldFortress && !this.ship.system.isActive && !this.ship.system.isCoolingDown) {
-      this.ship.system.activate();
-    } else if (!shouldFortress && this.ship.system.isActive && this.ship.system.state !== 'OUT') {
-      this.ship.system.deactivate();
-    }
-  }
-
-  private updateDoomTactics(dist: number, _angleDiff: number) {
-    // 厄运级相位战术：利用相位潜航高速机动绕后，伺机布设水雷与齐射死神鱼雷
-    const idealDist = 600;
-    if (dist > idealDist + 100) {
-      this.ship.throttle = 1.0;
-    } else if (dist < idealDist - 100) {
-      this.ship.throttle = -0.4;
-    } else {
-      this.ship.throttle = 0.5;
-    }
-
-    // 1. 相位潜航 (Phase Cloak) 决策:
-    // 当自身在敌舰重炮射程内且幅能较低时，潜入相位空间高速机动
-    const shouldPhase = (dist < 1100 && this.ship.flux.fluxPercent < 0.65 && !this.ship.flux.isOverloaded);
-    const mustUnphase = this.ship.flux.fluxPercent > 0.82;
-    if (mustUnphase) {
-      this.ship.shield.setActive(false);
-    } else if (shouldPhase && !this.ship.shield.isActive) {
-      this.ship.shield.setActive(true);
-    }
-
-    // 2. 空雷突袭 (Mine Strike) 决策:
-    // 当充能可用且距离在 1200 以内时，在敌舰附近空间折跃布雷
-    if (this.ship.system.type === 'MINE_STRIKE' && this.ship.system.charges > 0 && !this.ship.system.isCoolingDown && dist < 1200) {
-      this.ship.system.activate();
-    }
+    if (target) ship.defenseSystem.definition.advanceAI?.({ ship, system: ship.defenseSystem, target, distance: ship.pos.distanceTo(target.pos), angleDiff: signedAngle(facing-ship.facingRad),
+      tactical: { desiredRange: profile.range, withdrawing: this.withdrawing, waypoint: !!waypoint, avoidingCollision: avoidance.avoiding, forwardClear: true, quietFor: this.defense.quietFor, threat } });
+    const defense=this.defense.update(ship,threat);
+    ship.tacticalAI={mode:escort?'ESCORT':avoiding?'AVOID':defending?'DEFEND':waypoint?'WAYPOINT':!target?'IDLE':this.withdrawing?'WITHDRAW':'ENGAGE',desiredRange:profile.range,
+      desiredFacing:facing,availableFirepower:profile.firepower,avoidingCollision:avoidance.avoiding,yieldingFireLane:cooperation.yielding,
+      incomingDamage:threat.imminentDamage,incomingShieldFlux:threat.imminentShieldFlux,
+      earliestThreat:Number.isFinite(threat.earliest)?threat.earliest:null,ventSafe:defense.ventSafe,defense:defense.state};
   }
 }

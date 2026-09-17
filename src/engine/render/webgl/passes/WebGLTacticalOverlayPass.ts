@@ -1,3 +1,4 @@
+import { combatWeaponRange } from '../../../simulation/WeaponRange';
 import { CombatEngine } from '../../../simulation/CombatEngine';
 import { WebGLPassContext } from '../WebGLPassContext';
 import { Vector2 } from '../../../math/Vector2';
@@ -16,17 +17,19 @@ export class WebGLTacticalOverlayPass {
     engine: CombatEngine,
     ctx: WebGLPassContext,
     nowSec: number,
-    enemyPos: Vector2,
+    _enemyPos: Vector2,
     playerPos: Vector2,
     activeGroupIndex: number,
     arcAnimProgress: number
   ) {
     const { batcher, textures, whiteTex } = ctx;
+    const target = engine.findHostile(engine.playerShip);
+    const enemyPos = target?.interpolatedPos(ctx.alpha);
 
     // 1. 战术锁定目标经典四角红色括号 [ ] (Starsector Official Style)
-    if (!engine.enemyShip.isDead) {
-      const shipW = engine.enemyShip.spec.spriteWidth;
-      const shipH = engine.enemyShip.spec.spriteHeight;
+    if (target && enemyPos) {
+      const shipW = target.spec.spriteWidth;
+      const shipH = target.spec.spriteHeight;
       const halfW = Math.max(shipW, shipH) * 0.45;
       const halfH = halfW;
       const corner = Math.min(28, Math.max(16, halfW * 0.25));
@@ -50,7 +53,7 @@ export class WebGLTacticalOverlayPass {
     }
 
     // 1.1 射击前置量指示星标 (Target Lead Pip)
-    if (!engine.playerShip.isDead && !engine.enemyShip.isDead) {
+    if (!engine.playerShip.isDead && target) {
       let projSpeed = 800;
       let isBeam = false;
       const activeGroup = engine.playerShip.weaponGroups[activeGroupIndex];
@@ -61,10 +64,10 @@ export class WebGLTacticalOverlayPass {
           else if (activeMount.spec.projSpeed > 0) projSpeed = activeMount.spec.projSpeed;
         }
       }
-      const dist = engine.playerShip.pos.distanceTo(engine.enemyShip.pos);
+      const dist = engine.playerShip.pos.distanceTo(target.pos);
       const flightTime = isBeam ? 0 : dist / projSpeed;
-      const relVel = engine.enemyShip.vel.clone().sub(engine.playerShip.vel);
-      const leadPos = engine.enemyShip.pos.clone().addScaled(relVel, flightTime);
+      const relVel = target.vel.clone().sub(engine.playerShip.vel);
+      const leadPos = target.pos.clone().addScaled(relVel, flightTime);
 
       const pipTex = textures.getTexture('/game-assets/graphics/hud/holo_target.png');
       batcher.setBlendMode('ADDITIVE');
@@ -101,7 +104,7 @@ export class WebGLTacticalOverlayPass {
 
             const pFacingDeg = (p.facingRad * 180) / Math.PI;
             const f9 = pFacingDeg + mount.baseAngleDeg;
-            const f10 = mount.spec.range * (p.spec.weaponRangeMult || 1.0);
+            const f10 = combatWeaponRange(p, mount.spec);
             let f11 = Math.floor(f10 / 125.0);
             if (f11 < 1.0) f11 = 1.0;
             let f4 = f11;

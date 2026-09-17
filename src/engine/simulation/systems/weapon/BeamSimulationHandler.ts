@@ -1,11 +1,18 @@
+import { damageToMissiles } from './DamageToMissiles';
+import { combatWeaponRange } from '../../WeaponRange';
+import { applyComponentDamage } from './ComponentDamage';
+import { outgoingDamageMultiplier } from './OutgoingDamage';
+import { requireWeaponEffect } from '../../../extensions/weapon-effects/Registry';
 import { Vector2 } from '../../../math/Vector2';
-import { intersectSegmentWithPolygon } from '../../../math/Geometry';
-import { Beam } from '../../Weapon';
+import { intersectSegmentWithPolygon, segmentCircleEntry } from '../../../math/Geometry';
+import { Beam, type WeaponMount } from '../../Weapon';
+import { advanceBeamDamage } from './BeamDamageClock';
 import { Ship } from '../../Ship';
 import { sound } from '../../../audio/SoundManager';
-import { i18n } from '../../../i18n/LocalizationManager';
 import { WeaponSimContext } from './WeaponSimContext';
 import { advanceBeamContactPulse } from '../../../visual/ImpactVisuals';
+import { advanceBeamGlow, beamIntensity, recordBeamGlowDamage, shortenBeamGlow } from '../../../visual/BeamVisuals';
+import { shieldHitGlowDamage } from '../../../visual/HitGlowVisuals';
 
 /**
  * 计算射线与圆的物理入射交点与参数 t (Ray-Circle Entry Intersection)
@@ -48,7 +55,7 @@ function getBeamTargetIntersectionDistance(origin: Vector2, end: Vector2, ship: 
   const beamUnit = beamDir.clone().scale(1 / beamLen);
   let nearestT = Number.POSITIVE_INFINITY;
 
-  if (ship.shield.isActive && ship.shield.currentArcDeg > 5 && ship.shield.type !== 'NONE' && ship.shield.type !== 'PHASE') {
+  if (ship.shield.isActive && ship.shield.currentArcDeg > 0 && ship.shield.type !== 'NONE' && ship.shield.type !== 'PHASE') {
     const shieldCenter = ship.getShieldCenter(ship.pos, ship.facingRad);
     const shieldEntry = intersectRayCircleEntry(origin, beamUnit, shieldCenter, ship.shield.radius);
     if (shieldEntry && shieldEntry.t <= beamLen && ship.isShieldPointBlocked(shieldEntry.point)) {
@@ -89,34 +96,44 @@ function getBeamTargetIntersectionDistance(origin: Vector2, end: Vector2, ship: 
  * 2. 射线-护盾球体物理交点解算与有效弧度偏转吸收 (Ray-Sphere Entry Intersection)
  * 3. 能量护盾吸收与软幅能积累 (Soft Flux Accumulation，绝不穿盾)
  * 4. 速子光矛高压电弧硬幅能渗透 (Tachyon Lance Hard Flux EMP Piercing)
- * 5. 舰体精确多边形穿透点截断与 2D 装甲网格 DPS 连续切割
- * 6. 光束死光熔毁武器挂点与推进器熄火
- * 7. EMP 特斯拉跳跃电弧、融甲熔渣与死光击沉判定
+ * 5. 舰体多边形交点截断与 2D 装甲网格 DPS 累积分批伤害
+ * 6. 装甲/结构/EMP 伤害向 21 格部件图传递
+ * 7. 原版速子 EMP 电弧与舰船摧毁判定
  */
 export class BeamSimulationHandler {
   public update(dt: number, ctx: WeaponSimContext, beams: Beam[]) {
-    const ships = [ctx.playerShip, ctx.enemyShip, ...(ctx.fighters || [])];
-
+    const ships = ctx.ships ?? [ctx.playerShip, ctx.enemyShip, ...(ctx.fighters || [])];
+    const worldDt = dt;
     for (let i = beams.length - 1; i >= 0; i--) {
       const b = beams[i];
+      const srcShip = ships.find(s => s.id === b.sourceShipId);
+      // BeamWeaponRay.advance multiplies damage/glow clocks by the firing ship's time multiplier.
+      const dt = worldDt * (srcShip?.subjectiveTimeMultiplier ?? 1);
       b.elapsedTime += dt;
       b.duration -= dt;
       b.isHitting = false;
       let contactedThisTick = false;
+      let damageTarget: Ship | undefined;
+      let active = b.damageActive !== false;
+      let sourceMount: WeaponMount | undefined;
+      b.brightness = beamIntensity(b);
 
-      if (b.duration <= 0) {
+      // Mounted beams expire with the authoritative tracker, not a second timer that
+      // starts one step earlier and can erase glow/UV state before chargedown begins.
+      if (b.duration <= 0 && (!b.slotId || b.firingCycleId === undefined)) {
         beams.splice(i, 1);
         continue;
       }
 
       // 1. 动态锁定发射挂点坐标与炮口物理偏移 (1:1 BeamWeaponRay.java:114)
-      const srcShip = ships.find((s) => s.id === b.sourceShipId);
+
 
       // 母舰阵亡后其挂点不会再收到 update，firingState 会永久停留在 ACTIVE；
       // 因此光束有效性必须同时检查发射舰本身。vanilla BeamWeaponRay.isExpired() 无条件判定
-      // `getShip().isHulk() && !getShip().isAlive()`，即舰船被摧毁的瞬间所有光束 (含充能收束的
-      // 纯视觉光束) 一并消失；发射舰已不在战场实体列表时同样无法维持光束。
-      if (!srcShip || srcShip.isDead) {
+      // `getShip().isHulk() && !getShip().isAlive()`，即舰船被摧毁的瞬间所有光束
+      // (含充能收束阶段) 一并消失；发射舰已不在战场实体列表时同样无法维持光束。
+      // Native tracker D destroys its ray on overload/venting instead of retaining a visual tail.
+      if (!srcShip || srcShip.isDead || srcShip.flux.isOverloaded || srcShip.flux.isVenting) {
         beams.splice(i, 1);
         continue;
       }
@@ -124,21 +141,24 @@ export class BeamSimulationHandler {
       if (b.slotId) {
         const mount = srcShip.weapons.find((w) => w.slotId === b.slotId);
 
-        // A damaging production beam is valid only while its exact source firing
-        // cycle is still ACTIVE. Disabled/replaced mounts must not leave a stale
-        // sustained beam dealing damage; chargedown beams are visual-only and are
-        // intentionally exempt from this check.
-        if (
-          b.damageActive !== false &&
-          (!mount || mount.isDisabled ||
-            (b.firingCycleId !== undefined &&
-              (mount.firingCycleId !== b.firingCycleId || mount.firingState !== 'ACTIVE')))
-        ) {
+        // All stages and explicit visual-only fixtures belong to the same live mount/cycle;
+        // none survive a removed, disabled, replaced or idle mount.
+        if (!mount || mount.isDisabled || mount.spec.id !== b.specId || mount.firingState === 'IDLE' ||
+          (b.firingCycleId !== undefined && mount.firingCycleId !== b.firingCycleId)) {
           beams.splice(i, 1);
           continue;
         }
 
         if (mount) {
+          sourceMount = mount;
+          active = mount.firingState === 'ACTIVE';
+          b.duration = Number.isFinite(mount.firingStateTimer) ? Math.max(0, mount.firingStateTimer) : Number.MAX_SAFE_INTEGER;
+          b.brightness = beamIntensity(b, mount);
+          // Live source damage modifiers, not a snapshot from the last phase emission.
+          b.damagePerSec = (b.baseDamagePerSec ?? mount.spec.damagePerSecond) * srcShip.crDamageDealtMultiplier
+            * srcShip.getWeaponDamageMultiplier(mount.spec.weaponType) * srcShip.system.getBeamDamageMultiplier();
+          b.empPerSec = (mount.spec.empPerSecond ?? 0) * srcShip.crDamageDealtMultiplier;
+          const previousLength = b.startPos.distanceTo(b.endPos);
           const isHardpoint = mount.mountType === 'HARDPOINT';
           const offsets = isHardpoint
             ? (mount.spec.hardpointOffsets && mount.spec.hardpointOffsets.length >= 2 ? mount.spec.hardpointOffsets : mount.spec.turretOffsets)
@@ -155,11 +175,16 @@ export class BeamSimulationHandler {
           const mountWorldPos = srcShip.pos.clone().add(mountOffset);
           const fireDir = Vector2.fromAngle(mount.currentAngleRad, 1);
           b.startPos.copy(mountWorldPos.add(barrelOffsetWorld));
-          const maxRange = mount.spec.range * (srcShip.spec.weaponRangeMult || 1.0);
-          b.endPos = b.startPos.clone().addScaled(fireDir, maxRange);
-          mount.glowAlpha = Math.max(mount.glowAlpha, b.duration / b.maxDuration);
+          const maxRange = combatWeaponRange(srcShip, mount.spec);
+          b.rayEndPrevFrame = b.startPos.clone().addScaled(fireDir, previousLength);
+          const frontLength = Math.min(maxRange, previousLength + dt * (mount.spec.beamSpeed ?? 1400));
+          b.endPos = b.startPos.clone().addScaled(fireDir, frontLength);
+          mount.glowAlpha = b.brightness;
         }
       }
+
+      advanceBeamGlow(b, dt, active);
+      const sample = advanceBeamDamage(b, dt, ctx.random, sourceMount);
 
       // 2. 光束射线与目标物理相交检测 (优先按发射距离由近至远测试障碍物)
       const targetShips = ships
@@ -169,14 +194,46 @@ export class BeamSimulationHandler {
         .sort((a, bTarget) => a.hitT - bTarget.hitT)
         .map(({ ship }) => ship);
 
-      for (const ship of targetShips) {
+      let missileContact = false;
+      const rayLength = b.startPos.distanceTo(b.endPos);
+      const shipDistance = targetShips.length ? getBeamTargetIntersectionDistance(b.startPos, b.endPos, targetShips[0]) : Infinity;
+      let missileIndex = -1, missileT = Infinity;
+      for (let index = 0; index < (ctx.projectiles?.length ?? 0); index++) {
+        const candidate = ctx.projectiles![index];
+        if (!candidate.isRocket || candidate.sourceShipId === b.sourceShipId || (b.isPlayer !== undefined && candidate.isPlayer === b.isPlayer)) continue;
+        const t = segmentCircleEntry(b.startPos, b.endPos, candidate.pos, candidate.radius);
+        if (t !== null && t < missileT && t * rayLength < shipDistance) { missileT = t; missileIndex = index; }
+      }
+      if (missileIndex >= 0) {
+        const missile = ctx.projectiles![missileIndex];
+        b.endPos.copy(Vector2.lerp(b.startPos, b.endPos, missileT));
+        b.isHitting = b.damageActive !== false;
+        contactedThisTick = missileContact = true;
+        shortenBeamGlow(b);
+        if (sample && sample.damage > 0 && b.damageActive !== false) {
+          if (!b.hasRecordedHit) { ctx.statsTracker?.recordShotHit(b.isPlayer ?? false); b.hasRecordedHit = true; }
+          const damage = damageToMissiles(sample.damage * outgoingDamageMultiplier(srcShip, undefined, sourceMount?.spec.weaponType, b.startPos, b.endPos), b.sourceShipId, ctx);
+          const dealt = Math.min(missile.hitpoints ?? 100, damage);
+          missile.hitpoints = (missile.hitpoints ?? 100) - damage;
+          recordBeamGlowDamage(b, { hullDamage: dealt });
+          if (missile.hitpoints <= 0) {
+            ctx.contrailEngine?.detach(missile.id);
+            ctx.statsTracker?.recordMissileIntercepted(b.isPlayer ?? false);
+            if (missile.missileExplosionVisualSpec) ctx.fx.spawnSourceMissileExplosion(missile.pos, missile.missileExplosionVisualSpec);
+            sound.playAtPos('missile_explosion', missile.pos, ctx.playerShip.pos, .5);
+            ctx.projectiles!.splice(missileIndex, 1);
+          }
+        }
+      }
+
+      for (const ship of missileContact ? [] : targetShips) {
         const beamDir = b.endPos.clone().sub(b.startPos);
         const beamLen = beamDir.length();
         if (beamLen <= 0.001) break;
         const beamUnit = beamDir.clone().normalize();
 
         // 2.1 护盾球体相交检测 (Ray-Circle Intersection with Shield Sphere)
-        if (ship.shield.isActive && ship.shield.currentArcDeg > 5 && ship.shield.type !== 'NONE' && ship.shield.type !== 'PHASE') {
+        if (ship.shield.isActive && ship.shield.currentArcDeg > 0 && ship.shield.type !== 'NONE' && ship.shield.type !== 'PHASE') {
           const sCenter = ship.getShieldCenter(ship.pos, ship.facingRad);
           const shieldEntry = intersectRayCircleEntry(b.startPos, beamUnit, sCenter, ship.shield.radius);
           let shieldHitPoint: Vector2 | null = null;
@@ -203,59 +260,37 @@ export class BeamSimulationHandler {
             b.endPos.copy(shieldHitPoint);
             b.isHitting = true;
             contactedThisTick = true;
+            damageTarget = ship;
+            shortenBeamGlow(b);
             if (b.damageActive === false) {
               b.isHitting = false;
               break;
             }
-            if (!b.hasRecordedHit) {
-              ctx.statsTracker?.recordShotHit(b.isPlayer ?? false);
-              b.hasRecordedHit = true;
-            }
-            const tickDmg = b.damagePerSec * dt;
-            const shieldMult = ship.system.getShieldDamageMultiplier();
-            // 护盾吸收量同样按目标战备值修正 (CRPluginImpl.getDamageTakenChangePercent)
-            const absorbedDmg = tickDmg * shieldMult * ship.crDamageTakenMultiplier;
-            const hitAngle = Math.atan2(shieldHitPoint.y - sCenter.y, shieldHitPoint.x - sCenter.x);
-            const fluxGain = ship.shield.absorbDamage(absorbedDmg, b.damageType, hitAngle);
-            ship.flux.increaseFlux(fluxGain, false);
-            if (ctx.statsTracker) {
-              ctx.statsTracker.recordDamageDealt(b.isPlayer ?? false, b.damageType, absorbedDmg, 'SHIELD');
-            }
-
-            // Tachyon Lance 护盾硬幅能穿透电弧 (严格对齐 1:1 TachyonLanceEffect.java)
-            // 只有当硬幅能高于 10% (pierceChance = hardFlux - 0.1) 且随机通过时，才可能产生电弧瘫痪武器/引擎挂点，
-            // 绝不直接穿盾扣除舰船结构 HP！
-            if (b.isEmpPiercing) {
-              const hardFluxLevel = ship.flux.hardFlux / ship.spec.maxFlux;
-              const pierceChance = hardFluxLevel - 0.1;
-              if (pierceChance > 0 && ctx.random.next() < pierceChance * dt * 3.5) {
-                const activeMounts = ship.weapons.filter(w => !w.isDisabled && w.mountType !== 'HIDDEN');
-                if (activeMounts.length > 0) {
-                  const targetMount = activeMounts[Math.floor(ctx.random.next() * activeMounts.length)];
-                  const mOffset = new Vector2(targetMount.relativePos.x, targetMount.relativePos.y).rotate(ship.facingRad);
-                  const mPos = ship.pos.clone().add(mOffset);
-                  ctx.fx.spawnEmpArc(shieldHitPoint, mPos, {
-                    thickness: 2.8,
-                    glowColor: [165, 100, 255],
-                    coreColor: [255, 255, 255]
-                  });
-                  sound.playAtPos('emp_discharge', shieldHitPoint, ctx.playerShip.pos, 0.45);
-                  ship.damageWeaponMount(targetMount.relativePos, 200, true);
-                } else {
-                  ctx.fx.spawnEmpArc(shieldHitPoint, ship.pos, {
-                    thickness: 2.2,
-                    glowColor: [165, 100, 255],
-                    coreColor: [255, 255, 255]
-                  });
-                  sound.playAtPos('emp_discharge', shieldHitPoint, ctx.playerShip.pos, 0.45);
-                }
+            if (sample && sample.damage > 0) {
+              if (!b.hasRecordedHit) {
+                ctx.statsTracker?.recordShotHit(b.isPlayer ?? false);
+                b.hasRecordedHit = true;
+              }
+              const outgoing = outgoingDamageMultiplier(srcShip, ship, sourceMount?.spec.weaponType, b.startPos, b.endPos);
+              const tickDmg = sample.damage * outgoing;
+              const shieldMult = ship.system.getShieldDamageMultiplier();
+              // 护盾吸收量同样按目标战备值修正 (CRPluginImpl.getDamageTakenChangePercent)
+              const absorbedDmg = tickDmg * shieldMult * ship.crDamageTakenMultiplier;
+              const hitAngle = Math.atan2(shieldHitPoint.y - sCenter.y, shieldHitPoint.x - sCenter.x);
+              const fluxGain = ship.shield.absorbDamage(absorbedDmg, b.damageType, hitAngle);
+              recordBeamGlowDamage(b, { shieldDamage: shieldHitGlowDamage(fluxGain,
+                ship.flux.maxFlux - ship.flux.totalFlux, ship.shield.efficiency) });
+              ship.flux.increaseFlux(fluxGain, sourceMount?.spec.beamDealsHardFlux === true);
+              if (ctx.statsTracker) {
+                ctx.statsTracker.recordDamageDealt(b.isPlayer ?? false, b.damageType, absorbedDmg * ship.shield.damageTakenMultiplierFor(b.damageType), 'SHIELD');
               }
             }
+            // Contact audio remains an independent per-frame ACTIVE adapter.
+            if (!active) break;
+
             const contactPulse = advanceBeamContactPulse(b, 'SHIELD', dt);
-            if (contactPulse.emitFx) {
-              ctx.fx.spawnSparks(shieldHitPoint, 2, b.color);
-              ctx.fx.spawnShieldRipple(shieldHitPoint, Math.max(18, b.width * 1.4), b.color);
-            }
+            // The beam renderer owns its continuous contact glow; shield absorption
+            // already updates the native segment reaction. No extra timed spark/ring emitter.
             if (contactPulse.emitSound) {
               sound.playAtPos('shield_hit', shieldHitPoint, ctx.playerShip.pos, 0.22);
             }
@@ -293,94 +328,47 @@ export class BeamSimulationHandler {
             b.endPos.copy(worldImpact);
             b.isHitting = true;
             contactedThisTick = true;
+            damageTarget = ship;
+            shortenBeamGlow(b);
             if (b.damageActive === false) {
               b.isHitting = false;
               break;
             }
-            if (!b.hasRecordedHit) {
-              ctx.statsTracker?.recordShotHit(b.isPlayer ?? false);
-              b.hasRecordedHit = true;
-            }
-            const tickDmg = b.damagePerSec * dt;
-            const tickEmp = (b.empPerSec ?? 0) * dt;
-            // 装甲/结构承受伤害按目标战备值修正 (CRPluginImpl.getDamageTakenChangePercent)
-            const takenDmg = tickDmg * ship.crDamageTakenMultiplier;
-            const result = ship.armor.takeDamage(localImpact, takenDmg, b.damageType, b.damagePerSec, true);
-            if (ctx.statsTracker) {
-              let empRecorded = false;
-              if (result.armorDamage > 0) {
-                ctx.statsTracker.recordDamageDealt(b.isPlayer ?? false, b.damageType, result.armorDamage, 'ARMOR', tickEmp);
-                empRecorded = tickEmp > 0;
+            if (sample && sample.damage > 0) {
+              if (!b.hasRecordedHit) {
+                ctx.statsTracker?.recordShotHit(b.isPlayer ?? false);
+                b.hasRecordedHit = true;
               }
-              if (result.hullDamage > 0) {
-                ctx.statsTracker.recordDamageDealt(b.isPlayer ?? false, b.damageType, result.hullDamage, 'HULL', empRecorded ? 0 : tickEmp);
-              }
-            }
-            ship.hullHp = Math.max(0, ship.hullHp - result.hullDamage);
-            ship.addScorchMark(localImpact, result.armorDamage || result.hullDamage);
-
-            const contactPulse = advanceBeamContactPulse(b, 'HULL', dt);
-            if (contactPulse.emitFx) {
-              ctx.fx.spawnSparks(worldImpact, b.isEmpPiercing ? 8 : 3, b.isEmpPiercing ? [160, 220, 255] : b.color);
-              if (b.isEmpPiercing) ctx.addCameraShake(4, 0.12);
-            }
-            if (contactPulse.emitSound) {
-              sound.playAtPos('beam_hit', worldImpact, ctx.playerShip.pos, 0.35);
-            }
-
-            // 速子长矛命中船体/装甲时释放剧烈紫白 EMP 跳跃电弧 (严格对齐 1:1 TachyonLanceEffect.java)
-            if (b.isEmpPiercing && ctx.random.next() < dt * 4.5) {
-              const activeMounts = ship.weapons.filter(w => !w.isDisabled && w.mountType !== 'HIDDEN');
-              if (activeMounts.length > 0) {
-                const targetMount = activeMounts[Math.floor(ctx.random.next() * activeMounts.length)];
-                const mOffset = new Vector2(targetMount.relativePos.x, targetMount.relativePos.y).rotate(ship.facingRad);
-                const mPos = ship.pos.clone().add(mOffset);
-                ctx.fx.spawnEmpArc(worldImpact, mPos, {
-                  thickness: 3.0,
-                  glowColor: [165, 100, 255],
-                  coreColor: [255, 255, 255]
-                });
-                sound.playAtPos('emp_discharge', worldImpact, ctx.playerShip.pos, 0.5);
-                ship.damageWeaponMount(targetMount.relativePos, 350, true);
-              } else {
-                ctx.fx.spawnEmpArc(worldImpact, ship.pos, {
-                  thickness: 2.5,
-                  glowColor: [165, 100, 255],
-                  coreColor: [255, 255, 255]
-                });
-                sound.playAtPos('emp_discharge', worldImpact, ctx.playerShip.pos, 0.5);
-              }
-            }
-
-            // 光束穿透破坏武器挂点
-            const beamEmpDmg = tickEmp;
-            const disabledMount = ship.damageWeaponMount(localImpact, tickDmg + beamEmpDmg, beamEmpDmg > 0);
-            if (disabledMount) {
-              ctx.fx.spawnSparks(worldImpact, 25, [165, 100, 255]);
-              const weaponName = i18n.t(disabledMount.spec.nameKey).split(' ')[0] || disabledMount.slotId;
-              if (ship.isPlayer) {
-                ctx.addRadioMessage('损管警报', 'PLAYER', `武器挂点 [${disabledMount.slotId} - ${weaponName}] 遭高能死光击毁，强制下线！`, [255, 120, 60]);
-              } else {
-                ctx.addRadioMessage('战术火控', 'PLAYER', `死光主炮瘫痪敌舰武器挂点 [${weaponName}]！`, [100, 255, 160]);
-              }
-            }
-
-            // 引擎后向甲板熔穿熄火
-            if (localImpact.x < -ship.spec.collisionRadius * 0.25 && (b.specId === 'tachyonlance' || b.damagePerSec > 500)) {
-              if (ctx.random.next() < dt * 0.45) {
-                ship.triggerEngineFlameout();
-                if (ship.isPlayer) {
-                  ctx.addRadioMessage('损管警报', 'PLAYER', '高能光束熔穿后向甲板！推进器过载熄火！', [255, 100, 80]);
-                } else {
-                  ctx.addRadioMessage('战术火控', 'PLAYER', '死光主炮熔断敌方推进机组！敌舰熄火！', [120, 255, 150]);
+              const outgoing = outgoingDamageMultiplier(srcShip, ship, sourceMount?.spec.weaponType, b.startPos, b.endPos);
+              const tickDmg = sample.damage * outgoing;
+              const tickEmp = sample.emp;
+              // 装甲/结构承受伤害按目标战备值修正 (CRPluginImpl.getDamageTakenChangePercent)
+              const takenDmg = tickDmg * ship.crDamageTakenMultiplier;
+              const result = ship.armor.takeDamage(localImpact, takenDmg, b.damageType, sample.effectiveDps * outgoing * ship.crDamageTakenMultiplier, true);
+              recordBeamGlowDamage(b, result);
+              ctx.fx.spawnArmorDamageSparks(ship, localImpact, result.armorDamage);
+              if (ctx.statsTracker) {
+                let empRecorded = false;
+                if (result.armorDamage > 0) {
+                  ctx.statsTracker.recordDamageDealt(b.isPlayer ?? false, b.damageType, result.armorDamage, 'ARMOR', tickEmp);
+                  empRecorded = tickEmp > 0;
+                }
+                if (result.hullDamage > 0) {
+                  ctx.statsTracker.recordDamageDealt(b.isPlayer ?? false, b.damageType, result.hullDamage, 'HULL', empRecorded ? 0 : tickEmp);
                 }
               }
+              ship.hullHp = Math.max(0, ship.hullHp - result.hullDamage);
+
+              applyComponentDamage(ship, localImpact, result, tickEmp, srcShip);
+            }
+            if (!active) {
+              if (ship.hullHp <= 0) ctx.handleShipDestruction(ship);
+              break;
             }
 
-            if (ctx.visualRandom.next() < 0.08) {
-              const debrisColor: [number, number, number] =
-                ship.spec.id === 'onslaught' ? [125, 110, 95] : [100, 130, 160];
-              ctx.fx.spawnDebris(worldImpact, 1, debrisColor, 50, 'small');
+            const contactPulse = advanceBeamContactPulse(b, 'HULL', dt);
+            if (contactPulse.emitSound) {
+              sound.playAtPos('beam_hit', worldImpact, ctx.playerShip.pos, 0.35);
             }
 
             if (ship.hullHp <= 0) {
@@ -392,6 +380,7 @@ export class BeamSimulationHandler {
         }
       }
       if (!contactedThisTick) b.contactSurface = undefined;
+      if (b.beamEffect && b.damageActive !== false) requireWeaponEffect(b.beamEffect, 'beam', b.specId).beam!(b, damageTarget, sourceMount, ctx);
     }
   }
 }

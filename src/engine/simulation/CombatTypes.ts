@@ -1,4 +1,7 @@
 import { Vector2 } from '../math/Vector2';
+import type { Ship } from './Ship';
+
+export type ParticleMaterial = 'GLOW' | 'SPARK' | 'SMOKE' | 'SOURCE_SMOOTH';
 
 export interface Particle {
   pos: Vector2;
@@ -8,6 +11,18 @@ export interface Particle {
   size: number;
   color: [number, number, number];
   alpha: number;
+  /** Optional modern FX semantics. Legacy particles omit these and keep linear fade behaviour. */
+  material?: ParticleMaterial;
+  startSize?: number;
+  endSize?: number;
+  peakAlpha?: number;
+  rampUpFraction?: number;
+  fadeOutFraction?: number;
+  drag?: number;
+  rotation?: number;
+  angularVel?: number;
+  /** Velocity-aligned elongation for sparks; 1 means a compact particle. */
+  stretch?: number;
 }
 
 export interface ContrailParticle {
@@ -22,31 +37,70 @@ export interface ContrailParticle {
   color?: [number, number, number];
 }
 
+export interface ExplosionPuff {
+  offset: Vector2;
+  velocity: Vector2;
+  startSize: number;
+  endSize: number;
+  texture: 0 | 1 | 2 | 3;
+  rotation: number;
+}
+
 export interface ExplosionAnimation {
   id: number;
   visualKind?: 'impact' | 'missile' | 'ship';
   sourceShipId?: string;
   sourceAuthored?: boolean;
+  puffs?: ExplosionPuff[];
+  puffDuration?: number;
+  flash?: { diameter: number; coreDiameter?: number; color: [number, number, number]; duration: number; velocity: Vector2 };
+  flare?: { width: number; height: number; color: [number, number, number]; velocity: Vector2 };
   pos: Vector2;
   radius: number;
   maxRadius: number;
   life: number;
   maxLife: number;
-  frame: number; // 0 到 6 对应 explosion0.png 到 explosion6.png
+  frame: number; // Legacy synthetic scene frame; runtime puffs retain their texture.
   rotation: number;
   color: [number, number, number];
   hasShockwaveRing: boolean;
   shockwaveRadius: number;
-  maxShockwaveRadius: number;
+  maxShockwaveRadius: number;  /** Procedural secondary layers attached to the main explosion without spawning simulation entities. */
+  clusterSeed?: number;
+  debrisCount?: number;
+  smokeDensity?: number;
+  fireballScale?: number;
 }
 
+/** One native GenericTextureParticle, not a composite expanding flash. */
 export interface HitGlowAnimation {
   id: number;
   pos: Vector2;
-  radius: number;
+  vel: Vector2;
+  diameter: number;
   life: number;
   maxLife: number;
+  peakAlpha: number;
   color: [number, number, number];
+}
+
+/** Visual-only remnant of a MovingRay after a solid impact. */
+export interface MovingRayFade {
+  id: number;
+  headPos: Vector2;
+  tailPos: Vector2;
+  direction: Vector2;
+  moveSpeed: number;
+  life: number;
+  maxLife: number;
+  elapsedTime: number;
+  maxPulseLength: number;
+  width: number;
+  textureType: 'ROUGH' | 'SMOOTH';
+  textureScrollSpeed: number;
+  pixelsPerTexel: number;
+  fringeColor: [number, number, number, number];
+  coreColor: [number, number, number, number];
 }
 
 export interface EmpArcBranch {
@@ -55,6 +109,7 @@ export interface EmpArcBranch {
 }
 
 export interface EmpArc {
+  native?: import('../visual/EmpArcVisuals').NativeEmpArcVisual;
   startPos: Vector2;
   endPos: Vector2;
   life: number;
@@ -131,16 +186,22 @@ export interface SpatialMine {
   sourceShipId: string;
   // 部署时的阵营快照；发射舰被击毁后仍可据此判定引信敌我 (对齐 MISSILE_NO_FF)
   sourceIsPlayer?: boolean;
-  armedTimer: number;
-  isArmed: boolean;
+  age: number;
+  windupPlayed: boolean;
   detonatingTimer: number;
   isDetonating: boolean;
   triggerRadius: number;
   explosionRadius: number;
   damage: number;
   life: number;
-  pingTimer: number;
   rotation: number;
+}
+
+export interface HulkBreakup {
+  remainingSplits: number;
+  interval: number;
+  elapsed: number;
+  nextInterval: number;
 }
 
 export interface HulkFragment {
@@ -149,14 +210,16 @@ export interface HulkFragment {
   vel: Vector2;
   facingRad: number;
   angularVel: number;
-  life: number;
-  maxLife: number;
-  spriteUrl: string;
-  spriteWidth: number;
-  spriteHeight: number;
-  pivotX: number;
-  pivotY: number;
-  clipPart: 'FRONT' | 'REAR' | 'FULL';
+  /** Dead source instance retains its mounted weapons and permanent damage decals. */
+  sourceShip: Ship;
+  age: number;
+  breakup: HulkBreakup | null;
+  /** All polygon vertices remain in the original ship's local coordinate system. */
+  bounds: Vector2[];
+  visualBounds: Vector2[] | null;
+  mountSlotIds: string[];
+  /** Piece center in source ship coordinates; keeps the sprite continuous at splitting. */
+  localOffset: Vector2;
   collisionRadius: number;
 }
 
@@ -176,12 +239,9 @@ export interface Asteroid {
 export interface NebulaCloud {
   id: number;
   pos: Vector2;
-  radius: number;
-  type: 'AMBER' | 'BLUE';
-  depth: 'BACKGROUND' | 'MIDGROUND' | 'FOREGROUND';
-  rotation: number;
-  angularVel: number;
-  scale: number;
+  thickness: number;
+  atlasColumn: number;
+  atlasRow: number;
   spriteUrl: string;
 }
 
@@ -196,7 +256,7 @@ export interface RadioMessage {
 
 export interface TacticalOrder {
   id: string;
-  type: 'ENGAGE' | 'WAYPOINT';
+  type: 'ENGAGE' | 'WAYPOINT' | 'ASSAULT' | 'DEFEND' | 'ESCORT' | 'AVOID';
   targetShipId?: string;
   targetPos?: Vector2;
   issuedTime: number;
@@ -209,7 +269,11 @@ export interface FighterAIState {
 }
 
 export interface FlightDeckWing {
+  tags?: string[];
   wingId: string;
+  carrierId?: string;
+  role?: 'FIGHTER' | 'BOMBER';
+  rebuildSeconds?: number;
   name: string;
   specId: string;
   isPlayer: boolean;
@@ -235,4 +299,3 @@ export interface RebuildingCraft {
   timer: number;
   maxTimer: number;
 }
-

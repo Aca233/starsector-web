@@ -26,6 +26,7 @@ export class FixedTimestepScheduler {
   private fpsCounter = 0;
   private secondTimer = 0;
   private workTimeAccumMs = 0;
+  private clockRevision = 0;
 
   constructor(targetHz = 60) {
     this.fixedDeltaTime = 1 / targetHz;
@@ -33,10 +34,15 @@ export class FixedTimestepScheduler {
 
   /** Rebase wall-clock scheduling without clearing long-lived simulation/performance counters. */
   public resync(now = performance.now() / 1000) {
+    this.clockRevision++;
     this.lastTime = now;
     this.accumulator = 0;
     this.renderDeltaTime = 0;
     this.backlogSeconds = 0;
+    this.fpsCounter = 0;
+    this.tpsCounter = 0;
+    this.secondTimer = 0;
+    this.workTimeAccumMs = 0;
   }
 
   public reset(now = performance.now() / 1000) {
@@ -60,7 +66,8 @@ export class FixedTimestepScheduler {
       return;
     }
 
-    let frameTime = now - this.lastTime;
+    const wallFrameTime = Math.max(0, now - this.lastTime);
+    let frameTime = wallFrameTime;
     this.lastTime = now;
 
     // 防止切标签页回来后巨量耗时引发死循环
@@ -68,21 +75,6 @@ export class FixedTimestepScheduler {
       frameTime = this.maxFrameTime;
     }
     this.renderDeltaTime = Math.max(0, frameTime);
-
-    // 统计 TPS / FPS 与真实 Idle 空闲率
-    this.fpsCounter++;
-    this.secondTimer += frameTime;
-    if (this.secondTimer >= 1.0) {
-      this.measuredFPS = this.fpsCounter;
-      this.measuredTPS = this.tpsCounter;
-      // Browser-main-thread work share. This is intentionally not labelled CPU/GPU idle time.
-      const totalElapsedMs = this.secondTimer * 1000;
-      this.measuredFrameBudgetPercent = Math.round(Math.max(0, Math.min(1, this.workTimeAccumMs / totalElapsedMs)) * 100);
-      this.workTimeAccumMs = 0;
-      this.fpsCounter = 0;
-      this.tpsCounter = 0;
-      this.secondTimer -= 1.0;
-    }
 
     const tStart = performance.now();
 
@@ -93,11 +85,13 @@ export class FixedTimestepScheduler {
     let steps = 0;
     const maxSubSteps = 8;
     while (this.accumulator >= this.fixedDeltaTime && steps < maxSubSteps) {
-      onFixedTick(this.fixedDeltaTime);
+      const revision = this.clockRevision;
       this.accumulator -= this.fixedDeltaTime;
+      onFixedTick(this.fixedDeltaTime);
       this.simTicks++;
       this.tpsCounter++;
       steps++;
+      if (revision !== this.clockRevision) break;
     }
 
     // Clamp catastrophic backlog rather than dropping all accumulated time, and expose any loss.
@@ -117,5 +111,19 @@ export class FixedTimestepScheduler {
 
     const workElapsed = performance.now() - tStart;
     this.workTimeAccumMs += workElapsed;
+    // Diagnostics use wall time, not the simulation's 100 ms catch-up limit.
+    // Otherwise a one-frame-per-second tab is incorrectly reported as 10 FPS.
+    this.fpsCounter++;
+    this.secondTimer += wallFrameTime;
+    if (this.secondTimer >= 1) {
+      this.measuredFPS = Math.round(this.fpsCounter / this.secondTimer);
+      this.measuredTPS = Math.round(this.tpsCounter / this.secondTimer);
+      const totalElapsedMs = this.secondTimer * 1000;
+      this.measuredFrameBudgetPercent = Math.round(Math.max(0, Math.min(1, this.workTimeAccumMs / totalElapsedMs)) * 100);
+      this.workTimeAccumMs = 0;
+      this.fpsCounter = 0;
+      this.tpsCounter = 0;
+      this.secondTimer = 0;
+    }
   }
 }

@@ -1,4 +1,4 @@
-import { runtimeUrl } from '../runtime/RuntimePaths';
+import { immutableCopy } from '../extensions/Immutable';
 import { contentRegistry } from './ContentRegistry';
 import { validateShipSpec, validateWeaponSpec } from '../modding/ContentValidation';
 
@@ -36,18 +36,30 @@ function uniqueStrings(value: unknown, label: string): string[] {
 /** Loads and validates the repository-owned content contract before combat assets are accepted. */
 export class ContentManifestManager {
   private manifest: ContentManifest | null = null;
+  private registryRevision = -1;
   private loadPromise: Promise<void> | null = null;
 
   public get current(): ContentManifest | null { return this.manifest; }
 
-  public async ensureLoaded(url = runtimeUrl('content/manifest.json')): Promise<void> {
-    if (this.manifest) return;
+  public async ensureLoaded(url?: string): Promise<void> {
+    if (!url) {
+      if (this.registryRevision === contentRegistry.revision) return;
+      const ships = contentRegistry.getAllShips(), weapons = contentRegistry.getAllWeapons();
+      for (const ship of ships) validateShipSpec(ship, {allowExistingId:true, requireBundledAssets:true});
+      for (const weapon of weapons) validateWeaponSpec(weapon, true);
+      this.manifest = immutableCopy({schemaVersion:1, contentVersion:'runtime-' + contentRegistry.revision,
+        ships:ships.map(s=>s.id), weapons:weapons.map(w=>w.id),
+        loadouts:ships.map(s=>({id:s.id+'-default',shipId:s.id,source:'ship-defaults'})), visualProfiles:[],locales:['zh_CN','en_US']});
+      this.registryRevision = contentRegistry.revision;
+      return;
+    }
+    // Explicit external manifests remain strict; built-in runtime has no second ID list.
     if (this.loadPromise) return this.loadPromise;
     this.loadPromise = this.load(url);
     try {
       await this.loadPromise;
     } finally {
-      if (!this.manifest) this.loadPromise = null;
+      this.loadPromise = null;
     }
   }
 
@@ -106,7 +118,8 @@ export class ContentManifestManager {
       if (!weaponSet.has(weapon.id)) throw new Error(`Registered weapon missing from content manifest: ${weapon.id}`);
     }
 
-    this.manifest = {
+    this.registryRevision = -1;
+    this.manifest = immutableCopy({
       schemaVersion: SUPPORTED_SCHEMA_VERSION,
       contentVersion,
       ships,
@@ -114,7 +127,7 @@ export class ContentManifestManager {
       loadouts,
       visualProfiles,
       locales
-    };
+    });
   }
 }
 

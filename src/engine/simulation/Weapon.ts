@@ -1,3 +1,5 @@
+import type { WeaponVisualProfile } from '../visual/VisualProfiles';
+import type { ProjectileImpactFamily } from '../visual/ImpactVisuals';
 import { Vector2 } from '../math/Vector2';
 import { DamageType } from './ArmorGrid';
 
@@ -28,6 +30,9 @@ export interface MissileMirvSpec {
   spreadSpeedRange: number;
   projectileRange: number;
   projectileSpec: string;
+  splitSound?: string;
+  smokeSpec?: LauncherSmokeSpec;
+  childProjectile?: Partial<WeaponSpec>;
 }
 
 /**
@@ -82,19 +87,72 @@ export interface MissileTrailSpec {
 export interface MissileExplosionVisualSpec {
   radius: number;
   color: [number, number, number, number];
+  /** WeaponSpecLoader defaults true; unrelated to explosionSpec or interception visuals. */
+  useHitGlowWhenDealingDamage?: boolean;
+}
+
+/** Missile .proj explosionSpec, separate from cosmetic explosionRadius. */
+export interface ProjectileExplosionSpec {
+  /** ProximityFuseAI uses half damage at the edge; ordinary torpedoes use zero. */
+  minDamageFraction?: number;
+  duration: number;
+  radius: number;
+  coreRadius: number;
+  collisionClass: string;
+  particleCount: number;
+  particleSizeMin: number;
+  particleSizeRange: number;
+  particleDuration: number;
+  particleColor: [number, number, number, number];
+  explosionColor?: [number, number, number, number];
+  useDetailedExplosion?: boolean;
+  detailedExplosionFlashRadius?: number;
+  detailedExplosionFlashColorFringe?: [number, number, number, number];
 }
 
 export interface WeaponSpec {
+  /** Source DO_NOT_AIM / GUIDED_POOR: accept manual trigger regardless of cursor arc. */
+  alwaysFire?: boolean;
+  /** Source weapon_data.csv hints; unknown hints remain metadata, never ID-specific AI branches. */
+  aiHints?: string[];
+  autofireAccuracyBonus?: number;
+  eccmChanceBonus?: number;
+  missileGuidanceBonus?: number;
+  /** Derived static percent, retained so temporary percent bonuses add instead of multiply. */
+  projectileSpeedBonusPercent?: number;
+  tags?: string[];
+  ordnancePointCost?: number;
+  /** Derived beam stat, never inferred from the damage type. */
+  beamDealsHardFlux?: boolean;
+  visualProfile?: WeaponVisualProfile;
+  impactFamily?: ProjectileImpactFamily;
   id: string;
   nameKey: string;
   type: DamageType;
   mountSize: WeaponSlotSize;
+  weaponType?: 'BALLISTIC' | 'ENERGY' | 'MISSILE';
+  /** Native .wpn mounting category; independent of weaponType (e.g. ENERGY in HYBRID mounts). */
+  mountTypeOverride?: 'BALLISTIC' | 'ENERGY' | 'MISSILE' | 'HYBRID' | 'COMPOSITE' | 'SYNERGY' | 'UNIVERSAL';
+  isPointDefense?: boolean;
   isBeam: boolean;
   damagePerShot: number;
+  /** weapon_data.csv EMP delivered by each solid projectile. */
+  empPerShot?: number;
   damagePerSecond: number;
   fluxPerShot: number;
   range: number;
-  refireDelay: number; // 射击间隔 (秒)
+  refireDelay: number; // Chargedown; the complete cycle also includes chargeTime/burst.
+  onHitEffect?: string;
+  beamEffect?: string;
+  everyFrameEffect?: string;
+  passThroughMissiles?: boolean;
+  passThroughFighters?: boolean;
+  passThroughFightersOnlyWhenDestroyed?: boolean;
+  chargeTime?: number;
+  autoCharge?: boolean;
+  interruptibleBurst?: boolean;
+  soundIntroKey?: string;
+  soundLoopKey?: string;
   projSpeed: number;
   projRadius: number;
   color: [number, number, number];
@@ -113,6 +171,10 @@ export interface WeaponSpec {
   hardpointGunSpriteUrl?: string;
   glowSpriteUrl?: string;
   hardpointGlowSpriteUrl?: string;
+  /** 原版 .wpn 动画语义；GLOW_AND_FLASH 使用挂点 glow 图层做开火闪光。 */
+  animationType?: 'GLOW_AND_FLASH';
+  /** .wpn 显式 hardpointSprite:""：固定炮体已烘焙在舰体贴图里，不应回退绘制 turretSprite。 */
+  hardpointUsesHullSprite?: boolean;
   visualRecoil?: number;
   renderBarrelBelow?: boolean;
   turretOffsets?: number[];
@@ -120,6 +182,8 @@ export interface WeaponSpec {
 
   // 弹道/光束渲染材质与参数 (严格对齐 .proj 和 .wpn)
   spawnType?: 'BALLISTIC' | 'BALLISTIC_AS_BEAM' | 'MISSILE' | 'BEAM';
+  /** Native missile .proj flag, defaults true. Does not turn ballistic shots into missiles. */
+  renderTargetIndicator?: boolean;
   // 仅渲染语义；用于来源视觉类型与当前 gameplay 碰撞/实体语义暂时不一致的迁移场景。
   // 不得用于决定碰撞类别、伤害结算或实体生命周期。
   visualSpawnType?: 'BALLISTIC' | 'BALLISTIC_AS_BEAM' | 'MISSILE' | 'BEAM';
@@ -133,8 +197,9 @@ export interface WeaponSpec {
   hitGlowRadius?: number;
   glowRadius?: number;
   coreWidthMult?: number;
+  beamSpeed?: number; // weapon_data.csv front growth speed; default 1400 world units/s
   beamWidth?: number; // .wpn width；仅光束视觉宽度
-  beamDuration?: number; // BURST 光束实际伤害持续时间；持续光束由 trigger 生命周期维持
+  beamDuration?: number; // BURST 光束满亮度 ACTIVE 时长；充能/收束也按亮度结算伤害
   beamVisualMode?: 'BURST' | 'SUSTAINED';
   beamSourceChargeupTime?: number; // weapon_data chargeup，参与真实开火状态机
   beamSourceChargedownTime?: number; // weapon_data chargedown，参与真实退能状态机
@@ -143,7 +208,13 @@ export interface WeaponSpec {
   empPerSecond?: number;
   maxAmmo?: number;
   ammoRegenPerSec?: number;
-  hitGlowBrightenDuration?: number; // .wpn 命中辉光增亮时长；仅视觉，不改变光束伤害节拍
+  hitGlowBrightenDuration?: number; // WeaponSpecLoader default: 1 second
+  useGlowColorForHitGlow?: boolean;
+  beamFireOnlyOnFullCharge?: boolean;
+  fringeScrollSpeedMult?: number;
+  darkCore?: boolean;
+  darkFringeIter?: number;
+  darkCoreIter?: number;
 
   projSpriteUrl?: string;
   projLength?: number;
@@ -174,21 +245,34 @@ export interface WeaponSpec {
   missileEngineVisualSpec?: MissileEngineVisualSpec;
   missileTrailSpec?: MissileTrailSpec;
   missileExplosionVisualSpec?: MissileExplosionVisualSpec;
+  projectileExplosionSpec?: ProjectileExplosionSpec;
   isTwoStage?: boolean;
   mirv?: MissileMirvSpec;
   missileHp?: number; // 导弹生命值 (对齐 weapon_data.csv / 各 .proj 文件)
 }
 
 export interface WeaponMount {
+  /** Per-mount targeting, independent of the ship target used by orders/HUD. */
+  fireControl?: { targetId?: string | number; targetKind?: 'SHIP' | 'MISSILE'; reason: string };
+  fireControlTargetShipId?: string;
+  /** Captured at charge start so later retargeting cannot redirect an in-flight burst. */
+  cycleTargetShipId?: string;
+  healthTracker?: import('./systems/weapon/WeaponComponentHealth').WeaponHealthTracker;
+  isPermanentlyDisabled?: boolean;
   slotId: string;
   spec: WeaponSpec;
+  /** Original weapon capacity before hullmods, used by base-ammo reload systems. */
+  baseMaxAmmo?: number;
   mountType: WeaponMountType;
   relativePos: Vector2; // 舰船局部挂点坐标
   baseAngleDeg: number; // 默认朝向角度 (度)
   arcDeg: number; // 射界旋转限制弧度 (度)
+  aimIdleSeconds?: number;
   currentAngleRad: number; // 当前实际指向角度 (世界弧度)
   cooldownTimer: number;
   isAutofire: boolean;
+  lifecycleDt?: number;
+  burstFluxReserved?: boolean;
   burstRemaining: number;
   burstTimer: number;
   firingState: 'IDLE' | 'CHARGING' | 'ACTIVE' | 'CHARGEDOWN';
@@ -197,6 +281,8 @@ export interface WeaponMount {
   firingCycleId: number;
   ammo: number;
   ammoRechargeProgress: number;
+  /** Extra source-weapon seconds before the ordinary cooldown after an autoload. */
+  reloadDelayRemaining?: number;
 
   // 动态视觉后坐力与充能光晕状态
   recoil: number; // 0.0 ~ 1.0 (后坐到位为1，逐渐回位至0)
@@ -231,6 +317,11 @@ export interface WeaponGroup {
 }
 
 export interface Projectile {
+  /** Original weapon category and immutable launch point for hit-time damage listeners. */
+  sourceWeaponType?: WeaponSpec['weaponType'];
+  spawnLocation?: Vector2;
+  /** Launch-time damage scaling inherited by payloads, including zero-damage MIRV shells. */
+  sourceDamageMultiplier?: number;
   id: number;
   sourceShipId: string;
   slotId?: string;
@@ -238,7 +329,25 @@ export interface Projectile {
   specId: string;
   pos: Vector2;
   prevPos: Vector2; // 用于插值
+  /** Source OoOO/L projectile lifecycle, shared by native ballistic shots and moving rays. */
+  ballisticTail?: Vector2;
+  sourceMoveSpeed?: number;
+  sourceVelocity?: Vector2;
+  fadeProgress?: number;
+  prevFadeProgress?: number;
+  unfadedDamage?: number;
+  unfadedEmp?: number;
+  didDamage?: boolean;
+  onHitEffect?: string;
+  passThroughMissiles?: boolean;
+  passThroughFighters?: boolean;
+  passThroughFightersOnlyWhenDestroyed?: boolean;
+  damagedTargetIds?: string[];
+  softFlux?: boolean;
+  prevBallisticTail?: Vector2;
   vel: Vector2;
+  /** Source DamageAPI.getBaseDamage, before CR/stat modifiers. */
+  baseDamage?: number;
   damage: number;
   damageType: DamageType;
   empDamage?: number;
@@ -249,6 +358,7 @@ export interface Projectile {
   color: [number, number, number];
 
   spawnType?: 'BALLISTIC' | 'BALLISTIC_AS_BEAM' | 'MISSILE' | 'BEAM';
+  renderTargetIndicator?: boolean;
   visualSpawnType?: 'BALLISTIC' | 'BALLISTIC_AS_BEAM' | 'MISSILE' | 'BEAM';
   textureType?: 'ROUGH' | 'SMOOTH';
   textureScrollSpeed?: number;
@@ -260,6 +370,8 @@ export interface Projectile {
   hitGlowRadius?: number;
   glowRadius?: number;
   coreWidthMult?: number;
+  /** MovingRay propagation speed relative to the source ship; excludes inherited source velocity. */
+  movingRayMoveSpeed?: number;
 
   projSpriteUrl?: string;
   projLength?: number;
@@ -270,6 +382,10 @@ export interface Projectile {
   // 导弹航行与自主制导状态
   isGuided?: boolean;
   targetShipId?: string;
+  /** A guided seeker can lock a decoy without replacing its fallback ship target. */
+  targetProjectileId?: number;
+  eccmChance?: number;
+  guidanceBonus?: number;
   facingRad?: number;
   turnVelocityRad?: number;
   flightTimeRemaining?: number;
@@ -284,6 +400,7 @@ export interface Projectile {
   missileEngineVisualSpec?: MissileEngineVisualSpec;
   missileTrailSpec?: MissileTrailSpec;
   missileExplosionVisualSpec?: MissileExplosionVisualSpec;
+  projectileExplosionSpec?: ProjectileExplosionSpec;
   isTwoStage?: boolean;
   stageTriggered?: boolean;
   mirv?: MissileMirvSpec;
@@ -291,15 +408,24 @@ export interface Projectile {
 
   // 近炸引信规格与引爆判定
   proximityFuse?: ProximityFuseSpec;
+  /** Authored system bomb: ballistic flight, source spin, and no range-end detonation. */
+  inertialFlight?: boolean;
+  angularVelocityRad?: number;
+  fizzleAtRange?: boolean;
+  proximityExplosionSpec?: ProjectileExplosionSpec;
 
   // 导弹实体生命值 (支持机枪与破片拦截打爆)
   hitpoints?: number;
   maxHitpoints?: number;
 
   // 诱饵热焰弹规格与燃烧寿命
+  /** MineSystem owns movement/fuse; shared weapon paths own interception. */
+  isMine?: boolean;
   isFlare?: boolean;
   flareLife?: number;
   flareMaxLife?: number;
+  flareBehavior?: { mode: 'STANDARD' | 'SEEKER'; effectRange: number; effectChance: number; flameoutTime: number; noEngineGlowTime: number; fadeTime: number };
+  flareFizzling?: boolean;
 }
 
 export interface Beam {
@@ -312,17 +438,27 @@ export interface Beam {
   endPos: Vector2;
   barrelOffset?: { x: number; y: number };
   damagePerSec: number;
+  baseDamagePerSec?: number;
+  baseEmpPerSec?: number;
   empPerSec?: number;
   damageType: DamageType;
   color: [number, number, number];
   duration: number;
   maxDuration: number;
+  /** False is reserved for explicit visual-only fixtures, not charging/chargedown. */
   damageActive?: boolean;
+  /** Per-ray native .1s damage clock. Reset only when a new ray/cycle is created. */
+  elapsedSinceDamage?: number;
+  accumulatedBrightness?: number;
+  dpsDuration?: number;
+  damageMultiplier?: number;
+  /** Previous shortened length projected from this frame's muzzle and direction. */
+  rayEndPrevFrame?: Vector2;
   firingCycleId?: number;
   hasRecordedHit?: boolean;
   width: number;
   visualMode?: 'BURST' | 'SUSTAINED';
-  isEmpPiercing?: boolean;
+  beamEffect?: string;
   elapsedTime: number;
 
   textureType?: 'ROUGH' | 'SMOOTH';
@@ -334,6 +470,18 @@ export interface Beam {
   hitGlowRadius?: number;
   isHitting?: boolean;
   hitGlowBrightenDuration?: number;
+  useGlowColorForHitGlow?: boolean;
+  fringeScrollSpeedMult?: number;
+  coreWidthMult?: number;
+  darkCore?: boolean;
+  darkFringeIter?: number;
+  darkCoreIter?: number;
+  brightness?: number;
+  hitGlowBrightness?: number;
+  hitGlowSizeMult?: number;
+  wasShortened?: boolean;
+  /** BeamAPI runtime switch, default true; not a .wpn field. */
+  scaleGlowBasedOnDamageEffectiveness?: boolean;
   /** Visual-only deterministic contact cadence; never gates damage/contact simulation. */
   contactSurface?: 'SHIELD' | 'HULL';
   contactFxCooldown?: number;

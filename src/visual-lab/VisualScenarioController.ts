@@ -1,8 +1,11 @@
 import { contentRegistry } from '../engine/content/ContentRegistry';
+import { VISUAL_LAB_WINGS } from './VisualLabFleet';
 import { Vector2 } from '../engine/math/Vector2';
 import type { CombatSession } from '../engine/runtime/CombatSession';
 import type { ExplosionAnimation, MuzzleFlash } from '../engine/simulation/CombatTypes';
 import type { Beam, Projectile, WeaponSpec } from '../engine/simulation/Weapon';
+import { SimulationRandom } from '../engine/simulation/SimulationRandom';
+import { createExplosionPuffs, createShipExplosion } from '../engine/visual/ExplosionVisuals';
 
 export interface VisualScenarioDefinition {
   id: string;
@@ -11,26 +14,27 @@ export interface VisualScenarioDefinition {
   duration: number;
   shipId: string;
   checkpoints: number[];
-  mode?: 'SYNTHETIC' | 'REAL_WEAPON';
+  mode?: 'SYNTHETIC' | 'REAL_WEAPON' | 'REAL_SYSTEM';
 }
 
 /** The acceptance-scene catalog from the M2 plan. */
 export const VISUAL_SCENARIOS: VisualScenarioDefinition[] = [
   { id: 'VIS-01', title: '攻势静止，四个朝向', description: '固定镜头依次检查 0° / 90° / 180° / 270° 舰体与挂点。', duration: 4, shipId: 'onslaught', checkpoints: [0.25, 1.25, 2.25, 3.25] },
   { id: 'VIS-02', title: '怠速、推进、松键、侧移、冲刺', description: '同一艘攻势按固定时间轴展示发动机状态。', duration: 6, shipId: 'onslaught', checkpoints: [0.5, 1.6, 2.7, 3.6, 4.65, 5.55] },
-  { id: 'VIS-03', title: '护盾开关与单次受击', description: '固定展开/保持/关闭，并在固定时刻注入一次护盾命中。', duration: 4.5, shipId: 'onslaught', checkpoints: [0.6, 1.0, 1.8, 3.55] },
-  { id: 'VIS-04', title: '多次连续护盾命中', description: '固定方位与节奏连续产生护盾受击涟漪。', duration: 4.5, shipId: 'onslaught', checkpoints: [0.95, 1.65, 2.35] },
+  { id: 'VIS-03', title: '护盾开关与单次受击', description: '真实护盾展开与关闭时序，并在固定时刻注入一次护盾命中。', duration: 4.5, shipId: 'onslaught', checkpoints: [0.6, 1.0, 1.8, 3.55], mode: 'REAL_SYSTEM' },
+  { id: 'VIS-04', title: '多次连续护盾命中', description: '固定方位与节奏推进真实护盾分段受击与恢复。', duration: 4.5, shipId: 'onslaught', checkpoints: [0.95, 1.65, 2.35], mode: 'REAL_SYSTEM' },
   { id: 'VIS-05', title: 'TPC 单发', description: '合成分层场景：单次 TPC 枪口闪光、弹体、尾迹时间轴。', duration: 3.2, shipId: 'onslaught', checkpoints: [0.82, 0.95, 1.18, 1.55], mode: 'SYNTHETIC' },
   { id: 'VIS-06', title: '实弹炮连续开火', description: '合成分层场景：Mark IX 连续发射，固定发射间隔与弹道。', duration: 4.2, shipId: 'onslaught', checkpoints: [0.7, 1.4, 2.45, 3.4], mode: 'SYNTHETIC' },
   { id: 'VIS-07', title: '光束充能、照射、停止', description: '典范主炮固定充能、持续照射和停止消退。', duration: 4.6, shipId: 'paragon', checkpoints: [0.8, 1.3, 2.2, 3.3, 3.55] },
   { id: 'VIS-08', title: '导弹视觉层：直飞与命中', description: '合成分层场景：仅检查直飞导弹本体、尾迹与命中爆光；不作为制导转弯证据。', duration: 4.6, shipId: 'onslaught', checkpoints: [0.8, 1.5, 2.55, 3.5], mode: 'SYNTHETIC' },
-  { id: 'VIS-09', title: '排散完整过程', description: '固定初始幅能，从排散启动到烟雾完全消退。', duration: 5.2, shipId: 'onslaught', checkpoints: [0.5, 0.8, 2.0, 3.4, 4.2] },
+  { id: 'VIS-09', title: '排散完整过程', description: '固定初始幅能，调用真实排幅状态机直到完成；渐入、粒子与 HUD 倒计时共享同一状态。', duration: 14, shipId: 'onslaught', checkpoints: [0.5, 0.8, 2.0, 6.0, 13.0], mode: 'REAL_SYSTEM' },
   { id: 'VIS-10', title: '小命中与舰船爆炸', description: '先展示局部小命中，再展示完整舰船毁灭爆炸层。', duration: 4.8, shipId: 'onslaught', checkpoints: [0.9, 2.4, 2.65, 3.05] },
   { id: 'VIS-11', title: '固定状态 HUD', description: '冻结战斗状态，用于 HUD 布局与多分辨率截图。', duration: 10, shipId: 'onslaught', checkpoints: [2.0] },
   { id: 'VIS-12', title: '双舰加舰载机实战', description: '受控双舰、战机和轰炸机综合图层场景。', duration: 8, shipId: 'onslaught', checkpoints: [1.5, 4.6, 6.2] },
+  { id: 'VIS-13', title: '相位进入、线圈与退出', description: '厄运相位线圈的真实状态机、移动残影与冷却。', duration: 5, shipId: 'doom', checkpoints: [0.6, 1.1, 2.1, 2.6, 3.2, 4.8], mode: 'REAL_SYSTEM' },
   { id: 'WPN-TPC-01', title: 'TPC 真实开火：单炮空射', description: '走实际挂点、火控、投射物更新与渲染链的可重播 TPC 单炮空射。', duration: 2.4, shipId: 'onslaught', checkpoints: [0.86, 0.92, 0.98, 1.2], mode: 'REAL_WEAPON' },
   { id: 'WPN-AUTOPULSE-01', title: 'Autopulse 真实开火：单炮空射', description: '使用典范 WS 001 大型硬点，走实际火控与投射物链的可重播 Autopulse 单炮空射。', duration: 2.2, shipId: 'paragon', checkpoints: [0.86, 0.92, 0.98, 1.15], mode: 'REAL_WEAPON' },
-  { id: 'WPN-MARK9-01', title: 'Mark IX 真实开火：双管交替', description: '使用攻势 WS 019 前向大型炮塔持续开火，检查双管交替、后坐、枪口粒子与实体弹道。', duration: 2.4, shipId: 'onslaught', checkpoints: [0.72, 0.82, 1.08, 1.18, 1.45], mode: 'REAL_WEAPON' },
+  { id: 'WPN-MARK9-01', title: 'Mark IX 真实开火：双管交替', description: '使用攻势 WS 019 前向大型炮塔持续开火，检查双管交替、后坐、枪口粒子与实体弹道。', duration: 2.4, shipId: 'onslaught', checkpoints: [0.75, 0.85, 0.95, 1.05, 1.45], mode: 'REAL_WEAPON' },
   { id: 'WPN-HEAVYMAULER-01', title: 'Heavy Mauler 真实开火：单炮空射', description: '在攻势 WS 012 中型炮塔临时装入 Registry 中的 Heavy Mauler，走真实火控、枪口粒子、后坐与投射物链。', duration: 2.2, shipId: 'onslaught', checkpoints: [0.86, 0.92, 0.98, 1.18], mode: 'REAL_WEAPON' },
   { id: 'WPN-HVEL-01', title: 'Hypervelocity Driver 真实开火：单炮空射', description: '使用攻势 WS 012 原生 HVD，走真实火控、枪口粒子、后坐与投射物链。', duration: 2.2, shipId: 'onslaught', checkpoints: [0.86, 0.92, 0.98, 1.18], mode: 'REAL_WEAPON' },
   { id: 'WPN-LIGHTMG-01', title: 'Light MG 真实开火：Broadsword 单管', description: '使用阔剑 WS 001 原生轻机枪，走来源 5 发 burst 与 RAY-style 弹体契约，检查 beam-like 弹体成像。', duration: 2.0, shipId: 'broadsword', checkpoints: [0.86, 0.92, 0.98, 1.12], mode: 'REAL_WEAPON' },
@@ -48,6 +52,7 @@ export const VISUAL_SCENARIOS: VisualScenarioDefinition[] = [
 ];
 
 const EPSILON = 1e-9;
+const SHIELD_HITS = [[0.9, -0.38], [1.25, -0.12], [1.6, 0.15], [1.95, 0.4], [2.3, 0.05]] as const;
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
@@ -66,6 +71,8 @@ function projectileFromSpec(spec: WeaponSpec, sourceShipId: string, origin: Vect
   const distance = speed * Math.max(0, age);
   const pos = origin.clone().add(Vector2.fromAngle(facing, distance));
   const prevPos = origin.clone().add(Vector2.fromAngle(facing, Math.max(0, distance - speed / 60)));
+  const sourceShot = !spec.isRocket && (spec.spawnType === 'BALLISTIC' || spec.spawnType === 'BALLISTIC_AS_BEAM');
+  const fade = sourceShot && (spec.fadeTime ?? 0) > 0 ? clamp01((age - spec.range / speed) / spec.fadeTime!) : 0;
   return {
     id,
     sourceShipId,
@@ -74,7 +81,17 @@ function projectileFromSpec(spec: WeaponSpec, sourceShipId: string, origin: Vect
     pos,
     prevPos,
     vel: Vector2.fromAngle(facing, speed),
-    damage: spec.damagePerShot,
+    damage: spec.damagePerShot * (1 - fade) ** 2,
+    empDamage: (spec.empPerShot ?? 0) * (1 - fade) ** 2,
+    unfadedDamage: spec.damagePerShot,
+    unfadedEmp: spec.empPerShot ?? 0,
+    sourceMoveSpeed: sourceShot ? speed : undefined,
+    sourceVelocity: sourceShot ? new Vector2() : undefined,
+    ballisticTail: sourceShot ? pos.clone().add(Vector2.fromAngle(facing, -Math.min(spec.projLength ?? 0, distance))) : undefined,
+    prevBallisticTail: sourceShot ? prevPos.clone().add(Vector2.fromAngle(facing, -Math.min(spec.projLength ?? 0, Math.max(0, distance - speed / 60)))) : undefined,
+    fadeProgress: fade,
+    prevFadeProgress: fade,
+    softFlux: fade > 0,
     damageType: spec.type,
     radius: spec.projRadius,
     rangeRemaining: Math.max(0, spec.range - distance),
@@ -187,6 +204,9 @@ export class VisualScenarioController {
     if (!this.active) return;
     this.session.switchPlayerShip(this.previewShipId ?? this.active.shipId);
     this.session.setSeed(this.seed);
+    if (this.active.id === 'VIS-12' || this.active.id === 'VIS-11') {
+      this.session.engine.fighterSystem.init(this.session.engine.playerShip, this.session.engine.enemyShip, VISUAL_LAB_WINGS);
+    }
     this.session.pause();
     this.timeSeconds = 0;
     this.session.visualClock.seek(0);
@@ -197,6 +217,7 @@ export class VisualScenarioController {
     while (this.timeSeconds + fixed <= targetTime + EPSILON) this.advance(fixed);
     const remainder = targetTime - this.timeSeconds;
     if (remainder > EPSILON) this.advance(remainder);
+    this.session.refreshPresentationAssets();
   }
 
   private advance(dt: number): void {
@@ -205,17 +226,50 @@ export class VisualScenarioController {
     this.timeSeconds = Math.min(this.active.duration, previousTime + dt);
     const stepDt = this.timeSeconds - previousTime;
     this.session.visualClock.seek(this.timeSeconds);
-    if (this.active.mode === 'REAL_WEAPON') this.advanceRealWeaponScene(previousTime, this.timeSeconds, stepDt);
-    else this.applySceneState(this.timeSeconds);
+    if (this.active.mode === 'REAL_WEAPON' || this.active.mode === 'REAL_SYSTEM') this.advanceSimulatedScene(previousTime, this.timeSeconds, stepDt);
+    else this.applySceneState(this.timeSeconds, stepDt);
     this.session.updateVisualOnly(stepDt);
   }
 
-  private advanceRealWeaponScene(previousTime: number, currentTime: number, dt: number): void {
+  private advanceSimulatedScene(previousTime: number, currentTime: number, dt: number): void {
     if (!this.active || dt <= 0) return;
     const engine = this.session.engine;
     const player = engine.playerShip;
 
     switch (this.active.id) {
+      case 'VIS-03': {
+        player.shield.setActive(currentTime >= 0.45 && currentTime < 3.45);
+        player.shield.update(dt, player.facingRad, player.facingRad);
+        if (previousTime < 1.75 - EPSILON && currentTime >= 1.75 - EPSILON) {
+          player.shield.recordVisualHit(100, 0.12);
+        }
+        engine.combatTime = currentTime;
+        break;
+      }
+      case 'VIS-04': {
+        player.shield.update(dt, player.facingRad, player.facingRad);
+        for (const [at, angle] of SHIELD_HITS) {
+          if (previousTime < at - EPSILON && currentTime >= at - EPSILON) player.shield.recordVisualHit(100, angle);
+        }
+        engine.combatTime = currentTime;
+        break;
+      }
+      case 'VIS-09': {
+        const ventStart = 0.55;
+        if (previousTime < ventStart - EPSILON && currentTime >= ventStart - EPSILON) player.flux.startVenting();
+        if (currentTime >= ventStart - EPSILON) player.flux.update(dt, false);
+        player.shield.update(dt, player.facingRad, player.facingRad);
+        engine.combatTime = currentTime;
+        break;
+      }
+      case 'VIS-13': {
+        player.throttle = currentTime >= 0.5 && currentTime < 2.5 ? 1 : 0;
+        if (previousTime < 0.5 && currentTime >= 0.5) player.shield.setActive(true);
+        if (previousTime < 2.5 && currentTime >= 2.5) player.shield.setActive(false);
+        player.update(dt, null, () => {}, () => {});
+        engine.combatTime = currentTime;
+        break;
+      }
       case 'WPN-TPC-01':
       case 'WPN-AUTOPULSE-01':
       case 'WPN-HEAVYMAULER-01':
@@ -223,6 +277,7 @@ export class VisualScenarioController {
       case 'WPN-LIGHTMG-01': {
         const fireAt = 0.9;
         player.throttle = 0;
+    player.brakeInput = false;
         player.strafeInput = 0;
         player.turnInput = 0;
         player.aimTargetWorld.set(1400, 0);
@@ -359,8 +414,8 @@ export class VisualScenarioController {
 
     setPose(player, -260, 0, 0);
     setPose(enemy, 360, 0, Math.PI);
-    player.hullHp = player.spec.hitpoints;
-    enemy.hullHp = enemy.spec.hitpoints;
+    player.hullHp = player.maxHullHp;
+    enemy.hullHp = enemy.maxHullHp;
     player.isDead = false;
     enemy.isDead = false;
     player.throttle = 0;
@@ -369,21 +424,23 @@ export class VisualScenarioController {
     player.isFiringMain = false;
     player.shield.setActive(false);
     player.shield.currentArcDeg = 0;
-    player.shield.ripples = [];
+    player.shield.resetVisualHits();
     enemy.shield.setActive(false);
     enemy.shield.currentArcDeg = 0;
-    enemy.shield.ripples = [];
+    enemy.shield.resetVisualHits();
     player.flux.softFlux = 0;
     player.flux.hardFlux = 0;
     player.flux.isVenting = false;
     player.flux.isOverloaded = false;
     player.system.reset();
     enemy.system.reset();
-    for (const status of player.engineStatuses) {
-      status.currentThrust = 0;
-      status.prevThrust = 0;
-      status.isFlameout = false;
-      status.flameoutTimer = 0;
+    player.engineController.restore();
+    player.justCriticalDamage.length = 0;
+    player.resetShieldMalfunctionState();
+    enemy.resetShieldMalfunctionState();
+    for (const ship of [player, enemy]) {
+      ship.crAtDeployment = null;
+      ship.lowCRDamageSequence = null;
     }
     for (const mount of player.weapons) {
       mount.cooldownTimer = 0;
@@ -409,16 +466,19 @@ export class VisualScenarioController {
     engine.cameraShakeIntensity = 0;
     const player = engine.playerShip;
     const enemy = engine.enemyShip;
-    player.shield.ripples = [];
-    enemy.shield.ripples = [];
+    player.shield.resetVisualHits();
+    enemy.shield.resetVisualHits();
     player.throttle = 0;
     player.strafeInput = 0;
     player.turnInput = 0;
     player.isFiringMain = false;
     player.system.isActive = false;
+    player.engineController.flameAccelerating = false;
     for (const status of player.engineStatuses) {
       status.prevThrust = status.currentThrust;
-      status.currentThrust = 0;
+      status.currentThrust = 0.4;
+      status.prevSpread = status.spread;
+      status.spread = 0;
     }
     for (const mount of player.weapons) {
       mount.recoil = 0;
@@ -426,7 +486,7 @@ export class VisualScenarioController {
     }
   }
 
-  private applySceneState(t: number): void {
+  private applySceneState(t: number, dt = 0): void {
     const scene = this.active;
     if (!scene) return;
     const engine = this.session.engine;
@@ -439,7 +499,7 @@ export class VisualScenarioController {
       player.flux.isVenting = false;
       player.flux.ventProgress = 0;
     }
-    if (!['VIS-03', 'VIS-04', 'VIS-11'].includes(scene.id)) {
+    if (!['VIS-03', 'VIS-04', 'VIS-11', 'VIS-12'].includes(scene.id)) {
       player.shield.setActive(false);
       player.shield.currentArcDeg = 0;
     }
@@ -455,26 +515,28 @@ export class VisualScenarioController {
       case 'VIS-02': {
         setPose(player, 0, 0, 0);
         setPose(enemy, 1200, 0, Math.PI);
-        let thrust = 0.18;
+        let thrust = 0.4;
         if (t >= 1 && t < 2.4) { player.throttle = 1; thrust = 1; }
-        else if (t >= 2.4 && t < 3.1) { thrust = Math.max(0.18, 1 - (t - 2.4) / 0.7 * 0.82); }
-        else if (t >= 3.1 && t < 4.2) { player.strafeInput = 1; thrust = 0.72; }
-        else if (t >= 4.2 && t < 5.25) { player.throttle = 1; player.system.isActive = true; thrust = 2.2; }
-        else if (t >= 5.25) { thrust = Math.max(0, 0.9 - (t - 5.25) * 1.2); }
-        for (const status of player.engineStatuses) status.currentThrust = thrust;
+        else if (t >= 2.4 && t < 3.1) { thrust = Math.max(0.4, 1 - (t - 2.4)); }
+        else if (t >= 3.1 && t < 4.2) { player.strafeInput = 1; }
+        else if (t >= 4.2 && t < 5.25) { player.throttle = 1; player.system.isActive = true; thrust = 1; }
+        else if (t >= 5.25) { thrust = Math.max(0, 1 - (t - 5.25) * 1.4); }
+        player.engineController.flameAccelerating = player.throttle > 0 || (t >= 2.4 && t <= 2.45);
+        player.system.effectLevel = t >= 4.2 && t < 5.25 ? clamp01((t - 4.2) / 0.25) : 0;
+        for (const status of player.engineStatuses) {
+          status.currentThrust = thrust;
+          status.spread = t >= 3.1 && t < 4.2 ? Math.min(90, (t - 3.1) * 270) : 0;
+        }
+        break;
+      }
+      case 'VIS-13': {
+        setPose(player, -200, 0, 0);
+        setPose(enemy, 1600, 0, Math.PI);
         break;
       }
       case 'VIS-03': {
         setPose(player, 0, 0, 0);
         setPose(enemy, 650, 0, Math.PI);
-        const deployStart = 0.45;
-        const closeStart = 3.45;
-        player.shield.setActive(t >= deployStart && t < closeStart);
-        if (t < deployStart) player.shield.currentArcDeg = 0;
-        else if (t < deployStart + 0.5) player.shield.currentArcDeg = player.shield.maxArcDeg * clamp01((t - deployStart) / 0.5);
-        else if (t < closeStart) player.shield.currentArcDeg = player.shield.maxArcDeg;
-        else player.shield.currentArcDeg = player.shield.maxArcDeg * (1 - clamp01((t - closeStart) / 0.35));
-        this.addShieldHit(player, t, 1.75, 0.12, [255, 170, 70]);
         break;
       }
       case 'VIS-04': {
@@ -482,14 +544,6 @@ export class VisualScenarioController {
         setPose(enemy, 650, 0, Math.PI);
         player.shield.setActive(true);
         player.shield.currentArcDeg = player.shield.maxArcDeg;
-        const hits: Array<[number, number, [number, number, number]]> = [
-          [0.9, -0.38, [80, 200, 255]],
-          [1.25, -0.12, [255, 150, 70]],
-          [1.6, 0.15, [200, 100, 255]],
-          [1.95, 0.4, [80, 200, 255]],
-          [2.3, 0.05, [255, 150, 70]]
-        ];
-        for (const [at, angle, color] of hits) this.addShieldHit(player, t, at, angle, color);
         break;
       }
       case 'VIS-05': {
@@ -847,6 +901,13 @@ export class VisualScenarioController {
               glowColor: spec.glowColor,
               hitGlowRadius: spec.hitGlowRadius,
               hitGlowBrightenDuration: spec.hitGlowBrightenDuration,
+              brightness: 1,
+              // Isolated synthetic capture: explicitly author contact age rather than use shot age in the renderer.
+              hitGlowBrightness: (spec.hitGlowBrightenDuration ?? 1) <= 0 ? 1 : clamp01((t - 1.25) / (spec.hitGlowBrightenDuration ?? 1)),
+              hitGlowSizeMult: 1,
+              useGlowColorForHitGlow: spec.useGlowColorForHitGlow,
+              fringeScrollSpeedMult: spec.fringeScrollSpeedMult,
+              coreWidthMult: spec.coreWidthMult,
               isHitting: true
             };
             engine.beams.push(beam);
@@ -898,28 +959,11 @@ export class VisualScenarioController {
       case 'VIS-09': {
         setPose(player, 0, 0, 0);
         setPose(enemy, 1200, 0, Math.PI);
-        const ventStart = 0.55;
-        const ventEnd = 3.55;
         const initialFlux = player.spec.maxFlux * 0.82;
-        player.flux.initialVentFlux = initialFlux;
-        if (t < ventStart) {
-          player.flux.softFlux = initialFlux * 0.55;
-          player.flux.hardFlux = initialFlux * 0.45;
-          player.flux.isVenting = false;
-          player.flux.ventProgress = 0;
-        } else if (t < ventEnd) {
-          const progress = clamp01((t - ventStart) / (ventEnd - ventStart));
-          const remaining = initialFlux * (1 - progress);
-          player.flux.softFlux = remaining * 0.55;
-          player.flux.hardFlux = remaining * 0.45;
-          player.flux.isVenting = true;
-          player.flux.ventProgress = progress;
-        } else {
-          player.flux.softFlux = 0;
-          player.flux.hardFlux = 0;
-          player.flux.isVenting = false;
-          player.flux.ventProgress = 0;
-        }
+        player.flux.softFlux = initialFlux * 0.55;
+        player.flux.hardFlux = initialFlux * 0.45;
+        player.flux.isVenting = false;
+        player.flux.ventProgress = 0;
         break;
       }
       case 'VIS-10': {
@@ -934,7 +978,7 @@ export class VisualScenarioController {
         }
         const destroyAt = 2.35;
         const destroyAge = t - destroyAt;
-        if (destroyAge >= 0 && destroyAge < 1.0) {
+        if (destroyAge >= 0 && destroyAge < 2.25) {
           this.addExplosion(engine.fxSystem.explosions, enemy.pos.clone(), 190, destroyAge, 10001, 'ship', enemy.spec.id);
           engine.cameraShakeIntensity = Math.max(0, 18 * (1 - destroyAge));
           for (let i = 0; i < 8; i++) {
@@ -962,7 +1006,7 @@ export class VisualScenarioController {
         setPose(enemy, 360, -60, Math.PI - 0.18);
         player.flux.softFlux = player.spec.maxFlux * 0.28;
         player.flux.hardFlux = player.spec.maxFlux * 0.31;
-        player.hullHp = player.spec.hitpoints * 0.72;
+        player.hullHp = player.maxHullHp * 0.72;
         player.shield.setActive(true);
         player.shield.currentArcDeg = player.shield.maxArcDeg;
         player.currentCR = 0.63;
@@ -984,9 +1028,11 @@ export class VisualScenarioController {
           setPose(unit, center.x + Math.cos(angle) * radius * side, center.y + Math.sin(angle) * radius, angle + (side < 0 ? 0 : Math.PI));
         }
         player.shield.setActive(cycle > 0.12 && cycle < 0.72);
-        player.shield.currentArcDeg = player.shield.isActive ? player.shield.maxArcDeg : 0;
         enemy.shield.setActive(cycle > 0.25 && cycle < 0.82);
-        enemy.shield.currentArcDeg = enemy.shield.isActive ? enemy.shield.maxArcDeg : 0;
+        // Poses/projectiles are scripted, but shield deployment owns persistent state.
+        // Do not reset it every frame or leave the shutdown/re-raise timer frozen.
+        player.shield.update(dt, player.facingRad, player.facingRad);
+        enemy.shield.update(dt, enemy.facingRad, enemy.facingRad);
         const tpc = contentRegistry.getWeapon('tpc');
         if (tpc) {
           for (let i = 0; i < 4; i++) {
@@ -1009,7 +1055,7 @@ export class VisualScenarioController {
             color: [...beamSpec.color],
             duration: 0.2,
             maxDuration: 0.2,
-            width: beamSpec.projWidth || 24,
+            width: beamSpec.beamWidth ?? 25,
             elapsedTime: t - 4.1,
             textureType: beamSpec.textureType,
             textureScrollSpeed: beamSpec.textureScrollSpeed,
@@ -1019,19 +1065,18 @@ export class VisualScenarioController {
             glowColor: beamSpec.glowColor,
             hitGlowRadius: beamSpec.hitGlowRadius,
             hitGlowBrightenDuration: beamSpec.hitGlowBrightenDuration,
+            brightness: 1,
+            hitGlowBrightness: (beamSpec.hitGlowBrightenDuration ?? 1) <= 0 ? 1 : clamp01((t - 4.1) / (beamSpec.hitGlowBrightenDuration ?? 1)),
+            hitGlowSizeMult: 1,
+            useGlowColorForHitGlow: beamSpec.useGlowColorForHitGlow,
+            fringeScrollSpeedMult: beamSpec.fringeScrollSpeedMult,
+            coreWidthMult: beamSpec.coreWidthMult,
             isHitting: true
           });
         }
         break;
       }
     }
-  }
-
-  private addShieldHit(ship: { shield: { ripples: Array<{ angle: number; intensity: number; life: number; color: [number, number, number] }> } }, now: number, at: number, angle: number, color: [number, number, number]): void {
-    const age = now - at;
-    if (age < 0 || age > 0.4) return;
-    const life = 0.4 - age;
-    ship.shield.ripples.push({ angle, intensity: clamp01(life / 0.4), life, color });
   }
 
   private addMuzzle(target: MuzzleFlash[], origin: Vector2, angle: number, spec: WeaponSpec, age: number, id: number): void {
@@ -1050,6 +1095,17 @@ export class VisualScenarioController {
     sourceShipId?: string
   ): void {
     const maxLife = 0.95;
+    const random = new SimulationRandom(this.seed ^ id);
+    if (visualKind === 'ship' && sourceShipId) {
+      const spec = contentRegistry.getShip(sourceShipId);
+      if (spec) {
+        const explosion = createShipExplosion(spec, pos, new Vector2(), random);
+        explosion.id = id;
+        explosion.life -= age;
+        if (explosion.life > 0) target.push(explosion);
+        return;
+      }
+    }
     if (age < 0 || age > maxLife) return;
     const progress = clamp01(age / maxLife);
     target.push({
@@ -1057,6 +1113,7 @@ export class VisualScenarioController {
       pos: pos.clone(),
       visualKind,
       sourceShipId,
+      puffs: createExplosionPuffs(radius * 2, random, true),
       radius: radius * (0.3 + 0.7 * Math.sin(progress * Math.PI * 0.5)),
       maxRadius: radius,
       life: maxLife - age,

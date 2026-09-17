@@ -159,3 +159,52 @@ export function constrainPointToShipHull(ship: Ship, worldPoint: Vector2, fallba
   }
   return fallbackInside.clone();
 }
+
+/** World-space distance to the real hull boundary (zero inside). Bounding radii
+ * are broadphase only: using them as surfaces creates invisible circular armor. */
+export function distanceToShipHull(ship: Ship, worldPoint: Vector2): number {
+  const bounds = ship.spec.bounds;
+  if (!bounds || bounds.length < 3) return Math.max(0, worldPoint.distanceTo(ship.pos) - ship.spec.collisionRadius);
+  if (isPointInsideShipHull(ship, worldPoint)) return 0;
+  const point = worldPoint.clone().sub(ship.pos).rotate(-ship.facingRad);
+  let distanceSquared = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < bounds.length; i++) {
+    const [ax, ay] = bounds[i], [bx, by] = bounds[(i + 1) % bounds.length];
+    const dx = bx - ax, dy = by - ay;
+    const lengthSquared = dx * dx + dy * dy;
+    const t = lengthSquared > 0 ? Math.max(0, Math.min(1,
+      ((point.x - ax) * dx + (point.y - ay) * dy) / lengthSquared)) : 0;
+    const x = point.x - ax - t * dx, y = point.y - ay - t * dy;
+    distanceSquared = Math.min(distanceSquared, x * x + y * y);
+  }
+  return Math.sqrt(distanceSquared);
+}
+
+const immutableHullReach = new WeakMap<[number, number][], number>();
+
+/** Conservative rejection for a distance-limited query, never a replacement hull
+ * surface. Only deeply frozen finite outlines are cached; mutable/refit geometry
+ * and exceptional numeric inputs retain the exact distance calculation. */
+export function mayBeWithinShipHullDistance(ship: Ship, worldPoint: Vector2, distance: number): boolean {
+  const bounds = ship.spec.bounds;
+  if (!bounds || bounds.length < 3 || !(distance >= 0) || !Number.isFinite(ship.facingRad)) return true;
+  let reach = immutableHullReach.get(bounds);
+  if (reach === undefined) {
+    if (!Object.isFrozen(bounds)) return true;
+    reach = 0;
+    for (const point of bounds) {
+      if (!Object.isFrozen(point)) return true;
+      // L1 radius encloses every rotation, including authored vertices which
+      // extend beyond collisionRadius. NaN/Infinity disable rejection below.
+      reach = Math.max(reach, Math.abs(point[0]) + Math.abs(point[1]));
+    }
+    immutableHullReach.set(bounds, reach);
+  }
+  const scale = Math.max(1, Math.abs(worldPoint.x), Math.abs(worldPoint.y), Math.abs(ship.pos.x),
+    Math.abs(ship.pos.y), reach, distance);
+  // The exact polygon routines contain products of coordinates. Fail open at
+  // extreme scales rather than assuming those operations cannot overflow.
+  if (!(scale <= 1e100)) return true;
+  const limit = reach + distance + 1e-7 * scale;
+  return !(Math.abs(worldPoint.x - ship.pos.x) > limit || Math.abs(worldPoint.y - ship.pos.y) > limit);
+}

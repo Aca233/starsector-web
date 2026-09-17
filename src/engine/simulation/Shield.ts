@@ -13,23 +13,29 @@ export type PhaseCloakState = 'IDLE' | 'IN' | 'ACTIVE' | 'OUT' | 'COOLDOWN';
 export const PHASE_MIN_SPEED_MULT = 0.33;
 export const PHASE_BASE_FLUX_LEVEL_FOR_MIN_SPEED = 0.5;
 
-export interface ShieldHitRipple {
-  angle: number; // 击中角度 (弧度)
-  intensity: number; // 涟漪强度 0.0 ~ 1.0
-  life: number; // 剩余寿命 (秒)
-  color: [number, number, number]; // RGB
-}
-
 /**
  * 能量护盾系统 (Shield)
  * 核心机制:
  * 1. 护盾类型: FRONT (前向固定弧度，如攻势 180°), OMNI (全向可转动，如典范 360°), PHASE (相位隐形斗篷，如厄运级).
  * 2. 展开速度 (Unfold Speed): 开启护盾时从 0° 迅速向两侧延展至全弧度。
  * 3. 护盾防御效率 (Efficiency): 伤害转化为硬幅能的比率 (攻势为 1.0，典范为 0.6 极高韧性)。
- * 4. 动态受击光晕与涟漪 (Impact Ripples)。
+ * 4. 分段受击亮度与恢复 (Segment hit state)。
  * 5. 相位线圈进出阶段与冷却、开启/维持硬幅能成本、硬幅能减速 (Phase Cloak)。
  */
 export class Shield {
+  /** Separate from efficiency: Graviton modifies all incoming shield damage,
+   * not upkeep or the flux-to-damage conversion used by native hit glows. */
+  public readonly damageTakenModifiers = new Map<string, number>();
+  public externalDamageTakenMultiplier = () => 1;
+  public energyDamageTakenMultiplier = 1;
+  public damageTakenMultiplierFor(type: DamageType): number { return this.damageTakenMultiplier * (type === "ENERGY" ? this.energyDamageTakenMultiplier : 1); }
+  public get damageTakenMultiplier(): number { return [...this.damageTakenModifiers.values()].reduce((a, b) => a * b, 1) * this.externalDamageTakenMultiplier(); }
+  /** Actual shield contact age, separate from cosmetic hit levels. Advanced by Ship. */
+  public sinceLastDamageTaken = Number.POSITIVE_INFINITY;
+
+  public recordDamageContact(damage: number): void {
+    if (damage > 0) this.sinceLastDamageTaken = 0;
+  }
   public type: ShieldType;
   public maxArcDeg: number; // 最大展开弧度 (度)
   public radius: number; // 护盾球体半径 (像素)
@@ -40,15 +46,75 @@ export class Shield {
   public currentArcDeg = 0; // 当前已展开弧度 (度)
   public facingAngleRad = 0; // 当前护盾中心朝向 (弧度)
   public targetFacingAngleRad = 0;
-  public unfoldRateDeg = 360; // 展开速率 (度/秒)
+  private closeTimeRemaining = 0;
+  private pendingRaise = false;
+
+  public unfoldRateMultiplier = 1;
+  public turnRateMultiplier = 1;
+
+  public get unfoldRateDeg(): number {
+    return 100 * 180 / (Math.PI * Math.max(1, this.radius)) * (this.type === 'FRONT' ? 2 : 1) * this.unfoldRateMultiplier;
+  }
+
+  public get unfoldDuration(): number {
+    return this.maxArcDeg / this.unfoldRateDeg;
+  }
+
+  /** The source charge tracker fades brightness independently of the collision arc. */
+  public get visualAlpha(): number {
+    if (!this.isActive) return this.closeTimeRemaining / 0.35;
+    const fadeIn = Math.min(0.75, this.unfoldDuration);
+    return fadeIn > 0 ? Math.min(1, this.currentArcDeg / this.unfoldRateDeg / fadeIn) : 1;
+  }
   
-  public ripples: ShieldHitRipple[] = [];
+  private hitLevels = new Float32Array(0);
+  private hitRadius = -1;
+  private hitArcDeg = -1;
+
+  /** Source G.setArc: vertex count derived from 20-world-unit and 5-degree resolutions. */
+  public get hitSegmentLevels(): Float32Array {
+    if (this.hitRadius !== this.radius || this.hitArcDeg !== this.maxArcDeg) {
+      const arcLength = 2 * Math.PI * Math.max(0, this.radius) * this.maxArcDeg / 360;
+      const count = Math.max(2, Math.floor(arcLength / 20) + 1, Math.floor(this.maxArcDeg / 5) + 1);
+      this.hitLevels = new Float32Array(count).fill(100);
+      this.hitRadius = this.radius;
+      this.hitArcDeg = this.maxArcDeg;
+    }
+    return this.hitLevels;
+  }
+
+  /** Five degrees of visual fringe at each full-deployment arc endpoint. */
+  public get renderArcRad(): number {
+    return (this.maxArcDeg + 10) * this.deploymentLevel * Math.PI / 180;
+  }
+
+  public resetVisualHits(): void {
+    this.hitSegmentLevels.fill(100);
+  }
+
+  /** Source G.shieldHit consumes post-mitigation shield flux, not a damage-type color. */
+  public recordVisualHit(flux: number, hitAngleRad: number): void {
+    if (this.type !== 'FRONT' && this.type !== 'OMNI') return;
+    const arc = this.renderArcRad;
+    if (arc <= 0 || flux <= 0) return;
+    const levels = this.hitSegmentLevels;
+    const tau = Math.PI * 2;
+    const start = this.facingAngleRad - arc / 2;
+    const offset = ((hitAngleRad - start) % tau + tau) % tau;
+    const hitIndex = Math.round(offset / arc * (levels.length - 1));
+    const segmentLength = tau * this.radius * this.maxArcDeg / 360 / (levels.length - 1);
+    for (let i = 0; i < levels.length; i++) {
+      const weight = Math.max(0, 1 - Math.abs(hitIndex - i) * segmentLength / 50);
+      levels[i] = Math.max(0, levels[i] - flux * weight);
+    }
+  }
 
   // --------------------------------------------------------------------------
   // 相位线圈 (ship_systems.csv phasecloak: charge up 0.5 / down 0.5 / cooldown 2, toggle)
   // --------------------------------------------------------------------------
   public phaseState: PhaseCloakState = 'IDLE';
   public phaseEffectLevel = 0;
+  public phaseMinSpeedFluxThresholdMultiplier = 1;
   public phaseChargeUpDuration = 0.5;
   public phaseChargeDownDuration = 0.5;
   public phaseCooldownDuration = 2.0;
@@ -60,6 +126,11 @@ export class Shield {
   public phaseCanNotCauseOverload = true;
   private phaseStageTimer = 0;
   private pendingActivationCost = 0;
+
+  public get phaseCooldownLevel(): number {
+    return this.phaseState === 'COOLDOWN' && this.phaseCooldownDuration > 0
+      ? Math.max(0, Math.min(1, this.phaseStageTimer / this.phaseCooldownDuration)) : 0;
+  }
 
   /** 相位成本入账回调 (硬幅能，永不触发过载)，由 Ship 注入 flux 追踪器。 */
   private readonly raisePhaseFlux?: (amount: number) => void;
@@ -98,8 +169,9 @@ export class Shield {
   }
 
   public toggle(): boolean {
+    if (this.type === 'NONE') return false;
     if (this.type === 'PHASE') return this.togglePhase();
-    this.isActive = !this.isActive;
+    this.setActive(!(this.isActive || this.pendingRaise));
     return this.isActive;
   }
 
@@ -119,8 +191,14 @@ export class Shield {
   }
 
   public setActive(active: boolean) {
+    if (this.type === 'NONE') { this.isActive = false; return; }
     if (this.type !== 'PHASE') {
-      this.isActive = active;
+      this.pendingRaise = active && this.closeTimeRemaining > 0;
+      if (active && this.closeTimeRemaining <= 0) this.isActive = true;
+      else if (!active && this.isActive) {
+        this.isActive = false;
+        this.closeTimeRemaining = 0.35;
+      }
       return;
     }
     if (active) {
@@ -222,7 +300,7 @@ export class Shield {
    */
   public getPhaseSpeedMultiplier(hardFluxLevel: number): number {
     if (!this.isPhaseEngaged) return 1;
-    const threshold = PHASE_BASE_FLUX_LEVEL_FOR_MIN_SPEED;
+    const threshold = PHASE_BASE_FLUX_LEVEL_FOR_MIN_SPEED * this.phaseMinSpeedFluxThresholdMultiplier;
     if (threshold <= 0) return PHASE_MIN_SPEED_MULT;
     let disruption = hardFluxLevel / threshold;
     if (disruption > 1) disruption = 1;
@@ -230,14 +308,14 @@ export class Shield {
     return PHASE_MIN_SPEED_MULT + (1 - PHASE_MIN_SPEED_MULT) * (1 - disruption * this.phaseEffectLevel);
   }
 
-  /** Visual deployment survives toggle-off until the retract animation reaches zero. */
+  /** Arc coverage is retained throughout the separate fade-out. */
   public get deploymentLevel(): number {
     if (this.maxArcDeg <= 0) return 0;
     return Math.max(0, Math.min(1, this.currentArcDeg / this.maxArcDeg));
   }
 
   public get isVisuallyDeployed(): boolean {
-    return this.type !== 'NONE' && this.type !== 'PHASE' && this.currentArcDeg > 0.01;
+    return this.type !== 'NONE' && this.type !== 'PHASE' && this.currentArcDeg > 0.01 && this.visualAlpha > 0;
   }
 
   /**
@@ -271,6 +349,7 @@ export class Shield {
    * @returns 转化产生的硬幅能数值
    */
   public absorbDamage(damage: number, damageType: DamageType, hitAngleRad: number): number {
+    this.recordDamageContact(damage);
     // 伤害类型对护盾的倍率
     let shieldMult = 1.0;
     switch (damageType) {
@@ -288,35 +367,10 @@ export class Shield {
         break;
     }
 
-    // 最终幅能增加值 = 基础伤害 * 伤害类型倍率 * 护盾效率
-    const fluxGenerated = damage * shieldMult * this.efficiency;
+    // 最终幅能增加值 = 基础伤害 * 护盾易伤倍率 * 伤害类型倍率 * 护盾效率
+    const fluxGenerated = damage * this.damageTakenMultiplierFor(damageType) * shieldMult * this.efficiency;
 
-    // 记录受击光斑与涟漪 (合并同一方位高频撞击，如连续激光扫射)
-    const existing = this.ripples.find(r => Math.abs(r.angle - hitAngleRad) < 0.18);
-    const hitColor: [number, number, number] = damageType === 'KINETIC' ? [80, 200, 255] : (damageType === 'HIGH_EXPLOSIVE' ? [255, 120, 50] : [200, 100, 255]);
-    if (existing) {
-      existing.life = 0.38;
-      existing.intensity = Math.min(1.4, existing.intensity + 0.25);
-      existing.color = hitColor;
-    } else {
-      const ripple: ShieldHitRipple = {
-        angle: hitAngleRad,
-        intensity: 1.0,
-        life: 0.4,
-        color: hitColor
-      };
-      // The shader exposes four ripple slots. Keep that capacity deterministic and recycle
-      // the weakest/oldest slot rather than silently accumulating invisible hit state.
-      if (this.ripples.length >= 4) {
-        let replaceIndex = 0;
-        for (let i = 1; i < this.ripples.length; i++) {
-          if (this.ripples[i].intensity < this.ripples[replaceIndex].intensity) replaceIndex = i;
-        }
-        this.ripples[replaceIndex] = ripple;
-      } else {
-        this.ripples.push(ripple);
-      }
-    }
+    this.recordVisualHit(fluxGenerated, hitAngleRad);
 
     return fluxGenerated;
   }
@@ -328,32 +382,41 @@ export class Shield {
     // 0. 相位线圈状态机 (IN 0.5s → ACTIVE → OUT 0.5s → COOLDOWN 2s) 与硬幅能成本
     if (this.type === 'PHASE') this.updatePhase(dt);
 
-    // 1. 展开或收拢动画计算
-    if (this.isActive) {
-      this.currentArcDeg = Math.min(this.maxArcDeg, this.currentArcDeg + this.unfoldRateDeg * dt);
-    } else {
-      this.currentArcDeg = Math.max(0, this.currentArcDeg - this.unfoldRateDeg * 1.5 * dt);
+    // systems/G.java and ship/trackers/oooO: unfold the arc, then fade it in place on shutdown.
+    if (this.type === 'FRONT' || this.type === 'OMNI') {
+      if (this.isActive) {
+        this.currentArcDeg = Math.min(this.maxArcDeg, this.currentArcDeg + this.unfoldRateDeg * dt);
+      } else {
+        this.closeTimeRemaining = Math.max(0, this.closeTimeRemaining - dt);
+        if (this.closeTimeRemaining <= 1e-8) {
+          this.closeTimeRemaining = 0;
+          this.currentArcDeg = 0;
+          if (this.pendingRaise) {
+            this.pendingRaise = false;
+            this.isActive = true;
+          }
+        }
+      }
     }
 
     // 2. 护盾朝向追踪
     if (this.type === 'FRONT') {
       this.facingAngleRad = shipFacing;
-    } else if (this.type === 'OMNI') {
+    } else if (this.type === 'OMNI' && this.isActive) {
       // 全向护盾追踪瞄准方向
       let diff = aimFacing - this.facingAngleRad;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
-      const turnSpeed = 4.0; // rad/s
+      const turnSpeed = 100 / Math.max(1, this.radius) * this.turnRateMultiplier;
       this.facingAngleRad += Math.sign(diff) * Math.min(Math.abs(diff), turnSpeed * dt);
+    } else if (this.type === 'OMNI' && this.closeTimeRemaining === 0) {
+      this.facingAngleRad = shipFacing;
     }
 
-    // 3. 更新受击涟漪
-    for (let i = this.ripples.length - 1; i >= 0; i--) {
-      this.ripples[i].life -= dt;
-      this.ripples[i].intensity = Math.max(0, this.ripples[i].life / 0.4);
-      if (this.ripples[i].life <= 0) {
-        this.ripples.splice(i, 1);
-      }
+    // G.advance restores the 100-point visual meter over five seconds, even while off.
+    if (this.type === 'FRONT' || this.type === 'OMNI') {
+      const levels = this.hitSegmentLevels;
+      for (let i = 0; i < levels.length; i++) levels[i] = Math.min(100, levels[i] + 20 * dt);
     }
   }
 }

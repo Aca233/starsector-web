@@ -7,7 +7,7 @@ export const zh_CN: Record<string, string> = {
   'app.switch_to_paragon': '驾驶 典范级 (Paragon)',
   'app.reset_battle': '重置战局',
   'app.mod_manager': '舰船 Mod 工作台',
-  'app.controls': '操控指南: W 前进 | S 减速刹车 | A/D 左右偏航转向 | 鼠标 瞄准瞄线 | 左键 开火 | 右键 启闭护盾 | V / 空格 主动排散幅能 | F 激活战术系统 (冲刺推进 / 堡垒护盾)',
+  'app.controls': '操控指南: W 前进 | S 倒车 | X 制动 | A/D 左右侧移 | 鼠标 瞄准瞄线 | 左键 开火 | 右键 启闭护盾 | V / 空格 主动排散幅能 | F 激活战术系统 (冲刺推进 / 堡垒护盾)',
 
   // 战术 HUD
   'hud.hull': '装甲结构值',
@@ -75,8 +75,8 @@ export const zh_CN: Record<string, string> = {
 
   // 阔剑战机与机枪
   'ship.broadsword.name': '阔剑重型战斗机 (Broadsword Heavy Fighter)',
-  'ship.broadsword.designation': '重型战斗机 (3机编队)',
-  'ship.broadsword.desc': '霸权主力重型战斗机，装备双联轻型机枪与全向护盾，擅长压制敌方护盾与拦截来袭导弹。',
+  'ship.broadsword.designation': '重型战斗机',
+  'ship.broadsword.desc': '无护盾的重型战斗机，装备两门轻型机枪。',
   'weapon.lightmg.name': '轻型机枪 (Light Machine Gun)',
   'weapon.lightmg.desc': '小型高射速动能弹幕机枪，点防防空与护盾压制兼备。',
   'weapon.flak.name': '高射炮 (Flak Cannon)',
@@ -95,10 +95,7 @@ export const zh_CN: Record<string, string> = {
   'hud.btn_tactical_map': '战术地图 (TAB)',
   'hud.tactical_map_title': '星区战术指挥全景视图 (TAC-OPS RADAR GRID)',
   'hud.command_points': '指挥点数',
-  'hud.fighters_active': '阔剑战机中队: 3 架在空巡逻',
-  'hud.bombers_active': '匕首轰炸机中队: 2 架待命突袭',
   'hud.btn_recall_fighters': '战机召回 (Z)',
-  'hud.btn_countermeasures': '诱饵热焰 (C)',
   'hud.countermeasures_ready': '热焰诱饵就绪',
   'hud.countermeasures_cooldown': '热焰诱饵冷却中: {time}s',
   'hud.command_engage': '指令: 集火歼灭 (ENGAGE)',
@@ -111,6 +108,7 @@ export const zh_CN: Record<string, string> = {
   'damage.fragmentation': '破片伤害 (对结构 100% / 对护盾装甲 25%)',
 
   // 战斗展示可用性
+  'combat.shield_malfunction': '护盾失效！',
   'combat.availability.loading_title': '正在准备战斗画面',
   'combat.availability.loading_detail': '正在加载战斗资源并初始化 WebGL2。',
   'combat.availability.context_lost_title': '战斗画面暂时不可用',

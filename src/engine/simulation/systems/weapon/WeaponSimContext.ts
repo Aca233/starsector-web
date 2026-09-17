@@ -1,7 +1,8 @@
 import { Ship } from '../../Ship';
 import { Projectile } from '../../Weapon';
 import { CombatFXSystem } from '../CombatFXSystem';
-import { HulkFragment } from '../../CombatTypes';
+import { Vector2 } from '../../../math/Vector2';
+import { HulkFragment, type Asteroid } from '../../CombatTypes';
 import { ContrailEngine } from '../../ContrailEngine';
 import { SimulationRandom } from '../../SimulationRandom';
 import { AsteroidProjectileImpact } from '../AsteroidSystem';
@@ -13,6 +14,11 @@ export interface WeaponSimContext {
   playerShip: Ship;
   enemyShip: Ship;
   fighters: Ship[];
+  projectiles?: Projectile[];
+  asteroids?: Asteroid[];
+  spawnProjectileExplosion?: (p: Projectile, point: Vector2, excludedShipId?: string, excludedAsteroidId?: number) => void;
+  ships?: Ship[];
+  capitalShips?: Ship[];
   hulkFragments: HulkFragment[];
   fx: CombatFXSystem;
   statsTracker?: any;

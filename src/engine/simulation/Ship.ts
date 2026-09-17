@@ -1,5 +1,18 @@
+import { advanceCombatSkills, polarizedArmorLevel } from '../extensions/CombatSkills';
+import { hasOnlyNativeRangeModifiers, installedHullMods, effectiveHullStats, hullModLoadoutErrors } from '../extensions/HullMods';
+import { i18n } from '../i18n/LocalizationManager';
+import { applyComponentDamage } from './systems/weapon/ComponentDamage';
+import { advanceShipMotion, shipMotionStats } from './systems/ShipMotion';
+import { EngineController } from './systems/EngineController';
+import { LowCRShipDamageSequence } from './systems/LowCRShipDamageSequence';
+import { finalizePermanentWeaponMalfunction } from './systems/ComponentMalfunctions';
+import type { ComponentMalfunctionTarget } from './systems/ComponentMalfunctions';
+import type { TacticalDiagnostics } from '../ai/TacticalWorld';
+import type { FireControlWorld } from '../ai/AutofireController';
 import { Vector2 } from '../math/Vector2';
 import { ArmorGrid } from './ArmorGrid';
+import { ShipDamageState } from './ShipDamageState';
+import type { ScorchMark } from './ShipDamageState';
 import { FluxTracker } from './FluxTracker';
 import { Shield } from './Shield';
 import { ShipSystem } from './ShipSystem';
@@ -9,6 +22,7 @@ import { sound } from '../audio/SoundManager';
 import { ShipWeaponControlSystem } from './systems/ShipWeaponControlSystem';
 import { SimulationRandom } from './SimulationRandom';
 import {
+  CR_CRITICAL_MALFUNCTION_START,
   crDamageChangePercent,
   crDamageTakenChangePercent,
   crMovementChangePercent,
@@ -16,20 +30,11 @@ import {
   CombatReadinessEffects
 } from './CombatReadiness';
 
-export interface ScorchMark {
-  localPos: Vector2;
-  intensity: number;
-  size: number;
-  life: number;
-  maxLife: number;
-}
+// Identity, not a caller-writable "pure" flag; no new serialized combat state.
+const nativeShieldReaders = new WeakMap<Ship, () => number>();
+const nativeShieldDamageFor = Shield.prototype.damageTakenMultiplierFor;
 
-export interface EngineStatus {
-  isFlameout: boolean;
-  flameoutTimer: number;
-  currentThrust: number; // 当前实际物理平滑推力 [0.0, 2.5]
-  prevThrust: number;    // 上一物理帧推力 (用于渲染亚帧平滑插值)
-}
+export type { EngineStatus } from './systems/EngineController';
 
 export interface PhaseGhost {
   pos: Vector2;
@@ -39,10 +44,69 @@ export interface PhaseGhost {
   maxLife: number;
 }
 
+interface ArmorGridLocalRect {
+  minX: number;
+  minY: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * 装甲网格使用 .ship sprite 的真实局部矩形，而不是 collisionRadius 的正方形。
+ * 这里提供基于 pivot 的船体贴图范围；构造时按原版方格向外取整，再补两圈支撑格。
+ * pivot 保留前后不对称船体的局部坐标原点。
+ */
+function getArmorGridLocalRect(spec: ShipSpec): ArmorGridLocalRect {
+  const spriteWidth = Number.isFinite(spec.spriteWidth) && spec.spriteWidth > 0 ? spec.spriteWidth : 0;
+  const spriteHeight = Number.isFinite(spec.spriteHeight) && spec.spriteHeight > 0 ? spec.spriteHeight : 0;
+  const pivotX = Number.isFinite(spec.pivotX) ? spec.pivotX : spriteWidth / 2;
+  const pivotY = Number.isFinite(spec.pivotY) ? spec.pivotY : spriteHeight / 2;
+
+  if (spriteWidth > 0 && spriteHeight > 0) {
+    return {
+      // 物理局部 +X 对应贴图向前/上方；pivotY 已在载入时转换到 Web 坐标约定。
+      minX: pivotY - spriteHeight,
+      minY: -pivotX,
+      width: spriteHeight,
+      height: spriteWidth
+    };
+  }
+
+  if (spec.bounds.length >= 3) {
+    let minX = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    for (const [x, y] of spec.bounds) {
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+    }
+    if (maxX > minX && maxY > minY) {
+      return { minX, minY, width: maxX - minX, height: maxY - minY };
+    }
+  }
+
+  const diameter = Math.max(1, spec.collisionRadius * 2);
+  return { minX: -diameter / 2, minY: -diameter / 2, width: diameter, height: diameter };
+}
+
 export class Ship {
   public id: string;
   public spec: ShipSpec;
+  /** Combat-instance only: recalculated from the deployed roster each fixed step. */
+  public ecmRangePenalty = 0;
+  public readonly hullStats: ReturnType<typeof effectiveHullStats>;
   public isPlayer: boolean;
+  public flightDeckWingId?: string;
+  /** Runtime ownership, never persisted in hull specs or inferred from team alone. */
+  public sourceCarrier?: Ship;
+  public getWeaponDamageMultiplier(type: WeaponMount["spec"]["weaponType"]): number {
+    const carrier = this.sourceCarrier;
+    const support = carrier && !carrier.isDead && carrier.hullHp > 0 ? carrier.system.getFighterDamageMultiplier() : 1;
+    return this.system.getWeaponDamageMultiplier(type) * support;
+  }
 
   // 物理与刚体 (支持亚帧插值)
   public pos: Vector2;
@@ -54,10 +118,13 @@ export class Ship {
 
   // 核心机体状态
   public hullHp: number;
+  /** Effective maximum; raw hull specs are immutable and remain safe to save/refit. */
+  public get maxHullHp(): number { return this.hullStats.hitpoints; }
   public armor: ArmorGrid;
   public flux: FluxTracker;
   public shield: Shield;
   public system: ShipSystem;
+  public defenseSystem: ShipSystem;
   public readonly weaponControl: ShipWeaponControlSystem;
   private readonly random: SimulationRandom;
 
@@ -76,35 +143,102 @@ export class Ship {
   public set justRepairedMounts(val: WeaponMount[]) { this.weaponControl.justRepairedMounts = val; }
 
   // 发动机喷口独立健康与熄火状态 (Engine Flameout)
-  public engineStatuses: EngineStatus[] = [];
+  public readonly engineController: EngineController;
+  public get engineStatuses() { return this.engineController.engines; }
+
+  // Native component-stat hooks. The current built-in hull/loadout defaults are neutral.
+  public weaponHealthMultiplier = 1;
+  public engineHealthMultiplier = 1;
+  public combatEngineRepairTimeMultiplier = 1;
+  public combatWeaponRepairTimeMultiplier = 1;
+  public canRepairModulesUnderFire = false;
+  public crMalfunctionRangeMultiplier = 1;
+  public criticalMalfunctionChanceMultiplier = 1;
+  public criticalMalfunctionDamageMultiplier = 1;
+  public baseCriticalMalfunctionDamage = 100;
+  public justCriticalDamage: { local: Vector2; armorDamage: number; hullDamage: number }[] = [];
+  public empDamageTakenMultiplier = 1;
+  /** Source-keyed debuffs do not mutate persisted specs and cannot leave stale stacked multipliers. */
+  public readonly damageTakenModifiers = new Map<string, () => number>();
+  /** Unknown damage readers or extension hooks disable shared projectile queries. */
+  public get hasNativeThreatPhaseHooks(): boolean {
+    return this.damageTakenModifiers.size === 0
+      && !Object.hasOwn(this, 'externalDamageTakenMultiplier')
+      && this.shield.externalDamageTakenMultiplier === nativeShieldReaders.get(this)
+      && this.shield.damageTakenMultiplierFor === nativeShieldDamageFor
+      && !Object.hasOwn(this.shield, 'damageTakenMultiplier')
+      && this.system.hasNativeThreatPhaseAI && this.defenseSystem.hasNativeThreatPhaseAI
+      && hasOnlyNativeRangeModifiers(this.spec);
+  }
+  public get externalDamageTakenMultiplier(): number {
+    let value = 1;
+    for (const modifier of this.damageTakenModifiers.values()) value *= modifier();
+    return value;
+  }
+  public get subjectiveTimeMultiplier(): number { return (1 + 2 * this.hullStats.phaseTimeBonusMultiplier * this.shield.phaseEffectLevel) * this.system.getTimeMultiplier(); }
+  public get effectiveEmpDamageTakenMultiplier(): number { return this.empDamageTakenMultiplier * (1 - .5 * polarizedArmorLevel(this)) * this.system.getEmpDamageMultiplier() * this.externalDamageTakenMultiplier; }
+  public weaponDamageTakenMultiplier = 1;
+  public engineDamageTakenMultiplier = 1;
+  public damageToTargetWeaponsMultiplier = 1;
+  public damageToTargetEnginesMultiplier = 1;
+
+  /** Native target-side listener. Hits remain for one second after contact ends. */
+  public readonly statusEffects = new Map<string, { advance: (ship: Ship, dt: number) => boolean }>();
 
   // 相位潜航时空残影 (Phase Cloak Ghost Echoes)
   public phaseGhosts: PhaseGhost[] = [];
   public phaseGhostTimer = 0;
+  public engineBoostLevel = 0;
+  public prevEngineBoostLevel = 0;
 
   // 星云流体阻力减速系数
   public terrainSpeedMult = 1.0;
 
-  // 装甲灼烧痕迹 (Armor Thermal Scorch Decals)
-  public scorchMarks: ScorchMark[] = [];
+  // 舰体持续战损贴花：裂纹 / 熔蚀 / 穿孔，使用原版 damage_*48 贴图。
+  public readonly damageDecals: ShipDamageState;
+  public get scorchMarks(): readonly ScorchMark[] { return this.damageDecals.marks; }
+  /** Persistent set and armor-derived opacity revision; heat has a separate render revision. */
+  public get scorchMarkVersion(): number { return this.damageDecals.revision; }
 
   // 操纵指令输入
-  public throttle = 0; // -0.5 (倒车) ~ 1.0 (前进)
+  public throttle = 0; // -1.0 (倒车) ~ 1.0 (前进)
+  public brakeInput = false;
   public strafeInput = 0; // -1.0 (向左侧向平移) ~ 1.0 (向右侧向平移)
   public turnInput = 0; // -1.0 (左转) ~ 1.0 (右转)
   public aimTargetWorld: Vector2 = new Vector2();
   public isFiringMain = false;
+  /** Ownership, not faction: the player autopilot also uses autonomous per-mount fire control. */
+  public fireControlMode: 'MANUAL' | 'AI' = 'MANUAL';
+  public defenseFacingRad?: number;
+  public aiHoldOffensiveFire = false;
+  public tacticalAI?: TacticalDiagnostics;
   
+  /** Dynamic SHIELD_PIERCED_MULT target stat (native default 1). */
+  public shieldPiercedMultiplier = 1;
   public isDead = false;
+  public clearInput(): void {
+    this.isFiringMain = false;
+    this.throttle = 0;
+    this.brakeInput = false;
+    this.strafeInput = 0;
+    this.turnInput = 0;
+  }
   public prevOverloaded = false;
   public prevVenting = false;
   public currentTargetShip: Ship | null = null;
+  public combatShips: readonly Ship[] = [];
 
-  /** 战备值故障判定节拍 (原版按每秒概率掷点)。 */
-  private crMalfunctionTimer = 0;
+  /** Native IntervalTracker(.75, 1.25); overshoot is discarded on the next advance. */
+  private crShieldMalfunctionTimer = 0;
+  private crShieldMalfunctionInterval = 1;
+  private crShieldMalfunctionIntervalElapsed = false;
+  public justShieldMalfunction = false;
 
   // 1:1 原版战备值与峰值性能时钟 (Combat Readiness & Peak Performance Time)
   public shipName: string;
+  /** Captured on deployment, never recaptured when ordinary CR decays. */
+  public crAtDeployment: number | null = null;
+  public lowCRDamageSequence: LowCRShipDamageSequence | null = null;
   public currentCR = 0.70; // 标准 70% 战备值
   public peakPerformanceRemaining: number;
 
@@ -114,17 +248,27 @@ export class Ship {
     isPlayer = false,
     initialPos = new Vector2(),
     initialFacingRad = 0,
-    random = new SimulationRandom()
+    random = new SimulationRandom(),
+    visualRandom = new SimulationRandom(0x5c07c4)
   ) {
     this.id = id;
     this.spec = spec;
+    const modErrors = hullModLoadoutErrors(spec);
+    if (modErrors.length) throw new Error(spec.id + ": " + modErrors.join("; "));
+    const refit = this.hullStats = effectiveHullStats(spec);
+    this.weaponHealthMultiplier *= 1 + refit.weaponHealthPercent / 100;
+    this.engineHealthMultiplier *= 1 + refit.engineHealthPercent / 100;
+    this.weaponDamageTakenMultiplier *= refit.weaponDamageTakenMultiplier;
+    this.engineDamageTakenMultiplier *= refit.engineDamageTakenMultiplier;
+    this.canRepairModulesUnderFire = refit.canRepairModulesUnderFire > 0;
+    this.currentCR = Math.min(1, .7 + refit.maxCombatReadinessBonus);
+    this.combatEngineRepairTimeMultiplier *= refit.engineRepairTimeMultiplier;
+    this.combatWeaponRepairTimeMultiplier *= refit.weaponRepairTimeMultiplier;
     this.isPlayer = isPlayer;
     this.random = random;
     this.weaponControl = new ShipWeaponControlSystem(random);
-    this.shipName = isPlayer
-      ? (spec.id === 'onslaught' ? 'TTS HEGEMON' : spec.id === 'doom' ? 'TTS HARBINGER' : 'TTS INVINCIBLE')
-      : (spec.id === 'paragon' ? 'ISS RADIANCE' : 'ISS TRI-TACHYON');
-    this.peakPerformanceRemaining = spec.peakCRSec ?? 720;
+    this.shipName = i18n.t(spec.nameKey).split(' (')[0];
+    this.peakPerformanceRemaining = refit.peakCRSec;
 
     this.pos = initialPos.clone();
     this.prevPos = initialPos.clone();
@@ -133,14 +277,25 @@ export class Ship {
     this.prevFacingRad = initialFacingRad;
     this.angularVelRad = 0;
 
-    this.hullHp = spec.hitpoints;
-    this.armor = new ArmorGrid(
-      spec.armorCols,
-      spec.armorRows,
-      spec.collisionRadius / (spec.armorCols / 2),
-      spec.collisionRadius / (spec.armorRows / 2),
-      spec.armorRating
-    );
+    this.hullHp = this.maxHullHp;
+    const armorRect = getArmorGridLocalRect(spec);
+    // ship/_new: square cells aligned at the pivot, with two support cells on every side.
+    const grid = Math.min(30, Math.max(15, spec.spriteHeight / 10));
+    const behind = Math.ceil(-armorRect.minX / grid) + 2;
+    const ahead = Math.ceil((armorRect.minX + armorRect.width) / grid) + 2;
+    const left = Math.ceil(-armorRect.minY / grid) + 2;
+    const right = Math.ceil((armorRect.minY + armorRect.height) / grid) + 2;
+    this.armor = new ArmorGrid(behind + ahead, left + right, grid, grid, refit.armorRating, -behind * grid, -left * grid);
+    this.armor.damageTakenModifiers = (type) => ({
+      armor: refit.armorDamageMultiplier * (type === "ENERGY" ? refit.energyDamageMultiplier : 1) * this.system.getArmorDamageMultiplier() * this.externalDamageTakenMultiplier,
+      hull: refit.hullDamageMultiplier * (type === "ENERGY" ? refit.energyDamageMultiplier : 1) * this.system.getHullDamageMultiplier() * this.externalDamageTakenMultiplier,
+    });
+    this.armor.effectiveArmorMultiplier = refit.effectiveArmorMultiplier;
+    this.armor.dynamicEffectiveArmorMultiplier = () => 1 + .5 * polarizedArmorLevel(this);
+    this.armor.maxDamageReduction = Math.min(1, .85 + refit.maxArmorDamageReductionBonus);
+    this.armor.minArmorFractionMultiplier = refit.minArmorFractionMultiplier;
+    this.damageDecals = new ShipDamageState(this.armor, visualRandom);
+    this.armor.onCellDamage = (c, r, damage) => this.damageDecals.onCellDamage(c, r, damage);
     const inferredHullSize = spec.collisionRadius <= 50
       ? 'FIGHTER'
       : spec.collisionRadius <= 90
@@ -150,36 +305,53 @@ export class Ship {
       : spec.collisionRadius <= 210
       ? 'CRUISER'
       : 'CAPITAL_SHIP';
-    this.flux = new FluxTracker(spec.maxFlux, spec.fluxDissipation, spec.hullSize ?? inferredHullSize);
+    this.flux = new FluxTracker(refit.maxFlux, refit.fluxDissipation, spec.hullSize ?? inferredHullSize);
+    this.flux.ventRateMultiplier = refit.ventRateMultiplier;
+    this.flux.overloadTimeMultiplier = refit.overloadTimeMultiplier;
+    this.empDamageTakenMultiplier *= refit.empDamageMultiplier;
+    if (spec.captainSkills?.target_analysis === 2) {
+      this.damageToTargetWeaponsMultiplier *= 2;
+      this.damageToTargetEnginesMultiplier *= 2;
+    }
+    this.shieldPiercedMultiplier *= refit.shieldPiercedMultiplier;
     // ship_data.csv: shield upkeep 是基础耗散的比例 (攻势 0.4 → 240/s, 典范 0.6 → 750/s)。
-    const shieldUpkeepRate = Math.max(0, spec.shieldUpkeep ?? 0) * this.flux.baseDissipation;
+    const shieldUpkeepRate = refit.shieldUpkeepPerSecond;
     this.shield = new Shield(
-      spec.shieldType,
-      spec.shieldArcDeg,
+      refit.shieldType,
+      refit.shieldArcDeg,
       spec.shieldRadius,
-      spec.shieldEfficiency,
+      refit.shieldEfficiency,
       shieldUpkeepRate,
       (amount) => this.flux.increaseFluxClamped(amount, true)
     );
     // ship_data.csv: phase cost / phase upkeep 是基础幅能容量的比例 (厄运 0.05/0.05)。
+    this.shield.externalDamageTakenMultiplier = () => this.externalDamageTakenMultiplier;
+    nativeShieldReaders.set(this, this.shield.externalDamageTakenMultiplier);
+    this.shield.phaseMinSpeedFluxThresholdMultiplier = 1 + refit.phaseMinSpeedFluxThresholdPercent / 100;
+    this.shield.unfoldRateMultiplier = 1 + refit.shieldUnfoldRatePercent / 100;
+    this.shield.turnRateMultiplier = 1 + refit.shieldTurnRatePercent / 100;
+    this.shield.damageTakenModifiers.set("hullmods", refit.shieldDamageMultiplier);
+    this.shield.energyDamageTakenMultiplier = refit.energyDamageMultiplier;
     this.shield.phaseActivationCost = Math.max(0, spec.phaseCost ?? 0) * this.flux.maxFlux;
-    this.shield.phaseUpkeepPerSecond = Math.max(0, spec.phaseUpkeep ?? 0) * this.flux.maxFlux;
+    this.shield.phaseUpkeepPerSecond = Math.max(0, spec.phaseUpkeep ?? 0) * this.flux.maxFlux * refit.phaseUpkeepMultiplier;
+    this.shield.phaseCooldownDuration *= refit.phaseCooldownMultiplier;
     // HUD/检查工具读取 upkeepRate：相位线圈的维持费即每秒硬幅能成本。
     if (this.shield.type === 'PHASE') this.shield.upkeepRate = this.shield.phaseUpkeepPerSecond;
-    this.system = new ShipSystem(spec.systemType, this.flux.maxFlux);
+    this.system = new ShipSystem(spec.systemType, spec.maxFlux, this);
+    this.defenseSystem = new ShipSystem(spec.defenseSystemType ?? 'NONE', spec.maxFlux, this);
+    this.system.auxiliary = this.defenseSystem;
 
     // 初始化挂点武器与武器编组
-    this.weaponControl.init(spec, initialFacingRad);
+    this.weaponControl.init(spec, initialFacingRad, this.weaponHealthMultiplier);
 
-    // 初始化各个独立发动机喷口健康与平滑推力状态
-    if (spec.engineSlots && spec.engineSlots.length > 0) {
-      this.engineStatuses = spec.engineSlots.map(() => ({
-        isFlameout: false,
-        flameoutTimer: 0,
-        currentThrust: 0,
-        prevThrust: 0
-      }));
-    }
+    // All engine trackers start at installation, with independent repair/interval draws.
+    this.engineController = new EngineController(spec, this.random, this.engineHealthMultiplier);
+    // Ship.init: initial hull HP / (all weapons + ordinary weapons + ordinary engines) * .75.
+    const moduleCount = this.weapons.length + this.weapons.filter(mount => mount.mountType !== 'HIDDEN').length
+      + this.engineStatuses.filter(engine => !engine.systemActivated).length;
+    this.baseCriticalMalfunctionDamage = this.maxHullHp / Math.max(1, moduleCount) * .75;
+    this.resetShieldMalfunctionState();
+    for (const mod of installedHullMods(this.spec)) if (mod.status === 'implemented') mod.apply?.(this);
   }
 
   // --------------------------------------------------------------------------
@@ -187,7 +359,9 @@ export class Ship {
   // 在标准 70% 战备下所有倍率恒为 1.0，因此仅在衰退/超常战备时改变作战性能。
   // --------------------------------------------------------------------------
   public get crEffects(): CombatReadinessEffects {
-    return computeCombatReadinessEffects(this.currentCR);
+    const effects = computeCombatReadinessEffects(this.currentCR, this.crMalfunctionRangeMultiplier, this.flux.hullSize === 'FIGHTER');
+    effects.criticalMalfunctionChance *= this.criticalMalfunctionChanceMultiplier;
+    return effects;
   }
 
   /** 最高航速/加速度/减速度/转向速率倍率 (±10%)。 */
@@ -205,19 +379,21 @@ export class Ship {
     return 1 + crDamageTakenChangePercent(this.currentCR) / 100;
   }
 
-  /**
-   * 战备值性能修正与故障机制 (1:1 CRPluginImpl.applyCRToStats / applyCRToShip)
-   * - cr <= 0: setShipSystemDisabled(true) + setDefenseDisabled(true)
-   * - cr < 0.4: 每秒按战备缺口掷武器 10% / 引擎 7.5% 故障
-   * - cr < 0.2: 严重故障 (LowCRShipDamageSequence: 永久瘫痪挂点或发动机)
-   * - cr < 0.1: 护盾故障 (幅能高于 75% 时护盾掉线)
-   * 移动/伤害/受伤倍率由 crMovementMultiplier / crDamageDealtMultiplier /
-   * crDamageTakenMultiplier 提供，供运动学与各伤害结算点使用。
-   */
+  public resetShieldMalfunctionState(): void {
+    this.crShieldMalfunctionTimer = 0;
+    this.crShieldMalfunctionInterval = .75 + this.random.next() * .5;
+    this.crShieldMalfunctionIntervalElapsed = false;
+    this.shield.sinceLastDamageTaken = Number.POSITIVE_INFINITY;
+    this.justShieldMalfunction = false;
+  }
+
+  /** CR stat/system restrictions and native shield malfunction interval/impact gating. */
   private applyCombatReadiness(dt: number) {
     const effects = this.crEffects;
 
     this.system.disabled = effects.systemDisabled;
+    this.defenseSystem.disabled = effects.defenseDisabled;
+    if (effects.defenseDisabled) this.defenseSystem.deactivate();
     if (effects.systemDisabled && this.system.isActive) {
       this.system.deactivate();
     }
@@ -225,72 +401,80 @@ export class Ship {
       this.lowerShieldWithFeedback();
     }
 
-    this.crMalfunctionTimer += dt;
-    if (this.crMalfunctionTimer < 1) return;
-    this.crMalfunctionTimer -= 1;
-
-    if (effects.criticalMalfunctionChancePerSec > 0 && this.random.next() < effects.criticalMalfunctionChancePerSec) {
-      this.applyCriticalMalfunction();
-    } else {
-      if (effects.weaponMalfunctionChancePerSec > 0 && this.random.next() < effects.weaponMalfunctionChancePerSec) {
-        this.applyWeaponMalfunction();
-      }
-      if (effects.engineMalfunctionChancePerSec > 0 && this.random.next() < effects.engineMalfunctionChancePerSec) {
-        this.triggerEngineFlameout();
-      }
+    this.shield.sinceLastDamageTaken += dt;
+    if (this.crShieldMalfunctionIntervalElapsed) {
+      this.crShieldMalfunctionInterval = .75 + this.random.next() * .5;
+      this.crShieldMalfunctionTimer = 0;
+      this.crShieldMalfunctionIntervalElapsed = false;
     }
+    this.crShieldMalfunctionTimer += dt;
+    if (this.crShieldMalfunctionTimer < this.crShieldMalfunctionInterval) return;
+    this.crShieldMalfunctionIntervalElapsed = true;
 
-    // CRPluginImpl: shield malfunction flux level 0.75 — 高幅能时护盾有概率掉线。
+    // Ship.advance: only a real, active shield hit within 1.25s can fail at high flux.
     if (
-      effects.shieldMalfunctionChancePerSec > 0 &&
+      effects.shieldMalfunctionChance > 0 &&
+      (this.shield.type === 'FRONT' || this.shield.type === 'OMNI') &&
       this.shield.isActive &&
-      this.flux.fluxPercent > 0.75 &&
-      this.random.next() < effects.shieldMalfunctionChancePerSec
+      this.flux.fluxPercent > .75 &&
+      this.shield.sinceLastDamageTaken < 1.25 &&
+      this.random.next() < effects.shieldMalfunctionChance &&
+      this.flux.forceOverload(0)
     ) {
+      this.justShieldMalfunction = true;
       this.lowerShieldWithFeedback();
     }
   }
 
-  /** 武器故障：随机一门可用挂点短路停机数秒 (原版 weapon malfunction)。 */
-  private applyWeaponMalfunction(): void {
-    const candidates = this.weapons.filter((w) => !w.isDisabled);
-    if (candidates.length === 0) return;
-    const mount = candidates[Math.floor(this.random.next() * candidates.length)];
-    mount.isDisabled = true;
-    mount.disabledDuration = 3.0 + this.random.next() * 3.0;
-    mount.disabledTimer = mount.disabledDuration;
-    mount.burstRemaining = 0;
-    mount.firingState = 'IDLE';
-    mount.firingStateTimer = 0;
-    this.weaponControl.justDisabledMounts.push(mount);
+  /** Deployment hook; lazy first-update use lets callers configure CR before entry.
+   * Reapplying explicitly is a new deployment, not an ordinary in-combat CR edit. */
+  public applyDeploymentReadiness(cr = this.currentCR, controlsLocked = false): void {
+    this.currentCR = Number.isFinite(cr) ? Math.max(0, Math.min(1, cr)) : 0;
+    this.crAtDeployment = this.currentCR;
+    this.lowCRDamageSequence = null;
+    const threshold = CR_CRITICAL_MALFUNCTION_START * this.crMalfunctionRangeMultiplier - .001;
+    if (threshold > 0 && this.currentCR < threshold && !controlsLocked && this.flux.hullSize !== 'FIGHTER') {
+      const severity = (threshold - this.currentCR) / threshold * this.criticalMalfunctionChanceMultiplier;
+      this.lowCRDamageSequence = new LowCRShipDamageSequence(this, severity, this.random);
+    }
   }
 
-  /**
-   * 严重故障 (LowCRShipDamageSequence): 永久瘫痪一门挂点或一台发动机，
-   * 而不是像普通故障那样数秒后自动抢修。
-   */
-  private applyCriticalMalfunction(): void {
-    const usableMounts = this.weapons.filter((w) => !w.isDisabled);
-    const usableEngines = this.engineStatuses.filter((e) => !e.isFlameout);
-    const totalTargets = usableMounts.length + usableEngines.length;
-    if (totalTargets === 0) return;
+  private advanceDeploymentReadiness(dt: number): void {
+    if (this.crAtDeployment === null) this.applyDeploymentReadiness();
+    this.lowCRDamageSequence?.advance(dt);
+    if (this.lowCRDamageSequence?.finished) this.lowCRDamageSequence = null;
+  }
 
-    const pick = Math.floor(this.random.next() * totalTargets);
-    if (pick < usableMounts.length) {
-      const mount = usableMounts[pick];
-      mount.isDisabled = true;
-      mount.disabledDuration = 9999;
-      mount.disabledTimer = 9999;
-      mount.burstRemaining = 0;
-      mount.firingState = 'IDLE';
-      mount.firingStateTimer = 0;
-      this.weaponControl.justDisabledMounts.push(mount);
+  public applyCriticalMalfunction(target: ComponentMalfunctionTarget, permanent = true): void {
+    let local: Vector2;
+    if (target.kind === 'weapon') {
+      this.weaponControl.disableComponent(target.mount, permanent);
+      if (permanent) finalizePermanentWeaponMalfunction(this, target.mount);
+      local = target.mount.relativePos;
+    } else {
+      const slot = this.spec.engineSlots[target.index];
+      if (!slot) return;
+      this.engineController.malfunction(target.index, this.engineDisableContext, permanent);
+      local = new Vector2(slot.x, slot.y);
+    }
+    this.applyCriticalMalfunctionDamage(local);
+  }
+
+  /** Ship.applyCriticalMalfunction: side damage also occurs when permanence is vetoed. */
+  public applyCriticalMalfunctionDamage(local: Vector2): void {
+    const damage = this.baseCriticalMalfunctionDamage * (.75 + this.random.next() * .5) * this.criticalMalfunctionDamageMultiplier;
+    const lethal = this.hullHp <= damage;
+    if (!lethal && this.random.next() > .25) {
+      const hullDamage = Math.min(this.hullHp, damage);
+      this.hullHp = Math.max(0, this.hullHp - damage);
+      this.justCriticalDamage.push({ local: local.clone(), armorDamage: 0, hullDamage });
       return;
     }
-
-    const engine = usableEngines[pick - usableMounts.length];
-    engine.isFlameout = true;
-    engine.flameoutTimer = 9999;
+    const raw = lethal ? this.maxHullHp * 10 : damage;
+    const result = this.armor.takeDamage(local, raw * this.crDamageTakenMultiplier, 'ENERGY', raw, false);
+    this.hullHp = Math.max(0, this.hullHp - result.hullDamage);
+    applyComponentDamage(this, local, result, 0, this);
+    this.justCriticalDamage.push({ local: local.clone(), armorDamage: result.armorDamage, hullDamage: result.hullDamage });
   }
 
   public interpolatedPos(alpha: number): Vector2 {
@@ -322,37 +506,27 @@ export class Ship {
     return this.shield.isHitBlocked(shieldCenter, hitWorldPos, this.facingRad);
   }
 
-  public triggerEngineFlameout(engineIndex?: number) {
-    if (this.engineStatuses.length === 0) return;
-    if (engineIndex !== undefined && this.engineStatuses[engineIndex]) {
-      if (!this.engineStatuses[engineIndex].isFlameout) {
-        this.engineStatuses[engineIndex].isFlameout = true;
-        this.engineStatuses[engineIndex].flameoutTimer = 6.0 + this.random.next() * 4.0;
-        sound.play('engine_flameout', 0.9);
-        if (this.isPlayer) {
-          sound.play('flameout_alarm', 0.85);
-        }
-      }
-    } else {
-      const activeEngines = this.engineStatuses
-        .map((e, idx) => ({ e, idx }))
-        .filter(item => !item.e.isFlameout);
-      if (activeEngines.length > 0) {
-        const picked = activeEngines[Math.floor(this.random.next() * activeEngines.length)];
-        picked.e.isFlameout = true;
-        picked.e.flameoutTimer = 6.0 + this.random.next() * 4.0;
-        sound.play('engine_flameout', 0.9);
-        if (this.isPlayer) {
-          sound.play('flameout_alarm', 0.85);
-        }
-      }
-    }
+  /** Current Web flame-length modifiers; zero-flux boost is a separate mechanism. */
+  public get isEngineGlowExtended(): boolean {
+    return (this.system.definition.controls?.suppressZeroFlux && this.system.effectLevel > 0) || this.shield.phaseEffectLevel > 0;
+  }
+
+  private get engineDisableContext() {
+    return { extendedGlow: this.isEngineGlowExtended, systemActive: this.system.isActive };
+  }
+
+  public damageEngineComponent(engineIndex: number, damage: number): void {
+    this.engineController.damage(engineIndex, damage, this.isEngineGlowExtended);
+  }
+
+  /** No-index force is a controller cascade; an explicit index disables that component. */
+  public triggerEngineFlameout(engineIndex?: number): void {
+    if (engineIndex === undefined) this.engineController.forceFlameout();
+    else this.engineController.disable(engineIndex, this.engineDisableContext);
   }
 
   public getFlameoutRatio(): number {
-    if (this.engineStatuses.length === 0) return 0;
-    const flamed = this.engineStatuses.filter(e => e.isFlameout).length;
-    return flamed / this.engineStatuses.length;
+    return Math.max(0, Math.min(1, this.engineController.disabledFraction(true)));
   }
 
   public selectWeaponGroup(index: number) {
@@ -367,27 +541,29 @@ export class Ship {
     this.weaponControl.toggleFireMode(groupIndex);
   }
 
-  // 挂点受创损坏与故障判定 (严格对齐 WeaponAPI.java 与 EMP 瘫痪算法)
-  public damageWeaponMount(localImpactPos: Vector2, damage: number, isEmp: boolean): WeaponMount | null {
-    return this.weaponControl.damageMount(localImpactPos, damage, isEmp);
-  }
 
   /**
    * 60Hz 逻辑步长更新
    */
   public get isPhased(): boolean {
-    return this.shield.isPhased;
+    return this.shield.isPhased || this.system.isPhased;
   }
 
   /**
    * 判断当前是否允许开启护盾 (严格对齐 D.java: canUseShields / ship_systems.csv noShield).
    * Burn Drive 的 IN/ACTIVE/OUT 全阶段都带 noShield；冷却阶段则允许重新展开护盾。
    */
+  public activateDefenseSystem(): boolean {
+    if (this.defenseSystem.isActive) return this.defenseSystem.activate();
+    if (this.system.blocksShields || this.crEffects.defenseDisabled) return false;
+    return this.defenseSystem.activate();
+  }
+
   public canUseShields(): boolean {
-    const systemBlocksShield = this.system.type === 'BURN_DRIVE' && this.system.isActive;
+    const systemBlocksShield = this.system.blocksShields;
     // CRPluginImpl: cr <= 0 时 setDefenseDisabled(true)，护盾完全不可用。
     const crBlocksShield = this.crEffects.defenseDisabled;
-    return !systemBlocksShield && !crBlocksShield && !this.flux.isOverloaded && !this.flux.isVenting && !this.isDead;
+    return this.shield.type !== 'NONE' && !systemBlocksShield && !crBlocksShield && !this.flux.isOverloaded && !this.flux.isVenting && !this.isDead;
   }
 
   private lowerShieldWithFeedback(): boolean {
@@ -405,7 +581,7 @@ export class Ship {
    * 3. 播放关盾音效与排散启动音效
    */
   public startVenting(): boolean {
-    if (this.isDead || this.flux.isOverloaded || this.flux.isVenting || this.flux.totalFlux <= 5) {
+    if (this.isDead || this.system.blocksVenting || this.hullStats.ventRateMultiplier <= 0 || this.flux.isOverloaded || this.flux.isVenting || this.flux.totalFlux <= 5) {
       return false;
     }
 
@@ -435,27 +611,58 @@ export class Ship {
     return this.pos.distanceTo(target.pos) <= range;
   }
 
+  /** Adapt source D flux modifiers without mutating saved ShipSpec or FluxTracker defaults. */
+  private advanceHullModFlux(dt: number): void {
+    const boostTimer = this.flux.zeroFluxTimer;
+    const fluxLocked = this.flux.isOverloaded || this.flux.isVenting;
+    if (dt > 0 && !fluxLocked && !this.system.blocksFluxDissipation && this.shield.isActive && this.hullStats.hardFluxDissipationFraction > 0) {
+      // D.cfr_renamed_4: soft flux consumes the full budget first; only the
+      // remaining budget is scaled by the hard-flux dissipation fraction.
+      const leftover = Math.max(0, this.flux.baseDissipation * dt - this.flux.softFlux);
+      this.flux.hardFlux = Math.max(0, this.flux.hardFlux - leftover * Math.min(1, this.hullStats.hardFluxDissipationFraction));
+    }
+    this.flux.update(dt, this.shield.isActive, !this.system.blocksFluxDissipation);
+    if ((this.hullStats.zeroFluxMinimumFluxLevel > 0 || this.hullStats.allowZeroFluxAtAnyLevel > 0) && dt > 0) {
+      const canBoost = !fluxLocked && !this.flux.isOverloaded && !this.flux.isVenting && !this.isDead
+        && this.spec.hullSize !== 'FIGHTER' && !this.system.locksTurning
+        && (this.flux.fluxPercent <= this.hullStats.zeroFluxMinimumFluxLevel || this.hullStats.allowZeroFluxAtAnyLevel > 0);
+      this.flux.zeroFluxTimer = canBoost ? (this.hullStats.allowZeroFluxAtAnyLevel > 0 && this.flux.fluxPercent > this.hullStats.zeroFluxMinimumFluxLevel
+        ? this.flux.timeSinceFluxIncrease : boostTimer + dt) : 0;
+      this.flux.isEngineBoostActive = canBoost && this.flux.zeroFluxTimer >= this.flux.boostDelay;
+    }
+  }
+
   public update(
     dt: number,
     targetShip: Ship | null,
     spawnProjectile: (p: Projectile) => void,
     spawnBeam: (b: Beam) => void,
-    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void
+    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void,
+    fireControlWorld?: FireControlWorld
   ) {
-    if (this.isDead) return;
+    // Ship.advance advances listeners before weapons; use the Web combat step.
+    // A notification does not alter the triggering pulse or later beams this tick.
+    if (dt > 0) for (const [id, effect] of this.statusEffects) {
+      if (!effect.advance(this, dt)) this.statusEffects.delete(id);
+    }
+    if (dt > 0) for (const mod of installedHullMods(this.spec)) if (mod.status === 'implemented') mod.advance?.(this, dt, this.random);
+    // This deployment plugin uses world dt, before phase scales the ship clock.
+    this.advanceDeploymentReadiness(dt);
+    if (this.isDead || this.hullHp <= 0) return;
 
     // 记录上一物理帧状态，用于渲染亚帧平滑插值
     this.prevPos.copy(this.pos);
     this.prevFacingRad = this.facingRad;
     this.currentTargetShip = targetShip || null;
+    this.combatShips = fireControlWorld?.ships ?? (targetShip ? [this, targetShip] : [this]);
 
     // 战备值与峰值性能时钟推进 (1:1 RepairTracker.java & C.java)
-    if (this.spec.peakCRSec && this.spec.peakCRSec > 0) {
+    if (this.hullStats.peakCRSec > 0) {
       if (this.areSignificantEnemiesInRange(2500, targetShip)) {
         if (this.peakPerformanceRemaining > 0) {
           this.peakPerformanceRemaining = Math.max(0, this.peakPerformanceRemaining - dt);
         } else {
-          const lossRate = (this.spec.crLossPerSec ?? 0.25) * 0.01;
+          const lossRate = this.hullStats.crLossPerSec * 0.01;
           this.currentCR = Math.max(0, this.currentCR - lossRate * dt);
         }
       }
@@ -463,28 +670,37 @@ export class Ship {
 
     for (const eng of this.engineStatuses) {
       eng.prevThrust = eng.currentThrust;
+      eng.prevSpread = eng.spread;
     }
+    this.prevEngineBoostLevel = this.engineBoostLevel;
+    this.engineBoostLevel = this.flux.isEngineBoostActive
+      ? Math.min(1, this.engineBoostLevel + dt * 2)
+      : Math.max(0, this.engineBoostLevel - dt * 2);
 
     // 相位时钟膨胀 (严格对齐 PhaseCloakStats.java: 3x 主观战术时钟加速)
-    const effectiveDt = this.isPhased ? dt * 3.0 : dt;
+    const tacticalDt = dt * this.system.getTimeMultiplier();
+    const effectiveDt = dt * this.subjectiveTimeMultiplier;
+    advanceCombatSkills(this, effectiveDt);
 
     // 1. 更新战术技能与幅能
     this.system.update(effectiveDt);
+    this.defenseSystem.update(effectiveDt);
 
     // 1.1 战备值惩罚：cr <= 0 时舰船系统与防御彻底失效；低战备触发故障机制
-    this.applyCombatReadiness(dt);
+    this.applyCombatReadiness(effectiveDt);
 
-    // 严禁过载或主动排散时开启/保持系统，或在全发动机熄火时继续冲刺
+    // Existing Web system-cancellation rules remain an adapter, not native controller behavior.
+    if (this.flux.isOverloaded || this.flux.isVenting) this.defenseSystem.deactivate();
     if ((this.flux.isOverloaded || this.flux.isVenting) && this.system.isActive) {
       this.system.deactivate();
     }
-    if (this.system.isActive && this.system.type === 'BURN_DRIVE' && this.getFlameoutRatio() >= 1.0) {
+    if (this.system.isActive && this.system.definition.controls?.cancelOnFlameout && this.getFlameoutRatio() >= 1.0) {
       this.system.deactivate();
     }
 
     // ship_systems.csv marks Burn Drive as noShield for its entire applied IN/ACTIVE/OUT lifecycle.
     // noShield 立即取消碰撞防护，但视觉仍通过 currentArcDeg 平滑收拢。
-    if (this.system.isActive && this.system.type === 'BURN_DRIVE' && this.shield.isActive) {
+    if (this.system.blocksShields && this.shield.isActive) {
       this.lowerShieldWithFeedback();
     }
 
@@ -497,7 +713,7 @@ export class Ship {
     // 相位线圈的开启/维持成本由 Shield 状态机以硬幅能结算，绝不过载。
     if (this.shield.type !== 'PHASE' && this.shield.isActive && !this.flux.isOverloaded && !this.flux.isVenting) {
       const upkeepMult = this.system.getShieldUpkeepMultiplier();
-      this.flux.increaseFlux(this.shield.upkeepRate * upkeepMult * dt, false);
+      this.flux.increaseFlux(this.shield.upkeepRate * upkeepMult * tacticalDt, false);
     }
     if (this.shield.type === 'PHASE' && this.shield.isPhaseUpkeepActive) {
       this.flux.increaseFluxClamped(this.shield.phaseUpkeepPerSecond * dt, true);
@@ -506,9 +722,10 @@ export class Ship {
     // Fortress Shield 自身另有 2.5% 基础幅能容量/秒的硬幅能成本；
     // 不能被上面的 shield-upkeep 归零逻辑一并吞掉。
     if (!this.flux.isOverloaded && !this.flux.isVenting) {
-      const systemHardFluxPerSecond = this.system.getHardFluxPerSecond(this.spec.maxFlux);
+      this.flux.increaseFlux(this.system.getSoftFluxPerSecond() * tacticalDt, false);
+      const systemHardFluxPerSecond = this.system.getHardFluxPerSecond(this.flux.maxFlux);
       if (systemHardFluxPerSecond > 0) {
-        this.flux.increaseFlux(systemHardFluxPerSecond * dt, true);
+        this.flux.increaseFlux(systemHardFluxPerSecond * tacticalDt, true);
       }
     }
 
@@ -517,204 +734,56 @@ export class Ship {
     if (systemActivationFlux > 0) {
       this.flux.increaseFlux(systemActivationFlux, this.system.generatesHardFlux);
     }
-    this.flux.update(dt, this.shield.isActive);
+    const defenseActivationFlux = this.defenseSystem.consumePendingActivationFlux();
+    if (defenseActivationFlux > 0) this.flux.increaseFlux(defenseActivationFlux, this.defenseSystem.generatesHardFlux);
+    this.advanceHullModFlux(tacticalDt);
 
     // 2. 物理运动推力与转向 (相位下机动时限加速)
-    this.updateMotion(effectiveDt);
+    const engineCommands = this.updateMotion(effectiveDt);
 
     // 3. 护盾朝向与展开
     const aimAngle = Math.atan2(this.aimTargetWorld.y - this.pos.y, this.aimTargetWorld.x - this.pos.x);
-    this.shield.update(effectiveDt, this.facingRad, aimAngle);
+    this.shield.update(effectiveDt, this.facingRad, this.fireControlMode === 'AI' ? this.defenseFacingRad ?? aimAngle : aimAngle);
 
     // 4. 武器挂点瞄准与开火解算
-    this.weaponControl.update(effectiveDt, this, aimAngle, targetShip, spawnProjectile, spawnBeam, spawnMuzzleFlash);
+    this.weaponControl.update(effectiveDt, this, aimAngle, targetShip, spawnProjectile, spawnBeam, spawnMuzzleFlash, fireControlWorld);
 
-    // 5. 更新装甲灼烧与热斑冷却
+    // 5. 更新战损贴花的红热余辉；冷却后焦痕本体仍持续保留
     this.updateScorchMarks(dt);
 
-    // 6. 更新各个发动机熄火倒计时
-    for (const eng of this.engineStatuses) {
-      if (eng.isFlameout) {
-        eng.flameoutTimer -= dt;
-        if (eng.flameoutTimer <= 0) {
-          eng.isFlameout = false;
-          eng.flameoutTimer = 0;
-        }
+    // Native ship order: movement commands, component health, controller, then glow.
+    this.engineController.advance(effectiveDt, {
+      ...this.engineDisableContext, ...engineCommands, canRepair: !this.isDead && this.hullHp > 0,
+      repairTimeMultiplier: this.combatEngineRepairTimeMultiplier * this.system.getRepairTimeMultiplier(),
+      canRepairUnderFire: this.canRepairModulesUnderFire,
+      malfunctionChance: this.crEffects.engineMalfunctionChance,
+      criticalMalfunctionChance: this.crEffects.criticalMalfunctionChance,
+      onCriticalMalfunction: index => {
+        const slot = this.spec.engineSlots[index];
+        this.applyCriticalMalfunctionDamage(new Vector2(slot.x, slot.y));
       }
-    }
-
-    // 7. 相位潜航时空残影记录与衰减
-    if (this.isPhased) {
-      this.phaseGhostTimer += dt;
-      if (this.phaseGhostTimer >= 0.08) {
-        this.phaseGhostTimer = 0;
-        this.phaseGhosts.push({
-          pos: this.pos.clone(),
-          facingRad: this.facingRad,
-          alpha: 0.65,
-          life: 0.55,
-          maxLife: 0.55
-        });
-      }
-    }
-    for (let i = this.phaseGhosts.length - 1; i >= 0; i--) {
-      const g = this.phaseGhosts[i];
-      g.life -= dt;
-      g.alpha = Math.max(0, (g.life / g.maxLife) * 0.65);
-      if (g.life <= 0) {
-        this.phaseGhosts.splice(i, 1);
-      }
-    }
-  }
-
-  public addScorchMark(localPos: Vector2, damage: number) {
-    if (damage < 25) return;
-    const size = Math.min(45, 14 + Math.sqrt(damage) * 1.1);
-    const life = 10.0;
-    this.scorchMarks.push({
-      localPos: localPos.clone(),
-      intensity: 1.0,
-      size,
-      life,
-      maxLife: life
     });
-    // 限制最大贴花数以保持极高渲染帧率
-    if (this.scorchMarks.length > 28) {
-      this.scorchMarks.shift();
-    }
-  }
 
-  private updateScorchMarks(dt: number) {
-    for (let i = this.scorchMarks.length - 1; i >= 0; i--) {
-      const s = this.scorchMarks[i];
-      s.life -= dt;
-      s.intensity = Math.max(0, s.life / s.maxLife);
-      if (s.life <= 0) {
-        this.scorchMarks.splice(i, 1);
-      }
-    }
-  }
-
-  private updateMotion(dt: number) {
-    // 引擎健康度与星云流体阻尼系数 (发动机全灭时机动损失 70%)
-    const flameoutRatio = this.getFlameoutRatio();
-    const engineMult = Math.max(0.18, 1.0 - flameoutRatio * 0.72) * this.terrainSpeedMult;
-
-    // 战备值机动修正 (CRPluginImpl: 低于 50% 战备最多 -10%，高于 70% 最多 +10%)
-    const crMult = this.crMovementMultiplier;
-
-    // 转向加减速
-    const maxTurnRateRad = ((this.spec.maxTurnRateDeg * Math.PI) / 180) * engineMult * crMult;
-    const turnAccelRad = ((this.spec.turnAccelerationDeg * Math.PI) / 180) * engineMult * crMult;
-
-    // ship_systems.csv: Burn Drive has noTurning=true for the full system lifecycle.
-    const burnDriveLocked = this.system.isActive && this.system.type === 'BURN_DRIVE';
-    if (!burnDriveLocked && Math.abs(this.turnInput) > 0.01 && !this.flux.isOverloaded) {
-      this.angularVelRad += this.turnInput * turnAccelRad * dt;
-      this.angularVelRad = Math.max(-maxTurnRateRad, Math.min(maxTurnRateRad, this.angularVelRad));
+    // P.java retains seven recent poses for the coil masks, not fading hull copies.
+    if (this.shield.isPhaseEngaged) {
+      this.phaseGhosts.unshift({ pos: this.pos.clone(), facingRad: this.facingRad, alpha: 1, life: 1, maxLife: 1 });
+      if (this.phaseGhosts.length > 7) this.phaseGhosts.pop();
     } else {
-      // Existing angular momentum damps while turning input is unavailable.
-      this.angularVelRad *= Math.pow(0.05, dt);
+      this.phaseGhosts.length = 0;
     }
-    this.facingRad += this.angularVelRad * dt;
+  }
 
-    // 前进推力与极速 (对齐 BurnDriveStats.java: stats.getMaxSpeed().modifyFlat(200f))
-    let accel = (this.spec.acceleration + this.system.getAccelerationFlatBonus()) * engineMult * crMult;
-    let maxSpeed = (this.spec.maxSpeed + this.system.getSpeedFlatBonus()) * engineMult * crMult;
+  public syncWithArmorGridState(): void {
+    this.damageDecals.syncWithArmorGridState();
+  }
 
-    // 相位线圈硬幅能减速 (PhaseCloakStats.getSpeedMult: 基础阈值 50%，满缺口降至 33%)
-    if (this.shield.type === 'PHASE' && this.shield.isPhaseEngaged) {
-      const hardFluxLevel = this.flux.maxFlux > 0 ? this.flux.hardFlux / this.flux.maxFlux : 0;
-      maxSpeed *= this.shield.getPhaseSpeedMultiplier(hardFluxLevel);
-    }
+  public updateScorchMarks(dt: number): void {
+    this.damageDecals.advance(dt, this.hullHp / this.maxHullHp);
+  }
 
-    // 零幅能引擎推进加力 (严格对齐 settings.json: zeroFluxEngineBoost = 50)
-    if (this.flux.isEngineBoostActive) {
-      maxSpeed += 50 * engineMult;
-      accel += 50 * engineMult;
-    }
+  public getMotionStats() { return shipMotionStats(this); }
 
-    // 冲刺推进强制全功率前进且禁止侧移 (对齐 burndrive.system: alwaysAccelerate)
-    let curThrottle = this.throttle;
-    let curStrafe = this.strafeInput;
-    if (burnDriveLocked) {
-      // burndrive.system: alwaysAccelerate=true, noStrafing=true, noAccel=true (manual input disabled).
-      curThrottle = 1.0;
-      curStrafe = 0;
-    }
-
-    const forward = Vector2.fromAngle(this.facingRad);
-    const right = Vector2.fromAngle(this.facingRad + Math.PI / 2);
-
-    // 姿态推进器侧向平移加速度 (Maneuvering Thrusters: 85% 前向推力)
-    const strafeAccel = accel * 0.85;
-
-    let hasThrust = false;
-    if (Math.abs(curThrottle) > 0.01) {
-      this.vel.addScaled(forward, curThrottle * accel * dt);
-      hasThrust = true;
-    }
-    if (Math.abs(curStrafe) > 0.01) {
-      this.vel.addScaled(right, curStrafe * strafeAccel * dt);
-      hasThrust = true;
-    }
-
-    if (!hasThrust) {
-      // 线性阻尼自然制动
-      this.vel.scale(Math.pow(0.2, dt));
-    }
-
-    // 限速
-    const curSpeed = this.vel.length();
-    if (curSpeed > maxSpeed) {
-      this.vel.scale(maxSpeed / curSpeed);
-    }
-
-    // 坐标积分
-    this.pos.addScaled(this.vel, dt);
-
-    // 独立发动机平滑物理推力插值与差动转向模拟 (Engine Spooling & Differential Steering)
-    const isBurnDrive = burnDriveLocked;
-    const isBraking = curThrottle < -0.05;
-    const forwardCmd = Math.max(0, curThrottle);
-
-    for (let i = 0; i < this.engineStatuses.length; i++) {
-      const eng = this.engineStatuses[i];
-      const slot = this.spec.engineSlots[i];
-      if (!slot) continue;
-
-      let targetThrust = 0;
-      if (eng.isFlameout) {
-        targetThrust = 0;
-      } else if (isBurnDrive) {
-        targetThrust = 2.4;
-      } else if (isBraking) {
-        targetThrust = 0;
-      } else {
-        targetThrust = forwardCmd;
-
-        // 差动转向推力补偿 (Differential Steering)
-        if (Math.abs(this.turnInput) > 0.05) {
-          const steerSign = this.turnInput > 0 ? 1 : -1;
-          const yNorm = slot.y / (this.spec.collisionRadius * 0.4 || 40);
-          const steerBonus = yNorm * steerSign * Math.abs(this.turnInput) * 0.45;
-          targetThrust = Math.max(0.0, Math.min(1.0, targetThrust + steerBonus));
-        }
-
-        // 侧移辅助响应 (Strafe)
-        if (Math.abs(curStrafe) > 0.05 && slot.angleDeg !== 180) {
-          targetThrust = Math.max(targetThrust, Math.abs(curStrafe) * 0.7);
-        }
-      }
-
-      // 物理惯性平滑过渡 (升温起喷 ~0.26s，减速回火 ~0.38s)
-      const spoolRate = targetThrust > eng.currentThrust ? 3.8 : 2.6;
-      if (targetThrust > eng.currentThrust) {
-        eng.currentThrust = Math.min(targetThrust, eng.currentThrust + spoolRate * dt);
-      } else {
-        eng.currentThrust = Math.max(targetThrust, eng.currentThrust - spoolRate * dt);
-      }
-    }
+  private updateMotion(dt: number): { accelerating: boolean; spreading: boolean } {
+    return advanceShipMotion(this, dt);
   }
 }
-

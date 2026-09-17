@@ -1,9 +1,13 @@
+import { DEFAULT_PLAYER_HULL, DEFAULT_ENEMY_HULL } from '../data/SandboxDefaults';
 import { CapitalShipAI } from '../ai/CapitalShipAI';
 import type { ICombatRenderer } from '../render/ICombatRenderer';
 import { WebGLCombatRenderer, type WebGLRendererLifecycle } from '../render/webgl/WebGLCombatRenderer';
+import type { ShipSpec } from '../content/ShipSpec';
 import { CombatEngine } from '../simulation/CombatEngine';
+import type { BattleResult } from '../simulation/CombatStatistics';
 import { FixedTimestepScheduler } from '../simulation/FixedTimestepScheduler';
 import { Vector2 } from '../math/Vector2';
+import { CombatHudVisuals } from '../visual/CombatHudVisuals';
 import { VisualClock } from './VisualClock';
 import { VisualRandom } from './VisualRandom';
 import { PerformanceMetrics, type PerformanceReport } from './PerformanceMetrics';
@@ -41,6 +45,7 @@ export class CombatSession {
   public renderer: ICombatRenderer | null = null;
   public playerAI: CapitalShipAI;
   public readonly visualClock = new VisualClock();
+  public readonly hudVisuals = new CombatHudVisuals();
   public readonly visualRandom: VisualRandom;
   public readonly performance = new PerformanceMetrics();
   public readonly cameraController = new CameraController();
@@ -60,10 +65,31 @@ export class CombatSession {
   private readonly presentationListeners = new Set<(state: CombatPresentationState) => void>();
   private presentationGeneration = 0;
   private preparationRevision = 0;
+  private completedBattle: BattleResult | null = null;
+  private readonly battleListeners = new Set<() => void>();
+
+  public subscribeBattleCompleted(listener: () => void): () => void {
+    this.battleListeners.add(listener);
+    return () => this.battleListeners.delete(listener);
+  }
+
+  /** Install a new authoritative encounter; caller applies its roster before asset preparation. */
+  public beginEncounter(playerShipId: string | ShipSpec, enemyShipId: string | ShipSpec, seed: number): void {
+    if (this.state === 'disposed') throw new Error('Cannot reuse a disposed CombatSession');
+    this.setSeed(seed);
+    this.engine.switchPlayerShip(playerShipId, enemyShipId);
+    this.playerAI = new CapitalShipAI(this.engine.playerShip, this.engine.enemyShip);
+    this.completedBattle = null;
+    this.scheduler.reset();
+    this.visualClock.reset();
+    this.hudVisuals.reset();
+    this.renderer?.resetVisualState();
+    this.state = 'running';
+  }
 
   constructor(
-    playerShipId = 'onslaught',
-    enemyShipId = 'paragon',
+    playerShipId = DEFAULT_PLAYER_HULL,
+    enemyShipId = DEFAULT_ENEMY_HULL,
     seed = 0x51f15e,
     private readonly rendererFactory: CombatRendererFactory = (canvas, gl, lifecycle) => new WebGLCombatRenderer(canvas, gl, lifecycle)
   ) {
@@ -181,7 +207,7 @@ export class CombatSession {
       if (!this.isCurrentPresentationPreparation(renderer, generation, preparationRevision)) return;
       await contentManifestManager.ensureLoaded();
       if (!this.isCurrentPresentationPreparation(renderer, generation, preparationRevision)) return;
-      await renderer.prepareAssets();
+      await renderer.prepareAssets(this.engine);
     } catch (error) {
       if (!this.isCurrentPresentationPreparation(renderer, generation, preparationRevision)) return;
       this.failPresentation(generation, failureCode, error);
@@ -233,6 +259,30 @@ export class CombatSession {
     return this.assetPreparation;
   }
 
+  public refreshPresentationAssets(): void {
+    if (!this.renderer || this.state === 'disposed' || ['context-lost', 'restoring'].includes(this.presentationState.status)) return;
+    this.assetsReady = false;
+    this.setPresentationState({ status: 'loading', errorCode: null, errorMessage: null });
+    const preparation = this.preparePresentationResources(
+      this.renderer, this.presentationGeneration, ++this.preparationRevision, 'resource-prepare-failed'
+    );
+    this.assetPreparation = preparation;
+    void preparation.catch(() => {});
+  }
+
+  /** Detach a React presentation without destroying the retained simulation. */
+  public detachPresentation(): void {
+    if (this.state === 'disposed') return;
+    this.presentationGeneration++;
+    this.preparationRevision++;
+    this.assetsReady = false;
+    this.renderer?.dispose();
+    this.renderer = null;
+    this.canvas = null;
+    this.pause();
+    this.setPresentationState({ status: 'idle', errorCode: null, errorMessage: null });
+  }
+
   public pause(): void {
     if (this.state === 'disposed') return;
     this.visualClock.setPaused(true);
@@ -243,7 +293,7 @@ export class CombatSession {
     const damageEnabled = this.visualOptions.damage;
     const protectedShips = damageEnabled
       ? null
-      : [this.engine.playerShip, this.engine.enemyShip, ...this.engine.fighters, ...this.engine.bombers].map((ship) => ({
+      : this.engine.ships.map((ship) => ({
           ship,
           hullHp: ship.hullHp,
           isDead: ship.isDead,
@@ -259,7 +309,14 @@ export class CombatSession {
       battleResult: this.engine.battleResult
     };
 
-    this.engine.fixedUpdate(dt, { suppressDestructionSideEffects: !damageEnabled });
+    // Suppress damage callbacks while the lab temporarily applies/restores armor.
+    // Existing heat still advances; ignored hits create neither decals nor visual RNG draws.
+    if (protectedShips) for (const { ship } of protectedShips) ship.damageDecals.suppressed = true;
+    try {
+      this.engine.fixedUpdate(dt, { suppressDestructionSideEffects: !damageEnabled });
+    } finally {
+      if (protectedShips) for (const { ship } of protectedShips) ship.damageDecals.suppressed = false;
+    }
 
     if (protectedShips) {
       for (const snapshot of protectedShips) {
@@ -277,6 +334,12 @@ export class CombatSession {
       this.engine.statsTracker.playerStats = protectedStats.player;
       this.engine.statsTracker.enemyStats = protectedStats.enemy;
       this.engine.battleResult = protectedStats.battleResult;
+    }
+    // Emit once at the authoritative tick boundary, not from a React polling interval.
+    const report = this.engine.battleResult;
+    if (report && this.engine.isBattleResultReady && report !== this.completedBattle) {
+      this.completedBattle = report;
+      for (const listener of this.battleListeners) listener();
     }
   }
 
@@ -300,6 +363,7 @@ export class CombatSession {
   public updateVisualOnly(dt: number): void {
     if (this.state === 'disposed') return;
     const visualStart = performance.now();
+    this.hudVisuals.update(this.engine.playerShip, Math.max(0, dt));
     this.renderer?.updateVisual(this.engine, Math.max(0, dt), {
       visualTime: this.visualClock.time,
       random: this.visualRandom,
@@ -376,17 +440,27 @@ export class CombatSession {
     this.playerAI = new CapitalShipAI(this.engine.playerShip, this.engine.enemyShip);
     this.scheduler.reset();
     this.visualClock.reset();
+    this.hudVisuals.reset();
     this.renderer?.resetVisualState();
     if (this.state !== 'disposed') this.state = 'running';
+    this.refreshPresentationAssets();
+  }
+
+  public addShip(specId: string, isPlayer: boolean, pos: Vector2, facingRad = 0) {
+    const ship = this.engine.addShip(specId, isPlayer, pos, facingRad);
+    this.refreshPresentationAssets();
+    return ship;
   }
 
   public switchPlayerShip(shipId: string): void {
-    this.engine.resetBattle(shipId);
+    this.engine.switchPlayerShip(shipId);
     this.playerAI = new CapitalShipAI(this.engine.playerShip, this.engine.enemyShip);
     this.scheduler.reset();
     this.visualClock.reset();
+    this.hudVisuals.reset();
     this.renderer?.resetVisualState();
     if (this.state !== 'disposed') this.state = 'running';
+    this.refreshPresentationAssets();
   }
 
   public setSeed(seed: number): void {
@@ -424,5 +498,6 @@ export class CombatSession {
     this.state = 'disposed';
     this.setPresentationState({ status: 'disposed', errorCode: null, errorMessage: null });
     this.presentationListeners.clear();
+    this.battleListeners.clear();
   }
 }

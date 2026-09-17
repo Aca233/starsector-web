@@ -1,0 +1,2157 @@
+{
+  "afflictor": {
+    "builtInHullMods": [
+      "phasefield",
+      "delicate"
+    ],
+    "hints": []
+  },
+  "afflictor_d_pirates": {
+    "builtInHullMods": [
+      "phasefield",
+      "delicate"
+    ],
+    "hints": []
+  },
+  "anubis": {
+    "builtInHullMods": [
+      "design_compromises"
+    ],
+    "hints": []
+  },
+  "apex": {
+    "builtInHullMods": [
+      "automated",
+      "coherer"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "apogee": {
+    "builtInHullMods": [
+      "hiressensors",
+      "surveying_equipment"
+    ],
+    "hints": []
+  },
+  "aspect": {
+    "builtInHullMods": [
+      "automated",
+      "insulatedengine",
+      "fluxbreakers",
+      "turretgyros"
+    ],
+    "hints": [
+      "HIDE_IN_CODEX"
+    ]
+  },
+  "assault_unit": {
+    "builtInHullMods": [
+      "automated",
+      "threat_hullmod"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "astral": {
+    "builtInHullMods": [
+      "advancedcore",
+      "missleracks"
+    ],
+    "hints": [
+      "CARRIER"
+    ]
+  },
+  "atlas": {
+    "builtInHullMods": [
+      "civgrade"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "FREIGHTER"
+    ]
+  },
+  "atlas2": {
+    "builtInHullMods": [
+      "civgrade"
+    ],
+    "hints": []
+  },
+  "attack_swarm": {
+    "builtInHullMods": [
+      "threat_hullmod",
+      "fragment_swarm"
+    ],
+    "hints": []
+  },
+  "aurora": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "bastillon": {
+    "builtInHullMods": [
+      "automated",
+      "rugged"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "berserker": {
+    "builtInHullMods": [
+      "automated",
+      "rugged"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "brawler": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "brawler_LG": {
+    "builtInHullMods": [
+      "andrada_mods",
+      "solar_shielding",
+      "coherer"
+    ],
+    "hints": []
+  },
+  "brawler_pather": {
+    "builtInHullMods": [
+      "ill_advised",
+      "safetyoverrides"
+    ],
+    "hints": []
+  },
+  "brawler_tritachyon": {
+    "builtInHullMods": [
+      "insulatedengine"
+    ],
+    "hints": []
+  },
+  "brilliant": {
+    "builtInHullMods": [
+      "automated"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "broadsword": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "buffalo": {
+    "builtInHullMods": [
+      "civgrade"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "FREIGHTER"
+    ]
+  },
+  "buffalo2": {
+    "builtInHullMods": [
+      "civgrade"
+    ],
+    "hints": []
+  },
+  "buffalo_d": {
+    "builtInHullMods": [
+      "civgrade",
+      "degraded_engines"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "FREIGHTER"
+    ]
+  },
+  "buffalo_hegemony": {
+    "builtInHullMods": [
+      "civgrade",
+      "militarized_subsystems"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "FREIGHTER"
+    ]
+  },
+  "buffalo_luddic_church": {
+    "builtInHullMods": [
+      "civgrade"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "FREIGHTER"
+    ]
+  },
+  "buffalo_pirates": {
+    "builtInHullMods": [
+      "civgrade",
+      "shielded_holds"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "FREIGHTER"
+    ]
+  },
+  "buffalo_tritachyon": {
+    "builtInHullMods": [
+      "civgrade"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "FREIGHTER"
+    ]
+  },
+  "centurion": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "centurion_LG": {
+    "builtInHullMods": [
+      "andrada_mods",
+      "solar_shielding",
+      "coherer"
+    ],
+    "hints": []
+  },
+  "cerberus": {
+    "builtInHullMods": [
+      "rugged",
+      "shielded_holds"
+    ],
+    "hints": []
+  },
+  "cerberus_d": {
+    "builtInHullMods": [
+      "rugged",
+      "shielded_holds",
+      "comp_armor",
+      "faulty_grid"
+    ],
+    "hints": []
+  },
+  "cerberus_d_pirates": {
+    "builtInHullMods": [
+      "rugged",
+      "shielded_holds"
+    ],
+    "hints": []
+  },
+  "cerberus_luddic_path": {
+    "builtInHullMods": [
+      "rugged",
+      "shielded_holds",
+      "safetyoverrides",
+      "ill_advised"
+    ],
+    "hints": []
+  },
+  "champion": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "claw": {
+    "builtInHullMods": [
+      "no_weapon_flux"
+    ],
+    "hints": []
+  },
+  "cobra": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "colossus": {
+    "builtInHullMods": [
+      "civgrade"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "FREIGHTER"
+    ]
+  },
+  "colossus2": {
+    "builtInHullMods": [
+      "civgrade",
+      "ill_advised",
+      "safetyoverrides"
+    ],
+    "hints": [
+      "ALWAYS_PANIC"
+    ]
+  },
+  "colossus3": {
+    "builtInHullMods": [
+      "civgrade",
+      "converted_bay",
+      "ground_support"
+    ],
+    "hints": [
+      "CARRIER",
+      "COMBAT"
+    ]
+  },
+  "condor": {
+    "builtInHullMods": [],
+    "hints": [
+      "CARRIER"
+    ]
+  },
+  "conquest": {
+    "builtInHullMods": [
+      "hbi"
+    ],
+    "hints": []
+  },
+  "crig": {
+    "builtInHullMods": [
+      "civgrade",
+      "repair_gantry"
+    ],
+    "hints": [
+      "CIVILIAN"
+    ]
+  },
+  "dagger": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "defender": {
+    "builtInHullMods": [
+      "automated",
+      "rugged"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "dem_drone": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "derelict_mothership_bow_module": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "derelict_mothership_pod_engine_left": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "derelict_mothership_pod_m_left": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "derelict_mothership_pod_m_right": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "derelict_mothership_pod_s_right": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "derelict_mothership_sensor_mast": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "dominator": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "dominator_d": {
+    "builtInHullMods": [
+      "comp_armor",
+      "faulty_grid"
+    ],
+    "hints": []
+  },
+  "dominator_xiv": {
+    "builtInHullMods": [
+      "fourteenth"
+    ],
+    "hints": []
+  },
+  "doom": {
+    "builtInHullMods": [
+      "phasefield",
+      "delicate"
+    ],
+    "hints": []
+  },
+  "dram": {
+    "builtInHullMods": [
+      "civgrade"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "TANKER"
+    ]
+  },
+  "drone_assault": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "drone_borer": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "drone_pd": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "drone_pd_midline": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "drone_sensor": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "drone_terminator": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "drover": {
+    "builtInHullMods": [
+      "bdeck"
+    ],
+    "hints": [
+      "CARRIER",
+      "COMBAT"
+    ]
+  },
+  "eagle": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "eagle_LG": {
+    "builtInHullMods": [
+      "andrada_mods",
+      "solar_shielding",
+      "coherer"
+    ],
+    "hints": []
+  },
+  "eagle_d": {
+    "builtInHullMods": [
+      "degraded_engines",
+      "comp_armor",
+      "faulty_grid"
+    ],
+    "hints": []
+  },
+  "eagle_xiv": {
+    "builtInHullMods": [
+      "fourteenth"
+    ],
+    "hints": []
+  },
+  "enforcer": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "enforcer_d": {
+    "builtInHullMods": [
+      "degraded_engines",
+      "comp_armor",
+      "faulty_grid"
+    ],
+    "hints": []
+  },
+  "enforcer_d_pirates": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "enforcer_xiv": {
+    "builtInHullMods": [
+      "fourteenth"
+    ],
+    "hints": []
+  },
+  "eradicator": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "eradicator_pirates": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "executor": {
+    "builtInHullMods": [
+      "solar_shielding",
+      "andrada_mods",
+      "coherer"
+    ],
+    "hints": []
+  },
+  "fabricator_unit": {
+    "builtInHullMods": [
+      "automated",
+      "advancedcore",
+      "threat_hullmod"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "facet": {
+    "builtInHullMods": [
+      "automated",
+      "fluxbreakers",
+      "shard_spawner",
+      "do_not_back_off"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX"
+    ]
+  },
+  "falcon": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "falcon_LG": {
+    "builtInHullMods": [
+      "andrada_mods",
+      "solar_shielding",
+      "coherer"
+    ],
+    "hints": []
+  },
+  "falcon_d": {
+    "builtInHullMods": [
+      "degraded_engines",
+      "faulty_grid"
+    ],
+    "hints": []
+  },
+  "falcon_p": {
+    "builtInHullMods": [
+      "augmentedengines",
+      "unstable_injector"
+    ],
+    "hints": []
+  },
+  "falcon_xiv": {
+    "builtInHullMods": [
+      "fourteenth"
+    ],
+    "hints": []
+  },
+  "flare": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "flash": {
+    "builtInHullMods": [
+      "no_weapon_flux"
+    ],
+    "hints": []
+  },
+  "fulgent": {
+    "builtInHullMods": [
+      "automated",
+      "coherer"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "fury": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "gargoyle": {
+    "builtInHullMods": [
+      "supercomputer",
+      "fluxshunt"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "gemini": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "gladius": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "glimmer": {
+    "builtInHullMods": [
+      "automated"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "gremlin": {
+    "builtInHullMods": [
+      "rugged"
+    ],
+    "hints": []
+  },
+  "gremlin_d_pirates": {
+    "builtInHullMods": [
+      "rugged"
+    ],
+    "hints": []
+  },
+  "gremlin_luddic_path": {
+    "builtInHullMods": [
+      "rugged",
+      "safetyoverrides",
+      "ill_advised"
+    ],
+    "hints": []
+  },
+  "grendel": {
+    "builtInHullMods": [
+      "rugged",
+      "distributed_fire_control"
+    ],
+    "hints": []
+  },
+  "gryphon": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "guardian": {
+    "builtInHullMods": [
+      "automated",
+      "advancedcore",
+      "missile_reload"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "hammerhead": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "hammerhead_LG": {
+    "builtInHullMods": [
+      "andrada_mods",
+      "solar_shielding",
+      "coherer"
+    ],
+    "hints": []
+  },
+  "hammerhead_d": {
+    "builtInHullMods": [
+      "degraded_engines",
+      "comp_armor",
+      "faulty_grid"
+    ],
+    "hints": []
+  },
+  "harbinger": {
+    "builtInHullMods": [
+      "phasefield",
+      "delicate"
+    ],
+    "hints": []
+  },
+  "hermes": {
+    "builtInHullMods": [
+      "civgrade"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "FREIGHTER"
+    ]
+  },
+  "hermes_d": {
+    "builtInHullMods": [
+      "civgrade",
+      "degraded_engines"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "FREIGHTER"
+    ]
+  },
+  "heron": {
+    "builtInHullMods": [],
+    "hints": [
+      "CARRIER"
+    ]
+  },
+  "hive_unit": {
+    "builtInHullMods": [
+      "automated",
+      "threat_hullmod"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "hoplon": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "hound": {
+    "builtInHullMods": [
+      "rugged",
+      "shielded_holds"
+    ],
+    "hints": []
+  },
+  "hound_d": {
+    "builtInHullMods": [
+      "rugged",
+      "shielded_holds",
+      "degraded_engines"
+    ],
+    "hints": []
+  },
+  "hound_d_pirates": {
+    "builtInHullMods": [
+      "rugged",
+      "shielded_holds"
+    ],
+    "hints": []
+  },
+  "hound_hegemony": {
+    "builtInHullMods": [
+      "rugged",
+      "shielded_holds",
+      "armoredweapons"
+    ],
+    "hints": []
+  },
+  "hound_luddic_church": {
+    "builtInHullMods": [
+      "rugged",
+      "shielded_holds"
+    ],
+    "hints": []
+  },
+  "hound_luddic_path": {
+    "builtInHullMods": [
+      "rugged",
+      "shielded_holds",
+      "safetyoverrides",
+      "ill_advised"
+    ],
+    "hints": []
+  },
+  "hyperion": {
+    "builtInHullMods": [
+      "high_maintenance",
+      "delicate"
+    ],
+    "hints": []
+  },
+  "invictus": {
+    "builtInHullMods": [
+      "hbi",
+      "ablative_armor",
+      "distributed_fire_control",
+      "vast_hangar"
+    ],
+    "defenseSourceId": "canister_flak",
+    "hints": [
+      "NEVER_DODGE_MISSILES"
+    ]
+  },
+  "kite": {
+    "builtInHullMods": [
+      "civgrade"
+    ],
+    "hints": []
+  },
+  "kite_d": {
+    "builtInHullMods": [
+      "civgrade",
+      "degraded_engines",
+      "comp_armor",
+      "faulty_grid"
+    ],
+    "hints": []
+  },
+  "kite_hegemony": {
+    "builtInHullMods": [
+      "civgrade",
+      "militarized_subsystems"
+    ],
+    "hints": []
+  },
+  "kite_luddic_path": {
+    "builtInHullMods": [
+      "civgrade",
+      "safetyoverrides",
+      "ill_advised"
+    ],
+    "hints": []
+  },
+  "kite_original": {
+    "builtInHullMods": [
+      "civgrade"
+    ],
+    "hints": [
+      "CIVILIAN"
+    ]
+  },
+  "kite_pirates": {
+    "builtInHullMods": [
+      "civgrade"
+    ],
+    "hints": []
+  },
+  "lasher": {
+    "builtInHullMods": [
+      "ballistic_rangefinder"
+    ],
+    "hints": []
+  },
+  "lasher_d": {
+    "builtInHullMods": [
+      "ballistic_rangefinder",
+      "degraded_engines",
+      "faulty_grid"
+    ],
+    "hints": []
+  },
+  "lasher_luddic_church": {
+    "builtInHullMods": [
+      "ballistic_rangefinder"
+    ],
+    "hints": []
+  },
+  "lasher_pather": {
+    "builtInHullMods": [
+      "ballistic_rangefinder",
+      "safetyoverrides",
+      "ill_advised"
+    ],
+    "hints": []
+  },
+  "legion": {
+    "builtInHullMods": [],
+    "hints": [
+      "CARRIER",
+      "COMBAT",
+      "NO_AUTO_ESCORT"
+    ]
+  },
+  "legion_xiv": {
+    "builtInHullMods": [
+      "fourteenth"
+    ],
+    "hints": [
+      "CARRIER",
+      "COMBAT",
+      "NO_AUTO_ESCORT"
+    ]
+  },
+  "longbow": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "lumen": {
+    "builtInHullMods": [
+      "automated"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "lux": {
+    "builtInHullMods": [
+      "no_weapon_flux"
+    ],
+    "hints": []
+  },
+  "manticore": {
+    "builtInHullMods": [
+      "ballistic_rangefinder"
+    ],
+    "hints": []
+  },
+  "manticore_luddic_path": {
+    "builtInHullMods": [
+      "safetyoverrides",
+      "ill_advised"
+    ],
+    "hints": []
+  },
+  "manticore_pirates": {
+    "builtInHullMods": [
+      "ballistic_rangefinder"
+    ],
+    "hints": []
+  },
+  "medusa": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "mercury": {
+    "builtInHullMods": [
+      "civgrade"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "LINER"
+    ]
+  },
+  "mercury_d": {
+    "builtInHullMods": [
+      "civgrade",
+      "degraded_engines"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "LINER"
+    ]
+  },
+  "merlon": {
+    "builtInHullMods": [
+      "supercomputer"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "mining_drone": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "module_armour1": {
+    "builtInHullMods": [
+      "reduced_explosion",
+      "always_detaches"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_armour2": {
+    "builtInHullMods": [
+      "reduced_explosion",
+      "always_detaches"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_armour3": {
+    "builtInHullMods": [
+      "reduced_explosion",
+      "vastbulk",
+      "never_detaches",
+      "do_not_fire_through"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_armour4": {
+    "builtInHullMods": [
+      "reduced_explosion",
+      "vastbulk",
+      "never_detaches",
+      "do_not_fire_through"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_armour5": {
+    "builtInHullMods": [
+      "reduced_explosion",
+      "vastbulk",
+      "do_not_fire_through"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_bastion1_lowtech": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion",
+      "do_not_fire_through",
+      "always_detaches"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_bastion_pd1": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion",
+      "do_not_fire_through"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_blocker1": {
+    "builtInHullMods": [
+      "reduced_explosion",
+      "never_detaches",
+      "vastbulk",
+      "do_not_fire_through"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_blocker2": {
+    "builtInHullMods": [
+      "reduced_explosion",
+      "never_detaches",
+      "vastbulk"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_blocker2b": {
+    "builtInHullMods": [
+      "reduced_explosion",
+      "always_detaches",
+      "do_not_fire_through"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_blocker2c": {
+    "builtInHullMods": [
+      "reduced_explosion",
+      "always_detaches",
+      "do_not_fire_through"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_citadel1_lowtech": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion",
+      "do_not_fire_through",
+      "always_detaches"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_decor_midline1": {
+    "builtInHullMods": [
+      "vastbulk"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_decor_midline2": {
+    "builtInHullMods": [
+      "vastbulk",
+      "axialrotation"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_hightech_armour": {
+    "builtInHullMods": [
+      "reduced_explosion",
+      "always_detaches",
+      "anchorrotation",
+      "do_not_fire_through"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_hightech_attack": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion",
+      "missile_reload"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_hightech_attack_minelayer": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion",
+      "missile_reload"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_hightech_citadel": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion",
+      "anchorrotation",
+      "do_not_fire_through",
+      "missile_reload",
+      "always_detaches"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_hightech_decor": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "module_hightech_hangar": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion",
+      "missile_reload",
+      "chassis_storage"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_hightech_shield": {
+    "builtInHullMods": [
+      "anchorrotation",
+      "shield_always_on",
+      "reduced_explosion",
+      "always_detaches"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_hightech_strut": {
+    "builtInHullMods": [
+      "vastbulk",
+      "anchorrotation",
+      "never_detaches"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "UNDER_PARENT",
+      "MODULE"
+    ]
+  },
+  "module_large1_lowtech": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_large2_lowtech": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion",
+      "chassis_storage"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_midline_bastion": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion",
+      "do_not_fire_through"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_midline_broadside": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion",
+      "hbi"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_midline_citadel": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_midline_support": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion",
+      "chassis_storage",
+      "do_not_fire_through"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_onslaught_armor_left": {
+    "builtInHullMods": [
+      "reduced_explosion",
+      "always_detaches"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "module_onslaught_armor_right": {
+    "builtInHullMods": [
+      "reduced_explosion",
+      "always_detaches"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "monitor": {
+    "builtInHullMods": [
+      "fluxshunt"
+    ],
+    "hints": []
+  },
+  "mora": {
+    "builtInHullMods": [],
+    "hints": [
+      "CARRIER",
+      "COMBAT",
+      "NO_AUTO_ESCORT"
+    ]
+  },
+  "mudskipper": {
+    "builtInHullMods": [
+      "civgrade"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "LINER"
+    ]
+  },
+  "mudskipper2": {
+    "builtInHullMods": [
+      "civgrade",
+      "ill_advised",
+      "comp_storage"
+    ],
+    "hints": [
+      "LINER"
+    ]
+  },
+  "mule": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "mule_d": {
+    "builtInHullMods": [
+      "degraded_engines",
+      "erratic_injector",
+      "increased_maintenance"
+    ],
+    "hints": []
+  },
+  "mule_d_pirates": {
+    "builtInHullMods": [
+      "shielded_holds"
+    ],
+    "hints": []
+  },
+  "nebula": {
+    "builtInHullMods": [
+      "civgrade"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "LINER"
+    ]
+  },
+  "nova": {
+    "builtInHullMods": [
+      "automated"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "odyssey": {
+    "builtInHullMods": [
+      "hiressensors",
+      "eccm"
+    ],
+    "hints": []
+  },
+  "omen": {
+    "builtInHullMods": [
+      "hiressensors",
+      "ecm",
+      "eccm"
+    ],
+    "hints": []
+  },
+  "onslaught": {
+    "builtInHullMods": [
+      "hbi"
+    ],
+    "hints": []
+  },
+  "onslaught_mk1": {
+    "builtInHullMods": [
+      "automated",
+      "hbi",
+      "rugged"
+    ],
+    "hints": [
+      "SHIP_WITH_MODULES"
+    ]
+  },
+  "onslaught_xiv": {
+    "builtInHullMods": [
+      "hbi",
+      "fourteenth"
+    ],
+    "hints": []
+  },
+  "overseer_unit": {
+    "builtInHullMods": [
+      "automated",
+      "threat_hullmod"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "ox": {
+    "builtInHullMods": [
+      "drive_field_stabilizer",
+      "high_maintenance",
+      "civgrade"
+    ],
+    "hints": [
+      "CIVILIAN"
+    ]
+  },
+  "paragon": {
+    "builtInHullMods": [
+      "advancedcore"
+    ],
+    "hints": []
+  },
+  "pegasus": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "perdition": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "phaeton": {
+    "builtInHullMods": [
+      "civgrade"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "TANKER"
+    ]
+  },
+  "phantom": {
+    "builtInHullMods": [
+      "phasefield",
+      "delicate",
+      "advanced_ground_support"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "TRANSPORT"
+    ]
+  },
+  "picket": {
+    "builtInHullMods": [
+      "automated",
+      "rugged"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "piranha": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "platform1": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "prometheus": {
+    "builtInHullMods": [
+      "civgrade"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "TANKER"
+    ]
+  },
+  "prometheus2": {
+    "builtInHullMods": [
+      "civgrade"
+    ],
+    "hints": [
+      "ALWAYS_PANIC"
+    ]
+  },
+  "radiant": {
+    "builtInHullMods": [
+      "automated"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "rampart": {
+    "builtInHullMods": [
+      "automated",
+      "rugged"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "ravelin": {
+    "builtInHullMods": [
+      "supercomputer"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "remnant_armour1": {
+    "builtInHullMods": [
+      "reduced_explosion",
+      "always_detaches"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "remnant_armour2": {
+    "builtInHullMods": [
+      "reduced_explosion",
+      "always_detaches"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "remnant_armour3": {
+    "builtInHullMods": [
+      "reduced_explosion",
+      "always_detaches"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "remnant_hangar1": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "remnant_shield1": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "remnant_shield2": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "remnant_station1": {
+    "builtInHullMods": [
+      "vastbulk",
+      "axialrotation",
+      "supercomputer"
+    ],
+    "hints": [
+      "STATION",
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX"
+    ]
+  },
+  "remnant_station2": {
+    "builtInHullMods": [
+      "vastbulk",
+      "axialrotation",
+      "supercomputer",
+      "shared_flux_sink"
+    ],
+    "hints": [
+      "STATION",
+      "UNBOARDABLE"
+    ]
+  },
+  "remnant_weapon_platform1": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "remnant_weapon_platform2": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "remnant_weapon_platform3": {
+    "builtInHullMods": [
+      "supercomputer",
+      "reduced_explosion"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX",
+      "MODULE"
+    ]
+  },
+  "retribution": {
+    "builtInHullMods": [
+      "distributed_fire_control"
+    ],
+    "hints": []
+  },
+  "revenant": {
+    "builtInHullMods": [
+      "phasefield",
+      "delicate"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "TANKER",
+      "FREIGHTER"
+    ]
+  },
+  "sarissa": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "scarab": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "scintilla": {
+    "builtInHullMods": [
+      "automated"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "CARRIER"
+    ]
+  },
+  "sentry": {
+    "builtInHullMods": [
+      "automated",
+      "rugged"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "shade": {
+    "builtInHullMods": [
+      "phasefield",
+      "delicate"
+    ],
+    "hints": []
+  },
+  "shade_d_pirates": {
+    "builtInHullMods": [
+      "phasefield",
+      "delicate"
+    ],
+    "hints": []
+  },
+  "shard_left": {
+    "builtInHullMods": [
+      "automated",
+      "fluxbreakers",
+      "shard_spawner",
+      "do_not_back_off"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX"
+    ]
+  },
+  "shard_right": {
+    "builtInHullMods": [
+      "automated",
+      "fluxbreakers",
+      "shard_spawner",
+      "do_not_back_off"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX"
+    ]
+  },
+  "shepherd": {
+    "builtInHullMods": [
+      "civgrade",
+      "surveying_equipment",
+      "repair_gantry"
+    ],
+    "hints": [
+      "CARRIER"
+    ]
+  },
+  "shrike": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "shrike_pirates": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "shrouded_ejecta": {
+    "builtInHullMods": [
+      "dweller_hullmod"
+    ],
+    "hints": []
+  },
+  "shrouded_eye": {
+    "builtInHullMods": [
+      "dweller_hullmod"
+    ],
+    "hints": [
+      "COMBAT",
+      "UNBOARDABLE"
+    ]
+  },
+  "shrouded_maelstrom": {
+    "builtInHullMods": [
+      "dweller_hullmod"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "shrouded_maw": {
+    "builtInHullMods": [
+      "dweller_hullmod"
+    ],
+    "hints": [
+      "COMBAT",
+      "UNBOARDABLE"
+    ]
+  },
+  "shrouded_tendril": {
+    "builtInHullMods": [
+      "dweller_hullmod"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "shrouded_vortex": {
+    "builtInHullMods": [
+      "dweller_hullmod"
+    ],
+    "hints": []
+  },
+  "shuttlepod": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "skirmish_unit": {
+    "builtInHullMods": [
+      "automated",
+      "threat_hullmod"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "spark": {
+    "builtInHullMods": [
+      "no_weapon_flux"
+    ],
+    "hints": []
+  },
+  "standoff_unit": {
+    "builtInHullMods": [
+      "automated",
+      "threat_hullmod"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "starliner": {
+    "builtInHullMods": [
+      "civgrade"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "LINER"
+    ]
+  },
+  "station1": {
+    "builtInHullMods": [
+      "vastbulk",
+      "axialrotation",
+      "supercomputer",
+      "shared_flux_sink"
+    ],
+    "hints": [
+      "STATION",
+      "UNBOARDABLE"
+    ]
+  },
+  "station1_hightech": {
+    "builtInHullMods": [
+      "vastbulk",
+      "axialrotation",
+      "supercomputer",
+      "shared_flux_sink"
+    ],
+    "hints": [
+      "STATION",
+      "UNBOARDABLE"
+    ]
+  },
+  "station1_midline": {
+    "builtInHullMods": [
+      "vastbulk",
+      "axialrotation",
+      "supercomputer",
+      "shared_flux_sink"
+    ],
+    "hints": [
+      "STATION",
+      "UNBOARDABLE"
+    ]
+  },
+  "station2": {
+    "builtInHullMods": [
+      "vastbulk",
+      "axialrotation",
+      "supercomputer",
+      "shared_flux_sink"
+    ],
+    "hints": [
+      "STATION",
+      "UNBOARDABLE"
+    ]
+  },
+  "station2_hightech": {
+    "builtInHullMods": [
+      "vastbulk",
+      "axialrotation",
+      "supercomputer",
+      "shared_flux_sink"
+    ],
+    "hints": [
+      "STATION",
+      "UNBOARDABLE"
+    ]
+  },
+  "station2_midline": {
+    "builtInHullMods": [
+      "vastbulk",
+      "axialrotation",
+      "supercomputer",
+      "shared_flux_sink"
+    ],
+    "hints": [
+      "STATION",
+      "UNBOARDABLE"
+    ]
+  },
+  "station3": {
+    "builtInHullMods": [
+      "vastbulk",
+      "axialrotation",
+      "supercomputer",
+      "stealth_minefield_lt",
+      "shared_flux_sink"
+    ],
+    "hints": [
+      "STATION",
+      "UNBOARDABLE"
+    ]
+  },
+  "station3_hightech": {
+    "builtInHullMods": [
+      "vastbulk",
+      "axialrotation",
+      "supercomputer",
+      "shared_flux_sink"
+    ],
+    "hints": [
+      "STATION",
+      "UNBOARDABLE"
+    ]
+  },
+  "station3_midline": {
+    "builtInHullMods": [
+      "vastbulk",
+      "axialrotation",
+      "supercomputer",
+      "stealth_minefield",
+      "shared_flux_sink"
+    ],
+    "hints": [
+      "STATION",
+      "UNBOARDABLE"
+    ]
+  },
+  "station_derelict_survey_mothership": {
+    "builtInHullMods": [
+      "vastbulk",
+      "axialrotation",
+      "supercomputer"
+    ],
+    "hints": [
+      "STATION",
+      "UNBOARDABLE"
+    ]
+  },
+  "station_small": {
+    "builtInHullMods": [
+      "axialrotation",
+      "supercomputer"
+    ],
+    "hints": [
+      "SHIP_WITH_MODULES",
+      "HIDE_IN_CODEX"
+    ]
+  },
+  "sunder": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "sunder_LG": {
+    "builtInHullMods": [
+      "andrada_mods",
+      "solar_shielding",
+      "coherer"
+    ],
+    "hints": []
+  },
+  "sunder_d": {
+    "builtInHullMods": [
+      "faulty_grid"
+    ],
+    "hints": []
+  },
+  "talon": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "talon_tritachyon": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "tarsus": {
+    "builtInHullMods": [
+      "civgrade"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "FREIGHTER"
+    ]
+  },
+  "tarsus_d": {
+    "builtInHullMods": [
+      "civgrade",
+      "degraded_engines"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "FREIGHTER"
+    ]
+  },
+  "tempest": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "tesseract": {
+    "builtInHullMods": [
+      "automated",
+      "fluxbreakers",
+      "shard_spawner"
+    ],
+    "hints": [
+      "UNBOARDABLE",
+      "HIDE_IN_CODEX"
+    ]
+  },
+  "thunder": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "trident": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "valkyrie": {
+    "builtInHullMods": [
+      "ground_support"
+    ],
+    "hints": [
+      "CIVILIAN",
+      "TRANSPORT"
+    ]
+  },
+  "vanguard": {
+    "builtInHullMods": [
+      "rugged"
+    ],
+    "defenseSourceId": "damper",
+    "hints": []
+  },
+  "vanguard_pirates": {
+    "builtInHullMods": [
+      "rugged"
+    ],
+    "defenseSourceId": "damper",
+    "hints": []
+  },
+  "venture": {
+    "builtInHullMods": [
+      "civgrade",
+      "surveying_equipment"
+    ],
+    "hints": []
+  },
+  "venture_p": {
+    "builtInHullMods": [
+      "civgrade",
+      "surveying_equipment",
+      "comp_storage"
+    ],
+    "hints": []
+  },
+  "venture_pather": {
+    "builtInHullMods": [
+      "civgrade",
+      "surveying_equipment",
+      "ill_advised"
+    ],
+    "hints": []
+  },
+  "vigilance": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "warden": {
+    "builtInHullMods": [
+      "automated",
+      "rugged"
+    ],
+    "hints": [
+      "UNBOARDABLE"
+    ]
+  },
+  "warthog": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "wasp": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "wayfarer": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "wolf": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "wolf_d": {
+    "builtInHullMods": [
+      "degraded_engines",
+      "faulty_grid"
+    ],
+    "hints": []
+  },
+  "wolf_d_pirates": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "wolf_hegemony": {
+    "builtInHullMods": [],
+    "hints": []
+  },
+  "xyphos": {
+    "builtInHullMods": [
+      "no_weapon_flux"
+    ],
+    "hints": []
+  },
+  "ziggurat": {
+    "builtInHullMods": [
+      "phasefield",
+      "delicate",
+      "ex_phase_coils"
+    ],
+    "hints": []
+  }
+}

@@ -1,0 +1,29 @@
+import { useLayoutEffect, useRef } from 'react';
+import type { ReactNode } from 'react';
+import type { EquipmentHover } from './useEquipmentHover';
+import './equipment-tooltip.css';
+
+export function EquipmentTooltip({ hover, children, className = '', preferSide = false }: {
+  hover: EquipmentHover; children: ReactNode; className?: string; preferSide?: boolean;
+}) {
+  const ref = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const card = ref.current, anchor = hover.active?.anchor;
+    if (!card || !anchor?.isConnected) return;
+    const position = () => {
+      const a = anchor.getBoundingClientRect(), box = card.getBoundingClientRect();
+      const maxX = window.innerWidth - box.width - 8, maxY = window.innerHeight - box.height - 8;
+      let x = a.right - box.width, y = a.top - box.height - 6;
+      if (preferSide && a.right + box.width + 8 <= window.innerWidth - 8) { x = a.right + 8; y = a.top; }
+      else if (preferSide && a.left - box.width - 8 >= 8) { x = a.left - box.width - 8; y = a.top; }
+      else if (y < 8) y = a.bottom + 6;
+      card.style.left = `${Math.round(Math.max(8, Math.min(x, maxX)))}px`;
+      card.style.top = `${Math.round(Math.max(8, Math.min(y, maxY)))}px`;
+    };
+    position(); const observer = new ResizeObserver(position); observer.observe(card);
+    return () => observer.disconnect();
+  }, [hover.active, preferSide]);
+  if (!hover.active) return null;
+  return <aside ref={ref} id={hover.tooltipId} role="tooltip" data-equipment-tooltip className={`equipment-tooltip ${className}`}
+    onMouseEnter={hover.keep} onMouseLeave={hover.leave} onFocus={hover.keep} onBlur={hover.leave}>{children}</aside>;
+}

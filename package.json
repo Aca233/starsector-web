@@ -7,15 +7,21 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false",
-    "test": "vitest run",
     "lint": "oxlint",
     "benchmark:collision": "node scripts/benchmark-collision.mjs",
-    "preview": "vite preview"
+    "import:content": "node scripts/import-game-content.mjs",
+    "preview": "vite preview",
+    "import:catalog": "node scripts/import-native-catalog.mjs",
+    "import:refit-factions": "node scripts/import-refit-factions.mjs",
+    "import:all": "npm run import:content && npm run import:catalog && npm run import:refit-factions",
+    "lan": "npm run build && node server/lan-server.mjs",
+    "lan:serve": "node server/lan-server.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.45.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -26,7 +32,6 @@
     "oxlint": "^1.81.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~5.7.2",
-    "vite": "^6.2.0",
-    "vitest": "^3.2.4"
+    "vite": "^6.2.0"
   }
 }

@@ -11,7 +11,7 @@ New-Item -ItemType Directory -Force -Path $destRoot | Out-Null
 
 $pattern = '(?:/game-assets/)?((?:graphics|sounds)/[^''"\s)]+\.(?:png|jpg|jpeg|ogg|wav|fnt|ttf))'
 $paths = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src') -Recurse -File -Include *.ts,*.tsx,*.css | ForEach-Object {
+Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src') -Recurse -File -Include *.ts,*.tsx,*.css,*.json | ForEach-Object {
   $text = [IO.File]::ReadAllText($_.FullName)
   foreach ($match in [regex]::Matches($text, $pattern, [Text.RegularExpressions.RegexOptions]::IgnoreCase)) {
     $relative = $match.Groups[1].Value.Replace('/', '\')
@@ -44,7 +44,7 @@ foreach ($relative in ($paths | Sort-Object)) {
       # Only tiling FX textures should repeat. Weapon sprites such as
       # graphics/weapons/graviton_beam_*.png contain "beam" in the filename
       # but must keep clamp sampling at their transparent sprite bounds.
-      wrap = if ($relative -match '^graphics\\fx\\.*(?:beam|shield|contrail)') {'repeat'} else {'clamp'}
+      wrap = if ($relative -match '^graphics\\fx\\.*(?:beam|shield|contrail|engineglow)') {'repeat'} else {'clamp'}
       minFilter = 'linear'; magFilter = 'linear'; mipmap = $false
     }
   }

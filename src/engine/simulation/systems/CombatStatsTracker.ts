@@ -1,5 +1,5 @@
 import { DamageType } from '../ArmorGrid';
-import { FleetCombatStats, BattleResult, BattleRank } from '../CombatStatistics';
+import { FleetCombatStats, BattleResult } from '../CombatStatistics';
 
 /**
  * 全息战斗数据统计与战果裁决器 (CombatStatsTracker)
@@ -52,10 +52,11 @@ export class CombatStatsTracker {
     type: DamageType,
     amount: number,
     targetArea: 'SHIELD' | 'ARMOR' | 'HULL',
-    empAmount = 0
+    empAmount = 0,
+    isPlayerTarget = !isPlayerAttacker
   ) {
     const attacker = isPlayerAttacker ? this.playerStats : this.enemyStats;
-    const defender = isPlayerAttacker ? this.enemyStats : this.playerStats;
+    const defender = isPlayerTarget ? this.playerStats : this.enemyStats;
 
     attacker.totalDamageDealt += amount;
     if (empAmount > 0) attacker.empDamageDealt += empAmount;
@@ -112,29 +113,16 @@ export class CombatStatsTracker {
     combatDuration: number,
     playerSpecId: string,
     enemySpecId: string,
-    playerHullRatio: number
+    playerHullRatio: number,
+    enemyHullRatio: number
   ): BattleResult {
-    let rank: BattleRank = 'D';
-    if (isVictory) {
-      if (playerHullRatio >= 0.8 && combatDuration <= 60 && this.playerStats.overloadsSuffered === 0) {
-        rank = 'S';
-      } else if (playerHullRatio >= 0.5) {
-        rank = 'A';
-      } else if (playerHullRatio >= 0.25) {
-        rank = 'B';
-      } else {
-        rank = 'C';
-      }
-    } else {
-      rank = 'D';
-    }
-
     return {
       isVictory,
       combatDuration,
-      rank,
       playerShipSpecId: playerSpecId,
       enemyShipSpecId: enemySpecId,
+      playerHullDamageRatio: Math.max(0, Math.min(1, 1 - playerHullRatio)),
+      enemyHullDamageRatio: Math.max(0, Math.min(1, 1 - enemyHullRatio)),
       playerStats: { ...this.playerStats },
       enemyStats: { ...this.enemyStats }
     };

@@ -1,194 +1,132 @@
 import { Vector2 } from '../../math/Vector2';
-import { SpatialMine } from '../CombatTypes';
-import { DamageType } from '../ArmorGrid';
-import { Ship } from '../Ship';
+import type { SpatialMine } from '../CombatTypes';
+import type { Ship } from '../Ship';
+import type { Projectile, ProjectileExplosionSpec } from '../Weapon';
+import type { WeaponSimContext } from './weapon/WeaponSimContext';
+import { ProjectileExplosionSystem } from './weapon/ProjectileExplosionSystem';
+import { getShipExplosionContact } from '../collision/ExplosionContact';
 import { sound } from '../../audio/SoundManager';
 import { SimulationRandom } from '../SimulationRandom';
+import spec from '../../data/generated/mine-spec.json';
 
-export interface MineFXCallbacks {
-  spawnShieldRipple: (pos: Vector2, maxRadius: number, color: [number, number, number]) => void;
-  spawnSparks: (pos: Vector2, count: number, color: [number, number, number]) => void;
-  spawnAuthenticExplosion: (pos: Vector2, radius: number, color: [number, number, number], hasShockwave?: boolean) => void;
-  spawnDebris: (pos: Vector2, count: number, color: [number, number, number], speed: number) => void;
-  spawnExplosion: (pos: Vector2, count: number) => void;
-  spawnEmpArc: (from: Vector2, to: Vector2) => void;
-  addFloatingDamage: (pos: Vector2, amount: number, color: [number, number, number]) => void;
-  addCameraShake: (intensity: number, duration: number) => void;
-  getPlayerPos: () => Vector2;
-  handleShipDestruction: (ship: Ship) => void;
-  /** Battle statistics: mine detonations are real damage and must feed the result screen. */
-  recordDamageDealt?: (
-    isPlayerAttacker: boolean,
-    damageType: DamageType,
-    amount: number,
-    targetArea: 'SHIELD' | 'ARMOR' | 'HULL'
-  ) => void;
-}
+const fuse = spec.behaviorSpec;
+const explosionSpec: ProjectileExplosionSpec = {
+  ...fuse.explosionSpec, minDamageFraction: 0.5,
+  particleColor: [...fuse.explosionSpec.particleColor] as [number, number, number, number],
+  explosionColor: [...fuse.explosionSpec.explosionColor] as [number, number, number, number],
+};
 
+/** MineStrikeStats + GuidedProximityFuseAI timing/data. Steering is a Web adapter,
+ * not the complete native MissileAI; damage uses the shared explosion contact path. */
 export class MineSystem {
   public mines: SpatialMine[] = [];
+  private explosions = new ProjectileExplosionSystem();
 
-  constructor(
-    private readonly random = new SimulationRandom(),
-    private readonly visualRandom = new SimulationRandom(0x4d494e45)
-  ) {}
+  constructor(private readonly random = new SimulationRandom(),
+    private readonly visualRandom = new SimulationRandom(0x4d494e45)) {}
 
-  public clear() {
-    this.mines = [];
+  public clear(): void { this.mines = []; this.explosions.active = []; }
+
+  public deployMine(target: Vector2, source: Ship, ctx: WeaponSimContext, range = 1000): void {
+    const delta = target.clone().sub(source.pos), maxRange = Math.max(0, range) + source.spec.collisionRadius;
+    let center = delta.length() > maxRange ? source.pos.clone().add(delta.normalize().scale(maxRange)) : target.clone();
+    const clear = (pos: Vector2) => !(ctx.ships ?? []).some(s => s.spec.hullSize !== 'FIGHTER'
+      && pos.distanceTo(s.getShieldCenter()) < s.shield.radius + (s.spec.hullSize === 'FRIGATE' ? 110 : 75))
+      && !(ctx.asteroids ?? []).some(a => pos.distanceTo(a.pos) < a.radius + 75);
+    if (!clear(center)) {
+      const tried: Vector2[] = [];
+      let found: Vector2 | undefined;
+      for (let ring = 1; ring <= 32 && !found; ring *= 2) {
+        const start = this.random.next() * Math.PI * 2;
+        for (let i = 0; i < 6; i++) {
+          const p = center.clone().add(Vector2.fromAngle(start + i * Math.PI / 3, 50 * ring));
+          tried.push(p);
+          if (clear(p)) { found = p; break; }
+        }
+      }
+      center = found ?? tried[Math.floor(this.random.next() * tried.length)] ?? center;
+    }
+    const offset = () => center.clone().add(Vector2.fromAngle(this.random.next() * Math.PI * 2, 30 + this.random.next() * 30));
+    let pos = offset();
+    const start = this.random.next() * Math.PI * 2;
+    for (let i = 0; i <= 12; i++) {
+      if (i > 0) pos = center.clone().add(Vector2.fromAngle(start + i * Math.PI / 6, 50 + this.random.next() * 30));
+      if (!this.mines.some(m => m.pos.distanceTo(pos) < spec.collisionRadius + 40)) break;
+      if (i === 12) pos = offset();
+    }
+    this.mines.push({ id: this.random.next(), pos, vel: new Vector2(), sourceShipId: source.id,
+      sourceIsPlayer: source.isPlayer, age: 0, windupPlayed: false,
+      detonatingTimer: fuse.delay, isDetonating: false, triggerRadius: fuse.range,
+      explosionRadius: explosionSpec.radius, damage: spec.damage * source.crDamageDealtMultiplier,
+      life: 5, rotation: this.visualRandom.next() * Math.PI * 2 });
+    const m = this.mines[this.mines.length - 1];
+    ctx.projectiles?.push({ id: m.id, sourceShipId: m.sourceShipId, isPlayer: m.sourceIsPlayer,
+      specId: spec.id, pos: m.pos, prevPos: m.pos.clone(), vel: m.vel,
+      damage: m.damage, damageType: 'HIGH_EXPLOSIVE', radius: spec.collisionRadius,
+      rangeRemaining: Infinity, totalRange: Infinity, elapsedTime: 0, color: [148, 70, 211],
+      renderTargetIndicator: (spec as { renderTargetIndicator?: boolean }).renderTargetIndicator,
+      isRocket: true, isMine: true, hitpoints: spec.hitpoints, maxHitpoints: spec.hitpoints,
+      missileExplosionVisualSpec: { radius: spec.explosionRadius, color: [148, 0, 211, 255] } });
+    sound.playAtPos('mine_teleport', pos, ctx.playerShip.pos, 0.9);
   }
 
-  public deployMine(targetPos: Vector2, sourceShip: Ship, fx: MineFXCallbacks) {
-    const playerPos = fx.getPlayerPos();
-    const maxDeployRange = 1000 + sourceShip.spec.collisionRadius;
-    const fromSource = targetPos.clone().sub(sourceShip.pos);
-    const deployPos = fromSource.length() > maxDeployRange
-      ? sourceShip.pos.clone().add(fromSource.normalize().scale(maxDeployRange))
-      : targetPos.clone();
-    sound.playAtPos('mine_teleport', deployPos, playerPos, 0.9);
-    // 空间折跃能量环
-    fx.spawnShieldRipple(deployPos, 80, [150, 100, 255]);
-    fx.spawnSparks(deployPos, 25, [180, 120, 255]);
-
-    this.mines.push({
-      id: this.random.next(),
-      pos: deployPos,
-      vel: new Vector2(),
-      sourceShipId: sourceShip.id,
-      sourceIsPlayer: sourceShip.isPlayer,
-      armedTimer: 1.2,
-      isArmed: false,
-      detonatingTimer: 0.6,
-      isDetonating: false,
-      triggerRadius: 220,
-      explosionRadius: 380,
-      damage: 1000,
-      life: 5.0,
-      pingTimer: 0.5,
-      rotation: this.visualRandom.next() * Math.PI * 2
-    });
-  }
-
-  public update(dt: number, ships: Ship[], fx: MineFXCallbacks) {
-    const playerPos = fx.getPlayerPos();
-
+  public update(dt: number, ctx: WeaponSimContext): void {
+    if (dt <= 0) return;
+    this.explosions.update(dt, ctx);
     for (let i = this.mines.length - 1; i >= 0; i--) {
-      const mine = this.mines[i];
-      mine.life -= dt;
-      mine.rotation += dt * 0.5;
-
-      if (mine.life <= 0) {
-        this.mines.splice(i, 1);
-        continue;
-      }
-
-      // 1. 激活武装计时
-      if (!mine.isArmed) {
-        mine.armedTimer -= dt;
-        if (mine.armedTimer <= 0) {
-          mine.isArmed = true;
+      const m = this.mines[i];
+      const projectile = ctx.projectiles?.find(p => p.id === m.id && p.isMine);
+      if (ctx.projectiles && !projectile) { this.mines.splice(i, 1); continue; }
+      projectile?.prevPos.copy(m.pos);
+      m.age += dt;
+      if (m.isDetonating) {
+        // The native three seconds start at priming, not at deployment.
+        m.detonatingTimer -= dt;
+        if (!m.windupPlayed && m.detonatingTimer < fuse.windupDelay) {
+          m.windupPlayed = true;
+          sound.playAtPos(fuse.windupSound, m.pos, ctx.playerShip.pos, 1);
         }
-      }
-
-      // 归属方判定：发射舰可能已被击毁，回退到部署时记录的阵营快照
-      const sourceIsPlayer = ships.find(s => s.id === mine.sourceShipId)?.isPlayer ?? mine.sourceIsPlayer;
-
-      // 2. 周期性雷达警示音与光环
-      mine.pingTimer -= dt;
-      if (mine.pingTimer <= 0) {
-        mine.pingTimer = 0.7;
-        sound.playAtPos('mine_ping', mine.pos, playerPos, 0.5);
-        fx.spawnShieldRipple(mine.pos, mine.isDetonating ? 120 : 60, [255, 60, 60]);
-      }
-
-      // 3. 引信侦测与引爆倒计时
-      if (mine.isArmed && !mine.isDetonating) {
-        // 引信沿用原版 minelayer_mine_heavy.proj 的 "collisionClass":"MISSILE_NO_FF"：
-        // 只识别敌对方目标，友方战机/母舰不会引爆自己的空雷（爆炸本体仍为 MISSILE_FF，可杀伤友军）。
-        for (const ship of ships) {
-          if (ship.id === mine.sourceShipId || ship.isDead || ship.isPhased) continue;
-          if (ship.isPlayer === sourceIsPlayer) continue;
-          const dist = mine.pos.distanceTo(ship.pos);
-          if (dist <= mine.triggerRadius + ship.spec.collisionRadius * 0.5) {
-            mine.isDetonating = true;
-            sound.playAtPos('mine_windup', mine.pos, playerPos, 0.9);
-            break;
-          }
-        }
-      }
-
-      // 4. 引爆阶段
-      if (mine.isDetonating) {
-        mine.detonatingTimer -= dt;
-        // 临近爆炸火花激涌
-        if (this.visualRandom.next() < 0.5) {
-          fx.spawnSparks(mine.pos, 4, [255, 80, 50]);
-        }
-
-        if (mine.detonatingTimer <= 0) {
-          // 产生巨型爆轰！
-          sound.playAtPos('mine_explosion', mine.pos, playerPos, 1.0);
-          fx.spawnAuthenticExplosion(mine.pos, 120, [255, 90, 40], true);
-          fx.spawnSparks(mine.pos, 45, [255, 180, 60]);
-          fx.spawnDebris(mine.pos, 12, [140, 110, 90], 180);
-          fx.addCameraShake(18, 0.4);
-
-          // 空间范围伤害判定
-          for (const target of ships) {
-            if (target.isDead || target.isPhased) continue;
-            const dist = mine.pos.distanceTo(target.pos);
-            if (dist <= mine.explosionRadius) {
-              const damageFalloff = 1.0 - (dist / mine.explosionRadius) * 0.4;
-              const dmg = mine.damage * damageFalloff;
-
-              // 护盾阻挡判定
-              if (target.isShieldPointBlocked(mine.pos)) {
-                const shieldMult = target.system.getShieldDamageMultiplier();
-                // Shield.absorbDamage() applies the HE-vs-shield multiplier; the
-                // system multiplier and the CR damage-taken multiplier must each be
-                // applied exactly once before that API.
-                const absorbedDmg = dmg * shieldMult * target.crDamageTakenMultiplier;
-                const hitAngle = mine.pos.clone().sub(target.getShieldCenter()).heading();
-                const fluxGain = target.shield.absorbDamage(absorbedDmg, 'HIGH_EXPLOSIVE', hitAngle);
-                target.flux.increaseFlux(fluxGain, true);
-                fx.recordDamageDealt?.(sourceIsPlayer ?? false, 'HIGH_EXPLOSIVE', absorbedDmg, 'SHIELD');
-                fx.addFloatingDamage(mine.pos, absorbedDmg, [80, 200, 255]);
-                fx.spawnShieldRipple(mine.pos, 90, [255, 120, 50]);
-              } else {
-                // 装甲与船体毁灭破坏 (战备值 CR 同样影响空雷的实际承伤；
-                // hitStrength 保持空雷标称伤害，避免修正被装甲减伤公式二次放大)
-                const impactDmg = dmg * target.crDamageTakenMultiplier;
-                const localImpact = mine.pos.clone().sub(target.pos).rotate(-target.facingRad);
-                const res = target.armor.takeDamage(localImpact, impactDmg, 'HIGH_EXPLOSIVE', dmg, false);
-                target.hullHp = Math.max(0, target.hullHp - res.hullDamage);
-                target.addScorchMark(localImpact, res.armorDamage || res.hullDamage);
-                if (res.armorDamage > 0) {
-                  // 空雷伤害计入战斗统计，记录方式与 ProjectileCollisionHandler 一致（空雷不是炮弹，不计 shotsHit）
-                  fx.recordDamageDealt?.(sourceIsPlayer ?? false, 'HIGH_EXPLOSIVE', res.armorDamage, 'ARMOR');
-                  fx.addFloatingDamage(mine.pos, res.armorDamage, [255, 175, 40]);
-                }
-                if (res.hullDamage > 0) {
-                  fx.recordDamageDealt?.(sourceIsPlayer ?? false, 'HIGH_EXPLOSIVE', res.hullDamage, 'HULL');
-                  fx.addFloatingDamage(mine.pos, res.hullDamage, [255, 55, 45]);
-                }
-                // EMP 电击船体
-                for (let k = 0; k < 4; k++) {
-                  const empTarget = target.pos.clone().add(
-                    new Vector2((this.visualRandom.next() - 0.5) * 100, (this.visualRandom.next() - 0.5) * 100)
-                  );
-                  fx.spawnEmpArc(mine.pos, empTarget);
-                }
-                fx.addFloatingDamage(mine.pos.clone().add(new Vector2(15, -15)), 600, [130, 220, 255]);
-
-                if (target.hullHp <= 0) {
-                  fx.handleShipDestruction(target);
-                }
-              }
-            }
-          }
-
+        if (m.detonatingTimer <= 1e-9) {
+          this.detonate(m, ctx);
           this.mines.splice(i, 1);
         }
+        continue;
+      }
+      m.life -= dt;
+      const targets = (ctx.ships ?? []).filter(s => !s.isDead && !s.isPhased && s.isPlayer !== m.sourceIsPlayer);
+      const nearest = targets.reduce<Ship | undefined>((a, b) => !a || b.pos.distanceTo(m.pos) < a.pos.distanceTo(m.pos) ? b : a, undefined);
+      // Source max speed/acceleration; native target-choice/turning remains a port boundary.
+      if (nearest) {
+        const desired = nearest.pos.clone().sub(m.pos).normalize().scale(spec.speed);
+        const change = desired.sub(m.vel);
+        const amount = Math.min(change.length(), spec.engineSpec.acc * dt);
+        m.vel.addScaled(change.normalize(), amount);
+        m.pos.addScaled(m.vel, dt);
+      }
+      const closeShip = targets.some(s => getShipExplosionContact(s, m.pos).distance < m.triggerRadius);
+      const closeMissile = (ctx.projectiles ?? []).some(p => p.isRocket && !p.didDamage && !p.isFlare
+        && p.isPlayer !== m.sourceIsPlayer && m.pos.distanceTo(p.pos) < m.triggerRadius + p.radius);
+      if (m.life <= 1e-9 || closeShip || closeMissile) {
+        m.isDetonating = true;
+        m.vel.scale(0);
+        sound.playAtPos(fuse.pingSound, m.pos, ctx.playerShip.pos, 1);
+        // No idle ping loop, fake EMP arcs or decorative damage values.
       }
     }
+  }
+
+  private detonate(m: SpatialMine, ctx: WeaponSimContext): void {
+    const payload: Projectile = {
+      id: m.id, sourceShipId: m.sourceShipId, isPlayer: m.sourceIsPlayer,
+      specId: spec.id, pos: m.pos.clone(), prevPos: m.pos.clone(), vel: new Vector2(),
+      damage: m.damage, baseDamage: spec.damage, damageType: 'HIGH_EXPLOSIVE', empDamage: 0,
+      radius: spec.collisionRadius, rangeRemaining: 0, totalRange: 0, elapsedTime: 0,
+      color: [148, 70, 211], projectileExplosionSpec: explosionSpec,
+    };
+    sound.playAtPos('mine_explosion', m.pos, ctx.playerShip.pos, 1);
+    ctx.fx.spawnAuthenticExplosion(m.pos, spec.explosionRadius, [148, 70, 211], false);
+    const index = ctx.projectiles?.findIndex(p => p.id === m.id && p.isMine) ?? -1;
+    if (index >= 0) ctx.projectiles!.splice(index, 1);
+    this.explosions.spawn(payload, m.pos, ctx);
   }
 }

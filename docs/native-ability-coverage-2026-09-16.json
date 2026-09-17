@@ -1,0 +1,1412 @@
+{
+  "date": "2026-09-17",
+  "complete": false,
+  "counts": {
+    "systems": 63,
+    "systemAdapters": 33,
+    "phaseSlot": 1,
+    "hullmods": 129,
+    "combatHullmods": 54,
+    "mixedHullmods": 14,
+    "currentCaptainCombatSkills": 14,
+    "captainCombatSkillAdapters": 14
+  },
+  "limitations": [
+    "14/14项现行单舰舰长战斗技能均有战斗消费者，可在改装方案配置和试战；不是角色升级树或全部舰队/领导力技能。",
+    "系统为战斗适配，不意味着专用视觉/音效与原版AI全部移植",
+    "S-mod未实现",
+    "战役传感器、航行、船员、经营、打捞/回收未完整模拟",
+    "无人机闪现采用确定性安全落点，不包括原生25距离随机散布。",
+    "电子战已接双方部署舰ECM、原版惩罚公式及反制组件；传感干扰战场目标尚无占领机制。",
+    "后备部署采用Web甲板即时出击与到期返航，不包括原版逐架弹射动画；激光雷达阵列尚无雷达碟及装饰激光动画。",
+    "ECCM正制导加成已接原版通用预判消费者；各枚导弹的专用航线AI仍未全量移植。"
+  ],
+  "systems": [
+    {
+      "id": "acausaldisruptor",
+      "name": "量子干扰",
+      "source": "com.fs.starfarer.api.impl.combat.AcausalDisruptorStats",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "ammofeed",
+      "name": "加速填弹器",
+      "source": "data.shipsystems.scripts.AmmoFeedStats",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "burndrive",
+      "name": "烈焰驱动器",
+      "source": "data.shipsystems.scripts.BurnDriveStats",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "canister_flak",
+      "name": "罐式高射炮",
+      "source": "WEAPON",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "chiral_figment",
+      "name": "镜像投射",
+      "source": "com.fs.starfarer.api.impl.combat.ChiralFigmentStats",
+      "status": "unimplemented"
+    },
+    {
+      "id": "combat_burn",
+      "name": "战斗驱动器",
+      "source": "data.shipsystems.scripts.CombatBurnStats",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "construction_swarm",
+      "name": "工程集群",
+      "source": "com.fs.starfarer.api.impl.combat.threat.ConstructionSwarmSystemScript",
+      "status": "unimplemented"
+    },
+    {
+      "id": "convulsive_lunge",
+      "name": "痉挛急扑",
+      "source": "com.fs.starfarer.api.impl.combat.dweller.ConvulsiveLungeSystemScript",
+      "status": "unimplemented"
+    },
+    {
+      "id": "cryoflux",
+      "name": "幅能场变频",
+      "source": "com.fs.starfarer.api.impl.combat.CryofluxTransducerStats",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "damper",
+      "name": "阻尼力场",
+      "source": "com.fs.starfarer.api.impl.combat.DamperFieldStats",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "damper_omega",
+      "name": "熵抑制器",
+      "source": "com.fs.starfarer.api.impl.combat.DamperFieldOmegaStats",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "darkened_gaze",
+      "name": "深黯凝视",
+      "source": "com.fs.starfarer.api.impl.combat.dweller.DarkenedGazeSystemScript",
+      "status": "unimplemented"
+    },
+    {
+      "id": "displacer",
+      "name": "闪现",
+      "source": "DISPLACER",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "displacer_degraded",
+      "name": "低效闪现",
+      "source": "DISPLACER",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "displacer_threat",
+      "name": "移位器",
+      "source": "com.fs.starfarer.api.impl.combat.threat.DisplacerGlowScript",
+      "status": "unimplemented"
+    },
+    {
+      "id": "drone_borer",
+      "name": "螟蜂无人机",
+      "source": "DRONE_LAUNCHER",
+      "status": "unimplemented"
+    },
+    {
+      "id": "drone_pd",
+      "name": "点防无人机",
+      "source": "DRONE_LAUNCHER",
+      "status": "unimplemented"
+    },
+    {
+      "id": "drone_pd_x2",
+      "name": "点防无人机",
+      "source": "DRONE_LAUNCHER",
+      "status": "unimplemented"
+    },
+    {
+      "id": "drone_sensor",
+      "name": "感应无人机",
+      "source": "data.shipsystems.scripts.SensorDroneStats",
+      "status": "unimplemented"
+    },
+    {
+      "id": "drone_station_high",
+      "name": "石像鬼无人机",
+      "source": "DRONE_LAUNCHER",
+      "status": "unimplemented"
+    },
+    {
+      "id": "drone_station_lt",
+      "name": "城齿无人机",
+      "source": "DRONE_LAUNCHER",
+      "status": "unimplemented"
+    },
+    {
+      "id": "drone_station_mid",
+      "name": "三角堡无人机",
+      "source": "DRONE_LAUNCHER",
+      "status": "unimplemented"
+    },
+    {
+      "id": "drone_strike",
+      "name": "终结指令",
+      "source": "com.fs.starfarer.api.impl.combat.DroneStrikeStats",
+      "status": "unimplemented"
+    },
+    {
+      "id": "drone_terminator",
+      "name": "终结者无人机",
+      "source": "DRONE_LAUNCHER",
+      "status": "unimplemented"
+    },
+    {
+      "id": "dynamic_stabilizer",
+      "name": "动态稳定器",
+      "source": "data.shipsystems.scripts.DynamicStabilizerStats",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "emp",
+      "name": "EMP 发生器",
+      "source": "EMP",
+      "status": "unimplemented"
+    },
+    {
+      "id": "energy_conversion",
+      "name": "能量转换",
+      "source": "DISPLACER",
+      "status": "unimplemented"
+    },
+    {
+      "id": "energy_lash",
+      "name": "能量之鞭",
+      "source": "com.fs.starfarer.api.impl.combat.threat.EnergyLashSystemScript",
+      "status": "unimplemented"
+    },
+    {
+      "id": "entropyamplifier",
+      "name": "熵放大器",
+      "source": "com.fs.starfarer.api.impl.combat.EntropyAmplifierStats",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "extraction_protocol",
+      "name": "撤离协议",
+      "source": "com.fs.starfarer.api.impl.combat.threat.ExtractionProtocolSystemScript",
+      "status": "unimplemented"
+    },
+    {
+      "id": "fastmissileracks",
+      "name": "高速导弹挂架",
+      "source": "FAST_RELOAD",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "flarelauncher",
+      "name": "热诱弹发射器",
+      "source": "WEAPON",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "flarelauncher_active",
+      "name": "追踪热诱弹发射器",
+      "source": "WEAPON",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "flarelauncher_fighter",
+      "name": "诱饵发射器",
+      "source": "WEAPON",
+      "status": "unimplemented"
+    },
+    {
+      "id": "flarelauncher_single",
+      "name": "诱饵发射器 (单发)",
+      "source": "WEAPON",
+      "status": "unimplemented"
+    },
+    {
+      "id": "forgevats",
+      "name": "导弹自动工厂",
+      "source": "AMMO_RELOAD",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "forgevats_station",
+      "name": "重型导弹自动工厂",
+      "source": "AMMO_RELOAD",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "fortressshield",
+      "name": "堡垒护盾",
+      "source": "data.shipsystems.scripts.FortressShieldStats",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "fragment_volley",
+      "name": "碎片齐射",
+      "source": "com.fs.starfarer.api.impl.combat.threat.FragmentVolleySystemScript",
+      "status": "unimplemented"
+    },
+    {
+      "id": "highenergyfocus",
+      "name": "高能聚焦系统",
+      "source": "data.shipsystems.scripts.HighEnergyFocusStats",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "incursion_mode",
+      "name": "入侵模式",
+      "source": "com.fs.starfarer.api.impl.combat.threat.IncursionModeSystemScript",
+      "status": "unimplemented"
+    },
+    {
+      "id": "inferniuminjector",
+      "name": "烈焰喷射",
+      "source": "ENGINE_MOD",
+      "status": "unimplemented"
+    },
+    {
+      "id": "interdictor",
+      "name": "阻绝阵列",
+      "source": "com.fs.starfarer.api.impl.combat.InterdictorArrayStats",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "lidararray",
+      "name": "激光雷达阵列",
+      "source": "com.fs.starfarer.api.impl.combat.LidarArrayStats",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "maneuveringjets",
+      "name": "机动推进器",
+      "source": "data.shipsystems.scripts.ManeuveringJetsStats",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "microburn",
+      "name": "等离子爆裂驱动器",
+      "source": "data.shipsystems.scripts.MicroBurnStats",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "microburn_omega",
+      "name": "欧米伽爆裂驱动器",
+      "source": "data.shipsystems.scripts.MicroBurnOmegaStats",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "mine_strike",
+      "name": "空雷突袭",
+      "source": "com.fs.starfarer.api.impl.combat.MineStrikeStats",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "mine_strike_station",
+      "name": "传送感应空雷",
+      "source": "com.fs.starfarer.api.impl.combat.MineStrikeStationStats",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "mote_control",
+      "name": "光尘吸引场",
+      "source": "com.fs.starfarer.api.impl.combat.MoteControlScript",
+      "status": "unimplemented"
+    },
+    {
+      "id": "nova_burst",
+      "name": "新星爆裂驱动器",
+      "source": "com.fs.starfarer.api.impl.combat.NovaBurstStats",
+      "status": "unimplemented"
+    },
+    {
+      "id": "orion_device",
+      "name": "猎户座装置",
+      "source": "com.fs.starfarer.api.impl.combat.OrionDeviceStats",
+      "status": "unimplemented"
+    },
+    {
+      "id": "phasecloak",
+      "name": "相位线圈",
+      "source": "com.fs.starfarer.api.impl.combat.PhaseCloakStats",
+      "status": "shield-phase-adapter"
+    },
+    {
+      "id": "phaseteleporter",
+      "name": "相位传送器",
+      "source": "TELEPORTER",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "plasmajets",
+      "name": "等离子推进器",
+      "source": "com.fs.starfarer.api.impl.combat.PlasmaJetsStats",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "recalldevice",
+      "name": "召回装置",
+      "source": "com.fs.starfarer.api.impl.combat.RecallDeviceStats",
+      "status": "unimplemented"
+    },
+    {
+      "id": "reservewing",
+      "name": "后备部署",
+      "source": "com.fs.starfarer.api.impl.combat.ReserveWingStats",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "shrouded_vortex",
+      "name": "渊幕涡流",
+      "source": "STAT_MOD",
+      "status": "unimplemented"
+    },
+    {
+      "id": "skimmer_drone",
+      "name": "闪现 (无人机)",
+      "source": "DISPLACER",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "targetingfeed",
+      "name": "目标馈送系统",
+      "source": "com.fs.starfarer.api.impl.combat.TargetingFeedStats",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "temporalshell",
+      "name": "时流之壳",
+      "source": "com.fs.starfarer.api.impl.combat.TemporalShellStats",
+      "status": "combat-adapter"
+    },
+    {
+      "id": "tenebrous_expulsion",
+      "name": "冥暗喷射",
+      "source": "com.fs.starfarer.api.impl.combat.dweller.TenebrousExpulsionSystemScript",
+      "status": "unimplemented"
+    },
+    {
+      "id": "traveldrive",
+      "name": "巡航驱动",
+      "source": "data.shipsystems.scripts.TravelDriveStats",
+      "status": "combat-adapter"
+    }
+  ],
+  "hullmods": [
+    {
+      "id": "ablative_armor",
+      "name": "烧蚀装甲",
+      "source": "com.fs.starfarer.api.impl.hullmods.AblativeArmor",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "adaptive_coils",
+      "name": "自适应相位线圈",
+      "source": "com.fs.starfarer.api.impl.hullmods.AdaptivePhaseCoils",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "adaptiveshields",
+      "name": "全角护盾转化器",
+      "source": "data.hullmods.OmniShieldEmitter",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "additional_berthing",
+      "name": "船员宿舍扩容",
+      "source": "com.fs.starfarer.api.impl.hullmods.AdditionalBerthing",
+      "status": "unimplemented"
+    },
+    {
+      "id": "advanced_ground_support",
+      "name": "进阶地面支援",
+      "source": "com.fs.starfarer.api.impl.hullmods.AdvancedGroundSupport",
+      "status": "unimplemented"
+    },
+    {
+      "id": "advancedcore",
+      "name": "先进目标定位核心",
+      "source": "data.hullmods.AdvancedTargetingCore",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "advancedoptics",
+      "name": "先进光学器件",
+      "source": "data.hullmods.AdvancedOptics",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "advancedshieldemitter",
+      "name": "敏捷护盾",
+      "source": "data.hullmods.AcceleratedShieldEmitter",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "always_detaches",
+      "name": "总是分离",
+      "source": "data.hullmods.AlwaysDetaches",
+      "status": "unimplemented"
+    },
+    {
+      "id": "anchorrotation",
+      "name": "固定旋转",
+      "source": "data.hullmods.AnchorRotation",
+      "status": "unimplemented"
+    },
+    {
+      "id": "andrada_mods",
+      "name": "忠诚改装",
+      "source": "com.fs.starfarer.api.impl.hullmods.AndradaMods",
+      "status": "unimplemented"
+    },
+    {
+      "id": "armoredweapons",
+      "name": "炮塔装甲",
+      "source": "data.hullmods.ArmoredWeapons",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "assault_package",
+      "name": "突击套件",
+      "source": "com.fs.starfarer.api.impl.hullmods.AssaultPackage",
+      "status": "unimplemented"
+    },
+    {
+      "id": "augmentedengines",
+      "name": "增强驱动场",
+      "source": "data.hullmods.AugmentedEngines",
+      "status": "unimplemented"
+    },
+    {
+      "id": "automated",
+      "name": "全自动舰船",
+      "source": "com.fs.starfarer.api.impl.hullmods.Automated",
+      "status": "unimplemented"
+    },
+    {
+      "id": "autorepair",
+      "name": "自动修复单元",
+      "source": "data.hullmods.AutomatedRepairUnit",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "auxiliary_fuel_tanks",
+      "name": "辅助燃料罐",
+      "source": "com.fs.starfarer.api.impl.hullmods.AuxiliaryFuelTanks",
+      "status": "unimplemented"
+    },
+    {
+      "id": "auxiliarythrusters",
+      "name": "辅助推进器",
+      "source": "data.hullmods.AuxiliaryThrusters",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "axialrotation",
+      "name": "绕轴旋转",
+      "source": "data.hullmods.AxialRotation",
+      "status": "unimplemented"
+    },
+    {
+      "id": "ballistic_rangefinder",
+      "name": "弹道测距仪",
+      "source": "com.fs.starfarer.api.impl.hullmods.BallisticRangefinder",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "bdeck",
+      "name": "后备甲板",
+      "source": "com.fs.starfarer.api.impl.hullmods.BDeck",
+      "status": "unimplemented"
+    },
+    {
+      "id": "blast_doors",
+      "name": "防爆舱门",
+      "source": "data.hullmods.BlastDoors",
+      "status": "mixed-combat-implemented",
+      "support": {
+        "scope": "mixed",
+        "combat": "implemented",
+        "campaign": "not-simulated",
+        "summary": "结构加成已接入；船员伤亡与S-mod减伤效果未模拟。"
+      }
+    },
+    {
+      "id": "chassis_storage",
+      "name": "战机底盘储备",
+      "source": "com.fs.starfarer.api.impl.hullmods.FighterChassisStorage",
+      "status": "unimplemented"
+    },
+    {
+      "id": "civgrade",
+      "name": "民用级船体",
+      "source": "data.hullmods.CivGrade",
+      "status": "unimplemented"
+    },
+    {
+      "id": "coherer",
+      "name": "能量弹体同调器",
+      "source": "com.fs.starfarer.api.impl.hullmods.EnergyBoltCoherer",
+      "status": "mixed-combat-implemented",
+      "support": {
+        "scope": "mixed",
+        "combat": "implemented",
+        "campaign": "not-simulated",
+        "summary": "战斗基础射程同调已接入；有人舰船员伤亡增加50%的人员结算未模拟。"
+      }
+    },
+    {
+      "id": "comp_armor",
+      "name": "受损装甲",
+      "source": "data.hullmods.CompromisedArmor",
+      "status": "mixed-combat-implemented",
+      "support": {
+        "scope": "mixed",
+        "combat": "implemented",
+        "campaign": "not-simulated",
+        "summary": "战斗损伤惩罚已接入（无舰长损伤控制技能时）；部署补给折扣未模拟。"
+      }
+    },
+    {
+      "id": "comp_hull",
+      "name": "受损船体",
+      "source": "data.hullmods.CompromisedHull",
+      "status": "mixed-combat-implemented",
+      "support": {
+        "scope": "mixed",
+        "combat": "implemented",
+        "campaign": "not-simulated",
+        "summary": "战斗损伤惩罚已接入（无舰长损伤控制技能时）；部署补给折扣未模拟。"
+      }
+    },
+    {
+      "id": "comp_storage",
+      "name": "受损货舱",
+      "source": "com.fs.starfarer.api.impl.hullmods.CompromisedStorage",
+      "status": "unimplemented"
+    },
+    {
+      "id": "comp_structure",
+      "name": "结构损伤",
+      "source": "com.fs.starfarer.api.impl.hullmods.CompromisedStructure",
+      "status": "mixed-combat-implemented",
+      "support": {
+        "scope": "mixed",
+        "combat": "implemented",
+        "campaign": "not-simulated",
+        "summary": "战斗损伤惩罚已接入（无舰长损伤控制技能时）；战役部署补给折扣等效果未模拟。"
+      }
+    },
+    {
+      "id": "converted_bay",
+      "name": "货舱改装",
+      "source": "data.hullmods.ConvertedCargoBay",
+      "status": "unimplemented"
+    },
+    {
+      "id": "converted_fighterbay",
+      "name": "战机甲板改装",
+      "source": "data.hullmods.ConvertedFighterBay",
+      "status": "unimplemented"
+    },
+    {
+      "id": "converted_hangar",
+      "name": "机库改装",
+      "source": "com.fs.starfarer.api.impl.hullmods.ConvertedHangar",
+      "status": "unimplemented"
+    },
+    {
+      "id": "damaged_deck",
+      "name": "受损的飞行甲板",
+      "source": "com.fs.starfarer.api.impl.hullmods.DamagedFlightDeck",
+      "status": "unimplemented"
+    },
+    {
+      "id": "damaged_mounts",
+      "name": "武器位损坏",
+      "source": "com.fs.starfarer.api.impl.hullmods.DamagedWeaponMounts",
+      "status": "mixed-combat-implemented",
+      "support": {
+        "scope": "mixed",
+        "combat": "implemented",
+        "campaign": "not-simulated",
+        "summary": "战斗损伤惩罚已接入（无舰长损伤控制技能时）；战役部署补给折扣等效果未模拟。"
+      }
+    },
+    {
+      "id": "dedicated_targeting_core",
+      "name": "专注型目标锁定核心",
+      "source": "data.hullmods.DedicatedTargetingCore",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "defective_manufactory",
+      "name": "受损的制造工厂",
+      "source": "com.fs.starfarer.api.impl.hullmods.DefectiveManufactory",
+      "status": "unimplemented"
+    },
+    {
+      "id": "defensive_targeting_array",
+      "name": "护航定位阵列",
+      "source": "com.fs.starfarer.api.impl.hullmods.DefensiveTargetingArray",
+      "status": "unimplemented"
+    },
+    {
+      "id": "degraded_drive_field",
+      "name": "驱动场故障",
+      "source": "data.hullmods.DegradedDriveField",
+      "status": "unimplemented"
+    },
+    {
+      "id": "degraded_engines",
+      "name": "老化引擎",
+      "source": "data.hullmods.DegradedEngines",
+      "status": "mixed-combat-implemented",
+      "support": {
+        "scope": "mixed",
+        "combat": "implemented",
+        "campaign": "not-simulated",
+        "summary": "战斗损伤惩罚已接入（无舰长损伤控制技能时）；战役部署补给折扣等效果未模拟。"
+      }
+    },
+    {
+      "id": "degraded_life_support",
+      "name": "维生系统故障",
+      "source": "com.fs.starfarer.api.impl.hullmods.DegradedLifeSupport",
+      "status": "unimplemented"
+    },
+    {
+      "id": "degraded_shields",
+      "name": "护盾发生器老化",
+      "source": "com.fs.starfarer.api.impl.hullmods.DegradedShields",
+      "status": "mixed-combat-implemented",
+      "support": {
+        "scope": "mixed",
+        "combat": "implemented",
+        "campaign": "not-simulated",
+        "summary": "战斗损伤惩罚已接入（无舰长损伤控制技能时）；战役部署补给折扣等效果未模拟。"
+      }
+    },
+    {
+      "id": "delicate",
+      "name": "精密机械",
+      "source": "data.hullmods.DelicateMachinery",
+      "status": "combat-implemented",
+      "support": {
+        "scope": "combat",
+        "combat": "implemented",
+        "campaign": "not-applicable",
+        "summary": "峰值时间耗尽后的 CR 衰减速率 +50%，已接入舰船真实统计及战斗生命周期。"
+      }
+    },
+    {
+      "id": "design_compromises",
+      "name": "权衡设计",
+      "source": "com.fs.starfarer.api.impl.hullmods.DesignCompromises",
+      "status": "unimplemented"
+    },
+    {
+      "id": "destroyed_mounts",
+      "name": "武器位损毁",
+      "source": "data.hullmods.DestroyedWeaponMounts",
+      "status": "unimplemented"
+    },
+    {
+      "id": "distributed_fire_control",
+      "name": "分布式火控系统",
+      "source": "com.fs.starfarer.api.impl.hullmods.DistributedFireControl",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "do_not_back_off",
+      "name": "取消后退",
+      "source": "com.fs.starfarer.api.impl.hullmods.DoNotBackOff",
+      "status": "unimplemented"
+    },
+    {
+      "id": "do_not_fire_through",
+      "name": "视为障碍",
+      "source": "data.hullmods.DoNotFireThrough",
+      "status": "unimplemented"
+    },
+    {
+      "id": "drive_field_stabilizer",
+      "name": "驱动场稳定器",
+      "source": "com.fs.starfarer.api.impl.hullmods.DriveFieldStabilizer",
+      "status": "unimplemented"
+    },
+    {
+      "id": "dweller_hullmod",
+      "name": "渊幕原种改造",
+      "source": "com.fs.starfarer.api.impl.combat.dweller.DwellerHullmod",
+      "status": "unimplemented"
+    },
+    {
+      "id": "eccm",
+      "name": "电子反对抗组件",
+      "source": "data.hullmods.ECCMPackage",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "ecm",
+      "name": "电子对抗组件",
+      "source": "com.fs.starfarer.api.impl.hullmods.ECMPackage",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "efficiency_overhaul",
+      "name": "高效检修",
+      "source": "com.fs.starfarer.api.impl.hullmods.EfficiencyOverhaul",
+      "status": "unimplemented"
+    },
+    {
+      "id": "erratic_injector",
+      "name": "失常的燃料喷注器",
+      "source": "com.fs.starfarer.api.impl.hullmods.ErraticInjector",
+      "status": "unimplemented"
+    },
+    {
+      "id": "escort_package",
+      "name": "护航套件",
+      "source": "com.fs.starfarer.api.impl.hullmods.EscortPackage",
+      "status": "unimplemented"
+    },
+    {
+      "id": "ex_phase_coils",
+      "name": "实验性相位线圈",
+      "source": "com.fs.starfarer.api.impl.hullmods.ExperimentalPhaseCoils",
+      "status": "unimplemented"
+    },
+    {
+      "id": "expanded_cargo_holds",
+      "name": "货舱扩容",
+      "source": "com.fs.starfarer.api.impl.hullmods.ExpandedCargoHolds",
+      "status": "unimplemented"
+    },
+    {
+      "id": "expanded_deck_crew",
+      "name": "扩编飞行甲板人员",
+      "source": "com.fs.starfarer.api.impl.hullmods.ExpandedDeckCrew",
+      "status": "unimplemented"
+    },
+    {
+      "id": "extendedshieldemitter",
+      "name": "扩展护盾",
+      "source": "data.hullmods.ExtendedShieldEmitter",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "faulty_auto",
+      "name": "自动化系统损毁",
+      "source": "com.fs.starfarer.api.impl.hullmods.FaultyAutomatedSystems",
+      "status": "unimplemented"
+    },
+    {
+      "id": "faulty_grid",
+      "name": "缺损电网",
+      "source": "data.hullmods.FaultyPowerGrid",
+      "status": "mixed-combat-implemented",
+      "support": {
+        "scope": "mixed",
+        "combat": "implemented",
+        "campaign": "not-simulated",
+        "summary": "战斗损伤惩罚已接入（无舰长损伤控制技能时）；战役部署补给折扣等效果未模拟。"
+      }
+    },
+    {
+      "id": "fluxbreakers",
+      "name": "幅散管道扩容",
+      "source": "data.hullmods.FluxBreakers",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "fluxcoil",
+      "name": "附加幅能线圈",
+      "source": "data.hullmods.FluxCoilAdjunct",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "fluxdistributor",
+      "name": "幅能配送器",
+      "source": "data.hullmods.FluxDistributor",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "fluxshunt",
+      "name": "磁通分流",
+      "source": "data.hullmods.FluxShunt",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "fourteenth",
+      "name": "第十四战斗群",
+      "source": "data.hullmods.Fourteenth",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "fragile_subsystems",
+      "name": "不可靠子系统",
+      "source": "com.fs.starfarer.api.impl.hullmods.FragileSubsystems",
+      "status": "mixed-combat-implemented",
+      "support": {
+        "scope": "mixed",
+        "combat": "implemented",
+        "campaign": "not-simulated",
+        "summary": "战斗损伤惩罚已接入（无舰长损伤控制技能时）；战役部署补给折扣等效果未模拟。"
+      }
+    },
+    {
+      "id": "fragment_coordinator",
+      "name": "碎片协调器",
+      "source": "com.fs.starfarer.api.impl.combat.threat.FragmentCoordinatorHullmod",
+      "status": "unimplemented"
+    },
+    {
+      "id": "fragment_swarm",
+      "name": "碎片集群",
+      "source": "com.fs.starfarer.api.impl.combat.threat.FragmentSwarmHullmod",
+      "status": "unimplemented"
+    },
+    {
+      "id": "frontemitter",
+      "name": "固化护盾转化器",
+      "source": "data.hullmods.FrontShieldEmitter",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "frontshield",
+      "name": "临时护盾发生器",
+      "source": "data.hullmods.FrontShieldGenerator",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "glitched_sensors",
+      "name": "传感器阵列失灵",
+      "source": "com.fs.starfarer.api.impl.hullmods.GlitchedSensorArray",
+      "status": "unimplemented"
+    },
+    {
+      "id": "ground_support",
+      "name": "地面支援",
+      "source": "com.fs.starfarer.api.impl.hullmods.GroundSupport",
+      "status": "unimplemented"
+    },
+    {
+      "id": "hardened_subsystems",
+      "name": "硬化子系统",
+      "source": "data.hullmods.HardenedSubsystems",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "hardenedshieldemitter",
+      "name": "强化护盾",
+      "source": "data.hullmods.HardenedShieldEmitter",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "hbi",
+      "name": "重弹集成",
+      "source": "com.fs.starfarer.api.impl.hullmods.HeavyBallisticsIntegration",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "heavyarmor",
+      "name": "重型装甲",
+      "source": "data.hullmods.HeavyArmor",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "heg_militarized",
+      "name": "霸主军事配件",
+      "source": "data.hullmods.Militarized",
+      "status": "unimplemented"
+    },
+    {
+      "id": "high_frequency_attractor",
+      "name": "感灵吸引场",
+      "source": "com.fs.starfarer.api.combat.BaseHullMod",
+      "status": "unimplemented"
+    },
+    {
+      "id": "high_maintenance",
+      "name": "高维护需求",
+      "source": "data.hullmods.HighMaintenance",
+      "status": "unimplemented"
+    },
+    {
+      "id": "high_scatter_amp",
+      "name": "高散射增幅器",
+      "source": "com.fs.starfarer.api.impl.hullmods.HighScatterAmp",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "hiressensors",
+      "name": "高精度传感器",
+      "source": "com.fs.starfarer.api.impl.hullmods.HighResSensors",
+      "status": "unimplemented"
+    },
+    {
+      "id": "ill_advised",
+      "name": "不明智改装",
+      "source": "data.hullmods.IllAdvised",
+      "status": "unimplemented"
+    },
+    {
+      "id": "increased_maintenance",
+      "name": "过度维护",
+      "source": "com.fs.starfarer.api.impl.hullmods.IncreasedMaintenance",
+      "status": "unimplemented"
+    },
+    {
+      "id": "insulatedengine",
+      "name": "引擎隔离性装配",
+      "source": "data.hullmods.InsulatedEngines",
+      "status": "mixed-combat-implemented",
+      "support": {
+        "scope": "mixed",
+        "combat": "implemented",
+        "campaign": "not-simulated",
+        "summary": "战斗结构、引擎耐久已接入；战役传感器截面未模拟。"
+      }
+    },
+    {
+      "id": "magazines",
+      "name": "扩展弹仓",
+      "source": "data.hullmods.ExpandedMagazines",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "malfunctioning_comms",
+      "name": "通讯系统故障",
+      "source": "com.fs.starfarer.api.impl.hullmods.MalfunctioningComms",
+      "status": "unimplemented"
+    },
+    {
+      "id": "militarized_subsystems",
+      "name": "军事化子系统",
+      "source": "com.fs.starfarer.api.impl.hullmods.MilitarizedSubsystems",
+      "status": "unimplemented"
+    },
+    {
+      "id": "missile_autoloader",
+      "name": "导弹自动装填器",
+      "source": "com.fs.starfarer.api.impl.hullmods.MissileAutoloader",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "missile_reload",
+      "name": "导弹自动工厂",
+      "source": "com.fs.starfarer.api.impl.hullmods.PeriodicMissileReload",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "missleracks",
+      "name": "扩展发射架",
+      "source": "data.hullmods.ExpandedMissileRacks",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "nav_relay",
+      "name": "导航中继器",
+      "source": "com.fs.starfarer.api.impl.hullmods.NavRelay",
+      "status": "unimplemented"
+    },
+    {
+      "id": "neural_integrator",
+      "name": "神经集成器",
+      "source": "com.fs.starfarer.api.impl.hullmods.NeuralIntegrator",
+      "status": "unimplemented"
+    },
+    {
+      "id": "neural_interface",
+      "name": "神经接口",
+      "source": "com.fs.starfarer.api.impl.hullmods.NeuralInterface",
+      "status": "unimplemented"
+    },
+    {
+      "id": "never_detaches",
+      "name": "永不分离",
+      "source": "data.hullmods.NeverDetaches",
+      "status": "unimplemented"
+    },
+    {
+      "id": "no_weapon_flux",
+      "name": "零幅能武器",
+      "source": "data.hullmods.NoWeaponFlux",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "operations_center",
+      "name": "作战中心",
+      "source": "com.fs.starfarer.api.impl.hullmods.OperationsCenter",
+      "status": "unimplemented"
+    },
+    {
+      "id": "phase_anchor",
+      "name": "相位锚点",
+      "source": "com.fs.starfarer.api.impl.hullmods.PhaseAnchor",
+      "status": "unimplemented"
+    },
+    {
+      "id": "phasefield",
+      "name": "相位场",
+      "source": "com.fs.starfarer.api.impl.hullmods.PhaseField",
+      "status": "campaign-not-simulated"
+    },
+    {
+      "id": "pointdefenseai",
+      "name": "整合点防御 AI",
+      "source": "data.hullmods.IntegratedPointDefenseAI",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "recovery_shuttles",
+      "name": "救援穿梭舱",
+      "source": "com.fs.starfarer.api.impl.hullmods.RecoveryShuttles",
+      "status": "unimplemented"
+    },
+    {
+      "id": "reduced_explosion",
+      "name": "爆炸减免",
+      "source": "data.hullmods.ReducedExplosion",
+      "status": "unimplemented"
+    },
+    {
+      "id": "reinforcedhull",
+      "name": "强化舱壁",
+      "source": "data.hullmods.ReinforcedBulkheads",
+      "status": "mixed-combat-implemented",
+      "support": {
+        "scope": "mixed",
+        "combat": "implemented",
+        "campaign": "not-simulated",
+        "summary": "战斗结构与碎裂效果已接入；战役回收概率未模拟。"
+      }
+    },
+    {
+      "id": "repair_gantry",
+      "name": "打捞起重机",
+      "source": "com.fs.starfarer.api.impl.campaign.RepairGantry",
+      "status": "unimplemented"
+    },
+    {
+      "id": "rugged",
+      "name": "坚固结构",
+      "source": "com.fs.starfarer.api.impl.hullmods.RuggedConstruction",
+      "status": "unimplemented"
+    },
+    {
+      "id": "safetyoverrides",
+      "name": "安全协议超驰",
+      "source": "data.hullmods.SafetyOverrides",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "secondary_fabricator",
+      "name": "加装仿织器",
+      "source": "com.fs.starfarer.api.impl.combat.threat.SecondaryFabricatorHullmod",
+      "status": "unimplemented"
+    },
+    {
+      "id": "shard_spawner",
+      "name": "生成碎片",
+      "source": "com.fs.starfarer.api.impl.hullmods.ShardSpawner",
+      "status": "unimplemented"
+    },
+    {
+      "id": "shared_flux_sink",
+      "name": "共享幅散管道",
+      "source": "com.fs.starfarer.api.impl.hullmods.SharedFluxSink",
+      "status": "unimplemented"
+    },
+    {
+      "id": "shield_always_on",
+      "name": "保持开盾",
+      "source": "com.fs.starfarer.api.impl.hullmods.ShieldAlwaysOn",
+      "status": "unimplemented"
+    },
+    {
+      "id": "shield_shunt",
+      "name": "护盾分流",
+      "source": "com.fs.starfarer.api.impl.hullmods.ShieldShunt",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "shielded_holds",
+      "name": "屏蔽货舱",
+      "source": "data.hullmods.ShieldedCargoHolds",
+      "status": "unimplemented"
+    },
+    {
+      "id": "shrouded_lens",
+      "name": "渊幕瞳晶",
+      "source": "com.fs.starfarer.api.impl.combat.dweller.ShroudedLensHullmod",
+      "status": "unimplemented"
+    },
+    {
+      "id": "shrouded_mantle",
+      "name": "渊幕套膜",
+      "source": "com.fs.starfarer.api.impl.combat.dweller.ShroudedMantleHullmod",
+      "status": "unimplemented"
+    },
+    {
+      "id": "shrouded_thunderhead",
+      "name": "渊幕云砧",
+      "source": "com.fs.starfarer.api.impl.combat.dweller.ShroudedThunderheadHullmod",
+      "status": "unimplemented"
+    },
+    {
+      "id": "solar_shielding",
+      "name": "恒星防护层",
+      "source": "data.hullmods.SolarShielding",
+      "status": "mixed-combat-implemented",
+      "support": {
+        "scope": "mixed",
+        "combat": "implemented",
+        "campaign": "not-simulated",
+        "summary": "战斗中的能量伤害减免已接入；不模拟战役星冕或超空间危害。"
+      }
+    },
+    {
+      "id": "stabilizedshieldemitter",
+      "name": "稳定护盾",
+      "source": "data.hullmods.StabilizedShieldEmitter",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "stealth_minefield",
+      "name": "感应雷区",
+      "source": "com.fs.starfarer.api.impl.hullmods.StealthMinefield",
+      "status": "unimplemented"
+    },
+    {
+      "id": "stealth_minefield_lt",
+      "name": "感应雷区 - 低端技术",
+      "source": "com.fs.starfarer.api.impl.hullmods.StealthMinefieldLT",
+      "status": "unimplemented"
+    },
+    {
+      "id": "supercomputer",
+      "name": "目标定位巨型机",
+      "source": "data.hullmods.TargetingSupercomputer",
+      "status": "unimplemented"
+    },
+    {
+      "id": "surveying_equipment",
+      "name": "勘探设备",
+      "source": "data.hullmods.SurveyingEquipment",
+      "status": "unimplemented"
+    },
+    {
+      "id": "targetingunit",
+      "name": "目标定位系统",
+      "source": "data.hullmods.IntegratedTargetingUnit",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "terminator_core",
+      "name": "终结者核心",
+      "source": "com.fs.starfarer.api.impl.hullmods.TerminatorCore",
+      "status": "unimplemented"
+    },
+    {
+      "id": "threat_hullmod",
+      "name": "威胁船体",
+      "source": "com.fs.starfarer.api.impl.combat.threat.ThreatHullmod",
+      "status": "unimplemented"
+    },
+    {
+      "id": "tow_cable",
+      "name": "牵引线缆",
+      "source": "com.fs.starfarer.api.impl.campaign.TowCable",
+      "status": "unimplemented"
+    },
+    {
+      "id": "turretgyros",
+      "name": "高级炮塔陀螺仪",
+      "source": "data.hullmods.AdvancedTurretGyros",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "unstable_coils",
+      "name": "不稳定相位线圈",
+      "source": "data.hullmods.PhaseCoilInstability",
+      "status": "mixed-combat-implemented",
+      "support": {
+        "scope": "mixed",
+        "combat": "implemented",
+        "campaign": "not-simulated",
+        "summary": "战斗损伤惩罚已接入（无舰长损伤控制技能时）；部署补给折扣未模拟。"
+      }
+    },
+    {
+      "id": "unstable_injector",
+      "name": "不稳定喷射器",
+      "source": "data.hullmods.UnstableInjector",
+      "status": "combat-implemented"
+    },
+    {
+      "id": "vast_hangar",
+      "name": "巨型机库",
+      "source": "com.fs.starfarer.api.impl.hullmods.VastHangar",
+      "status": "unimplemented"
+    },
+    {
+      "id": "vastbulk",
+      "name": "庞然大物",
+      "source": "data.hullmods.VastBulk",
+      "status": "unimplemented"
+    }
+  ],
+  "captainCombatSkills": [
+    {
+      "id": "point_defense",
+      "name": "点防专精",
+      "source": "com.fs.starfarer.api.impl.campaign.skills.PointDefense",
+      "status": "combat-adapter",
+      "levels": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "target_analysis",
+      "name": "目标解析",
+      "source": "com.fs.starfarer.api.impl.campaign.skills.TargetAnalysis",
+      "status": "combat-adapter",
+      "levels": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "energy_weapon_mastery",
+      "name": "能量武器精通",
+      "source": "com.fs.starfarer.api.impl.campaign.skills.EnergyWeaponMastery",
+      "status": "combat-adapter",
+      "levels": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "systems_expertise",
+      "name": "系统专长",
+      "source": "com.fs.starfarer.api.impl.campaign.skills.SystemsExpertise",
+      "status": "combat-adapter",
+      "levels": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "helmsmanship",
+      "name": "操舵技术",
+      "source": "com.fs.starfarer.api.impl.campaign.skills.Helmsmanship",
+      "status": "combat-adapter",
+      "levels": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "combat_endurance",
+      "name": "战斗耐力",
+      "source": "com.fs.starfarer.api.impl.campaign.skills.CombatEndurance",
+      "status": "combat-adapter",
+      "levels": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "impact_mitigation",
+      "name": "冲击缓解",
+      "source": "com.fs.starfarer.api.impl.campaign.skills.ImpactMitigation",
+      "status": "combat-adapter",
+      "levels": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "damage_control",
+      "name": "损伤管制",
+      "source": "com.fs.starfarer.api.impl.campaign.skills.DamageControl",
+      "status": "combat-adapter",
+      "levels": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "field_modulation",
+      "name": "相场调制",
+      "source": "com.fs.starfarer.api.impl.campaign.skills.FieldModulation",
+      "status": "combat-adapter",
+      "levels": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "ballistic_mastery",
+      "name": "实弹精通",
+      "source": "com.fs.starfarer.api.impl.campaign.skills.BallisticMastery",
+      "status": "combat-adapter",
+      "levels": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "missile_specialization",
+      "name": "导弹特化",
+      "source": "com.fs.starfarer.api.impl.campaign.skills.MissileSpecialization",
+      "status": "combat-adapter",
+      "levels": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "polarized_armor",
+      "name": "极化装甲",
+      "source": "com.fs.starfarer.api.impl.campaign.skills.PolarizedArmor",
+      "status": "combat-adapter",
+      "levels": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "ordnance_expert",
+      "name": "军械专长",
+      "source": "com.fs.starfarer.api.impl.campaign.skills.OrdnanceExpertise",
+      "status": "combat-adapter",
+      "levels": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "gunnery_implants",
+      "name": "火控植入",
+      "source": "com.fs.starfarer.api.impl.campaign.skills.GunneryImplants",
+      "status": "combat-adapter",
+      "levels": [
+        1,
+        2
+      ]
+    }
+  ]
+}

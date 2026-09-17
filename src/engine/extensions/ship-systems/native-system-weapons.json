@@ -1,0 +1,185 @@
+{
+  "canister_flak": {
+    "weapon": {
+      "id": "canister_flak",
+      "specClass": "projectile",
+      "type": "SYSTEM",
+      "size": "SMALL",
+      "turretSprite": "",
+      "hardpointSprite": "",
+      "hardpointOffsets": [
+        0,
+        0
+      ],
+      "turretOffsets": [
+        0,
+        0
+      ],
+      "hardpointAngleOffsets": [
+        0
+      ],
+      "turretAngleOffsets": [
+        0
+      ],
+      "barrelMode": "ALTERNATING",
+      "animationType": "SMOKE",
+      "interruptibleBurst": false,
+      "smokeSpec": {
+        "particleSizeMin": 10,
+        "particleSizeRange": 10,
+        "cloudParticleCount": 3,
+        "cloudDuration": 1,
+        "cloudRadius": 10,
+        "blowbackParticleCount": 0,
+        "blowbackDuration": 2,
+        "blowbackLength": 30,
+        "blowbackSpread": 10,
+        "particleColor": [
+          100,
+          100,
+          100,
+          150
+        ]
+      },
+      "projectileSpecId": "canister_flak_proj",
+      "fireSoundTwo": "system_canister_flak_fire"
+    },
+    "row": {
+      "name": "罐式高射炮",
+      "id": "canister_flak",
+      "tier": "",
+      "rarity": "",
+      "base value": "",
+      "range": "200",
+      "damage/second": "",
+      "damage/shot": "200",
+      "emp": "",
+      "impact": "",
+      "turn rate": "",
+      "OPs": "",
+      "ammo": "",
+      "ammo/sec": "0",
+      "reload size": "",
+      "type": "HIGH_EXPLOSIVE",
+      "energy/shot": "0",
+      "energy/second": "0",
+      "chargeup": "0",
+      "chargedown": "0.1",
+      "burst size": "5",
+      "burst delay": "0.5",
+      "min spread": "150",
+      "max spread": "150",
+      "spread/shot": "0",
+      "spread decay/sec": "0",
+      "beam speed": "",
+      "proj speed": "50",
+      "launch speed": "200",
+      "flight time": "2",
+      "proj hitpoints": "100",
+      "autofireAccBonus": "",
+      "extraArcForAI": "",
+      "hints": "SYSTEM",
+      "tags": "",
+      "groupTag": "",
+      "tech/manufacturer": "",
+      "for weapon tooltip>>": "",
+      "primaryRoleStr": "",
+      "speedStr": "",
+      "trackingStr": "",
+      "turnRateStr": "",
+      "accuracyStr": "",
+      "customPrimary": "",
+      "customPrimaryHL": "",
+      "customAncillary": "",
+      "customAncillaryHL": "",
+      "noDPSInTooltip": "",
+      "number": "35.5"
+    },
+    "projectile": {
+      "id": "canister_flak_proj",
+      "specClass": "missile",
+      "missileType": "BOMB",
+      "onFireEffect": "com.fs.starfarer.api.impl.combat.CanisterFlakPlugin",
+      "sprite": "graphics/missiles/canister_flak.png",
+      "size": [
+        6,
+        10
+      ],
+      "center": [
+        3,
+        5
+      ],
+      "collisionRadius": 9,
+      "collisionClass": "MISSILE_NO_FF",
+      "explosionColor": [
+        255,
+        155,
+        125,
+        255
+      ],
+      "explosionRadius": 100,
+      "fizzleOnReachingWeaponRange": true,
+      "flameoutTime": 0.05,
+      "noEngineGlowTime": 0.05,
+      "fadeTime": 0.05,
+      "explosionSpec": {
+        "duration": 0.1,
+        "radius": 75,
+        "coreRadius": 50,
+        "collisionClass": "MISSILE_FF",
+        "collisionClassByFighter": "MISSILE_FF"
+      },
+      "behaviorSpec": {
+        "behavior": "PROXIMITY_FUSE",
+        "range": 40,
+        "explosionSpec": {
+          "duration": 0.12,
+          "radius": 75,
+          "coreRadius": 50,
+          "collisionClass": "PROJECTILE_NO_FF",
+          "collisionClassByFighter": "PROJECTILE_FIGHTER",
+          "particleSizeMin": 4,
+          "particleSizeRange": 4,
+          "particleDuration": 1,
+          "particleCount": 50,
+          "particleColor": [
+            255,
+            225,
+            125,
+            255
+          ],
+          "explosionColor": [
+            155,
+            125,
+            75,
+            255
+          ],
+          "useDetailedExplosion": true,
+          "useDetailedExplosionColorAlpha": true,
+          "detailedExplosionRadius": 80,
+          "detailedExplosionFlashRadius": 250,
+          "detailedExplosionFlashDuration": 0.5,
+          "detailedExplosionFlashColorFringe": [
+            200,
+            175,
+            100,
+            255
+          ],
+          "detailedExplosionFlashColorCore": [
+            155,
+            155,
+            155,
+            255
+          ],
+          "sound": "system_canister_flak_explosion"
+        }
+      },
+      "engineSpec": {
+        "turnAcc": 100,
+        "turnRate": 10,
+        "acc": 100,
+        "dec": 100
+      }
+    }
+  }
+}

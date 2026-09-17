@@ -6,7 +6,7 @@ export const en_US: Record<string, string> = {
   'app.switch_to_paragon': 'Pilot Paragon-class',
   'app.reset_battle': 'Reset Battle',
   'app.mod_manager': 'Ship Mod Workshop',
-  'app.controls': 'Controls: W Accelerate | S Decelerate/Brake | A/D Yaw Turn | Mouse Aim | LMB Fire | RMB Shield Toggle | V / Space Vent Flux | F Ship System (Burn Drive / Fortress Shield)',
+  'app.controls': 'Controls: W Accelerate | S Reverse | X Brake | A/D Strafe | Mouse Aim | LMB Fire | RMB Shield Toggle | V / Space Vent Flux | F Ship System (Burn Drive / Fortress Shield)',
 
   'hud.hull': 'Hull Integrity',
   'hud.flux': 'Flux Level',
@@ -70,8 +70,8 @@ export const en_US: Record<string, string> = {
 
   // Broadsword and lightmg
   'ship.broadsword.name': 'Broadsword Heavy Fighter',
-  'ship.broadsword.designation': 'Heavy Fighter (3-wing formation)',
-  'ship.broadsword.desc': 'Hegemony heavy fighter equipped with twin light machine guns and frontal shielding.',
+  'ship.broadsword.designation': 'Heavy Fighter',
+  'ship.broadsword.desc': 'Heavy fighter with two light machine guns and no shield.',
   'weapon.lightmg.name': 'Light Machine Gun',
   'weapon.lightmg.desc': 'Rapid-fire kinetic point-defense ballistics.',
   'weapon.flak.name': 'Flak Cannon',
@@ -90,14 +90,13 @@ export const en_US: Record<string, string> = {
   'hud.btn_tactical_map': 'Tactical Map (TAB)',
   'hud.tactical_map_title': 'TAC-OPS BATTLEFIELD RADAR OVERVIEW',
   'hud.command_points': 'Command Points',
-  'hud.fighters_active': 'Broadsword Wing: 3 Active',
-  'hud.bombers_active': 'Dagger Flight: 2 Armed',
   'hud.btn_recall_fighters': 'Recall Fighters (Z)',
-  'hud.btn_countermeasures': 'Flares (C)',
   'hud.countermeasures_ready': 'Flares Ready',
   'hud.countermeasures_cooldown': 'Flares Cooldown: {time}s',
   'hud.command_engage': 'Order: ENGAGE TARGET',
   'hud.command_waypoint': 'Order: WAYPOINT',
+
+  'combat.shield_malfunction': 'Shield failure!',
 
   // Combat presentation availability
   'combat.availability.loading_title': 'Preparing combat display',

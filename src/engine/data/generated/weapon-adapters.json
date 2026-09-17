@@ -1,0 +1,153 @@
+{
+  "tpc": {
+    "soundKey": "tpc_fire",
+    "muzzleFlashColor": [
+      255,
+      100,
+      100
+    ],
+    "muzzleFlashSize": 35
+  },
+  "tachyonlance": {
+    "soundKey": "tachyon_fire",
+    "muzzleFlashColor": [
+      165,
+      100,
+      255
+    ],
+    "muzzleFlashSize": 40
+  },
+  "autopulse": {
+    "soundKey": "autopulse_fire",
+    "muzzleFlashColor": [
+      100,
+      100,
+      255
+    ],
+    "muzzleFlashSize": 25
+  },
+  "mark9": {
+    "soundKey": "mark9_fire",
+    "muzzleFlashColor": [
+      165,
+      225,
+      185
+    ],
+    "muzzleFlashSize": 45
+  },
+  "heavymauler": {
+    "soundKey": "mauler_fire",
+    "muzzleFlashColor": [
+      255,
+      240,
+      165
+    ],
+    "muzzleFlashSize": 35
+  },
+  "hveldriver": {
+    "soundKey": "hveldriver_fire",
+    "muzzleFlashColor": [
+      255,
+      220,
+      100
+    ],
+    "muzzleFlashSize": 55
+  },
+  "annihilatorpod": {
+    "soundKey": "annihilator_fire",
+    "muzzleFlashColor": [
+      255,
+      180,
+      50
+    ],
+    "muzzleFlashSize": 20
+  },
+  "gravitonbeam": {
+    "muzzleFlashColor": [
+      25,
+      215,
+      255
+    ],
+    "muzzleFlashSize": 15
+  },
+  "taclaser": {
+    "muzzleFlashColor": [
+      155,
+      255,
+      155
+    ],
+    "muzzleFlashSize": 12
+  },
+  "heavyblaster": {
+    "soundKey": "heavyblaster_fire",
+    "muzzleFlashColor": [
+      80,
+      180,
+      255
+    ],
+    "muzzleFlashSize": 35
+  },
+  "typhoon": {
+    "soundKey": "typhoon_fire",
+    "muzzleFlashColor": [
+      255,
+      120,
+      40
+    ],
+    "muzzleFlashSize": 30
+  },
+  "sabot": {
+    "soundKey": "sabot_fire",
+    "muzzleFlashColor": [
+      120,
+      220,
+      255
+    ],
+    "muzzleFlashSize": 18
+  },
+  "lightmg": {
+    "soundKey": "lightmg_fire",
+    "muzzleFlashColor": [
+      255,
+      210,
+      120
+    ],
+    "muzzleFlashSize": 14
+  },
+  "pdburst": {
+    "soundKey": "pdburst_fire",
+    "muzzleFlashColor": [
+      100,
+      220,
+      255
+    ],
+    "muzzleFlashSize": 15
+  },
+  "atropos_single": {
+    "soundKey": "atropos_fire",
+    "muzzleFlashColor": [
+      255,
+      140,
+      40
+    ],
+    "muzzleFlashSize": 25
+  },
+  "flak": {
+    "soundKey": "flak_fire",
+    "muzzleFlashColor": [
+      255,
+      155,
+      75
+    ],
+    "muzzleFlashSize": 36
+  },
+  "dualflak": {
+    "soundKey": "flak_fire",
+    "muzzleFlashColor": [
+      255,
+      155,
+      75
+    ],
+    "muzzleFlashSize": 36
+  }
+}

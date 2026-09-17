@@ -1,0 +1,14 @@
+{
+  "modIcons": {
+    "dedicated_targeting_core": "graphics/hullmods/targeting_core.png",
+    "targetingunit": "graphics/hullmods/integrated_targeting_unit.png",
+    "phasefield": "graphics/hullmods/phase_field.png",
+    "delicate": "graphics/hullmods/delicate_machinery.png",
+    "hbi": "graphics/hullmods/ballistics_integration.png",
+    "advancedcore": "graphics/hullmods/advanced_targeting_core.png",
+    "fluxdistributor": "graphics/hullmods/flux_distributor.png",
+    "hardenedshieldemitter": "graphics/hullmods/hardened_shields.png",
+    "fluxbreakers": "graphics/hullmods/resistant_flux_conduits.png",
+    "stabilizedshieldemitter": "graphics/hullmods/stabilized_shields.png"
+  }
+}

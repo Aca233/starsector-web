@@ -1,0 +1,94 @@
+/* Warroom layout: original textures and bitmap type, not generic web panels. */
+.tactical-map { --tac-blue: #a0d8ed; --tac-muted: #6091a4; --tac-sidebar: 260px; position: absolute; inset: 0; z-index: 40; pointer-events: auto; color: var(--tac-blue); font: 15px/1.4 var(--font-ui, 'Microsoft YaHei', sans-serif); outline: none; }
+.tactical-map-shade { position: absolute; inset: 0; background: rgba(0, 0, 0, .72); pointer-events: none; }
+.tactical-map-state { position: absolute; top: 28px; left: 26px; color: #ddd; font-size: 15px; letter-spacing: 1px; text-shadow: 1px 1px #000; }
+.tactical-map-state small { display: block; color: #8ca1ac; font-size: 12px; margin-top: 6px; letter-spacing: 0; }
+.tactical-map-square { position: absolute; left: 11%; right: 11%; top: 0; bottom: 0; }
+.tactical-map-square canvas { display: block; width: 100%; height: 100%; border: 0; outline: 1px solid #365467; cursor: crosshair; touch-action: none; }
+.tactical-map-scale { display: flex; justify-content: space-between; gap: 12px; color: #7dabbf; font: 11px/22px monospace; position: absolute; left: 5px; right: 5px; top: 0; opacity: 0; transition: opacity .15s; pointer-events: none; }
+.tactical-map-scale span { font-family: 'Microsoft YaHei', sans-serif; opacity: .7; }
+.tactical-map-transport { position: absolute; top: calc(50% - 42px); left: 0; width: 49px; padding: 2px 0 2px 15px; background: url('/game-assets/graphics/warroom/ui_pauseplay.png') left top / 128px 128px no-repeat; }
+.tactical-map button { cursor: pointer; color: inherit; font: inherit; }
+.tactical-map button:disabled { cursor: not-allowed; opacity: .35; }
+.tactical-map button:focus-visible { outline: 1px solid #ffe358; outline-offset: 3px; }
+.tactical-map-transport button { width: 34px; height: 34px; display: block; padding: 0; border: 0; margin-bottom: 7px; background: #03090d; border-radius: 3px; opacity: .45; }
+.tactical-map-transport button[aria-pressed='true'] { opacity: 1; }
+.tactical-map-transport button:hover { opacity: 1; }
+.tactical-map-transport img { width: 34px; height: 34px; }
+.tactical-map-commands { position: absolute; top: 16px; right: 0; width: var(--tac-sidebar); max-height: calc(100% - 44px); overflow: visible; scrollbar-width: thin; scrollbar-color: #365363 transparent; padding: 0 18px 0 0; }
+.tactical-map-command-head { position: relative; display: flex; justify-content: flex-end; height: 135px; }
+.tactical-map-reinforce { position: absolute; top: 14px; right: 98px; border: 0; padding: 0; background: none; white-space: nowrap; }
+.tactical-map em { font-style: normal; color: #ffdf25; font-size: .9em; }
+.tactical-map-counters { width: 92px; }
+.tactical-map-counter { position: relative; height: 43px; background: url('/game-assets/graphics/warroom/topright_widget_large.png') 0 4px / 103px 41px no-repeat; }
+.tactical-map-counter > span { display: block; font-size: 10px; line-height: 11px; text-align: center; position: relative; z-index: 1; color: #acddef; }
+.tactical-map-counter > div { height: 29px; display: flex; align-items: center; background: #01080c; margin: 0 4px 0 7px; padding: 0 4px; gap: 4px; }
+.tactical-map-counter img { width: 21px; height: 21px; object-fit: contain; }
+.tactical-map-counter b { color: #07d0f0; font-weight: normal; }
+.tactical-map-counter b[data-tone='yellow'] { color: #ffe32c; }
+.tactical-map-action { border: none; display: flex; align-items: center; width: 100%; height: 41px; padding: 0; background: none; gap: 0; }
+.tactical-map-action > span { flex: 1; min-width: 0; height: 26px; border-block: 1px solid #2c617b; background: rgba(0, 7, 11, .9); text-align: center; position: relative; }
+.tactical-map-action > span::before { content: ''; position: absolute; left: -4px; top: -1px; height: 26px; width: 7px; background: #020b10; border-left: 1px solid #4d809a; clip-path: polygon(100% 0, 0 20%, 0 80%, 100% 100%); }
+.tactical-map-action > img { object-fit: contain; width: 36px; height: 36px; border: 1px solid #4f7789; background: #020c12; padding: 2px; }
+.tactical-map-action:hover:not(:disabled) > span, .tactical-map-action[aria-pressed='true'] > span { color: #ffe36c; border-color: #dbce65; background: #152329; }
+
+.tactical-map-square:hover .tactical-map-scale { opacity: .65; }
+.tactical-map-unavailable { position: absolute; right: 18px; font-size: 10px; color: #698595; opacity: 0; }
+.tactical-map-commands:hover .tactical-map-unavailable { opacity: .9; }
+.tactical-map-state { z-index: 1; top: 27px; left: 26px; }
+.tactical-map-state small { opacity: 0; transition: opacity .15s; }
+.tactical-map-state:hover small { opacity: .8; }
+.tactical-map-help { position: absolute; bottom: 20px; left: max(230px, 12vw); right: 650px; color: #c2dce5; font-size: 12px; text-shadow: 1px 1px #000; pointer-events: none; }
+.tactical-ship-status { position: absolute; bottom: 18px; left: 20px; width: 190px; color: #97dfff; font: 12px/13px 'Microsoft YaHei',sans-serif; }
+.tactical-status-meter { display: flex; align-items: center; height: 12px; gap: 1px; }
+.tactical-status-meter > span:first-child { width: 48px; flex-shrink: 0; }
+.tactical-status-meter b { font-weight: normal; margin-left: auto; min-width: 58px; text-align: right; }
+.tactical-status-meter .hud-meter { color: #20c1db; }
+.tactical-ship-status > canvas { display: block; width: 190px; height: 166px; margin-bottom: -6px; }
+.tactical-ship-status > strong,.tactical-ship-status > span { display: block; font-weight: normal; }
+.tactical-ship-status > span:last-child { font-size: 11px; line-height: 14px; }
+.tactical-command-dock { position: absolute; right: 20px; bottom: 18px; display: flex; align-items: flex-end; gap: 14px; z-index: 2; }
+.tactical-command-group { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.tactical-command-dock[data-groups="3"] > .tactical-command-group:first-of-type { position: absolute; right: 0; bottom: 94px; }
+.tactical-command-tiles { display: flex; gap: 3px; }
+.tactical-command-group-title { color: #bcdfeb; font-size: 15px; padding-right: 2px; height: 20px; }
+.tactical-command-tile { --cut: polygon(13% 0,87% 0,100% 13%,100% 87%,87% 100%,13% 100%,0 87%,0 13%); width: 64px; height: 64px; border: 0; background: #5591a9; padding: 1px; position: relative; clip-path: var(--cut); }
+.tactical-command-tile-face { display: grid; place-items: center; width: 100%; height: 100%; background: rgba(3,18,24,.94); clip-path: var(--cut); }
+.tactical-command-tile img { width: 58px; height: 58px; object-fit: contain; opacity: .8; }
+.tactical-command-tile kbd { position: absolute; top: -2px; right: 7px; color: #9aabb0; text-shadow: 1px 1px #000; font: 17px/20px monospace; }
+.tactical-command-tile[aria-disabled='true'] img { opacity: .28; }
+.tactical-command-tile[aria-disabled='true'] { background: #375c6d; cursor: not-allowed; }
+.tactical-command-tile:hover, .tactical-command-tile:focus-visible { background: #b3eeff; outline: none !important; }
+.tactical-command-tile:hover img,.tactical-command-tile:focus-visible img { opacity: 1; }
+.tactical-command-tile[aria-pressed='true'] { background: #a1d468; }
+.tactical-command-tile[aria-pressed='true'] .tactical-command-tile-face { background: #133125; }
+.tactical-command-tooltip { position: absolute; bottom: calc(100% + 12px); right: 0; width: 315px; padding: 12px 15px; border: 1px solid #5c91a6; color: #adcdda; background: rgba(3,13,20,.97); font-size: 13px; pointer-events: none; z-index: 5; }
+.tactical-command-dock[data-groups="3"] .tactical-command-tooltip { bottom: calc(100% + 106px); }
+.tactical-command-tooltip strong { font-weight: normal; color: #d4edff; }
+.tactical-command-tooltip p { margin: 8px 0 0; }
+.tactical-command-tooltip small { color: #d5a568; }
+.tactical-map-info { position: absolute; right: 20px; bottom: 245px; width: 355px; z-index: 4; padding: 15px; border: 1px solid #48758e; background: rgba(2,10,16,.98); font-size: 13px; color: #a7d5e6; }
+.tactical-map-info p { margin-top: 9px; }
+.tactical-map-info button { background: transparent; border: 1px solid #547b91; padding: 4px 14px; margin-top: 12px; }
+[data-view="combat"]:has(.tactical-map) .studio-combat-identity { visibility: hidden; }
+@media (max-width: 1400px), (max-height: 800px) {
+ .tactical-map { --tac-sidebar: 225px; }
+ .tactical-ship-status { transform: scale(.8); transform-origin: bottom left; left: 14px; bottom: 12px; }
+ .tactical-command-dock { transform: scale(.8); transform-origin: bottom right; right: 14px; bottom: 12px; }
+ .tactical-map-state { top: 20px; left: 18px; font-size: 13px; }
+ .tactical-map-help { left: 175px; right: 450px; font-size: 11px; bottom: 14px; }
+}
+@media (max-width: 1000px) {
+ .tactical-map-square { left: 13%; right: 8%; }
+ .tactical-map-commands { transform: scale(.8); transform-origin: top right; }
+ .tactical-map-help { bottom: 204px; right: 24px; left: 180px; }
+ .tactical-command-dock { transform: scale(.7); }
+ .tactical-map-info { bottom: 190px; right: 12px; max-width: calc(100vw - 200px); }
+}
+@media (max-width: 650px) {
+ .tactical-command-dock { transform: scale(.55); right: 8px; bottom: 8px; }
+ .tactical-ship-status { transform: scale(.6); left: 8px; bottom: 8px; }
+ .tactical-map-commands { transform: scale(.65); }
+ .tactical-map-state { font-size: 11px; max-width: 200px; left: 12px; }
+ .tactical-map-help { left: 130px; bottom: 166px; }
+}

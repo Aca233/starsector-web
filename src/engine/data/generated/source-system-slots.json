@@ -1,0 +1,1560 @@
+{
+  "afflictor": [
+    {
+      "slotId": "WS 007",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 10,
+      "y": 27,
+      "baseAngleDeg": 160,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 008",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 10,
+      "y": -26,
+      "baseAngleDeg": 200,
+      "arcDeg": 5
+    }
+  ],
+  "afflictor_d_pirates": [
+    {
+      "slotId": "WS 007",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 10,
+      "y": 27,
+      "baseAngleDeg": 160,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 008",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 10,
+      "y": -26,
+      "baseAngleDeg": 200,
+      "arcDeg": 5
+    }
+  ],
+  "apogee": [
+    {
+      "slotId": "WS 010",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 4,
+      "y": -38,
+      "baseAngleDeg": -45,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 011",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -37,
+      "y": 40,
+      "baseAngleDeg": 45,
+      "arcDeg": 5
+    }
+  ],
+  "astral": [
+    {
+      "slotId": "WS 019",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 102,
+      "y": -60,
+      "baseAngleDeg": 0,
+      "arcDeg": 5
+    }
+  ],
+  "atlas": [
+    {
+      "slotId": "WS 005",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 265,
+      "y": 0,
+      "baseAngleDeg": 0,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 006",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -88,
+      "y": 54,
+      "baseAngleDeg": 140,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 007",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -88,
+      "y": -54,
+      "baseAngleDeg": 220,
+      "arcDeg": 5
+    }
+  ],
+  "atlas2": [
+    {
+      "slotId": "WS 005",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 267,
+      "y": 0,
+      "baseAngleDeg": 0,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 006",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -89,
+      "y": 55,
+      "baseAngleDeg": 140,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 007",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -91,
+      "y": -53,
+      "baseAngleDeg": 220,
+      "arcDeg": 5
+    }
+  ],
+  "aurora": [
+    {
+      "slotId": "WS 014",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -115,
+      "y": 1,
+      "baseAngleDeg": 180,
+      "arcDeg": 5
+    }
+  ],
+  "bastillon": [
+    {
+      "slotId": "WS 009",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 39,
+      "y": 0,
+      "baseAngleDeg": 0,
+      "arcDeg": 20
+    },
+    {
+      "slotId": "WS 010",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 9,
+      "y": 45,
+      "baseAngleDeg": 55,
+      "arcDeg": 20
+    },
+    {
+      "slotId": "WS 011",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 9,
+      "y": -44,
+      "baseAngleDeg": -55,
+      "arcDeg": 20
+    },
+    {
+      "slotId": "WS 012",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -44,
+      "y": 49,
+      "baseAngleDeg": 145,
+      "arcDeg": 20
+    },
+    {
+      "slotId": "WS 013",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -44,
+      "y": -49,
+      "baseAngleDeg": 215,
+      "arcDeg": 20
+    }
+  ],
+  "brilliant": [
+    {
+      "slotId": "WS 008",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -26,
+      "y": 72,
+      "baseAngleDeg": 45,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 009",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -26,
+      "y": -71,
+      "baseAngleDeg": -45,
+      "arcDeg": 5
+    }
+  ],
+  "broadsword": [
+    {
+      "slotId": "WS 005",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -6,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 5
+    }
+  ],
+  "buffalo": [
+    {
+      "slotId": "WS 002",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -50,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 5
+    }
+  ],
+  "buffalo2": [
+    {
+      "slotId": "WS 010",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -16,
+      "y": -29,
+      "baseAngleDeg": -45,
+      "arcDeg": 5
+    }
+  ],
+  "buffalo_d": [
+    {
+      "slotId": "WS 002",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -50,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 5
+    }
+  ],
+  "buffalo_hegemony": [
+    {
+      "slotId": "WS 002",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -50,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 5
+    }
+  ],
+  "buffalo_luddic_church": [
+    {
+      "slotId": "WS 002",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -50,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 5
+    }
+  ],
+  "buffalo_pirates": [
+    {
+      "slotId": "WS 002",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -50,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 5
+    }
+  ],
+  "buffalo_tritachyon": [
+    {
+      "slotId": "WS 002",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -50,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 5
+    }
+  ],
+  "colossus": [
+    {
+      "slotId": "WS 005",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 87,
+      "y": 83,
+      "baseAngleDeg": 45,
+      "arcDeg": 20
+    },
+    {
+      "slotId": "WS 006",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 86,
+      "y": -83,
+      "baseAngleDeg": -45,
+      "arcDeg": 20
+    },
+    {
+      "slotId": "WS 007",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -83,
+      "y": 83,
+      "baseAngleDeg": 100,
+      "arcDeg": 20
+    },
+    {
+      "slotId": "WS 008",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -84,
+      "y": -81,
+      "baseAngleDeg": 260,
+      "arcDeg": 20
+    }
+  ],
+  "colossus2": [
+    {
+      "slotId": "WS 005",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 89,
+      "y": 64,
+      "baseAngleDeg": 45,
+      "arcDeg": 20
+    },
+    {
+      "slotId": "WS 006",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 89,
+      "y": -61,
+      "baseAngleDeg": -45,
+      "arcDeg": 20
+    },
+    {
+      "slotId": "WS 007",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -83,
+      "y": 84,
+      "baseAngleDeg": 100,
+      "arcDeg": 20
+    },
+    {
+      "slotId": "WS 008",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -84,
+      "y": -81,
+      "baseAngleDeg": 260,
+      "arcDeg": 20
+    }
+  ],
+  "colossus3": [
+    {
+      "slotId": "WS 005",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 89,
+      "y": 64,
+      "baseAngleDeg": 45,
+      "arcDeg": 20
+    },
+    {
+      "slotId": "WS 006",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 89,
+      "y": -61,
+      "baseAngleDeg": -45,
+      "arcDeg": 20
+    },
+    {
+      "slotId": "WS 007",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -83,
+      "y": 84,
+      "baseAngleDeg": 100,
+      "arcDeg": 20
+    },
+    {
+      "slotId": "WS 008",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -84,
+      "y": -81,
+      "baseAngleDeg": 260,
+      "arcDeg": 20
+    }
+  ],
+  "crig": [
+    {
+      "slotId": "WS 001",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -71,
+      "y": -22,
+      "baseAngleDeg": 200,
+      "arcDeg": 30
+    }
+  ],
+  "defender": [
+    {
+      "slotId": "WS 005",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 8,
+      "y": 22,
+      "baseAngleDeg": 105,
+      "arcDeg": 10
+    },
+    {
+      "slotId": "WS 006",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 8,
+      "y": -21,
+      "baseAngleDeg": 255,
+      "arcDeg": 10
+    },
+    {
+      "slotId": "WS 007",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -19,
+      "y": -3,
+      "baseAngleDeg": 170,
+      "arcDeg": 10
+    },
+    {
+      "slotId": "WS 008",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 18,
+      "y": 7,
+      "baseAngleDeg": -10,
+      "arcDeg": 10
+    }
+  ],
+  "dram": [
+    {
+      "slotId": "WS 004",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -30,
+      "y": 34,
+      "baseAngleDeg": 155,
+      "arcDeg": 5
+    }
+  ],
+  "drover": [
+    {
+      "slotId": "WS 013",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 0,
+      "y": 63,
+      "baseAngleDeg": 110,
+      "arcDeg": 10
+    },
+    {
+      "slotId": "WS 014",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 1,
+      "y": -62,
+      "baseAngleDeg": 250,
+      "arcDeg": 10
+    }
+  ],
+  "fabricator_unit": [
+    {
+      "slotId": "WS 025",
+      "mountType": "HARDPOINT",
+      "slotSize": "SMALL",
+      "x": 120,
+      "y": 116,
+      "baseAngleDeg": 45,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 026",
+      "mountType": "HARDPOINT",
+      "slotSize": "SMALL",
+      "x": 120,
+      "y": -116,
+      "baseAngleDeg": -45,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 027",
+      "mountType": "HARDPOINT",
+      "slotSize": "SMALL",
+      "x": 13,
+      "y": -120,
+      "baseAngleDeg": 240,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 028",
+      "mountType": "HARDPOINT",
+      "slotSize": "SMALL",
+      "x": -26,
+      "y": -40,
+      "baseAngleDeg": 195,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 029",
+      "mountType": "HARDPOINT",
+      "slotSize": "SMALL",
+      "x": -26,
+      "y": 41,
+      "baseAngleDeg": 165,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 030",
+      "mountType": "HARDPOINT",
+      "slotSize": "SMALL",
+      "x": 14,
+      "y": 123,
+      "baseAngleDeg": 120,
+      "arcDeg": 5
+    }
+  ],
+  "gemini": [
+    {
+      "slotId": "WS 005",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -16,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 5
+    }
+  ],
+  "gremlin": [
+    {
+      "slotId": "WS 004",
+      "mountType": "HARDPOINT",
+      "slotSize": "SMALL",
+      "x": 45,
+      "y": 0,
+      "baseAngleDeg": 0,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 005",
+      "mountType": "HARDPOINT",
+      "slotSize": "SMALL",
+      "x": 12,
+      "y": 38,
+      "baseAngleDeg": 110,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 006",
+      "mountType": "HARDPOINT",
+      "slotSize": "SMALL",
+      "x": 12,
+      "y": -37,
+      "baseAngleDeg": 250,
+      "arcDeg": 5
+    }
+  ],
+  "gremlin_d_pirates": [
+    {
+      "slotId": "WS 004",
+      "mountType": "HARDPOINT",
+      "slotSize": "SMALL",
+      "x": 45,
+      "y": 0,
+      "baseAngleDeg": 0,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 005",
+      "mountType": "HARDPOINT",
+      "slotSize": "SMALL",
+      "x": 12,
+      "y": 38,
+      "baseAngleDeg": 110,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 006",
+      "mountType": "HARDPOINT",
+      "slotSize": "SMALL",
+      "x": 12,
+      "y": -37,
+      "baseAngleDeg": 250,
+      "arcDeg": 5
+    }
+  ],
+  "gremlin_luddic_path": [
+    {
+      "slotId": "WS 004",
+      "mountType": "HARDPOINT",
+      "slotSize": "SMALL",
+      "x": 45,
+      "y": 0,
+      "baseAngleDeg": 0,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 005",
+      "mountType": "HARDPOINT",
+      "slotSize": "SMALL",
+      "x": 12,
+      "y": 38,
+      "baseAngleDeg": 110,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 006",
+      "mountType": "HARDPOINT",
+      "slotSize": "SMALL",
+      "x": 12,
+      "y": -37,
+      "baseAngleDeg": 250,
+      "arcDeg": 5
+    }
+  ],
+  "grendel": [
+    {
+      "slotId": "WS 015",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 65,
+      "y": -58,
+      "baseAngleDeg": 0,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 016",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 65,
+      "y": -52,
+      "baseAngleDeg": 0,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 017",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 65,
+      "y": -64,
+      "baseAngleDeg": 0,
+      "arcDeg": 5
+    }
+  ],
+  "hermes": [
+    {
+      "slotId": "WS 004",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -40,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 30
+    }
+  ],
+  "hermes_d": [
+    {
+      "slotId": "WS 004",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -40,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 30
+    }
+  ],
+  "heron": [
+    {
+      "slotId": "WS 010",
+      "mountType": "TURRET",
+      "slotSize": "SMALL",
+      "x": 82,
+      "y": 31,
+      "baseAngleDeg": 0,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 011",
+      "mountType": "TURRET",
+      "slotSize": "SMALL",
+      "x": 29,
+      "y": -37,
+      "baseAngleDeg": 0,
+      "arcDeg": 5
+    }
+  ],
+  "hound": [
+    {
+      "slotId": "WS 003",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -19,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 90
+    }
+  ],
+  "hound_d": [
+    {
+      "slotId": "WS 003",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -19,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 90
+    }
+  ],
+  "hound_d_pirates": [
+    {
+      "slotId": "WS 003",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -19,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 90
+    }
+  ],
+  "hound_hegemony": [
+    {
+      "slotId": "WS 003",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -19,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 90
+    }
+  ],
+  "hound_luddic_church": [
+    {
+      "slotId": "WS 003",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -19,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 90
+    }
+  ],
+  "hound_luddic_path": [
+    {
+      "slotId": "WS 003",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -19,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 90
+    }
+  ],
+  "invictus": [
+    {
+      "slotId": "WS 011",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -6,
+      "y": 170,
+      "baseAngleDeg": 90,
+      "arcDeg": 8
+    },
+    {
+      "slotId": "WS 012",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 108,
+      "y": 142,
+      "baseAngleDeg": 65,
+      "arcDeg": 8
+    },
+    {
+      "slotId": "WS 013",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 192,
+      "y": 106,
+      "baseAngleDeg": 15,
+      "arcDeg": 8
+    },
+    {
+      "slotId": "WS 014",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 185,
+      "y": 0,
+      "baseAngleDeg": 0,
+      "arcDeg": 8
+    },
+    {
+      "slotId": "WS 015",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 192,
+      "y": -105,
+      "baseAngleDeg": -15,
+      "arcDeg": 8
+    },
+    {
+      "slotId": "WS 016",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 108,
+      "y": -141,
+      "baseAngleDeg": -65,
+      "arcDeg": 8
+    },
+    {
+      "slotId": "WS 017",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -5,
+      "y": -170,
+      "baseAngleDeg": -90,
+      "arcDeg": 8
+    },
+    {
+      "slotId": "WS 018",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -77,
+      "y": -156,
+      "baseAngleDeg": 250,
+      "arcDeg": 8
+    },
+    {
+      "slotId": "WS 019",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -164,
+      "y": -115,
+      "baseAngleDeg": 210,
+      "arcDeg": 8
+    },
+    {
+      "slotId": "WS 020",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -164,
+      "y": 116,
+      "baseAngleDeg": 150,
+      "arcDeg": 8
+    },
+    {
+      "slotId": "WS 021",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -77,
+      "y": 156,
+      "baseAngleDeg": 110,
+      "arcDeg": 8
+    }
+  ],
+  "lasher": [
+    {
+      "slotId": "WS 008",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -15,
+      "y": 29,
+      "baseAngleDeg": 160,
+      "arcDeg": 60
+    },
+    {
+      "slotId": "WS 009",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -15,
+      "y": -29,
+      "baseAngleDeg": 200,
+      "arcDeg": 60
+    }
+  ],
+  "lasher_d": [
+    {
+      "slotId": "WS 008",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -15,
+      "y": 29,
+      "baseAngleDeg": 160,
+      "arcDeg": 60
+    },
+    {
+      "slotId": "WS 009",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -15,
+      "y": -29,
+      "baseAngleDeg": 200,
+      "arcDeg": 60
+    }
+  ],
+  "lasher_luddic_church": [
+    {
+      "slotId": "WS 008",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -15,
+      "y": 29,
+      "baseAngleDeg": 160,
+      "arcDeg": 60
+    },
+    {
+      "slotId": "WS 009",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -15,
+      "y": -29,
+      "baseAngleDeg": 200,
+      "arcDeg": 60
+    }
+  ],
+  "lasher_pather": [
+    {
+      "slotId": "WS 008",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -15,
+      "y": 29,
+      "baseAngleDeg": 160,
+      "arcDeg": 60
+    },
+    {
+      "slotId": "WS 009",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -15,
+      "y": -29,
+      "baseAngleDeg": 200,
+      "arcDeg": 60
+    }
+  ],
+  "manticore": [
+    {
+      "slotId": "WS 006",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 36,
+      "y": -20,
+      "baseAngleDeg": -45,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 007",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 36,
+      "y": 21,
+      "baseAngleDeg": 45,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 008",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -19,
+      "y": 40,
+      "baseAngleDeg": 135,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 009",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -19,
+      "y": -40,
+      "baseAngleDeg": 225,
+      "arcDeg": 5
+    }
+  ],
+  "manticore_luddic_path": [
+    {
+      "slotId": "WS 006",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 36,
+      "y": -20,
+      "baseAngleDeg": -45,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 007",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 36,
+      "y": 21,
+      "baseAngleDeg": 45,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 008",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -19,
+      "y": 40,
+      "baseAngleDeg": 135,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 009",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -19,
+      "y": -40,
+      "baseAngleDeg": 225,
+      "arcDeg": 5
+    }
+  ],
+  "manticore_pirates": [
+    {
+      "slotId": "WS 006",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 36,
+      "y": -20,
+      "baseAngleDeg": -45,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 007",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 36,
+      "y": 21,
+      "baseAngleDeg": 45,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 008",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -19,
+      "y": 40,
+      "baseAngleDeg": 135,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 009",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -19,
+      "y": -40,
+      "baseAngleDeg": 225,
+      "arcDeg": 5
+    }
+  ],
+  "mercury": [
+    {
+      "slotId": "WS 004",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -30,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 90
+    }
+  ],
+  "mercury_d": [
+    {
+      "slotId": "WS 004",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -30,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 90
+    }
+  ],
+  "monitor": [
+    {
+      "slotId": "WS 005",
+      "mountType": "TURRET",
+      "slotSize": "SMALL",
+      "x": -27,
+      "y": 17,
+      "baseAngleDeg": 160,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 006",
+      "mountType": "TURRET",
+      "slotSize": "SMALL",
+      "x": -27,
+      "y": -16,
+      "baseAngleDeg": 200,
+      "arcDeg": 5
+    }
+  ],
+  "nebula": [
+    {
+      "slotId": "WS 005",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -56,
+      "y": 39,
+      "baseAngleDeg": 150,
+      "arcDeg": 30
+    },
+    {
+      "slotId": "WS 006",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -56,
+      "y": -38,
+      "baseAngleDeg": 210,
+      "arcDeg": 30
+    }
+  ],
+  "nova": [
+    {
+      "slotId": "WS 014",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -151,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 5
+    }
+  ],
+  "omen": [
+    {
+      "slotId": "WS 004",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 35,
+      "y": -2,
+      "baseAngleDeg": 0,
+      "arcDeg": 90
+    }
+  ],
+  "overseer_unit": [
+    {
+      "slotId": "WS 010",
+      "mountType": "TURRET",
+      "slotSize": "MEDIUM",
+      "x": -28,
+      "y": 0,
+      "baseAngleDeg": 0,
+      "arcDeg": 360
+    },
+    {
+      "slotId": "WS 011",
+      "mountType": "TURRET",
+      "slotSize": "SMALL",
+      "x": -16,
+      "y": 34,
+      "baseAngleDeg": 0,
+      "arcDeg": 360
+    },
+    {
+      "slotId": "WS 012",
+      "mountType": "TURRET",
+      "slotSize": "SMALL",
+      "x": -18,
+      "y": -35,
+      "baseAngleDeg": 0,
+      "arcDeg": 360
+    }
+  ],
+  "ox": [
+    {
+      "slotId": "WS 001",
+      "mountType": "TURRET",
+      "slotSize": "SMALL",
+      "x": -23,
+      "y": 1,
+      "baseAngleDeg": 180,
+      "arcDeg": 10
+    }
+  ],
+  "phaeton": [
+    {
+      "slotId": "WS 005",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -51,
+      "y": 59,
+      "baseAngleDeg": 110,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 006",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -51,
+      "y": -58,
+      "baseAngleDeg": 250,
+      "arcDeg": 5
+    }
+  ],
+  "phantom": [
+    {
+      "slotId": "WS 000",
+      "mountType": "TURRET",
+      "slotSize": "SMALL",
+      "x": -32,
+      "y": 89,
+      "baseAngleDeg": 150,
+      "arcDeg": 10
+    },
+    {
+      "slotId": "WS 001",
+      "mountType": "TURRET",
+      "slotSize": "SMALL",
+      "x": -32,
+      "y": -89,
+      "baseAngleDeg": 210,
+      "arcDeg": 10
+    }
+  ],
+  "piranha": [
+    {
+      "slotId": "WS 003",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -2,
+      "y": -10,
+      "baseAngleDeg": 225,
+      "arcDeg": 5
+    }
+  ],
+  "prometheus": [
+    {
+      "slotId": "WS 008",
+      "mountType": "TURRET",
+      "slotSize": "SMALL",
+      "x": 122,
+      "y": -101,
+      "baseAngleDeg": 0,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 009",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 121,
+      "y": 96,
+      "baseAngleDeg": 90,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 010",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -97,
+      "y": 104,
+      "baseAngleDeg": 90,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 011",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -97,
+      "y": -103,
+      "baseAngleDeg": -90,
+      "arcDeg": 5
+    }
+  ],
+  "prometheus2": [
+    {
+      "slotId": "WS 008",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 49,
+      "y": -86,
+      "baseAngleDeg": -90,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 009",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 48,
+      "y": 81,
+      "baseAngleDeg": 90,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 010",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -106,
+      "y": 102,
+      "baseAngleDeg": 90,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 011",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -105,
+      "y": -104,
+      "baseAngleDeg": -90,
+      "arcDeg": 5
+    }
+  ],
+  "remnant_weapon_platform1": [
+    {
+      "slotId": "WS 007",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 45,
+      "y": -26,
+      "baseAngleDeg": -50,
+      "arcDeg": 8
+    }
+  ],
+  "retribution": [
+    {
+      "slotId": "WS 018",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -135,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 5
+    }
+  ],
+  "revenant": [
+    {
+      "slotId": "WS 000",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -99,
+      "y": 50,
+      "baseAngleDeg": 160,
+      "arcDeg": 10
+    },
+    {
+      "slotId": "WS 001",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -99,
+      "y": -50,
+      "baseAngleDeg": 200,
+      "arcDeg": 10
+    }
+  ],
+  "sarissa": [
+    {
+      "slotId": "WS 002",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 13,
+      "y": 0,
+      "baseAngleDeg": 0,
+      "arcDeg": 180
+    }
+  ],
+  "shade": [
+    {
+      "slotId": "WS 006",
+      "mountType": "TURRET",
+      "slotSize": "SMALL",
+      "x": -22,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 5
+    }
+  ],
+  "shade_d_pirates": [
+    {
+      "slotId": "WS 006",
+      "mountType": "TURRET",
+      "slotSize": "SMALL",
+      "x": -22,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 5
+    }
+  ],
+  "starliner": [
+    {
+      "slotId": "WS 007",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 71,
+      "y": 54,
+      "baseAngleDeg": 150,
+      "arcDeg": 30
+    },
+    {
+      "slotId": "WS 008",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 71,
+      "y": -53,
+      "baseAngleDeg": 210,
+      "arcDeg": 30
+    }
+  ],
+  "talon": [
+    {
+      "slotId": "WS 002",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -8,
+      "y": 2,
+      "baseAngleDeg": 180,
+      "arcDeg": 5
+    }
+  ],
+  "talon_tritachyon": [
+    {
+      "slotId": "WS 002",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -8,
+      "y": 2,
+      "baseAngleDeg": 180,
+      "arcDeg": 5
+    }
+  ],
+  "tempest": [
+    {
+      "slotId": "WS 005",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -23,
+      "y": -17,
+      "baseAngleDeg": 210,
+      "arcDeg": 5
+    }
+  ],
+  "valkyrie": [
+    {
+      "slotId": "WS 007",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": 147,
+      "y": 0,
+      "baseAngleDeg": 0,
+      "arcDeg": 5
+    }
+  ],
+  "venture": [
+    {
+      "slotId": "WS 010",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -73,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 5
+    }
+  ],
+  "venture_p": [
+    {
+      "slotId": "WS 010",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -73,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 5
+    }
+  ],
+  "venture_pather": [
+    {
+      "slotId": "WS 010",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -73,
+      "y": 0,
+      "baseAngleDeg": 180,
+      "arcDeg": 5
+    }
+  ],
+  "vigilance": [
+    {
+      "slotId": "WS 003",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -20,
+      "y": 21,
+      "baseAngleDeg": 30,
+      "arcDeg": 5
+    },
+    {
+      "slotId": "WS 004",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -20,
+      "y": -18,
+      "baseAngleDeg": -30,
+      "arcDeg": 5
+    }
+  ],
+  "wayfarer": [
+    {
+      "slotId": "WS 007",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -32,
+      "y": 1,
+      "baseAngleDeg": 180,
+      "arcDeg": 5
+    }
+  ],
+  "ziggurat": [
+    {
+      "slotId": "WS 016",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -14,
+      "y": 153,
+      "baseAngleDeg": 160,
+      "arcDeg": 10
+    },
+    {
+      "slotId": "WS 017",
+      "mountType": "HIDDEN",
+      "slotSize": "SMALL",
+      "x": -14,
+      "y": -152,
+      "baseAngleDeg": 200,
+      "arcDeg": 10
+    },
+    {
+      "slotId": "WS 018",
+      "mountType": "HIDDEN",
+      "slotSize": "MEDIUM",
+      "x": 46,
+      "y": 0,
+      "baseAngleDeg": 0,
+      "arcDeg": 30
+    }
+  ]
+}

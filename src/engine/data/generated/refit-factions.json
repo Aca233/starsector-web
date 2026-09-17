@@ -1,0 +1,2068 @@
+{
+  "factions": [
+    {
+      "id": "derelict",
+      "name": "遗弃船"
+    },
+    {
+      "id": "dweller",
+      "name": "渊幕原种"
+    },
+    {
+      "id": "hegemony",
+      "name": "霸主"
+    },
+    {
+      "id": "independent",
+      "name": "非势力团体"
+    },
+    {
+      "id": "lions_guard",
+      "name": "狮心卫队"
+    },
+    {
+      "id": "luddic_church",
+      "name": "卢德教会"
+    },
+    {
+      "id": "luddic_path",
+      "name": "卢德左径"
+    },
+    {
+      "id": "mercenary",
+      "name": "雇佣兵"
+    },
+    {
+      "id": "omega",
+      "name": "欧米伽"
+    },
+    {
+      "id": "persean",
+      "name": "英仙座联盟"
+    },
+    {
+      "id": "pirates",
+      "name": "海盗"
+    },
+    {
+      "id": "remnant",
+      "name": "余辉"
+    },
+    {
+      "id": "scavengers",
+      "name": "拾荒者"
+    },
+    {
+      "id": "sindrian_diktat",
+      "name": "辛达强权"
+    },
+    {
+      "id": "threat",
+      "name": "威胁"
+    },
+    {
+      "id": "tritachyon",
+      "name": "速子科技"
+    }
+  ],
+  "hullFactions": {
+    "afflictor": [
+      "independent",
+      "mercenary",
+      "scavengers",
+      "tritachyon"
+    ],
+    "afflictor_d_pirates": [
+      "independent",
+      "mercenary",
+      "pirates",
+      "scavengers"
+    ],
+    "anubis": [
+      "mercenary",
+      "tritachyon"
+    ],
+    "apex": [
+      "remnant"
+    ],
+    "apogee": [
+      "independent",
+      "mercenary",
+      "scavengers"
+    ],
+    "assault_unit": [
+      "threat"
+    ],
+    "astral": [
+      "mercenary",
+      "tritachyon"
+    ],
+    "atlas": [
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "mercenary",
+      "persean",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "atlas2": [
+      "pirates"
+    ],
+    "attack_swarm": [
+      "threat"
+    ],
+    "aurora": [
+      "independent",
+      "mercenary",
+      "scavengers",
+      "tritachyon"
+    ],
+    "bastillon": [
+      "derelict"
+    ],
+    "berserker": [
+      "derelict"
+    ],
+    "brawler": [
+      "independent",
+      "mercenary",
+      "persean",
+      "scavengers",
+      "sindrian_diktat"
+    ],
+    "brawler_LG": [
+      "independent",
+      "lions_guard",
+      "mercenary",
+      "scavengers"
+    ],
+    "brawler_pather": [
+      "independent",
+      "luddic_path",
+      "mercenary",
+      "scavengers"
+    ],
+    "brawler_tritachyon": [
+      "independent",
+      "mercenary",
+      "scavengers",
+      "tritachyon"
+    ],
+    "brilliant": [
+      "remnant"
+    ],
+    "buffalo": [
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "mercenary",
+      "persean",
+      "pirates",
+      "scavengers",
+      "sindrian_diktat"
+    ],
+    "buffalo2": [
+      "independent",
+      "luddic_church",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "buffalo_d": [
+      "independent",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "scavengers"
+    ],
+    "buffalo_hegemony": [
+      "hegemony",
+      "independent",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "scavengers"
+    ],
+    "buffalo_luddic_church": [
+      "independent",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "scavengers"
+    ],
+    "buffalo_pirates": [
+      "independent",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "scavengers"
+    ],
+    "buffalo_tritachyon": [
+      "independent",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "scavengers",
+      "tritachyon"
+    ],
+    "centurion": [
+      "hegemony",
+      "independent",
+      "mercenary",
+      "scavengers",
+      "sindrian_diktat"
+    ],
+    "centurion_LG": [
+      "independent",
+      "lions_guard",
+      "mercenary",
+      "scavengers"
+    ],
+    "cerberus": [
+      "hegemony",
+      "independent",
+      "luddic_church",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "cerberus_d": [
+      "independent",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "cerberus_d_pirates": [
+      "independent",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "cerberus_luddic_path": [
+      "independent",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "champion": [
+      "independent",
+      "mercenary",
+      "persean",
+      "scavengers"
+    ],
+    "colossus": [
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "persean",
+      "pirates",
+      "scavengers",
+      "sindrian_diktat"
+    ],
+    "colossus2": [
+      "luddic_path"
+    ],
+    "colossus3": [
+      "pirates"
+    ],
+    "condor": [
+      "hegemony",
+      "independent",
+      "luddic_church",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "conquest": [
+      "mercenary",
+      "persean"
+    ],
+    "crig": [
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "persean",
+      "pirates",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "defender": [
+      "derelict"
+    ],
+    "dominator": [
+      "hegemony",
+      "independent",
+      "mercenary",
+      "scavengers"
+    ],
+    "dominator_d": [
+      "independent",
+      "mercenary",
+      "scavengers"
+    ],
+    "dominator_xiv": [
+      "hegemony",
+      "independent",
+      "mercenary",
+      "scavengers"
+    ],
+    "doom": [
+      "mercenary",
+      "tritachyon"
+    ],
+    "dram": [
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "persean",
+      "pirates",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "drover": [
+      "independent",
+      "mercenary",
+      "persean",
+      "scavengers"
+    ],
+    "eagle": [
+      "hegemony",
+      "independent",
+      "mercenary",
+      "persean",
+      "scavengers",
+      "sindrian_diktat"
+    ],
+    "eagle_LG": [
+      "independent",
+      "lions_guard",
+      "mercenary",
+      "scavengers"
+    ],
+    "eagle_d": [
+      "independent",
+      "mercenary",
+      "scavengers"
+    ],
+    "eagle_xiv": [
+      "hegemony",
+      "independent",
+      "mercenary",
+      "scavengers"
+    ],
+    "enforcer": [
+      "hegemony",
+      "independent",
+      "luddic_path",
+      "mercenary",
+      "scavengers"
+    ],
+    "enforcer_d": [
+      "independent",
+      "mercenary",
+      "scavengers"
+    ],
+    "enforcer_d_pirates": [
+      "independent",
+      "mercenary",
+      "pirates",
+      "scavengers"
+    ],
+    "enforcer_xiv": [
+      "hegemony",
+      "independent",
+      "mercenary",
+      "scavengers"
+    ],
+    "eradicator": [
+      "independent",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "scavengers"
+    ],
+    "eradicator_pirates": [
+      "independent",
+      "mercenary",
+      "pirates",
+      "scavengers"
+    ],
+    "executor": [
+      "lions_guard",
+      "mercenary",
+      "sindrian_diktat"
+    ],
+    "fabricator_unit": [
+      "threat"
+    ],
+    "facet": [
+      "omega"
+    ],
+    "falcon": [
+      "independent",
+      "mercenary",
+      "persean",
+      "scavengers",
+      "sindrian_diktat"
+    ],
+    "falcon_LG": [
+      "independent",
+      "lions_guard",
+      "mercenary",
+      "scavengers"
+    ],
+    "falcon_d": [
+      "independent",
+      "mercenary",
+      "scavengers"
+    ],
+    "falcon_p": [
+      "independent",
+      "mercenary",
+      "pirates",
+      "scavengers"
+    ],
+    "falcon_xiv": [
+      "hegemony",
+      "independent",
+      "mercenary",
+      "scavengers"
+    ],
+    "fulgent": [
+      "remnant"
+    ],
+    "fury": [
+      "independent",
+      "mercenary",
+      "scavengers",
+      "tritachyon"
+    ],
+    "gemini": [
+      "independent",
+      "lions_guard",
+      "persean",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "glimmer": [
+      "remnant"
+    ],
+    "gremlin": [
+      "hegemony",
+      "luddic_path",
+      "pirates"
+    ],
+    "gremlin_d_pirates": [
+      "luddic_path",
+      "pirates"
+    ],
+    "gremlin_luddic_path": [
+      "luddic_path",
+      "pirates"
+    ],
+    "grendel": [
+      "hegemony"
+    ],
+    "gryphon": [
+      "independent",
+      "mercenary",
+      "persean",
+      "scavengers"
+    ],
+    "guardian": [
+      "derelict"
+    ],
+    "hammerhead": [
+      "independent",
+      "luddic_path",
+      "mercenary",
+      "persean",
+      "scavengers",
+      "sindrian_diktat"
+    ],
+    "hammerhead_LG": [
+      "independent",
+      "lions_guard",
+      "mercenary",
+      "scavengers"
+    ],
+    "hammerhead_d": [
+      "independent",
+      "mercenary",
+      "scavengers"
+    ],
+    "harbinger": [
+      "independent",
+      "mercenary",
+      "scavengers",
+      "tritachyon"
+    ],
+    "hermes": [
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "persean",
+      "pirates",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "hermes_d": [
+      "independent",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "heron": [
+      "independent",
+      "mercenary",
+      "persean",
+      "scavengers"
+    ],
+    "hive_unit": [
+      "threat"
+    ],
+    "hound": [
+      "independent",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "hound_d": [
+      "independent",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "hound_d_pirates": [
+      "independent",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "hound_hegemony": [
+      "hegemony",
+      "independent",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "hound_luddic_church": [
+      "independent",
+      "luddic_church",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "hound_luddic_path": [
+      "independent",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "hyperion": [
+      "independent",
+      "mercenary",
+      "scavengers",
+      "tritachyon"
+    ],
+    "invictus": [
+      "luddic_church"
+    ],
+    "kite": [
+      "independent",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "kite_d": [
+      "independent",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "kite_hegemony": [
+      "hegemony",
+      "independent",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "kite_luddic_path": [
+      "independent",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "kite_original": [
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "persean",
+      "pirates",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "kite_pirates": [
+      "independent",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "lasher": [
+      "hegemony",
+      "independent",
+      "mercenary",
+      "scavengers"
+    ],
+    "lasher_d": [
+      "independent",
+      "mercenary",
+      "scavengers"
+    ],
+    "lasher_luddic_church": [
+      "independent",
+      "luddic_church",
+      "mercenary",
+      "scavengers"
+    ],
+    "lasher_pather": [
+      "independent",
+      "luddic_path",
+      "mercenary",
+      "scavengers"
+    ],
+    "legion": [
+      "hegemony",
+      "mercenary"
+    ],
+    "legion_xiv": [
+      "hegemony",
+      "mercenary"
+    ],
+    "lumen": [
+      "remnant"
+    ],
+    "manticore": [
+      "independent",
+      "luddic_church",
+      "mercenary",
+      "scavengers"
+    ],
+    "manticore_luddic_path": [
+      "independent",
+      "luddic_path",
+      "mercenary",
+      "scavengers"
+    ],
+    "manticore_pirates": [
+      "independent",
+      "mercenary",
+      "pirates",
+      "scavengers"
+    ],
+    "medusa": [
+      "independent",
+      "mercenary",
+      "scavengers",
+      "tritachyon"
+    ],
+    "mercury": [
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "persean",
+      "pirates",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "mercury_d": [
+      "independent",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "monitor": [
+      "independent",
+      "mercenary",
+      "persean",
+      "scavengers"
+    ],
+    "mora": [
+      "hegemony",
+      "independent",
+      "luddic_church",
+      "mercenary",
+      "scavengers"
+    ],
+    "mudskipper": [
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "persean",
+      "pirates",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "mudskipper2": [
+      "independent",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "mule": [
+      "hegemony",
+      "independent",
+      "luddic_church",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "mule_d": [
+      "independent",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "mule_d_pirates": [
+      "independent",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "nebula": [
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "persean",
+      "pirates",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "nova": [
+      "remnant"
+    ],
+    "odyssey": [
+      "mercenary",
+      "tritachyon"
+    ],
+    "omen": [
+      "independent",
+      "mercenary",
+      "scavengers",
+      "tritachyon"
+    ],
+    "onslaught": [
+      "hegemony",
+      "mercenary"
+    ],
+    "onslaught_xiv": [
+      "hegemony",
+      "mercenary"
+    ],
+    "overseer_unit": [
+      "threat"
+    ],
+    "ox": [
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "persean",
+      "pirates",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "paragon": [
+      "mercenary",
+      "tritachyon"
+    ],
+    "pegasus": [
+      "mercenary",
+      "persean"
+    ],
+    "phaeton": [
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "persean",
+      "pirates",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "phantom": [
+      "mercenary",
+      "tritachyon"
+    ],
+    "picket": [
+      "derelict"
+    ],
+    "prometheus": [
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "mercenary",
+      "persean",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "prometheus2": [
+      "luddic_path"
+    ],
+    "radiant": [
+      "remnant"
+    ],
+    "rampart": [
+      "derelict"
+    ],
+    "remnant_station2": [
+      "remnant"
+    ],
+    "retribution": [
+      "luddic_church"
+    ],
+    "revenant": [
+      "mercenary",
+      "tritachyon"
+    ],
+    "scarab": [
+      "independent",
+      "mercenary",
+      "scavengers",
+      "tritachyon"
+    ],
+    "scintilla": [
+      "remnant"
+    ],
+    "sentry": [
+      "derelict"
+    ],
+    "shade": [
+      "independent",
+      "mercenary",
+      "scavengers",
+      "tritachyon"
+    ],
+    "shade_d_pirates": [
+      "independent",
+      "mercenary",
+      "pirates",
+      "scavengers"
+    ],
+    "shard_left": [
+      "omega"
+    ],
+    "shard_right": [
+      "omega"
+    ],
+    "shepherd": [
+      "hegemony",
+      "independent",
+      "luddic_church",
+      "luddic_path",
+      "pirates",
+      "scavengers"
+    ],
+    "shrike": [
+      "independent",
+      "mercenary",
+      "scavengers",
+      "tritachyon"
+    ],
+    "shrike_pirates": [
+      "independent",
+      "mercenary",
+      "pirates",
+      "scavengers"
+    ],
+    "shrouded_ejecta": [
+      "dweller"
+    ],
+    "shrouded_eye": [
+      "dweller"
+    ],
+    "shrouded_maelstrom": [
+      "dweller"
+    ],
+    "shrouded_maw": [
+      "dweller"
+    ],
+    "shrouded_tendril": [
+      "dweller"
+    ],
+    "shrouded_vortex": [
+      "dweller"
+    ],
+    "skirmish_unit": [
+      "threat"
+    ],
+    "standoff_unit": [
+      "threat"
+    ],
+    "starliner": [
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "mercenary",
+      "persean",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "station_derelict_survey_mothership": [
+      "derelict"
+    ],
+    "sunder": [
+      "independent",
+      "luddic_path",
+      "mercenary",
+      "persean",
+      "scavengers",
+      "sindrian_diktat"
+    ],
+    "sunder_LG": [
+      "independent",
+      "lions_guard",
+      "mercenary",
+      "scavengers"
+    ],
+    "sunder_d": [
+      "independent",
+      "mercenary",
+      "scavengers"
+    ],
+    "tarsus": [
+      "hegemony",
+      "independent",
+      "luddic_church",
+      "mercenary",
+      "scavengers"
+    ],
+    "tarsus_d": [
+      "independent",
+      "mercenary",
+      "scavengers"
+    ],
+    "tempest": [
+      "independent",
+      "mercenary",
+      "scavengers",
+      "tritachyon"
+    ],
+    "tesseract": [
+      "omega"
+    ],
+    "valkyrie": [
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "mercenary",
+      "persean",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "vanguard": [
+      "independent",
+      "luddic_church",
+      "mercenary",
+      "scavengers"
+    ],
+    "vanguard_pirates": [
+      "independent",
+      "mercenary",
+      "pirates",
+      "scavengers"
+    ],
+    "venture": [
+      "hegemony",
+      "independent",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "scavengers"
+    ],
+    "venture_p": [
+      "independent",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "scavengers"
+    ],
+    "venture_pather": [
+      "independent",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "scavengers"
+    ],
+    "vigilance": [
+      "independent",
+      "mercenary",
+      "persean",
+      "scavengers"
+    ],
+    "warden": [
+      "derelict"
+    ],
+    "wayfarer": [
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "persean",
+      "pirates",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "wolf": [
+      "independent",
+      "mercenary",
+      "scavengers"
+    ],
+    "wolf_d": [
+      "independent",
+      "mercenary",
+      "scavengers"
+    ],
+    "wolf_d_pirates": [
+      "independent",
+      "mercenary",
+      "pirates",
+      "scavengers"
+    ],
+    "wolf_hegemony": [
+      "hegemony",
+      "independent",
+      "mercenary",
+      "scavengers"
+    ]
+  },
+  "weaponFactions": {
+    "abyssal_glare": [
+      "dweller"
+    ],
+    "amblaster": [
+      "independent",
+      "lions_guard",
+      "mercenary",
+      "remnant",
+      "scavengers",
+      "tritachyon"
+    ],
+    "amsrm": [
+      "omega"
+    ],
+    "annihilator": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "annihilatorpod": [
+      "derelict",
+      "independent",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers"
+    ],
+    "arbalest": [
+      "derelict",
+      "independent",
+      "luddic_church",
+      "luddic_path",
+      "pirates",
+      "remnant",
+      "scavengers"
+    ],
+    "assaying_rift": [
+      "dweller"
+    ],
+    "atropos": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "atropos_single": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "autopulse": [
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "breach": [
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "breachpod": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "mercenary",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "chaingun": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat"
+    ],
+    "cryoblaster": [
+      "omega"
+    ],
+    "cryoflux": [
+      "omega"
+    ],
+    "cyclone": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "mercenary",
+      "remnant",
+      "scavengers",
+      "tritachyon"
+    ],
+    "devastator": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat"
+    ],
+    "devouring_swarm": [
+      "threat"
+    ],
+    "disintegrator": [
+      "omega"
+    ],
+    "dragon": [
+      "mercenary",
+      "persean"
+    ],
+    "dragonpod": [
+      "mercenary",
+      "persean"
+    ],
+    "dualflak": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "mercenary",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat"
+    ],
+    "flak": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "persean",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat"
+    ],
+    "gauss": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "mercenary",
+      "remnant",
+      "scavengers"
+    ],
+    "gazer": [
+      "mercenary",
+      "persean"
+    ],
+    "gazerpod": [
+      "mercenary",
+      "persean"
+    ],
+    "gigacannon": [
+      "lions_guard"
+    ],
+    "gorgon": [
+      "mercenary",
+      "persean"
+    ],
+    "gorgonpod": [
+      "mercenary",
+      "persean"
+    ],
+    "gravitonbeam": [
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "mercenary",
+      "persean",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "guardian": [
+      "independent",
+      "mercenary",
+      "persean",
+      "remnant",
+      "scavengers",
+      "tritachyon"
+    ],
+    "hammer": [
+      "derelict",
+      "independent",
+      "luddic_church",
+      "luddic_path",
+      "pirates",
+      "remnant",
+      "scavengers"
+    ],
+    "hammer_single": [
+      "derelict",
+      "independent",
+      "luddic_church",
+      "luddic_path",
+      "pirates",
+      "remnant",
+      "scavengers"
+    ],
+    "hammerrack": [
+      "derelict",
+      "independent",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers"
+    ],
+    "harpoon": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "harpoon_single": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "harpoonpod": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "heatseeker": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "heavy_mass_driver": [
+      "threat"
+    ],
+    "heavyac": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "mercenary",
+      "persean",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat"
+    ],
+    "heavyblaster": [
+      "independent",
+      "lions_guard",
+      "mercenary",
+      "remnant",
+      "scavengers",
+      "tritachyon"
+    ],
+    "heavyburst": [
+      "independent",
+      "mercenary",
+      "persean",
+      "remnant",
+      "scavengers",
+      "tritachyon"
+    ],
+    "heavymauler": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "mercenary",
+      "persean",
+      "remnant",
+      "scavengers"
+    ],
+    "heavymg": [
+      "derelict",
+      "independent",
+      "luddic_path",
+      "mercenary",
+      "persean",
+      "pirates",
+      "remnant",
+      "scavengers"
+    ],
+    "heavymortar": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat"
+    ],
+    "heavyneedler": [
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "mercenary",
+      "remnant",
+      "scavengers",
+      "tritachyon"
+    ],
+    "hellbore": [
+      "derelict",
+      "independent",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers"
+    ],
+    "hephag": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat"
+    ],
+    "hil": [
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "mercenary",
+      "persean",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "hurricane": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "tritachyon"
+    ],
+    "hveldriver": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "mercenary",
+      "remnant",
+      "scavengers",
+      "tritachyon"
+    ],
+    "hydra": [
+      "mercenary",
+      "persean"
+    ],
+    "inimical_emanation": [
+      "dweller"
+    ],
+    "ionbeam": [
+      "independent",
+      "mercenary",
+      "persean",
+      "remnant",
+      "scavengers",
+      "tritachyon"
+    ],
+    "ioncannon": [
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "mercenary",
+      "persean",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "ionpulser": [
+      "independent",
+      "mercenary",
+      "remnant",
+      "scavengers",
+      "tritachyon"
+    ],
+    "irautolance": [
+      "mercenary",
+      "persean",
+      "pirates"
+    ],
+    "irpulse": [
+      "derelict",
+      "independent",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "jackhammer": [
+      "independent",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers"
+    ],
+    "kinetic_fragments": [
+      "threat"
+    ],
+    "kineticblaster": [
+      "lions_guard"
+    ],
+    "light_mass_driver": [
+      "threat"
+    ],
+    "lightac": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "persean",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat"
+    ],
+    "lightag": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "mercenary",
+      "persean",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat"
+    ],
+    "lightdualac": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "persean",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat"
+    ],
+    "lightdualmg": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "persean",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat"
+    ],
+    "lightmg": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "persean",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat"
+    ],
+    "lightmortar": [
+      "derelict",
+      "independent",
+      "luddic_church",
+      "luddic_path",
+      "pirates",
+      "remnant",
+      "scavengers"
+    ],
+    "lightneedler": [
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "mercenary",
+      "remnant",
+      "scavengers",
+      "tritachyon"
+    ],
+    "locust": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "lrpdlaser": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "mercenary",
+      "persean",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "mark9": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat"
+    ],
+    "miningblaster": [
+      "derelict",
+      "independent",
+      "luddic_church",
+      "luddic_path",
+      "pirates",
+      "remnant",
+      "scavengers"
+    ],
+    "mininglaser": [
+      "derelict",
+      "independent",
+      "luddic_church",
+      "luddic_path",
+      "pirates",
+      "remnant",
+      "scavengers"
+    ],
+    "minipulser": [
+      "omega"
+    ],
+    "mjolnir": [
+      "derelict",
+      "independent",
+      "mercenary",
+      "persean",
+      "remnant",
+      "scavengers",
+      "tritachyon"
+    ],
+    "multineedler": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "mercenary",
+      "remnant",
+      "scavengers",
+      "tritachyon"
+    ],
+    "neoferric_quadcoil": [
+      "threat"
+    ],
+    "neutron_torpedo": [
+      "threat"
+    ],
+    "pdburst": [
+      "independent",
+      "mercenary",
+      "persean",
+      "remnant",
+      "scavengers",
+      "tritachyon"
+    ],
+    "pdlaser": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "mercenary",
+      "persean",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "phasebeam": [
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "mercenary",
+      "persean",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "phasecl": [
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "mercenary",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "pilum": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat"
+    ],
+    "pilum_large": [
+      "independent",
+      "luddic_church",
+      "mercenary",
+      "scavengers"
+    ],
+    "plasma": [
+      "derelict",
+      "independent",
+      "mercenary",
+      "remnant",
+      "scavengers",
+      "tritachyon"
+    ],
+    "pseudoparticle_jet": [
+      "dweller"
+    ],
+    "pulselaser": [
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "railgun": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "mercenary",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "realitydisruptor": [
+      "omega"
+    ],
+    "reaper": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "resonatormrm": [
+      "omega"
+    ],
+    "rift_lightning": [
+      "dweller"
+    ],
+    "riftbeam": [
+      "omega"
+    ],
+    "riftcascade": [
+      "omega"
+    ],
+    "riftlance": [
+      "omega"
+    ],
+    "rifttorpedo": [
+      "omega"
+    ],
+    "sabot": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "sabot_single": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "sabotpod": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "mercenary",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "salamanderpod": [
+      "derelict",
+      "independent",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "tritachyon"
+    ],
+    "seeker_fragment": [
+      "threat"
+    ],
+    "shockrepeater": [
+      "omega"
+    ],
+    "shredder": [
+      "derelict",
+      "independent",
+      "luddic_church",
+      "luddic_path",
+      "pirates",
+      "remnant",
+      "scavengers"
+    ],
+    "squall": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "swarm_launcher": [
+      "threat"
+    ],
+    "swarmer": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "tachyonlance": [
+      "independent",
+      "mercenary",
+      "remnant",
+      "scavengers",
+      "tritachyon"
+    ],
+    "taclaser": [
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "mercenary",
+      "persean",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "typhoon": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat",
+      "tritachyon"
+    ],
+    "unstable_fragment": [
+      "threat"
+    ],
+    "voidblaster": [
+      "threat"
+    ],
+    "voltaic_cannon": [
+      "threat"
+    ],
+    "voltaic_discharge": [
+      "threat"
+    ],
+    "vortex_launcher": [
+      "dweller"
+    ],
+    "vpdriver": [
+      "omega"
+    ],
+    "vulcan": [
+      "derelict",
+      "hegemony",
+      "independent",
+      "lions_guard",
+      "luddic_church",
+      "luddic_path",
+      "mercenary",
+      "pirates",
+      "remnant",
+      "scavengers",
+      "sindrian_diktat"
+    ]
+  },
+  "notes": [
+    "Generated only from native-catalog.json. Import this lightweight file at runtime, not the full native catalog. Rebuild with npm run import:refit-factions after catalog changes.",
+    "Faction IDs and names are the exact .faction id/displayName values. Include factions with at least one resolved hull or weapon; exclude player, neutral and poor even if they have starting blueprints.",
+    "Membership is the union of knownShips/priorityShips (hulls or any matching tag) and knownWeapons/priorityWeapons (weapons or any matching tag). Tags are case-sensitive native CSV stats/spec tokens, not manufacturer or technology guesses.",
+    "Skin tags are reconstructed recursively from base-hull tags plus raw skinSpec.tags, then skinSpec.removeTags are removed when present (none in the current catalog). Flattened skin stats are not re-added. Only tags inherit: explicit hull membership never propagates between a parent and its skins or siblings.",
+    "Positive numeric entries in faction shipRoles and variantOverrides additionally select their exact variant.spec.hullId. Zero/negative weights and includeDefault metadata do not select hulls. Global default ship roles are not expanded.",
+    "Duplicate hull, weapon and variant IDs use their first catalog occurrence, matching the catalog base-hull resolver; no union of conflicting duplicate definitions is inferred.",
+    "Shared hulls and weapons may belong to multiple factions. This is static native pool membership, not exclusive origin, blueprint ownership, spawn probability, current market stock or full campaign/Java-script behavior.",
+    "No inference from shipsWhenImporting, hull/weapon frequency or sale weights, fighter-wing pools, variant weapon loadouts, built-in weapons, station modules, hull names or ID spelling. Unknown explicit references are omitted and reported below. Missing map keys mean no resolved membership, not unusable content.",
+    "Factions omitted because both resolved pools are empty: knights_of_ludd, sleeper."
+  ]
+}

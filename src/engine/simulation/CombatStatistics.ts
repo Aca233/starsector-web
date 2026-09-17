@@ -19,14 +19,14 @@ export interface FleetCombatStats {
   overloadsSuffered: number;
 }
 
-export type BattleRank = 'S' | 'A' | 'B' | 'C' | 'D';
 
 export interface BattleResult {
   isVictory: boolean;
   combatDuration: number;
-  rank: BattleRank;
   playerShipSpecId: string;
   enemyShipSpecId: string;
+  playerHullDamageRatio: number;
+  enemyHullDamageRatio: number;
   playerStats: FleetCombatStats;
   enemyStats: FleetCombatStats;
 }

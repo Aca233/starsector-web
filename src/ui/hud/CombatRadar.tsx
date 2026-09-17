@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { CombatEngine } from '../../engine/simulation/CombatEngine';
 import { Vector2 } from '../../engine/math/Vector2';
+import { runtimeAssetUrl } from '../../engine/runtime/RuntimePaths';
 
 export interface CombatRadarProps {
   engine: CombatEngine;
@@ -55,7 +56,7 @@ export const CombatRadar: React.FC<CombatRadarProps> = ({ engine }) => {
       ctx.setLineDash([]);
 
       // 3. 绘制敌舰 (红色三角箭头，对齐 iconEnemyColor: [255, 0, 0])
-      const enemy = engine.enemyShip;
+      for (const enemy of engine.capitalShips.filter(s => s !== player)) {
       if (enemy && !enemy.isDead) {
         const { rx, ry } = toRadarPos(enemy.pos);
         if (rx >= 0 && rx <= w && ry >= 0 && ry <= h) {
@@ -63,8 +64,8 @@ export const CombatRadar: React.FC<CombatRadarProps> = ({ engine }) => {
           ctx.translate(rx, ry);
           ctx.rotate(enemy.facingRad);
 
-          ctx.fillStyle = '#ef4444';
-          ctx.strokeStyle = '#fca5a5';
+          ctx.fillStyle = enemy.isPlayer === player.isPlayer ? '#22c55e' : '#ef4444';
+          ctx.strokeStyle = enemy.isPlayer === player.isPlayer ? '#86efac' : '#fca5a5';
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(6, 0);
@@ -78,11 +79,13 @@ export const CombatRadar: React.FC<CombatRadarProps> = ({ engine }) => {
           ctx.restore();
         }
       }
+      }
 
       // 4. 绘制舰载机群与轰炸机小点
       if (engine.fighters) {
         ctx.fillStyle = '#4ade80';
         for (const ftr of engine.fighters) {
+          ctx.fillStyle = ftr.isPlayer === player.isPlayer ? '#4ade80' : '#ef4444';
           if (ftr.isDead) continue;
           const { rx, ry } = toRadarPos(ftr.pos);
           if (rx >= 2 && rx <= w - 2 && ry >= 2 && ry <= h - 2) {
@@ -93,6 +96,7 @@ export const CombatRadar: React.FC<CombatRadarProps> = ({ engine }) => {
       if (engine.bombers) {
         ctx.fillStyle = '#60a5fa';
         for (const bmr of engine.bombers) {
+          ctx.fillStyle = bmr.isPlayer ? '#60a5fa' : '#ef4444';
           if (bmr.isDead) continue;
           const { rx, ry } = toRadarPos(bmr.pos);
           if (rx >= 2 && rx <= w - 2 && ry >= 2 && ry <= h - 2) {
@@ -133,7 +137,7 @@ export const CombatRadar: React.FC<CombatRadarProps> = ({ engine }) => {
     <div 
       className="relative w-[204px] h-[204px] select-none shadow-2xl"
       style={{
-        backgroundImage: 'url(/game-assets/graphics/hud/minimap_bg2.png)',
+        backgroundImage: `url(${runtimeAssetUrl('graphics/hud/minimap_bg2.png')})`,
         backgroundSize: '204px 204px',
         backgroundRepeat: 'no-repeat'
       }}
@@ -142,7 +146,7 @@ export const CombatRadar: React.FC<CombatRadarProps> = ({ engine }) => {
       <div 
         className="absolute top-[3px] left-[3px] w-[198px] h-[198px] pointer-events-none opacity-40"
         style={{
-          backgroundImage: 'url(/game-assets/graphics/hud/holo_grid.png)',
+          backgroundImage: `url(${runtimeAssetUrl('graphics/hud/holo_grid.png')})`,
           backgroundSize: '198px 198px',
           backgroundRepeat: 'no-repeat'
         }}

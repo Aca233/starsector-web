@@ -1,8 +1,13 @@
+import { damageToMissiles } from './DamageToMissiles';
+import { segmentCircleEntry } from '../../../math/Geometry';
+import { distanceToSegment, segmentHullHit } from '../../../visual/HulkGeometry';
 import { Vector2 } from '../../../math/Vector2';
 import { Ship } from '../../Ship';
 import { Projectile } from '../../Weapon';
 import { sound } from '../../../audio/SoundManager';
-import { i18n } from '../../../i18n/LocalizationManager';
+import { requireWeaponEffect } from '../../../extensions/weapon-effects/Registry';
+import { applyComponentDamage } from './ComponentDamage';
+import { projectileOutgoingMultiplier, projectileSource, bindProjectileSource } from './OutgoingDamage';
 import { WeaponSimContext } from './WeaponSimContext';
 import { SpatialShipIndex } from '../../collision/SpatialShipIndex';
 import {
@@ -11,10 +16,15 @@ import {
   RuntimeCollisionQuery
 } from '../../collision/RuntimeCollisionKernel';
 import { getProjectileImpactVisualProfile } from '../../../visual/ImpactVisuals';
+import { shieldHitGlowDamage } from '../../../visual/HitGlowVisuals';
+import { distanceToDeployedShield } from '../../collision/ShieldCollisionGeometry';
+import { getShipExplosionContact } from '../../collision/ExplosionContact';
+import { distanceToShipHull, mayBeWithinShipHullDistance } from '../../collision/HullGeometry';
 
-export interface LightMGInterceptionResult {
+export interface ProjectileInterceptionResult {
   targetProjectileId: number;
   targetDestroyed: boolean;
+  consumesProjectile: boolean;
 }
 
 /**
@@ -50,7 +60,7 @@ export class ProjectileCollisionHandler {
   }
 
   public canBatchShipCollision(p: Projectile): boolean {
-    return !p.isRocket && !p.proximityFuse && p.specId !== 'lightmg' && !p.isFlare;
+    return !p.isRocket && !p.proximityFuse && !p.passThroughFighters && p.specId !== 'lightmg' && !p.isFlare;
   }
 
   public checkShipCollisionsBatch(projectiles: Projectile[], allShips: Ship[], ctx: WeaponSimContext): Set<number> {
@@ -91,6 +101,7 @@ export class ProjectileCollisionHandler {
       projectile: p,
       candidates: broadphaseCandidates.filter((ship) =>
         ship.id !== p.sourceShipId &&
+        !p.damagedTargetIds?.includes(ship.id) &&
         (p.isPlayer === undefined || ship.isPlayer !== p.isPlayer) &&
         !ship.isDead &&
         !ship.isPhased
@@ -119,13 +130,14 @@ export class ProjectileCollisionHandler {
    * 判定高射炮近炸引信与凌空殉爆 AOE 破片杀伤
    * @returns 弹丸是否发生近炸引信引爆
    */
-  public checkProximityFuse(p: Projectile, ctx: WeaponSimContext, allProjectiles: Projectile[]): boolean {
+  public checkProximityFuse(p: Projectile, ctx: WeaponSimContext, allProjectiles: Projectile[],
+    fuseCandidates: Projectile[] = allProjectiles): boolean {
     if (!p.proximityFuse) return false;
 
     let shouldAirburst = false;
 
     // 引信检测 A: 接近敌方导弹
-    for (const targetM of allProjectiles) {
+    for (const targetM of fuseCandidates) {
       if (targetM.isRocket && this.isHostileProjectile(p, targetM)) {
         if (p.pos.distanceTo(targetM.pos) <= p.proximityFuse.range) {
           shouldAirburst = true;
@@ -148,10 +160,18 @@ export class ProjectileCollisionHandler {
 
     // 引信检测 C: 接近敌方大舰护盾或外壳
     if (!shouldAirburst) {
-      for (const s of [ctx.playerShip, ctx.enemyShip]) {
+      for (const s of ctx.capitalShips ?? [ctx.playerShip, ctx.enemyShip]) {
         if (s.id !== p.sourceShipId && (p.isPlayer === undefined || s.isPlayer !== p.isPlayer) && !s.isDead && !s.isPhased) {
-          const targetRadius = s.shield.isActive ? s.shield.radius : s.spec.collisionRadius;
-          if (p.pos.distanceTo(s.pos) <= targetRadius + p.proximityFuse.range * 0.5) {
+          // Fuse contacts must match the currently deployed arc and authored hull,
+          // not a full shield/bounding circle as soon as the toggle is active.
+          const shieldDistance = distanceToDeployedShield(s, p.pos);
+          // Most fuse/ship pairs are distant. Do not walk an entire hull unless
+          // its conservative bound can reach the fuse or the shield is already
+          // close. Keep Math.min and the exact fallback for NaN/Infinity inputs.
+          if (shieldDistance > p.proximityFuse.range * 0.5
+            && !mayBeWithinShipHullDistance(s, p.pos, p.proximityFuse.range * 0.5)) continue;
+          const surfaceDistance = Math.min(shieldDistance, distanceToShipHull(s, p.pos));
+          if (surfaceDistance <= p.proximityFuse.range * 0.5) {
             shouldAirburst = true;
             break;
           }
@@ -166,6 +186,13 @@ export class ProjectileCollisionHandler {
 
     if (!shouldAirburst) return false;
 
+    if (p.proximityExplosionSpec) {
+      if (!ctx.spawnProjectileExplosion) throw new Error('Source fuse requires explosion simulation');
+      ctx.spawnProjectileExplosion(bindProjectileSource({ ...p, vel: new Vector2(), projectileExplosionSpec:p.proximityExplosionSpec }, projectileSource(p, ctx)),p.pos);
+      sound.playAtPos(p.proximityFuse.soundKey || 'flak_explosion',p.pos,ctx.playerShip.pos,.6);
+      ctx.fx.spawnSourceMissileExplosion(p.pos,{radius:p.proximityExplosionSpec.radius,color:p.proximityExplosionSpec.explosionColor ?? [255,155,125,255]});
+      return true;
+    }
     const expRadius = p.proximityFuse.explosionRadius || 45;
     sound.playAtPos(p.proximityFuse.soundKey || 'flak_explosion', p.pos, ctx.playerShip.pos, 0.6);
 
@@ -200,7 +227,7 @@ export class ProjectileCollisionHandler {
       const targetM = allProjectiles[mIdx];
       if (targetM.isRocket && this.isHostileProjectile(p, targetM)) {
         if (p.pos.distanceTo(targetM.pos) <= expRadius) {
-          const damage = p.damage * this.getExplosionDamageScale(p, p.pos.distanceTo(targetM.pos));
+          const damage = damageToMissiles(p.damage * this.getExplosionDamageScale(p, p.pos.distanceTo(targetM.pos)) * projectileOutgoingMultiplier(p, undefined, targetM.pos, ctx), p.sourceShipId, ctx, projectileSource(p, ctx));
           if (damage <= 0) continue;
           targetM.hitpoints = (targetM.hitpoints ?? 100) - damage;
           damagedHostileTarget = true;
@@ -226,68 +253,54 @@ export class ProjectileCollisionHandler {
       }
     }
 
-    // 2) 撕裂波及范围内的敌方战机/轰炸机
-    for (const f of ctx.fighters) {
-      if (f.id !== p.sourceShipId && (p.isPlayer === undefined || f.isPlayer !== p.isPlayer) && !f.isDead && !f.isPhased) {
-        const dist = p.pos.distanceTo(f.pos);
-        if (dist <= expRadius + f.spec.collisionRadius) {
-          const surfaceDistance = Math.max(0, dist - f.spec.collisionRadius);
-          const aoeDmg = p.damage * this.getExplosionDamageScale(p, surfaceDistance);
-          if (aoeDmg <= 0) continue;
-          // 战机在本引擎中同样是 Ship 实例，破片必须经装甲网格结算 (与下方大舰分支一致)，
-          // 否则凌空近炸会直接穿透战机装甲扣船体。
-          const localImpact = p.pos.clone().sub(f.pos).rotate(-f.facingRad);
-          const res = f.armor.takeDamage(localImpact, aoeDmg * f.crDamageTakenMultiplier, 'FRAGMENTATION', aoeDmg, false);
-          if (res.armorDamage > 0) ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, 'FRAGMENTATION', res.armorDamage, 'ARMOR');
-          if (res.hullDamage > 0) ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, 'FRAGMENTATION', res.hullDamage, 'HULL');
-          f.hullHp = Math.max(0, f.hullHp - res.hullDamage);
-          f.addScorchMark(localImpact, res.armorDamage || res.hullDamage);
-          damagedHostileTarget = true;
-          const appliedDmg = res.armorDamage + res.hullDamage;
-          if (appliedDmg > 0) ctx.fx.addFloatingDamage(f.pos.clone(), appliedDmg, [255, 180, 60]);
-          ctx.fx.spawnSparks(f.pos, 10, [255, 120, 40]);
-          if (f.hullHp <= 0) {
-            ctx.handleShipDestruction(f);
-            ctx.fx.addFloatingText(f.pos.clone(), 'BOMBER SPLASHED', [255, 80, 80], 14, 1.2);
-            if (p.sourceShipId === ctx.playerShip.id) {
-              ctx.addRadioMessage('点防火控', 'PLAYER', '目标敌机已被双管高射炮破片弹幕彻底凌空撕碎！', [120, 255, 140]);
-            }
-          }
-        }
-      }
-    }
+    // Fighters are Ships too: shield/system/CR, hull and component damage must
+    // use the same route. Deduplicate mixed contexts so a target is hit once.
+    const ships = ctx.ships ?? [...(ctx.capitalShips ?? [ctx.playerShip, ctx.enemyShip]), ...ctx.fighters];
+    const sourceShip = projectileSource(p, ctx);
+    const sourceIsPlayer = p.isPlayer ?? sourceShip?.isPlayer;
+    const fighterIds = new Set(ctx.fighters.map(ship => ship.id));
+    const visited = new Set<string>();
+    for (const ship of ships) {
+      if (visited.has(ship.id)) continue;
+      visited.add(ship.id);
+      if (ship.id === p.sourceShipId || (sourceIsPlayer !== undefined && ship.isPlayer === sourceIsPlayer) || ship.isDead || ship.isPhased) continue;
 
-    // 3) 敌舰近距离破片擦伤
-    for (const s of [ctx.playerShip, ctx.enemyShip]) {
-      if (s.id !== p.sourceShipId && (p.isPlayer === undefined || s.isPlayer !== p.isPlayer) && !s.isDead && !s.isPhased) {
-        const distToShip = p.pos.distanceTo(s.pos);
-        if (distToShip <= expRadius + (s.shield.isActive ? s.shield.radius : s.spec.collisionRadius)) {
-          if (s.isShieldPointBlocked(p.pos)) {
-            const shieldSurfaceDistance = Math.max(0, p.pos.distanceTo(s.getShieldCenter()) - s.shield.radius);
-            // 护盾承伤同时受目标战备值修正 (CRPluginImpl.getDamageTakenChangePercent)
-            const damage = p.damage
-              * this.getExplosionDamageScale(p, shieldSurfaceDistance)
-              * s.system.getShieldDamageMultiplier()
-              * s.crDamageTakenMultiplier;
-            if (damage > 0) {
-              damagedHostileTarget = true;
-              const fluxGain = s.shield.absorbDamage(damage, 'FRAGMENTATION', p.pos.clone().sub(s.getShieldCenter()).heading());
-              s.flux.increaseFlux(fluxGain, true);
-              ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, 'FRAGMENTATION', damage, 'SHIELD');
-              ctx.fx.spawnShieldRipple(p.pos, 35, [255, 120, 100]);
-            }
-          } else if (distToShip <= expRadius + s.spec.collisionRadius) {
-            const surfaceDistance = Math.max(0, distToShip - s.spec.collisionRadius);
-            const rawDamage = p.damage * this.getExplosionDamageScale(p, surfaceDistance);
-            if (rawDamage <= 0) continue;
-            const damage = rawDamage * s.crDamageTakenMultiplier;
-            const localImpact = p.pos.clone().sub(s.pos).rotate(-s.facingRad);
-            damagedHostileTarget = true;
-            const res = s.armor.takeDamage(localImpact, damage, 'FRAGMENTATION', rawDamage, false);
-            if (res.armorDamage > 0) ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, 'FRAGMENTATION', res.armorDamage, 'ARMOR');
-            if (res.hullDamage > 0) ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, 'FRAGMENTATION', res.hullDamage, 'HULL');
-            s.hullHp = Math.max(0, s.hullHp - res.hullDamage);
-            s.addScorchMark(localImpact, res.armorDamage || res.hullDamage);
+      const contact = getShipExplosionContact(ship, p.pos);
+      const shieldContact = contact.shield;
+      const surfaceDistance = contact.distance;
+      const shieldCenter = ship.getShieldCenter();
+      const rawDamage = p.damage * this.getExplosionDamageScale(p, surfaceDistance) * projectileOutgoingMultiplier(p, ship, contact.point, ctx);
+      if (rawDamage <= 0) continue;
+      const takenDamage = rawDamage * ship.crDamageTakenMultiplier;
+      damagedHostileTarget = true;
+      if (shieldContact) {
+        const shieldDamage = takenDamage * ship.system.getShieldDamageMultiplier();
+        const fluxGain = ship.shield.absorbDamage(shieldDamage, 'FRAGMENTATION', contact.point.clone().sub(shieldCenter).heading());
+        ship.flux.increaseFlux(fluxGain, true);
+        ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, 'FRAGMENTATION', shieldDamage * ship.shield.damageTakenMultiplierFor("FRAGMENTATION"), 'SHIELD');
+        ctx.fx.spawnShieldRipple(p.pos, 35, [255, 120, 100]);
+        continue;
+      }
+
+      const localImpact = contact.point.clone().sub(ship.pos).rotate(-ship.facingRad);
+      const result = ship.armor.takeDamage(localImpact, takenDamage, 'FRAGMENTATION', rawDamage, false);
+      applyComponentDamage(ship, localImpact, result, 0, sourceShip);
+      ctx.fx.spawnArmorDamageSparks(ship, localImpact, result.armorDamage);
+      if (result.armorDamage > 0) ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, 'FRAGMENTATION', result.armorDamage, 'ARMOR');
+      if (result.hullDamage > 0) ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, 'FRAGMENTATION', result.hullDamage, 'HULL');
+      ship.hullHp = Math.max(0, ship.hullHp - result.hullDamage);
+      const fighter = fighterIds.has(ship.id) || ship.spec.hullSize === 'FIGHTER';
+      if (fighter) {
+        const applied = result.armorDamage + result.hullDamage;
+        if (applied > 0) ctx.fx.addFloatingDamage(ship.pos.clone(), applied, [255, 180, 60]);
+        ctx.fx.spawnSparks(ship.pos, 10, [255, 120, 40]);
+      }
+      if (ship.hullHp <= 0) {
+        ctx.handleShipDestruction(ship);
+        if (fighter) {
+          ctx.fx.addFloatingText(ship.pos.clone(), 'BOMBER SPLASHED', [255, 80, 80], 14, 1.2);
+          if (p.sourceShipId === ctx.playerShip.id) {
+            ctx.addRadioMessage('点防火控', 'PLAYER', '目标敌机已被双管高射炮破片弹幕彻底凌空撕碎！', [120, 255, 140]);
           }
         }
       }
@@ -299,44 +312,53 @@ export class ProjectileCollisionHandler {
   }
 
   /**
-   * 轻型机枪点防拦截导弹判定 (Light MG PD)
+   * 来源弹丸与导弹的连续扫掠碰撞 (含 TPC 穿透)
    * 返回命中的导弹身份，由外层统一执行数组删除，避免嵌套 splice 破坏遍历游标。
    */
-  public checkLightMGInterception(
+  public checkMissileInterception(
     p: Projectile,
     ctx: WeaponSimContext,
     allProjectiles: Projectile[]
-  ): LightMGInterceptionResult | null {
-    if (p.specId !== 'lightmg') return null;
-
-    for (let mIdx = allProjectiles.length - 1; mIdx >= 0; mIdx--) {
-      const targetM = allProjectiles[mIdx];
-      const hostile = p.isPlayer === undefined
-        ? targetM.sourceShipId !== p.sourceShipId
-        : targetM.isPlayer !== p.isPlayer;
-      if (targetM.isRocket && hostile && targetM.sourceShipId !== p.sourceShipId) {
-        if (p.pos.distanceTo(targetM.pos) < 24) {
-          targetM.hitpoints = (targetM.hitpoints ?? 100) - p.damage;
-          const targetDestroyed = targetM.hitpoints <= 0;
-          if (targetDestroyed) {
-            ctx.contrailEngine?.detach(targetM.id);
-            if (ctx.statsTracker) ctx.statsTracker.recordMissileIntercepted(p.isPlayer ?? false);
-            sound.playAtPos('missile_explosion', targetM.pos, ctx.playerShip.pos, 0.5);
-            this.spawnMissileDestructionVisual(targetM, targetM.pos, ctx, [255, 160, 40]);
-            ctx.fx.addFloatingText(targetM.pos.clone(), 'MG INTERCEPTED', [120, 255, 150], 12, 0.8);
-            if (ctx.visualRandom.next() < 0.45) {
-              ctx.addRadioMessage('点防火控', 'PLAYER', '近防机枪已成功打爆一枚来袭重型导弹！', [140, 255, 180]);
-            }
-          } else {
-            ctx.fx.spawnSparks(targetM.pos, 8, [255, 180, 60]);
-          }
-          ctx.statsTracker?.recordShotHit(p.isPlayer ?? false);
-          return { targetProjectileId: targetM.id, targetDestroyed };
-        }
-      }
+  ): ProjectileInterceptionResult | null {
+    if ((p.isRocket && p.targetProjectileId === undefined) || p.isFlare || p.didDamage) return null;
+    let target: Projectile | undefined, first = Infinity;
+    for (const candidate of allProjectiles) {
+      if (!candidate.isRocket || !this.isHostileProjectile(p, candidate) || p.damagedTargetIds?.includes('projectile:' + candidate.id)) continue;
+      if (p.isRocket && (candidate.id !== p.targetProjectileId || !candidate.isFlare || candidate.flareFizzling)) continue;
+      const t = segmentCircleEntry(p.prevPos, p.pos, candidate.pos, candidate.radius + (p.spawnType === 'BALLISTIC_AS_BEAM' ? 0 : p.radius));
+      if (t !== null && t < first) { target = candidate; first = t; }
     }
-
-    return null;
+    if (!target) return null;
+    // No obstruction can matter unless the swept path actually reaches a missile.
+    // The nearest missile is the only candidate needed: if it is behind a blocker,
+    // all later candidates are too. Keep strict t comparisons and original tie order.
+    const ships = ctx.ships ?? [ctx.playerShip, ctx.enemyShip, ...ctx.fighters];
+    const shipHit = this.runtimeCollisionKernel.findHits([this.createRuntimeQuery(p, ships)])[0];
+    let limit = Math.min(shipHit?.t ?? Infinity, ctx.queryAsteroidImpact?.(p)?.t ?? Infinity);
+    for (const frag of ctx.hulkFragments) {
+      const local = (point: Vector2) => point.clone().sub(frag.pos).rotate(-frag.facingRad).add(frag.localOffset);
+      const t = segmentHullHit(local(p.prevPos), local(p.pos), frag.bounds);
+      if (t !== null) limit = Math.min(limit, t);
+    }
+    if (!(first < limit)) return null;
+    const point = Vector2.lerp(p.prevPos, p.pos, first);
+    target.hitpoints = (target.hitpoints ?? 100) - damageToMissiles(p.damage * projectileOutgoingMultiplier(p, undefined, point, ctx), p.sourceShipId, ctx, projectileSource(p, ctx));
+    const targetDestroyed = target.hitpoints <= 0;
+    if (targetDestroyed) {
+      ctx.contrailEngine?.detach(target.id);
+      ctx.statsTracker?.recordMissileIntercepted(p.isPlayer ?? false);
+      sound.playAtPos('missile_explosion', target.pos, ctx.playerShip.pos, .5);
+      this.spawnMissileDestructionVisual(target, target.pos, ctx);
+    } else ctx.fx.spawnSparks(point, 8, [255, 180, 60]);
+    ctx.statsTracker?.recordShotHit(p.isPlayer ?? false);
+    (p.damagedTargetIds ??= []).push('projectile:' + target.id);
+    if (!p.passThroughMissiles) p.pos.copy(point);
+    if (p.isRocket) {
+      ctx.contrailEngine?.detach(p.id);
+      ctx.spawnProjectileExplosion?.(p, point);
+      this.spawnMissileDestructionVisual(p, point, ctx);
+    }
+    return { targetProjectileId: target.id, targetDestroyed, consumesProjectile: !p.passThroughMissiles };
   }
 
   /**
@@ -344,15 +366,19 @@ export class ProjectileCollisionHandler {
    * @returns 是否命中残骸
    */
   public checkHulkCollision(p: Projectile, ctx: WeaponSimContext): boolean {
+    let first = Infinity;
     for (const frag of ctx.hulkFragments) {
-      if (p.pos.distanceTo(frag.pos) < frag.collisionRadius) {
-        sound.playAtPos('shield_hit', p.pos, ctx.playerShip.pos, 0.3);
-        ctx.fx.spawnSparks(p.pos, 10, [255, 160, 60]);
-        ctx.fx.spawnDebris(p.pos, 1, [80, 75, 70], 50, 'small');
-        return true;
-      }
+      if (distanceToSegment(frag.pos, p.prevPos, p.pos).distance > frag.collisionRadius + Math.max(0, p.radius)) continue;
+      const toSource = (point: Vector2) => point.clone().sub(frag.pos).rotate(-frag.facingRad).add(frag.localOffset);
+      const t = segmentHullHit(toSource(p.prevPos), toSource(p.pos), frag.bounds);
+      if (t !== null) first = Math.min(first, t);
     }
-    return false;
+    if (!Number.isFinite(first)) return false;
+    p.pos.copy(p.prevPos.clone().addScaled(p.pos.clone().sub(p.prevPos), first));
+    sound.playAtPos('shield_hit', p.pos, ctx.playerShip.pos, 0.3);
+    ctx.fx.spawnSparks(p.pos, 10, [255, 160, 60]);
+    ctx.fx.spawnDebris(p.pos, 1, [80, 75, 70], 50, 'small');
+    return true;
   }
 
   /**
@@ -361,15 +387,23 @@ export class ProjectileCollisionHandler {
    */
   public checkShipCollision(p: Projectile, allShips: Ship[], ctx: WeaponSimContext): boolean {
     if (!this.spatialIndex.isPrepared) this.prepareShipCollisionFrame(allShips);
-    const query = this.createRuntimeQuery(p, allShips);
-    const hit = this.runtimeCollisionKernel.findHits([query])[0];
-    return hit ? this.applyShipCollisionHit(hit, ctx) : false;
+    const end = p.pos.clone();
+    for (let remaining = allShips.length; remaining > 0; remaining--) {
+      const hit = this.runtimeCollisionKernel.findHits([this.createRuntimeQuery(p, allShips)])[0];
+      if (!hit) return false;
+      if (this.applyShipCollisionHit(hit, ctx)) return true;
+      p.pos.copy(end);
+      if (!p.damagedTargetIds?.includes(hit.ship.id)) return false;
+    }
+    return false;
   }
 
   private applyShipCollisionHit(hit: RuntimeCollisionHit, ctx: WeaponSimContext): boolean {
     const { projectile: p, ship } = hit;
     if (ship.isDead || ship.isPhased) return false;
     const impactWorld = hit.worldPoint;
+    const impactDamage = p.damage * projectileOutgoingMultiplier(p, ship, impactWorld, ctx);
+    p.pos.copy(impactWorld);
     ctx.statsTracker?.recordShotHit(p.isPlayer ?? false);
 
     if (hit.kind === 'SHIELD') {
@@ -377,13 +411,14 @@ export class ProjectileCollisionHandler {
       const toShield = impactWorld.clone().sub(sCenter);
       const shieldMult = ship.system.getShieldDamageMultiplier();
       // CRPluginImpl: 护盾承伤按战备值修正 (标准 70% 战备时为 1.0)
-      const absorbedDmg = p.damage * shieldMult * ship.crDamageTakenMultiplier;
+      const absorbedDmg = impactDamage * shieldMult * ship.crDamageTakenMultiplier;
       const fluxGain = ship.shield.absorbDamage(absorbedDmg, p.damageType, toShield.heading());
       if (ctx.statsTracker) {
-        ctx.statsTracker.recordDamageDealt(p.isPlayer ?? false, p.damageType, absorbedDmg, 'SHIELD');
+        ctx.statsTracker.recordDamageDealt(p.isPlayer ?? false, p.damageType, absorbedDmg * ship.shield.damageTakenMultiplierFor(p.damageType), 'SHIELD');
       }
-      ship.flux.increaseFlux(fluxGain, true);
-      ctx.fx.addFloatingDamage(impactWorld, absorbedDmg, [80, 200, 255]);
+      const shieldDamage = shieldHitGlowDamage(fluxGain, ship.flux.maxFlux - ship.flux.totalFlux, ship.shield.efficiency);
+      ship.flux.increaseFlux(fluxGain, !p.softFlux);
+      ctx.fx.addFloatingDamage(impactWorld, absorbedDmg * ship.shield.damageTakenMultiplierFor(p.damageType), [80, 200, 255]);
       const visual = getProjectileImpactVisualProfile({
         specId: p.specId,
         damageType: p.damageType,
@@ -392,10 +427,12 @@ export class ProjectileCollisionHandler {
         surface: 'SHIELD'
       });
       sound.playAtPos(visual.soundKey, impactWorld, ctx.playerShip.pos, visual.soundVolume);
-      ctx.fx.spawnShieldRipple(impactWorld, visual.shieldRippleRadius, p.color);
-      // Shield contacts stay on the field surface: never draw a hull/missile
-      // fireball merely because a high-damage projectile was blocked.
-      ctx.fx.spawnSparks(impactWorld, visual.sparkCount, p.color);
+      // Shield.absorbDamage already updates the source shield segments. The projectile
+      // adds its own native hit-particle pair, including missiles; no generic ring/spark burst.
+      ctx.fx.spawnProjectileHitGlows(p, impactWorld, ship, { shieldDamage });
+      ctx.fx.spawnMovingRayImpactFade(p, impactWorld);
+      if (p.onHitEffect) requireWeaponEffect(p.onHitEffect, 'hit', p.specId).hit!(p, ship, impactWorld, true, ctx.ships?.find(s => s.id === p.sourceShipId), ctx);
+      ctx.spawnProjectileExplosion?.(p, impactWorld, ship.id);
       ctx.addCameraShake(visual.cameraShake, 0.1);
       return true;
     }
@@ -403,8 +440,9 @@ export class ProjectileCollisionHandler {
     const impactPoint = hit.localPoint;
     // 装甲/结构承伤按目标战备值修正 (CRPluginImpl.getDamageTakenChangePercent)；
     // hitStrength 保持武器标称伤害，避免战备修正被装甲减伤公式二次放大。
-    const takenDamage = p.damage * ship.crDamageTakenMultiplier;
-    const result = ship.armor.takeDamage(impactPoint, takenDamage, p.damageType, p.damage, false);
+    const takenDamage = impactDamage * ship.crDamageTakenMultiplier;
+    const result = ship.armor.takeDamage(impactPoint, takenDamage, p.damageType, impactDamage, false);
+    ctx.fx.spawnArmorDamageSparks(ship, impactPoint, result.armorDamage);
     if (ctx.statsTracker) {
       if (result.armorDamage > 0) {
         ctx.statsTracker.recordDamageDealt(
@@ -420,31 +458,9 @@ export class ProjectileCollisionHandler {
       }
     }
     ship.hullHp = Math.max(0, ship.hullHp - result.hullDamage);
-    ship.addScorchMark(impactPoint, result.armorDamage || result.hullDamage);
 
-    const disabledMount = ship.damageWeaponMount(impactPoint, p.damage + (p.empDamage || 0), !!p.empDamage);
-    if (disabledMount) {
-      ctx.fx.addFloatingText(impactWorld.clone(), `WEAPON DISABLED: ${disabledMount.slotId}`, [255, 140, 40], 14, 2.0);
-      ctx.fx.spawnSparks(impactWorld, 30, [100, 200, 255]);
-      const weaponName = i18n.t(disabledMount.spec.nameKey).split(' ')[0] || disabledMount.slotId;
-      if (ship.isPlayer) {
-        ctx.addRadioMessage('损管警报', 'PLAYER', `武器挂点 [${disabledMount.slotId} - ${weaponName}] 遭受过载短路，已强制下线！`, [255, 120, 60]);
-      } else {
-        ctx.addRadioMessage('战术火控', 'PLAYER', `成功瘫痪目标舰武器挂点 [${weaponName}]！`, [100, 255, 160]);
-      }
-    }
-
-    if (impactPoint.x < -ship.spec.collisionRadius * 0.25 && (p.damage >= 150 || (p.empDamage && p.empDamage > 120))) {
-      if (ctx.random.next() < 0.55) {
-        ship.triggerEngineFlameout();
-        ctx.fx.addFloatingText(impactWorld.clone(), 'ENGINE FLAMEOUT', [255, 140, 40], 14, 1.8);
-        if (ship.isPlayer) {
-          ctx.addRadioMessage('损管警报', 'PLAYER', '主推进器受损熄火！机动性严重受阻！', [255, 100, 80]);
-        } else {
-          ctx.addRadioMessage('战术火控', 'PLAYER', '敌舰推进引擎遭受重创，已过载熄火！', [120, 255, 150]);
-        }
-      }
-    }
+    const source = projectileSource(p, ctx);
+    applyComponentDamage(ship, impactPoint, result, p.empDamage ?? 0, source);
 
     const impactSurface = result.hullDamage > 0 ? 'HULL' : 'ARMOR';
     const visual = getProjectileImpactVisualProfile({
@@ -459,39 +475,29 @@ export class ProjectileCollisionHandler {
     if (result.armorDamage > 0) ctx.fx.addFloatingDamage(impactWorld, result.armorDamage, [255, 175, 40]);
     if (result.hullDamage > 0) ctx.fx.addFloatingDamage(impactWorld, result.hullDamage, [255, 55, 45]);
 
-    if (p.hitGlowRadius && p.hitGlowRadius > 0) {
-      ctx.fx.spawnHitGlow(impactWorld, p.hitGlowRadius, p.color);
-    }
-    if (p.isRocket) {
-      this.spawnMissileDestructionVisual(p, impactWorld, ctx, p.color);
-    } else if (visual.sparkCount > 0) {
-      ctx.fx.spawnSparks(impactWorld, visual.sparkCount, p.color);
-    }
+    ctx.fx.spawnProjectileHitGlows(p, impactWorld, ship, result);
+    ctx.fx.spawnMovingRayImpactFade(p, impactWorld);
+    // Armor-loss sparks and the source hit-particle pair are independent. A missile's
+    // top-level explosionRadius is that pair, not an extra interception/explosion flash.
+    // explosionSpec damage is a separate source-duration entity; Sabot owns its optional EMP arc.
 
     if (p.damage >= 150) {
       const debrisColor: [number, number, number] =
-        ship.spec.id === 'onslaught' ? [125, 110, 95] : [100, 130, 160];
+        ship.spec.debrisColor ?? [100, 130, 160];
       const count = p.damage >= 450 ? 3 : (p.damage >= 280 ? 2 : 1);
       const sizeCat = p.damage >= 450 ? 'medium' : 'small';
       ctx.fx.spawnDebris(impactWorld, count, debrisColor, 100, sizeCat);
     }
 
-    if (p.empDamage && p.empDamage > 0) {
-      for (let a = 0; a < 2; a++) {
-        const empEnd = ship.pos.clone().add(
-          new Vector2(
-            (ctx.visualRandom.next() - 0.5) * ship.spec.collisionRadius,
-            (ctx.visualRandom.next() - 0.5) * ship.spec.collisionRadius
-          ).rotate(ship.facingRad)
-        );
-        ctx.fx.spawnEmpArc(impactWorld, empEnd);
-      }
-      sound.playAtPos('emp_discharge', impactWorld, ctx.playerShip.pos, 0.55);
-      ctx.fx.addFloatingDamage(impactWorld.clone().add(new Vector2(10, -10)), p.empDamage, [130, 220, 255]);
-    }
+    if (p.onHitEffect) requireWeaponEffect(p.onHitEffect, 'hit', p.specId).hit!(p, ship, impactWorld, false, source, ctx);
 
+    ctx.spawnProjectileExplosion?.(p, impactWorld, ship.id);
     ctx.addCameraShake(visual.cameraShake, 0.15);
     if (ship.hullHp <= 0) ctx.handleShipDestruction(ship);
+    if (p.passThroughFighters && ship.spec.hullSize === 'FIGHTER' && (!p.passThroughFightersOnlyWhenDestroyed || ship.hullHp <= 0)) {
+      (p.damagedTargetIds ??= []).push(ship.id);
+      return false;
+    }
     return true;
   }
 }

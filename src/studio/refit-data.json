@@ -1,0 +1,180 @@
+{
+  "source": "Local Starsector ship_data.csv, weapon_data.csv, hull_mods.csv; settings.json; CoreAutofitPlugin.getBaseMax. No skills or economy modifiers.",
+  "fluxPerCapacitor": 200,
+  "dissipationPerVent": 10,
+  "limits": {
+    "FRIGATE": 10,
+    "DESTROYER": 20,
+    "CRUISER": 30,
+    "CAPITAL_SHIP": 50
+  },
+  "ships": {
+    "onslaught": {
+      "op": 360,
+      "name": "攻势",
+      "manufacturer": "低端技术",
+      "designation": "战列舰"
+    },
+    "paragon": {
+      "op": 370,
+      "name": "典范",
+      "manufacturer": "高新技术",
+      "designation": "战列舰"
+    },
+    "doom": {
+      "op": 145,
+      "name": "厄运",
+      "manufacturer": "高新技术",
+      "designation": "相位巡洋舰"
+    }
+  },
+  "weapons": {
+    "tpc": {
+      "op": 0,
+      "name": "热脉冲加农炮"
+    },
+    "tachyonlance": {
+      "op": 25,
+      "name": "速子长矛"
+    },
+    "autopulse": {
+      "op": 20,
+      "name": "自动脉冲激光"
+    },
+    "mark9": {
+      "op": 18,
+      "name": "马克 IX 自动炮"
+    },
+    "heavymauler": {
+      "op": 12,
+      "name": "重型撕裂者"
+    },
+    "hveldriver": {
+      "op": 13,
+      "name": "高速打击者"
+    },
+    "annihilatorpod": {
+      "op": 10,
+      "name": "歼灭者火箭发射舱"
+    },
+    "gravitonbeam": {
+      "op": 9,
+      "name": "引力子束"
+    },
+    "taclaser": {
+      "op": 4,
+      "name": "战术激光炮"
+    },
+    "heavyblaster": {
+      "op": 12,
+      "name": "重型冲击波"
+    },
+    "typhoon": {
+      "op": 10,
+      "name": "台风级死神鱼雷发射器"
+    },
+    "sabot": {
+      "op": 4,
+      "name": "赛博 SRM"
+    },
+    "lightmg": {
+      "op": 3,
+      "name": "轻机枪"
+    },
+    "pdburst": {
+      "op": 6,
+      "name": "瞬发 PD 激光炮"
+    },
+    "atropos_single": {
+      "op": 1,
+      "name": "阿特罗波斯鱼雷 (单发)"
+    },
+    "flak": {
+      "op": 8,
+      "name": "高射炮"
+    },
+    "dualflak": {
+      "op": 12,
+      "name": "双管高射炮"
+    }
+  },
+  "hullmods": {
+    "targetingunit": {
+      "name": "目标定位系统",
+      "cost": {
+        "FRIGATE": 4,
+        "DESTROYER": 8,
+        "CRUISER": 15,
+        "CAPITAL_SHIP": 25
+      },
+      "uiTags": ["武器"],
+      "manufacturer": "普通"
+    },
+    "dedicated_targeting_core": {
+      "name": "专注型目标锁定核心",
+      "cost": {
+        "FRIGATE": 0,
+        "DESTROYER": 0,
+        "CRUISER": 15,
+        "CAPITAL_SHIP": 25
+      },
+      "uiTags": ["武器"],
+      "manufacturer": "普通"
+    },
+    "advancedcore": {
+      "name": "先进目标定位核心",
+      "cost": {
+        "FRIGATE": 0,
+        "DESTROYER": 0,
+        "CRUISER": 0,
+        "CAPITAL_SHIP": 0
+      },
+      "uiTags": [],
+      "manufacturer": "普通"
+    },
+    "fluxdistributor": {
+      "name": "幅能配送器",
+      "cost": {
+        "FRIGATE": 4,
+        "DESTROYER": 8,
+        "CRUISER": 12,
+        "CAPITAL_SHIP": 20
+      },
+      "uiTags": ["特殊"],
+      "manufacturer": "普通"
+    },
+    "hardenedshieldemitter": {
+      "name": "强化护盾",
+      "cost": {
+        "FRIGATE": 5,
+        "DESTROYER": 10,
+        "CRUISER": 15,
+        "CAPITAL_SHIP": 25
+      },
+      "uiTags": ["护盾"],
+      "manufacturer": "普通"
+    },
+    "fluxbreakers": {
+      "name": "幅散管道扩容",
+      "cost": {
+        "FRIGATE": 3,
+        "DESTROYER": 6,
+        "CRUISER": 9,
+        "CAPITAL_SHIP": 15
+      },
+      "uiTags": ["特殊", "防御"],
+      "manufacturer": "普通"
+    },
+    "stabilizedshieldemitter": {
+      "name": "稳定护盾",
+      "cost": {
+        "FRIGATE": 3,
+        "DESTROYER": 6,
+        "CRUISER": 9,
+        "CAPITAL_SHIP": 15
+      },
+      "uiTags": ["护盾"],
+      "manufacturer": "普通"
+    }
+  }
+}

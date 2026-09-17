@@ -1,0 +1,1434 @@
+{
+  "abyssal_glare": {
+    "tags": [
+      "monster",
+      "dweller",
+      "restricted",
+      "codex_unlockable",
+      "beam21",
+      "no_drop",
+      "substrate_5"
+    ],
+    "ordnancePointCost": 30
+  },
+  "amblaster": {
+    "tags": [
+      "strike10",
+      "rare_bp",
+      "hist1t",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 9
+  },
+  "amsrm": {
+    "tags": [
+      "utility8",
+      "missile9",
+      "strike7",
+      "omega",
+      "restricted",
+      "codex_unlockable"
+    ],
+    "ordnancePointCost": 7
+  },
+  "annihilator": {
+    "tags": [
+      "rocket7",
+      "strike0",
+      "missile_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 4
+  },
+  "annihilator_fighter": {
+    "tags": [
+      "rocket13",
+      "strike8",
+      "show_in_codex"
+    ],
+    "ordnancePointCost": 4
+  },
+  "annihilatorpod": {
+    "tags": [
+      "rocket13",
+      "strike8",
+      "missile_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 10
+  },
+  "arbalest": {
+    "tags": [
+      "kinetic12",
+      "base_bp",
+      "ind"
+    ],
+    "ordnancePointCost": 8
+  },
+  "assaying_rift": {
+    "tags": [
+      "monster",
+      "dweller",
+      "restricted",
+      "codex_unlockable",
+      "pd10",
+      "missile10",
+      "no_drop",
+      "substrate_2"
+    ],
+    "ordnancePointCost": 18
+  },
+  "atropos": {
+    "tags": [
+      "strike9",
+      "missile1",
+      "missile_bp",
+      "merc",
+      "ind",
+      "reload_3pt"
+    ],
+    "ordnancePointCost": 3
+  },
+  "atropos_single": {
+    "tags": [
+      "strike7",
+      "missile0",
+      "base_bp",
+      "ind",
+      "reload_1_and_a_half_pt"
+    ],
+    "ordnancePointCost": 1
+  },
+  "autopulse": {
+    "tags": [
+      "energy18",
+      "hightech_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 20
+  },
+  "blinker_green": {
+    "tags": [],
+    "ordnancePointCost": 0
+  },
+  "blinker_red": {
+    "tags": [],
+    "ordnancePointCost": 0
+  },
+  "bomb": {
+    "tags": [
+      "he0",
+      "no_sell",
+      "no_drop",
+      "no_drop_salvage"
+    ],
+    "ordnancePointCost": 4
+  },
+  "breach": {
+    "tags": [
+      "missile7",
+      "base_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 3
+  },
+  "breachpod": {
+    "tags": [
+      "missile13",
+      "rare_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 10
+  },
+  "canister_flak": {
+    "tags": [],
+    "ordnancePointCost": 0
+  },
+  "chaingun": {
+    "tags": [
+      "he15",
+      "SR",
+      "lowtech_bp",
+      "midline_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 10
+  },
+  "clusterbomb": {
+    "tags": [
+      "he0"
+    ],
+    "ordnancePointCost": 5
+  },
+  "cryoblaster": {
+    "tags": [
+      "energy15",
+      "omega",
+      "restricted",
+      "codex_unlockable"
+    ],
+    "ordnancePointCost": 16
+  },
+  "cryoflux": {
+    "tags": [
+      "energy15",
+      "SR",
+      "omega",
+      "restricted",
+      "codex_unlockable"
+    ],
+    "ordnancePointCost": 15
+  },
+  "cyclone": {
+    "tags": [
+      "strike18",
+      "rocket14",
+      "rare_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 26
+  },
+  "devastator": {
+    "tags": [
+      "he16",
+      "pd17",
+      "lowtech_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 20
+  },
+  "devouring_swarm": {
+    "tags": [
+      "threat",
+      "fragment",
+      "restricted",
+      "codex_unlockable",
+      "he1"
+    ],
+    "ordnancePointCost": 3
+  },
+  "disintegrator": {
+    "tags": [
+      "he18",
+      "omega",
+      "restricted",
+      "codex_unlockable"
+    ],
+    "ordnancePointCost": 14
+  },
+  "dragon": {
+    "tags": [
+      "strike8",
+      "missile3",
+      "merc",
+      "rare_bp",
+      "damage_special",
+      "damage_soft_flux"
+    ],
+    "ordnancePointCost": 10
+  },
+  "dragon_payload": {
+    "tags": [
+      "fires_one_burst"
+    ],
+    "ordnancePointCost": 0
+  },
+  "dragonpod": {
+    "tags": [
+      "strike18",
+      "missile15",
+      "merc",
+      "rare_bp",
+      "damage_special",
+      "damage_soft_flux"
+    ],
+    "ordnancePointCost": 25
+  },
+  "dualflak": {
+    "tags": [
+      "pd15",
+      "SR",
+      "remnant",
+      "rare_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 12
+  },
+  "flak": {
+    "tags": [
+      "pd13",
+      "SR",
+      "lowtech_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 8
+  },
+  "flarelauncher1": {
+    "tags": [],
+    "ordnancePointCost": 0
+  },
+  "flarelauncher2": {
+    "tags": [],
+    "ordnancePointCost": 0
+  },
+  "flarelauncher21": {
+    "tags": [],
+    "ordnancePointCost": 0
+  },
+  "flarelauncher3": {
+    "tags": [],
+    "ordnancePointCost": 0
+  },
+  "fragbomb": {
+    "tags": [
+      "he0",
+      "show_in_codex"
+    ],
+    "ordnancePointCost": 1
+  },
+  "gauss": {
+    "tags": [
+      "kinetic20",
+      "LR",
+      "remnant",
+      "rare_bp",
+      "hist1t",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 25
+  },
+  "gazer": {
+    "tags": [
+      "missile6",
+      "merc",
+      "rare_bp",
+      "damage_special",
+      "damage_soft_flux"
+    ],
+    "ordnancePointCost": 4
+  },
+  "gazer_payload": {
+    "tags": [],
+    "ordnancePointCost": 0
+  },
+  "gazerpod": {
+    "tags": [
+      "missile12",
+      "merc",
+      "rare_bp",
+      "damage_special",
+      "damage_soft_flux"
+    ],
+    "ordnancePointCost": 9
+  },
+  "gigacannon": {
+    "tags": [
+      "strike18",
+      "no_sell",
+      "no_dealer",
+      "no_drop_salvage",
+      "codex_unlockable"
+    ],
+    "ordnancePointCost": 25
+  },
+  "gorgon": {
+    "tags": [
+      "missile8",
+      "strike4",
+      "merc",
+      "rare_bp",
+      "damage_special",
+      "damage_soft_flux"
+    ],
+    "ordnancePointCost": 4
+  },
+  "gorgon_payload": {
+    "tags": [
+      "fires_one_burst"
+    ],
+    "ordnancePointCost": 0
+  },
+  "gorgonpod": {
+    "tags": [
+      "missile12",
+      "strike9",
+      "merc",
+      "rare_bp",
+      "damage_special",
+      "damage_soft_flux"
+    ],
+    "ordnancePointCost": 10
+  },
+  "gravitonbeam": {
+    "tags": [
+      "beam12",
+      "kinetic11",
+      "LR",
+      "hightech_bp",
+      "midline_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 9
+  },
+  "guardian": {
+    "tags": [
+      "pd19",
+      "beam15",
+      "rare_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 18
+  },
+  "hammer": {
+    "tags": [
+      "strike6",
+      "rocket2",
+      "base_bp",
+      "ind"
+    ],
+    "ordnancePointCost": 2
+  },
+  "hammer_single": {
+    "tags": [
+      "strike5",
+      "rocket1",
+      "base_bp",
+      "ind"
+    ],
+    "ordnancePointCost": 1
+  },
+  "hammerrack": {
+    "tags": [
+      "strike16",
+      "rocket14",
+      "missile_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 16
+  },
+  "harpoon": {
+    "tags": [
+      "missile8",
+      "strike3",
+      "missile_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 4
+  },
+  "harpoon_single": {
+    "tags": [
+      "missile6",
+      "strike1",
+      "base_bp",
+      "ind"
+    ],
+    "ordnancePointCost": 2
+  },
+  "harpoonpod": {
+    "tags": [
+      "missile12",
+      "strike9",
+      "missile_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 10
+  },
+  "heatseeker": {
+    "tags": [
+      "utility13",
+      "missile0",
+      "missile_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 3
+  },
+  "heavy_adjudicator": {
+    "tags": [
+      "codex_unlockable"
+    ],
+    "ordnancePointCost": 40
+  },
+  "heavy_mass_driver": {
+    "tags": [
+      "threat",
+      "restricted",
+      "codex_unlockable",
+      "kinetic14",
+      "LR"
+    ],
+    "ordnancePointCost": 15
+  },
+  "heavyac": {
+    "tags": [
+      "kinetic14",
+      "lowtech_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 10
+  },
+  "heavyblaster": {
+    "tags": [
+      "energy14",
+      "rare_bp",
+      "hist1t",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 12
+  },
+  "heavyburst": {
+    "tags": [
+      "pd15",
+      "beam10",
+      "rare_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 9
+  },
+  "heavymauler": {
+    "tags": [
+      "he16",
+      "LR",
+      "remnant",
+      "rare_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 12
+  },
+  "heavymg": {
+    "tags": [
+      "kinetic11",
+      "pd10",
+      "SR",
+      "midline_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 10
+  },
+  "heavymortar": {
+    "tags": [
+      "he11",
+      "base_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 7
+  },
+  "heavyneedler": {
+    "tags": [
+      "kinetic15",
+      "remnant",
+      "rare_bp",
+      "hist1t",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 15
+  },
+  "hellbore": {
+    "tags": [
+      "he18",
+      "lowtech_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 16
+  },
+  "hephag": {
+    "tags": [
+      "he18",
+      "lowtech_bp",
+      "midline_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 20
+  },
+  "hil": {
+    "tags": [
+      "beam20",
+      "LR",
+      "hightech_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 20
+  },
+  "hurricane": {
+    "tags": [
+      "missile18",
+      "strike15",
+      "rare_bp",
+      "hist1t",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 25
+  },
+  "hveldriver": {
+    "tags": [
+      "kinetic15",
+      "LR",
+      "remnant",
+      "rare_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 13
+  },
+  "hydra": {
+    "tags": [
+      "missile18",
+      "strike10",
+      "rare_bp",
+      "merc",
+      "damage_special",
+      "damage_soft_flux"
+    ],
+    "ordnancePointCost": 20
+  },
+  "hydra_payload": {
+    "tags": [],
+    "ordnancePointCost": 0
+  },
+  "inimical_emanation": {
+    "tags": [
+      "monster",
+      "dweller",
+      "restricted",
+      "codex_unlockable",
+      "pd14",
+      "no_drop",
+      "substrate_1"
+    ],
+    "ordnancePointCost": 10
+  },
+  "interdictorbeam": {
+    "tags": [],
+    "ordnancePointCost": 5
+  },
+  "ionbeam": {
+    "tags": [
+      "beam14",
+      "LR",
+      "rare_bp",
+      "hist1t",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 12
+  },
+  "ioncannon": {
+    "tags": [
+      "energy8",
+      "hightech_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 6
+  },
+  "ioncannon_fighter": {
+    "tags": [
+      "energy8",
+      "show_in_codex"
+    ],
+    "ordnancePointCost": 6
+  },
+  "ionpulser": {
+    "tags": [
+      "energy13",
+      "rare_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 11
+  },
+  "irautolance": {
+    "tags": [
+      "beam12",
+      "energy10",
+      "rare_bp",
+      "merc"
+    ],
+    "ordnancePointCost": 8
+  },
+  "irpulse": {
+    "tags": [
+      "energy8",
+      "hightech_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 5
+  },
+  "irpulse_fighter": {
+    "tags": [
+      "energy8",
+      "show_in_codex"
+    ],
+    "ordnancePointCost": 5
+  },
+  "jackhammer": {
+    "tags": [
+      "strike10",
+      "rocket5",
+      "ind",
+      "missile_bp",
+      "merc"
+    ],
+    "ordnancePointCost": 6
+  },
+  "kinetic_fragments": {
+    "tags": [
+      "threat",
+      "fragment",
+      "restricted",
+      "codex_unlockable",
+      "kinetic1",
+      "rocket1"
+    ],
+    "ordnancePointCost": 4
+  },
+  "kineticblaster": {
+    "tags": [
+      "kinetic11",
+      "no_sell",
+      "no_dealer",
+      "no_drop_salvage",
+      "codex_unlockable"
+    ],
+    "ordnancePointCost": 12
+  },
+  "lidardish": {
+    "tags": [
+      "lidar"
+    ],
+    "ordnancePointCost": 0
+  },
+  "light_mass_driver": {
+    "tags": [
+      "threat",
+      "restricted",
+      "codex_unlockable",
+      "kinetic8",
+      "LR"
+    ],
+    "ordnancePointCost": 10
+  },
+  "lightac": {
+    "tags": [
+      "kinetic6",
+      "base_bp",
+      "ind"
+    ],
+    "ordnancePointCost": 4
+  },
+  "lightag": {
+    "tags": [
+      "he6",
+      "lowtech_bp",
+      "midline_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 5
+  },
+  "lightdualac": {
+    "tags": [
+      "kinetic7",
+      "lowtech_bp",
+      "midline_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 5
+  },
+  "lightdualmg": {
+    "tags": [
+      "pd7",
+      "kinetic4",
+      "SR",
+      "lowtech_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 5
+  },
+  "lightmg": {
+    "tags": [
+      "pd6",
+      "kinetic3",
+      "SR",
+      "base_bp",
+      "ind"
+    ],
+    "ordnancePointCost": 3
+  },
+  "lightmortar": {
+    "tags": [
+      "he6",
+      "base_bp",
+      "ind"
+    ],
+    "ordnancePointCost": 2
+  },
+  "lightneedler": {
+    "tags": [
+      "kinetic9",
+      "LR",
+      "remnant",
+      "rare_bp",
+      "hist1t",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 8
+  },
+  "lights_buffalo": {
+    "tags": [],
+    "ordnancePointCost": 0
+  },
+  "lights_hound": {
+    "tags": [],
+    "ordnancePointCost": 0
+  },
+  "locust": {
+    "tags": [
+      "utility18",
+      "missile15",
+      "rare_bp",
+      "hist1t",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 18
+  },
+  "lrpdlaser": {
+    "tags": [
+      "pd7",
+      "beam5",
+      "hightech_bp",
+      "midline_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 4
+  },
+  "mark9": {
+    "tags": [
+      "kinetic18",
+      "base_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 18
+  },
+  "minelayer1": {
+    "tags": [],
+    "ordnancePointCost": 12
+  },
+  "minelayer2": {
+    "tags": [],
+    "ordnancePointCost": 12
+  },
+  "miningblaster": {
+    "tags": [
+      "energy12",
+      "base_bp",
+      "ind"
+    ],
+    "ordnancePointCost": 10
+  },
+  "mininglaser": {
+    "tags": [
+      "beam0",
+      "energy0",
+      "pd0",
+      "base_bp",
+      "ind"
+    ],
+    "ordnancePointCost": 1
+  },
+  "minipulser": {
+    "tags": [
+      "kinetic9",
+      "omega",
+      "restricted",
+      "codex_unlockable"
+    ],
+    "ordnancePointCost": 8
+  },
+  "mjolnir": {
+    "tags": [
+      "energy18",
+      "he17",
+      "kinetic17",
+      "remnant",
+      "rare_bp",
+      "hist1t",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 24
+  },
+  "motelauncher": {
+    "tags": [],
+    "ordnancePointCost": 0
+  },
+  "motelauncher_hf": {
+    "tags": [],
+    "ordnancePointCost": 0
+  },
+  "multineedler": {
+    "tags": [
+      "kinetic19",
+      "remnant",
+      "rare_bp",
+      "hist1t",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 28
+  },
+  "nb_bomblauncher": {
+    "tags": [],
+    "ordnancePointCost": 12
+  },
+  "neoferric_quadcoil": {
+    "tags": [
+      "threat",
+      "restricted",
+      "codex_unlockable",
+      "he17"
+    ],
+    "ordnancePointCost": 20
+  },
+  "neutron_torpedo": {
+    "tags": [
+      "threat",
+      "restricted",
+      "codex_unlockable",
+      "strike6",
+      "rocket2",
+      "reload_3pt"
+    ],
+    "ordnancePointCost": 3
+  },
+  "novalaser": {
+    "tags": [
+      "nova",
+      "fixed_range"
+    ],
+    "ordnancePointCost": 0
+  },
+  "od_bomblauncher": {
+    "tags": [],
+    "ordnancePointCost": 12
+  },
+  "pdburst": {
+    "tags": [
+      "pd9",
+      "beam6",
+      "rare_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 6
+  },
+  "pdburst_fighter": {
+    "tags": [
+      "pd9",
+      "beam6",
+      "show_in_codex"
+    ],
+    "ordnancePointCost": 6
+  },
+  "pdlaser": {
+    "tags": [
+      "pd7",
+      "beam7",
+      "SR",
+      "hightech_bp",
+      "midline_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 3
+  },
+  "phasebeam": {
+    "tags": [
+      "energy14",
+      "beam10",
+      "rare_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 10
+  },
+  "phasecl": {
+    "tags": [
+      "utility8",
+      "rare_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 12
+  },
+  "phasecl_bomber": {
+    "tags": [
+      "utility8",
+      "show_in_codex"
+    ],
+    "ordnancePointCost": 12
+  },
+  "pilum": {
+    "tags": [
+      "utility13",
+      "missile7",
+      "missile_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 7
+  },
+  "pilum_large": {
+    "tags": [
+      "utility15",
+      "missile14",
+      "rare_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 14
+  },
+  "plasma": {
+    "tags": [
+      "energy20",
+      "rare_bp",
+      "hist1t",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 30
+  },
+  "pseudoparticle_jet": {
+    "tags": [
+      "monster",
+      "dweller",
+      "restricted",
+      "codex_unlockable",
+      "kinetic15",
+      "SR",
+      "no_drop",
+      "substrate_2"
+    ],
+    "ordnancePointCost": 22
+  },
+  "pulselaser": {
+    "tags": [
+      "energy13",
+      "base_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 10
+  },
+  "pusherplate_lt": {
+    "tags": [
+      "pusherplate"
+    ],
+    "ordnancePointCost": 0
+  },
+  "pusherplate_lt_small": {
+    "tags": [
+      "pusherplate"
+    ],
+    "ordnancePointCost": 0
+  },
+  "pusherplate_nova": {
+    "tags": [
+      "pusherplate"
+    ],
+    "ordnancePointCost": 0
+  },
+  "railgun": {
+    "tags": [
+      "kinetic8",
+      "LR",
+      "remnant",
+      "rare_bp",
+      "hist1t",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 7
+  },
+  "realitydisruptor": {
+    "tags": [
+      "energy22",
+      "LR",
+      "omega",
+      "restricted",
+      "codex_unlockable"
+    ],
+    "ordnancePointCost": 30
+  },
+  "reaper": {
+    "tags": [
+      "strike8",
+      "rocket3",
+      "missile_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 2
+  },
+  "resonatormrm": {
+    "tags": [
+      "missile15",
+      "strike11",
+      "omega",
+      "restricted",
+      "codex_unlockable"
+    ],
+    "ordnancePointCost": 16
+  },
+  "rift_lightning": {
+    "tags": [
+      "monster",
+      "dweller",
+      "restricted",
+      "codex_unlockable",
+      "pd15",
+      "energy19",
+      "no_drop",
+      "substrate_3"
+    ],
+    "ordnancePointCost": 20
+  },
+  "rift_lightning_minelayer": {
+    "tags": [
+      "restricted",
+      "no_drop"
+    ],
+    "ordnancePointCost": 0
+  },
+  "riftbeam": {
+    "tags": [
+      "beam10",
+      "pd15",
+      "omega",
+      "restricted",
+      "codex_unlockable"
+    ],
+    "ordnancePointCost": 10
+  },
+  "riftbeam_minelayer": {
+    "tags": [],
+    "ordnancePointCost": 0
+  },
+  "riftcascade": {
+    "tags": [
+      "energy22",
+      "beam17",
+      "LR",
+      "omega",
+      "restricted",
+      "codex_unlockable"
+    ],
+    "ordnancePointCost": 30
+  },
+  "riftcascade_minelayer": {
+    "tags": [],
+    "ordnancePointCost": 0
+  },
+  "riftlance": {
+    "tags": [
+      "energy11",
+      "beam10",
+      "omega",
+      "restricted",
+      "codex_unlockable"
+    ],
+    "ordnancePointCost": 9
+  },
+  "riftlance_minelayer": {
+    "tags": [],
+    "ordnancePointCost": 0
+  },
+  "rifttorpedo": {
+    "tags": [
+      "strike20",
+      "missile20",
+      "omega",
+      "restricted",
+      "codex_unlockable"
+    ],
+    "ordnancePointCost": 30
+  },
+  "sabot": {
+    "tags": [
+      "missile8",
+      "strike2",
+      "missile_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 4
+  },
+  "sabot_fighter": {
+    "tags": [
+      "missile6",
+      "strike0",
+      "show_in_codex"
+    ],
+    "ordnancePointCost": 1
+  },
+  "sabot_single": {
+    "tags": [
+      "missile6",
+      "strike0",
+      "base_bp",
+      "ind"
+    ],
+    "ordnancePointCost": 2
+  },
+  "sabotpod": {
+    "tags": [
+      "missile13",
+      "strike8",
+      "rare_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 10
+  },
+  "salamanderpod": {
+    "tags": [
+      "utility13",
+      "missile_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 6
+  },
+  "seeker_fragment": {
+    "tags": [
+      "threat",
+      "fragment",
+      "restricted",
+      "codex_unlockable",
+      "missile1"
+    ],
+    "ordnancePointCost": 3
+  },
+  "sensordish": {
+    "tags": [],
+    "ordnancePointCost": 0
+  },
+  "shockrepeater": {
+    "tags": [
+      "pd14",
+      "omega",
+      "restricted",
+      "codex_unlockable"
+    ],
+    "ordnancePointCost": 7
+  },
+  "shredder": {
+    "tags": [
+      "kinetic8",
+      "base_bp",
+      "ind"
+    ],
+    "ordnancePointCost": 7
+  },
+  "squall": {
+    "tags": [
+      "missile19",
+      "strike15",
+      "rare_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 20
+  },
+  "swarm_launcher": {
+    "tags": [
+      "threat",
+      "fragment",
+      "restricted",
+      "codex_unlockable",
+      "no_standard_data",
+      "swarm1"
+    ],
+    "ordnancePointCost": 20
+  },
+  "swarmer": {
+    "tags": [
+      "utility8",
+      "missile0",
+      "missile_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 3
+  },
+  "swarmer_fighter": {
+    "tags": [
+      "utility8",
+      "missile0",
+      "show_in_codex"
+    ],
+    "ordnancePointCost": 4
+  },
+  "tachyonlance": {
+    "tags": [
+      "energy20",
+      "beam15",
+      "LR",
+      "rare_bp",
+      "hist1t",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 25
+  },
+  "taclaser": {
+    "tags": [
+      "beam9",
+      "LR",
+      "hightech_bp",
+      "midline_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 4
+  },
+  "targetinglaser1": {
+    "tags": [],
+    "ordnancePointCost": 0
+  },
+  "targetinglaser2": {
+    "tags": [],
+    "ordnancePointCost": 0
+  },
+  "targetinglaser3": {
+    "tags": [],
+    "ordnancePointCost": 0
+  },
+  "terminator_missile": {
+    "tags": [
+      "restricted"
+    ],
+    "ordnancePointCost": 0
+  },
+  "tpc": {
+    "tags": [],
+    "ordnancePointCost": 0
+  },
+  "typhoon": {
+    "tags": [
+      "strike13",
+      "rocket8",
+      "missile_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 10
+  },
+  "unstable_fragment": {
+    "tags": [
+      "threat",
+      "fragment",
+      "restricted",
+      "codex_unlockable",
+      "pd1",
+      "rocket1"
+    ],
+    "ordnancePointCost": 2
+  },
+  "voidblaster": {
+    "tags": [
+      "threat",
+      "restricted",
+      "codex_unlockable",
+      "he12"
+    ],
+    "ordnancePointCost": 16
+  },
+  "voltaic_cannon": {
+    "tags": [
+      "threat",
+      "restricted",
+      "codex_unlockable",
+      "energy7",
+      "strike3"
+    ],
+    "ordnancePointCost": 3
+  },
+  "voltaic_discharge": {
+    "tags": [
+      "threat",
+      "fragment",
+      "fragment_glow",
+      "restricted",
+      "codex_unlockable",
+      "pd1",
+      "energy7"
+    ],
+    "ordnancePointCost": 5
+  },
+  "vortex_launcher": {
+    "tags": [
+      "monster",
+      "dweller",
+      "restricted",
+      "codex_unlockable",
+      "no_drop",
+      "no_standard_data"
+    ],
+    "ordnancePointCost": 50
+  },
+  "vpdriver": {
+    "tags": [
+      "kinetic20",
+      "omega",
+      "restricted",
+      "codex_unlockable"
+    ],
+    "ordnancePointCost": 30
+  },
+  "vulcan": {
+    "tags": [
+      "pd7",
+      "SR",
+      "lowtech_bp",
+      "merc",
+      "ind"
+    ],
+    "ordnancePointCost": 4
+  }
+}

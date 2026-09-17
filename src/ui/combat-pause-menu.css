@@ -1,0 +1,115 @@
+/* Combat/E.java + class/I.java: native 500x293 panel, 7px inner border,
+ * 10px content inset, 220x30 actions, orbitron24aabold and 12condensed atlases.
+ * Typography, borders and materials are shared through NativeChrome. */
+.ui-modal-backdrop:has(.combat-pause-layout) {
+  background: #000b;
+  backdrop-filter: none;
+}
+.ui-modal:has(.combat-pause-layout) {
+  position: relative;
+  width: 500px;
+  height: 293px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+  padding: 17px;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  box-shadow: none;
+  background: transparent;
+  overflow: visible;
+  isolation: isolate;
+  animation: none;
+}
+.ui-modal:has(.combat-pause-layout) .ui-modal-header { display: none; }
+.ui-modal:has(.combat-pause-layout) .ui-modal-body {
+  padding: 0;
+  height: 100%;
+  overflow: visible;
+}
+.combat-pause-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 10px;
+  height: 100%;
+  color: #aadeff;
+  font: 16px/16px var(--native-font-body);
+}
+.combat-pause-ship { position: relative; min-width: 0; height: 100%; }
+.combat-pause-ship-name { position: relative; z-index: 2; }
+.combat-pause-ship-name > span {
+  display: block;
+  height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.combat-pause-portrait { position: absolute; inset: 0; pointer-events: none; }
+.combat-pause-portrait .studio-ship {
+  width: min(90cqw, 190px * var(--ship-ratio), 80cqh * var(--ship-ratio));
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  transform: none;
+  pointer-events: none;
+}
+.combat-pause-portrait .studio-hull-image { object-fit: contain; }
+.combat-pause-portrait::after {
+  content: "";
+  position: absolute;
+  inset: 32px 0 4px;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent 0 1px, #0003 1px 2px);
+}
+.combat-pause-actions { display: flex; flex-direction: column; justify-content: space-between; }
+.native-button.combat-pause-button {
+  display: flex;
+  flex: 0 0 30px;
+  width: 100%;
+  height: 30px;
+  padding: 0 15px;
+}
+.combat-pause-end-actions { display: flex; flex-direction: column; gap: 3px; }
+.ui-modal:has(.combat-settings) { width: 500px; max-width: calc(100vw - 28px); }
+.combat-settings {
+  color: #c4dbe4;
+  font: 15px/1.5 var(--ui-font);
+}
+.combat-settings h3 {
+  background: #153b48;
+  font: 16px var(--ui-font);
+  padding: 4px 8px;
+  margin: 12px 0 8px;
+  color: #bfe2f0;
+}
+.combat-settings h3:first-child {
+  margin-top: 0;
+}
+.combat-settings label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.combat-settings input {
+  accent-color: #83c8e6;
+  width: 16px;
+  height: 16px;
+}
+.combat-settings p {
+  color: #819daa;
+  font-size: 13px;
+  padding: 0 8px;
+  margin: 4px 0 16px;
+}
+.combat-settings-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+@media (max-width: 520px) {
+  .combat-pause-layout { grid-template-columns: minmax(0, 1fr) minmax(140px, 48%); gap: 8px; }
+  .combat-pause-button { padding-inline: 10px; }
+}

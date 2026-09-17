@@ -21,6 +21,9 @@ export class ArmorGrid {
   public rows: number;
   public cellWidth: number;
   public cellHeight: number;
+  /** 舰船局部坐标中装甲网格左下角；不再假定网格以 (0,0) 对称居中。 */
+  public minX: number;
+  public minY: number;
   public maxArmorRating: number;
   public maxCellArmor: number;
   
@@ -28,16 +31,32 @@ export class ArmorGrid {
   public cells: Float32Array;
   // 脏版本计数器，供 ShipPaperDoll 等装甲可视化按需重绘
   public dirtyVersion = 0;
+  public damageTakenModifiers?: (type: DamageType) => { armor: number; hull: number };
+  public effectiveArmorMultiplier = 1;
+  public dynamicEffectiveArmorMultiplier?: () => number;
+  public maxDamageReduction = .85;
+  public minArmorFractionMultiplier = 1;
+  public onCellDamage?: (c: number, r: number, damage: number) => void;
 
-  constructor(cols = 16, rows = 8, cellWidth = 20, cellHeight = 20, maxArmorRating = 1500) {
+  constructor(
+    cols = 16,
+    rows = 8,
+    cellWidth = 20,
+    cellHeight = 20,
+    maxArmorRating = 1500,
+    minX = -(cols * cellWidth) / 2,
+    minY = -(rows * cellHeight) / 2
+  ) {
     this.cols = cols;
     this.rows = rows;
     this.cellWidth = cellWidth;
     this.cellHeight = cellHeight;
+    this.minX = minX;
+    this.minY = minY;
     this.maxArmorRating = maxArmorRating;
     
     // 原版公式：单个单元格满装甲约为总装甲的 1/15
-    this.maxCellArmor = maxArmorRating / 15;
+    this.maxCellArmor = Math.max(1, maxArmorRating / 15);
     this.cells = new Float32Array(cols * rows);
     this.cells.fill(this.maxCellArmor);
   }
@@ -62,14 +81,29 @@ export class ArmorGrid {
    * 将舰船局部坐标转换为装甲网格坐标 (c, r)
    */
   public localToGrid(localPos: Vector2): { c: number; r: number } {
-    const halfW = (this.cols * this.cellWidth) / 2;
-    const halfH = (this.rows * this.cellHeight) / 2;
-    const c = Math.floor((localPos.x + halfW) / this.cellWidth);
-    const r = Math.floor((localPos.y + halfH) / this.cellHeight);
+    // Native grids floor relative to the pivot, then add integer support-cell offsets.
+    // Subtracting a floating min first can put Doom's 23.8-unit origin into the wrong cell.
+    const originX = this.minX / this.cellWidth, originY = this.minY / this.cellHeight;
+    const c = Math.abs(originX - Math.round(originX)) < 1e-9
+      ? Math.floor(localPos.x / this.cellWidth) - Math.round(originX)
+      : Math.floor((localPos.x - this.minX) / this.cellWidth);
+    const r = Math.abs(originY - Math.round(originY)) < 1e-9
+      ? Math.floor(localPos.y / this.cellHeight) - Math.round(originY)
+      : Math.floor((localPos.y - this.minY) / this.cellHeight);
     return {
       c: Math.max(0, Math.min(this.cols - 1, c)),
       r: Math.max(0, Math.min(this.rows - 1, r))
     };
+  }
+
+  /** 将装甲格坐标还原为舰船局部坐标中的格子中心。 */
+  public getCellCenterLocal(c: number, r: number): Vector2 {
+    const safeC = Math.max(0, Math.min(this.cols - 1, c));
+    const safeR = Math.max(0, Math.min(this.rows - 1, r));
+    return new Vector2(
+      this.minX + (safeC + 0.5) * this.cellWidth,
+      this.minY + (safeR + 0.5) * this.cellHeight
+    );
   }
 
   /**
@@ -98,8 +132,8 @@ export class ArmorGrid {
     }
 
     // 最低保底残留装甲 (严格对齐 settings.json: minArmorFraction = 0.05)
-    const minResidual = this.maxArmorRating * 0.05;
-    return Math.max(effectiveArmor, minResidual);
+    const minResidual = this.maxArmorRating * 0.05 * this.minArmorFractionMultiplier;
+    return Math.max(effectiveArmor * this.effectiveArmorMultiplier * (this.dynamicEffectiveArmorMultiplier?.() ?? 1), minResidual);
   }
 
   /**
@@ -142,6 +176,10 @@ export class ArmorGrid {
     const { c, r } = this.localToGrid(localHitPos);
     const effectiveArmor = this.getEffectiveArmor(c, r);
 
+    const incoming = this.damageTakenModifiers?.(damageType);
+    armorMult *= incoming?.armor ?? 1;
+    hullMult *= incoming?.hull ?? 1;
+    if (armorMult <= 0) return { armorDamage: 0, hullDamage: 0, residualArmor: effectiveArmor };
     // 2. 装甲减伤与实际伤害解算
     let modifiedDamage = baseDamage * armorMult;
     let effectiveHitStr = (hitStrength ?? baseDamage) * armorMult;
@@ -154,7 +192,7 @@ export class ArmorGrid {
     // Damage multiplier is hitStrength/(hitStrength+armor), with an 85%
     // maximum reduction (therefore a 15% minimum damage multiplier).
     const rawDamageMult = effectiveHitStr / (effectiveHitStr + effectiveArmor);
-    const damageMult = Math.max(0.15, rawDamageMult);
+    const damageMult = Math.max(1 - this.maxDamageReduction, rawDamageMult);
     const damageAfterReduction = modifiedDamage * damageMult;
 
     // 3. 21 单元格装甲扣减与船体溢出穿透计算
@@ -182,6 +220,7 @@ export class ArmorGrid {
         const overflow = Math.max(0, cellDmg - curArmor);
 
         this.setCell(c + dx, r + dy, nextArmor);
+        if (cellDmg > 0) this.onCellDamage?.(c + dx, r + dy, cellDmg);
         totalArmorDamage += (curArmor - nextArmor);
         // 单元格装甲完全被击穿后，剩余溢出的伤害直接击入船体 HP
         totalHullDamage += overflow * hullFactor;

@@ -1,199 +1,75 @@
 import { WebGLShaderUtil } from './WebGLShaderUtil';
-import { Vector2 } from '../../math/Vector2';
-import { Ship } from '../../simulation/Ship';
+import type { Vector2 } from '../../math/Vector2';
+import type { Ship } from '../../simulation/Ship';
 import { SHIELD_VISUAL_PROFILES, getShipVisualProfile } from '../../visual/VisualProfiles';
 
 const SHIELD_VS = `#version 300 es
 precision highp float;
-
-layout(location = 0) in vec2 a_corner; // [-0.5, 0.5]
-
+layout(location = 0) in vec2 a_position;
+layout(location = 1) in vec2 a_uv;
+layout(location = 2) in float a_alpha;
 uniform mat3 u_viewProj;
-uniform vec2 u_center;
-uniform float u_radius;
-
-out vec2 v_localPos;
-
+out vec2 v_uv;
+out float v_alpha;
 void main() {
-  float boxSize = u_radius * 2.35;
-  v_localPos = a_corner * boxSize;
-  vec2 worldPos = u_center + v_localPos;
-  vec3 clip = u_viewProj * vec3(worldPos, 1.0);
+  vec3 clip = u_viewProj * vec3(a_position, 1.0);
   gl_Position = vec4(clip.xy, 0.0, 1.0);
+  v_uv = a_uv;
+  v_alpha = a_alpha;
 }
 `;
 
 const SHIELD_FS = `#version 300 es
 precision highp float;
-
-in vec2 v_localPos;
-
-uniform float u_radius;
-uniform float u_centerAngle;
-uniform float u_halfArc;
-uniform float u_innerAngle1;
-uniform float u_innerAngle2;
-uniform float u_ringAngle;
-uniform vec3 u_innerColor;
-uniform vec3 u_ringColor;
-uniform float u_fluxWobble;
-uniform float u_time;
-uniform float u_brightness;
-uniform float u_opacity;
-uniform float u_deployLevel;
-uniform float u_rimWidth;
-uniform float u_hitFlash;
-
-// 4 组受击高光参数: x=angle, y=intensity, z=arcSpan, w=active(0/1)
-uniform vec4 u_ripples[4];
-
-uniform sampler2D u_texShield; // shields256.png
-
+in vec2 v_uv;
+in float v_alpha;
+uniform sampler2D u_texture;
+uniform vec4 u_color;
 out vec4 fragColor;
-
 void main() {
-  float dist = length(v_localPos);
-  float maxShieldR = u_radius * 1.07;
-  if (dist > maxShieldR + 6.0 || dist < 1.0) {
-    discard;
-  }
-
-  // 1. 扇区角度与边缘平滑收敛 (1:1 对齐 G.java: 10~15度角平滑柔和渐隐)
-  float angle = atan(v_localPos.y, v_localPos.x);
-  float diff = angle - u_centerAngle;
-  diff = mod(diff + 3.14159265359, 6.28318530718) - 3.14159265359;
-  float absDiff = abs(diff);
-
-  if (u_halfArc < 3.10 && absDiff > u_halfArc) {
-    discard;
-  }
-
-  // 10~15度平滑收尾渐隐 (0.22 rad)
-  float taper = u_halfArc >= 3.10 ? 1.0 : smoothstep(0.0, 0.22, u_halfArc - absDiff);
-
-  // 2. 径向环带与顶点 Alpha 梯度 (1:1 对齐 G.java:364-394)
-  // 中心 (0, 0) 处 alpha 为 0，边缘 maxShieldR 处 alpha 为 spec.innerColor.alpha (75/255 = 0.294)
-  float normDist = clamp(dist / maxShieldR, 0.0, 1.0);
-  float vertexAlpha = normDist * 0.2941;
-
-  // 3. 内部星云流动纹理采样 (1:1 对齐 G.java: 双层差速逆向旋转 ±0.3927 rad/s，采样 shields256.png 的 Alpha 通道)
-  float c1 = cos(u_innerAngle1);
-  float s1 = sin(u_innerAngle1);
-  vec2 uv1 = vec2(c1 * v_localPos.x - s1 * v_localPos.y, s1 * v_localPos.x + c1 * v_localPos.y) / (maxShieldR * 2.0) + 0.5;
-  float tex1Alpha = texture(u_texShield, uv1).a;
-
-  float c2 = cos(u_innerAngle2);
-  float s2 = sin(u_innerAngle2);
-  vec2 uv2 = vec2(c2 * v_localPos.x - s2 * v_localPos.y, s2 * v_localPos.x + c2 * v_localPos.y) / (maxShieldR * 2.0) + 0.5;
-  float tex2Alpha = texture(u_texShield, uv2).a;
-
-  // 双层焦散叠加，经 vertexAlpha 与扇区端点 taper 调制 (极具通透感与层次感，彻底告别死板纯色方块)
-  vec3 innerCol = u_innerColor * ((tex1Alpha + tex2Alpha) * 0.5 * vertexAlpha * taper * 2.6 * u_opacity);
-
-  // 4. 护盾边缘外环 (1:1 对齐 G.java:408-468: 5px line8x8.png 轮廓)
-  float wobble = sin(angle * 10.0 + u_ringAngle * 10.0) * (0.35 + u_fluxWobble);
-  float rimR = u_radius + wobble;
-  float rimDist = abs(dist - rimR);
-  float rimPx = clamp(u_rimWidth * u_radius, 1.8, 7.0);
-  float rimFactor = smoothstep(rimPx, 0.0, rimDist) * taper;
-  vec3 rimCol = u_ringColor * (rimFactor * 0.95);
-
-  // 5. 受击瞬态高光闪烁 (Hit Ripple Glow)
-  vec3 ripCol = vec3(0.0);
-  for (int i = 0; i < 4; i++) {
-    if (u_ripples[i].w < 0.5) continue;
-    float rAngle = u_ripples[i].x;
-    float rIntensity = u_ripples[i].y;
-    float rSpan = u_ripples[i].z;
-
-    float rDiff = angle - rAngle;
-    rDiff = mod(rDiff + 3.14159265359, 6.28318530718) - 3.14159265359;
-    float absRDiff = abs(rDiff);
-    if (absRDiff < rSpan) {
-      float spanFade = 1.0 - absRDiff / rSpan;
-      float rRim = smoothstep(6.0 * rIntensity, 0.0, abs(dist - u_radius));
-      ripCol += (u_ringColor + vec3(0.2)) * (spanFade * rRim * rIntensity * 1.5 * u_hitFlash);
-    }
-  }
-
-  // 6. 最终加色合成。展开/收拢阶段不仅改变 active arc，也同步淡入淡出，
-  // 避免 toggle-off 后像贴图被直接切掉一样瞬间消失。
-  float deployAlpha = smoothstep(0.0, 0.22, u_deployLevel);
-  vec3 finalRgb = (innerCol + rimCol + ripCol) * u_brightness * deployAlpha;
-  fragColor = vec4(finalRgb, 1.0);
+  vec4 texel = texture(u_texture, v_uv);
+  fragColor = vec4(texel.rgb * u_color.rgb, texel.a * u_color.a * v_alpha);
 }
 `;
 
+/**
+ * Common shield path from combat/systems/G.java: two additive triangle fans,
+ * then an inward textured rim strip. Segment brightness lives on Shield, so
+ * drawing/pausing/renderer recreation never advances or discards hit recovery.
+ */
 export class WebGLShieldShader {
-  private gl: WebGL2RenderingContext;
-  private program: WebGLProgram;
-  private quadVbo: WebGLBuffer;
-  private vao: WebGLVertexArrayObject;
+  private readonly program: WebGLProgram;
+  private readonly vbo: WebGLBuffer;
+  private readonly vao: WebGLVertexArrayObject;
+  private readonly uViewProj: WebGLUniformLocation | null;
+  private readonly uTexture: WebGLUniformLocation | null;
+  private readonly uColor: WebGLUniformLocation | null;
+  private vertices = new Float32Array(0);
+  public drawCalls = 0;
 
-  private uViewProj: WebGLUniformLocation;
-  private uCenter: WebGLUniformLocation;
-  private uRadius: WebGLUniformLocation;
-  private uCenterAngle: WebGLUniformLocation;
-  private uHalfArc: WebGLUniformLocation;
-  private uInnerAngle1: WebGLUniformLocation;
-  private uInnerAngle2: WebGLUniformLocation;
-  private uRingAngle: WebGLUniformLocation;
-  private uInnerColor: WebGLUniformLocation;
-  private uRingColor: WebGLUniformLocation;
-  private uFluxWobble: WebGLUniformLocation;
-  private uTime: WebGLUniformLocation;
-  private uBrightness: WebGLUniformLocation;
-  private uOpacity: WebGLUniformLocation;
-  private uDeployLevel: WebGLUniformLocation;
-  private uRimWidth: WebGLUniformLocation;
-  private uHitFlash: WebGLUniformLocation;
-  private uRipplesLocs: WebGLUniformLocation[] = [];
-  private uTexShield: WebGLUniformLocation;
-
-  constructor(gl: WebGL2RenderingContext) {
-    this.gl = gl;
+  constructor(private readonly gl: WebGL2RenderingContext) {
     this.program = WebGLShaderUtil.createProgram(gl, SHIELD_VS, SHIELD_FS);
-
-    this.uViewProj = gl.getUniformLocation(this.program, 'u_viewProj')!;
-    this.uCenter = gl.getUniformLocation(this.program, 'u_center')!;
-    this.uRadius = gl.getUniformLocation(this.program, 'u_radius')!;
-    this.uCenterAngle = gl.getUniformLocation(this.program, 'u_centerAngle')!;
-    this.uHalfArc = gl.getUniformLocation(this.program, 'u_halfArc')!;
-    this.uInnerAngle1 = gl.getUniformLocation(this.program, 'u_innerAngle1')!;
-    this.uInnerAngle2 = gl.getUniformLocation(this.program, 'u_innerAngle2')!;
-    this.uRingAngle = gl.getUniformLocation(this.program, 'u_ringAngle')!;
-    this.uInnerColor = gl.getUniformLocation(this.program, 'u_innerColor')!;
-    this.uRingColor = gl.getUniformLocation(this.program, 'u_ringColor')!;
-    this.uFluxWobble = gl.getUniformLocation(this.program, 'u_fluxWobble')!;
-    this.uTime = gl.getUniformLocation(this.program, 'u_time')!;
-    this.uBrightness = gl.getUniformLocation(this.program, 'u_brightness')!;
-    this.uOpacity = gl.getUniformLocation(this.program, 'u_opacity')!;
-    this.uDeployLevel = gl.getUniformLocation(this.program, 'u_deployLevel')!;
-    this.uRimWidth = gl.getUniformLocation(this.program, 'u_rimWidth')!;
-    this.uHitFlash = gl.getUniformLocation(this.program, 'u_hitFlash')!;
-    this.uTexShield = gl.getUniformLocation(this.program, 'u_texShield')!;
-
-    for (let i = 0; i < 4; i++) {
-      this.uRipplesLocs.push(gl.getUniformLocation(this.program, `u_ripples[${i}]`)!);
+    const vbo = gl.createBuffer();
+    const vao = gl.createVertexArray();
+    if (!vbo || !vao) {
+      if (vbo) gl.deleteBuffer(vbo);
+      if (vao) gl.deleteVertexArray(vao);
+      gl.deleteProgram(this.program);
+      throw new Error('Failed to allocate shield geometry');
     }
-
-    // 初始化单位四边形 [-0.5, 0.5]
-    this.vao = gl.createVertexArray()!;
-    gl.bindVertexArray(this.vao);
-
-    this.quadVbo = gl.createBuffer()!;
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.quadVbo);
-    const quadVertices = new Float32Array([
-      -0.5, -0.5,
-       0.5, -0.5,
-      -0.5,  0.5,
-       0.5,  0.5
-    ]);
-    gl.bufferData(gl.ARRAY_BUFFER, quadVertices, gl.STATIC_DRAW);
-
+    this.vbo = vbo;
+    this.vao = vao;
+    this.uViewProj = gl.getUniformLocation(this.program, 'u_viewProj');
+    this.uTexture = gl.getUniformLocation(this.program, 'u_texture');
+    this.uColor = gl.getUniformLocation(this.program, 'u_color');
+    gl.bindVertexArray(vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
     gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 20, 0);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 8);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 1, gl.FLOAT, false, 20, 16);
     gl.bindVertexArray(null);
   }
 
@@ -203,89 +79,99 @@ export class WebGLShieldShader {
     shipWorldPos: Vector2,
     shipFacingRad: number,
     texShield: WebGLTexture,
-    nowSec: number
-  ) {
+    nowSec: number,
+    texRim: WebGLTexture
+  ): void {
     const shield = ship.shield;
-    // isActive 表示防护是否生效；currentArcDeg 独立承载视觉展开/收拢。
-    // 因此 toggle-off、Burn Drive、排散和过载后仍要画完退场动画。
     if (!shield.isVisuallyDeployed || shield.radius <= 0) return;
-    if (shield.currentArcDeg <= 2) return;
+    const levels = shield.hitSegmentLevels;
+    const count = levels.length;
+    const arc = shield.renderArcRad;
+    const facing = shield.type === 'FRONT' ? shipFacingRad : shield.facingAngleRad;
+    const start = facing - arc / 2;
+    const step = arc / (count - 1);
+    const visual = getShipVisualProfile(ship.spec);
+    const base = SHIELD_VISUAL_PROFILES[visual.shieldProfile];
+    const fortress = SHIELD_VISUAL_PROFILES[visual.fortressShieldProfile ?? 'fortress'];
+    const system = Math.max(0, Math.min(1, ship.system.fortressVisualLevel));
+    const mix = (a: number, b: number) => a + (b - a) * system;
+    const brightness = mix(base.brightness, fortress.brightness);
+    const innerRotation = nowSec * mix(base.textureRotationSpeed, fortress.textureRotationSpeed);
+    const ringRotation = nowSec * Math.sqrt(62.831853 / Math.max(1, shield.radius)) * mix(base.ringSpeedScale, fortress.ringSpeedScale);
+    const rimScale = ship.spec.hullSize === 'FIGHTER' ? 3 / 5 : ship.spec.hullSize === 'FRIGATE' ? 4 / 5 : 1;
+    const rimWidth = mix(base.rimWidth, fortress.rimWidth) * rimScale;
+    const wobble = Math.min(1, 0.25 + 0.75 * shield.radius / 256);
+    const fanRadius = shield.radius * 1.07;
+    const fanVertices = count + 1;
+    const totalFloats = (fanVertices * 2 + count * 2) * 5;
+    if (this.vertices.length < totalFloats) this.vertices = new Float32Array(2 ** Math.ceil(Math.log2(totalFloats)));
+    let cursor = 0;
+    const vertex = (x: number, y: number, u: number, v: number, alpha: number) => {
+      this.vertices[cursor++] = x;
+      this.vertices[cursor++] = y;
+      this.vertices[cursor++] = u;
+      this.vertices[cursor++] = v;
+      this.vertices[cursor++] = alpha;
+    };
+    const segmentAlpha = (i: number) => {
+      const theta = i * step;
+      const taper = Math.max(0, Math.min(1, Math.min(theta, arc - theta) / (Math.PI / 18)));
+      return shield.visualAlpha * (1 - 0.45 * levels[i] / 100) * taper;
+    };
+
+    for (let layer = 0; layer < 2; layer++) {
+      vertex(shipWorldPos.x, shipWorldPos.y, 0.5, 0.5, 0);
+      const textureAngle = (layer === 0 ? innerRotation : -innerRotation) - arc / 2;
+      for (let i = 0; i < count; i++) {
+        const theta = i * step;
+        const angle = start + theta;
+        vertex(shipWorldPos.x + Math.cos(angle) * fanRadius, shipWorldPos.y + Math.sin(angle) * fanRadius,
+          0.5 + Math.cos(theta + textureAngle) / 2, 0.5 + Math.sin(theta + textureAngle) / 2,
+          Math.floor(segmentAlpha(i) * 75) / 255);
+      }
+    }
+    for (let i = 0; i < count; i++) {
+      const theta = i * step;
+      const angle = start + theta;
+      const radius = shield.radius + wobble * Math.sin(ringRotation * 10 + theta * 10);
+      const alpha = Math.floor(segmentAlpha(i) * 255) / 255;
+      const x = Math.cos(angle);
+      const y = Math.sin(angle);
+      vertex(shipWorldPos.x + x * radius, shipWorldPos.y + y * radius, 0, 0, alpha);
+      vertex(shipWorldPos.x + x * (radius - rimWidth), shipWorldPos.y + y * (radius - rimWidth), 0, 1, alpha);
+    }
 
     const gl = this.gl;
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vao);
-
-    // 启用 1:1 原版加色混合 (G.java:342 GL11.glBlendFunc(770, 1))
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.ONE, gl.ONE);
-
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, this.vertices.subarray(0, totalFloats), gl.DYNAMIC_DRAW);
     gl.uniformMatrix3fv(this.uViewProj, false, viewProjMatrix);
-    gl.uniform2f(this.uCenter, shipWorldPos.x, shipWorldPos.y);
-    gl.uniform1f(this.uRadius, shield.radius);
-
-    // 确定护盾中心朝向弧度与半张角
-    const centerAngle = shield.type === 'FRONT' ? shipFacingRad : shield.facingAngleRad;
-    const halfArcRad = Math.min(Math.PI, (shield.currentArcDeg * Math.PI) / 360);
-    gl.uniform1f(this.uCenterAngle, centerAngle);
-    gl.uniform1f(this.uHalfArc, halfArcRad);
-
-    // M3: all shield lookups come from reusable hull visual profiles rather than ship-id branches.
-    const shipVisual = getShipVisualProfile(ship.spec.id);
-    const isFortress = ship.system.type === 'FORTRESS_SHIELD' && ship.system.isActive;
-    const profileKey = isFortress ? (shipVisual.fortressShieldProfile ?? 'fortress') : shipVisual.shieldProfile;
-    const profile = SHIELD_VISUAL_PROFILES[profileKey];
-
-    // The profile keeps the original double counter-rotation structure while allowing technology-specific cadence.
-    const innerAngle1 = (nowSec * profile.textureRotationSpeed) % (Math.PI * 2);
-    const innerAngle2 = (-nowSec * profile.textureRotationSpeed) % (Math.PI * 2);
-    const ringRate = Math.sqrt(62.831853 / Math.max(1.0, shield.radius)) * profile.ringSpeedScale;
-    const ringAngle = (nowSec * ringRate) % (Math.PI * 2);
-
-    gl.uniform1f(this.uInnerAngle1, innerAngle1);
-    gl.uniform1f(this.uInnerAngle2, innerAngle2);
-    gl.uniform1f(this.uRingAngle, ringAngle);
-
-    const innerColor = profile.innerColor.map((v) => v / 255) as [number, number, number];
-    const ringColor = profile.outerColor.map((v) => v / 255) as [number, number, number];
-    gl.uniform3f(this.uInnerColor, innerColor[0], innerColor[1], innerColor[2]);
-    gl.uniform3f(this.uRingColor, ringColor[0], ringColor[1], ringColor[2]);
-
-    const deployRaw = shield.deploymentLevel;
-    const deployFactor = profile.deployCurve === 'ease-out' ? 1 - Math.pow(1 - deployRaw, 2) : deployRaw;
-    const fluxWobble = (ship.flux.totalFlux / ship.spec.maxFlux) * 1.8;
-    gl.uniform1f(this.uFluxWobble, fluxWobble);
-    gl.uniform1f(this.uTime, nowSec);
-    gl.uniform1f(this.uBrightness, profile.brightness * (0.82 + deployFactor * 0.18));
-    gl.uniform1f(this.uOpacity, profile.opacity);
-    gl.uniform1f(this.uDeployLevel, deployRaw);
-    gl.uniform1f(this.uRimWidth, profile.rimWidth);
-    gl.uniform1f(this.uHitFlash, profile.hitFlash);
-
-    // 受击涟漪参数 (最多 4 条)
-    for (let i = 0; i < 4; i++) {
-      if (i < shield.ripples.length) {
-        const rip = shield.ripples[i];
-        const span = 0.22 + (1.0 - rip.intensity) * 0.26;
-        gl.uniform4f(this.uRipplesLocs[i], rip.angle, rip.intensity, span, 1.0);
-      } else {
-        gl.uniform4f(this.uRipplesLocs[i], 0, 0, 0, 0);
-      }
-    }
-
-    // M3 decision: the old shields256ringd texture is intentionally not sampled.
-    // The rim is generated procedurally above so there is no redundant texture request/upload.
-    // 绑定 shields256.png
+    gl.uniform1i(this.uTexture, 0);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texShield);
-    gl.uniform1i(this.uTexShield, 0);
-
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    gl.uniform4f(this.uColor,
+      mix(base.innerColor[0], fortress.innerColor[0]) / 255 * brightness,
+      mix(base.innerColor[1], fortress.innerColor[1]) / 255 * brightness,
+      mix(base.innerColor[2], fortress.innerColor[2]) / 255 * brightness,
+      mix(base.opacity, fortress.opacity));
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, fanVertices);
+    gl.drawArrays(gl.TRIANGLE_FAN, fanVertices, fanVertices);
+    gl.bindTexture(gl.TEXTURE_2D, texRim);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.uniform4f(this.uColor,
+      mix(base.outerColor[0], fortress.outerColor[0]) / 255 * brightness,
+      mix(base.outerColor[1], fortress.outerColor[1]) / 255 * brightness,
+      mix(base.outerColor[2], fortress.outerColor[2]) / 255 * brightness, 1);
+    gl.drawArrays(gl.TRIANGLE_STRIP, fanVertices * 2, count * 2);
+    this.drawCalls += 3;
     gl.bindVertexArray(null);
   }
 
-  public dispose() {
-    this.gl.deleteBuffer(this.quadVbo);
+  public dispose(): void {
+    this.gl.deleteBuffer(this.vbo);
     this.gl.deleteVertexArray(this.vao);
     this.gl.deleteProgram(this.program);
   }

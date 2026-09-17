@@ -1,6 +1,15 @@
+import { effectiveHullModWeaponSpec } from '../../extensions/HullMods';
+import { AutofireController, type FireControlWorld } from '../../ai/AutofireController';
+import { signedAngle } from '../../math/Angles';
+import { manualFireSlots, advanceTurretAim } from './weapon/WeaponAim';
+import { combatWeaponRange, combatProjectileSpeed } from '../WeaponRange';
+import { bindProjectileSource } from './weapon/OutgoingDamage';
+import { canPermanentlyDisableWeapon, finalizePermanentWeaponMalfunction, weaponIsInFiringCycle } from './ComponentMalfunctions';
+import { advanceWeaponComponent, createWeaponHealthTracker, damageWeaponComponent, disableWeaponComponent, weaponHealthProfile } from './weapon/WeaponComponentHealth';
 import { Vector2 } from '../../math/Vector2';
 import { Projectile, Beam, WeaponMount, WeaponGroup, LauncherSmokeSpec, MuzzleFlashSpec } from '../Weapon';
 import { ShipSpec } from '../../modding/ModManager';
+import { initializeSourceProjectile } from './weapon/SourceProjectileLifecycle';
 import { sound } from '../../audio/SoundManager';
 import type { Ship } from '../Ship';
 import { contentRegistry } from '../../content/ContentRegistry';
@@ -11,6 +20,8 @@ import { SimulationRandom } from '../SimulationRandom';
  * 纯粹负责管理各挂点旋转、火控散布衰减、自动火控解算与多管射击偏移。
  */
 export class ShipWeaponControlSystem {
+  private readonly autofire = new AutofireController();
+  private previousHullFacingRad = 0;
   public weapons: WeaponMount[] = [];
   public weaponGroups: WeaponGroup[] = [];
   public selectedGroupIndex = 0;
@@ -19,7 +30,9 @@ export class ShipWeaponControlSystem {
 
   constructor(private readonly random = new SimulationRandom()) {}
 
-  public init(spec: ShipSpec, initialFacingRad: number) {
+  public init(spec: ShipSpec, initialFacingRad: number, healthMultiplier = 1) {
+    this.autofire.reset();
+    this.previousHullFacingRad = initialFacingRad;
     this.weapons = [];
     this.weaponGroups = [];
     this.selectedGroupIndex = 0;
@@ -28,8 +41,11 @@ export class ShipWeaponControlSystem {
 
     // 装备挂点与武器
     for (const slot of spec.weaponSlots) {
-      const weaponSpec = slot.defaultWeaponId ? contentRegistry.getWeapon(slot.defaultWeaponId) : undefined;
+      const baseWeapon = slot.defaultWeaponId ? contentRegistry.getWeapon(slot.defaultWeaponId) : undefined;
+      const weaponSpec = baseWeapon ? effectiveHullModWeaponSpec(spec, baseWeapon) : undefined;
+      if (slot.defaultWeaponId && !weaponSpec) throw new Error(`${spec.id}.${slot.slotId}: unknown weapon ${slot.defaultWeaponId}`);
       if (weaponSpec) {
+        const health = weaponHealthProfile(weaponSpec.mountSize, slot.mountType, healthMultiplier);
         this.weapons.push({
           slotId: slot.slotId,
           spec: weaponSpec,
@@ -37,6 +53,7 @@ export class ShipWeaponControlSystem {
           relativePos: new Vector2(slot.x, slot.y),
           baseAngleDeg: slot.baseAngleDeg,
           arcDeg: slot.arcDeg,
+          aimIdleSeconds: 15.1,
           currentAngleRad: initialFacingRad + (slot.baseAngleDeg * Math.PI) / 180,
           cooldownTimer: 0,
           isAutofire: slot.mountType === 'TURRET',
@@ -46,14 +63,17 @@ export class ShipWeaponControlSystem {
           firingStateTimer: 0,
           triggerHeld: false,
           firingCycleId: 0,
+          baseMaxAmmo: baseWeapon?.maxAmmo,
           ammo: weaponSpec.maxAmmo ?? Number.POSITIVE_INFINITY,
           ammoRechargeProgress: 0,
           recoil: 0,
           glowAlpha: 0,
           barrelIndex: 0,
           currentSpreadDeg: weaponSpec.minSpread || 0,
-          health: weaponSpec.mountSize === 'LARGE' ? 1500 : weaponSpec.mountSize === 'MEDIUM' ? 800 : 500,
-          maxHealth: weaponSpec.mountSize === 'LARGE' ? 1500 : weaponSpec.mountSize === 'MEDIUM' ? 800 : 500,
+          health: health.health,
+          maxHealth: health.health,
+          healthTracker: createWeaponHealthTracker(health.repairDuration, this.random),
+          isPermanentlyDisabled: false,
           isDisabled: false,
           disabledTimer: 0,
           disabledDuration: 0
@@ -113,34 +133,28 @@ export class ShipWeaponControlSystem {
     }
   }
 
-  // 挂点受创损坏与故障判定 (严格对齐 WeaponAPI.java 与 EMP 瘫痪算法)
-  public damageMount(localImpactPos: Vector2, damage: number, isEmp: boolean): WeaponMount | null {
-    for (const mount of this.weapons) {
-      if (mount.isDisabled) continue;
-      const dist = mount.relativePos.distanceTo(localImpactPos);
-      const threshold = mount.spec.mountSize === 'LARGE' ? 65 : mount.spec.mountSize === 'MEDIUM' ? 45 : 30;
-      if (dist < threshold) {
-        const effectiveDamage = isEmp ? damage * 2.8 : damage * 0.65;
-        mount.health -= effectiveDamage;
-        if (mount.health <= 0) {
-          mount.health = 0;
-          mount.isDisabled = true;
-          mount.disabledDuration = 5.0 + this.random.next() * 4.0;
-          mount.disabledTimer = mount.disabledDuration;
+  /** Raw component transfer; periodic health checks, not damage calls, disable. */
+  public damageComponent(mount: WeaponMount, damage: number): void {
+    damageWeaponComponent(mount, damage, this.random);
+  }
 
-          const sfx = mount.spec.mountSize === 'LARGE' 
-            ? 'weapon_malfunction_large' 
-            : mount.spec.mountSize === 'MEDIUM' 
-            ? 'weapon_malfunction_medium' 
-            : 'weapon_malfunction_small';
-          sound.play(sfx, 0.75);
+  public disableComponent(mount: WeaponMount, permanent = false): void {
+    if (disableWeaponComponent(mount, this.random, permanent)) this.onComponentDisabled(mount);
+  }
 
-          this.justDisabledMounts.push(mount);
-          return mount;
-        }
-      }
+  private onComponentDisabled(mount: WeaponMount): void {
+    // Destroy charge/burst state immediately; normal weapon cooldown keeps running
+    // during repairs. There is no invented half-second cooldown on recovery.
+    if (mount.firingState !== 'IDLE' || mount.burstRemaining > 0) {
+      mount.cooldownTimer = Math.max(mount.cooldownTimer, mount.spec.beamBurstDelay ?? mount.spec.refireDelay);
     }
-    return null;
+    mount.burstRemaining = 0;
+    mount.burstFluxReserved = false;
+    mount.burstTimer = 0;
+    mount.firingState = 'IDLE';
+    mount.firingStateTimer = 0;
+    mount.triggerHeld = false;
+    this.justDisabledMounts.push(mount);
   }
 
   public update(
@@ -150,16 +164,33 @@ export class ShipWeaponControlSystem {
     targetShip: Ship | null,
     spawnProjectile: (p: Projectile) => void,
     spawnBeam: (b: Beam) => void,
-    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void
+    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void,
+    fireControlWorld?: FireControlWorld
   ) {
-    const isFortressShieldBlockingWeapons = (ship.system.type === 'FORTRESS_SHIELD' && ship.system.isActive);
+    const world: FireControlWorld = fireControlWorld ?? { ships: targetShip ? [ship, targetShip] : [ship], missiles: [], asteroids: [] };
+    const manualControl = ship.fireControlMode === 'MANUAL';
+    const hullTurn = signedAngle(ship.facingRad - this.previousHullFacingRad);
+    this.previousHullFacingRad = ship.facingRad;
+    for (const mount of this.weapons) mount.currentAngleRad += hullTurn;
+    const systemBlocksWeapons = ship.system.blocksWeapons;
     const isPhaseBlockingWeapons = ship.isPhased;
-    const canShipFire = !ship.flux.isOverloaded && !ship.flux.isVenting && !isFortressShieldBlockingWeapons && !isPhaseBlockingWeapons;
+    const canShipFire = !ship.flux.isOverloaded && !ship.flux.isVenting && !systemBlocksWeapons && !isPhaseBlockingWeapons;
 
     // 冷却计时器、后坐力回位与弹道散布收束 (严格对齐 MultiBarrelRecoilTracker.java 与 weapon_data.csv)
+    const cr = ship.crEffects;
     for (const mount of this.weapons) {
+      // Timers remain in source weapon seconds. Apply transient RoF to their clock,
+      // never to shared specs, ammo regeneration, repair, turret aim or projectile speed.
+      const rate = this.weaponClockRate(mount, ship);
+      const reloadDelay = mount.reloadDelayRemaining ?? 0;
+      mount.reloadDelayRemaining = Math.max(0, reloadDelay - dt * rate);
+      const weaponDt = Math.max(0, dt * rate - reloadDelay);
+      mount.lifecycleDt = mount.spec.isBeam
+        ? Math.max(0, (weaponDt - mount.cooldownTimer) / rate)
+        : Math.max(0, weaponDt - mount.cooldownTimer);
       if (mount.cooldownTimer > 0) {
-        mount.cooldownTimer = Math.max(0, mount.cooldownTimer - dt);
+        mount.cooldownTimer = Math.max(0, mount.cooldownTimer - weaponDt);
+        if (mount.cooldownTimer < 1e-9) mount.cooldownTimer = 0;
       }
       if (Number.isFinite(mount.ammo) && mount.spec.maxAmmo !== undefined && mount.spec.ammoRegenPerSec) {
         mount.ammoRechargeProgress += mount.spec.ammoRegenPerSec * dt;
@@ -180,20 +211,25 @@ export class ShipWeaponControlSystem {
       // 真实弹道散布自然恢复 (spread decay)
       const minSpr = mount.spec.minSpread || 0;
       if (mount.currentSpreadDeg > minSpr) {
-        mount.currentSpreadDeg = Math.max(minSpr, mount.currentSpreadDeg - (mount.spec.spreadDecay || 5) * dt);
+        mount.currentSpreadDeg = Math.max(minSpr, mount.currentSpreadDeg - (mount.spec.spreadDecay || 5) * ship.system.getRecoilMultiplier() * dt);
       }
-      // 挂点故障倒计时与自动抢修
-      if (mount.isDisabled) {
-        mount.disabledTimer -= dt;
-        if (mount.disabledTimer <= 0) {
-          mount.isDisabled = false;
-          mount.disabledTimer = 0;
-          mount.health = mount.maxHealth * 0.5;
-          mount.cooldownTimer = 0.5;
-          this.justRepairedMounts.push(mount);
-        }
-      }
+      const healthEvent = advanceWeaponComponent(mount, dt, this.random, !ship.isDead,
+        ship.combatWeaponRepairTimeMultiplier * ship.system.getRepairTimeMultiplier(), ship.canRepairModulesUnderFire,
+        cr.weaponMalfunctionChance > 0 && weaponIsInFiringCycle(mount) ? {
+          chance: cr.weaponMalfunctionChance, criticalChance: cr.criticalMalfunctionChance,
+          canPermanentlyDisable: () => canPermanentlyDisableWeapon(ship, mount),
+          disable: (critical, permanent) => {
+            const onset = disableWeaponComponent(mount, this.random, permanent);
+            if (permanent) finalizePermanentWeaponMalfunction(ship, mount);
+            if (critical) ship.applyCriticalMalfunctionDamage(mount.relativePos);
+            return onset;
+          }
+        } : undefined);
+      if (healthEvent.disabled) this.onComponentDisabled(mount);
+      if (healthEvent.repaired) this.justRepairedMounts.push(mount);
     }
+
+    if (ship.hullHp <= 0) return;
 
     const activeGroup = this.weaponGroups[this.selectedGroupIndex];
     const activeSlotSet = new Set(activeGroup ? activeGroup.weaponSlotIds : []);
@@ -208,10 +244,10 @@ export class ShipWeaponControlSystem {
 
     // 交替射击组：同一时刻只允许"当前活动挂点"开火，并按原版时间片轮换
     // (见 advanceAlternatingActive)。故障/无弹挂点会被跳过，否则它们会永久阻塞整组。
-    const isAlternatingGroup = !!activeGroup && activeGroup.mode === 'ALTERNATING';
+    const isAlternatingGroup = manualControl && !!activeGroup && activeGroup.mode === 'ALTERNATING';
     if (isAlternatingGroup && activeGroup) {
       if (ship.isFiringMain && canShipFire) {
-        this.advanceAlternatingActive(activeGroup, dt);
+        this.advanceAlternatingActive(activeGroup, dt, ship);
       } else {
         // 原版 WeaponGroup.advanceAlternating：松开扳机时，若上一次活动权不是被时间片
         // 自动轮换掉的，就把活动权手动交给下一门可用炮——也就是玩家常用的"轻点扳机换炮"。
@@ -227,11 +263,14 @@ export class ShipWeaponControlSystem {
       ? activeGroup.weaponSlotIds[((activeGroup.alternatingIndex % activeGroup.weaponSlotIds.length) + activeGroup.weaponSlotIds.length) % activeGroup.weaponSlotIds.length]
       : undefined;
 
+    const manualSlots = manualFireSlots(ship, this.weapons, activeSlotSet, alternatingSlotId);
     for (const mount of this.weapons) {
       mount.triggerHeld = false;
       if (mount.isDisabled) {
+        this.autofire.clear(mount);
         // 故障挂点电机失灵无法旋转瞄准，射控电路短路无法击发
         mount.burstRemaining = 0;
+        mount.burstFluxReserved = false;
         mount.firingState = 'IDLE';
         mount.firingStateTimer = 0;
         continue;
@@ -247,25 +286,23 @@ export class ShipWeaponControlSystem {
       const halfArcRad = (mount.arcDeg * Math.PI) / 360;
 
       // 硬挂点或固定主炮不可独立转动 (对齐 Starsector: if.java:781)
-      const isHardpoint = mount.mountType === 'HARDPOINT' || mount.arcDeg <= 10 || (mount.spec.turnRateDegPerSec !== undefined && mount.spec.turnRateDegPerSec <= 0);
-      const turretTurnRateRad = isHardpoint ? 0 : (((mount.spec.turnRateDegPerSec || 30) * Math.PI) / 180);
+      const isHardpoint = mount.mountType === 'HARDPOINT' || (mount.spec.turnRateDegPerSec !== undefined && mount.spec.turnRateDegPerSec <= 0);
+      const turretTurnRateRad = isHardpoint ? 0 : (((mount.spec.turnRateDegPerSec ?? 30) * Math.PI) / 180);
 
       // 官方炮塔瞄准算法 (com.fs.starfarer.combat.entities.ship.trackers.oooo_0.java:106-171)
-      const aimTurret = (targetPoint: Vector2 | null, maxAimErrorTolerance = 0.20): { targetAngle: number; isAimedAtTarget: boolean; isWithinArc: boolean } => {
+      const aimTurret = (targetPoint: Vector2 | null): void => {
         if (isHardpoint || turretTurnRateRad <= 0) {
           mount.currentAngleRad = mountBaseWorldAngle;
-          return { targetAngle: mountBaseWorldAngle, isAimedAtTarget: true, isWithinArc: true };
+          return;
         }
 
         if (!targetPoint) {
-          // 无瞄准目标点：平滑回正至基准角
-          let curDiff = mountBaseWorldAngle - mount.currentAngleRad;
-          while (curDiff > Math.PI) curDiff -= Math.PI * 2;
-          while (curDiff < -Math.PI) curDiff += Math.PI * 2;
-          mount.currentAngleRad += Math.sign(curDiff) * Math.min(Math.abs(curDiff), (turretTurnRateRad || 1.5) * dt);
-          return { targetAngle: mountBaseWorldAngle, isAimedAtTarget: false, isWithinArc: false };
+          mount.aimIdleSeconds = (mount.aimIdleSeconds ?? 15.1) + dt;
+          if (mount.aimIdleSeconds > 15) mount.currentAngleRad = advanceTurretAim(mount.currentAngleRad,mountBaseWorldAngle,mountBaseWorldAngle,mount.arcDeg,turretTurnRateRad,ship.angularVelRad,dt);
+          return;
         }
 
+        mount.aimIdleSeconds = 0;
         // 1. 各挂点独立计算朝向目标的世界角度 (从该挂点实际世界坐标计算，避免舰体视差)
         const dx = targetPoint.x - mountX;
         const dy = targetPoint.y - mountY;
@@ -276,53 +313,28 @@ export class ShipWeaponControlSystem {
         while (diffFromBase > Math.PI) diffFromBase -= Math.PI * 2;
         while (diffFromBase < -Math.PI) diffFromBase += Math.PI * 2;
 
-        const isWithinArc = mount.arcDeg >= 355 || Math.abs(diffFromBase) <= halfArcRad;
+        const isWithinArc = mount.arcDeg >= 360 || Math.abs(diffFromBase) <= halfArcRad;
         let desiredAngle = targetAngle;
         if (!isWithinArc) {
           // 原版机制：光标超出射界时，炮塔紧贴射界边缘指向光标，绝不倒转回中！
           desiredAngle = mountBaseWorldAngle + Math.sign(diffFromBase) * halfArcRad;
         }
 
-        // 3. 以炮塔额定转速 (turnRate) 向期望朝向平滑回转 (trackers/oooo_0.java:133-138)
-        let curDiff = desiredAngle - mount.currentAngleRad;
-        while (curDiff > Math.PI) curDiff -= Math.PI * 2;
-        while (curDiff < -Math.PI) curDiff += Math.PI * 2;
-        mount.currentAngleRad += Math.sign(curDiff) * Math.min(Math.abs(curDiff), turretTurnRateRad * dt);
+        mount.currentAngleRad = advanceTurretAim(mount.currentAngleRad,mountBaseWorldAngle,desiredAngle,mount.arcDeg,turretTurnRateRad,ship.angularVelRad,dt);
 
-        let aimError = targetAngle - mount.currentAngleRad;
-        while (aimError > Math.PI) aimError -= Math.PI * 2;
-        while (aimError < -Math.PI) aimError += Math.PI * 2;
-
-        const isAimedAtTarget = Math.abs(aimError) <= maxAimErrorTolerance && isWithinArc;
-        return { targetAngle, isAimedAtTarget, isWithinArc };
       };
 
       // 1. 当前选中的主力武器编组 (Active Group - 玩家手动瞄准与击发，绝对优先级)
-      if (isInActiveGroup) {
+      if (manualControl && isInActiveGroup) {
+        this.autofire.clear(mount);
         if (isHardpoint) {
           mount.currentAngleRad = mountBaseWorldAngle;
         } else {
           aimTurret(ship.aimTargetWorld);
         }
 
-        // 瞄准误差与开火条件
-        const dx = ship.aimTargetWorld.x - mountX;
-        const dy = ship.aimTargetWorld.y - mountY;
-        const targetAngle = Math.atan2(dy, dx);
-        let aimError = targetAngle - mount.currentAngleRad;
-        while (aimError > Math.PI) aimError -= Math.PI * 2;
-        while (aimError < -Math.PI) aimError += Math.PI * 2;
-        let diffFromBase = targetAngle - mountBaseWorldAngle;
-        while (diffFromBase > Math.PI) diffFromBase -= Math.PI * 2;
-        while (diffFromBase < -Math.PI) diffFromBase += Math.PI * 2;
-
-        // 严格对齐 Starsector 原版 WeaponGroup.java:329 (硬挂点瞄准容差额外增加 +30.0f 度)
-        const hardpointTolerance = ((mount.arcDeg + 30) * Math.PI) / 360;
-        const isAimed = isHardpoint
-          ? Math.abs(diffFromBase) <= hardpointTolerance
-          : (Math.abs(aimError) < 0.20 && (mount.arcDeg >= 355 || Math.abs(diffFromBase) <= halfArcRad + 0.05));
-
-        if (ship.isFiringMain && canShipFire && mount.cooldownTimer <= 0 && isAimed) {
+        // Manual fire follows the group selection rule, not an invented alignment tolerance.
+        if (ship.isFiringMain && canShipFire && mount.cooldownTimer <= 0 && manualSlots.has(mount.slotId)) {
           if (activeGroup.mode === 'LINKED') {
             this.requestWeaponFire(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
           } else if (activeGroup.mode === 'ALTERNATING') {
@@ -334,77 +346,29 @@ export class ShipWeaponControlSystem {
           }
         }
       }
-      // 2. 独立自动开火武器编组 (Autofire Slots - 优先追踪射程内的敌舰)
-      else if (isAutofireSlot) {
-        const effectiveRange = mount.spec.spawnType === 'MISSILE'
-          ? mount.spec.range
-          : mount.spec.range * (ship.spec.weaponRangeMult || 1.0);
-
-        let targetFound = false;
-        // 已阵亡或完全进入相位的目标均不被所有碰撞路径接受 (ProjectileCollisionHandler /
-        // BeamSimulationHandler / MineSystem 全部跳过 isPhased 舰船)，自动火控对其开火
-        // 只会白白浪费弹药 (尤其是有限弹药的导弹)，因此直接视为无目标而保持待发。
-        if (targetShip && !targetShip.isDead && !targetShip.isPhased) {
-          // 目标前置量计算 (Target Leading for Ballistics)
-          let aimTargetPoint = targetShip.pos;
-          if (!mount.spec.isBeam && mount.spec.projSpeed && mount.spec.projSpeed > 0) {
-            const distEst = targetShip.pos.distanceTo(new Vector2(mountX, mountY));
-            const t = distEst / mount.spec.projSpeed;
-            const relVel = targetShip.vel.clone().sub(ship.vel);
-            aimTargetPoint = targetShip.pos.clone().addScaled(relVel, t);
-          }
-
-          const toTarget = aimTargetPoint.clone().sub(new Vector2(mountX, mountY));
-          const distToTarget = toTarget.length();
-          const targetAngle = toTarget.heading();
-
-          let angleDiff = targetAngle - mountBaseWorldAngle;
-          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-
-          if (distToTarget <= effectiveRange + 150 && (mount.arcDeg >= 355 || Math.abs(angleDiff) <= halfArcRad)) {
-            targetFound = true;
-            // 计算基于目标舰体碰撞半径的严格瞄准容差，杜绝未对准就胡乱开火射向虚空
-            const targetRadius = (targetShip.spec.collisionRadius || 120) * 0.7;
-            const maxAimTol = Math.min(0.065, Math.max(0.015, targetRadius / Math.max(80, distToTarget)));
-
-            if (isHardpoint) {
-              mount.currentAngleRad = mountBaseWorldAngle;
-              let aimError = targetAngle - mountBaseWorldAngle;
-              while (aimError > Math.PI) aimError -= Math.PI * 2;
-              while (aimError < -Math.PI) aimError += Math.PI * 2;
-              if (canShipFire && mount.cooldownTimer <= 0 && Math.abs(aimError) <= maxAimTol && distToTarget <= effectiveRange) {
-                this.requestWeaponFire(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
-              }
-            } else {
-              const res = aimTurret(aimTargetPoint, maxAimTol);
-              if (canShipFire && mount.cooldownTimer <= 0 && res.isAimedAtTarget && distToTarget <= effectiveRange) {
-                this.requestWeaponFire(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
-              }
-            }
-          }
-        }
-
-        if (!targetFound) {
-          // 敌舰不在射界内或无目标：若是玩家座舰，跟随鼠标光标瞄准 (Starsector 官方逻辑: trackers/oooo_0.java)
-          if (ship.isPlayer && !isHardpoint) {
-            aimTurret(ship.aimTargetWorld);
-          } else {
-            aimTurret(null);
-          }
+      // Native advanceAutofire evaluates each weapon independently (including alternating groups).
+      // AI owns all mounts; a manual pilot owns the selected group and opts others into autofire.
+      else if (!manualControl || isAutofireSlot) {
+        const solution = this.autofire.aim(dt, ship, mount, world);
+        aimTurret(solution?.point ?? null);
+        if (this.autofire.decide(ship, mount, solution, world, dt) === 'FIRE' && canShipFire && mount.cooldownTimer <= 0) {
+          this.requestWeaponFire(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
         }
       }
       // 3. 其余未激活且非自动开火挂点 (Inactive Manual Weapons: Starsector WeaponGroup.java:334)
       else {
-        // 官方机制：全舰所有非自动开火的手动旋转炮塔，全量跟随玩家鼠标光标瞄准！
-        if (ship.isPlayer && !isHardpoint) {
+        this.autofire.clear(mount);
+        const idleTargetAngle = Math.atan2(ship.aimTargetWorld.y-mountY,ship.aimTargetWorld.x-mountX);
+        const cursorNearArc = Math.abs(signedAngle(idleTargetAngle-mountBaseWorldAngle)) <= (mount.arcDeg+30)*Math.PI/360;
+        // Native inactive manual turrets receive the cursor only near their arc.
+        if (ship.isPlayer && !isHardpoint && (cursorNearArc || mount.spec.alwaysFire)) {
           aimTurret(ship.aimTargetWorld);
         } else {
           aimTurret(null);
         }
       }
 
-      this.advanceWeaponLifecycle(dt, mount, ship, canShipFire, spawnProjectile, spawnBeam, spawnMuzzleFlash);
+      this.advanceWeaponLifecycle(mount.lifecycleDt ?? dt, mount, ship, canShipFire && ship.system.canFireWeapon(mount), spawnProjectile, spawnBeam, spawnMuzzleFlash);
     }
   }
 
@@ -422,7 +386,7 @@ export class ShipWeaponControlSystem {
    * 故障/无弹挂点会被立即跳过（原版 findNextWeaponFrom 跳过 getAmmo()<=0），
    * 因此单个坏挂点既不会卡死整组，也不会白占一个时间片。
    */
-  private advanceAlternatingActive(group: WeaponGroup, dt: number): void {
+  private advanceAlternatingActive(group: WeaponGroup, dt: number, ship: Ship): void {
     const slotIds = group.weaponSlotIds;
     if (slotIds.length === 0) return;
 
@@ -460,7 +424,7 @@ export class ShipWeaponControlSystem {
       return;
     }
 
-    const slice = this.getAlternatingSlice(active, slotIds.length);
+    const slice = this.getAlternatingSlice(active, slotIds.length, ship);
     const elapsed = (group.alternatingElapsed ?? 0) + dt;
     if (elapsed > slice) {
       const nextIndex = this.findNextFireableAlternatingIndex(group, activeIndex);
@@ -499,8 +463,8 @@ export class ShipWeaponControlSystem {
     group.alternatingElapsed = 0;
   }
 
-  /** 原版时间片长度：单门炮的完整射击周期除以炮数 (RoF 倍率与 chargeTime 本移植未建模，按 1/0 计)。 */
-  private getAlternatingSlice(mount: WeaponMount, weaponCount: number): number {
+  /** 原版时间片长度：单门炮的完整射击周期除以炮数与实时 RoF 倍率 (包含 source chargeTime)。 */
+  private getAlternatingSlice(mount: WeaponMount, weaponCount: number, ship: Ship): number {
     const count = Math.max(1, weaponCount);
     const spec = mount.spec;
     let cycle: number;
@@ -518,9 +482,27 @@ export class ShipWeaponControlSystem {
       cycle =
         burstSize > 50
           ? 3.0
-          : Math.max(0, burstSize - 1) * (spec.burstDelay ?? 0) + spec.refireDelay + 0;
+          : Math.max(0, burstSize - 1) * (spec.burstDelay ?? 0) + spec.refireDelay + (spec.chargeTime ?? 0);
     }
-    return Math.max(1 / 240, cycle / count);
+    return Math.max(1 / 240, cycle / count / Math.max(.001, ship.system.getWeaponRateOfFireMultiplier(spec.weaponType)));
+  }
+
+  /** Native projectile controller ship/A/if.java and settings.json minRefireDelay=0.05.
+   * Burst beams use RoF only for cooldown; their charge/ACTIVE/chargedown and flux
+   * stay on real time (ship/A/oooo_1.java). Continuous beams are not accelerated.
+   */
+  private weaponClockRate(mount: WeaponMount, ship: Ship): number {
+    const rate = Math.max(.001, ship.system.getWeaponRateOfFireMultiplier(mount.spec.weaponType));
+    if (mount.spec.isBeam) return mount.spec.beamVisualMode === 'BURST' ? rate : 1;
+    if (rate <= 1) return rate;
+    const sourceDelay = mount.burstRemaining > 0
+      ? mount.spec.burstDelay ?? 0
+      : mount.spec.refireDelay + (mount.spec.chargeTime ?? 0);
+    return sourceDelay / rate < .05 ? Math.max(1, sourceDelay / .05) : rate;
+  }
+
+  private weaponFluxPerShot(mount: WeaponMount, ship: Ship): number {
+    return mount.spec.fluxPerShot * ship.system.getWeaponFluxCostMultiplier(mount.spec.weaponType);
   }
 
   private requestWeaponFire(
@@ -530,33 +512,35 @@ export class ShipWeaponControlSystem {
     spawnBeam: (b: Beam) => void,
     spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void
   ): boolean {
+    if ((mount.reloadDelayRemaining ?? 0) > 0 || !ship.system.canFireWeapon(mount)) return false;
     mount.triggerHeld = true;
 
     if (mount.spec.isBeam) {
       if (mount.firingState !== 'IDLE' || mount.cooldownTimer > 0) return false;
       if (Number.isFinite(mount.ammo) && mount.ammo < 1) return false;
+      if (Number.isFinite(mount.ammo)) mount.ammo = Math.max(0, mount.ammo - 1);
       mount.firingCycleId++;
+      if (mount.spec.soundIntroKey) sound.play(mount.spec.soundIntroKey, ship.isPlayer ? .85 : .45);
       const chargeup = mount.spec.beamSourceChargeupTime ?? 0;
       if (chargeup > 0) {
         mount.firingState = 'CHARGING';
         mount.firingStateTimer = chargeup;
         mount.glowAlpha = 0;
+        if (!mount.spec.beamFireOnlyOnFullCharge) this.emitBeamState(mount, ship, spawnBeam, true, chargeup);
       } else {
         this.activateBeam(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
       }
       return true;
     }
 
-    if (mount.burstRemaining > 0 || mount.cooldownTimer > 0) return false;
+    if (mount.firingState !== 'IDLE' || mount.burstRemaining > 0 || mount.cooldownTimer > 0) return false;
     if (Number.isFinite(mount.ammo) && mount.ammo < 1) return false;
-    const burstSize = Math.max(1, Math.floor(mount.spec.burstSize ?? 1));
-    if (!this.fireWeapon(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash)) return false;
-    if (burstSize > 1) {
-      mount.burstRemaining = burstSize - 1;
-      mount.burstTimer = mount.spec.burstDelay ?? 0;
-    } else {
-      mount.cooldownTimer = mount.spec.refireDelay;
-    }
+    const cost = this.weaponFluxPerShot(mount, ship) * (mount.spec.interruptibleBurst ? 1 : Math.max(1, mount.spec.burstSize ?? 1));
+    if (ship.flux.maxFlux - ship.flux.totalFlux < cost) return false;
+    mount.cycleTargetShipId = mount.fireControl ? mount.fireControlTargetShipId : ship.currentTargetShip?.id;
+    mount.firingState = 'CHARGING';
+    mount.firingStateTimer = mount.spec.chargeTime ?? 0;
+
     return true;
   }
 
@@ -567,7 +551,6 @@ export class ShipWeaponControlSystem {
     spawnBeam: (b: Beam) => void,
     spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void
   ): void {
-    if (Number.isFinite(mount.ammo)) mount.ammo = Math.max(0, mount.ammo - 1);
     mount.firingState = 'ACTIVE';
     mount.firingStateTimer = mount.spec.beamVisualMode === 'BURST'
       ? Math.max(0.001, mount.spec.beamDuration ?? 0.001)
@@ -584,7 +567,6 @@ export class ShipWeaponControlSystem {
   ): void {
     const mountOffset = mount.relativePos.clone().rotate(ship.facingRad);
     const firePos = ship.pos.clone().add(mountOffset);
-    const effectiveRange = mount.spec.range * (ship.spec.weaponRangeMult || 1.0);
     spawnBeam({
       id: this.random.next(),
       sourceShipId: ship.id,
@@ -592,10 +574,12 @@ export class ShipWeaponControlSystem {
       isPlayer: ship.isPlayer,
       specId: mount.spec.id,
       startPos: firePos,
-      endPos: firePos.clone().addScaled(Vector2.fromAngle(mount.currentAngleRad, 1), effectiveRange),
-      // 纯视觉充能收束光束同样带上按战备值修正的伤害数值 (damageActive=false，不结算伤害)
-      damagePerSec: mount.spec.damagePerSecond * ship.crDamageDealtMultiplier,
+      endPos: firePos.clone(),
+      // Charging and chargedown share the real ray and brightness-squared damage clock.
+      damagePerSec: mount.spec.damagePerSecond * ship.crDamageDealtMultiplier * ship.getWeaponDamageMultiplier(mount.spec.weaponType) * ship.system.getBeamDamageMultiplier(),
+      baseDamagePerSec: mount.spec.damagePerSecond,
       empPerSec: mount.spec.empPerSecond,
+      baseEmpPerSec: mount.spec.empPerSecond,
       damageType: mount.spec.type,
       color: mount.spec.color,
       duration: Math.max(0.001, duration),
@@ -604,7 +588,7 @@ export class ShipWeaponControlSystem {
       firingCycleId: mount.firingCycleId,
       width: mount.spec.beamWidth ?? 12,
       visualMode: mount.spec.beamVisualMode,
-      isEmpPiercing: mount.spec.id === 'tachyonlance',
+      beamEffect: mount.spec.beamEffect,
       elapsedTime: 0,
       textureType: mount.spec.textureType,
       textureScrollSpeed: mount.spec.textureScrollSpeed,
@@ -613,16 +597,27 @@ export class ShipWeaponControlSystem {
       coreColor: mount.spec.coreColor,
       glowColor: mount.spec.glowColor,
       hitGlowRadius: mount.spec.hitGlowRadius,
-      hitGlowBrightenDuration: mount.spec.hitGlowBrightenDuration
+      hitGlowBrightenDuration: mount.spec.hitGlowBrightenDuration,
+      useGlowColorForHitGlow: mount.spec.useGlowColorForHitGlow,
+      fringeScrollSpeedMult: mount.spec.fringeScrollSpeedMult,
+      coreWidthMult: mount.spec.coreWidthMult,
+      darkCore: mount.spec.darkCore,
+      darkFringeIter: mount.spec.darkFringeIter,
+      darkCoreIter: mount.spec.darkCoreIter
     });
   }
 
   private enterBeamChargedown(mount: WeaponMount, ship: Ship, spawnBeam: (b: Beam) => void, hadActiveBeam: boolean): void {
     const chargedown = mount.spec.beamSourceChargedownTime ?? 0;
-    if (hadActiveBeam && chargedown > 0) this.emitBeamState(mount, ship, spawnBeam, false, chargedown);
-    if (chargedown > 0) {
+    const level = mount.firingState === 'CHARGING'
+      ? Math.max(0, Math.min(1, 1 - mount.firingStateTimer / Math.max(0.001, mount.spec.beamSourceChargeupTime ?? 0))) : 1;
+    const remaining = chargedown * level;
+    if ((hadActiveBeam || !mount.spec.beamFireOnlyOnFullCharge) && remaining > 0) {
+      this.emitBeamState(mount, ship, spawnBeam, true, remaining);
+    }
+    if (remaining > 0) {
       mount.firingState = 'CHARGEDOWN';
-      mount.firingStateTimer = chargedown;
+      mount.firingStateTimer = remaining;
     } else {
       mount.firingState = 'IDLE';
       mount.firingStateTimer = 0;
@@ -639,11 +634,38 @@ export class ShipWeaponControlSystem {
     spawnBeam: (b: Beam) => void,
     spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void
   ): void {
+    if (!mount.spec.isBeam && mount.firingState === 'CHARGING') {
+      if (!canShipFire || (!mount.triggerHeld && !mount.spec.autoCharge)) {
+        mount.firingState = 'IDLE';
+        mount.firingStateTimer = 0;
+        return;
+      }
+      mount.firingStateTimer -= dt;
+      mount.glowAlpha = 1 - Math.max(0, mount.firingStateTimer) / Math.max(.001, mount.spec.chargeTime ?? 0);
+      if (mount.firingStateTimer > 1e-9) return;
+      mount.firingState = 'IDLE';
+      const count = Math.max(1, Math.floor(mount.spec.burstSize ?? 1));
+      if (!mount.spec.interruptibleBurst && count > 1) {
+        const cost = this.weaponFluxPerShot(mount, ship) * count;
+        if (ship.flux.maxFlux - ship.flux.totalFlux < cost) return;
+        ship.flux.increaseFlux(cost, false);
+        mount.burstFluxReserved = true; // Native B reserves noninterruptible bursts as a whole.
+      }
+      if (!this.fireWeapon(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash)) {
+        mount.burstFluxReserved = false;
+        return;
+      }
+      mount.burstRemaining = count - 1;
+      if (count > 1) mount.burstTimer = mount.spec.burstDelay ?? 0;
+      else mount.cooldownTimer = mount.spec.refireDelay;
+      return; // Do not advance a freshly fired burst by this same dt a second time.
+    }
     if (!mount.spec.isBeam && mount.burstRemaining > 0) {
       // A burst is not an autonomous entity: overload/venting/phase/system weapon
       // lock interrupts the remaining shots immediately.
-      if (!canShipFire) {
+      if (!canShipFire || (mount.spec.interruptibleBurst && !mount.triggerHeld)) {
         mount.burstRemaining = 0;
+        mount.burstFluxReserved = false;
         mount.burstTimer = 0;
         mount.cooldownTimer = Math.max(mount.cooldownTimer, mount.spec.refireDelay);
         return;
@@ -651,14 +673,16 @@ export class ShipWeaponControlSystem {
 
       mount.burstTimer -= dt;
       const delay = Math.max(0.0001, mount.spec.burstDelay ?? 0.0001);
-      while (mount.burstRemaining > 0 && mount.burstTimer <= 0) {
+      while (mount.burstRemaining > 0 && mount.burstTimer <= 1e-9) {
         if (!this.fireWeapon(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash)) {
           mount.burstRemaining = 0;
+          mount.burstFluxReserved = false;
           mount.burstTimer = 0;
           mount.cooldownTimer = Math.max(mount.cooldownTimer, mount.spec.refireDelay);
           break;
         }
         mount.burstRemaining--;
+        if (mount.burstRemaining === 0) mount.burstFluxReserved = false;
         if (mount.burstRemaining > 0) mount.burstTimer += delay;
         else mount.cooldownTimer = mount.spec.refireDelay;
       }
@@ -667,10 +691,11 @@ export class ShipWeaponControlSystem {
 
     if (!mount.spec.isBeam) return;
     if (mount.firingState === 'CHARGING') {
-      if (!mount.triggerHeld) {
+      if ((!mount.triggerHeld && mount.spec.beamVisualMode !== 'BURST') || !canShipFire) {
         this.enterBeamChargedown(mount, ship, spawnBeam, false);
         return;
       }
+      if (mount.spec.fluxPerSecond) ship.flux.increaseFlux(mount.spec.fluxPerSecond * ship.system.getWeaponFluxCostMultiplier(mount.spec.weaponType) * dt, false);
       mount.firingStateTimer -= dt;
       const chargeup = Math.max(0.001, mount.spec.beamSourceChargeupTime ?? 0.001);
       mount.glowAlpha = Math.max(mount.glowAlpha, 1 - Math.max(0, mount.firingStateTimer) / chargeup);
@@ -691,7 +716,7 @@ export class ShipWeaponControlSystem {
         this.enterBeamChargedown(mount, ship, spawnBeam, true);
         return;
       }
-      if (mount.spec.fluxPerSecond) ship.flux.increaseFlux(mount.spec.fluxPerSecond * dt, false);
+      if (mount.spec.fluxPerSecond) ship.flux.increaseFlux(mount.spec.fluxPerSecond * ship.system.getWeaponFluxCostMultiplier(mount.spec.weaponType) * dt, false);
       if (isBurstBeam) {
         mount.firingStateTimer -= dt;
         if (mount.firingStateTimer <= 0) this.enterBeamChargedown(mount, ship, spawnBeam, true);
@@ -718,14 +743,15 @@ export class ShipWeaponControlSystem {
     spawnBeam: (b: Beam) => void,
     spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void
   ): boolean {
+    if ((mount.reloadDelayRemaining ?? 0) > 0 || !ship.system.canFireWeapon(mount)) return false;
     // 开火必须校验剩余幅能容量 (vanilla com/fs/starfarer/combat/entities/ship/A/if.java:346
     // startedChargeup(): `getFluxAvailable() >= getFluxCostToFire()`，与弹药、过载/排散判定并列)。
     // 幅能不足时严禁产生任何副作用：不扣弹药、不产生后坐力/散布增长/枪口火焰/音效，也不生成弹丸。
-    // 光束不受此限：其幅能按 ACTIVE 时长以 fluxPerSecond 连续累积。
+    // 光束不受此限：其幅能按充能和 ACTIVE 时长以 fluxPerSecond 连续累积。
     if (
-      !mount.spec.isBeam &&
+      !mount.spec.isBeam && !mount.burstFluxReserved &&
       mount.spec.fluxPerShot > 0 &&
-      ship.flux.maxFlux - ship.flux.totalFlux < mount.spec.fluxPerShot
+      ship.flux.maxFlux - ship.flux.totalFlux < this.weaponFluxPerShot(mount, ship)
     ) {
       return false;
     }
@@ -742,8 +768,8 @@ export class ShipWeaponControlSystem {
 
     // 累积散布与计算实际开火偏角 (严格对齐 weapon_data.csv: min/max spread, spread/shot)
     const minSpr = mount.spec.minSpread || 0;
-    const maxSpr = mount.spec.maxSpread || minSpr;
-    const sprPerShot = mount.spec.spreadPerShot || 0;
+    const maxSpr = Math.max(minSpr, (mount.spec.maxSpread || minSpr) * ship.system.getRecoilMultiplier());
+    const sprPerShot = (mount.spec.spreadPerShot || 0) * ship.system.getRecoilMultiplier();
     mount.currentSpreadDeg = Math.min(maxSpr, mount.currentSpreadDeg + sprPerShot);
     const spreadRad = ((this.random.next() - 0.5) * mount.currentSpreadDeg * Math.PI) / 180;
     const fireAngleRad = mount.currentAngleRad + spreadRad;
@@ -770,11 +796,11 @@ export class ShipWeaponControlSystem {
     const rotatedOffset = mount.relativePos.clone().rotate(ship.facingRad);
     const firePos = ship.pos.clone().add(rotatedOffset).add(barrelOffsetWorld);
 
-    // 实体弹药按发射次数产生幅能；光束按 ACTIVE 时间连续产生 source energy/second 幅能。
-    if (!mount.spec.isBeam && mount.spec.fluxPerShot > 0) ship.flux.increaseFlux(mount.spec.fluxPerShot, false);
+    // 实体弹药按发射次数产生幅能；光束按充能和 ACTIVE 时间连续产生 source energy/second 幅能。
+    if (!mount.spec.isBeam && !mount.burstFluxReserved && mount.spec.fluxPerShot > 0) ship.flux.increaseFlux(this.weaponFluxPerShot(mount, ship), false);
 
     // 播放官方真实音效
-    if (mount.spec.soundKey) {
+    if (mount.spec.soundKey && !mount.spec.soundLoopKey && !mount.spec.soundIntroKey) {
       sound.play(mount.spec.soundKey, ship.isPlayer ? 0.85 : 0.45);
     }
 
@@ -799,7 +825,7 @@ export class ShipWeaponControlSystem {
           mount.spec.muzzleFlashSpec,
           ship.vel
         );
-      } else if (mount.spec.muzzleFlashColor) {
+      } else if (mount.spec.muzzleFlashColor && !mount.spec.isBeam) {
         spawnMuzzleFlash(
           firePos,
           fireAngleRad,
@@ -809,14 +835,12 @@ export class ShipWeaponControlSystem {
       }
     }
 
-    const effectiveRange = mount.spec.spawnType === 'MISSILE'
-      ? mount.spec.range
-      : mount.spec.range * (ship.spec.weaponRangeMult || 1.0);
+    const effectiveRange = combatWeaponRange(ship, mount.spec);
 
     if (mount.spec.isBeam) {
       // 每个 beam firing cycle 只创建一个实体；持续光束由挂点 ACTIVE 状态维持。
-      const beamDir = Vector2.fromAngle(fireAngleRad, effectiveRange);
-      const endPos = firePos.clone().add(beamDir);
+      // A new ray starts at zero length; the handler grows its collision front.
+      const endPos = firePos.clone();
       const beamDuration = mount.spec.beamVisualMode === 'SUSTAINED'
         ? Number.MAX_SAFE_INTEGER
         : Math.max(0.001, mount.spec.beamDuration ?? 0.001);
@@ -831,8 +855,10 @@ export class ShipWeaponControlSystem {
         endPos: endPos,
         barrelOffset: { x: offX, y: offY },
         // 武器输出伤害按母舰战备值修正 (CRPluginImpl.getDamageChangePercent)
-        damagePerSec: mount.spec.damagePerSecond * ship.crDamageDealtMultiplier,
+        damagePerSec: mount.spec.damagePerSecond * ship.crDamageDealtMultiplier * ship.getWeaponDamageMultiplier(mount.spec.weaponType) * ship.system.getBeamDamageMultiplier(),
+        baseDamagePerSec: mount.spec.damagePerSecond,
         empPerSec: mount.spec.empPerSecond,
+        baseEmpPerSec: mount.spec.empPerSecond,
         damageType: mount.spec.type,
         color: mount.spec.color,
         duration: beamDuration,
@@ -842,7 +868,7 @@ export class ShipWeaponControlSystem {
         hasRecordedHit: false,
         width: mount.spec.beamWidth ?? 12,
         visualMode: mount.spec.beamVisualMode,
-        isEmpPiercing: mount.spec.id === 'tachyonlance',
+        beamEffect: mount.spec.beamEffect,
         elapsedTime: 0,
         textureType: mount.spec.textureType,
         textureScrollSpeed: mount.spec.textureScrollSpeed,
@@ -851,15 +877,21 @@ export class ShipWeaponControlSystem {
         coreColor: mount.spec.coreColor,
         glowColor: mount.spec.glowColor,
         hitGlowRadius: mount.spec.hitGlowRadius,
-        hitGlowBrightenDuration: mount.spec.hitGlowBrightenDuration
+        hitGlowBrightenDuration: mount.spec.hitGlowBrightenDuration,
+        useGlowColorForHitGlow: mount.spec.useGlowColorForHitGlow,
+        fringeScrollSpeedMult: mount.spec.fringeScrollSpeedMult,
+        coreWidthMult: mount.spec.coreWidthMult,
+        darkCore: mount.spec.darkCore,
+        darkFringeIter: mount.spec.darkFringeIter,
+        darkCoreIter: mount.spec.darkCoreIter
       });
     } else {
       // 实体弹药使用弹速；导弹则严格区分发射初速与发动机额定极速。
       const projectileLaunchSpeed = (mount.spec.isRocket || mount.spec.spawnType === 'MISSILE')
         ? (mount.spec.launchSpeed ?? mount.spec.projSpeed)
-        : mount.spec.projSpeed;
+        : combatProjectileSpeed(ship, mount.spec);
       const projVel = Vector2.fromAngle(fireAngleRad, projectileLaunchSpeed).add(ship.vel);
-      spawnProjectile({
+      const projectile: Projectile = {
         id: this.random.next(),
         sourceShipId: ship.id,
         slotId: mount.slotId,
@@ -867,16 +899,28 @@ export class ShipWeaponControlSystem {
         specId: mount.spec.id,
         pos: firePos.clone(),
         prevPos: firePos.clone(),
+        ballisticTail: mount.spec.spawnType === 'BALLISTIC' ? firePos.clone() : undefined,
+        prevBallisticTail: mount.spec.spawnType === 'BALLISTIC' ? firePos.clone() : undefined,
         vel: projVel,
         // 武器输出伤害按母舰战备值修正 (CRPluginImpl.getDamageChangePercent)
-        damage: mount.spec.damagePerShot * ship.crDamageDealtMultiplier,
+        baseDamage: mount.spec.damagePerShot,
+        sourceDamageMultiplier: ship.crDamageDealtMultiplier * ship.getWeaponDamageMultiplier(mount.spec.weaponType),
+        sourceWeaponType: mount.spec.weaponType,
+        spawnLocation: firePos.clone(),
+        empDamage: mount.spec.empPerShot ?? 0,
+        damage: mount.spec.damagePerShot * ship.crDamageDealtMultiplier * ship.getWeaponDamageMultiplier(mount.spec.weaponType),
         damageType: mount.spec.type,
+        onHitEffect: mount.spec.onHitEffect,
+        passThroughMissiles: mount.spec.passThroughMissiles,
+        passThroughFighters: mount.spec.passThroughFighters,
+        passThroughFightersOnlyWhenDestroyed: mount.spec.passThroughFightersOnlyWhenDestroyed,
         radius: mount.spec.projRadius,
         rangeRemaining: effectiveRange,
         totalRange: effectiveRange,
         elapsedTime: 0,
         color: mount.spec.color,
         spawnType: mount.spec.spawnType,
+        renderTargetIndicator: mount.spec.renderTargetIndicator,
         visualSpawnType: mount.spec.visualSpawnType,
         textureType: mount.spec.textureType,
         textureScrollSpeed: mount.spec.textureScrollSpeed,
@@ -888,16 +932,19 @@ export class ShipWeaponControlSystem {
         hitGlowRadius: mount.spec.hitGlowRadius,
         glowRadius: mount.spec.glowRadius,
         coreWidthMult: mount.spec.coreWidthMult,
+        movingRayMoveSpeed: mount.spec.spawnType === 'BALLISTIC_AS_BEAM' ? combatProjectileSpeed(ship, mount.spec) : undefined,
         projSpriteUrl: mount.spec.projSpriteUrl,
         projLength: mount.spec.projLength,
         projWidth: mount.spec.projWidth,
         barrelOffset: { x: offX, y: offY },
         isRocket: mount.spec.isRocket || mount.spec.spawnType === 'MISSILE',
         isGuided: mount.spec.isGuided,
-        targetShipId: ship.currentTargetShip?.id,
+        eccmChance: mount.spec.eccmChanceBonus,
+        guidanceBonus: mount.spec.missileGuidanceBonus,
+        targetShipId: mount.cycleTargetShipId,
         facingRad: fireAngleRad,
-        flightTimeRemaining: mount.spec.flightTime,
-        maxFlightTime: mount.spec.flightTime,
+        flightTimeRemaining: mount.spec.flightTime === undefined ? undefined : mount.spec.flightTime * (1 - ship.ecmRangePenalty / 100),
+        maxFlightTime: mount.spec.flightTime === undefined ? undefined : mount.spec.flightTime * (1 - ship.ecmRangePenalty / 100),
         armingTimeRemaining: mount.spec.armingTime,
         turnVelocityRad: 0,
         engineAcceleration: mount.spec.engineAcceleration,
@@ -909,12 +956,15 @@ export class ShipWeaponControlSystem {
         missileEngineVisualSpec: mount.spec.missileEngineVisualSpec,
         missileTrailSpec: mount.spec.missileTrailSpec,
         missileExplosionVisualSpec: mount.spec.missileExplosionVisualSpec,
+        projectileExplosionSpec: mount.spec.projectileExplosionSpec,
         isTwoStage: mount.spec.isTwoStage,
         mirv: mount.spec.mirv,
         proximityFuse: mount.spec.proximityFuse,
         hitpoints: mount.spec.missileHp || (mount.spec.isRocket || mount.spec.spawnType === 'MISSILE' ? 100 : undefined),
         maxHitpoints: mount.spec.missileHp || (mount.spec.isRocket || mount.spec.spawnType === 'MISSILE' ? 100 : undefined)
-      });
+      };
+      initializeSourceProjectile(projectile, combatProjectileSpeed(ship, mount.spec), ship.vel);
+      spawnProjectile(bindProjectileSource(projectile, ship));
     }
     return true;
   }
