@@ -44,8 +44,8 @@ class SteamPeer extends EventEmitter {
 }
 /** Native Steam stays in this localhost helper, never in the browser process. */
 export class SteamGateway {
-  constructor({ appId = 480, build, client = null }) {
-    this.appId = appId; this.build = build; this.client = client; this.initialized = false; this.networkLost = false; this.error = '';
+  constructor({ appId = 480, build, client = null, overlay = null }) {
+    this.overlay = overlay; this.appId = appId; this.build = build; this.client = client; this.initialized = false; this.networkLost = false; this.error = '';
     this.selected = null; this.pendingInvite = null; this.renderer = null; this.guestConnection = null;
     this.peers = new Map(); this.codec = new SteamPacketCodec(); this.callbacks = []; this.busy = false; this.generation = 0;
     this.owner = ''; this.name = ''; this.lastAudit = 0; this.relay = null; this.faults = new Map();
@@ -76,6 +76,7 @@ export class SteamGateway {
     return { service: 'starsector-web-steam', available: this.initialized && !this.networkLost, protocol: protocol.version, build: this.build,
       appId: this.appId, testApp: this.appId === 480, name: this.name, steamId: this.owner, error: this.error, busy: this.busy,
       occupied: this.renderer?.readyState === 1, pendingInvite: this.pendingInvite,
+      overlay: this.overlay?.status() ?? { supported: false, available: false, reason: '浏览器版不支持 Steam 浮层，请复制完整房间号邀请朋友，或使用桌面版。' },
       lobby: this.selected ? { id: this.selected.id, owner: this.selected.owner, host: this.selected.owner === this.owner, code: this.selected.code } : null };
   }
   allowed(remote) {
@@ -238,7 +239,12 @@ export class SteamGateway {
         else if (url.pathname === '/steam/create') result = await this.select('create', value.visibility);
         else if (url.pathname === '/steam/join') result = await this.select('join', value.lobby);
         else if (url.pathname === '/steam/leave') result = await this.leave();
-        else if (url.pathname === '/steam/invite') { if (!this.selected) throw Error('请先进入 Steam 房间'); this.selected.lobby.openInviteDialog(); result = { ok: true, note: '浏览器不保证能显示 Steam 浮层；未出现时请复制房间号邀请。' }; }
+        else if (url.pathname === '/steam/invite') {
+          if (!this.selected) throw Error('请先进入 Steam 房间');
+          if (!this.initialized || this.networkLost) throw Error(this.error || 'Steam 未连接');
+          if (!this.overlay) throw Error(this.status().overlay.reason);
+          result = await this.overlay.invite(this.selected.id, this.owner);
+        }
         else if (url.pathname === '/steam/list') {
           if (!this.initialized || this.networkLost || this.busy) throw Error('Steam 尚未就绪或有请求正在进行');
           this.busy = true;

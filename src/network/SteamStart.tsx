@@ -1,6 +1,6 @@
 import { MotionPresence } from '../ui/core/MotionPresence';
 import { steamRequest, type SteamStatus } from "./SteamApi";
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NativeButton } from '../ui/NativeChrome';
 import { NativeBitmapText } from '../ui/NativeBitmapText';
 import { Modal } from '../ui/core/UI';
@@ -56,5 +56,46 @@ export function SteamStart({ status, name, onName, busy: connecting, onSelected,
 }
 export function SteamInvite({ lobbyId }: { lobbyId: string }) {
   const [notice, setNotice] = useState('');
-  return <div className="lan-help lan-room-settings"><p>朋友先运行自己的 Steam 启动器，在「加入 Steam 房间」粘贴下面的完整房间号；有密码时请另行告知。</p><label>Steam 房间号<input aria-label="Steam 邀请房间号" value={lobbyId} readOnly onFocus={e=>e.target.select()}/></label><NativeButton onClick={()=>{if (!navigator.clipboard) {setNotice('请选中房间号，按 Ctrl+C 复制。');return;}void navigator.clipboard.writeText(lobbyId).then(()=>setNotice('房间号已复制'),()=>setNotice('请选中房间号，按 Ctrl+C 复制。'));}}>复制 Steam 房间号</NativeButton><NativeButton onClick={()=>void steamRequest<{note:string}>('invite').then(result=>setNotice(result.note),error=>setNotice(error.message))}>尝试打开 Steam 邀请</NativeButton><p role="status">{notice}</p><p>浏览器不保证显示 Steam 覆盖层，复制房间号不依赖覆盖层。不要发送 127.0.0.1 地址，也不要发送房间侧栏的六位局域网编号。</p></div>;
+  const [status, setStatus] = useState<SteamStatus | null>(null);
+  const [checking, setChecking] = useState(true);
+  const [opening, setOpening] = useState(false);
+  useEffect(() => {
+    const abort = new AbortController();
+    let pending = false;
+    const refresh = async () => {
+      if (pending) return;
+      pending = true;
+      try {
+        const response = await fetch('/steam/status', { cache: 'no-store', signal: AbortSignal.any([abort.signal, AbortSignal.timeout(5000)]) });
+        const next = await response.json() as SteamStatus;
+        if (!response.ok || next.service !== 'starsector-web-steam') throw Error('Steam helper unavailable');
+        if (!abort.signal.aborted) setStatus(next);
+      } catch { if (!abort.signal.aborted) setStatus(null); }
+      finally { pending = false; if (!abort.signal.aborted) setChecking(false); }
+    };
+    void refresh();
+    const timer = setInterval(() => void refresh(), 2000);
+    return () => { clearInterval(timer); abort.abort(); };
+  }, [lobbyId]);
+  const overlay = status?.overlay;
+  const invite = async () => {
+    if (opening) return;
+    setOpening(true); setNotice('');
+    try { const result = await steamRequest<{ note: string }>('invite'); setNotice(result.note); }
+    catch (error) { setNotice(error instanceof Error ? error.message : 'Steam 邀请请求失败'); }
+    finally { setOpening(false); }
+  };
+  const reason = checking ? '正在检测 Steam 浮层…' : !status ? '无法连接本机 Steam 服务，请重试；也可先复制房间号。'
+    : !overlay ? '此启动器版本未接入 Steam 浮层，请更新桌面版或复制房间号。'
+    : !status.available ? status.error || 'Steam 尚未连接，请恢复 Steam 网络后重试。'
+    : overlay.reason;
+  return <div className="lan-help lan-room-settings">
+    <p>朋友先启动同一版本游戏并进入 Steam 联机。可以通过桌面版 Steam 好友邀请加入，也可以在「加入 Steam 房间」粘贴完整房间号；密码需另行告知。</p>
+    <label>Steam 房间号<input aria-label="Steam 邀请房间号" value={lobbyId} readOnly onFocus={e=>e.target.select()}/></label>
+    <NativeButton onClick={()=>{if (!navigator.clipboard) {setNotice('请选中房间号，按 Ctrl+C 复制。');return;}void navigator.clipboard.writeText(lobbyId).then(()=>setNotice('房间号已复制'),()=>setNotice('请选中房间号，按 Ctrl+C 复制。'));}}>复制 Steam 房间号</NativeButton>
+    {overlay?.supported && <NativeButton disabled={opening || !status?.available || !overlay.available || status.lobby?.id !== lobbyId} onClick={()=>void invite()}>{opening ? '正在打开 Steam 邀请…' : '打开 Steam 好友邀请'}</NativeButton>}
+    {reason && <p role="status">{reason}</p>}
+    {notice && <p role="status">{notice}</p>}
+    <p>不要发送 127.0.0.1 地址，也不要发送房间侧栏的六位局域网编号。接受 Steam 邀请后仍需在游戏入口确认加入，不会自动退出当前房间。</p>
+  </div>;
 }

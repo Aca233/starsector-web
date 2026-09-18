@@ -25,7 +25,7 @@
 .sim-deployment-ship:hover,.sim-deployment-ship:focus-visible { outline: 0; border-color: #6dabbf; background: #20445855; }
 .sim-deployment-ship[aria-pressed='true'] { border-color: #a5d582; background: #7fbd5633; }
 .sim-deployment-ship[aria-pressed='true']::after { content: ''; position: absolute; inset: 3px; border: 1px solid #a5d58266; pointer-events: none; }
-.sim-deployment-ship[aria-disabled='true'] img { opacity: .3; }
+.sim-deployment-ship[data-unavailable='true'] img { opacity: .3; }
 .sim-deployment-pages { display: flex; align-items: center; gap: 7px; font-size: 11px; flex-shrink: 0; padding: 4px 0 7px; }
 .sim-deployment-pages > span:first-child { margin-right: auto; }
 .sim-deployment-pages button { border: 1px solid #376173; color: #b1dfed; background: #081319; padding: 2px 6px; cursor: pointer; }

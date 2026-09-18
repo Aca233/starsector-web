@@ -10,6 +10,7 @@ import { SnapshotPlayback } from "./SnapshotPlayback";
 import { LanSnapshotDecoder } from "./LanSnapshotDecoder";
 import type { SnapshotDecodeStats } from "./LanSnapshotDecoder";
 import { MotionPrediction } from "./MotionPrediction";
+import { InputSendBudget, LAN_INPUT_INTERVAL_MS } from "./InputSendBudget";
 import { LAN_SNAPSHOT_HZ, SnapshotReceiveRate } from "./SnapshotPolicy";
 import type { HostPerformance } from "./SnapshotPolicy";
 import { FleetDeployment } from '../ui/tactical/FleetDeployment';
@@ -186,6 +187,7 @@ export function LanBattle({
     let acknowledgementMs: number | null = null;
     const sentInputs = new Map<number, number>();
     const prediction = new MotionPrediction();
+    const inputBudget = new InputSendBudget();
     let playback = new SnapshotPlayback();
     const localContrails = new LocalContrails();
     const localMuzzles = new LocalMuzzleEffects();
@@ -532,6 +534,7 @@ export function LanBattle({
             id: (actionId = Math.max(actionId, connection.actionSequence) + 1),
             kind, value, ...(pointerActive ? { aim: [aim.x, aim.y] as [number, number] } : {}),
           });
+          sendInput();
         }
     };
     actionRef.current = action;
@@ -571,6 +574,8 @@ export function LanBattle({
     const sendInput = () => {
       if (!engine || !launched || !synced || !connection.ready) return;
       if ((connection.socket?.bufferedAmount ?? 0) > 65536) { actions = []; return; }
+      const now = performance.now();
+      if (!inputBudget.take(now)) return;
       // Keep sending neutral packets while unfocused; silence alone leaves stale
       // controls active until the host timeout and cannot express pointer ownership.
       if (!active()) resetInput();
@@ -584,7 +589,6 @@ export function LanBattle({
         actions,
       };
       if (send({ type: "input", input })) {
-        const now = performance.now();
         sentInputs.set(input.seq, now);
         while (sentInputs.size > 120) sentInputs.delete(sentInputs.keys().next().value!);
         prediction.record(input, now);
@@ -615,14 +619,18 @@ export function LanBattle({
         return;
       }
       if (flightKey(event.code)) {
+        const previousKeys = keys;
         heldFlightKeys.add(event.code);
         refreshKeys();
         event.preventDefault();
+        if (keys !== previousKeys) sendInput();
       }
     };
     const up = (event: KeyboardEvent) => {
+      const previousKeys = keys;
       heldFlightKeys.delete(event.code);
       refreshKeys();
+      if (keys !== previousKeys) sendInput();
     };
     const move = (event: MouseEvent) => {
       if (!active()) { pointerActive = false; cameraController.suspendPointer(); return; }
@@ -636,11 +644,11 @@ export function LanBattle({
       pointer = { x: event.clientX, y: event.clientY };
       pointerActive = true;
       cameraController.samplePointer(event.clientX, event.clientY);
-      if (event.button === 0) firing = true;
+      if (event.button === 0 && !firing) { firing = true; sendInput(); }
       if (event.button === 2) action("shield");
     };
     const mouseUp = (event: MouseEvent) => {
-      if (event.button === 0) firing = false;
+      if (event.button === 0 && firing) { firing = false; sendInput(); }
     };
     const loseFocus = () => { cameraController.suspendPointer(); clear(); };
     const onFocus = (event: FocusEvent) => { if (isCombatTextEntry(event.target) || hasCombatModal()) loseFocus(); };
@@ -668,7 +676,7 @@ export function LanBattle({
         sendInput();
         lastInput = performance.now();
       }
-    }, 1000 / 30);
+    }, LAN_INPUT_INTERVAL_MS);
     const frame = (now: number) => {
       if (disposed) return;
       frameId = requestAnimationFrame(frame);

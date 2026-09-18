@@ -57,8 +57,8 @@ for (const file of ['index.js', 'package.json', 'LICENSE', 'dist/win64']) {
 await fs.writeFile(path.join(backend, 'package.json'), JSON.stringify({ name: 'starsector-desktop-backend', version, private: true, type: 'module' }));
 await fs.writeFile(path.join(backend, 'desktop-build.json'), JSON.stringify({ version, build: buildId, serverFiles: inputs }, null, 2));
 const licenses = path.join(staging, 'licenses');
-for (const name of ['react', 'react-dom', 'scheduler', 'lucide-react', 'ws', 'steamworks.js', '@msgpack/msgpack']) {
-  await copy(path.join(project, 'node_modules', name, 'LICENSE'), path.join(licenses, name.replaceAll('/', '-') + '.txt'));
+for (const name of ['react', 'react-dom', 'scheduler', 'lucide-react', 'ws', 'steamworks.js', '@msgpack/msgpack', 'koffi']) {
+  await copy(path.join(project, 'node_modules', name, name === 'koffi' ? 'LICENSE.txt' : 'LICENSE'), path.join(licenses, name.replaceAll('/', '-') + '.txt'));
 }
 const electronDist = path.dirname(createRequire(import.meta.url)('electron'));
 const artifacts = await build({ projectDir: project, targets: Platform.WINDOWS.createTarget(args.includes('--dir') ? ['dir'] : ['nsis', 'zip'], Arch.x64),
@@ -66,6 +66,7 @@ const artifacts = await build({ projectDir: project, targets: Platform.WINDOWS.c
     appId: 'com.aca233.starsectorweb', productName: 'Starsector Web', electronVersion: pkg.devDependencies.electron, electronDist,
     directories: { output, buildResources: path.join(project, 'desktop') },
     extraMetadata: { version, main: 'desktop/main.mjs' }, asar: true, npmRebuild: false,
+    asarUnpack: ['node_modules/koffi/**/*', 'node_modules/@koromix/koffi-win32-x64/**/*'],
     files: ['desktop/**/*.mjs', 'package.json', '!node_modules/steamworks.js{,/**/*}', '!node_modules/@types{,/**/*}'],
     // electron-builder excludes a FileSet's root node_modules directory, even for extraResources.
     // Map each backend dependency explicitly so the app never falls back to the developer checkout.
@@ -86,6 +87,7 @@ const artifacts = await build({ projectDir: project, targets: Platform.WINDOWS.c
       }
       await fs.access(path.join(packagedBackend, 'node_modules', 'steamworks.js', 'dist', 'win64', 'steamworksjs.win32-x64-msvc.node'));
       await fs.access(path.join(appOutDir, 'steam_api64.dll'));
+      await fs.access(path.join(appOutDir, 'resources', 'app.asar.unpacked', 'node_modules', '@koromix', 'koffi-win32-x64', 'win32_x64', 'koffi.node'));
     },
     win: { artifactName: 'Starsector-Web-Desktop-${version}-${arch}.${ext}' },
     nsis: { artifactName: 'Starsector-Web-Desktop-Setup-${version}-${arch}.${ext}', oneClick: false,

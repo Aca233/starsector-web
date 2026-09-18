@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, Menu, dialog, screen, session, shell } from 'electron';
 import { DesktopBackend } from './backend.mjs';
+import { DesktopSteamOverlay, loadDesktopSteam, steamRestartArgs } from './steam-overlay.mjs';
 import { desktopUpdater } from './updates.mjs';
 import { contentSecurityPolicy, desktopOptions, isGameUrl, isProjectLink, requestedMode } from './policy.mjs';
 
@@ -22,6 +23,10 @@ let settings = {};
 try { settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8')); } catch { /* First run or invalid local preferences. */ }
 let mode = options.mode ?? (['local', 'lan', 'steam'].includes(settings.mode) ? settings.mode : 'local');
 let win, backend, updater, switching = false, quitting = false, quitPrompt = false, allowQuit = false, unloadCancelled = false;
+const backendRoot = app.isPackaged ? path.join(process.resourcesPath, 'backend') : project;
+let pendingSteamInvite = null, steamEntry = null;
+const steamOverlay = new DesktopSteamOverlay({ appId: options.appId, load: () => loadDesktopSteam(backendRoot),
+  getWindow: () => win, log, onInvite: lobby => { if (backend) backend.receiveSteamInvite(lobby); else pendingSteamInvite = lobby; } });
 const modeNames = { local: '单机', lan: '局域网', steam: 'Steam' };
 function log(message) {
   const text = typeof message === 'string' ? message : String(message);
@@ -37,7 +42,7 @@ function saveSettings() {
   try {
     fs.mkdirSync(path.dirname(settingsFile), { recursive: true });
     const temporary = settingsFile + '.tmp';
-    fs.writeFileSync(temporary, JSON.stringify({ mode, bounds: win.getNormalBounds(), maximized: win.isMaximized() }));
+    fs.writeFileSync(temporary, JSON.stringify({ mode, bounds: win.getNormalBounds(), maximized: win.isMaximized(), steamEntry }));
     fs.renameSync(temporary, settingsFile);
   } catch (error) { log('无法保存窗口设置：' + error.message); }
 }
@@ -113,6 +118,14 @@ async function switchMode(next, target = origin + (next === 'local' ? '/' : `/?v
       // Unload old requests/timers before closing HTTP; otherwise they can hit a closing server.
       await win.loadURL('about:blank');
       await session.defaultSession.flushStorageData();
+      if (next === 'steam' && !steamOverlay.prepared) {
+        // Overlay injection must precede graphics initialization; never disable renderer security.
+        restarting = true; mode = 'steam'; steamEntry = target;
+        await stopAll();
+        app.relaunch({ args: steamRestartArgs(process.argv.slice(1)) });
+        quitting = true; allowQuit = true; app.quit();
+        return;
+      }
       restarting = true;
       await backend.stop();
       await backend.start(next); mode = next;
@@ -124,7 +137,7 @@ async function switchMode(next, target = origin + (next === 'local' ? '/' : `/?v
     log(error.message);
     if (restarting) {
       try {
-        await backend.stop(); await backend.start(previous); mode = previous;
+        steamEntry = null; await backend.stop(); await backend.start(previous); mode = previous;
         await win.loadURL(isGameUrl(previousUrl, origin) ? previousUrl : origin + '/');
       } catch (restoreError) { log(restoreError.message); }
     }
@@ -174,8 +187,9 @@ function windowBounds() {
 }
 async function ready() {
   fs.mkdirSync(app.getPath('userData'), { recursive: true });
-  backend = new DesktopBackend({ root: app.isPackaged ? path.join(process.resourcesPath, 'backend') : project,
+  backend = new DesktopBackend({ root: backendRoot, overlay: steamOverlay,
     port: options.port, appId: options.appId, log, failed: message => void backendFailed(message), quitRequested: () => void requestQuit() });
+  if (pendingSteamInvite) { backend.receiveSteamInvite(pendingSteamInvite); pendingSteamInvite = null; }
   win = new BrowserWindow({ ...windowBounds(), minWidth: 800, minHeight: 600, show: false,
     backgroundColor: '#090e16', title: 'Starsector Web',
     webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, nodeIntegrationInWorker: false,
@@ -203,13 +217,17 @@ async function ready() {
   updater = desktopUpdater({ changed: updateMenu, log, enabled: !options.noUpdate, install: install => requestQuit({ install }) });
   updateMenu();
   await backend.start(mode);
-  await win.loadURL(origin + (mode === 'local' ? '/' : `/?view=${mode}`));
+  const entry = mode === 'steam' && isGameUrl(settings.steamEntry, origin) && requestedMode(settings.steamEntry, 'local') === 'steam'
+    ? settings.steamEntry : origin + (mode === 'local' ? '/' : `/?view=${mode}`);
+  await win.loadURL(entry); saveSettings();
   if (settings.maximized) win.maximize();
   if (!options.hidden) win.show();
   updater.start();
 }
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
+  if (mode === 'steam') steamOverlay.prepare();
+  app.on('will-quit', () => steamOverlay.close());
   app.on('second-instance', () => { if (win && !win.isDestroyed()) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); } });
   app.on('before-quit', event => {
     if (allowQuit) return;

@@ -11,6 +11,13 @@ export class SnapshotPlayback {
   private lastAt: number | null = null;
   private receivedTick = -1;
   private segmented = false;
+  // Tick progress per observed delivery, not per packet: a relay may release
+  // several 60 Hz packets together. Only small numeric histories are retained.
+  private intervals: number[] = [];
+  private cadence = 1;
+  private sampledTick = -1;
+  private phases: number[] = [];
+  private jitter = 1;
 
   push(frame: CombatSnapshot): boolean {
     if (frame.tick <= this.receivedTick) return false;
@@ -25,6 +32,24 @@ export class SnapshotPlayback {
   sample(now: number, immediate = false) {
     const gap = this.lastAt === null ? 0 : Math.max(0, now - this.lastAt);
     this.lastAt = now;
+    // Use an upper quantile of recent delivery spans so isolated loss/stalls do
+    // not become the permanent buffer size, while sustained low rates do adapt.
+    if (this.receivedTick > this.sampledTick) {
+      if (this.sampledTick >= 0) {
+        this.intervals.push(this.receivedTick - this.sampledTick);
+        if (this.intervals.length > 32) this.intervals.shift();
+        const sorted = [...this.intervals].sort((a, b) => a - b);
+        this.cadence = sorted[Math.floor((sorted.length - 1) * .9)];
+      }
+      // Arrival phase spread measures jitter without clock synchronization.
+      // Keep 1..2 ticks of guard, rather than following individual packet times.
+      this.phases.push(now * .06 - this.receivedTick);
+      if (this.phases.length > 32) this.phases.shift();
+      const phases = [...this.phases].sort((a, b) => a - b);
+      const spread = phases[Math.floor((phases.length - 1) * .9)] - phases[Math.floor((phases.length - 1) * .1)];
+      this.jitter = Math.max(1, Math.min(2, Math.ceil(spread - 1e-6)));
+      this.sampledTick = this.receivedTick;
+    }
     const newest = this.queue.at(-1);
     const reset = !!newest && (!this.current || immediate || gap > 500 || newest.tick - this.cursor > 60);
     const frames: CombatSnapshot[] = [];
@@ -36,11 +61,24 @@ export class SnapshotPlayback {
       this.segmented = false;
       frames.push(newest!);
     } else if (this.current) {
-      // Start one snapshot behind. Thereafter advance in real time, not over an
-      // EMA packet interval (which used to stretch/compress motion on every packet).
-      const span = Math.max(3, this.current.tick - this.previousTick);
-      const backlog = (newest?.tick ?? this.current.tick) - this.cursor;
-      if (this.segmented) this.cursor += gap * .06 * (backlog > Math.max(6, span * 1.5) ? 1.1 : 1);
+      const latestTick = newest?.tick ?? this.current.tick;
+      // At stable 60 Hz: target <= 2 ticks (33 ms), hard ceiling 6 (100 ms).
+      // This is a ceiling/repair target, not a mandatory added delay: ordinary
+      // one-tick-behind playback stays exactly 1x; never rewind to fill a buffer.
+      const target = this.cadence + this.jitter;
+      const limit = Math.max(6, this.cadence * 2 + 2);
+      const advance = gap * .06;
+      if (this.segmented) {
+        this.cursor += advance;
+        // Correct only the debt LEFT AFTER normal advancement. Comparing the
+        // pre-advance backlog leaves a rate-dependent, persistent extra tick.
+        const excess = latestTick - this.cursor - target;
+        if (excess > 0) this.cursor += Math.min(advance * .1, excess);
+      }
+      // Severe debt is stale presentation, not physics to resimulate. Skip it
+      // within known authority, then retain the actual bracketing endpoints.
+      // A low delivery rate gets a proportional bound, not a forced 60 Hz jump.
+      if (latestTick - this.cursor > limit) this.cursor = latestTick - target;
       while (this.queue.length && this.cursor >= this.current.tick) {
         this.previousTick = this.current.tick;
         this.previousTime = this.current.world.combatTime;

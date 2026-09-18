@@ -1,11 +1,4 @@
-.fleet-deployment { width:620px; max-width:calc(100vw - 24px); }
-.fleet-deployment p { color:#9bb6bf; font-size:13px; margin:8px 0; }
-.fleet-deployment-list { display:grid; gap:4px; max-height:55vh; overflow:auto; }
-.fleet-deployment-list button { display:flex; align-items:center; gap:14px; padding:8px 12px; background:#0a1b23; border:1px solid #315967; color:#b8dbe5; text-align:left; }
-.fleet-deployment-list button[aria-pressed=true] { border-color:#add47a; background:#253b33; }
-.fleet-deployment-list button:disabled { opacity:.6; }
-.fleet-deployment-list img { width:60px; height:55px; object-fit:contain; }
-.fleet-deployment-list button>span:nth-child(2) { flex:1; }
-.fleet-deployment-list small { display:block; margin-top:5px; font-size:12px; font-weight:normal; }
-.fleet-deployment .ui-modal-footer { display:flex; gap:8px; }
-.fleet-deployment .ui-modal-footer>span { margin-right:auto; }
+.fleet-deployment-team { align-items: center; gap: 18px; padding-bottom: 5px; }
+.fleet-deployment-team > span:last-child { margin-left: auto; color: #7f9aa4; font-size: 11px; }
+.fleet-deployment-budget { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; padding: 8px 0 0; border-top: 1px solid #345260; flex-shrink: 0; font-size: 13px; }
+.fleet-deployment .sim-deployment-ship:disabled { cursor: wait; }

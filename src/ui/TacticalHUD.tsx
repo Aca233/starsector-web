@@ -132,6 +132,9 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
       data-hud-density={hudDensity}
       data-combat-input-block
     >
+      {paused && <div className="combat-pause-status" role="status" aria-live="polite" aria-atomic="true">
+        <strong>战斗已暂停</strong><span>{inputBlocked || showHelpDrawer ? '关闭当前窗口后可切换暂停' : '空格继续'}</span>
+      </div>}
       <CombatNotifications engine={engine} controlNotice={controlNotice?.ship === player && !autopilot
         && !engine.battleResult && !player.isDead && player.hullHp > 0 && !player.isDocked && !player.isRetreated && !player.retreating
         ? '自动驾驶已关闭 · 已切换为手动操作' : undefined} />

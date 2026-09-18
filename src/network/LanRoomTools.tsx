@@ -156,7 +156,7 @@ export function LanRoomTools({
             <NativeButton onClick={() => setPanel(null)}>返回</NativeButton>
           }
         >
-          {room.network?.kind === "steam" ? <SteamInvite lobbyId={room.network.lobbyId}/> : <div className="lan-help lan-room-settings">
+          {room.network?.kind === "steam" ? <SteamInvite key={room.network.lobbyId} lobbyId={room.network.lobbyId}/> : <div className="lan-help lan-room-settings">
             <p>
               选择同一局域网或 n2n / Radmin
               虚拟网卡的地址，分享给朋友。链接已带房间码；如有密码，请另行告知。
