@@ -104,7 +104,7 @@ function findShipPairCollisionContact(s1: Ship, s2: Ship): ShipPairCollisionCont
  */
 export class ShipCollisionSystem {
   public resolveShipToShipCollision(s1: Ship, s2: Ship, fx: CollisionFXCallbacks, _dt: number) {
-    if (s1.isDead || s2.isDead || s1.isCollisionless || s2.isCollisionless) return;
+    if (s1.assemblyRoot === s2.assemblyRoot || s1.isDead || s2.isDead || s1.isCollisionless || s2.isCollisionless) return;
 
     const contact = findShipPairCollisionContact(s1, s2);
     if (contact) {
@@ -114,23 +114,25 @@ export class ShipCollisionSystem {
 
       // Starsector 的碰撞结算会考虑实体质量：较重的一方更难被推开，也应承受更少的反冲损伤。
       // 用对方质量占总质量的比例分配位置/速度响应；同质量时仍保持原来的 50/50 与 0.4v 行为。
-      const s1Mass = Math.max(1, s1.spec.mass);
-      const s2Mass = Math.max(1, s2.spec.mass);
+      const root1 = s1.assemblyRoot, root2 = s2.assemblyRoot;
+      const s1Mass = Math.max(1, root1.spec.mass);
+      const s2Mass = Math.max(1, root2.spec.mass);
       const totalMass = s1Mass + s2Mass;
-      const s1ResponseShare = s2Mass / totalMass;
-      const s2ResponseShare = s1Mass / totalMass;
+      const s1ResponseShare = root1.isStation ? 0 : root2.isStation ? 1 : s2Mass / totalMass;
+      const s2ResponseShare = root2.isStation ? 0 : root1.isStation ? 1 : s1Mass / totalMass;
 
-      s1.pos.addScaled(normal, -overlap * s1ResponseShare);
-      s2.pos.addScaled(normal, overlap * s2ResponseShare);
+      root1.pos.addScaled(normal, -overlap * s1ResponseShare);
+      root2.pos.addScaled(normal, overlap * s2ResponseShare);
 
+      root1.syncModuleTree(); root2.syncModuleTree();
       const relVel = s1.vel.clone().sub(s2.vel);
       const impactSpeed = relVel.dot(normal);
 
       if (impactSpeed > 20) {
         sound.playAtPos('ship_collision', s1.pos, fx.getPlayerPos(), 0.85);
         // 保留原实现 80% 的法向相对速度消解量，但按质量分配冲量。
-        s1.vel.addScaled(normal, -impactSpeed * 0.8 * s1ResponseShare);
-        s2.vel.addScaled(normal, impactSpeed * 0.8 * s2ResponseShare);
+        root1.vel.addScaled(normal, -impactSpeed * 0.8 * s1ResponseShare);
+        root2.vel.addScaled(normal, impactSpeed * 0.8 * s2ResponseShare);
 
         const baseRamDmg = impactSpeed * 8;
         // 同质量时双方仍各吃 baseRamDmg；质量差越大，重舰承伤越低、轻舰承伤越高。

@@ -1,0 +1,81 @@
+/* Room-specific layout: preserve the narrower AI editor sidebar. */
+.lan-room-fleet-sidebar {
+  width:clamp(260px,22vw,316px); min-width:clamp(260px,22vw,316px); flex-basis:clamp(260px,22vw,316px);
+}
+.lan-room-fleet-sidebar > header { padding:4px 4px 6px; font-size:13px; }
+.lan-room-fleet-sidebar > p { margin:2px 4px 6px; font-size:11px; }
+.lan-room-fleet-sidebar > .lan-room-progress { flex:0 0 auto; max-height:30%; padding:7px 8px; margin:2px 0 8px; }
+.lan-room-progress summary { cursor:pointer; color:var(--ui-accent); }
+.lan-room-progress summary > span { display:block; padding-left:15px; font-size:11px; color:var(--ui-dim); }
+.lan-room-fleet-sidebar .lan-room-progress ol { grid-template-columns:1fr; }
+.lan-room-fleet-sidebar .lan-room-progress li { display:grid; }
+.lan-room-fleet-sidebar .lan-room-progress li small { display:block; }
+.lan-room-fleet-sidebar .lan-room-progress > p { max-height:36px; overflow-y:auto; font-size:11px; }
+.lan-room-fleet-sidebar > .lan-room-ai { margin-top:6px; padding-top:6px; }
+.lan-room-fleet-sidebar .lan-ai-summary { margin:0; gap:0; }
+.lan-room-fleet-sidebar .lan-ai-summary > .native-button { width:100%; font-size:12px; }
+.lan-room-fleet-sidebar .lan-ai-summary > small { display:block; margin:4px 0 0; font-size:11px; text-align:center; }
+.lan-room-roster { display:flex; flex-direction:column; flex:1 1 0; min-height:100px; min-width:0; }
+.lan-room-roster-bar { display:flex; flex:none; justify-content:space-between; gap:6px; padding:2px 4px 6px; color:var(--ui-dim); font:11px/1.4 var(--ui-font); }
+.lan-room-roster-bar strong { color:var(--ui-text); font-weight:normal; }
+.lan-room-roster-feedback { display:flex; flex:none; align-items:start; gap:4px; margin:0 0 5px; padding:4px 6px; background:#0e2830; font:11px/1.4 var(--ui-font); color:var(--ui-accent); }
+.lan-room-roster-feedback > span { flex:1; min-width:0; max-height:46px; overflow:auto; overflow-wrap:anywhere; }
+.lan-room-roster-feedback[data-error="true"] { color:var(--ui-warning); }
+.lan-room-roster-feedback > button { flex:none; border:0; background:none; color:inherit; cursor:pointer; }
+.lan-room-roster .lan-teams { overscroll-behavior:contain; scrollbar-gutter:stable; }
+.lan-room-roster .lan-team { margin-bottom:7px; }
+.lan-room-roster .lan-team-heading { padding:0; font-size:14px; }
+.lan-room-roster .lan-team-toggle { flex:1; min-width:0; display:flex; justify-content:space-between; align-items:center; gap:4px; padding:7px 6px; color:inherit; background:transparent; border:0; font:inherit; cursor:pointer; }
+.lan-room-roster .lan-team-toggle small { font-size:10px; white-space:nowrap; }
+.lan-room-roster .lan-team-toggle > span { white-space:nowrap; }
+.lan-room-roster .lan-team-header-actions { display:flex; flex:none; gap:3px; padding-right:4px; }
+.lan-room-roster .lan-team-header-actions:empty { display:none; }
+.lan-room-roster .lan-team-header-actions .native-button { padding:2px 4px; min-width:0; min-height:24px; font-size:10px; }
+.lan-room-roster .lan-team-toggle:hover { background:#24526555; }
+.lan-room-roster .lan-team-toggle:focus-visible { outline:1px solid var(--ui-accent); outline-offset:-2px; }
+.lan-room-roster .lan-team-quick-actions { padding:5px 6px; margin:0; }
+.lan-room-roster .lan-team-quick-actions .native-button { padding:3px 6px; font-size:11px; }
+.lan-room-roster .lan-team-member { display:grid; grid-template-columns:42px minmax(0,1fr); gap:4px 7px; padding:7px 6px; min-height:0; }
+.lan-room-roster .lan-member-identity { grid-column:1/-1; margin:0; gap:7px; }
+.lan-room-roster .lan-member-captain { width:28px; height:28px; flex-basis:28px; }
+.lan-room-roster .lan-member-heading { flex-direction:row; align-items:center; }
+.lan-room-roster .lan-member-heading strong { font-size:12px; }
+.lan-room-roster .lan-member-heading > span { font-size:10px; }
+.lan-room-roster .lan-member-ship { float:none; grid-row:2/4; width:42px; height:60px; margin:0; }
+.lan-room-roster .lan-team-member > p { margin:0; font-size:11px; line-height:1.4; overflow-wrap:anywhere; }
+.lan-room-roster .lan-team-member > .native-button { justify-self:start; padding:3px 7px; font-size:11px; }
+.lan-room-roster .lan-team-select { grid-column:1/-1; margin:0; gap:6px; font-size:11px; }
+.lan-room-roster .lan-team-select select { padding:3px 5px; font-size:11px; }
+.lan-room-roster .lan-team-empty { margin:6px; font-size:11px; }
+.lan-room-roster .lan-team-limit { margin:6px 2px 0; font-size:11px; }
+.lan-room-ai-row { display:grid; grid-template-columns:36px minmax(0,1fr) auto; gap:4px 7px; padding:7px 6px; border-top:1px solid var(--ui-divider); background:#07171d; font:12px/1.4 var(--ui-font); }
+.lan-room-ai-inspect { grid-row:1/3; width:36px; height:56px; margin:0; padding:0; align-self:center; border:1px solid var(--ui-border); background:#061318; cursor:pointer; }
+.lan-room-ai-inspect:hover { border-color:var(--ui-accent); }
+.lan-room-ai-inspect .lan-hull-thumbnail { display:block; width:100%; height:100%; padding:2px; border:0; background:none; }
+.lan-room-ai-inspect .lan-hull-thumbnail img { width:100%; height:100%; object-fit:contain; }
+.lan-room-ai-identity { min-width:0; align-self:center; }
+.lan-room-ai-identity strong,.lan-room-ai-identity > span { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lan-room-ai-identity strong { color:var(--ui-text); font-weight:normal; }
+.lan-room-ai-identity small { margin-left:2px; font-size:9px; color:var(--ui-accent); }
+.lan-room-ai-identity > span { color:var(--ui-dim); font-size:11px; }
+.lan-room-ai-count { color:var(--ui-accent); font:13px/1.5 var(--ui-font); font-variant-numeric:tabular-nums; align-self:center; }
+.lan-room-ai-actions { grid-column:2/-1; display:flex; align-items:center; gap:5px; }
+.lan-room-ai-actions .native-button { min-width:28px; min-height:26px; padding:3px 5px; font-size:11px; }
+.lan-room-ai-actions .native-button:last-child { margin-left:auto; }
+.lan-room-ai-remove { grid-column:1/-1; display:flex; flex-wrap:wrap; align-items:center; gap:5px; padding:6px; background:#34291c; color:var(--ui-warning); font-size:11px; }
+.lan-room-ai-remove > span { width:100%; overflow-wrap:anywhere; }
+.lan-room-ai-remove .native-button { padding:3px 6px; font-size:11px; }
+.lan-room-ai-remove > button:not(.native-button) { background:none; color:var(--ui-text); border:0; cursor:pointer; }
+@media (max-width:849px) {
+  .lan-room-fleet-sidebar { width:230px; min-width:230px; flex-basis:230px; }
+  .lan-room-roster .lan-team-member { column-gap:5px; }
+  .lan-room-roster .lan-team-toggle { padding-inline:4px; gap:3px; }
+  .lan-room-ai-row { column-gap:5px; }
+}
+@media (max-height:800px) {
+  .lan-room-fleet-sidebar .lan-ai-summary > small { display:none; }
+}
+@media (max-height:650px) {
+  .lan-room-fleet-sidebar .lan-ai-summary > small { display:none; }
+  .lan-room-fleet-sidebar .lan-room-progress summary > span { display:inline; padding-left:5px; }
+}

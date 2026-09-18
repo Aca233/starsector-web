@@ -1,3 +1,5 @@
+import { InFlightFireBudget } from '../ai/InFlightFireBudget';
+import { assemblyRadius } from '../content/ModuleGeometry';
 import { CombatDeployment, deploymentCost } from './CombatDeployment';
 import { advanceBattleAftermath } from './systems/BattleAftermath';
 import type { ShipLossNotification } from './CombatNotifications';
@@ -6,6 +8,7 @@ import type { AIPhaseBatch } from '../ai/multicore/Types';
 import { shipExplosionPayload } from './systems/ShipExplosion';
 import { DEFAULT_PLAYER_HULL, DEFAULT_ENEMY_HULL, defaultOpponent } from '../data/SandboxDefaults';
 import { clearEffectState } from '../extensions/EffectState';
+import { FriendlyFireLaneIndex } from '../ai/FriendlyFireLaneIndex';
 import { Vector2 } from '../math/Vector2';
 import { createShipHulk, applyHulkDisableDamage } from '../visual/HulkVisuals';
 import { Ship } from './Ship';
@@ -141,15 +144,15 @@ export class CombatEngine {
     // Opening formation is shared by both sides, irrespective of which tab was submitted last.
     const initialDeployment = !this.primaryEnemyDeployed;
     for (let i=0; i<entries.length; i++) {
-      const {isPlayer}=entries[i], spec=specs[i], side=isPlayer?0:1, index=indices[side]++;
+      const {isPlayer}=entries[i], spec=specs[i], radius=assemblyRadius(spec), side=isPlayer?0:1, index=indices[side]++;
       const occupied=[...this.capitalShips.filter(ship=>!ship.isDead&&!ship.isRetreated),...pending];
       let pos:Vector2;
       if (initialDeployment) {
         const columns=Math.min(counts[side],6);
         pos=new Vector2(this.playerShip.pos.x+((index%columns)-(columns-1)/2)*1000,
           this.playerShip.pos.y+(isPlayer?1500:-2600)+(isPlayer?1:-1)*Math.floor(index/columns)*1200);
-        while(occupied.some(ship=>ship.pos.distanceTo(pos)<ship.spec.collisionRadius+spec.collisionRadius+180))pos.y+=isPlayer?1200:-1200;
-      } else pos=this.deployment.entryPosition(isPlayer?this.playerShip.teamId:this.enemyShip.teamId,spec.collisionRadius,occupied);
+        while(occupied.some(ship=>ship.pos.distanceTo(pos)<ship.deploymentRadius+radius+180))pos.y+=isPlayer?1200:-1200;
+      } else pos=this.deployment.entryPosition(isPlayer?this.playerShip.teamId:this.enemyShip.teamId,radius,occupied,spec.sourceHullTraits?.includes('STATION'));
       const id=!isPlayer&&initialDeployment&&index===0?'enemy_ship':this.random.nextId('ship');
       const ship=new Ship(id,spec,isPlayer,pos,isPlayer?-Math.PI/2:Math.PI/2,this.random,this.visualRandom);
       ship.teamId=isPlayer?this.playerShip.teamId:this.enemyShip.teamId;
@@ -164,10 +167,13 @@ export class CombatEngine {
       this.fighterSystem.addCarrier(ship);
       this.simulationCosts.set(ship.id,entries[index].cost);
     });
-    updateCombatVisibility(this.ships);
+    updateCombatVisibility(this.ships, this.openBattlefield);
     return pending;
   }
-  public get ships(): Ship[] { return [...this.capitalShips, ...this.fighters, ...this.bombers, ...this.droneSystem.drones].filter(ship => !ship.isRetreated); }
+  /** Combat components participate in hits/rendering, never fleet budgets or victory independently. */
+  public get combatShips(): Ship[] { return this.capitalShips.flatMap(ship => ship.assemblyShips); }
+  private readonly moduleAI = new WeakMap<Ship, CapitalShipAI>();
+  public get ships(): Ship[] { return [...this.combatShips, ...this.fighters, ...this.bombers, ...this.droneSystem.drones].filter(ship => !ship.isRetreated); }
 
   public addShip(specId: string | ShipSpec, isPlayer: boolean, pos: Vector2, facingRad = 0, teamId = isPlayer ? 0 : 1): Ship {
     const spec = typeof specId === 'string' ? modManager.getShip(specId) : specId;
@@ -181,8 +187,8 @@ export class CombatEngine {
     return ship;
   }
 
-  public findHostile(ship: Ship, targetId?: string): Ship | undefined {
-    const hostiles = this.ships.filter(candidate => !candidate.isDead && candidate.isVisibleTo(ship.teamId) && !sameTeam(candidate, ship));
+  public findHostile(ship: Ship, targetId?: string, roster: readonly Ship[] = this.ships): Ship | undefined {
+    const hostiles = roster.filter(candidate => !candidate.hasVastBulk && !candidate.isDead && candidate.isVisibleTo(ship.teamId) && !sameTeam(candidate, ship));
     const ordered = targetId && hostiles.find(candidate => candidate.id === targetId);
     if (ordered) return ordered;
     if (ship.currentTargetShip && hostiles.includes(ship.currentTargetShip)) return ship.currentTargetShip;
@@ -197,15 +203,16 @@ export class CombatEngine {
     return planFleetTactics(this.ships, this.orders, manual);
   }
 
-  public updateShipAI(ai: CapitalShipAI, dt: number, projectileThreatIndex?: ProjectileThreatIndex, weaponThreatEnvelope?: WeaponThreatEnvelope, fleetPlan?: FleetPlan): void {
+  public updateShipAI(ai: CapitalShipAI, dt: number, projectileThreatIndex?: ProjectileThreatIndex, weaponThreatEnvelope?: WeaponThreatEnvelope, fleetPlan?: FleetPlan, phaseShips?: readonly Ship[], friendlyFireLaneIndex?: FriendlyFireLaneIndex): void {
     const order = this.orders.get(ai.ship.id) ?? (ai.ship.isPlayer ? this.orders.get('fleet') : undefined);
-    const target = this.findHostile(ai.ship, order?.type === 'ENGAGE' || order?.type === 'AVOID' ? order.targetShipId : undefined);
+    const targetId = order?.type === 'ENGAGE' || order?.type === 'AVOID' ? order.targetShipId : undefined;
+    const target = phaseShips ? this.findHostile(ai.ship, targetId, phaseShips) : this.findHostile(ai.ship, targetId);
     if (target) ai.targetShip = target;
     // The player's pre-tick autopilot call is outside the native fleet phase. Include that
     // caller even on the MANUAL -> AI transition, without granting control of other manual ships.
-    fleetPlan ??= planFleetTactics(this.ships, this.orders, new Set([...this.externallyControlledShipIds,
+    fleetPlan ??= planFleetTactics(phaseShips ?? this.ships, this.orders, new Set([...this.externallyControlledShipIds,
       ...(ai.ship !== this.playerShip && this.playerShip.fireControlMode !== 'AI' ? [this.playerShip.id] : [])]));
-    ai.update(dt, order ?? null, { fleetPlan, ships: this.ships, projectiles: this.projectiles, beams: this.beams, asteroids: this.asteroids, projectileThreatIndex, weaponThreatEnvelope });
+    ai.update(dt, order ?? null, { fleetPlan, ships: phaseShips ?? this.ships, projectiles: this.projectiles, beams: this.beams, asteroids: this.asteroids, projectileThreatIndex, weaponThreatEnvelope, friendlyFireLaneIndex });
   }
   private readonly combatEffects = new Set<(dt: number) => boolean>();
   private readonly transientCombatShips = new WeakSet<Ship>();
@@ -233,6 +240,8 @@ export class CombatEngine {
   public get notificationTime(): number { return this.combatTime + this.aftermathTime; }
   /** LAN elimination is decided across every team, even after the host flagship dies. */
   public multiTeamBattle = false;
+  /** Three-or-more-team LAN skirmishes are public arenas; ordinary combat keeps sensors. */
+  public openBattlefield = false;
   public winningTeam: number | null = null;
 
   public get isBattleResultReady(): boolean {
@@ -343,6 +352,8 @@ export class CombatEngine {
     this.combatTime = 0;
 
     this.isSimulation = false;
+    this.multiTeamBattle = false;
+    this.openBattlefield = false;
     this.deployment.clear();
     this.primaryEnemyDeployed = true;
     this.simulationCosts.clear();
@@ -481,7 +492,10 @@ export class CombatEngine {
     const fleetOrder = this.orders.get('fleet');
     if (fleetOrder?.type === 'WAYPOINT' && fleetOrder.targetPos) {
       const destination = fleetOrder.targetPos;
-      if (this.ships.filter(ship => ship.isPlayer && !ship.isDead && !this.orders.has(ship.id))
+      // Fleet arrival belongs to the deployed main ships. Wing craft may be
+      // recalled/rearming and system drones orbit their carrier rather than the
+      // waypoint; waiting for them would keep an arrived carrier on this order.
+      if (this.capitalShips.filter(ship => ship.isPlayer && !ship.isDead && !this.orders.has(ship.id))
         .every(ship => ship.pos.distanceTo(destination) <= 90)) this.cancelOrder('fleet');
     }
   }
@@ -574,7 +588,7 @@ export class CombatEngine {
     const saved = ships.map(s => [s.visibleToPlayer, s.visibleToEnemy, s.visibilityMask, s.visibilityOverflow, s.ecmRangePenalty,
       s.fleetSpeedBonusPercent, s.combatShips, s.currentTargetShip] as const);
     try {
-      updateCombatVisibility(ships);
+      updateCombatVisibility(ships, this.openBattlefield);
       updateElectronicWarfare(ships);
       return publish(this.getNativeAIs().filter(ai => !this.externallyControlledShipIds.has(ai.ship.id)));
     } finally {
@@ -605,8 +619,10 @@ export class CombatEngine {
       this.cameraShakeIntensity = 0;
     }
 
+    let fireBudget: InFlightFireBudget | undefined;
     const spawnProj = (p: Projectile) => {
       this.projectiles.push(p);
+      fireBudget?.add(p);
       this.statsTracker.recordShotFired(p.isPlayer ?? false);
     };
     const spawnBeam = (b: Beam) => {
@@ -697,7 +713,7 @@ export class CombatEngine {
     };
 
     for (const effect of this.combatEffects) if (effect(dt)) this.combatEffects.delete(effect);
-    updateCombatVisibility(this.ships);
+    updateCombatVisibility(this.ships, this.openBattlefield);
     updateElectronicWarfare(this.ships);
 
     // 1. 更新 AI
@@ -715,27 +731,53 @@ export class CombatEngine {
     const projectileThreatIndex = nativeThreatPhase && this.projectiles.length >= 128
       ? new ProjectileThreatIndex(this.projectiles) : undefined;
     const weaponThreatEnvelope = nativeThreatPhase ? new WeaponThreatEnvelope() : undefined;
+    // Native AI only changes live ship/system state here; deployment, destruction,
+    // spawning and module detachment advance outside this synchronous phase. Share
+    // membership/order, never visibility, hostility, targets or mutable ship stats.
+    const phaseShips = nativeThreatPhase && !batch && this.findHostile === nativeFindHostile
+      && this.planFleetAI === nativePlanFleetAI && Object.getPrototypeOf(this) === CombatEngine.prototype
+      && nativeRosterReaders.every(([key, getter]) => !Object.hasOwn(this, key)
+        && Object.getOwnPropertyDescriptor(CombatEngine.prototype, key)?.get === getter) ? this.ships : undefined;
+    const friendlyFireLaneIndex = phaseShips ? new FriendlyFireLaneIndex(phaseShips) : undefined;
     try {
       for (const ai of ais) {
         if (!this.externallyControlledShipIds.has(ai.ship.id)) {
           if (batch) batch.commit(ai, projectileThreatIndex, weaponThreatEnvelope, fleetPlan);
-          else this.updateShipAI(ai, dt, projectileThreatIndex, weaponThreatEnvelope, fleetPlan);
+          else this.updateShipAI(ai, dt, projectileThreatIndex, weaponThreatEnvelope, fleetPlan, phaseShips, friendlyFireLaneIndex);
           weaponThreatEnvelope?.invalidate(ai.ship);
         }
       }
     } finally {
       projectileThreatIndex?.close();
       weaponThreatEnvelope?.close();
+      friendlyFireLaneIndex?.close();
       options.aiBatch?.finish();
     }
 
     this.commandSystem.advance(dt, !this.playerShip.isDead && !this.playerShip.isRetreated ? this.playerShip.hullStats.commandPointRateFlat : 0);
 
     // Capture one target roster before weapon emission; newly fired missiles enter next step.
-    const fireControlWorld = { ships: this.ships, missiles: this.projectiles.filter(p => p.isRocket || p.spawnType === 'MISSILE' || p.isMine || p.isFlare), asteroids: this.asteroids };
+    for (const root of this.capitalShips) for (const parent of root.assemblyShips) {
+      if (!parent.spec.sourceHullTraits?.includes('shared_flux_sink')) continue;
+      const active = parent.childModules.filter(child => child.isCombatModule && !child.hasVastBulk);
+      const live = active.filter(child => !child.isDead && child.hullHp > 0);
+      const lost = active.filter(child => child.isDead || child.hullHp <= 0).reduce((sum, child) => sum + child.hullStats.fluxDissipation * .5, 0);
+      const total = live.reduce((sum, child) => sum + child.hullStats.fluxDissipation, 0);
+      for (const child of live) {
+        child.moduleFluxBonus = total > 0 ? lost * child.hullStats.fluxDissipation / total : 0;
+        child.moduleHardFluxFraction = child.moduleFluxBonus / Math.max(1, child.hullStats.fluxDissipation + child.moduleFluxBonus) * .2;
+      }
+    }
+    fireBudget = new InFlightFireBudget(this.ships, this.projectiles, this.asteroids);
+    const fireControlWorld = { fireBudget, ships: this.ships, missiles: this.projectiles.filter(p => p.isRocket || p.spawnType === 'MISSILE' || p.isMine || p.isFlare), asteroids: this.asteroids };
 
     // 2. 更新舰船逻辑
-    for (const ship of this.capitalShips) {
+    for (const ship of this.combatShips) {
+      if (ship.isAttachedModule) {
+        let ai = this.moduleAI.get(ship);
+        if (!ai) { ai = new CapitalShipAI(ship, this.enemyShip); this.moduleAI.set(ship, ai); }
+        this.updateShipAI(ai, dt, projectileThreatIndex, weaponThreatEnvelope, fleetPlan);
+      }
       this.deployment.navigateRetreat(ship);
       const target = ship.fireControlMode === 'MANUAL'
         ? this.ships.find(other => other.id === ship.playerTargetId && !other.isDead && !other.isRetreated && !other.isDocked && other.isVisibleTo(ship.teamId))
@@ -776,7 +818,7 @@ export class CombatEngine {
       statsTracker: this.statsTracker,
       playerShip: this.playerShip,
       enemyShip: this.enemyShip,
-      ships: this.capitalShips,
+      ships: this.combatShips,
       componentShips: allShips,
       projectiles: this.projectiles,
       asteroids: this.asteroids,
@@ -800,7 +842,7 @@ export class CombatEngine {
     });
 
     // 3. 舰体物理碰撞与冲撞挤压 (如攻势级 Burn Drive 冲撞)
-    const capitals = this.capitalShips;
+    const capitals = this.combatShips;
     for (let i = 0; i < capitals.length; i++) for (let j = i + 1; j < capitals.length; j++) {
       this.collisionSystem.resolveShipToShipCollision(
       capitals[i],
@@ -815,6 +857,8 @@ export class CombatEngine {
       dt
     );
     }
+
+    for (const root of this.capitalShips) root.syncModuleTree();
 
     // 4. 更新投射物并进行空间多边形精确碰撞检测、高射炮近炸破片与高能死光扫射
     this.weaponSystem.update(dt, this.getWeaponSimContext());
@@ -831,6 +875,14 @@ export class CombatEngine {
     // 8. Include system drones/orphans; damage may arrive outside weapon callbacks.
     for (const ship of this.ships) {
       if (!ship.isDead && ship.hullHp <= 0) this.handleShipDestruction(ship);
+    }
+    for (const root of this.capitalShips) {
+      if (!root.isDead && root.isStation && root.childModules.length) {
+        const vital = root.assemblyShips.slice(1).filter(child => child.isCombatModule && !child.hasVastBulk);
+        if (vital.length && vital.every(child => child.isDead || child.hullHp <= 0)) {
+          root.hullHp = 0; this.handleShipDestruction(root);
+        }
+      }
     }
     this.deployment.advance();
     if (this.multiTeamBattle) {
@@ -849,7 +901,7 @@ export class CombatEngine {
       enemyShip: this.enemyShip,
       fighters: [...this.fighterSystem.fighters, ...this.fighterSystem.bombers],
       ships: this.ships,
-      capitalShips: this.capitalShips,
+      capitalShips: this.combatShips,
       hulkFragments: this.fxSystem.hulkFragments,
       fx: this.fxSystem,
       statsTracker: this.statsTracker,
@@ -877,6 +929,10 @@ export class CombatEngine {
     if (ship.isDead) return;
     if (this.suppressDestructionSideEffects) return;
     ship.isDead = true;
+    // Mark the parent first: explosion recursion must not destroy an assembly twice.
+    for (const child of ship.childModules) {
+      if (!child.isDead) { child.hullHp = 0; this.handleShipDestruction(child); }
+    }
     ship.clearInput();
     if (ship.flux.isVenting) ship.flux.cancelVenting();
     ship.shield.setActive(false);
@@ -885,7 +941,7 @@ export class CombatEngine {
     ship.defenseSystem.deactivate();
     ship.defenseSystem.disabled = true;
     const fighter = ship.spec.hullSize === 'FIGHTER';
-    if (!fighter && !this.transientCombatShips.has(ship)) {
+    if (!fighter && !ship.isAttachedModule && !this.transientCombatShips.has(ship)) {
       this.shipLossNotifications.push({
         id: ship.id, shipName: ship.shipName, hullName: i18n.t(ship.spec.nameKey).split(' (')[0],
         teamId: ship.teamId, time: this.notificationTime, status: 'destroyed'
@@ -966,3 +1022,6 @@ export class CombatEngine {
 const nativeCapitalAIUpdate = CapitalShipAI.prototype.update;
 const nativeUpdateShipAI = CombatEngine.prototype.updateShipAI;
 const nativePlanFleetAI = CombatEngine.prototype.planFleetAI;
+const nativeFindHostile = CombatEngine.prototype.findHostile;
+const nativeRosterReaders = ['allCapitalShips', 'capitalShips', 'combatShips', 'ships']
+  .map(key => [key, Object.getOwnPropertyDescriptor(CombatEngine.prototype, key)?.get] as const);

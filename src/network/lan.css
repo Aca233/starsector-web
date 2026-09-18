@@ -936,3 +936,36 @@
 .lan-battle-tools .lan-network-quality { font-size: 11px; color: #a5b9b3; white-space: normal; }
 .lan-battle-tools .lan-network-quality[data-quality="slow"] { color: #e2bc75; }
 .lan-battle-tools .lan-network-quality[data-quality="syncing"] { color: #e2bc75; }
+
+/* Keep the next lobby action visible instead of hiding it in a disabled button. */
+.lan-room-sidebar > .lan-room-progress { flex:0 1 auto; min-height:0; overflow-y:auto; margin:2px 0 10px; }
+.lan-room-progress { border:1px solid var(--ui-border); background:#091b21; padding:9px; font:12px/1.45 var(--ui-font); }
+.lan-room-progress > header { display:flex; flex-wrap:wrap; gap:4px 8px; justify-content:space-between; }
+.lan-room-progress > header strong { color:var(--ui-accent); }
+.lan-room-progress > header > span { color:var(--ui-dim); }
+.lan-room-progress ol { list-style:none; margin:8px 0; padding:0; display:grid; gap:6px; }
+.lan-room-progress li { display:grid; grid-template-columns:16px 1fr; color:var(--ui-text); }
+.lan-room-progress li > span { color:var(--ui-warning); }
+.lan-room-progress li[data-done="true"] > span { color:var(--ui-accent); }
+.lan-room-progress li small { grid-column:2; color:var(--ui-dim); overflow-wrap:anywhere; }
+.lan-room-progress > p { margin:6px 0 0; color:var(--ui-dim); overflow-wrap:anywhere; }
+.lan-room-next-actions,.lan-team-quick-actions { display:flex; flex-wrap:wrap; gap:5px; }
+.lan-room-next-actions .native-button,.lan-team-quick-actions .native-button { min-width:0; padding:5px 8px; font-size:12px; }
+.lan-team-quick-actions:empty { display:none; }
+.lan-team-quick-actions { margin-bottom:8px; }
+.lan-editor-tools .lan-team-controls { margin:0; }
+.lan-editor-primary { flex-wrap:wrap; justify-content:flex-end; }
+@media (max-height:800px), (max-width:849px) {
+  .lan-room-progress ol { grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; }
+  .lan-room-progress li { display:block; font-size:11px; }
+  .lan-room-progress li > span { margin-right:3px; }
+  .lan-room-progress li small { display:none; }
+  .lan-room-progress > p { max-height:54px; overflow-y:auto; }
+  .lan-room-sidebar > .lan-room-guidance { display:none; }
+}
+.lan-editor-tools .lan-room-tools { display:contents; }
+
+.lan-ai-assembly-filters { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:8px 0; }
+.lan-ai-assembly-filters button { padding:5px 12px; border:1px solid #456573; background:#08181f; color:#c7e1e5; cursor:pointer; }
+.lan-ai-assembly-filters button[aria-pressed="true"] { background:#244555; border-color:#9bd8d6; color:#edffff; }
+.lan-ai-assembly-filters span { margin-left:auto; font-size:12px; color:#9db0b1; }

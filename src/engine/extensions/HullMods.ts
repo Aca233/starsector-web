@@ -402,6 +402,8 @@ native('assault_package', '需军事化子系统：结构+10%、装甲+5%、幅�
 });
 native('nav_relay', '根据舰级为己方部署舰队提供2/3/4/5%航速加成，包含自身，上限20%。不提高加速度或转向。', {stats: s => ({navRating:bySize(s,[2,3,4,5])})});
 native('do_not_back_off', '非排幅期间禁止AI因高幅能而主动退避。仍遵守碰撞避让和显式命令。', {stats: () => ({doNotBackOff:1})});
+native('vastbulk', '空间站骨架：免疫结构和引擎损伤；作战模块全部摧毁后核心失效。', {stats: () => ({hullDamageMultiplier:0, engineDamageTakenMultiplier:0})});
+native('shared_flux_sink', '损失模块的50%基础耗散按比例分配给存活作战模块；额外耗散的20%可用于硬幅能。', {});
 native('axialrotation', '内置轴向自转控制器：持续右转，仍受真实转向加速度、转速和引擎故障限制。', {stats: () => ({forcedRightTurn:1})});
 native('faulty_auto', '最大战备值-5个百分点。人员需求和部署费用不模拟。', {stats: () => ({maxCombatReadinessBonus:-.05})});
 native('glitched_sensors', '实弹/能量射程×0.9；战役探测不模拟。', {rangeMultiplier: (_s,w) => w.weaponType === 'MISSILE' ? 1 : .9});

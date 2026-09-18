@@ -28,6 +28,11 @@ export interface ThreatAssessment {
 }
 const shieldMultiplier = (type: DamageType) => type === 'KINETIC' ? 2 : type === 'HIGH_EXPLOSIVE' ? .5 : type === 'FRAGMENTATION' ? .25 : 1;
 
+function weaponReadiness(m: import('../simulation/Weapon').WeaponMount): number {
+  const charge = m.firingState==='CHARGING' ? m.firingStateTimer : m.spec.isBeam ? m.spec.beamSourceChargeupTime ?? 0 : m.spec.chargeTime ?? 0;
+  return m.burstRemaining>0 ? m.burstTimer : Math.max(0,m.cooldownTimer)+charge;
+}
+
 /** Local forecast, not omniscient future simulation: actual trajectories plus earliest
  * plausible follow-up shots from every hostile, including recovery/turn/closing times. */
 export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number, defenseWindow: number): ThreatAssessment {
@@ -159,15 +164,22 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
       const approachTime = Math.max(0,distance-radius-range)/Math.max(1,motion.maxSpeed+relativeClosing);
       // Exact lower bound for the existing ETA, not a shorter awareness radius.
       if (approachTime > horizon) continue;
+      // The native envelope keeps weapon state stable within this AI query; unknown hooks retain
+      // their original field reads below. Do not query readiness for weapons
+      // already excluded by the original distance/approach bounds.
+      const readinessHint = envelope ? weaponReadiness(m) : undefined;
+      // Even perfect aim cannot arrive before recovery/readiness/approach plus
+      // travel. Equality and uncertain comparisons keep the original calculation.
+      const travelHint = envelope ? (m.spec.isBeam ? 0 : Math.max(0,Math.min(range,distance-radius))/Math.max(1,m.spec.maxSpeed ?? m.spec.projSpeed)) : undefined;
+      if (travelHint !== undefined && Math.max(recovery,readinessHint!,approachTime)+travelHint > horizon) continue;
       const base = enemy.facingRad+m.baseAngleDeg*Math.PI/180;
       const halfArc = m.mountType==='HARDPOINT' || (m.spec.turnRateDegPerSec ?? 1)<=0 ? 0 : m.arcDeg*Math.PI/360;
       const turn = Math.abs(signedAngle(delta.heading()-base));
       const hullTurnTime = Math.max(0,turn-halfArc-Math.asin(Math.min(1,radius/Math.max(1,distance))))/Math.max(.001,motion.maxTurnRate);
       const turretTime = halfArc>0 ? Math.abs(signedAngle(delta.heading()-m.currentAngleRad))/Math.max(.001,(m.spec.turnRateDegPerSec ?? 30)*Math.PI/180) : 0;
       const turnTime = m.spec.isGuided && m.spec.alwaysFire ? 0 : Math.max(hullTurnTime,turretTime);
-      const charge = m.firingState==='CHARGING' ? m.firingStateTimer : m.spec.isBeam ? m.spec.beamSourceChargeupTime ?? 0 : m.spec.chargeTime ?? 0;
-      const readiness = m.burstRemaining>0 ? m.burstTimer : Math.max(0,m.cooldownTimer)+charge;
-      const travel = m.spec.isBeam ? 0 : Math.max(0,Math.min(range,distance-radius))/Math.max(1,m.spec.maxSpeed ?? m.spec.projSpeed);
+      const readiness = readinessHint ?? weaponReadiness(m);
+      const travel = travelHint ?? (m.spec.isBeam ? 0 : Math.max(0,Math.min(range,distance-radius))/Math.max(1,m.spec.maxSpeed ?? m.spec.projSpeed));
       const eta = Math.max(recovery,readiness,turnTime,approachTime)+travel;
       // Forecast the first burst, not unlimited DPS over the entire vent horizon.
       const count = Math.min(m.ammo,Math.max(1,m.spec.burstSize ?? 1));

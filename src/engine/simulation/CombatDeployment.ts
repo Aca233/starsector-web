@@ -83,14 +83,14 @@ export class CombatDeployment {
     if (this.used(team)+cost>this.limit) return '超出本队可用部署点。';
   }
   /** Used by both catalog simulation waves and persistent/online reserves. */
-  public entryPosition(team: number, radius: number, occupied: readonly Ship[]): Vector2 {
+  public entryPosition(team: number, radius: number, occupied: readonly Ship[], stationary = false): Vector2 {
     const angle=this.angles.get(team) ?? (team===this.engine.playerShip.teamId ? Math.PI/2 : -Math.PI/2);
     const normal=Vector2.fromAngle(angle), tangent=new Vector2(-normal.y,normal.x);
     const edge=BATTLE_HALF_EXTENT/Math.max(Math.abs(normal.x),Math.abs(normal.y));
     for (let i=0;i<256;i++) {
       const lane=(i%2===0?1:-1)*Math.ceil(i/2)*(radius*2+220);
-      const pos=normal.clone().scale(edge+radius+200+Math.floor(Math.abs(lane)/8000)*(radius*2+220)).addScaled(tangent, lane%8000);
-      if (!occupied.some(s=>!s.isDead&&!s.isRetreated&&s.pos.distanceTo(pos)<s.spec.collisionRadius+radius+180)) return pos;
+      const pos=normal.clone().scale((stationary ? edge-radius-600 : edge+radius+200)+Math.floor(Math.abs(lane)/8000)*(radius*2+220)*(stationary?-1:1)).addScaled(tangent, lane%8000);
+      if (!occupied.some(s=>!s.isDead&&!s.isRetreated&&s.pos.distanceTo(pos)<(s.deploymentRadius ?? s.spec.collisionRadius)+radius+180)) return pos;
     }
     throw Error('本方入场边缘拥堵，请稍后部署。');
   }
@@ -98,7 +98,7 @@ export class CombatDeployment {
     const reason=this.reason(ids,team); if(reason)throw Error(reason);
     const occupied=[...this.engine.capitalShips], pending=ids.map(id=>this.entries.get(id)!);
     const positions:Vector2[]=[];
-    for (const e of pending) { const pos=this.entryPosition(team,e.ship.spec.collisionRadius,occupied); positions.push(pos); occupied.push({pos,spec:e.ship.spec,isDead:false,isRetreated:false} as Ship); }
+    for (const e of pending) { const pos=this.entryPosition(team,e.ship.deploymentRadius,occupied,e.ship.isStation); positions.push(pos); occupied.push({pos,spec:e.ship.spec,deploymentRadius:e.ship.deploymentRadius,isDead:false,isRetreated:false} as Ship); }
     pending.forEach((e,index)=>{
       e.ship.pos.copy(positions[index]); e.ship.prevPos.copy(e.ship.pos);
       e.ship.facingRad=e.ship.pos.clone().scale(-1).heading(); e.ship.prevFacingRad=e.ship.facingRad;
@@ -109,6 +109,7 @@ export class CombatDeployment {
   public requestRetreat(ids: readonly string[], team: number, withdrawReserves = false): void {
     if (this.engine.battleResult || (!ids.length && !withdrawReserves) || new Set(ids).size!==ids.length) throw Error('不能下达撤退。');
     const entries=ids.map(id=>this.entries.get(id));
+    if (entries.some(e=>e?.ship.isStation)) throw Error('空间站不能撤退。');
     if(entries.some(e=>!e||e.ship.teamId!==team||this.status(e)!=='deployed'))throw Error('只能撤退本队在场舰船。');
     if(withdrawReserves)for(const e of this.entries.values())if(e.ship.teamId===team&&e.pending)e.ship.isRetreated=true;
     for(const e of entries){ e!.ship.retreating=true; e!.ship.clearInput(); this.engine.orders.delete(e!.ship.id); }

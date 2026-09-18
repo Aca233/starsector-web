@@ -1,3 +1,4 @@
+import { RefitHint } from './RefitHint';
 import { factionIndex, matchesFaction } from './FactionModel';
 
 export function FactionFilter({ value, onChange, memberships, label }: {
@@ -7,7 +8,7 @@ export function FactionFilter({ value, onChange, memberships, label }: {
   label: string;
 }) {
   const count = (id: string) => memberships.filter(ids => matchesFaction(id, ids)).length;
-  return <label className="refit-faction-filter" title="按原版势力已知装备与舰队配置筛选；同一装备可以属于多个势力。">
+  return <RefitHint text="按原版势力已知装备与舰队配置筛选；同一装备可以属于多个势力。"><label className="refit-faction-filter" >
     <span>势力</span>
     <select aria-label={label} value={value} onChange={e => onChange(e.target.value)}>
       <option value="">全部势力（{memberships.length}）</option>
@@ -16,5 +17,5 @@ export function FactionFilter({ value, onChange, memberships, label }: {
       </option>)}
       <option value="__unassigned">未归类 / 特殊（{count("__unassigned")}）</option>
     </select>
-  </label>;
+  </label></RefitHint>;
 }

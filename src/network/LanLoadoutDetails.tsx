@@ -6,7 +6,7 @@ import { validateLanDesign } from './LanDesign';
 import { combatSkillDefinitions } from "../engine/extensions/CombatSkills";
 import { evaluate, data, weaponName, nativeRefit, designWingSlots, type Design } from '../studio/DesignModel';
 
-export function LanLoadoutDetails({member,onClose}:{member:Pick<Member,"name"|"hull"|"design">;onClose:()=>void}) {
+export function LanLoadoutDetails({member,onClose,warnings=[],returnLabel="返回房间"}:{member:Pick<Member,"name"|"hull"|"design">;onClose:()=>void;warnings?:string[];returnLabel?:string}) {
   let d: Design | null = null, result: ReturnType<typeof evaluate> | null = null, error = "";
   try {
     d=member.design ? validateLanDesign(member.design) : null;
@@ -21,5 +21,5 @@ export function LanLoadoutDetails({member,onClose}:{member:Pick<Member,"name"|"h
       <h3>战斗技能</h3><p>{Object.entries(d.captainSkills??{}).map(([id,level])=>(combatSkillDefinitions.find(s=>s.id===id)?.name??id)+(level===2?" · 精英":" · 普通")).join("、")||"未配置"}</p>
       <p>只读查看。真人配装由本人调整，AI 配装由房主调整；应用改装后取消全员准备。</p>
     </div> : <p>{LAN_SHIPS.find(s=>s.id===member.hull)?.name??member.hull} · 当前版本内置预设</p>;
-  return <Modal title={member.name+'的参战配装'} eyebrow="只读" onClose={onClose} footer={<NativeButton onClick={onClose}>返回房间</NativeButton>}>{description}</Modal>;
+  return <Modal title={member.name+'的参战配装'} eyebrow="只读" onClose={onClose} footer={<NativeButton onClick={onClose}>{returnLabel}</NativeButton>}>{description}{warnings.length>0&&<details className="lan-help"><summary>配装适配说明（{warnings.length}）</summary><ul>{warnings.map((warning,index)=><li key={index}>{warning}</li>)}</ul></details>}</Modal>;
 }

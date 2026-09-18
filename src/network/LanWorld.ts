@@ -2,6 +2,7 @@ import { aiLoadout, aiHullId } from "./ai-loadouts.mjs";
 import { battleTeamLimit } from "../shared/battle-size.mjs";
 import { deploymentCost } from "../engine/simulation/CombatDeployment";
 import { sameTeam } from "../engine/simulation/CombatTeams";
+import { updateCombatVisibility } from "../engine/simulation/systems/CombatVisibility";
 import { CombatEngine } from "../engine/simulation/CombatEngine";
 import { registerLanDesign } from "./LanDesign";
 import { createDesign } from "../studio/DesignModel";
@@ -43,9 +44,10 @@ export function createLanWorld(match: Match) {
   const controlled = new Map<Seat, Ship>();
   engine.multiTeamBattle = true;
   const teams = [...new Set(roster.map(entry=>entry.team))].sort((a,b)=>a-b);
-  const positions = match.options.aiHulls.map(()=>0);
-  const counts = match.options.aiHulls.map(()=>0);
-  for (const entry of roster) counts[entry.team]++;
+  engine.openBattlefield = teams.length >= 3;
+  const positions = new Map(teams.map(team => [team, 0]));
+  const counts = new Map(teams.map(team => [team, 0]));
+  for (const entry of roster) counts.set(entry.team, counts.get(entry.team)! + 1);
   const teamIndices = new Map(teams.map((team,index)=>[team,index]));
   for (const entry of roster) {
     const ship =
@@ -56,8 +58,9 @@ export function createLanWorld(match: Match) {
           : engine.addShip(entry.hull, entry.team === hostTeam, new Vector2(), 0, entry.team);
     ship.teamId = entry.team;
     // Stable construction order gives matching IDs on host and every viewer.
-    const index = positions[entry.team]++,
-      columns = Math.ceil(Math.sqrt(counts[entry.team]));
+    const index = positions.get(entry.team)!;
+    positions.set(entry.team, index + 1);
+    const columns = Math.ceil(Math.sqrt(counts.get(entry.team)!));
     const lateral = ((index % columns) - (columns - 1) / 2) * 1000;
     const teamIndex = teamIndices.get(entry.team)!;
     const angle = Math.PI / 2 + teamIndex * Math.PI * 2 / teams.length;
@@ -67,6 +70,7 @@ export function createLanWorld(match: Match) {
     ship.prevPos.copy(ship.pos);
     ship.facingRad = angle + Math.PI;
     ship.prevFacingRad = ship.facingRad;
+    ship.syncModuleTree(true);
     if (entry.seat !== undefined) controlled.set(entry.seat, ship);
   }
   const limit=battleTeamLimit(match.options.battleSize,teams.length), initialLimit=Math.min(match.options.initialDeploymentLimit??limit,limit);
@@ -84,7 +88,9 @@ export function createLanWorld(match: Match) {
     craft.pos.copy(craft.sourceCarrier.pos); craft.prevPos.copy(craft.pos);
     craft.facingRad = craft.sourceCarrier.facingRad; craft.prevFacingRad = craft.facingRad;
   }
-  for (const wing of [...engine.playerWings,...engine.enemyWings]) wing.teamId = engine.capitalShips.find(ship=>ship.id===wing.carrierId)?.teamId;
+  for (const wing of [...engine.playerWings,...engine.enemyWings]) wing.teamId = engine.combatShips.find(ship=>ship.id===wing.carrierId)?.teamId;
+  // The initial frame obeys the same sensor policy as subsequent authority ticks.
+  updateCombatVisibility(engine.ships, engine.openBattlefield);
   for (const ship of engine.capitalShips)
     ship.currentTargetShip = engine.findHostile(ship) ?? null;
   return { engine, controlled };

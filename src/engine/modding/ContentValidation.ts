@@ -255,9 +255,38 @@ function validateEngineSlot(slotInput: unknown, shipId: string, index: number): 
   return slot as unknown as EngineSlotConfig;
 }
 
-export function validateShipSpec(input: unknown, options: ShipValidationOptions = {}): asserts input is ShipSpec {
+export function validateShipSpec(input: unknown, options: ShipValidationOptions = {}, graph = { depth: 0, count: 0 }): asserts input is ShipSpec {
+  if (graph.depth > 8 || ++graph.count > 128) throw new Error('Module graph exceeds 8 levels / 128 entities');
   const registry = options.registry ?? contentRegistry;
   const spec = object(input, '舰船规格');
+  if (spec.moduleCombat !== undefined && typeof spec.moduleCombat !== 'boolean') throw new Error('Invalid active module flag');
+  if (spec.isModuleHull !== undefined && typeof spec.isModuleHull !== 'boolean') throw new Error('Invalid module hull flag');
+  if (spec.moduleAnchor !== undefined) {
+    if (!Array.isArray(spec.moduleAnchor) || spec.moduleAnchor.length !== 2) throw new Error('Invalid module anchor');
+    spec.moduleAnchor.forEach((n: unknown) => finite(n, 'moduleAnchor'));
+  }
+  const moduleSlots = new Map<string, Record<string, unknown>>();
+  if (spec.moduleSlots !== undefined) {
+    if (!Array.isArray(spec.moduleSlots) || spec.moduleSlots.length > 64) throw new Error('Invalid module slots');
+    for (const raw of spec.moduleSlots) {
+      const slot = object(raw, 'moduleSlot'), id = text(slot.slotId, 'moduleSlot.slotId');
+      if (moduleSlots.has(id)) throw new Error('Duplicate module slot: ' + id);
+      for (const key of ['x', 'y', 'angleDeg']) finite(slot[key], 'moduleSlot.' + key);
+      moduleSlots.set(id, slot);
+    }
+  }
+  if (spec.modules !== undefined) {
+    if (!Array.isArray(spec.modules) || spec.modules.length > 64) throw new Error('Invalid modules');
+    const used = new Set<string>();
+    for (const raw of spec.modules) {
+      const module = object(raw, 'module'), slot = moduleSlots.get(text(module.slotId, 'module.slotId'));
+      if (!slot || used.has(String(module.slotId))) throw new Error('Missing/duplicate module mount: ' + module.slotId);
+      used.add(String(module.slotId));
+      for (const key of ['x', 'y', 'angleDeg']) if (module[key] !== slot[key]) throw new Error('Module transform differs from mount');
+      graph.depth++;
+      try { validateShipSpec(module.spec, { ...options, allowExistingId: true }, graph); } finally { graph.depth--; }
+    }
+  }
   if (spec.overloadColor !== undefined) colorTuple(spec.overloadColor, '舰船规格.overloadColor', 3);
   const id = text(spec.id, 'ship.id');
   if (spec.sourceHullId !== undefined && !/^[A-Za-z0-9._-]+$/.test(text(spec.sourceHullId, 'ship.sourceHullId'))) throw new Error('Invalid source hull identity');
@@ -272,7 +301,7 @@ export function validateShipSpec(input: unknown, options: ShipValidationOptions 
   finite(spec.pivotY, `${id}.pivotY`, 0, spriteHeight);
 
   for (const key of ['collisionRadius', 'mass', 'maxSpeed', 'acceleration', 'deceleration', 'maxTurnRateDeg', 'turnAccelerationDeg', 'hitpoints', 'armorRating', 'maxFlux', 'fluxDissipation', 'shieldRadius', 'shieldEfficiency'] as const) {
-    finite(spec[key], `${id}.${key}`, ['maxSpeed', 'armorRating', 'fluxDissipation', 'shieldEfficiency', 'shieldRadius'].includes(key) ? 0 : 0.000001);
+    finite(spec[key], `${id}.${key}`, ['maxSpeed', 'acceleration', 'deceleration', 'maxTurnRateDeg', 'turnAccelerationDeg', 'armorRating', 'fluxDissipation', 'shieldEfficiency', 'shieldRadius'].includes(key) ? 0 : 0.000001);
   }
   if (spec.shieldUpkeepBaseDissipation !== undefined) finite(spec.shieldUpkeepBaseDissipation, `${id}.shieldUpkeepBaseDissipation`, 0);
   integer(spec.armorCols, `${id}.armorCols`, 1, 256);

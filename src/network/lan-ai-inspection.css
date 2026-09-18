@@ -1,0 +1,16 @@
+/* Native ship tooltip composition, not a dashboard card or a permanent side pane. */
+.lan-ai-inspection.native-dwell { width: min(390px, calc(100dvw - 16px)); }
+.lan-ai-inspection-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.lan-ai-inspection-heading > .lan-hull-thumbnail { flex: none; width: 64px; height: 74px; padding: 2px; border: 0; background: none; }
+.lan-ai-inspection-heading > .lan-hull-thumbnail img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.lan-ai-inspection-heading > div { flex: 1; min-width: 0; }
+.lan-ai-inspection.native-dwell .lan-ai-inspection-heading h3 { margin-bottom: 4px; }
+.lan-ai-inspection.native-dwell .lan-ai-inspection-heading p { margin: 2px 0; }
+.lan-ai-inspection .refit-inspection-list li + li { border: 0; }
+.lan-ai-inspection .refit-inspection-item { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 3px 2px; font: 15px/17px var(--native-font-body); }
+.lan-ai-inspection .refit-inspection-item > span { min-width: 0; }
+.lan-ai-inspection .refit-inspection-item small { flex: 0 1 auto; margin: 0; color: #888; font: 12px/16px var(--native-font-body); text-align: right; }
+.lan-ai-inspection .refit-inspection-item:hover, .lan-ai-inspection .refit-inspection-item:focus-visible { background: #17444f80; }
+.lan-ai-inspection-footnote { color: #888; font: 12px/16px var(--native-font-body); }
+.lan-ai-inspection-notices { border: 0; background: none; padding: 2px 0; color: #ff9700; font: 12px/16px var(--native-font-body); cursor: help; text-align: left; }
+.lan-ai-inspection-notices:hover, .lan-ai-inspection-notices:focus-visible { color: #ffe000; }

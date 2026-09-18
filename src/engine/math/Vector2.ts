@@ -1,3 +1,17 @@
+// Two-coordinate scaled norm: retain hypot's overflow/subnormal handling without
+// its variadic accumulator. Capture the intrinsics, but respect a replaced hypot.
+const builtinHypot = Math.hypot, normAbs = Math.abs, normSqrt = Math.sqrt;
+const applyNorm = Reflect.apply;
+const nativeNormIntrinsics = [[builtinHypot, "hypot"], [normAbs, "abs"], [normSqrt, "sqrt"]]
+  .every(([fn, name]) => typeof fn === "function" && Function.prototype.toString.call(fn) === `function ${name}() { [native code] }`);
+function norm2(x: number, y: number): number {
+  const a = normAbs(x), b = normAbs(y);
+  if (a === Infinity || b === Infinity) return Infinity;
+  const max = a > b ? a : b;
+  if (max === 0 && a === 0) return 0;
+  const ratio = (a > b ? b : a) / max;
+  return normSqrt(1 + ratio * ratio) * max;
+}
 /**
  * 高性能 2D 向量计算工具类 (Vector2)
  * 支持纯函数计算与零垃圾回收 (Zero Allocation) 内存复用
@@ -72,7 +86,8 @@ export class Vector2 {
   }
 
   public length(): number {
-    return Math.hypot(this.x, this.y);
+    const math = Math, hypot = math.hypot, x = this.x, y = this.y;
+    return nativeNormIntrinsics && hypot === builtinHypot ? norm2(x, y) : applyNorm(hypot, math, [x, y]);
   }
 
   public normalize(): this {
@@ -99,7 +114,8 @@ export class Vector2 {
   }
 
   public distanceTo(v: Vector2): number {
-    return Math.hypot(this.x - v.x, this.y - v.y);
+    const math = Math, hypot = math.hypot, x = this.x - v.x, y = this.y - v.y;
+    return nativeNormIntrinsics && hypot === builtinHypot ? norm2(x, y) : applyNorm(hypot, math, [x, y]);
   }
 
   public heading(): number {

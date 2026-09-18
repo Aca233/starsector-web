@@ -1,5 +1,7 @@
 import { teamName, checkFleetBudget, editAiFleet } from "../src/network/room-fleet.mjs";
 import { MAX_BATTLE_REPORT_BYTES, validateBattleReport } from "../src/network/battle-report.mjs";
+import { summarizeCombatFrame, reusableStateText } from "./lan-state.mjs";
+import { decodeBinaryState } from "../src/network/BinarySnapshot.mjs";
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -39,7 +41,12 @@ const mime = {
 export async function createLanServer({
   host = "0.0.0.0",
   port = 3001,
+  extension = null,
   dist = path.join(project, "dist"),
+  // Localhost hosts can share immutable AI input with their own Workers.
+  // Plain HTTP LAN-IP guests remain supported without SharedArrayBuffer.
+  isolated = true,
+  portable = null,
 } = {}) {
   const root = fs.realpathSync(dist);
   const { build } = JSON.parse(
@@ -77,7 +84,8 @@ export async function createLanServer({
   const addresses = () =>
     Object.values(networkInterfaces())
       .flat()
-      .filter((n) => n && n.family === "IPv4" && !n.internal)
+      .filter((n) => n && n.family === "IPv4" && !n.internal
+        && (["0.0.0.0", "::"].includes(host) || n.address === host))
       .map(
         (n) =>
           "http://" + n.address + ":" + server.address().port + "/?view=lan",
@@ -88,8 +96,13 @@ export async function createLanServer({
       res.end("Host not allowed");
       return;
     }
+    if (isolated) {
+      res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+      res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+    }
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Referrer-Policy", "same-origin");
+    if (extension?.http?.(req, res)) return;
     if (!["GET", "HEAD"].includes(req.method)) {
       res.writeHead(405);
       res.end();
@@ -106,6 +119,7 @@ export async function createLanServer({
             protocol: protocol.version,
             build,
             addresses: addresses(),
+            ...(portable ? { portable } : {}),
           }),
         );
         return;
@@ -163,27 +177,21 @@ export async function createLanServer({
     return true;
   };
   const send = (p, message) => sendEncoded(p, JSON.stringify(message));
-  const broadcast = (r, message, except) => {
-    const encoded = JSON.stringify(message);
+  const broadcast = (r, message, except, encoded) => {
+    // Encode lazily, once per broadcast; validated host states can reuse their text.
     for (const p of r.peers) {
-      if (p === except) continue;
+      if (p === except || !connected(p)) continue;
       // Snapshots are replaceable. Do not queue stale views behind a slow receiver.
       if (message.type === "state") {
-        const now = Date.now();
-        if (p.ws.bufferedAmount > 0) {
-          if (now - p.deliveryChanged > 1000) {
-            p.deliveryHz = p.deliveryHz > 10 ? 10 : p.deliveryHz > 5 ? 5 : 2;
-            p.deliveryChanged = now;
-          }
-          continue;
-        }
-        if (now - p.deliveryChanged > 10000 && p.deliveryHz < 20) {
-          p.deliveryHz = p.deliveryHz < 5 ? 5 : p.deliveryHz < 10 ? 10 : 20;
-          p.deliveryChanged = now;
-        }
-        if (p.loaded && now < p.nextStateAt) continue;
-        p.nextStateAt = now + 1000 / p.deliveryHz - 3;
+        // Resource readiness is distinct from controls-ready: syncing peers still
+        // need the next full frame. Loading/hidden peers cannot present it yet;
+        // returning visible peers request a fresh baseline through resync.
+        if (!p.assetsLoaded || p.background) continue;
+        // Forward every host tick to a ready peer. A busy socket still skips
+        // replaceable state instead of accumulating stale megabyte snapshots.
+        if (p.ws.bufferedAmount > 0) continue;
       }
+      encoded ??= JSON.stringify(message);
       sendEncoded(p, encoded);
     }
   };
@@ -195,6 +203,7 @@ export async function createLanServer({
     match: r.match,
     reason: r.reason,
     options: r.options,
+    ...(r.network ? { network: r.network } : {}),
     passwordProtected: !!r.passwordHash,
     chat: r.chat,
     members: r.peers.map((p) => ({
@@ -227,12 +236,14 @@ export async function createLanServer({
     syncSolo(r);
     if (["lobby", "ended"].includes(r.status)) r.options.deploymentLimit = battleTeamLimit(r.options.battleSize, battleTeamCount(r.peers,r.options.aiHulls));
     broadcast(r, { type: "room", room: view(r) });
+    extension?.roomChanged?.(r);
   };
   const presence = (r, p, online) =>
     send(r.peers[0], {
       type: "presence",
       matchId: r.match?.id,
       seat: p.seat,
+      connected: p.room === r && connected(p),
       online,
     });
   // Loading resources is not permission to send controls. A fresh full frame must
@@ -319,12 +330,13 @@ export async function createLanServer({
       const origin = new URL(req.headers.origin ?? "");
       if (
         !validHost(req) ||
-        req.url !== "/lan/ws" ||
+        (req.url !== "/lan/ws" && !extension?.isUpgrade?.(req.url)) ||
         !["http:", "https:"].includes(origin.protocol) ||
         origin.host !== req.headers.host ||
         peers.size >= 64
       )
         throw Error("upgrade");
+      if (extension?.isUpgrade?.(req.url)) { extension.upgrade(req, socket, head); return; }
       wss.handleUpgrade(req, socket, head, (ws) =>
         wss.emit("connection", ws, req),
       );
@@ -333,9 +345,10 @@ export async function createLanServer({
       socket.destroy();
     }
   });
-  wss.on("connection", (ws) => {
+  const acceptTransport = (ws, transport = null) => {
     let p = {
       ws,
+      transport,
       id: randomUUID(),
       name: "",
       hello: false,
@@ -350,9 +363,6 @@ export async function createLanServer({
       loaded: false,
       assetsLoaded: false,
       sync: null,
-      deliveryHz: 20,
-      nextStateAt: 0,
-      deliveryChanged: 0,
       seq: -1,
       action: -1,
       lastPong: Date.now(),
@@ -364,6 +374,7 @@ export async function createLanServer({
       instance: "",
       lastChat: 0,
       lastResync: 0,
+      background: false,
     };
     peers.add(p);
     ws.on("pong", () => {
@@ -388,7 +399,8 @@ export async function createLanServer({
       if (p.ws !== ws) return;
       let requestId;
       try {
-        if (binary) throw Error("仅接受 JSON 消息");
+        if (binary && (!p.hello || p.transport || !p.room || p.room.hostId !== p.id))
+          throw Error("只有局域网计算主机可以发送二进制状态");
         const now = Date.now();
         if (now - p.window >= 1000) {
           p.window = now;
@@ -398,9 +410,10 @@ export async function createLanServer({
           ws.close(1008, "Rate limit");
           return;
         }
-        const m = JSON.parse(raw.toString());
+        const text = binary ? null : raw.toString();
+        const m = binary ? decodeBinaryState(raw) : JSON.parse(text);
         if (!m || typeof m.type !== "string") throw Error("无效消息");
-        if (["configure","ai"].includes(m.type) && typeof m.requestId === "string" && /^[a-zA-Z0-9-]{1,64}$/.test(m.requestId)) requestId = m.requestId;
+        if (["configure","ai","ready","start"].includes(m.type) && typeof m.requestId === "string" && /^[a-zA-Z0-9-]{1,64}$/.test(m.requestId)) requestId = m.requestId;
         if (m.type !== "state" && raw.length > (["configure","ai"].includes(m.type) ? MAX_DESIGN_BYTES * 4 + 4096 : m.type === "options" ? protocol.maxOptionsBytes + 4096 : m.type === "finish" ? MAX_BATTLE_REPORT_BYTES + 4096 : 16384)) {
           ws.close(1009, "Message too large");
           return;
@@ -445,6 +458,11 @@ export async function createLanServer({
               ws.close(4003, "Resume expired");
               return;
             }
+            if ((previous.transport?.identity ?? "") !== (transport?.identity ?? "") || (previous.transport?.scope ?? "") !== (transport?.scope ?? "")) {
+              send(p, { type: "error", code: "RESUME_EXPIRED", message: "重连身份或 Steam 房间不匹配。" });
+              ws.close(4003, "Identity mismatch");
+              return;
+            }
             peers.delete(p);
             const old = previous.ws;
             hostReload =
@@ -453,11 +471,11 @@ export async function createLanServer({
             p = previous;
             p.ws = ws;
             p.disconnected = 0;
+            // Retain visibility until the resumed page reports it. A previously
+            // hidden host returning visible still needs fresh-state grace.
             p.loaded = false;
             p.assetsLoaded = false;
             p.sync = null;
-            p.deliveryHz = 20;
-            p.nextStateAt = 0;
             p.lastPong = now;
             p.window = now;
             p.count = 0;
@@ -497,6 +515,9 @@ export async function createLanServer({
                 r,
                 "计算主机页面已重新加载，无法恢复权威模拟。请重新准备开局。",
               );
+            // Reclaim manual ownership immediately, before the resumed page has
+            // reloaded resources. Being connected is not yet permission for input.
+            if (["loading", "running"].includes(r.status)) presence(r, p, false);
             publish(r);
             if (["loading", "running"].includes(r.status)) {
               send(p, { type: "match", match: r.match });
@@ -509,6 +530,16 @@ export async function createLanServer({
           }
           return;
         }
+        if (m.type === "visibility") {
+          if (typeof m.hidden !== "boolean") throw Error("无效页面可见状态");
+          // Repeating a visibility message never renews the inactivity deadline.
+          if (p.background && !m.hidden && p.room?.hostId === p.id && p.room.status === "running") {
+            const r = p.room;
+            r.recoveryUntil = Math.min(now + protocol.hostStateTimeoutMs, r.lastState + protocol.backgroundGraceMs);
+          }
+          p.background = m.hidden;
+          return;
+        }
         if (m.type === "ping") {
           send(p, { type: "pong", sent: m.sent });
           return;
@@ -519,6 +550,7 @@ export async function createLanServer({
           return;
         }
         if (m.type === "create") {
+          if (p.transport && !p.transport.canHost) throw Error("只有 Steam 大厅房主可以创建游戏房间。");
           if (p.room) throw Error("请先离开当前房间");
           if (rooms.size >= 16) throw Error("房间数量已满");
           const battleSize = m.battleSize ?? DEFAULT_BATTLE_SIZE;
@@ -535,6 +567,8 @@ export async function createLanServer({
             code,
             capacity: protocol.defaultCapacity,
             hostId: p.id,
+            scope: p.transport?.scope ?? "",
+            network: p.transport ? { kind: "steam", lobbyId: p.transport.scope, appId: p.transport.appId } : null,
             peers: [p],
             status: "lobby",
             match: null,
@@ -561,7 +595,8 @@ export async function createLanServer({
         if (m.type === "join") {
           if (p.room) throw Error("请先离开当前房间");
           const r = rooms.get(String(m.code).trim().toUpperCase());
-          if (!r) throw Error("房间不存在");
+          if (!r || (r.scope ?? "") !== (p.transport?.scope ?? "")) throw Error("房间不存在或连接方式不匹配");
+          if (p.transport && r.peers.some(member => member.id !== p.id && member.transport?.identity === p.transport.identity)) throw Error("这个 Steam 账号已占用席位，请在原页面重连或等待席位释放。");
           if (r.peers.length >= r.capacity)
             throw Error("房间已满；掉线玩家的席位会保留 30 秒");
           editable(r);
@@ -608,8 +643,7 @@ export async function createLanServer({
         }
         if (m.type === "ai") {
           isHost(p, r); editable(r);
-          if(m.requestId !== undefined && !requestId)throw Error('配装请求标识无效');
-          if(m.operation==='refit' && (!requestId || m.roomCode!==r.code))throw Error('缺少 AI 改装确认信息');
+          if(!requestId || m.roomCode!==r.code || !Number.isSafeInteger(m.baseRevision))throw Error('缺少 AI 编成确认信息，请刷新页面后重新操作');
           const next=editAiFleet(r.options,m,protocol.maxOptionsBytes,protocol.maxPlayers);
           if(!validOptions(next))throw Error('不支持此 AI 舰体或配装引用');
           r.options=next;
@@ -744,7 +778,7 @@ export async function createLanServer({
                 hull,
                 design: design ? structuredClone(design) : null,
               })),
-            snapshotHz: 20, // Worker adapts to deployed complexity and observed congestion, not reserves.
+            snapshotHz: protocol.snapshotHz, // Fixed target; bounded sockets may still skip congested state.
             options: copyOptions(r.options),
           };
           r.status = "loading";
@@ -759,8 +793,6 @@ export async function createLanServer({
             member.loaded = false;
             member.assetsLoaded = false;
             member.sync = null;
-            member.deliveryHz = 20;
-            member.nextStateAt = 0;
             member.ready = false;
           }
           publish(r);
@@ -919,28 +951,18 @@ export async function createLanServer({
           if (r.status !== "running") return;
           if (!Number.isSafeInteger(m.seq) || m.seq <= r.lastSeq) return;
           const f = m.frame;
-          if (
-            !f ||
-            !Number.isSafeInteger(f.tick) ||
-            f.tick <= r.lastTick ||
-            !Array.isArray(f.ships) ||
-            f.ships.length !== expectedShips(r) ||
-            new Set(f.ships.map((s) => s.id)).size !== f.ships.length ||
-            !Array.isArray(f.crafts) ||
-            !Array.isArray(f.craftSpecs) ||
-            new Set([...f.ships, ...f.crafts].map((s) => s.id)).size !== f.ships.length + f.crafts.length ||
-            !f.world ||
-            typeof f.world !== "object"
-          )
-            throw Error("无效战斗状态");
+          const summary = summarizeCombatFrame(f, expectedShips(r), r.lastTick);
           r.lastSeq = m.seq;
           r.lastTick = f.tick;
           r.lastState = now;
-          r.frame = f;
+          // Rejoin waits for a fresh frame; only deployment/report validation
+          // needs retained state, not the weapon, projectile or effect graph.
+          r.frame = summary;
           broadcast(
             r,
             { type: "state", matchId: r.match.id, seq: m.seq, frame: f },
             p,
+            binary ? raw : reusableStateText(m, text),
           );
           return;
         }
@@ -973,7 +995,8 @@ export async function createLanServer({
         });
       }
     });
-  });
+  };
+  wss.on("connection", ws => acceptTransport(ws));
   const timer = setInterval(() => {
     const now = Date.now();
     for (const p of peers) {
@@ -996,19 +1019,29 @@ export async function createLanServer({
         r.status === "running" &&
         connected(r.peers[0]) &&
         now > (r.recoveryUntil ?? 0) &&
-        now - r.lastState > 12000
+        now - r.lastState > (r.peers[0].background ? protocol.backgroundGraceMs : protocol.hostStateTimeoutMs)
       )
-        abort(r, "计算主机超过 12 秒未更新，恢复超时，本局停止。");
+        abort(r, r.peers[0].background
+          ? "计算主机后台超过 5 分钟未更新，恢复超时，本局停止。"
+          : "计算主机超过 12 秒未更新，恢复超时，本局停止。");
     }
   }, 1000);
   timer.unref();
-  await new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(port, host, resolve);
-  });
+  try {
+    await new Promise((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(port, host, resolve);
+    });
+  } catch (error) {
+    clearInterval(timer);
+    wss.close();
+    throw error;
+  }
   return {
     server,
     rooms,
+    acceptTransport,
+    closeRoom: code => { const room = rooms.get(code); if (room) leave(room.peers[0]); },
     addresses: addresses(),
     close: async () => {
       clearInterval(timer);

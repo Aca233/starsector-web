@@ -1,8 +1,12 @@
+import { DwellReader } from './DwellTooltip';
+import { RefitHint } from './RefitHint';
+import { useMemo } from "react";
+import { RefitHoverTerm, type RefitHoverTermId } from "./RefitHoverTerms";
 import { NativeBitmapText } from "../ui/NativeBitmapText";
 import { runtimeAssetUrl } from "../engine/runtime/RuntimePaths";
-import type { WeaponMountSlotConfig } from "../engine/content/ShipSpec";
+import type { ShipSpec, WeaponMountSlotConfig } from "../engine/content/ShipSpec";
 import type { WeaponSpec } from "../engine/simulation/Weapon";
-import { nativeRefit, designHullSpec, weaponOPCost, damageNames, isBuiltIn, sizes, types, weaponFluxPerSecond, weaponName } from "./DesignModel";
+import { nativeRefit, evaluate, weaponOPCost, damageNames, isBuiltIn, sizes, types, weaponFluxPerSecond, weaponName } from "./DesignModel";
 import type { Design } from "./DesignModel";
 import { effectiveHullModWeaponSpec } from "../engine/extensions/HullMods";
 import { effectiveWeaponRange } from "../engine/simulation/WeaponRange";
@@ -31,18 +35,24 @@ export function WeaponIcon({ weapon }: { weapon: WeaponSpec }) {
 }
 
 /** Shared original/fitted weapon data for picker rows and installed hull mounts. */
-export function WeaponInformation({ candidate, installed, draft, selected, compare = false, isCurrent = false, showFitted, onToggleFitted, onOpenCodex }: {
+export function WeaponInformation({ candidate, installed, draft, selected, compare = false, isCurrent = false, showFitted, onToggleFitted, onOpenCodex, shipSpec, previewInstallation = false }: {
   candidate: WeaponSpec; installed?: WeaponSpec; draft: Design; selected: WeaponMountSlotConfig;
   compare?: boolean; isCurrent?: boolean; showFitted: boolean;
+  shipSpec?: ShipSpec; previewInstallation?: boolean;
   onToggleFitted: () => void; onOpenCodex?: (weapon: WeaponSpec) => void;
 }) {
   const meta = weaponMetadata[candidate.id];
   const paragraphs = meta?.description.split(/\r?\n\r?\n/) ?? [];
-  const hullSpec = designHullSpec(draft);
+  const currentSpec = useMemo(() => shipSpec ?? evaluate(draft).spec, [draft, shipSpec]);
+  const hullSpec = useMemo(() => !previewInstallation ? currentSpec : { ...currentSpec,
+    weaponSlots: currentSpec.weaponSlots.map(slot => slot.slotId === selected.slotId ? { ...slot, defaultWeaponId: candidate.id } : slot) },
+    [currentSpec, previewInstallation, selected.slotId, candidate.id]);
   const locked = isBuiltIn(draft.hullId, selected.slotId);
   const costOf = (w: WeaponSpec) => locked ? 0 : weaponOPCost(draft, w.id);
-  const rangeOf = (w: WeaponSpec) => showFitted ? effectiveWeaponRange(hullSpec, w) : w.range;
-  const fitted = (w: WeaponSpec) => showFitted ? effectiveHullModWeaponSpec(hullSpec, w) : w;
+  const specOf = (w: WeaponSpec) => previewInstallation && installed?.id === w.id && w.id !== candidate.id ? currentSpec : hullSpec;
+  const rangeOf = (w: WeaponSpec) => showFitted ? effectiveWeaponRange(specOf(w), w) : w.range;
+  const fitted = (w: WeaponSpec) => showFitted ? effectiveHullModWeaponSpec(specOf(w), w) : w;
+  const terms: Record<string, RefitHoverTermId> = { '战术应用': 'role', '安装类型': 'mount', '伤害': 'hitDamage', '精确度': 'accuracy', '转向速度': 'turnRate', '弹药容量': 'ammo', '装配点数': 'op', '武器射程': 'range', '伤害 / 秒': 'dps', '幅能 / 秒': 'flux', '幅能 / 每发射弹': 'shotFlux', '幅能 / 伤害': 'efficiency', '伤害类型': 'damage', '开火间隔 (秒)': 'cycle' };
   const stat = (label: string, read: (weapon: WeaponSpec) => number | string) =>
     candidate && (
       <div
@@ -50,14 +60,14 @@ export function WeaponInformation({ candidate, installed, draft, selected, compa
         key={label}
         data-compare={compare}
       >
-        <dt>{label}</dt>
+        <dt>{terms[label] ? <RefitHoverTerm term={terms[label]}>{label}</RefitHoverTerm> : label}</dt>
         {compare && (
           <dd className="source-weapon-compare">{read(installed!)}</dd>
         )}
         <dd>{read(candidate)}</dd>
       </div>
     );
-  return <>
+  return <DwellReader>
     <h3>
       <NativeBitmapText font="body" color="currentColor">{weaponName(candidate.id)}</NativeBitmapText>
       {isCurrent && <em> - 当前安装</em>}
@@ -69,7 +79,7 @@ export function WeaponInformation({ candidate, installed, draft, selected, compa
       {paragraphs[0]}
     </p>
     {paragraphs.length > 1 && <p className="source-weapon-attribution">{paragraphs.slice(1).join("\n\n")}</p>}
-    <h4 className="source-weapon-stat-title"><button onClick={onToggleFitted} title="点击切换原始数据 / 当前舰船插件加成后的数据">{showFitted ? "舰装后数据" : "原始数据"}{compare && <span>（当前安装 / 预览）</span>}</button></h4>
+    <h4 className="source-weapon-stat-title"><RefitHint text="点击切换原始数据 / 当前舰船插件加成后的数据"><button onClick={onToggleFitted}>{showFitted ? "舰装后数据" : "原始数据"}{compare && <span>（当前安装 / 预览）</span>}</button></RefitHint></h4>
     <div className="source-weapon-primary">
       <WeaponIcon weapon={candidate} />
       <dl>
@@ -88,17 +98,17 @@ export function WeaponInformation({ candidate, installed, draft, selected, compa
         {stat(
           "伤害",
           (w) =>
-            formatWeaponNumber(w.isBeam ? w.damagePerSecond : w.damagePerShot) +
+            formatWeaponNumber(w.isBeam ? fitted(w).damagePerSecond : fitted(w).damagePerShot) +
             (w.isBeam ? "/秒" : ""),
         )}
-        {stat("伤害 / 秒", (w) => formatWeaponNumber(dps(w)))}
+        {stat("伤害 / 秒", (w) => formatWeaponNumber(dps(fitted(w))))}
         <div className="source-weapon-stat-gap" />
         {stat("幅能 / 秒", (w) => formatWeaponNumber(weaponFluxPerSecond(fitted(w))))}
         {stat("幅能 / 每发射弹", (w) =>
           w.isBeam ? "—" : formatWeaponNumber(fitted(w).fluxPerShot),
         )}
         {stat("幅能 / 伤害", (w) =>
-          dps(w) ? Number((weaponFluxPerSecond(fitted(w)) / dps(w)).toFixed(2)).toString() : "—",
+          dps(fitted(w)) ? Number((weaponFluxPerSecond(fitted(w)) / dps(fitted(w))).toFixed(2)).toString() : "—",
         )}
       </dl>
     </div>
@@ -132,7 +142,7 @@ export function WeaponInformation({ candidate, installed, draft, selected, compa
         {stat("开火间隔 (秒)", (w) =>
           w.isBeam && w.beamVisualMode !== "BURST"
             ? "持续"
-            : formatWeaponNumber(cycleSeconds(w)),
+            : formatWeaponNumber(cycleSeconds(fitted(w))),
         )}
         {candidate.maxAmmo !== undefined &&
           stat("弹药容量", (w) => fitted(w).maxAmmo ?? "无限")}
@@ -145,5 +155,5 @@ export function WeaponInformation({ candidate, installed, draft, selected, compa
     >
       按 <kbd>F2</kbd> 打开数据百科
     </button>}
-  </>;
+  </DwellReader>;
 }

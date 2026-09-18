@@ -1,3 +1,5 @@
+import { MotionPresence } from '../ui/core/MotionPresence';
+import { FullscreenButton } from '../ui/FullscreenButton';
 import { useEffect, useState } from 'react';
 import { Modal } from '../ui/core/UI';
 import { LocalBattleSizeSettings } from '../ui/BattleSizeControl';
@@ -5,7 +7,7 @@ import { NativeButton } from '../ui/NativeChrome';
 import { runtimeAssetUrl } from '../engine/runtime/RuntimePaths';
 import { hullCount, weaponCount } from 'virtual:studio-summary';
 
-export function NativeHome({ onEnter, onSkills, onLan }: { onEnter: () => void; onSkills: () => void; onLan?: () => void }) {
+export function NativeHome({ onEnter, onSkills, onLan, onSteam, entryError }: { onEnter: () => void; onSkills: () => void; onLan?: () => void; onSteam?: () => void; entryError?: string }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => { document.title = "远行星号 · 舰船设计"; }, []);
   useEffect(() => {
@@ -20,6 +22,7 @@ export function NativeHome({ onEnter, onSkills, onLan }: { onEnter: () => void; 
   }, [onEnter, onSkills]);
   return (
     <main className="native-home">
+      <div className="fullscreen-home-control"><FullscreenButton /></div>
       <img
         className="native-title-logo"
         src={runtimeAssetUrl(
@@ -33,13 +36,15 @@ export function NativeHome({ onEnter, onSkills, onLan }: { onEnter: () => void; 
         </NativeButton>
         <NativeButton shortcut="C" onClick={onSkills} data-skills-entry>角色技能</NativeButton>
         {onLan && <NativeButton onClick={onLan}>局域网联机</NativeButton>}
+        {onSteam && <NativeButton onClick={onSteam}>Steam 联机</NativeButton>}
         <NativeButton onClick={() => setSettingsOpen(true)}>游戏设置</NativeButton>
+        {entryError && <p className="lan-error" role="alert">{entryError}</p>}
         <p className="native-content-count">{hullCount} 艘可改装舰船 · {weaponCount} 种可安装武器</p>
       </div>
       <span className="native-home-version">
         Starsector Web · 舰船改装与模拟战斗
       </span>
-      {settingsOpen && <Modal title="游戏设置" eyebrow="" onClose={()=>setSettingsOpen(false)} footer={<NativeButton onClick={()=>setSettingsOpen(false)}>返回</NativeButton>}><LocalBattleSizeSettings/></Modal>}
+      <MotionPresence>{settingsOpen && <Modal title="游戏设置" eyebrow="" onClose={()=>setSettingsOpen(false)} footer={<NativeButton onClick={()=>setSettingsOpen(false)}>返回</NativeButton>}><LocalBattleSizeSettings/></Modal>}</MotionPresence>
     </main>
   );
 }

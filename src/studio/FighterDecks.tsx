@@ -1,3 +1,7 @@
+import { useDwellHover } from './useDwellHover';
+import { EquipmentTooltip } from './EquipmentTooltip';
+import { WingInformation } from './WingInformation';
+import { RefitHoverTerm } from './RefitHoverTerms';
 import type { CSSProperties } from 'react';
 import { contentRegistry } from '../engine/content/ContentRegistry';
 import { runtimeAssetUrl } from '../engine/runtime/RuntimePaths';
@@ -20,8 +24,13 @@ export function FighterDecks({ draft, selected, inert, onSelect, onRemove }: {
   draft: Design; selected: number | null; inert?: boolean;
   onSelect: (index: number) => void; onRemove: (index: number) => void;
 }) {
+  const hover = useDwellHover({ enabled: !inert && selected === null });
   const slots = designWingSlots(draft);
   const builtins = builtInWingIds(draft.hullId);
+  const activeIndex = hover.active ? Number(hover.active.id) : -1;
+  const activeId = slots[activeIndex];
+  const preview = activeId ? nativeRefit.wings?.[activeId] : undefined;
+  const activeBuiltin = activeIndex >= 0 && activeIndex < builtins.length;
   if (!slots.length) return null;
   return <section className="refit-fighter-decks" aria-label="战机甲板" inert={inert}>
     <h2>战机甲板</h2>
@@ -31,14 +40,19 @@ export function FighterDecks({ draft, selected, inert, onSelect, onRemove }: {
         const builtin = index < builtins.length;
         const label = `战机甲板 ${index + 1}，${wing ? wing.name + '，' + wing.count + ' 架' : '空甲板'}${builtin ? '，内置联队' : wing ? '，' + wing.op + ' OP' : ''}`;
         return <button type="button" key={index} className="refit-deck-slot" data-deck-index={index} aria-label={label}
-          aria-pressed={selected === index} title={`${label}\n${builtin ? '内置联队，点击查看' : '点击更换联队；右键或 Delete 卸下'}`}
-          onClick={() => onSelect(index)} onContextMenu={e => { e.preventDefault(); if (!builtin && id) onRemove(index); }}
-          onKeyDown={e => { if (e.key === 'Delete' && !builtin && id) {e.preventDefault(); e.stopPropagation(); onRemove(index);} }}>
+          aria-pressed={selected === index} {...hover.bind(String(index))}
+          onClick={() => { hover.hide(); onSelect(index); }} onContextMenu={e => { e.preventDefault(); if (!builtin && id) { hover.hide(); onRemove(index); } }}
+          onKeyDown={e => { if (e.key === 'Delete' && !builtin && id) {e.preventDefault(); e.stopPropagation(); hover.hide(); onRemove(index);} }}>
           {id ? <WingFormation id={id} /> : <span className="refit-deck-empty" aria-hidden="true">+</span>}
           <span className="refit-deck-op">{builtin ? '内置' : wing?.op ?? ''}</span>
           <span className="refit-deck-index" aria-hidden="true">{index + 1}</span>
         </button>;
       })}
     </div>
+    {hover.active && <EquipmentTooltip hover={hover} preferSide className="native-wing-tooltip">
+      <h3>战机甲板 {activeIndex + 1} · {preview?.name ?? '空甲板'}</h3>
+      <p className="equipment-state">{activeBuiltin ? '舰体内置 · 点击查看，不占装配点' : '点击更换联队；右键或 Delete 卸下'}</p>
+      {preview ? <WingInformation wing={preview} /> : <p>此甲板未安装联队。点击选择战机，每个甲板安装一个联队，共享舰船的 <RefitHoverTerm term="op">OP</RefitHoverTerm> 预算。</p>}
+    </EquipmentTooltip>}
   </section>;
 }

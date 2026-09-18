@@ -1,3 +1,4 @@
+import { appendMissileContrail } from '../../MissileContrails';
 import { sameTeam } from "../../CombatTeams";
 import { initializeSourceProjectile } from './SourceProjectileLifecycle';
 import { Vector2 } from '../../../math/Vector2';
@@ -196,35 +197,7 @@ export class MissileGuidanceHandler {
    * 普通投射物不在这里追加臆造粒子；MovingRay/TPC 的视觉由投射物渲染器负责。
    */
   public updateParticlesAndContrail(p: Projectile, ctx: WeaponSimContext) {
-    // 导弹烟雾尾迹带 (1:1 对齐原版 ContrailEngine.java)
-    if (p.isRocket && !p.isFlare) {
-      const heading = p.facingRad !== undefined ? p.facingRad : p.vel.heading();
-      const fallbackNozzleOffset = -(p.projLength || 25) * 0.5;
-      const nozzleOffset = p.missileEngineVisualSpec?.nozzleOffset ?? fallbackNozzleOffset;
-      const trail = p.missileTrailSpec;
-      const nozzlePos = p.pos.clone().addScaled(
-        Vector2.fromAngle(heading, 1),
-        nozzleOffset + (trail?.spawnOffset ?? 0)
-      );
-
-      const contrailDuration = trail?.duration ?? 1.6;
-      const baseWidth = trail?.baseWidth ?? 11;
-      const widenMult = trail?.widenMult ?? 2.4;
-      const minSeg = trail?.minSeg ?? 5.0;
-      const smokeColor: [number, number, number, number] = trail?.color ?? [200, 200, 205, 215];
-      const blendMode = trail?.blendMode ?? 'NORMAL';
-
-      ctx.contrailEngine?.addPoint(
-        p.id,
-        nozzlePos,
-        contrailDuration,
-        baseWidth,
-        widenMult,
-        minSeg,
-        smokeColor,
-        blendMode
-      );
-    }
+    if (ctx.contrailEngine) appendMissileContrail(ctx.contrailEngine, p);
 
   }
 }

@@ -1,3 +1,4 @@
+import { MotionPresence } from './core/MotionPresence';
 import { BattleSizeControl } from './BattleSizeControl';
 import { readBattleSize } from '../engine/runtime/BattleSizeSettings';
 import { battleTeamLimit } from '../shared/battle-size.mjs';
@@ -64,6 +65,6 @@ export function GameStatePanel({ game, onClose, onAction, actionError, onClearEr
         catch { onAction(() => { throw new Error('无法读取所选存档文件，当前游戏未更改。'); }); }
       }} />
     </Modal>
-    {confirmation && <ConfirmDialog confirmation={confirmation} onCancel={() => setConfirmation(null)} onConfirm={() => { const action = confirmation.action; setConfirmation(null); onAction(action); }} />}
+    <MotionPresence>{confirmation && <ConfirmDialog confirmation={confirmation} onCancel={() => setConfirmation(null)} onConfirm={() => { const action = confirmation.action; setConfirmation(null); onAction(action); }} />}</MotionPresence>
   </>;
 }

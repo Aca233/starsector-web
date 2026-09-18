@@ -1,3 +1,4 @@
+import type { ShipSpec } from '../../content/ShipSpec';
 import type { FleetPlan, FleetAssignment } from '../FleetTactics';
 import type { CapitalShipAI } from '../CapitalShipAI';
 import type { ProjectileThreatIndex } from '../ProjectileThreatIndex';
@@ -16,6 +17,8 @@ export interface Model {
     index: number;
     id: string;
     specId: string;
+    /** Actual refit, never re-resolved through a hull ID in another realm. */
+    spec: ShipSpec;
     isPlayer: boolean;
     offset: number;
     schema: {

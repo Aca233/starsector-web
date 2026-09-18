@@ -1,3 +1,6 @@
+import { MotionPresence } from '../ui/core/MotionPresence';
+import { FullscreenButton } from '../ui/FullscreenButton';
+import { SteamInvite } from "./SteamStart";
 import { BattleSizeControl } from "../ui/BattleSizeControl";
 import { battleTeamCount, battleTeamLimit } from "../shared/battle-size.mjs";
 import { useState } from "react";
@@ -11,13 +14,19 @@ export function LanRoomTools({
   id,
   addresses,
   send,
+  connected = true,
+  openSettingsRequest = 0,
 }: {
   room: Room;
   id: string;
   addresses: string[];
   send: (m: unknown) => void;
+  connected?: boolean;
+  openSettingsRequest?: number;
 }) {
   const [panel, setPanel] = useState<"rules" | "invite" | "chat" | null>(null);
+  const [lastSettingsRequest,setLastSettingsRequest]=useState(openSettingsRequest);
+  if(lastSettingsRequest!==openSettingsRequest){setLastSettingsRequest(openSettingsRequest);if(openSettingsRequest)setPanel("rules");}
   const [password, setPassword] = useState("");
   const [text, setText] = useState("");
   const [address, setAddress] = useState(
@@ -26,7 +35,7 @@ export function LanRoomTools({
   const [copied, setCopied] = useState("");
   const [kick, setKick] = useState("");
   const editable =
-    id === room.hostId && ["lobby", "ended"].includes(room.status);
+    connected && id === room.hostId && ["lobby", "ended"].includes(room.status);
   const teams = battleTeamCount(room.members,room.options.aiHulls);
   const limit = battleTeamLimit(room.options.battleSize,teams);
   const initial = room.options.initialDeploymentLimit;
@@ -35,23 +44,11 @@ export function LanRoomTools({
   invite.searchParams.set("room", room.code);
   return (
     <div className="lan-room-tools">
-      <NativeButton
-        onClick={() => {
-          setPanel("rules");
-        }}
-      >
-        房间设置
-      </NativeButton>
-      <NativeButton
-        onClick={() => {
-          setCopied("");
-          setPanel("invite");
-        }}
-      >
-        邀请朋友
-      </NativeButton>
-      <NativeButton onClick={() => setPanel("chat")}>房间聊天</NativeButton>
-      {panel === "rules" && (
+      <NativeButton onClick={()=>{setCopied('');setPanel('invite');}}>邀请朋友</NativeButton>
+      <NativeButton onClick={()=>setPanel('rules')}>房间设置</NativeButton>
+      <NativeButton onClick={()=>setPanel('chat')}>房间聊天</NativeButton>
+      <FullscreenButton />
+      <MotionPresence>{panel === "rules" && (
         <Modal
           title="房间设置"
           eyebrow=""
@@ -107,8 +104,7 @@ export function LanRoomTools({
                   </select>
                 </label>
                 <p>
-                  无需坐满；其他真人准备后，房主直接开始。只有房主时，给对面添加 AI 也可开局。掉线保留席位也计入容量；超过 4
-                  人时使用 10Hz 完整快照以降低带宽，不代表已通过大规模性能验收。
+                  无需坐满；其他真人准备后，房主直接开始。只有房主时，给对面添加 AI 也可开局。掉线保留席位也计入容量；同步按在场复杂度和网络拥塞调整，不代表已通过大规模性能验收。
                 </p>
                 <h3>访问与成员</h3>
                 <label>
@@ -150,8 +146,8 @@ export function LanRoomTools({
             )}
           </div>
         </Modal>
-      )}
-      {panel === "invite" && (
+      )}</MotionPresence>
+      <MotionPresence>{panel === "invite" && (
         <Modal
           title="邀请朋友"
           eyebrow=""
@@ -160,7 +156,7 @@ export function LanRoomTools({
             <NativeButton onClick={() => setPanel(null)}>返回</NativeButton>
           }
         >
-          <div className="lan-help lan-room-settings">
+          {room.network?.kind === "steam" ? <SteamInvite lobbyId={room.network.lobbyId}/> : <div className="lan-help lan-room-settings">
             <p>
               选择同一局域网或 n2n / Radmin
               虚拟网卡的地址，分享给朋友。链接已带房间码；如有密码，请另行告知。
@@ -199,10 +195,10 @@ export function LanRoomTools({
             </NativeButton>
             <p role="status">{copied}</p>
             <p>加入者只打开链接，不需要启动自己的后台。</p>
-          </div>
+          </div>}
         </Modal>
-      )}
-      {panel === "chat" && (
+      )}</MotionPresence>
+      <MotionPresence>{panel === "chat" && (
         <Modal
           title="房间聊天"
           eyebrow=""
@@ -227,7 +223,7 @@ export function LanRoomTools({
             className="lan-chat-form"
             onSubmit={(e) => {
               e.preventDefault();
-              if (text.trim()) {
+              if (connected && text.trim()) {
                 send({ type: "chat", text });
                 setText("");
               }
@@ -240,13 +236,13 @@ export function LanRoomTools({
               onChange={(e) => setText(e.target.value)}
               placeholder="输入消息（最多 200 字）"
             />
-            <NativeButton type="submit" disabled={!text.trim()}>
+            <NativeButton type="submit" disabled={!connected||!text.trim()}>
               发送
             </NativeButton>
           </form>
         </Modal>
-      )}
-      {kick && (
+      )}</MotionPresence>
+      <MotionPresence>{kick && (
         <Modal
           title="移出这位玩家？"
           eyebrow=""
@@ -268,7 +264,7 @@ export function LanRoomTools({
         >
           <p>该玩家会离开房间；房间继续保留。</p>
         </Modal>
-      )}
+      )}</MotionPresence>
     </div>
   );
 }

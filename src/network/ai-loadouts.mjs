@@ -2,12 +2,16 @@ import { wireDesign } from './design-wire.mjs';
 /** Identity/name/time/profile are presentation, not combat configuration. */
 export function aiDesignSignature(input) {
   const d = wireDesign(input);
-  return JSON.stringify({hullId:d.hullId, sourceVariantId:d.sourceVariantId ?? null,
+  return JSON.stringify(combatConfiguration(d));
+}
+function combatConfiguration(d) {
+  return {hullId:d.hullId, sourceVariantId:d.sourceVariantId ?? null,
+    modules:Object.entries(d.modules ?? {}).sort(([a],[b])=>a.localeCompare(b)).map(([slot, child])=>[slot,combatConfiguration(child)]),
     weapons:Object.entries(d.weapons).filter(([,id])=>id!==null).sort(([a],[b])=>a < b ? -1 : a > b ? 1 : 0),
     hullMods:[...d.hullMods].sort(),sMods:[...d.sMods].sort(),
     captainSkills:Object.entries(d.captainSkills).sort(([a],[b])=>a < b ? -1 : a > b ? 1 : 0),
     wings:d.wings ?? null,capacitors:d.capacitors,vents:d.vents,
-    groups:d.groups.map(g=>({...g,weaponSlotIds:[...g.weaponSlotIds].sort()})).sort((a,b)=>a.index-b.index)});
+    groups:d.groups.map(g=>({...g,weaponSlotIds:[...g.weaponSlotIds].sort()})).sort((a,b)=>a.index-b.index)};
 }
 export const aiLoadout = (options, key) => Object.hasOwn(options.aiLoadouts ?? {}, key) ? options.aiLoadouts[key] : undefined;
 /** Raw hull IDs are retained only for legacy/default fleet entries. */

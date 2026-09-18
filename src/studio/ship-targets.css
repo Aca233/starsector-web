@@ -1,0 +1,18 @@
+/* The marker retains its original size. Only the transparent, nearest-target hit area grows. */
+.studio-ship .studio-mount { --mount-visual-size: 19px; width: 28px; height: 28px; min-width: 0; min-height: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; outline: none; }
+.studio-ship .studio-mount--medium { --mount-visual-size: 22px; }
+.studio-ship .studio-mount--large { --mount-visual-size: 29px; }
+.studio-ship .studio-mount::before { content: ''; position: absolute; left: 50%; top: 50%; width: var(--mount-visual-size); height: var(--mount-visual-size); box-sizing: border-box; transform: translate(-50%, -50%); border: 1px solid #8c6ecc; border-radius: 50%; background: #11101d66; pointer-events: none; }
+.studio-ship .studio-mount[data-type="BALLISTIC"]::before { border-color: #cbb176; }
+.studio-ship .studio-mount[data-type="MISSILE"]::before { border-color: #9dc98b; }
+.studio-ship .studio-mount[data-type="UNIVERSAL"]::before { border-color: #ccc; }
+.studio-ship .studio-mount:not(.is-equipped)::before { border-style: dashed; }
+.studio-ship .studio-mount.is-grouped::before { border-color: #9bff00; background: #9bff0040; }
+.studio-ship .studio-mount:hover::before, .studio-ship .studio-mount.is-selected::before { border-color: #ffd200; background: #1e597177; box-shadow: 0 0 0 1px #07151c; }
+.studio-ship .studio-mount:focus-visible::before { border-color: #ffd200; outline: 2px solid #ffd200; outline-offset: -3px; background: #0a263baa; }
+/* Fixed screen-pixel edge tolerance, underneath the actual module surfaces. */
+.assembly-hit-regions .assembly-module-padding { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; vector-effect: non-scaling-stroke; }
+.assembly-hit-regions .assembly-module-padding:hover { fill: none; stroke: transparent; }
+.assembly-hit-regions [data-module-path][data-module-hovered="true"] { fill: #6ce8ea40; stroke: #ecda6d; }
+
+.studio-ship .studio-mount:is(:hover, :focus-visible, .is-selected, .is-grouped, :not(.is-equipped)) { border: 0; background: transparent; box-shadow: none; }

@@ -1,3 +1,7 @@
+import { VariantInspection } from './VariantInspection';
+import { useInspectionCodex } from './useInspectionCodex';
+import { RefitHint } from './RefitHint';
+import { MotionPresence } from '../ui/core/MotionPresence';
 import { useMemo, useState } from "react";
 import { Modal } from "../ui/core/UI";
 import { NativeButton } from "../ui/NativeChrome";
@@ -8,10 +12,9 @@ import { ShipStage } from "./ShipStage";
 import { importNativeVariant } from "./NativeVariantImport";
 import { autoGroups, baseHull, budget, compatibility, createDesign, evaluate, isBuiltIn, modReason, weaponOPCost, weapons } from "./DesignModel";
 import type { Design } from "./DesignModel";
-import stockText from "../engine/data/generated/refit-variants.json?raw";
+import { nativeVariantsForHull } from "./NativeVariantCatalog";
 
 const signature = (d: Design) => JSON.stringify({ ...d, updatedAt: 0 });
-const stock = JSON.parse(stockText) as Record<string, Record<string, unknown>[]>;
 interface Choice { id: string; name: string; design: Design; warnings: string[]; saved?: Design }
 interface Props {
   draft: Design; designs: Design[]; onClose: () => void; onApply: (design: Design) => void;
@@ -21,16 +24,17 @@ interface Props {
 function Option({ label, checked = false, disabled = false, hint, onChange }: {
   label: string; checked?: boolean; disabled?: boolean; hint?: string; onChange?: (checked: boolean) => void;
 }) {
-  return <label className="source-fit-option" title={hint}>
+  return <RefitHint text={hint}><label className="source-fit-option" >
     <input type="checkbox" checked={checked} disabled={disabled} onChange={e => onChange?.(e.target.checked)} />
     <span><NativeBitmapText font="body" color="currentColor">{label}</NativeBitmapText></span>
-  </label>;
+  </label></RefitHint>;
 }
 /** Preview is local: selecting, hiding or cancelling never edits the live ship. */
 export function SourceVariantPicker({ draft, designs, onClose, onApply, onSave, onDelete, onRename }: Props) {
-  const nativeChoices = useMemo<Choice[]>(() => (stock[draft.hullId] ?? []).map(raw => {
-    const imported = importNativeVariant(raw);
-    return { id: String(raw.variantId), name: String(raw.displayName ?? raw.variantId), ...imported };
+  const codex = useInspectionCodex();
+  const nativeChoices = useMemo<Choice[]>(() => nativeVariantsForHull(draft.hullId).map(choice => {
+    const imported = importNativeVariant(choice.raw);
+    return { id: choice.id, name: choice.name, ...imported };
   }).sort((a, b) => {
     const order = ["火力支援", "突击", "精英"];
     return (order.includes(a.name) ? order.indexOf(a.name) : 9) - (order.includes(b.name) ? order.indexOf(b.name) : 9);
@@ -96,18 +100,19 @@ export function SourceVariantPicker({ draft, designs, onClose, onApply, onSave, 
           <h3 className="source-fit-title"><NativeBitmapText font="body">选择最适合的装配方案</NativeBitmapText></h3>
           <div className="source-fit-choices" role="group" aria-label="可用装配方案">
             {options.map(c => <div className="source-fit-card" key={c.id}>
+              <VariantInspection name={c.name} design={c.design} warnings={c.warnings} saved={!!c.saved} enabled={!naming && !codex.isOpen} onOpenCodex={codex.open}>
               <button className="source-fit-select" aria-label={"预览装配方案：" + c.name} aria-pressed={choice?.id === c.id} onClick={() => select(c)}>
                 <ShipStage spec={evaluate(c.design).spec} home />
                 <span>{c.name}</span>
-              </button>
-              <button className="source-fit-remove" aria-label={(c.saved ? "删除方案：" : "隐藏原版方案：") + c.name} title={c.saved ? "删除保存的方案（需确认）" : "隐藏此原版方案；可恢复"}
-                onClick={() => c.saved ? onDelete(c.saved) : setHidden(prev => [...prev, c.id])}>×</button>
+              </button></VariantInspection>
+              <RefitHint text={c.saved ? "删除保存的方案（需确认）" : "隐藏此原版方案；可恢复"}><button className="source-fit-remove" aria-label={(c.saved ? "删除方案：" : "隐藏原版方案：") + c.name}
+                onClick={() => c.saved ? onDelete(c.saved) : setHidden(prev => [...prev, c.id])}>×</button></RefitHint>
             </div>)}
-            <button className="source-fit-save" disabled={evaluate(draft).errors.length > 0} aria-label="保存当前配置为装配方案" title="保存当前舰船的装配方案"
+            <RefitHint text="保存当前舰船的装配方案"><button className="source-fit-save" disabled={evaluate(draft).errors.length > 0} aria-label="保存当前配置为装配方案"
               onClick={() => { setName(draft.name); setNaming("save"); }}>
               <span className="source-fit-silhouette" style={{ maskImage: 'url("' + runtimeAssetUrl(baseHull(draft.hullId)!.spriteUrl) + '")' }} />
               <span className="source-fit-save-caption">保存当前配置</span>
-            </button>
+            </button></RefitHint>
           </div>
           <div className="source-fit-options">
             {["搜索货舱使用装备", "搜索仓库使用装备", "搜索市场购买装备", "允许搜索黑市购买"].map(text =>
@@ -141,18 +146,19 @@ export function SourceVariantPicker({ draft, designs, onClose, onApply, onSave, 
           </div>
         </section>
         <div className="source-fit-footer">
-          <NativeButton shortcut="Q" className="source-fit-auto" onClick={autoFit} title="预览补齐空挂点：优先所选方案的武器，受兼容类型和剩余 OP 限制">自动装配</NativeButton>
+          <RefitHint text="预览补齐空挂点：优先所选方案的武器，受兼容类型和剩余 OP 限制"><NativeButton shortcut="Q" className="source-fit-auto" onClick={autoFit} >自动装配</NativeButton></RefitHint>
           <NativeButton shortcut="G" disabled={!changed || result.errors.length > 0} onClick={apply}>确认</NativeButton>
           <NativeButton shortcut="V" onClick={onClose}>取消</NativeButton>
         </div>
       </div>
     </Modal>
-    {naming && <Modal title={naming === "save" ? "保存装配方案" : "重命名装配方案"} width="small" eyebrow="" onClose={() => setNaming(null)}
+    {codex.content}
+    <MotionPresence>{naming && <Modal title={naming === "save" ? "保存装配方案" : "重命名装配方案"} width="small" eyebrow="" onClose={() => setNaming(null)}
       footer={<><NativeButton disabled={!name.trim()} onClick={() => {
         const ok = naming === "save" ? onSave({ ...draft, name }) : choice?.saved ? onRename(choice.saved, name) : false;
         if (ok) { setNaming(null); setMessage("装配方案已保存。"); }
       }}>确认</NativeButton><NativeButton onClick={() => setNaming(null)}>取消</NativeButton></>}>
       <label className="source-fit-name-label">方案名称<input aria-label="装配方案名称" value={name} maxLength={48} onChange={e => setName(e.target.value)} /></label>
-    </Modal>}
+    </Modal>}</MotionPresence>
   </>;
 }

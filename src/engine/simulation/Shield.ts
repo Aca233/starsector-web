@@ -393,6 +393,10 @@ export class Shield {
       else { this.phaseState = 'IN'; this.isActive = true; this.phaseEffectLevel = Math.max(0,Math.min(1,this.forcedPhaseEffectLevel)); }
     }
 
+    // A fresh omni deployment starts at the aim point, not at the bow.
+    // Once deployed, rotation is rate-limited; shutdown retains the last facing.
+    const openingOmni = this.type === 'OMNI' && this.isActive && this.currentArcDeg === 0;
+
     // systems/G.java and ship/trackers/oooO: unfold the arc, then fade it in place on shutdown.
     if (this.type === 'FRONT' || this.type === 'OMNI') {
       if (this.isActive) {
@@ -414,12 +418,17 @@ export class Shield {
     if (this.type === 'FRONT') {
       this.facingAngleRad = shipFacing;
     } else if (this.type === 'OMNI' && this.isActive) {
-      // 全向护盾追踪瞄准方向
-      let diff = aimFacing - this.facingAngleRad;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      const turnSpeed = 100 / Math.max(1, this.radius) * this.turnRateMultiplier;
-      this.facingAngleRad += Math.sign(diff) * Math.min(Math.abs(diff), turnSpeed * dt);
+      if (openingOmni || this.currentArcDeg === 0) {
+        // Also covers a queued raise when the previous arc has fully closed.
+        this.facingAngleRad = aimFacing;
+      } else {
+        // Once raised, follow the cursor (or AI defense aim) by the shortest turn.
+        let diff = aimFacing - this.facingAngleRad;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        const turnSpeed = 100 / Math.max(1, this.radius) * this.turnRateMultiplier;
+        this.facingAngleRad += Math.sign(diff) * Math.min(Math.abs(diff), turnSpeed * dt);
+      }
     } else if (this.type === 'OMNI' && this.closeTimeRemaining === 0) {
       this.facingAngleRad = shipFacing;
     }

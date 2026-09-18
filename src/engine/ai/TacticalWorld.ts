@@ -1,3 +1,4 @@
+import type { FriendlyFireLaneIndex } from './FriendlyFireLaneIndex';
 import type { FleetPlan, FleetRole, FleetTask } from './FleetTactics';
 import type { WeaponThreatEnvelope } from './WeaponThreatEnvelope';
 import type { ProjectileThreatIndex } from './ProjectileThreatIndex';
@@ -12,6 +13,7 @@ export interface TacticalWorld {
   /** Only supplied inside an audited, synchronous native AI phase. */
   projectileThreatIndex?: ProjectileThreatIndex;
   weaponThreatEnvelope?: WeaponThreatEnvelope;
+  friendlyFireLaneIndex?: FriendlyFireLaneIndex;
   ships: readonly Ship[];
   projectiles: readonly Projectile[];
   beams: readonly Beam[];
@@ -27,11 +29,14 @@ export const tacticalPolicy = Object.freeze({
   avoidanceSteps: 8,
   calmBeforeLowering: .5,
   ventFluxFraction: .7,
-  retreatAt: .85,
-  resumeAt: .55,
+  retreatAt: .9,
+  resumeAt: .65,
   imminentWindow: 1,
 });
 export interface TacticalDiagnostics {
+  positioning?: 'BASELINE' | 'FIRE_LANE' | 'COVER';
+  positionScoreGain?: number;
+  clearFireFraction?: number;
   mode: 'ENGAGE' | 'WITHDRAW' | 'WAYPOINT' | 'IDLE' | 'DEFEND' | 'ESCORT' | 'AVOID';
   fleetRole?: FleetRole;
   fleetTask?: FleetTask;

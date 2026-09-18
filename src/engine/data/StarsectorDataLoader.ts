@@ -42,6 +42,8 @@ export class StarsectorDataLoader {
 
   /**
    * 从本地文件系统异步载入真实的 .ship 与 CSV 舰船规格
+   * Offline output keeps native local coordinates; built-in/variant entry points
+   * apply nativeShipToRuntime once, after assembling source equipment metadata.
    */
   public async loadShipFromSource(hullId: string, readText: StarsectorSourceReader, options: SourceImportOptions = {}): Promise<ShipSpec> {
     sourceId(hullId);
@@ -108,9 +110,9 @@ export class StarsectorDataLoader {
 
     // 转换原版 weaponSlots
     const weaponSlots: WeaponMountSlotConfig[] = (shipJson.weaponSlots || []).filter((s: any) =>
-      ['TURRET', 'HARDPOINT', 'HIDDEN'].includes(s.mount) && !['SYSTEM', 'DECORATIVE', 'LAUNCH_BAY'].includes(s.type)
+      ['TURRET', 'HARDPOINT', 'HIDDEN'].includes(s.mount) && !['SYSTEM', 'DECORATIVE', 'LAUNCH_BAY', 'STATION_MODULE'].includes(s.type)
     ).map((s: any) => {
-      // 原版 .ship 中的 locations 为 [y, x] 或 [x, y]
+      // Native .ship locations are [forward, port]; keep them native for generated data.
       const loc = s.locations || [0, 0];
       return {
         slotId: s.id,
@@ -219,6 +221,10 @@ export class StarsectorDataLoader {
       systemType,
       ...(defenseSystemType ? { defenseSystemType } : {}),
       weaponSlots,
+      moduleAnchor: shipJson.moduleAnchor,
+      moduleSlots: (shipJson.weaponSlots || []).filter((s: any) => s.type === 'STATION_MODULE').map((s: any) => ({
+        slotId: s.id, x: s.locations[0], y: s.locations[1], angleDeg: s.angle ?? 0,
+      })),
       systemWeaponSlots: (shipJson.weaponSlots || []).filter((s: any) => s.type === 'SYSTEM').map((s: any) => ({
         slotId:s.id, mountType:s.mount, slotSize:s.size, x:s.locations[0], y:s.locations[1], baseAngleDeg:s.angle??0, arcDeg:s.arc??10,
       })),

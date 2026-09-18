@@ -29,6 +29,10 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
   const hullHp = Math.trunc(player.hullHp);
   const maxHull = player.maxHullHp || 15000;
   const hullRatio = Math.min(1.0, Math.max(0, player.hullHp / maxHull));
+  // Read the same phase/flux multiplier as shipMotionStats, including refit and IN/OUT effects.
+  const phaseSpeedPercent = player.shield.type === 'PHASE' && player.shield.isPhaseEngaged
+    ? Math.round(player.shield.getPhaseSpeedMultiplier(player.flux.maxFlux > 0 ? player.flux.hardFlux / player.flux.maxFlux : 0) * 100)
+    : 100;
 
   // 战术系统名称与状态
   const systemStatus = (system: typeof player.system) => !system.available ? '未接入 · 不可激活' : player.isDead || system.disabled ? '离线'
@@ -105,6 +109,13 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
               />
               <span className="font-bold"><span className="hud-text">幅能过载</span></span>
               <span className="text-red-300/90"><span className="hud-text">({Math.ceil(player.flux.overloadTimer)}s 后恢复)</span></span>
+            </div>
+          )}
+
+          {phaseSpeedPercent < 100 && !player.isDead && player.hullHp > 0 && !player.isDocked && !player.isRetreated && (
+            <div className="text-amber-300 font-bold" data-phase-coil-load
+              title="硬幅能越高，相位最高航速越低；退出相位并耗散硬幅能可恢复。此百分比不包含相位时间流速增益。">
+              <span className="hud-text">相位线圈负荷：最高航速降至 {phaseSpeedPercent}%</span>
             </div>
           )}
 

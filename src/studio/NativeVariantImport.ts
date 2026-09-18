@@ -10,7 +10,7 @@ import type { Design } from './DesignModel';
 
 /** Convert a native loadout without executing source scripts or silently hiding omissions. */
 export function importNativeVariant(raw: Record<string, unknown>): { design: Design; warnings: string[] } {
-  if (typeof raw.hullId !== 'string' || !baseHull(raw.hullId)) throw new Error('该方案的舰体尚不能进入 Web 改装。');
+  if (typeof raw.hullId !== 'string' || (!baseHull(raw.hullId) || baseHull(raw.hullId)?.isModuleHull)) throw new Error('该方案的舰体尚不能进入 Web 改装。');
   const d = createDesign(raw.hullId, 'empty');
   if (typeof raw.variantId === 'string' && /^[a-zA-Z0-9_-]{1,160}$/.test(raw.variantId)) d.sourceVariantId = raw.variantId;
   const hull = baseHull(d.hullId)!;
@@ -71,7 +71,7 @@ export function importNativeVariant(raw: Record<string, unknown>): { design: Des
     if (d.wings.length >= designFighterBays(d)) { warnings.push(`舰载机联队 ${id} 超出机库数量。`); continue; }
     d.wings.push(id);
   }
-  if (raw.modules && Object.keys(raw.modules as object).length) warnings.push('模块化舰体编组尚未移植。');
+  if (raw.modules && Object.keys(raw.modules as object).length && !d.sourceVariantId) warnings.push('模块方案缺少原版身份，不能导入自定义模块编组。');
   for (const reason of currentImportReasons(nativeRefit.shipStatus[d.hullId]?.reasons ?? [])) if (!reason.startsWith('Default variant ')) warnings.push(reason);
   warnings.push(...evaluate(d).errors);
   return {design: d, warnings: [...new Set(warnings)]};

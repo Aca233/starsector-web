@@ -20,8 +20,10 @@ export function checkFleetBudget(options, limit, humans, extraHull = "", extraCo
 /** Atomic per-configuration edits; a refit preserves roster positions and solo teams. */
 export function editAiFleet(options, edit, limit, humans) {
   if (edit.assignment !== options.assignment) throw Error('编队规则已改变，请重新操作。');
-  if (!['add','adjust','set-count','refit','remove'].includes(edit.operation)) throw Error('无效 AI 编组操作');
+  if (!['add','adjust','set-count','refit','remove','move'].includes(edit.operation)) throw Error('无效 AI 编组操作');
+  if(edit.baseRevision !== undefined && edit.baseRevision !== (options.aiRevision ?? 0))throw Error('AI 编成已变化，未应用本次修改；请检查最新编成后再操作。');
   const solo=options.assignment==='solo', team=solo?0:edit.team;
+  if(edit.operation==='move' && (solo || !Number.isSafeInteger(edit.targetTeam) || edit.targetTeam<0 || edit.targetTeam>=options.aiHulls.length || edit.targetTeam===team))throw Error('请选择其他有效队伍；个人战每艘独立成队，不能移队。');
   if(!Number.isSafeInteger(team)||team<0||team>=options.aiHulls.length)throw Error('无效队伍');
   const refit=edit.operation==='refit';
   if(refit && (edit.baseRevision !== (options.aiRevision ?? 0) || !['group','one'].includes(edit.scope)))throw Error('AI 编成已变化，草稿已保留；请返回编成确认后重新改装。');
@@ -51,6 +53,10 @@ export function editAiFleet(options, edit, limit, humans) {
   checkFleetBudget(next,limit,humans,key,additions);
   const rows=options.aiHulls.map(row=>[...row]);
   if(refit)for(const [i,j] of (edit.scope==='one'?positions.slice(0,1):positions))rows[i][j]=key;
+  else if(edit.operation==='move'){
+    for(const [i,j] of positions)rows[i][j]=null;
+    rows[edit.targetTeam]=rows[edit.targetTeam].concat(positions.map(()=>key));
+  }
   else if(edit.operation==='remove')for(const [i,j] of positions)rows[i][j]=null;
   else if(removals)for(const [i,j] of positions.slice(-removals))rows[i][j]=null;
   if(additions)rows[team]=rows[team].concat(Array(additions).fill(key));

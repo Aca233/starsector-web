@@ -1,20 +1,21 @@
+import { MotionPresence } from '../ui/core/MotionPresence';
 import { useEffect, useRef, useState } from 'react';
 import { NativeButton } from '../ui/NativeChrome';
 import { Modal } from '../ui/core/UI';
 import { readLibrary, data, evaluate, type Design } from '../studio/DesignModel';
 import { validateLanDesign } from './LanDesign';
 
-export function LanDesignPicker({disabled, onSelect, onEdit}: {disabled:boolean; onSelect:(design:Design)=>void; onEdit:()=>void}) {
+export function LanDesignPicker({disabled, onSelect, onEdit, returnLabel='返回房间'}: {disabled:boolean; onSelect:(design:Design)=>void; onEdit?:()=>void; returnLabel?:string}) {
   const [open,setOpen]=useState(false), [designs,setDesigns]=useState<Design[]>([]), [error,setError]=useState('');
   const file=useRef<HTMLInputElement>(null);
   const refresh=()=>{const result=readLibrary();setError(result.error??'');setDesigns(result.library.designs);};
   useEffect(()=>{if(!open)return; window.addEventListener('storage',refresh);window.addEventListener('focus',refresh);return()=>{window.removeEventListener('storage',refresh);window.removeEventListener('focus',refresh);};},[open]);
   const choose=(input:unknown)=>{try{const design=validateLanDesign(input);onSelect(design);setOpen(false);}catch(e){setError(e instanceof Error?e.message:'配装不可用');}};
   return <>
-    <NativeButton disabled={disabled} onClick={()=>{refresh();setOpen(true);}}>已存方案 / 导入</NativeButton>
-    {open&&<Modal title="选择舰船设计" eyebrow="联机配装" onClose={()=>setOpen(false)} footer={<NativeButton onClick={()=>setOpen(false)}>返回房间</NativeButton>}>
+    <NativeButton disabled={disabled} onClick={()=>{refresh();setOpen(true);}}>本机方案 / 导入</NativeButton>
+    <MotionPresence>{open&&<Modal title="选择舰船设计" eyebrow="联机配装" onClose={()=>setOpen(false)} footer={<NativeButton onClick={()=>setOpen(false)}>{returnLabel}</NativeButton>}>
       <div className="lan-design-tools">
-        <NativeButton onClick={()=>{setOpen(false);onEdit();}}>直接选船与改装</NativeButton>
+        {onEdit&&<NativeButton onClick={()=>{setOpen(false);onEdit();}}>直接选船与改装</NativeButton>}
         <NativeButton onClick={refresh}>刷新本机方案</NativeButton>
         <NativeButton onClick={()=>file.current?.click()}>导入方案 JSON</NativeButton>
       </div>
@@ -29,12 +30,12 @@ export function LanDesignPicker({disabled, onSelect, onEdit}: {disabled:boolean;
       }}/>
       {error&&<p className="lan-error" role="alert">{error}</p>}
       <div className="lan-design-list">
-        {!designs.length&&<p>当前地址还没有已存方案。可直接选船与改装，无需先保存；也可导入已有方案。</p>}
+        {!designs.length&&<p>当前地址还没有本机保存的方案。原版预设不在本机存档里：返回 AI 编成，选择舰体后即可切换原版配装；也可在这里导入自己的方案。</p>}
         {designs.map((d,index)=>{
           let reason='',summary='';try{const valid=validateLanDesign(d), result=evaluate(valid);summary=(data.ships[d.hullId]?.name??d.hullId)+' · '+result.op.used+'/'+result.op.total+' OP · '+Object.values(d.weapons).filter(Boolean).length+' 门武器';}catch(e){reason=e instanceof Error?e.message:'方案不可用';}
           return <section className="lan-design-row" key={index}><div><strong>{d.name}</strong><p>{summary||d.hullId}</p>{reason&&<p className="lan-error">{reason}</p>}</div><NativeButton disabled={!!reason||disabled} onClick={()=>choose(d)}>使用此方案</NativeButton></section>;
         })}
       </div>
-    </Modal>}
+    </Modal>}</MotionPresence>
   </>;
 }

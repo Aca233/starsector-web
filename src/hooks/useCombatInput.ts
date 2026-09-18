@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Vector2 } from '../engine/math/Vector2';
 import { Ship } from '../engine/simulation/Ship';
 import { sound } from '../engine/audio/SoundManager';
 import { CombatSession } from '../engine/runtime/CombatSession';
 import { clientToCombatWorld, zoomCombatView } from '../engine/runtime/PlayerControls';
+import { lockedCombatTarget } from '../engine/runtime/CombatTargeting';
 import { isCombatTextEntry, isCombatPointerUi, hasCombatModal, hasCombatInputFocus } from '../engine/runtime/CombatInputFocus';
 import { dispatchShipCommand, flightKey, shipCommandForKey, type ShipCommand } from '../engine/runtime/CombatCommands';
 
@@ -42,6 +43,51 @@ export function useCombatInput({
   setIsAutopilot,
   onTogglePause
 }: UseCombatInputParams) {
+  const [takeoverNotice, setTakeoverNotice] = useState<{ ship: Ship } | null>(null);
+  useEffect(() => {
+    if (!takeoverNotice) return;
+    const timer = window.setTimeout(() => setTakeoverNotice(null), 3500);
+    return () => window.clearTimeout(timer);
+  }, [takeoverNotice]);
+
+  const canPilot = useCallback(() => {
+    const { engine } = sessionRef.current, ship = engine.playerShip;
+    return !engine.battleResult && !ship.isDead && ship.hullHp > 0
+      && !ship.isRetreated && !ship.isDocked && !ship.retreating;
+  }, [sessionRef]);
+
+  // Keyboard, canvas and HUD buttons share one synchronous control-owner change.
+  // Clear AI intent before executing the triggering action, including while paused.
+  const setAutopilot = useCallback((enabled: boolean) => {
+    if (!canPilot() || isAutopilotRef.current === enabled) return;
+    const { engine } = sessionRef.current, ship = engine.playerShip;
+    resetInputState(keysPressed, isMouseDown, ship);
+    isAutopilotRef.current = enabled;
+    setIsAutopilot(enabled);
+    ship.fireControlMode = enabled ? 'AI' : 'MANUAL';
+    ship.defenseFacingRad = undefined;
+    ship.aiHoldOffensiveFire = false;
+    ship.tacticalAI = undefined;
+    if (!enabled) ship.currentTargetShip = lockedCombatTarget(engine.ships, ship);
+    setTakeoverNotice(enabled ? null : { ship });
+    sound.play('autofire_toggle', .8);
+  }, [canPilot, sessionRef, keysPressed, isMouseDown, isAutopilotRef, setIsAutopilot]);
+
+  const takeManualControl = useCallback(() => {
+    if (!canPilot()) return false;
+    setAutopilot(false);
+    return true;
+  }, [canPilot, setAutopilot]);
+
+  const command = useCallback((action: ShipCommand) => {
+    const session = sessionRef.current, engine = session.engine, canvas = canvasRef.current;
+    if (!canvas || inputBlockedRef.current || engine.isTacticalMap
+      || !session.isPresentationReady() || !hasCombatInputFocus() || !takeManualControl()) return;
+    const aim = clientToCombatWorld(mouseScreenPos.current, canvas, cameraPosRef.current, zoomRef.current);
+    const result = dispatchShipCommand(engine.playerShip, action, mouseAimActiveRef.current ? aim : undefined, engine.ships);
+    if (!result.accepted && result.reason) engine.addFloatingText(engine.playerShip.pos.clone(), result.reason, [255, 190, 90], 13, 1.3);
+  }, [sessionRef, canvasRef, inputBlockedRef, takeManualControl, mouseScreenPos, cameraPosRef, zoomRef, mouseAimActiveRef]);
+
   const onTogglePauseRef = useRef(onTogglePause);
   useEffect(() => { onTogglePauseRef.current = onTogglePause; }, [onTogglePause]);
 
@@ -74,17 +120,6 @@ export function useCombatInput({
     });
     if (!sessionRef.current.isPresentationReady()) loseFocus();
 
-    const command = (action: ShipCommand) => {
-      const engine = sessionRef.current.engine;
-      if (engine.battleResult) return;
-      if (isAutopilotRef.current && ['system', 'shield', 'vent'].includes(action.kind)) {
-        engine.addFloatingText(engine.playerShip.pos.clone(), '自动驾驶中，按 U 接管', [255, 190, 90], 13, 1.3);
-        return;
-      }
-      const aim = clientToCombatWorld(mouseScreenPos.current, canvas, cameraPosRef.current, zoomRef.current);
-      const result = dispatchShipCommand(engine.playerShip, action, mouseAimActiveRef.current ? aim : undefined, engine.ships);
-      if (!result.accepted && result.reason) engine.addFloatingText(engine.playerShip.pos.clone(), result.reason, [255, 190, 90], 13, 1.3);
-    };
     const onMouseMove = (e: MouseEvent) => {
       if (inputBlockedRef.current || !hasCombatInputFocus() || !sessionRef.current.isPresentationReady()) { loseFocus(); return; }
       if (e.target !== canvas) {
@@ -114,7 +149,7 @@ export function useCombatInput({
       sessionRef.current.cameraController.samplePointer(e.clientX, e.clientY);
 
       if (e.button === 0) {
-        if (engine.battleResult || engine.playerShip.isDead || sessionRef.current.state !== 'running' || isAutopilotRef.current) return;
+        if (!takeManualControl() || sessionRef.current.state !== 'running') return;
         isMouseDown.current = true;
       } else if (e.button === 2) {
         e.preventDefault();
@@ -139,7 +174,9 @@ export function useCombatInput({
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.isComposing || blocked(e.target)) return;
+      if (e.defaultPrevented || e.isComposing || blocked(e.target) || !hasCombatInputFocus()) return;
+      // Focused HUD buttons own Space/Enter activation, not the pause shortcut.
+      if ((e.code === 'Space' || e.code === 'Enter') && isCombatPointerUi(e.target)) return;
       const engine = sessionRef.current.engine;
       const action = shipCommandForKey(e);
       if (e.ctrlKey || e.altKey || e.metaKey) {
@@ -161,13 +198,7 @@ export function useCombatInput({
         return;
       }
       if (e.code === 'KeyU') {
-        if (engine.battleResult || engine.playerShip.isDead || engine.playerShip.isRetreated) return;
-        if (!e.repeat) {
-          clearTransientInput();
-          isAutopilotRef.current = !isAutopilotRef.current;
-          setIsAutopilot(isAutopilotRef.current);
-          sound.play('autofire_toggle', .8);
-        }
+        if (!e.repeat) setAutopilot(!isAutopilotRef.current);
         return;
       }
       if (action) {
@@ -177,8 +208,9 @@ export function useCombatInput({
       }
       if (flightKey(e.code)) {
         e.preventDefault();
-        if (engine.battleResult || engine.playerShip.isDead || engine.playerShip.isRetreated
-          || (!isAutopilotRef.current && sessionRef.current.state === 'running')) keysPressed.current[e.code] = true;
+        if (engine.battleResult || engine.playerShip.isDead || engine.playerShip.isRetreated) {
+          keysPressed.current[e.code] = true; // Observer-camera controls never claim pilot ownership.
+        } else if (takeManualControl() && sessionRef.current.state === 'running') keysPressed.current[e.code] = true;
       }
     };
 
@@ -214,5 +246,7 @@ export function useCombatInput({
       window.removeEventListener('blur', loseFocus);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [sessionRef, canvasRef, cameraPosRef, zoomRef, isAutopilotRef, inputBlockedRef, keysPressed, mouseScreenPos, mouseAimActiveRef, isMouseDown, setIsAutopilot]);
+  }, [sessionRef, canvasRef, cameraPosRef, zoomRef, isAutopilotRef, inputBlockedRef, keysPressed, mouseScreenPos, mouseAimActiveRef, isMouseDown, command, setAutopilot, takeManualControl]);
+
+  return { command, setAutopilot, controlNotice: takeoverNotice ?? undefined };
 }

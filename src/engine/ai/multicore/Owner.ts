@@ -1,16 +1,17 @@
+import { immutableCopy } from '../../extensions/Immutable';
 import { scalarWireCodec, type ScalarWireCodec } from './ScalarWire';
 import { Ship } from '../../simulation/Ship.ts';
 import { CapitalShipAI } from '../../ai/CapitalShipAI.ts';
 import { ProjectileThreatIndex } from '../../ai/ProjectileThreatIndex.ts';
 import { Vector2 } from '../../math/Vector2.ts';
 import { SimulationRandom } from '../../simulation/SimulationRandom.ts';
-import { modManager } from '../../modding/ModManager.ts';
+import { createWeaponHealthTracker, weaponHealthProfile } from '../../simulation/systems/weapon/WeaponComponentHealth';
 import { sound } from '../../audio/SoundManager.ts';
 import { parts, controls, primitive, NumericReader, shipPaths, mountPaths, projectileWireWidth, readProjectile, motionKeys, writePath } from './Protocol.ts';
 import type { Model, Frame, OwnerResult, Fields, Part, Row, Scalar } from './Types';
 import type { TacticalWorld } from '../TacticalWorld';
 import type { WeaponThreatEnvelope } from '../WeaponThreatEnvelope';
-import type { Projectile, Beam } from '../../simulation/Weapon';
+import type { Projectile, Beam, WeaponMount } from '../../simulation/Weapon';
 import type { Asteroid } from '../../simulation/CombatTypes';
 sound.setMuted(true);
 const writable = new Set(['ship', 'flux', 'shield', 'system', 'defenseSystem', 'aimTargetWorld', 'ai', 'defense']);
@@ -33,14 +34,32 @@ export class Owner {
         this.views = [];
         this.projectilePool = [];
         this.lastSequence = 0;
+        // Wire metadata is plain structured-clone data. Re-establish the native deep-
+        // immutable marker so the ordinary hull/range caches work in this realm too.
+        const immutable = new Map<object, any>();
+        const freeze = <T extends object>(value: T): T => {
+            if (!immutable.has(value)) immutable.set(value, immutableCopy(value));
+            return immutable.get(value);
+        };
+        for (const m of models) {
+            m.spec = freeze(m.spec);
+            for (const mount of m.mounts) mount.spec = freeze(mount.spec);
+        }
         // Only construct full Ship and CapitalShipAI instances for this owner's partition.
         for (const i of indices) {
-            const m = models[i], s = new Ship(m.id, modManager.getShip(m.specId), m.isPlayer, new Vector2(), 0, new SimulationRandom(0x51180));
+            const m = models[i], s = new Ship(m.id, m.spec, m.isPlayer, new Vector2(), 0, new SimulationRandom(0x51180));
+            // The runtime mount list may differ from the hull's default slots. Copy the
+            // actual fit, including effective weapon specs; never guess from specId.
+            s.weaponControl.weapons = m.mounts.map(t => ({
+                ...t, relativePos: new Vector2(t.x, t.y),
+                healthTracker: createWeaponHealthTracker(weaponHealthProfile(t.spec.mountSize, t.mountType).repairDuration, new SimulationRandom(0x51180)),
+                fireControl: {},
+            } as unknown as WeaponMount));
             const ai = new CapitalShipAI(s, s);
             this.owned.set(i, { ship: s, ai, nodes: parts(s, ai) });
         }
         for (const m of models) {
-            const v: Fields = { id: m.id, index: m.index, spec: modManager.getShip(m.specId), pos: new Vector2(), vel: new Vector2(), facingRad: 0, shield: { type: 'FRONT' }, flux: {}, system: { hasNativeStats: true }, weapons: [], motion: {}, hasNativeThreatPhaseHooks: true, isVisibleTo(side) { const team = typeof side === "boolean" ? (side ? 0 : 1) : side; return this.teamId === team || (team < 31 ? !!(this.visibilityMask & (1 << team)) : this.visibilityOverflow === "*" || this.visibilityOverflow?.includes("|" + team + "|")); }, getMotionStats() { return this.motion; } };
+            const v: Fields = { id: m.id, index: m.index, spec: m.spec, pos: new Vector2(), vel: new Vector2(), facingRad: 0, shield: { type: m.spec.shieldType }, flux: {}, system: { hasNativeStats: true }, weapons: [], motion: {}, hasNativeThreatPhaseHooks: true, isVisibleTo(side) { const team = typeof side === "boolean" ? (side ? 0 : 1) : side; return this.teamId === team || (team < 31 ? !!(this.visibilityMask & (1 << team)) : this.visibilityOverflow === "*" || this.visibilityOverflow?.includes("|" + team + "|")); }, getMotionStats() { return this.motion; } };
             v.flux.getTimeToVent = () => v.ventTime;
             for (const t of m.mounts)
                 v.weapons.push({ spec: t.spec, slotId: t.slotId, mountType: t.mountType, relativePos: new Vector2(t.x,t.y), baseAngleDeg: t.baseAngleDeg, arcDeg: t.arcDeg, fireControl: {} });
@@ -50,7 +69,7 @@ export class Owner {
         this.indexById = new Map(models.map(m => [m.id, m.index]));
         for (const [i, own] of this.owned) {
             own.ship.getMotionStats = () => this.views[i].motion;
-            if (own.nodes.length !== models[i].schema.length)
+            if (own.nodes.length !== models[i].schema.length || own.nodes.some(([kind], p) => kind !== models[i].schema[p].kind))
                 throw Error('owned ship schema mismatch');
             let offset = models[i].offset;
             for (let part = 0; part < own.nodes.length; part++) {

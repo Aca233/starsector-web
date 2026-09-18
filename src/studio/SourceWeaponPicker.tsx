@@ -1,16 +1,20 @@
+import { RefitHint } from './RefitHint';
+import { useDwellHover } from './useDwellHover';
+import { DwellScope, DwellStatus } from './DwellTooltip';
+import { MotionPresence } from '../ui/core/MotionPresence';
 import { WeaponInformation, WeaponIcon } from "./WeaponInformation";
 import { weaponMetadata as metadata, formatWeaponNumber as number } from "./WeaponTooltipData";
 import { NativeBitmapText } from "../ui/NativeBitmapText";
 import { NativeBorder } from "../ui/NativeChrome";
 import { NativeButton } from "../ui/NativeChrome";
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Modal } from "../ui/core/UI";
 import { contentRegistry } from "../engine/content/ContentRegistry";
-import type { WeaponMountSlotConfig } from "../engine/content/ShipSpec";
+import type { ShipSpec, WeaponMountSlotConfig } from "../engine/content/ShipSpec";
 import type { WeaponSpec } from "../engine/simulation/Weapon";
 import {
   compatibility,
-  designHullSpec,
+  evaluate,
   weaponOPCost,
   damageNames,
   isBuiltIn,
@@ -32,12 +36,14 @@ export function SourceWeaponPicker({
   draft,
   selected,
   remaining,
+  shipSpec,
   onClose,
   onInstall,
 }: {
   draft: Design;
   selected: WeaponMountSlotConfig;
   remaining: number;
+  shipSpec?: ShipSpec;
   onClose: () => void;
   onInstall: (id: string | null) => void;
 }) {
@@ -45,7 +51,7 @@ export function SourceWeaponPicker({
     ? contentRegistry.getWeapon(selected.defaultWeaponId)
     : undefined;
   const locked = isBuiltIn(draft.hullId, selected.slotId);
-  const hullSpec = designHullSpec(draft);
+  const hullSpec = shipSpec ?? evaluate(draft).spec;
   const [showFitted, setShowFitted] = useState(false);
   const costOf = (w: WeaponSpec) => locked ? 0 : weaponOPCost(draft, w.id);
   const rangeOf = (w: WeaponSpec) => showFitted ? effectiveWeaponRange(hullSpec, w) : w.range;
@@ -57,39 +63,13 @@ export function SourceWeaponPicker({
   const [affordableOnly, setAffordableOnly] = useState(false);
   const [faction, setFaction] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
-  const [preview, setPreview] = useState<{ id: string; anchor: HTMLButtonElement } | null>(null);
-  const previewAnchor = useRef<HTMLButtonElement | null>(null);
+  const [encyclopedia, setEncyclopedia] = useState<WeaponSpec | null>(null);
+  const hover = useDwellHover({ enabled: !encyclopedia });
+  const { active: preview, hide: hidePreview, keep: cancelHide, leave: scheduleHide, tooltipId: detailsId } = hover;
   const detailsRef = useRef<HTMLElement>(null);
-  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const detailsId = useId();
-  const cancelHide = useCallback(() => {
-    if (hideTimer.current !== null) clearTimeout(hideTimer.current);
-    hideTimer.current = null;
-  }, []);
-  const hidePreview = useCallback(() => {
-    cancelHide();
-    previewAnchor.current = null;
-    setPreview(null);
-  }, [cancelHide]);
-  const showPreview = (id: string, anchor: HTMLButtonElement) => {
-    cancelHide();
-    previewAnchor.current = anchor;
-    setPreview(previous => previous?.id === id && previous.anchor === anchor ? previous : { id, anchor });
-  };
-  const scheduleHide = useCallback(() => {
-    cancelHide();
-    // Bridge the small row-to-tooltip gap without pinning mouse-click focus forever.
-    hideTimer.current = setTimeout(() => {
-      hideTimer.current = null;
-      if (previewAnchor.current?.matches(":hover, :focus-visible") ||
-          detailsRef.current?.matches(":hover") || detailsRef.current?.querySelector(":focus-visible")) return;
-      hidePreview();
-    }, 180);
-  }, [cancelHide, hidePreview]);
-  useEffect(() => cancelHide, [cancelHide]);
   const [comparing, setComparing] = useState(false);
   // The nested codex must survive the hover/focus owner losing focus to its modal.
-  const [encyclopedia, setEncyclopedia] = useState<WeaponSpec | null>(null);
+
   const ref = useRef<HTMLDivElement>(null);
   const budgetHere = remaining + (installed ? costOf(installed) : 0);
   const canAfford = (w: WeaponSpec) => costOf(w) <= budgetHere;
@@ -254,13 +234,11 @@ export function SourceWeaponPicker({
             : "安装" + weaponName(w.id)
         }
         data-weapon-choice={current ? undefined : w.id}
+        data-inspect-weapon={w.id}
         aria-disabled={disabled}
         data-preview={candidate?.id === w.id}
         aria-controls={candidate?.id === w.id ? detailsId : undefined}
-        onMouseEnter={e => showPreview(w.id, e.currentTarget)}
-        onMouseLeave={scheduleHide}
-        onFocus={e => showPreview(w.id, e.currentTarget)}
-        onBlur={scheduleHide}
+        {...hover.bind(w.id)}
         onClick={() => {
           if (!disabled) onInstall(current ? null : w.id);
         }}
@@ -306,7 +284,11 @@ export function SourceWeaponPicker({
             toggleType(weaponTypes[Number(key) - 1]);
           if (key === "4") setMessageLibrary(true);
           if (key === "f") setAdvanced(value => !value);
-          if (key === "f2" && candidate) setEncyclopedia(candidate ?? null);
+          if (key === "f2") {
+            const focused = document.activeElement instanceof HTMLElement && ref.current?.contains(document.activeElement) ? document.activeElement.dataset.inspectWeapon : undefined;
+            const weapon = candidate ?? (focused ? contentRegistry.getWeapon(focused) : undefined);
+            if (weapon) { setEncyclopedia(weapon); hidePreview(); }
+          }
         }}
       >
         <div className="source-weapon-picker" ref={ref}>
@@ -325,9 +307,9 @@ export function SourceWeaponPicker({
                 disabled={!relevantTypes.includes(type)} onClick={() => toggleType(type)}>{types[type]}</NativeButton>)}
             </div>
             <div className="source-ownership-filters" role="group" aria-label="装备来源">
-              <NativeButton font="body" shortcut="4" aria-pressed="true" onClick={() => setMessageLibrary(true)} title="当前使用完整模拟装备库，不扣除库存">拥有</NativeButton>
-              <NativeButton font="body" shortcut="5" disabled title="尚未接入市场交易">合法购买</NativeButton>
-              <NativeButton font="body" shortcut="6" disabled title="尚未接入黑市交易">非法购买</NativeButton>
+              <RefitHint text="当前使用完整模拟装备库，不扣除库存"><NativeButton font="body" shortcut="4" aria-pressed="true" onClick={() => setMessageLibrary(true)} >拥有</NativeButton></RefitHint>
+              <RefitHint text="尚未接入市场交易"><NativeButton font="body" shortcut="5" disabled >合法购买</NativeButton></RefitHint>
+              <RefitHint text="尚未接入黑市交易"><NativeButton font="body" shortcut="6" disabled >非法购买</NativeButton></RefitHint>
             </div>
           </div>}
           {!locked && advanced && <div className="refit-weapon-filters">
@@ -360,18 +342,20 @@ export function SourceWeaponPicker({
             <span>{available.length} 种 · {budgetHere} OP</span>
           </div>}
           {messageLibrary && <p className="source-library-note" role="status">模拟装备库：无限库存，不涉及交易。<button onClick={() => setMessageLibrary(false)} aria-label="关闭装备库说明">×</button></p>}
-          {candidate && (
-            <aside ref={detailsRef} id={detailsId} className="source-weapon-details" aria-label="武器详细参数"
+          {candidate && !encyclopedia && (
+            <aside ref={detailsRef} id={detailsId} key={candidate.id} data-dwell-id={detailsId} data-dwell-depth={hover.depth} data-dwell-owner={hover.ownerId} data-dwell-locked={hover.locked} className="source-weapon-details" aria-label="武器详细参数"
               onMouseEnter={cancelHide} onMouseLeave={scheduleHide} onFocus={cancelHide} onBlur={scheduleHide}>
               <NativeBorder />
-              <WeaponInformation candidate={candidate} installed={installed} draft={draft} selected={selected}
+              <DwellScope hover={hover}><DwellStatus hover={hover} />
+              <WeaponInformation candidate={candidate} installed={installed} draft={draft} selected={selected} shipSpec={shipSpec} previewInstallation
                 compare={compare} isCurrent={isCurrent} showFitted={showFitted}
-                onToggleFitted={() => setShowFitted(value => !value)} onOpenCodex={setEncyclopedia} />
+                onToggleFitted={() => setShowFitted(value => !value)} onOpenCodex={weapon => { setEncyclopedia(weapon); hidePreview(); }} />
+              </DwellScope>
             </aside>
           )}
         </div>
       </Modal>
-      {encyclopedia && (
+      <MotionPresence>{encyclopedia && (
         <Modal
           title={weaponName(encyclopedia.id)}
           eyebrow="武器数据百科"
@@ -383,7 +367,7 @@ export function SourceWeaponPicker({
             <small>原作资料；上方装配界面使用当前引擎已接入的武器参数。</small>
           </article>
         </Modal>
-      )}
+      )}</MotionPresence>
     </>
   );
 }

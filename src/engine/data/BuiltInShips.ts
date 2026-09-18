@@ -1,3 +1,4 @@
+import { nativeShipToRuntime } from './NativeShipCoordinates';
 import { normalizeSourceCapabilities } from './SourceCapabilities';
 import presentation from './PresentationPolicy';
 import sourceShips from './generated/ships.json';
@@ -23,5 +24,5 @@ export function assembleShip(source: ShipSpec, loadout?: SandboxLoadout): ShipSp
   });
 }
 export function builtInShips(): ShipSpec[] {
-  return Object.values(sourceShips).map(raw=>assembleShip({...raw, ...(presentation.ships as unknown as Record<string, Partial<ShipSpec>>)[raw.id]} as ShipSpec, (loadouts as Record<string,SandboxLoadout>)[raw.id]));
+  return Object.values(sourceShips).map(raw=>nativeShipToRuntime(assembleShip({...raw, ...(presentation.ships as unknown as Record<string, Partial<ShipSpec>>)[raw.id]} as ShipSpec, (loadouts as Record<string,SandboxLoadout>)[raw.id])));
 }

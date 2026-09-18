@@ -1,3 +1,10 @@
+import { WeaponGroupInspection } from './WeaponGroupInspection';
+import { WeaponInspection } from './WeaponInspection';
+import { useInspectionCodex } from './useInspectionCodex';
+import { RefitExplanationText } from './RefitHoverTerms';
+import { RefitHint, RefitInfoHover } from './RefitHint';
+import { RefitStatHover } from "./RefitHoverTerms";
+import { MotionPresence } from '../ui/core/MotionPresence';
 import { currentImportReasons } from '../engine/data/SourceCapabilities';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { NativeButton, NativeFrame } from "../ui/NativeChrome";
@@ -24,6 +31,9 @@ import { SourceModPicker } from "./SourceModPicker";
 import { SourceWeaponPicker } from "./SourceWeaponPicker";
 import {
   autoGroups,
+  moduleDesignContext,
+  withModuleDesign,
+  builtInWingIds,
   modDescriptions,
   weaponFluxPerSecond,
   builtInModName,
@@ -33,8 +43,6 @@ import {
   fluxLimit,
   hulls,
   isBuiltIn,
-  sizes,
-  types,
   weaponName,
   withWeapon,
   withWing,
@@ -46,7 +54,7 @@ import type { ShipSpec } from "../engine/content/ShipSpec";
 const SourceVariantPicker = lazy(() => import("./SourceVariantPicker").then(module => ({ default: module.SourceVariantPicker })));
 
 type Panel =
-  "weapons" | "groups" | "mods" | "designs" | "help" | "wings" | null;
+  "weapons" | "groups" | "mods" | "designs" | "help" | "wings" | "clearModule" | null;
 interface Props {
   /** Context-specific presentation; the normal single-player editor keeps its defaults. */
   embedded?: { title: string; backLabel: string; primaryLabel: string; disabledReason?: string };
@@ -78,13 +86,49 @@ interface Props {
   readHullScroll: () => number;
   writeHullScroll: (value: number) => void;
 }
+interface ModuleEditorContext {
+  path: string[];
+  draft: Design;
+  template?: ShipSpec;
+  rootEvaluation: ReturnType<typeof evaluate>;
+  options: {path: string[]; spec: ShipSpec}[];
+  select: (path: string[]) => void;
+}
 export function NativeRefit(props: Props) {
-  const { draft, designs, dirty, onChange } = props;
+  const identity = [props.draft.id, props.draft.hullId, props.draft.sourceVariantId ?? ''].join(':');
+  const [selection, setSelection] = useState<{identity: string; path: string[]}>({identity, path: []});
+  const candidate = selection.identity === identity ? selection.path : [];
+  const context = moduleDesignContext(props.draft, candidate);
+  const path = context ? candidate : [];
+  const rootEvaluation = useMemo(() => evaluate(props.draft), [props.draft]);
+  const options: ModuleEditorContext['options'] = [];
+  const visit = (spec: ShipSpec, parent: string[]) => {
+    for (const mount of spec.modules ?? []) {
+      const childPath = [...parent, mount.slotId];
+      options.push({path: childPath, spec: mount.spec});
+      visit(mount.spec, childPath);
+    }
+  };
+  visit(rootEvaluation.spec, []);
+  return <RefitEditor {...props} key={identity} moduleContext={{
+    path, ...(context ?? {draft: props.draft}), rootEvaluation, options,
+    select: next => setSelection({identity, path: next}),
+  }} />;
+}
+function RefitEditor(props: Props & {moduleContext: ModuleEditorContext}) {
+  const { designs, dirty, moduleContext } = props;
+  const {draft, path, template, rootEvaluation} = moduleContext;
+  const editingModule = path.length > 0;
+  const onChange = (next: Design) => props.onChange(editingModule ? withModuleDesign(props.draft, path, next) : next);
+  const clear = () => editingModule ? setPanel('clearModule') : props.onClear();
   const [panel, setPanel] = useState<Panel>(null);
+  const [moduleListOpen, setModuleListOpen] = useState(false);
   const modDetails = useHullModTooltip(panel === null);
   const [slotId, setSlotId] = useState("");
   const [deckIndex, setDeckIndex] = useState(0);
-  const [zoom, setZoom] = useState(props.roomLayout ? 0.95 : 0.65);
+  const [zoom, setZoom] = useState(moduleContext.options.length ? 1 : props.roomLayout ? 0.95 : 0.65);
+  const [pan, setPan] = useState({x: 0, y: 0});
+  const drag = useRef<{pointerId: number; x: number; y: number; pan: {x: number; y: number}} | null>(null);
   const [groupHighlight, setGroupHighlight] = useState<number | null>(null);
   const [showMounts, setShowMounts] = useState(false);
   const [feedback, setFeedback] = useState("");
@@ -95,8 +139,9 @@ export function NativeRefit(props: Props) {
   const caveats = [...currentImportReasons(importStatus?.reasons ?? []), ...equippedCaveats];
 
   const mainRef = useRef<HTMLDivElement>(null);
-  const evaluation = useMemo(() => evaluate(draft), [draft]);
-  const { spec, op, errors } = evaluation;
+  const evaluation = useMemo(() => evaluate(draft, template), [draft, template]);
+  const { spec, op } = evaluation;
+  const errors = [...new Set([...rootEvaluation.errors, ...evaluation.errors])];
   const stats = effectiveHullStats(spec);
   const systems = [{ definition: shipSystemDefinitions.require(spec.systemType), label: '舰船系统', key: 'F' },
     { definition: shipSystemDefinitions.require(spec.defenseSystemType ?? 'NONE'), label: '防御系统', key: '鼠标右键' }];
@@ -116,6 +161,12 @@ export function NativeRefit(props: Props) {
     if (patch.hullMods) next.wings = designWingSlots(next);
     onChange(next);
   };
+  const selectModule = (next: string[]) => {
+    weaponDetails.hide();
+    setModuleListOpen(false);
+    setPanel(null); setSlotId(''); setDeckIndex(0); setGroupHighlight(null); setFeedback('');
+    moduleContext.select(next);
+  };
   const selectSlot = (id: string) => {
     setSlotId(id);
     setPanel("weapons");
@@ -130,7 +181,7 @@ export function NativeRefit(props: Props) {
   );
   const nextHull = () => {
     if (props.roomLayout) { props.roomLayout.onPickHull(); return; }
-    const current = hulls.findIndex(h => h.id === draft.hullId);
+    const current = hulls.findIndex(h => h.id === props.draft.hullId);
     for (let offset = 1; offset <= hulls.length; offset++) {
       const next = hulls[(current + offset) % hulls.length];
       if (!props.hullUnavailableReason?.(next)) { props.onHull(next.id); return; }
@@ -184,7 +235,7 @@ export function NativeRefit(props: Props) {
         },
 
         u: props.onUndo,
-        t: props.onClear,
+        t: clear,
         x: nextHull,
         escape: props.onHome,
       };
@@ -228,12 +279,12 @@ export function NativeRefit(props: Props) {
       {...modDetails.bind(id)}
     >
       <span>{builtInModName(id)}{draft.sMods?.includes(id) ? " · S" : ""}</span>
-      {(draft.sMods?.includes(id) || !sModInstallReason(spec, id)) && <button className="native-step"
-        title={(hullModDefinitions.get(id)?.sMod?.description ?? "固化免除OP费用，无额外战斗加成。") + " 沙盒允许撤销固化。"}
+      {(draft.sMods?.includes(id) || !sModInstallReason(spec, id)) && <RefitHint text={(hullModDefinitions.get(id)?.sMod?.description ?? "固化免除OP费用，无额外战斗加成。") + " 沙盒允许撤销固化。"}><button className="native-step"
+
         aria-label={(draft.sMods?.includes(id) ? "撤销固化" : "固化") + builtInModName(id)}
         onClick={() => change({sMods: draft.sMods?.includes(id) ? draft.sMods.filter(m => m !== id) : [...(draft.sMods ?? []), id]})}>
         {draft.sMods?.includes(id) ? "撤销 S" : "固化 S"}
-      </button>}
+      </button></RefitHint>}
       {!builtin && (
         <>
           <b>{hullModOPCost(spec, id)}</b>
@@ -267,7 +318,7 @@ export function NativeRefit(props: Props) {
       <div className="native-screen-tab">
         {props.embedded?.title ?? "舰队改装"} <span className="native-shortcut">[R]</span>
       </div>
-      <div className="refit-skills-entry"><NativeButton shortcut="C" disabled={props.roomLayout?.locked} onClick={props.onSkills} data-skills-entry>角色技能 · {Object.keys(draft.captainSkills ?? {}).length} 项</NativeButton></div>
+      <div className="refit-skills-entry"><NativeButton shortcut="C" disabled={props.roomLayout?.locked} onClick={props.onSkills} data-skills-entry>角色技能 · {Object.keys(props.draft.captainSkills ?? {}).length} 项</NativeButton></div>
       <button
         className="native-screen-close"
         aria-label={props.embedded?.backLabel ?? "返回主页面"}
@@ -276,34 +327,81 @@ export function NativeRefit(props: Props) {
         ×
       </button>
       <NativeFrame className="refit-shell">
-        {props.roomLayout?.sidebar ?? <HullRoster unavailableReason={props.hullUnavailableReason} draft={draft} spec={spec} filter={props.hullFilter} onFilter={props.onHullFilter}
+        {props.roomLayout?.sidebar ?? <HullRoster unavailableReason={props.hullUnavailableReason} draft={props.draft} spec={rootEvaluation.spec} filter={props.hullFilter} onFilter={props.onHullFilter}
           readScrollPosition={props.readHullScroll} writeScrollPosition={props.writeHullScroll} onHull={props.onHull} inert={panel === "mods"} />}
         <div
-          className={"refit-grid " + (stats.fighterBays ? "has-flight-decks " : "") + (showMounts ? "show-all-mounts" : "")}
+          className={"refit-grid " + (moduleContext.options.length ? "has-assembly " : "") + (stats.fighterBays ? "has-flight-decks " : "") + (showMounts ? "show-all-mounts" : "")}
           ref={mainRef}
           inert={props.roomLayout?.locked}
         >
-          <div className="refit-cr">
+          <RefitHint text="战备值（CR）：当前配置进入战斗时的作战准备程度，不是舰体结构或护盾值。"><div className="refit-cr">
             <div className="native-cr-meter">
               <i />
               <b />
             </div>
             <span className="native-numeric">{Math.round(Math.min(1, .7 + stats.maxCombatReadinessBonus) * 100)}%</span>
             <label>战备值 (CR)</label>
-          </div>
+          </div></RefitHint>
           <FighterDecks draft={draft} selected={panel === "wings" ? deckIndex : null} inert={panel === "mods"}
             onSelect={index => { setDeckIndex(index); setPanel("wings"); }}
             onRemove={index => { onChange(withWing(draft, index, null)); setFeedback("已卸下联队 · 可撤消恢复"); }} />
           <div
-            className="refit-vessel"
+            className={"refit-vessel " + (moduleContext.options.length ? "refit-vessel--assembly" : "")}
             inert={panel === "mods"}
             onWheel={(e) => {
+              if (e.target instanceof Element && e.target.closest('.assembly-editor')) return;
               weaponDetails.hide();
-              setZoom((z) => Math.max(0.65, Math.min(1.5, z - e.deltaY * 0.001)));
+              setZoom((z) => Math.max(0.65, Math.min(moduleContext.options.length ? 4 : 1.5, z - e.deltaY * 0.001)));
             }}
+            onPointerDownCapture={e => {
+              if (!moduleContext.options.length || (e.button !== 1 && !(e.button === 0 && e.shiftKey)) ||
+                  (e.target instanceof Element && e.target.closest('.assembly-editor'))) return;
+              e.preventDefault(); e.stopPropagation(); weaponDetails.hide();
+              e.currentTarget.setPointerCapture(e.pointerId);
+              drag.current = {pointerId: e.pointerId, x: e.clientX, y: e.clientY, pan};
+            }}
+            onPointerMove={e => {
+              const start = drag.current;
+              if (start?.pointerId === e.pointerId) setPan({x: start.pan.x + e.clientX-start.x, y: start.pan.y+e.clientY-start.y});
+            }}
+            onPointerUp={e => {
+              if (drag.current?.pointerId !== e.pointerId) return;
+              drag.current = null;
+              e.currentTarget.releasePointerCapture(e.pointerId);
+            }}
+            onPointerCancel={() => { drag.current = null; }}
+            onLostPointerCapture={() => { drag.current = null; }}
+            onClickCapture={e => { if (e.shiftKey && moduleContext.options.length) e.stopPropagation(); }}
           >
+            {!!moduleContext.options.length && <section className="assembly-editor" aria-label="模块改装导航">
+              <div className="assembly-editor-heading">
+                <button type="button" aria-pressed={!editingModule} onClick={() => selectModule([])}>选择母舰</button>
+                <RefitHint text="只编辑选中部件，OP 独立计算；保存与战斗仍使用整舰。"><strong >{editingModule ? `模块 ${path.join(' / ')} · ${info.designation}` : '母舰 · 点击模块原位改装'}</strong></RefitHint>
+              </div>
+              <details open={moduleListOpen} onToggle={e => setModuleListOpen(e.currentTarget.open)}>
+                <summary>选择模块 · {moduleContext.options.length} 个挂接模块</summary>
+                <div className="assembly-module-list">
+                  {moduleContext.options.map(option => <button type="button" key={JSON.stringify(option.path)}
+                    aria-pressed={JSON.stringify(option.path) === JSON.stringify(path)}
+                    onClick={() => selectModule(option.path)}>
+                    <span>{option.path.join(' / ')}</span> {data.ships[option.spec.id]?.designation ?? option.spec.id}
+                  </button>)}
+                </div>
+              </details>
+              <div className="assembly-editor-actions">
+              <button type="button" onClick={() => { setZoom(1); setPan({x: 0, y: 0}); }}>重置视图</button>
+              {editingModule && <button type="button" className="assembly-restore"
+                disabled={!moduleDesignContext(props.draft, path.slice(0, -1))?.draft.modules?.[path[path.length - 1]]}
+                onClick={() => { props.onChange(withModuleDesign(props.draft, path, null)); setFeedback('此模块已恢复原版装配 · 可撤消'); }}>
+                恢复此模块原版装配
+              </button>}
+              </div>
+              <small>滚轮缩放 · Shift + 拖动平移</small>
+            </section>}
             <ShipStage
-              spec={spec}
+              spec={rootEvaluation.spec}
+              activeModulePath={path}
+              onSelectModule={selectModule}
               onSelect={selectSlot}
               selectedSlot={weaponDetails.activeSlot?.slotId ?? slotId}
               slotBindings={weaponDetails.bind}
@@ -322,16 +420,17 @@ export function NativeRefit(props: Props) {
               }
               pickingWeapon={panel === "weapons"}
               zoom={zoom}
+              pan={moduleContext.options.length ? pan : undefined}
             />
           </div>
           <aside className="refit-stats" aria-label="舰船装配参数">
-            {caveats.length > 0 && <details className="refit-import-warning"><summary>基础模拟 · {caveats.length} 项适配说明</summary><p>以下原作机制尚未完整重现；导入不等于战斗完全一致。</p><ul>{caveats.map((reason, i) => <li key={i}>{reason}</li>)}</ul></details>}
-            {systems.filter(s => s.definition.id !== 'NONE').map(({ definition: tacticalSystem, label, key }) => <details key={label} className="refit-system-readiness" data-available={!tacticalSystem.unavailable}>
-              <summary>{label}：{tacticalSystem.name.replace(/^未适配[:：]\s*/, "")} · {tacticalSystem.unavailable ? "未接入" : "可用"}</summary>
+            {caveats.length > 0 && <RefitInfoHover enabled={panel === null} className="refit-import-warning" title={`基础模拟 · ${caveats.length} 项适配说明`}><p>以下原作机制尚未完整重现；导入不等于战斗完全一致。</p><ul>{caveats.map((reason, i) => <li key={i}>{reason}</li>)}</ul></RefitInfoHover>}
+            {systems.filter(s => s.definition.id !== 'NONE').map(({ definition: tacticalSystem, label, key }) => <RefitInfoHover key={label} enabled={panel === null} className="refit-system-readiness" available={!tacticalSystem.unavailable}
+              title={`${label}：${tacticalSystem.name.replace(/^未适配[:：]\s*/, "")} · ${tacticalSystem.unavailable ? "未接入" : "可用"}`}>
               <p>{tacticalSystem.unavailable ? "此系统尚未实现战斗效果，不能激活。不会把空计时显示成已生效。" : "已接入战斗逻辑，试战中按 " + key + " 激活；受冷却、充能和舰船状态限制。"}</p>
-              {tacticalSystem.description && <p>{tacticalSystem.description}</p>}
-              {tacticalSystem.implementationDetails && <p>{tacticalSystem.implementationDetails}</p>}
-            </details>)}
+              {tacticalSystem.description && <p><RefitExplanationText text={tacticalSystem.description} /></p>}
+              {tacticalSystem.implementationDetails && <p><RefitExplanationText text={tacticalSystem.implementationDetails} /></p>}
+            </RefitInfoHover>)}
             <div className="refit-op-heading">
               <button
                 className="native-help-button"
@@ -340,7 +439,14 @@ export function NativeRefit(props: Props) {
               >
                 ?
               </button>
-              <div
+              <RefitHint text={
+                  "已用 " +
+                  op.used +
+                  " / 总计 " +
+                  op.total +
+                  " OP，剩余 " +
+                  op.remaining
+                }><div
                 className={
                   "native-op-bar " + (op.remaining < 0 ? "over-budget" : "")
                 }
@@ -349,14 +455,7 @@ export function NativeRefit(props: Props) {
                 aria-valuenow={op.used}
                 aria-valuemin={0}
                 aria-valuemax={op.total}
-                title={
-                  "已用 " +
-                  op.used +
-                  " / 总计 " +
-                  op.total +
-                  " OP，剩余 " +
-                  op.remaining
-                }
+
               >
                 <i
                   style={{
@@ -366,20 +465,26 @@ export function NativeRefit(props: Props) {
                 <strong>
                   {op.used} / {op.total}
                 </strong>
-              </div>
+              </div></RefitHint>
             </div>
             <div className="native-stat-three">
               <div>
+                <RefitStatHover term="speed" value={spec.sourceHullTraits?.includes('STATION') ? '固定' : Number(stats.maxSpeed.toFixed(1))} enabled={panel === null}>
                 <small>最高航速</small>
-                <b>{Number(stats.maxSpeed.toFixed(1))}</b>
+                <b>{spec.sourceHullTraits?.includes('STATION') ? '固定' : Number(stats.maxSpeed.toFixed(1))}</b>
+                </RefitStatHover>
               </div>
               <div>
+                <RefitStatHover term="armor" value={Math.round(stats.armorRating)} enabled={panel === null}>
                 <small>舰体装甲</small>
                 <b>{Math.round(stats.armorRating)}</b>
+                </RefitStatHover>
               </div>
               <div>
+                <RefitStatHover term="hull" value={Math.round(stats.hitpoints)} enabled={panel === null}>
                 <small>舰体结构</small>
                 <b>{Math.round(stats.hitpoints)}</b>
+                </RefitStatHover>
               </div>
             </div>
             {(
@@ -399,7 +504,7 @@ export function NativeRefit(props: Props) {
               ] as const
             ).map((item) => (
               <div className="native-flux-row" key={item.key}>
-                <label htmlFor={"refit-" + item.key}>{item.label}</label>
+                <RefitHint text={item.label + "：每点投资消耗 1 OP，上限由舰体决定。"}><label htmlFor={"refit-" + item.key}>{item.label}</label></RefitHint>
                 <button
                   className="native-step"
                   aria-label={"减少" + item.label}
@@ -436,53 +541,62 @@ export function NativeRefit(props: Props) {
                   +
                 </button>
                 <div>
+                  <RefitStatHover term={item.key === "vents" ? "dissipation" : "capacity"} value={item.value} enabled={panel === null}>
                   <small>{item.stat}</small>
                   <b className="native-green">{item.value}</b>
+                  </RefitStatHover>
                 </div>
               </div>
             ))}
             <div className="native-stat-three refit-shields">
               <div>
+                <RefitStatHover term="arc" value={stats.shieldType === "NONE" || stats.shieldType === "PHASE" ? "—" : stats.shieldArcDeg} enabled={panel === null}>
                 <small>护盾角度</small>
                 <b>
                   {stats.shieldType === "NONE" || stats.shieldType === "PHASE"
                     ? "—"
                     : stats.shieldArcDeg}
                 </b>
+                </RefitStatHover>
               </div>
               <div>
+                <RefitStatHover term="upkeep" value={stats.shieldType === "PHASE" ? "—" : Math.round(stats.shieldUpkeepPerSecond)} enabled={panel === null}>
                 <small>护盾维持 幅能/秒</small>
                 <b className="native-green">
                   {stats.shieldType === "PHASE"
                     ? "—"
                     : Math.round(stats.shieldUpkeepPerSecond)}
                 </b>
+                </RefitStatHover>
               </div>
               <div>
+                <RefitStatHover term="shield" value={stats.shieldType === "NONE" || stats.shieldType === "PHASE" ? "—" : Number(stats.shieldFluxPerDamage.toFixed(2))} enabled={panel === null}>
                 <small>护盾 幅能/伤害</small>
                 <b className="native-green">
                   {stats.shieldType === "NONE" || stats.shieldType === "PHASE"
                     ? "—"
                     : Number(stats.shieldFluxPerDamage.toFixed(2))}
                 </b>
+                </RefitStatHover>
               </div>
             </div>
             <div
               className="refit-weapon-flux"
-              title="所有武器的射击周期平均幅能负载，含充能和冷却；不计弹药回充等待、射界与编组交替。"
             >
+              <RefitStatHover term="flux" value={weaponFlux} enabled={panel === null}>
               <small>武器 幅能/秒</small>
               <b>{weaponFlux}</b>
+              </RefitStatHover>
             </div>
             <section className="refit-hullmods">
-              <h2>舰体插件 · S-mod {(draft.sMods ?? []).filter(id => !spec.builtInHullMods?.includes(id)).length}/2</h2>
+              <RefitHint text="S-mod 固化：外装固化免除 OP 费用，最多两项；内置插件增强不占这两个名额。"><h2>舰体插件 · S-mod {(draft.sMods ?? []).filter(id => !spec.builtInHullMods?.includes(id)).length}/2</h2></RefitHint>
               {(spec.builtInHullMods ?? []).map((id) => modRow(id, true))}
               {draft.hullMods.map((id) => modRow(id, false))}
-              {campaignBuiltins.map(id => <details className="refit-campaign-mods" key={id}><summary>{builtInModName(id)}：仅战役 · 当前无战役模拟</summary><p>{modDescriptions[id]}</p></details>)}
-              {!!missingBuiltins.length && <details className="refit-missing-mods"><summary>{missingBuiltins.length} 项原作内置插件未完整接入</summary>
+              {campaignBuiltins.map(id => <RefitInfoHover enabled={panel === null} className="refit-campaign-mods" key={id} title={builtInModName(id) + "：仅战役 · 当前无战役模拟"}><p><RefitExplanationText text={modDescriptions[id]} /></p></RefitInfoHover>)}
+              {!!missingBuiltins.length && <RefitInfoHover enabled={panel === null} className="refit-missing-mods" title={`${missingBuiltins.length} 项原作内置插件未完整接入`}>
                 <p>以下项目不应视为已实现的战斗加成；战役、后勤或特殊机制仍需单独移植。</p>
                 <ul>{missingBuiltins.map(id => <li key={id}>{nativeRefit.hullmods?.[id]?.name ?? builtInModName(id)}</li>)}</ul>
-              </details>}
+              </RefitInfoHover>}
               <NativeButton
                 shortcut="A"
                 aria-expanded={panel === "mods"}
@@ -508,12 +622,12 @@ export function NativeRefit(props: Props) {
             <div className="refit-name">
               <input
                 aria-label="方案名称"
-                value={draft.name}
+                value={props.draft.name}
                 maxLength={48}
-                onChange={(e) => change({ name: e.target.value })}
+                onChange={(e) => props.onChange({ ...props.draft, name: e.target.value })}
               />
-              <span>{info.name}-级</span>
-              <small title={props.status}>{dirty ? " *" : ""}</small>
+              <span>{data.ships[props.draft.hullId].name}-级{editingModule ? " · 模块编辑中" : ""}</span>
+              <RefitHint text={props.status}><small >{dirty ? " *" : ""}</small></RefitHint>
             </div>
             <div className="refit-actions">
               <NativeButton shortcut="W" onClick={() => setPanel("groups")}>
@@ -529,24 +643,24 @@ export function NativeRefit(props: Props) {
               >
                 撤消
               </NativeButton>
-              <NativeButton shortcut="T" onClick={props.onClear}>
-                清空装配
+              <NativeButton shortcut="T" onClick={clear}>
+                {editingModule ? "清空此模块" : "清空装配"}
               </NativeButton>
-              <NativeButton
+              <RefitHint text="当前舰体没有需要修复的 D-插件；试战损伤不写回设计。"><NativeButton
                 shortcut="G"
                 disabled
-                title="当前舰体没有需要修复的 D-插件；试战损伤不写回设计。"
+
               >
                 修复...
-              </NativeButton>
-              {!props.roomLayout && <NativeButton
+              </NativeButton></RefitHint>
+              {!props.roomLayout && <RefitHint text={props.embedded?.disabledReason}><NativeButton
                 shortcut="N"
                 disabled={!!errors.length || !!props.embedded?.disabledReason}
-                title={props.embedded?.disabledReason}
+
                 onClick={() => props.onLaunch()}
               >
                 {props.embedded?.primaryLabel ?? "模拟战斗"}
-              </NativeButton>}
+              </NativeButton></RefitHint>}
               <NativeButton
                 shortcut="X"
                 className="refit-next"
@@ -572,9 +686,10 @@ export function NativeRefit(props: Props) {
         )}
       </NativeFrame>
       {weaponDetails.content}
-      {panel === "weapons" && selected && (
+      <MotionPresence>{panel === "weapons" && selected && (
         <SourceWeaponPicker
           draft={draft}
+          shipSpec={spec}
           selected={selected}
           remaining={op.remaining}
           onClose={() => setPanel(null)}
@@ -586,8 +701,8 @@ export function NativeRefit(props: Props) {
             );
           }}
         />
-      )}
-      {panel === "groups" && (
+      )}</MotionPresence>
+      <MotionPresence>{panel === "groups" && (
         <SourceWeaponGroups
           draft={draft}
           spec={spec}
@@ -601,19 +716,29 @@ export function NativeRefit(props: Props) {
             setGroupHighlight(null);
           }}
         />
-      )}
-      {panel === "designs" && (
+      )}</MotionPresence>
+      <MotionPresence>{panel === "designs" && (
         <Suspense fallback={<Modal title="装配方案" eyebrow="" onClose={() => setPanel(null)}><div className="source-variant-picker">正在读取原版装配方案…</div></Modal>}>
-        <SourceVariantPicker draft={draft} designs={designs} onClose={() => setPanel(null)}
-          onApply={next => { onChange(next); setFeedback("已应用装配方案；可使用撤消恢复。"); }}
+        <SourceVariantPicker draft={props.draft} designs={designs} onClose={() => setPanel(null)}
+          onApply={next => { props.onChange(next); selectModule([]); setPanel(null); setFeedback("已应用整舰装配方案；可使用撤消恢复。"); }}
           onSave={props.onSave} onDelete={props.onDelete} onRename={props.onRename} />
         </Suspense>
-      )}
-      {panel === "wings" && deckIndex < stats.fighterBays && (
+      )}</MotionPresence>
+      <MotionPresence>{panel === "wings" && deckIndex < stats.fighterBays && (
         <SourceWingPicker key={draft.hullId + ':' + deckIndex} draft={draft} index={deckIndex}
           onClose={() => setPanel(null)} onEquip={id => { onChange(withWing(draft, deckIndex, id)); setPanel(null); setFeedback(id ? "已更换联队 · 可撤消恢复" : "已卸下联队 · 可撤消恢复"); }} />
-      )}
-      {panel === "help" && (
+      )}</MotionPresence>
+      <MotionPresence>{panel === 'clearModule' && <Modal title="清空此模块装配？" eyebrow="仅当前挂点" onClose={() => setPanel(null)}>
+        <p>卸下此模块的非内置武器、插件和联队，幅能投资归零。不改变母舰与其他模块；可撤消恢复。</p>
+        <NativeButton onClick={() => setPanel(null)}>取消</NativeButton>
+        <NativeButton onClick={() => {
+          let next = structuredClone(draft);
+          for (const id of Object.keys(next.weapons)) next = withWeapon(next, id, null);
+          onChange({...next, hullMods: [], sMods: [], wings: [...builtInWingIds(draft.hullId)], capacitors: 0, vents: 0});
+          setPanel(null); setFeedback('已清空此模块 · 可撤消恢复');
+        }}>确认清空此模块</NativeButton>
+      </Modal>}</MotionPresence>
+      <MotionPresence>{panel === "help" && (
         <Modal
           title="舰船改装"
           eyebrow="操作说明"
@@ -648,7 +773,7 @@ export function NativeRefit(props: Props) {
             </p>
           </div>
         </Modal>
-      )}
+      )}</MotionPresence>
     </main>
   );
 }
@@ -665,6 +790,7 @@ function SourceWeaponGroups({
   onClose: () => void;
   onConfirm: (groups: Group[]) => void;
 }) {
+  const codex = useInspectionCodex();
   const [groups, setGroups] = useState(() => structuredClone(draft.groups));
   const stats = effectiveHullStats(spec);
 
@@ -686,13 +812,14 @@ function SourceWeaponGroups({
   const flux = (group: Group) =>
     Math.round(
       group.weaponSlotIds.reduce((sum, slot) => {
-        const weapon = contentRegistry.getWeapon(draft.weapons[slot] ?? "");
+        const weapon = contentRegistry.getWeapon(spec.weaponSlots.find(mount => mount.slotId === slot)?.defaultWeaponId ?? "");
         return sum + (weapon ? weaponFluxPerSecond(effectiveHullModWeaponSpec(spec, weapon)) : 0);
       }, 0),
     );
   const weaponType = (weaponId: string) =>
     contentRegistry.getWeapon(weaponId)?.weaponType ?? "ENERGY";
   return (
+    <>
     <Modal
       title="武器组管理"
       surface="solid"
@@ -726,9 +853,8 @@ function SourceWeaponGroups({
           <div className="source-group-row source-group-autofire">
             <span>启用自动开火</span>
             {groups.map((g) => (
-              <button
+              <RefitHint key={g.index} text={"自动开火：" + (g.isAutofire ? "已开启。" : "已关闭。") + "手动驾驶时，未选中的此组可由自动火控开火；选中组仍由你控制。AI 驾驶会接管所有武器。点击切换，确认后保存。"}><button
                 type="button"
-                key={g.index}
                 className="source-group-cell"
                 role="checkbox"
                 aria-label={"武器组 " + (g.index + 1) + " 自动开火"}
@@ -742,13 +868,15 @@ function SourceWeaponGroups({
                     ),
                   )
                 }
-              />
+              /></RefitHint>
             ))}
           </div>
           <div className="source-group-row source-group-header">
             <span>武器</span>
             {groups.map((g) => (
-              <b key={g.index}>{g.index + 1}</b>
+              <WeaponGroupInspection key={g.index} group={g} draft={draft} spec={spec} flux={flux(g)} onOpenCodex={codex.open} enabled={!codex.isOpen}>
+                <b aria-label={"查看武器组 " + (g.index + 1)}>{g.index + 1}</b>
+              </WeaponGroupInspection>
             ))}
           </div>
           <div
@@ -761,17 +889,9 @@ function SourceWeaponGroups({
                 data-type={weaponType(slot.defaultWeaponId!)}
                 key={slot.slotId}
               >
-                <span
+                <WeaponInspection draft={draft} spec={spec} slot={slot} onOpenCodex={codex.open} enabled={!codex.isOpen}><span
                   className="source-group-weapon-label"
-                  title={
-                    slot.slotId +
-                    " · " +
-                    sizes[slot.slotSize] +
-                    types[slot.weaponType ?? "UNIVERSAL"] +
-                    " · " +
-                    slot.arcDeg +
-                    "° 射界"
-                  }
+
                 >
                   <span>{weaponName(slot.defaultWeaponId!)}</span>
                   <em>
@@ -785,7 +905,7 @@ function SourceWeaponGroups({
                     <circle cx="9" cy="9" r="7.5" />
                     <path d={mountArcPath(slot.arcDeg, slot.baseAngleDeg)} />
                   </svg>
-                </span>
+                </span></WeaponInspection>
                 {groups.map((g) => (
                   <button
                     type="button"
@@ -832,8 +952,12 @@ function SourceWeaponGroups({
                     : "EMPTY"
                 }
               >
-                <span>武器组 {g.index + 1}</span>
-                <button
+                <WeaponGroupInspection group={g} draft={draft} spec={spec} flux={flux(g)} onOpenCodex={codex.open} enabled={!codex.isOpen}>
+                  <span>武器组 {g.index + 1}</span>
+                </WeaponGroupInspection>
+                <RefitHint text={!g.weaponSlotIds.length ? "空组：先分配武器，再设置射击模式。" : g.mode === "LINKED"
+                  ? "同步射击：组内武器同时收到开火指令，但各自仍受冷却、弹药与幅能限制。点击切换为交替射击；确认后保存。"
+                  : "交替射击：轮流启动组内武器的射击周期，已开始的充能或连发仍会继续。不会减少单次伤害或产幅。点击切换为同步射击；确认后保存。"}><button
                   type="button"
                   disabled={!g.weaponSlotIds.length}
                   aria-label={"武器组 " + (g.index + 1) + " 开火模式"}
@@ -856,8 +980,8 @@ function SourceWeaponGroups({
                     : g.mode === "LINKED"
                       ? "同步射击"
                       : "交替射击"}
-                </button>
-                <b>{g.weaponSlotIds.length ? flux(g) : "---"}</b>
+                </button></RefitHint>
+                <RefitHint text="组幅能：组内武器的舰装后周期平均产幅之和，不扣除交替、弹药回充等待或未开火时间；不包含护盾消耗，不等同于实时净产幅。"><b>{g.weaponSlotIds.length ? flux(g) : "---"}</b></RefitHint>
               </div>
             ))}
           </div>
@@ -872,6 +996,8 @@ function SourceWeaponGroups({
         </section>
       </div>
     </Modal>
+    {codex.content}
+    </>
   );
 }
 

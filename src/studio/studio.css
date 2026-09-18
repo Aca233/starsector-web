@@ -2815,3 +2815,44 @@ select:focus-visible {
 /* Character skills are a separate studio page, with a persistent refit entry. */
 .refit-skills-entry { position: absolute; right: calc(52 * var(--u)); top: calc(7 * var(--u)); height: calc(24 * var(--u)); }
 .refit-skills-entry .native-button { height: 100%; min-height: 0; padding: 0 12px; font-size: calc(14 * var(--u)); }
+
+.assembly-details { position:absolute; z-index:8; top:8px; left:12px; max-width:min(420px,90%); padding:6px 10px; background:#07131eea; border:1px solid #385463; color:#b5d9df; font-size:12px; }
+.assembly-details summary { cursor:pointer; }
+.assembly-details p { max-width:360px; line-height:1.5; }
+.assembly-details ul { max-height:150px; overflow:auto; padding-left:18px; }
+
+.refit-assembly-chips { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; }
+.refit-assembly-chips .native-button { min-width:0; min-height:29px; padding:4px 2px; }
+.refit-assembly-chips .native-button[aria-pressed="true"] { color:#ecf6cf; background-color:#244555; }
+.refit-assembly-label { color:#9bd8d6; }
+
+/* Module hit testing follows hull polygons, not overlapping transparent sprite rectangles. */
+.assembly-hit-regions { position:absolute; inset:0; width:100%; height:100%; z-index:2; pointer-events:none; overflow:visible; }
+.assembly-hit-regions polygon { pointer-events:all; cursor:pointer; fill:#58dbe00c; stroke:#8fdde055; stroke-width:1.5; vector-effect:non-scaling-stroke; }
+.assembly-hit-regions polygon:hover, .assembly-hit-regions polygon:focus-visible { fill:#6ce8ea40; stroke:#ecda6d; outline:none; }
+.assembly-editor { position:absolute; z-index:8; top:48px; left:12px; width:min(350px,48%); max-height:calc(100% - 170px); overflow:auto; padding:8px 10px; border:1px solid #385463; background:#07131ef2; color:#b5d9df; font-size:12px; pointer-events:auto; }
+.assembly-editor-heading { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+.assembly-editor p { margin:6px 0; line-height:1.5; color:#8caab6; }
+.assembly-editor summary { cursor:pointer; padding:7px 0; color:#e1db9a; }
+.assembly-editor button { background:#102c39; color:#bfe5ed; border:1px solid #456271; padding:5px 7px; cursor:pointer; text-align:left; }
+.assembly-editor button:hover, .assembly-editor button:focus-visible { background:#244c5c; border-color:#e1db9a; }
+.assembly-editor button:disabled { opacity:.45; cursor:default; }
+.assembly-module-list { display:grid; gap:4px; max-height:180px; overflow:auto; }
+.assembly-module-list button[aria-pressed="true"] { border-color:#e1db9a; color:#ffebac; }
+.assembly-module-list span { display:inline-block; min-width:54px; }
+.assembly-restore { margin-top:6px; }
+
+/* Keep enlarged modules and their mount targets clear of the stats/actions. */
+.refit-vessel--assembly > .ship-stage { position:absolute; left:calc(85 * var(--u)); right:calc(310 * var(--u)); top:calc(205 * var(--u)); bottom:calc(155 * var(--u)); width:auto; height:auto; }
+.refit-vessel--assembly > .ship-stage .studio-ship { width:min(85cqw, 90cqh * var(--ship-ratio)); }
+
+/* Selection changes the editing context, never the assembly camera or geometry. */
+.assembly-hit-regions polygon.is-active-module { fill:#55ddd51c; stroke:#ffe36b; stroke-width:2; }
+.studio-ship--assembly .studio-mount { opacity:.75; }
+.studio-ship--assembly .studio-mount:not(.is-equipped) { opacity:.65; }
+.assembly-editor button[aria-pressed="true"] { color:#ffebac; border-color:#d7c578; }
+.assembly-editor-actions { display:flex; flex-wrap:wrap; gap:6px; margin:4px 0; }
+.assembly-editor-actions .assembly-restore { margin-top:0; }
+.assembly-editor small { color:#8caab6; }
+.native-refit-app .refit-grid.has-assembly .refit-vessel { left:0; }
+.refit-grid.has-assembly .refit-fighter-decks { top:calc(210 * var(--u)); }

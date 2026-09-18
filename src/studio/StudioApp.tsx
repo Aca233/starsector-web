@@ -1,3 +1,4 @@
+import { MotionPresence } from '../ui/core/MotionPresence';
 import { randomId } from "../shared/RandomId";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "../ui/core/UI";
@@ -511,7 +512,7 @@ export function StudioApp() {
           </button>
         </div>
       )}
-      {confirmation && (
+      <MotionPresence>{confirmation && (
         <Modal
           title={confirmation.title}
           description={confirmation.body}
@@ -554,7 +555,7 @@ export function StudioApp() {
             原作资源与已有游戏存档不会被修改。
           </p>
         </Modal>
-      )}
+      )}</MotionPresence>
     </>
   );
 }

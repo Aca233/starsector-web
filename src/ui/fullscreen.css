@@ -1,0 +1,17 @@
+.fullscreen-home-control {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  z-index: 2;
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  max-width: calc(100vw - 24px);
+}
+.fullscreen-error {
+  display: block;
+  max-width: 320px;
+  color: #fbbf24;
+  font: 13px/1.5 var(--ui-font);
+  overflow-wrap: anywhere;
+}

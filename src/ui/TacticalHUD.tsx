@@ -10,6 +10,7 @@ import { CombatContacts } from "./hud/CombatContacts";
 import { CombatRadar } from "./hud/CombatRadar";
 import { getHudDensity } from "./hud/HudLayout";
 import { TacticalMap } from "./tactical/TacticalMap";
+import type { ShipCommand } from '../engine/runtime/CombatCommands';
 import { CombatNotifications } from './hud/CombatNotifications';
 import { TacticalHelpPanel } from "./TacticalHelpPanel";
 
@@ -27,6 +28,8 @@ export interface TacticalHUDProps {
   onPausedChange: (paused: boolean) => void;
   autopilot: boolean;
   onAutopilotChange: (enabled: boolean) => void;
+  onShipCommand?: (command: ShipCommand) => void;
+  controlNotice?: { ship: CombatEngine['playerShip'] };
   defaultMouseSteering?: boolean;
   onDefaultMouseSteeringChange?: (value: boolean) => void;
   hudVisuals?: CombatHudVisuals;
@@ -49,6 +52,8 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
   onPausedChange,
   autopilot,
   onAutopilotChange,
+  onShipCommand,
+  controlNotice,
   defaultMouseSteering,
   onDefaultMouseSteeringChange,
   hudVisuals,
@@ -127,7 +132,9 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
       data-hud-density={hudDensity}
       data-combat-input-block
     >
-      <CombatNotifications engine={engine} />
+      <CombatNotifications engine={engine} controlNotice={controlNotice?.ship === player && !autopilot
+        && !engine.battleResult && !player.isDead && player.hullHp > 0 && !player.isDocked && !player.isRetreated && !player.retreating
+        ? '自动驾驶已关闭 · 已切换为手动操作' : undefined} />
       {engine.playerShip.isDead && !engine.battleResult && !engine.isTacticalMap && (
         <div className="combat-observer-hint">旗舰已损失 · WASD / 方向键观察战场 · Tab 战术地图</div>
       )}
@@ -146,6 +153,12 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
           player={player}
           engine={engine}
           hudVisuals={hudVisuals}
+          weaponControls={onShipCommand ? {
+            onSelectGroup: value => onShipCommand({ kind: 'group', value }),
+            onToggleMode: value => onShipCommand({ kind: 'mode', value }),
+            onToggleAutofire: value => onShipCommand({ kind: 'autofire', value }),
+          } : undefined}
+          onToggleRecall={onShipCommand ? () => onShipCommand({ kind: 'recall' }) : undefined}
         />
       </div>
 

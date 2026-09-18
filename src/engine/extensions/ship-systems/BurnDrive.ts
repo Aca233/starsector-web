@@ -1,3 +1,4 @@
+import { offensiveManeuverAllowed } from './SystemAI';
 import type { ShipSystemDefinition } from './Types';
 export const burnDrive: ShipSystemDefinition = {
   id: 'BURN_DRIVE', sourceIds: ['burndrive'], name: '冲刺推进',
@@ -15,7 +16,7 @@ export const burnDrive: ShipSystemDefinition = {
     const stopping=boostedSpeed*boostedSpeed/(2*stats.deceleration)+boostedSpeed*ship.system.chargeDownDuration;
     const heading=Math.atan2(target.pos.y-ship.pos.y,target.pos.x-ship.pos.x)-ship.facingRad;
     const aligned=Math.abs(Math.atan2(Math.sin(heading),Math.cos(heading)))<.1;
-    const safe=tactical.forwardClear&&!tactical.avoidingCollision&&!tactical.withdrawing&&!tactical.waypoint
+    const safe=offensiveManeuverAllowed(tactical)
       &&tactical.threat.imminentDamage===0&&distance-tactical.desiredRange>stopping;
     if(ship.system.isActive){
       if(!safe&&ship.system.state!=='OUT')ship.system.deactivate();

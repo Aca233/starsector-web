@@ -1,0 +1,112 @@
+/* UI-only motion. No global * rules, combat canvas transforms, idle particles,
+ * permanent will-change layers, or transitions of layout dimensions.
+ * Modal/picker ancestors MUST NOT transform: their fixed tooltips use the viewport.
+ */
+:root {
+  --ui-motion-fast: 120ms;
+  --ui-motion-normal: 220ms;
+  --ui-motion-screen: 300ms;
+  --ui-motion-ease: cubic-bezier(.2, .75, .25, 1);
+}
+
+@keyframes ui-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ui-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes ui-menu-in {
+  from { opacity: 0; translate: 0 10px; }
+  to { opacity: 1; translate: 0 0; }
+}
+@keyframes ui-notice-in {
+  from { opacity: 0; translate: 0 5px; }
+  to { opacity: 1; translate: 0 0; }
+}
+@keyframes ui-loading-sweep {
+  from { transform: scaleX(.2); opacity: .4; }
+  to { transform: scaleX(1); opacity: 1; }
+}
+
+/* The indicator remains a static line when the user requests reduced motion. */
+.native-loading::after {
+  content: "";
+  display: block;
+  justify-self: center;
+  width: 112px;
+  height: 2px;
+  background: #aadeff;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :is(.native-home, .native-refit-app, .captain-skills-screen, .native-catalog) {
+    animation: ui-fade-in var(--ui-motion-screen) var(--ui-motion-ease);
+  }
+  .native-title-logo {
+    animation: ui-menu-in 560ms var(--ui-motion-ease) both;
+  }
+  .native-home-menu > .native-button {
+    animation: ui-menu-in 360ms var(--ui-motion-ease) backwards;
+    animation-delay: 90ms;
+  }
+  .native-home-menu > .native-button:nth-child(2) { animation-delay: 145ms; }
+  .native-home-menu > .native-button:nth-child(3) { animation-delay: 200ms; }
+  .native-home-menu > .native-button:nth-child(4) { animation-delay: 255ms; }
+  .native-home-menu > .native-button:nth-child(5) { animation-delay: 310ms; }
+  .native-home-menu > .native-content-count,
+  .native-home-version { animation: ui-fade-in 440ms 240ms var(--ui-motion-ease) backwards; }
+
+  .ui-modal-backdrop[data-motion-state="present"] {
+    animation: ui-fade-in 180ms var(--ui-motion-ease);
+  }
+  .ui-modal-backdrop[data-motion-state="exiting"] {
+    animation: ui-fade-out var(--ui-exit-duration) ease-in both;
+    pointer-events: none;
+  }
+  /* Opacity only: retain pixel-snapped native fonts and anchored picker geometry. */
+  .ui-modal-backdrop[data-motion-state="present"] > .ui-modal {
+    animation: ui-fade-in var(--ui-motion-normal) var(--ui-motion-ease);
+  }
+
+  :is(.native-button.native-action, .ui-button.native-action) {
+    transition: background-color var(--ui-motion-fast) ease-out,
+      color var(--ui-motion-fast) ease-out,
+      box-shadow var(--ui-motion-fast) ease-out,
+      translate 90ms var(--ui-motion-ease);
+  }
+  :is(.native-button.native-action, .ui-button.native-action):hover:not(:disabled),
+  :is(.native-button.native-action, .ui-button.native-action):focus-visible:not(:disabled) {
+    box-shadow: inset 0 1px #aadeff55, inset 0 -1px #aadeff22;
+  }
+  :is(.native-button.native-action, .ui-button.native-action):active:not(:disabled) {
+    translate: 0 1px;
+    transition-duration: 55ms;
+    box-shadow: inset 0 2px 5px #0008;
+  }
+  .native-action > .native-bitmap-text { transition: filter var(--ui-motion-fast) ease-out; }
+
+  /* Selection responds to the existing hover/pressed classes; no DOM reordering
+   * or list staggering that would make a large catalog slower to use. */
+  :is(.native-refit-app, .captain-skills-screen, .native-catalog, .ui-modal) :is(button:not(.native-action), input, select, summary) {
+    transition: background-color var(--ui-motion-fast) ease-out,
+      border-color var(--ui-motion-fast) ease-out,
+      color var(--ui-motion-fast) ease-out,
+      box-shadow var(--ui-motion-fast) ease-out;
+  }
+  :is(.refit-roster-thumbnail, .captain-skill-icon > img) {
+    transition: opacity var(--ui-motion-fast) ease-out, filter var(--ui-motion-fast) ease-out;
+  }
+  :is(.lan-team-member, .lan-ai-roster-row) {
+    animation: ui-fade-in var(--ui-motion-normal) var(--ui-motion-ease);
+    transition: border-color var(--ui-motion-normal), background-color var(--ui-motion-normal);
+  }
+  :is(.equipment-tooltip, .source-weapon-details, .sim-loadout-picker, .source-mod-picker) {
+    animation: ui-fade-in 160ms var(--ui-motion-ease);
+  }
+  :is(.native-error-toast, .ui-notice, .lan-error, .lan-ai-remove-note) {
+    animation: ui-notice-in 180ms var(--ui-motion-ease);
+  }
+  .refit-vessel .studio-ship {
+    animation: ui-fade-in 240ms var(--ui-motion-ease);
+    transition: transform var(--ui-motion-fast) var(--ui-motion-ease);
+  }
+  .native-loading::after {
+    animation: ui-loading-sweep 850ms ease-in-out infinite alternate;
+  }
+}

@@ -1,3 +1,4 @@
+import { nativeModules } from '../engine/content/ModularVariants';
 import { randomId } from "../shared/RandomId";
 import { validCaptainProfile, type CaptainProfile } from "./CaptainProfile";
 import { combatSkillErrors } from "../engine/extensions/CombatSkills";
@@ -55,7 +56,7 @@ export const data = { ...refitData, ships: {...nativeRefit.ships, ...refitData.s
 };
 export const hulls = Object.keys(data.ships).map((id) =>
   modManager.requireShip(id),
-).filter(h => h.hullSize !== "FIGHTER");
+).filter(h => h.hullSize !== "FIGHTER" && !h.isModuleHull);
 export const weapons = contentRegistry
   .getAllWeapons()
   .filter((w) => data.weapons[w.id] && w.id !== "tpc" && !nativeRefit.weapons[w.id]?.builtInOnly);
@@ -99,6 +100,8 @@ export interface Design {
   name: string;
   hullId: string;
   sourceVariantId?: string;
+  /** Only edited modules, keyed by native attachment slot (not hull ID). */
+  modules?: Record<string, Design>;
   weapons: Record<string, string | null>;
   hullMods: string[];
   sMods?: string[];
@@ -123,7 +126,10 @@ export const storageKey =
 export const weaponName = (id: string) =>
   data.weapons[id]?.name ??
   i18n.t(contentRegistry.getWeapon(id)?.nameKey ?? id);
-export const baseHull = (id: string) => hulls.find((s) => s.id === id);
+export const baseHull = (id: string): ShipSpec | undefined => {
+  const hull = Object.hasOwn(data.ships, id) ? modManager.getShip(id) : undefined;
+  return hull?.hullSize === 'FIGHTER' ? undefined : hull;
+};
 export const nativeHull = (id: string): ShipSpec =>
   (sourceShips as unknown as Record<string, ShipSpec>)[id];
 export const isBuiltIn = (hullId: string, slotId: string) =>
@@ -353,13 +359,17 @@ export function withWeapon(
   next.updatedAt = Date.now();
   return next;
 }
-export function evaluate(d: Design): {
+export function evaluate(d: Design, template?: ShipSpec) {
+  return evaluateAssembly(d, template, { count: 0 }, 0);
+}
+function evaluateAssembly(d: Design, template: ShipSpec | undefined, state: { count: number }, depth: number): {
   spec: ShipSpec;
   errors: string[];
   op: ReturnType<typeof budget>;
 } {
-  const hull = baseHull(d.hullId);
-  if (!hull) throw new Error("舰体不在已支持目录中。");
+  if (depth > 8 || ++state.count > 128) throw new Error("模块编组超过限制。");
+  const hull = template ?? baseHull(d.hullId);
+  if (!hull || hull.id !== d.hullId) throw new Error("舰体不在已支持目录中。");
   const errors: string[] = [...hullModLoadoutErrors(designHullSpec(d)), ...combatSkillErrors(d.captainSkills)];
   const op = budget(d);
   if (!d.name.trim()) errors.push("请填写方案名称");
@@ -377,6 +387,24 @@ export function evaluate(d: Design): {
     nativeHull(d.hullId).fluxDissipation + d.vents * data.dissipationPerVent;
   spec.shieldUpkeepBaseDissipation = nativeHull(d.hullId).fluxDissipation;
   spec.sourceVariantId = d.sourceVariantId;
+  if (!template && spec.moduleSlots?.length && d.sourceVariantId) {
+    try { spec.modules = nativeModules(d.hullId, d.sourceVariantId); }
+    catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
+  }
+  if (d.modules) {
+    for (const [slotId, child] of Object.entries(d.modules)) {
+      const mount = spec.modules?.find(m => m.slotId === slotId);
+      if (!mount || child?.hullId !== mount.spec.id || child.sourceVariantId !== mount.spec.sourceVariantId) {
+        errors.push(`模块 ${slotId}：与原版挂接方案不匹配`);
+        continue;
+      }
+      try {
+        const compiled = evaluateAssembly(child, mount.spec, state, depth + 1);
+        mount.spec = compiled.spec;
+        errors.push(...compiled.errors.map(error => `模块 ${slotId}：${error}`));
+      } catch (error) { errors.push(`模块 ${slotId}：${error instanceof Error ? error.message : String(error)}`); }
+    }
+  }
   spec.hullMods = [...d.hullMods];
   spec.sMods = [...(d.sMods ?? [])];
   spec.captainSkills = structuredClone(d.captainSkills ?? {});
@@ -412,6 +440,7 @@ export function evaluate(d: Design): {
 }
 /** One reserved, isolated prototype; never replace the source hull or modify library designs. */
 export function registerPrototype(d: Design): string {
+  if (baseHull(d.hullId)?.isModuleHull) throw new Error("模块必须随母舰部署。");
   const { spec, errors } = evaluate(d);
   if (errors.length) throw new Error(errors.join("；"));
   spec.id = "studio-prototype";
@@ -426,6 +455,10 @@ export function registerPrototype(d: Design): string {
   return spec.id;
 }
 export function decodeDesign(input: unknown): Design {
+  return decodeAssembly(input, undefined, { count: 0 }, 0);
+}
+function decodeAssembly(input: unknown, template: ShipSpec | undefined, state: { count: number }, depth: number): Design {
+  if (depth > 8 || ++state.count > 128) throw new Error("模块编组超过限制。");
   if (!input || typeof input !== "object")
     throw new Error("方案不是有效对象。");
   const d = input as Design;
@@ -449,6 +482,19 @@ export function decodeDesign(input: unknown): Design {
   if (!d.weapons || typeof d.weapons !== "object" || Array.isArray(d.weapons))
     throw new Error("武器配置无效。");
   const hull = baseHull(d.hullId)!;
+  if (!template && hull.isModuleHull) throw new Error("模块不能作为独立舰船方案。");
+  if (template && (d.hullId !== template.id || d.sourceVariantId !== template.sourceVariantId))
+    throw new Error("模块舰体或原版方案与挂点不匹配。");
+  const decodedModules: Record<string, Design> = {};
+  if (d.modules !== undefined) {
+    if (!d.modules || typeof d.modules !== "object" || Array.isArray(d.modules)) throw new Error("模块配置无效。");
+    const mounts = designModules(d, template);
+    for (const [slot, child] of Object.entries(d.modules)) {
+      const mount = mounts.find(m => m.slotId === slot);
+      if (["__proto__", "prototype", "constructor"].includes(slot) || !mount) throw new Error("模块挂点不存在：" + slot);
+      decodedModules[slot] = decodeAssembly(child, mount.spec, state, depth + 1);
+    }
+  }
   const slots = new Set(hull.weaponSlots.map((s) => s.slotId));
   if (
     Object.keys(d.weapons).length !== slots.size ||
@@ -506,6 +552,7 @@ export function decodeDesign(input: unknown): Design {
   const modErrors = hullModLoadoutErrors(designHullSpec(d));
   if (modErrors.length) throw new Error(modErrors.join("；"));
   const decoded = structuredClone(d);
+  if (d.modules !== undefined) decoded.modules = decodedModules;
   // Older web drafts had five groups. Preserve their assignments and append the
   // two empty groups present in the original WeaponGroupDialogV2 / combat input.
   while (decoded.groups.length < 7)
@@ -624,4 +671,72 @@ export function weaponFluxPerSecond(w: WeaponSpec): number {
       w.refireDelay + (w.chargeTime ?? 0) + (burst - 1) * (w.burstDelay ?? 0),
     )
   );
+}
+
+/** Unmodified attachment templates; never derive defaults from another slot's edits. */
+export function designModules(d: Design, template?: ShipSpec) {
+  if (template) return template.modules ?? [];
+  const hull = baseHull(d.hullId);
+  return hull?.moduleSlots?.length && d.sourceVariantId
+    ? nativeModules(d.hullId, d.sourceVariantId) : hull?.modules ?? [];
+}
+
+/** Recover the exact imported module fit, including flux investments and groups. */
+export function designFromModule(spec: ShipSpec): Design {
+  const raw = nativeHull(spec.id);
+  const d: Design = {
+    version: 1, id: ('module-' + spec.id).replace(/_/g, '-').slice(0, 80),
+    name: (data.ships[spec.id].name + ' · 模块').slice(0, 48), hullId: spec.id,
+    sourceVariantId: spec.sourceVariantId,
+    weapons: Object.fromEntries(spec.weaponSlots.map(s => [s.slotId, s.defaultWeaponId ?? null])),
+    hullMods: [...(spec.hullMods ?? [])], sMods: [...(spec.sMods ?? [])],
+    capacitors: Math.round((spec.maxFlux - raw.maxFlux) / data.fluxPerCapacitor),
+    vents: Math.round((spec.fluxDissipation - raw.fluxDissipation) / data.dissipationPerVent),
+    groups: Array.from({length: 7}, (_, index) => {
+      const group = spec.defaultWeaponGroups?.find(g => g.index === index);
+      return group ? structuredClone(group) : {index, weaponSlotIds: [], mode: 'LINKED', isAutofire: true};
+    }),
+    wings: (spec.fighterWings ?? []).map(wing => Object.entries(nativeRefit.wings ?? {})
+      .find(([, entry]) => entry.specId === wing.specId && entry.count === wing.count)?.[0] ?? null),
+    updatedAt: 0,
+  };
+  for (const [slot, id] of Object.entries(d.weapons)) {
+    if (id && !d.groups.some(g => g.weaponSlotIds.includes(slot))) d.groups[0].weaponSlotIds.push(slot);
+  }
+  return d;
+}
+
+export function moduleDesignContext(root: Design, path: readonly string[]) {
+  let draft = root;
+  let template: ShipSpec | undefined;
+  for (const slot of path) {
+    const mount = designModules(draft, template).find(m => m.slotId === slot);
+    if (!mount) return null;
+    template = mount.spec;
+    draft = draft.modules?.[slot] ?? designFromModule(template);
+  }
+  return {draft, template};
+}
+
+/** Immutable path update keeps identical module hulls, undo, and root identity separate. */
+export function withModuleDesign(root: Design, path: readonly string[], next: Design | null): Design {
+  const update = (parent: Design, depth: number): Design => {
+    const slot = path[depth];
+    const context = moduleDesignContext(root, path.slice(0, depth + 1));
+    if (!context || !path.length) throw new Error('模块挂点不存在。');
+    const modules = {...parent.modules};
+    if (depth === path.length - 1) {
+      if (next === null) delete modules[slot];
+      else {
+        if (next.hullId !== context.template!.id || next.sourceVariantId !== context.template!.sourceVariantId)
+          throw new Error('不能替换模块舰体或挂接方案。');
+        modules[slot] = next;
+      }
+    } else modules[slot] = update(context.draft, depth + 1);
+    const updated = {...parent, updatedAt: Date.now()};
+    if (Object.keys(modules).length) updated.modules = modules;
+    else delete updated.modules;
+    return updated;
+  };
+  return update(root, 0);
 }

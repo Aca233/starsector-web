@@ -1,5 +1,6 @@
 {
-  "version": 16,
+  "version": 25,
+  "snapshotHz": 60,
   "ships": [
     {
       "id": "onslaught",
@@ -11,6 +12,8 @@
     }
   ],
   "reconnectMs": 30000,
+  "backgroundGraceMs": 300000,
+  "hostStateTimeoutMs": 12000,
   "maxPlayers": 10,
   "defaultCapacity": 4,
   "maxOptionsBytes": 1048576,

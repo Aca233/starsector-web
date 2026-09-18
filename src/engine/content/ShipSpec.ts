@@ -38,7 +38,18 @@ export interface FighterWingSpec {
   range?: number;
 }
 
+/** Local mount coordinates use the same forward/right convention as weapon slots. */
+export interface ShipModuleSlot { slotId: string; x: number; y: number; angleDeg: number; }
+export interface ShipModuleSpec extends ShipModuleSlot { spec: ShipSpec; }
+
 export interface ShipSpec {
+  moduleSlots?: ShipModuleSlot[];
+  moduleAnchor?: [number, number];
+  /** Complete, source-authored module fits; modules are not separate fleet members. */
+  modules?: ShipModuleSpec[];
+  isModuleHull?: boolean;
+  /** Native active-module classification (OP / weapon groups / flight decks). */
+  moduleCombat?: boolean;
   visualProfile?: ShipVisualProfile;
   debrisColor?: [number, number, number];
   /** Source hull_styles overloadColor; omitted uses native [150,150,255]. */

@@ -1,3 +1,4 @@
+import { appendMuzzleFlash, appendLauncherSmoke } from '../../visual/MuzzleParticles';
 import { createNativeEmpArc, advanceNativeEmpArc } from '../../visual/EmpArcVisuals';
 import { DEBRIS_TEXTURES } from '../../assets/CombatFXAssets';
 import { Vector2 } from '../../math/Vector2';
@@ -70,6 +71,14 @@ function mixRgb(
 }
 
 
+
+export type MuzzleEventSink = (kind: 0 | 1, spec: MuzzleFlashSpec | LauncherSmokeSpec,
+  pos: Vector2, angle: number, velocity: Vector2, random: SimulationRandom) => boolean;
+// A sidecar is not projected into combat snapshots and cannot replace collision FX.
+const muzzleEventSinks = new WeakMap<CombatFXSystem, MuzzleEventSink>();
+export function setMuzzleEventSink(fx: CombatFXSystem, sink?: MuzzleEventSink): void {
+  if (sink) muzzleEventSinks.set(fx, sink); else muzzleEventSinks.delete(fx);
+}
 
 export class CombatFXSystem {
   public particles: Particle[] = [];
@@ -270,70 +279,15 @@ export class CombatFXSystem {
   /**
    * 1:1 原版枪口爆炸风粒子生成 (com.fs.starfarer.combat.entities.ship.A.class.java:29-54 & SmoothParticle.java)
    */
-  public spawnAuthenticMuzzleFlash(
-    spec: MuzzleFlashSpec,
-    muzzlePos: Vector2,
-    angleRad: number,
-    shipVel: Vector2
-  ) {
+  public spawnAuthenticMuzzleFlash(spec: MuzzleFlashSpec, muzzlePos: Vector2, angleRad: number, shipVel: Vector2) {
     if (!spec || spec.particleCount <= 0) return;
-    const spreadRad = (spec.spread * Math.PI) / 180;
-    const baseAngle = angleRad - spreadRad / 2;
-    for (let i = 0; i < spec.particleCount; i++) {
-      const pSize = spec.particleSizeRange * this.random.next() + spec.particleSizeMin;
-      const pAngle = this.random.next() * spreadRad + baseAngle;
-      const pDist = this.random.next() * spec.length;
-      const f10 = Math.cos(pAngle) * pDist;
-      const f11 = Math.sin(pAngle) * pDist;
-      this.muzzleParticles.push({
-        pos: new Vector2(muzzlePos.x + f10, muzzlePos.y + f11),
-        vel: new Vector2(f10 + shipVel.x, f11 + shipVel.y),
-        size: pSize,
-        life: spec.particleDuration,
-        maxLife: spec.particleDuration,
-        color: [...spec.particleColor]
-      });
-    }
+    if (muzzleEventSinks.get(this)?.(0, spec, muzzlePos, angleRad, shipVel, this.random)) return;
+    appendMuzzleFlash(this.muzzleParticles, this.random, spec, muzzlePos, angleRad, shipVel);
   }
 
-  public spawnLauncherSmoke(
-    spec: LauncherSmokeSpec,
-    muzzlePos: Vector2,
-    angleRad: number,
-    shipVel: Vector2
-  ) {
-    const [r, g, b, a] = spec.particleColor;
-    for (let i = 0; i < spec.cloudParticleCount; i++) {
-      const theta = this.random.next() * Math.PI * 2;
-      const radius = Math.sqrt(this.random.next()) * spec.cloudRadius;
-      const outward = 4 + this.random.next() * 10;
-      this.muzzleParticles.push({
-        pos: muzzlePos.clone().add(Vector2.fromAngle(theta, radius)),
-        vel: shipVel.clone().add(Vector2.fromAngle(theta, outward)),
-        size: spec.particleSizeMin + this.random.next() * spec.particleSizeRange,
-        life: spec.cloudDuration,
-        maxLife: spec.cloudDuration,
-        color: [r, g, b, a],
-        blendMode: 'NORMAL'
-      });
-    }
-
-    const spreadRad = (spec.blowbackSpread * Math.PI) / 180;
-    const rearAngle = angleRad + Math.PI;
-    for (let i = 0; i < spec.blowbackParticleCount; i++) {
-      const theta = rearAngle + (this.random.next() - 0.5) * spreadRad;
-      const dist = this.random.next() * spec.blowbackLength;
-      const offset = Vector2.fromAngle(theta, dist);
-      this.muzzleParticles.push({
-        pos: muzzlePos.clone().add(offset),
-        vel: shipVel.clone().add(offset),
-        size: spec.particleSizeMin + this.random.next() * spec.particleSizeRange,
-        life: spec.blowbackDuration,
-        maxLife: spec.blowbackDuration,
-        color: [r, g, b, a],
-        blendMode: 'NORMAL'
-      });
-    }
+  public spawnLauncherSmoke(spec: LauncherSmokeSpec, muzzlePos: Vector2, angleRad: number, shipVel: Vector2) {
+    if (muzzleEventSinks.get(this)?.(1, spec, muzzlePos, angleRad, shipVel, this.random)) return;
+    appendLauncherSmoke(this.muzzleParticles, this.random, spec, muzzlePos, angleRad, shipVel);
   }
 
   public updateFloatingTexts(dt: number) {

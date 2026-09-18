@@ -9,7 +9,7 @@ import type { ScorchMark } from '../simulation/ShipDamageState';
 export type DamageDecalLayer = 'base' | 'glow';
 
 /**
- * Starsector ship-local coordinates use +X toward the bow and +Y toward port/right-on-source.
+ * Web ship-local coordinates use +X toward the bow and +Y toward starboard.
  * Ship sprites point upward in source art, and pivotY is already expressed in web/canvas pixels.
  */
 export function shipLocalToSpritePixel(

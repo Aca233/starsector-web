@@ -1,0 +1,27 @@
+/* Only information targets change; the native fitting cards and assignment grid keep their footprint. */
+.refit-inspect-trigger:focus-visible { outline: 1px solid #bceaf5; outline-offset: 2px; }
+.source-group-header .refit-inspect-trigger, .source-group-summary-row > .refit-inspect-trigger { cursor: help; text-decoration: underline dotted #89aebb; text-underline-offset: 3px; }
+.refit-loadout-inspection, .refit-group-inspection { width: min(340px, calc(100dvw - 16px)); }
+.refit-inspection-weapon.dwell-popover.source-weapon-details { width: min(390px, calc(100dvw - 16px)); max-height: calc(100dvh - 16px); padding: 9px 11px; background: #061017; }
+.refit-inspection-equipment.dwell-popover { width: min(340px, calc(100dvw - 16px)); }
+.refit-inspection-note { padding: 6px 0; border-bottom: 1px solid #294650; color: #a9bec6; font-size: 12px; }
+.refit-loadout-section h4, .refit-group-inspection h4, .refit-inspection-warnings h4 { margin: 10px 0 4px; color: #afd2de; font-weight: normal; }
+.refit-loadout-section .refit-loadout-section { margin-top: 12px; padding-top: 5px; border-top: 1px solid #42626c; }
+.refit-inspection-budget strong { color: #e4d58f; font-weight: normal; }
+.refit-inspection-budget[data-invalid="true"], .refit-inspection-warnings { color: #eab48b; }
+.dwell-popover .refit-inspection-list { list-style: none; padding: 0; margin: 0; }
+.refit-inspection-list li + li { border-top: 1px solid #19333e; }
+.refit-inspection-item { display: block; width: 100%; border: 0; padding: 5px 0; background: none; color: inherit; font: inherit; text-align: left; cursor: help; }
+.refit-inspection-item > span { border-bottom: 1px dotted #89aebb; }
+.refit-inspection-item:hover > span { color: #e9e19d; }
+.refit-inspection-item small { display: block; margin-top: 2px; color: #91aab5; font-size: 11px; overflow-wrap: anywhere; }
+.refit-inspection-equipment table { width: 100%; border-collapse: collapse; }
+.refit-inspection-equipment th { text-align: left; font-weight: normal; }
+.refit-inspection-equipment td { text-align: right; color: #e4d58f; }
+.refit-inspection-equipment th, .refit-inspection-equipment td { padding: 4px 0; border-bottom: 1px solid #294650; }
+.refit-hull-inspection.dwell-popover { width: min(340px, calc(100dvw - 16px)); }
+.refit-hull-inspection h4 { margin: 10px 0 4px; color: #afd2de; font-weight: normal; }
+.refit-hull-baseline { margin: 8px 0; }
+.refit-hull-baseline > div { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; border-bottom: 1px solid #19333e; }
+.refit-hull-baseline dt { min-width: 0; }
+.refit-hull-baseline dd { margin: 0; text-align: right; color: #e4d58f; }

@@ -1,0 +1,50 @@
+/* B: original full card, delayed appearance and dwell-to-lock. No moving inline panels. */
+[data-dwell-id][data-dwell-locked="false"] { pointer-events: none !important; }
+[data-dwell-id][data-dwell-locked="true"] { pointer-events: auto !important; }
+.dwell-status { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; margin: 0 0 7px; padding: 2px 0 5px; border-bottom: 1px solid #31525f; color: #9bb6bf; font: 12px/16px var(--native-font-body); }
+.dwell-status button { border: 0; padding: 2px 3px; background: transparent; color: #c5e3ed; font: inherit; white-space: nowrap; cursor: pointer; }
+.dwell-status button:hover { color: #ffe000; }
+.dwell-progress { width: 70px; height: 2px; background: #163540; }
+.dwell-progress i { display: block; height: 100%; width: 0; background: #c8d878; animation: dwell-lock 650ms linear forwards; }
+@keyframes dwell-lock { to { width: 100%; } }
+.dwell-popover { position: fixed; box-sizing: border-box; width: min(300px, calc(100dvw - 16px)); max-height: calc(100dvh - 16px); overflow: auto; overscroll-behavior: contain; padding: 9px 11px; border: 1px solid #5894a7; background: #061017; box-shadow: 0 4px 15px #0009; color: #d1e0e5; font: 14px/1.5 var(--native-font-body); text-align: left; overflow-wrap: anywhere; scrollbar-width: thin; }
+.dwell-popover h3 { margin: 0 0 7px; color: #bceaf5; font: 15px/1.4 var(--native-font-body); }
+.dwell-popover p { margin: 7px 0; }
+.dwell-current { color: #96b2bc; }
+.dwell-current strong { color: #ffe000; font-weight: normal; }
+.dwell-related { display: flex; flex-wrap: wrap; gap: 7px 12px; padding-top: 6px; border-top: 1px solid #294650; }
+.refit-hover-term { display: inline; max-width: 100%; padding: 0; border: 0; border-bottom: 1px dotted #89aebb; border-radius: 0; background: transparent; color: inherit; font: inherit; text-align: inherit; cursor: help; }
+.refit-hover-term:disabled { opacity: 1; color: inherit; cursor: default; }
+.refit-hover-term:not(:disabled):hover { color: #e9e19d; }
+.refit-stat-hover { display: flex; flex-direction: column; align-items: flex-end; gap: 0; padding: 0; min-width: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: inherit; cursor: help; }
+.refit-stat-hover:hover small, .refit-stat-hover:focus-visible small { text-decoration: underline dotted; text-underline-offset: 3px; }
+/* Opaque background avoids unrelated text shining through once the reader is locked. */
+.source-weapon-details[data-dwell-locked="true"] { background: #061017; }
+@media (prefers-reduced-motion: reduce) { .dwell-progress i { animation: none; width: 100%; } }/* Keep information triggers in the original cells and disclosure footprints. */
+.refit-info-trigger { display: block; width: 100%; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: inherit; cursor: help; }
+.refit-info-trigger:hover, .refit-info-trigger:focus-visible { text-decoration: underline dotted; text-underline-offset: 3px; }
+.equipment-tooltip[data-dwell-locked="true"] { background: #061017; }
+.dwell-popover ul { margin: 7px 0; padding-left: 18px; }
+
+/* Opt-in native readers: the same shipped eight-slice frame as the refit UI.
+ * Scroll only the contents so the original frame and dismiss hint stay in place. */
+.dwell-popover.native-dwell.native-frame[data-native-surface] {
+  display: flex; flex-direction: column; gap: 0; padding: 8px; overflow: hidden;
+  border: 0; border-radius: 0; box-shadow: none; background: transparent;
+  color: #ddd; font: 15px/17px var(--native-font-body); isolation: isolate;
+}
+.native-dwell > .native-dwell-content { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 4px 5px; scrollbar-width: thin; scrollbar-color: #43717b #000; }
+.native-dwell .native-dwell-content h3 { color: #aadeff; font: 15px/19px var(--native-font-body); margin: 0 0 7px; }
+.native-dwell .native-dwell-content h4 { background: #17444f; color: #aadeff; padding: 2px 4px; height: auto; margin: 9px 0 5px; font: 15px/17px var(--native-font-body); }
+.native-dwell .native-dwell-content p { margin: 6px 0; }
+.native-dwell .equipment-state { color: #888; font-size: 12px; line-height: 16px; }
+.native-dwell .refit-hover-term, .native-dwell .refit-inspection-item > span { border-bottom: 0; }
+.native-dwell .refit-hover-term:hover, .native-dwell .refit-inspection-item:hover > span { color: #ffe000; }
+.native-dwell .refit-inspection-budget strong { color: #ffe000; }
+.native-dwell > .native-dwell-status { flex: none; margin: 3px 4px 0; padding: 4px 0 0; min-height: 20px; border-top: 1px solid #17444f; border-bottom: 0; color: #888; font: 12px/16px var(--native-font-body); }
+.native-dwell-status .native-button { min-height: 19px; padding: 0 7px; }
+.native-dwell .refit-inspection-note { border-color: #17444f; color: #888; }
+/* Weapon picker styles normally omit top/bottom tiles; native readers use all eight. */
+.dwell-popover.native-dwell > .native-chrome-border .native-chrome-tile { display: block; }
+.dwell-popover.native-dwell > .native-chrome-border .native-chrome-tile-w,
+.dwell-popover.native-dwell > .native-chrome-border .native-chrome-tile-e { top: 8px; bottom: 8px; }

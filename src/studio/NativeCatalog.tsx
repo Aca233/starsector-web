@@ -1,3 +1,4 @@
+import { RefitHint } from './RefitHint';
 import { currentImportReasons } from '../engine/data/SourceCapabilities';
 import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
@@ -235,7 +236,7 @@ function canRefit(entry: Entry): boolean {
     && !!entry.hullSize && entry.hullSize.toUpperCase() !== "FIGHTER" && entry.status.level !== "unsupported";
 }
 function Badge({ status }: { status: Status }) {
-  return <span className={`nc-badge nc-badge--${status.level}`} title={status.reasons.join("\n")}><span aria-hidden="true">●</span> {levelNames[status.level]}</span>;
+  return <RefitHint text={status.reasons.join("\n")}><span className={`nc-badge nc-badge--${status.level}`} ><span aria-hidden="true">●</span> {levelNames[status.level]}</span></RefitHint>;
 }
 function Pager({ page, count, onChange, label }: { page: number; count: number; onChange: (page: number) => void; label: string }) {
   const pages = Math.max(1, Math.ceil(count / PAGE_SIZE));
@@ -454,7 +455,7 @@ export default function NativeCatalog({ onClose, onRefit, onVariant }: NativeCat
   };
   return <main className="native-catalog" onKeyDown={onKeyDown} aria-labelledby={`${uid}-title`}>
     <header className="nc-header"><div><span className="nc-eyebrow">STARSECTOR / NATIVE CONTENT ARCHIVE</span><h1 id={`${uid}-title`}>原生内容档案</h1><p>浏览源定义，核对支持边界。</p></div>
-      <div className="nc-header-actions"><button type="button" disabled={!history.length} onClick={goBack} title="Alt + ←">← 返回上一条</button><button type="button" className="nc-close" onClick={onClose} title="Esc（非输入状态）">关闭 / 返回 <span aria-hidden="true">×</span></button></div>
+      <div className="nc-header-actions"><RefitHint text="Alt + ←"><button type="button" disabled={!history.length} onClick={goBack} >← 返回上一条</button></RefitHint><RefitHint text="Esc（非输入状态）"><button type="button" className="nc-close" onClick={onClose} >关闭 / 返回 <span aria-hidden="true">×</span></button></RefitHint></div>
     </header>
     <div className="nc-caution"><span aria-hidden="true">△</span><span>完整目录不等于完整移植。原始数值仅供查阅；Java 系统、插件与武器特效可能未实现或仅近似。</span><strong>{categories.reduce((sum, c) => sum + index.byKind[c.kind].length, 0).toLocaleString()} 条源记录</strong></div>
     {(sourceDocument.error || runtimeDocument.error || catalog.schemaVersion !== 1) && <p role="alert" className="nc-data-error">{sourceDocument.error && `目录解析失败：${sourceDocument.error}。`}{runtimeDocument.error && `运行时清单解析失败：${runtimeDocument.error}；改装已保守禁用。`}{catalog.schemaVersion !== 1 && `目录版本 ${String(catalog.schemaVersion)} 与预期 v1 不同。`}</p>}

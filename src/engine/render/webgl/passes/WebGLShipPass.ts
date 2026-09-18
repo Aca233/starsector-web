@@ -73,12 +73,19 @@ export class WebGLShipPass {
   public render(engine: CombatEngine, ctx: WebGLPassContext, nowSec: number) {
     const { batcher, textures, hitGlowTex, alpha } = ctx;
     const activeDamageTextures = new Set<string>();
+    // Damage state advances before this synchronous pass. Reuse only its hot/cold
+    // decision here, never across RAFs: heat/flash can change without a decal revision.
+    // Clipped wreck pieces must not share the whole source hull's decision.
+    const hotDamageOwners = new Set<Ship | HulkFragment>();
     const damageId = (ship: Ship, hulk?: HulkFragment) => hulk?.visualBounds ? ship.id + ':piece-' + hulk.id : ship.id;
     const collectDamage = (ship: Ship, hulk?: HulkFragment) => {
       const id = damageId(ship, hulk);
       if (ship.scorchMarks.length > 0) {
         activeDamageTextures.add('ship-damage-base:' + id);
-        if (hasHotDamageGlow(ship, hulk?.visualBounds ?? undefined)) activeDamageTextures.add('ship-damage-glow:' + id);
+        if (hasHotDamageGlow(ship, hulk?.visualBounds ?? undefined)) {
+          activeDamageTextures.add('ship-damage-glow:' + id);
+          hotDamageOwners.add(hulk?.visualBounds ? hulk : ship);
+        }
       }
       if (hulk?.visualBounds) activeDamageTextures.add('hulk-hull:' + hulk.id);
     };
@@ -175,7 +182,7 @@ export class WebGLShipPass {
           );
         }
 
-        if (hasHotDamageGlow(ship, hulk?.visualBounds ?? undefined)) {
+        if (hotDamageOwners.has(damageOwner)) {
           const nextGlowRevision = getDamageGlowRevision(ship, hulk?.visualBounds ?? undefined);
           const glowSizeChanged = damageState.glowCanvas.width !== ship.spec.spriteWidth
             || damageState.glowCanvas.height !== ship.spec.spriteHeight;

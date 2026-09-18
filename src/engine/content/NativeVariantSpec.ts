@@ -1,3 +1,4 @@
+import { nativeModules } from './ModularVariants';
 import { contentRegistry } from './ContentRegistry';
 import { hullModDefinitions } from '../extensions/HullMods';
 import type { ShipSpec } from './ShipSpec';
@@ -15,7 +16,7 @@ export function nativeVariantSpec(variant: NativeVariant): ShipSpec {
   const mods = [...new Set([...(variant.hullMods??[]),...(variant.permaMods??[])])];
   const internal = mods.filter(id=>hullModDefinitions.require(id).refit?.builtInOnly);
   const builtIn = [...new Set([...(base.builtInHullMods??[]),...internal])];
-  return { ...base, sourceVariantId:variant.variantId, hullMods:mods.filter(id=>!builtIn.includes(id)), builtInHullMods:builtIn,
+  return { ...base, ...(base.moduleSlots?.length ? {modules:nativeModules(base.sourceHullId ?? base.id, variant.variantId)} : {}), sourceVariantId:variant.variantId, hullMods:mods.filter(id=>!builtIn.includes(id)), builtInHullMods:builtIn,
     sourceHullTraits:[...new Set([...(base.sourceHullTraits??[]),...internal])], sMods:[...(variant.sMods??[])], captainSkills:{},
     maxFlux:base.maxFlux+variant.fluxCapacitors*200, fluxDissipation:base.fluxDissipation+variant.fluxVents*10,
     shieldUpkeepBaseDissipation:base.shieldUpkeepBaseDissipation??base.fluxDissipation,

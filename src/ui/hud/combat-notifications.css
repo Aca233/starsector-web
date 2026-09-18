@@ -11,6 +11,7 @@
   text-shadow: 0 1px 3px #000, 1px 0 2px #000;
 }
 .combat-notification { padding: 2px 6px; background: linear-gradient(90deg, #0a262c80, transparent); overflow-wrap: anywhere; }
+.combat-control-notice { color: #94ff00; margin-bottom: 6px; }
 .combat-notification-friendly { color: #94ff00; }
 .combat-notification-hostile { color: #ff6868; }
 .combat-observer-hint, .combat-observation-bar {

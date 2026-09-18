@@ -1,4 +1,4 @@
-import { sameTeam } from '../../engine/simulation/CombatTeams';
+import { sameTeam, combatTeamColor } from '../../engine/simulation/CombatTeams';
 import type { CombatEngine } from '../../engine/simulation/CombatEngine';
 import type { Ship } from '../../engine/simulation/Ship';
 import { tacticalContactVisible, tacticalObservers } from './TacticalVisibility';
@@ -10,13 +10,15 @@ export interface MapView { center: Vector2; span: number }
 export interface MapCamera { pos: Vector2; width: number; height: number; zoom: number }
 const MIN_SPAN = 2400;
 const MAX_SPAN = 64000;
-export function fitTacticalView(engine: CombatEngine): MapView {
+export function fitTacticalView(engine: CombatEngine, width = 1, height = width): MapView {
   const observers = tacticalObservers(engine);
-  const ships = engine.capitalShips.filter(s => tacticalContactVisible(s, observers));
+  const ships = engine.capitalShips.filter(s => tacticalContactVisible(s, observers, engine.playerShip.teamId, engine.openBattlefield));
   if (!ships.length) return { center: engine.playerShip.pos.clone(), span: 20000 };
   const xs = ships.map(s => s.pos.x), ys = ships.map(s => s.pos.y);
+  // Span is horizontal world units; vertical coverage depends on the actual canvas aspect.
+  const aspect = width > 0 && height > 0 ? width / height : 1;
   return { center: new Vector2((Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2),
-    span: Math.max(20000, Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) * 1.5) };
+    span: Math.max(20000, Math.max(Math.max(...xs) - Math.min(...xs), (Math.max(...ys) - Math.min(...ys)) * aspect) * 1.5) };
 }
 /** Match combat and radar axes: +X right, +Y down. Allies deploy below enemies.
  * Drawing, picking, navigation and the viewport footprint share this transform. */
@@ -38,7 +40,7 @@ export function mapShipRadius(ship: Ship, view: MapView, size: number): number {
 }
 export function pickMapShip(engine: CombatEngine, point: Vector2, view: MapView, size: number, height = size): Ship | undefined {
   const observers = tacticalObservers(engine);
-  return engine.capitalShips.filter(s => tacticalContactVisible(s, observers))
+  return engine.capitalShips.filter(s => tacticalContactVisible(s, observers, engine.playerShip.teamId, engine.openBattlefield))
     .map(ship => ({ ship, distance: mapPoint(ship.pos, view, size, height).distanceTo(point) }))
     .filter(hit => hit.distance <= mapShipRadius(hit.ship, view, size) + 4)
     .sort((a, b) => a.distance - b.distance)[0]?.ship;
@@ -81,7 +83,7 @@ export class TacticalMapPainter {
     }
     ctx.globalAlpha = 1;
     if (this.fog.width !== Math.round(size) || this.fog.height !== Math.round(height)) { this.fog.width = Math.round(size); this.fog.height = Math.round(height); }
-    const fog = this.fog.getContext('2d');
+    const fog = engine.openBattlefield ? null : this.fog.getContext('2d');
     if (fog) {
       fog.clearRect(0, 0, size, height); fog.globalCompositeOperation = 'source-over';
       fog.fillStyle = 'rgba(70, 92, 114, .39)'; fog.fillRect(0, 0, size, height);
@@ -109,14 +111,14 @@ export class TacticalMapPainter {
       ctx.strokeStyle = i % 4 === 0 ? '#396076' : 'rgba(62, 99, 118, .4)';
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(size, y); ctx.stroke();
     }
-    const living = engine.capitalShips.filter(s => tacticalContactVisible(s, observers));
+    const living = engine.capitalShips.filter(s => tacticalContactVisible(s, observers, engine.playerShip.teamId, engine.openBattlefield));
     // Real viewport footprint, not a made-up sensor/reveal radius.
     const cam = mapPoint(camera.pos, view, size, height);
     const cw = camera.width / camera.zoom * scale, ch = camera.height / camera.zoom * scale;
     this.brackets(ctx, cam, cw / 2, ch / 2, '#90dcff', 8);
     for (const ship of living) {
       const order = engine.orders.get(ship.id) ?? (sameTeam(ship,engine.playerShip) ? engine.orders.get('fleet') : undefined);
-      const target = order && ['ENGAGE', 'ESCORT', 'AVOID'].includes(order.type) ? engine.ships.find(s => s.id === order.targetShipId && tacticalContactVisible(s, observers))?.pos
+      const target = order && ['ENGAGE', 'ESCORT', 'AVOID'].includes(order.type) ? engine.ships.find(s => s.id === order.targetShipId && tacticalContactVisible(s, observers, engine.playerShip.teamId, engine.openBattlefield))?.pos
         : order?.type === 'WAYPOINT' || order?.type === 'DEFEND' ? order.targetPos : undefined;
       if (!target) continue;
       const a = mapPoint(ship.pos, view, size, height), b = mapPoint(target, view, size, height);
@@ -134,17 +136,17 @@ export class TacticalMapPainter {
       ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
     }
     for (const fighter of [...engine.fighters, ...engine.bombers]) {
-      if (!tacticalContactVisible(fighter, observers)) continue;
+      if (!tacticalContactVisible(fighter, observers, engine.playerShip.teamId, engine.openBattlefield)) continue;
       const p = mapPoint(fighter.pos, view, size, height);
       ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(fighter.facingRad);
-      ctx.fillStyle = sameTeam(fighter,engine.playerShip) ? '#63bc45' : '#e94128';
+      ctx.fillStyle = engine.multiTeamBattle ? combatTeamColor(fighter.teamId) : sameTeam(fighter,engine.playerShip) ? '#63bc45' : '#e94128';
       ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(-3, -2.5); ctx.lineTo(-2, 0); ctx.lineTo(-3, 2.5); ctx.closePath(); ctx.fill(); ctx.restore();
     }
     for (const ship of living) {
       const p = mapPoint(ship.pos, view, size, height), r = mapShipRadius(ship, view, size);
       if (p.x < -r || p.y < -r || p.x > size + r || p.y > height + r) continue;
       const selected = engine.selectedUnitId === ship.id || (engine.selectedUnitId === 'fleet' && sameTeam(ship,engine.playerShip));
-      const color = sameTeam(ship,engine.playerShip) ? '#98bc51' : '#bc641e';
+      const color = engine.multiTeamBattle ? combatTeamColor(ship.teamId) : sameTeam(ship,engine.playerShip) ? '#98bc51' : '#bc641e';
       const image = this.image(ship.spec.spriteUrl);
       ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(ship.facingRad + Math.PI / 2);
       if (image) {
@@ -157,13 +159,13 @@ export class TacticalMapPainter {
       if (sameTeam(ship,engine.playerShip)) ctx.strokeRect(p.x - r, p.y - r, r * 2, r * 2);
       else { ctx.beginPath(); ctx.moveTo(p.x, p.y - r * 1.35); ctx.lineTo(p.x + r * 1.35, p.y); ctx.lineTo(p.x, p.y + r * 1.35); ctx.lineTo(p.x - r * 1.35, p.y); ctx.closePath(); ctx.stroke(); }
       ctx.globalAlpha = 1;
-      if (selected || hoveredId === ship.id || inspectedId === ship.id) this.brackets(ctx, p, r + 5, r + 5, selected ? '#c5f29a' : '#a1d7e9', 5);
+      if (selected || hoveredId === ship.id || inspectedId === ship.id) this.brackets(ctx, p, r + 5, r + 5, selected ? (engine.multiTeamBattle ? color : '#c5f29a') : '#a1d7e9', 5);
       if (selected) {
         ctx.fillStyle = '#101b14'; ctx.fillRect(p.x - r, p.y - r - 6, r * 2, 2);
         ctx.fillStyle = '#a0d16c'; ctx.fillRect(p.x - r, p.y - r - 6, r * 2 * Math.max(0, ship.hullHp / ship.maxHullHp), 2);
       }
       if (ship === engine.playerShip) {
-        ctx.fillStyle = '#62cbff'; ctx.beginPath(); ctx.moveTo(p.x, p.y - r - 15); ctx.lineTo(p.x - 3, p.y - r - 9); ctx.lineTo(p.x + 3, p.y - r - 9); ctx.fill();
+        ctx.fillStyle = engine.multiTeamBattle ? color : '#62cbff'; ctx.beginPath(); ctx.moveTo(p.x, p.y - r - 15); ctx.lineTo(p.x - 3, p.y - r - 9); ctx.lineTo(p.x + 3, p.y - r - 9); ctx.fill();
       }
     }
   }

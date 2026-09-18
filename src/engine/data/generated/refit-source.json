@@ -226,7 +226,7 @@
     },
     "shared_flux_sink": {
       "name": "共享幅散管道",
-      "implemented": false
+      "implemented": true
     },
     "stealth_minefield": {
       "name": "感应雷区",
@@ -366,7 +366,7 @@
     },
     "vastbulk": {
       "name": "庞然大物",
-      "implemented": false
+      "implemented": true
     },
     "axialrotation": {
       "name": "绕轴旋转",
@@ -2682,6 +2682,330 @@
       "name": "Aspect",
       "manufacturer": "未知",
       "designation": "位向"
+    },
+    "derelict_mothership_bow_module": {
+      "op": 16,
+      "name": "Bow Shield Module",
+      "manufacturer": "开拓者",
+      "designation": "前端阻抗模块"
+    },
+    "derelict_mothership_pod_engine_left": {
+      "op": 28,
+      "name": "Gun Pod, Rear",
+      "manufacturer": "开拓者",
+      "designation": "尾部武器吊舱"
+    },
+    "derelict_mothership_pod_m_left": {
+      "op": 26,
+      "name": "Gun Pod, Medium",
+      "manufacturer": "开拓者",
+      "designation": "中型武器吊舱"
+    },
+    "derelict_mothership_pod_m_right": {
+      "op": 22,
+      "name": "Gun Pod, Medium",
+      "manufacturer": "开拓者",
+      "designation": "中型武器吊舱"
+    },
+    "derelict_mothership_pod_s_right": {
+      "op": 14,
+      "name": "Gun Pod, Small",
+      "manufacturer": "开拓者",
+      "designation": "小型武器吊舱"
+    },
+    "derelict_mothership_sensor_mast": {
+      "op": 32,
+      "name": "Bow Sensor Mast",
+      "manufacturer": "开拓者",
+      "designation": "前端传感桅杆"
+    },
+    "module_armour1": {
+      "op": 0,
+      "name": "Station Armour Module",
+      "manufacturer": "",
+      "designation": "空间站装甲"
+    },
+    "module_armour2": {
+      "op": 0,
+      "name": "Station Armour Module",
+      "manufacturer": "",
+      "designation": "空间站装甲"
+    },
+    "module_armour3": {
+      "op": 0,
+      "name": "Station Armour Module",
+      "manufacturer": "",
+      "designation": "空间站支撑结构"
+    },
+    "module_armour4": {
+      "op": 0,
+      "name": "Station Armour Module",
+      "manufacturer": "",
+      "designation": "空间站支撑结构"
+    },
+    "module_armour5": {
+      "op": 0,
+      "name": "Station Armour Module",
+      "manufacturer": "",
+      "designation": "空间站支撑结构"
+    },
+    "module_bastion1_lowtech": {
+      "op": 1000,
+      "name": "Module, PD Bastion",
+      "manufacturer": "低端技术",
+      "designation": "PD 堡垒"
+    },
+    "module_bastion_pd1": {
+      "op": 44,
+      "name": "PD Bastion",
+      "manufacturer": "",
+      "designation": "PD 堡垒"
+    },
+    "module_blocker1": {
+      "op": 0,
+      "name": "Station Structural Spur",
+      "manufacturer": "",
+      "designation": "空间站支撑结构"
+    },
+    "module_blocker2": {
+      "op": 0,
+      "name": "Station Structural Spur",
+      "manufacturer": "",
+      "designation": "空间站支撑结构"
+    },
+    "module_blocker2b": {
+      "op": 0,
+      "name": "Station Structural Spur",
+      "manufacturer": "",
+      "designation": "空间站支撑结构"
+    },
+    "module_blocker2c": {
+      "op": 0,
+      "name": "Station Structural Spur",
+      "manufacturer": "",
+      "designation": "空间站支撑结构"
+    },
+    "module_citadel1_lowtech": {
+      "op": 1000,
+      "name": "Module, Combat Citadel",
+      "manufacturer": "低端技术",
+      "designation": "重型星堡"
+    },
+    "module_decor_midline1": {
+      "op": 0,
+      "name": "Station Extension",
+      "manufacturer": "中线技术",
+      "designation": "空间站外延结构"
+    },
+    "module_decor_midline2": {
+      "op": 0,
+      "name": "Station Extension",
+      "manufacturer": "中线技术",
+      "designation": "空间站外延结构"
+    },
+    "module_hightech_armour": {
+      "op": 0,
+      "name": "Station Armour",
+      "manufacturer": "高新技术",
+      "designation": "空间站装甲"
+    },
+    "module_hightech_attack": {
+      "op": 1000,
+      "name": "Attack Module",
+      "manufacturer": "高新技术",
+      "designation": "空间站炮台"
+    },
+    "module_hightech_attack_minelayer": {
+      "op": 1000,
+      "name": "Attack Module",
+      "manufacturer": "高新技术",
+      "designation": "空间站炮台"
+    },
+    "module_hightech_citadel": {
+      "op": 1000,
+      "name": "Citadel Module",
+      "manufacturer": "高新技术",
+      "designation": "重型星堡"
+    },
+    "module_hightech_hangar": {
+      "op": 1000,
+      "name": "Support Module",
+      "manufacturer": "高新技术",
+      "designation": "机库模块"
+    },
+    "module_hightech_shield": {
+      "op": 0,
+      "name": "Shield Module",
+      "manufacturer": "高新技术",
+      "designation": "护盾模块"
+    },
+    "module_hightech_strut": {
+      "op": 0,
+      "name": "Station Strut",
+      "manufacturer": "高新技术",
+      "designation": "空间站外延结构"
+    },
+    "module_large1_lowtech": {
+      "op": 1000,
+      "name": "Module, Heavy Combat",
+      "manufacturer": "低端技术",
+      "designation": "重型战斗模块"
+    },
+    "module_large2_lowtech": {
+      "op": 1000,
+      "name": "Module, Combat Support",
+      "manufacturer": "低端技术",
+      "designation": "重型支援模块"
+    },
+    "module_midline_bastion": {
+      "op": 1000,
+      "name": "PD Bastion",
+      "manufacturer": "中线技术",
+      "designation": "轻型支援模块"
+    },
+    "module_midline_broadside": {
+      "op": 1000,
+      "name": "Heavy Broadside Module",
+      "manufacturer": "中线技术",
+      "designation": "重型侧舷模块"
+    },
+    "module_midline_citadel": {
+      "op": 1000,
+      "name": "Heavy Station Battery",
+      "manufacturer": "中线技术",
+      "designation": "重型空间站炮台"
+    },
+    "module_midline_support": {
+      "op": 1000,
+      "name": "Heavy Support Module",
+      "manufacturer": "中线技术",
+      "designation": "重型支援模块"
+    },
+    "module_onslaught_armor_left": {
+      "op": 0,
+      "name": "Armor Module",
+      "manufacturer": "人之领管制科技",
+      "designation": "护腕模块"
+    },
+    "module_onslaught_armor_right": {
+      "op": 0,
+      "name": "Armor Module",
+      "manufacturer": "人之领管制科技",
+      "designation": "护腕模块"
+    },
+    "onslaught_mk1": {
+      "op": 300,
+      "name": "攻势 Mk.I",
+      "manufacturer": "人之领管制科技",
+      "designation": "战列舰"
+    },
+    "platform1": {
+      "op": 100,
+      "name": "platform1",
+      "manufacturer": "中线技术",
+      "designation": "武器平台"
+    },
+    "remnant_armour3": {
+      "op": 0,
+      "name": "Remnant Station Armour",
+      "manufacturer": "余辉",
+      "designation": "余辉空间站装甲"
+    },
+    "remnant_hangar1": {
+      "op": 1000,
+      "name": "Remnant Station Hangar",
+      "manufacturer": "余辉",
+      "designation": "余辉空间站机库"
+    },
+    "remnant_shield2": {
+      "op": 1000,
+      "name": "Remnant Station Citadel",
+      "manufacturer": "余辉",
+      "designation": "余辉空间站星堡"
+    },
+    "remnant_station2": {
+      "op": 0,
+      "name": "Remnant Station",
+      "manufacturer": "余辉",
+      "designation": "余辉中枢"
+    },
+    "remnant_weapon_platform1": {
+      "op": 1000,
+      "name": "Remnant Weapon Platform 1",
+      "manufacturer": "余辉",
+      "designation": "余辉武器平台"
+    },
+    "remnant_weapon_platform2": {
+      "op": 1000,
+      "name": "Remnant Weapon Platform",
+      "manufacturer": "余辉",
+      "designation": "余辉武器平台"
+    },
+    "station1": {
+      "op": 0,
+      "name": "轨道空间站",
+      "manufacturer": "低端技术",
+      "designation": "轨道空间站"
+    },
+    "station1_hightech": {
+      "op": 0,
+      "name": "轨道空间站",
+      "manufacturer": "高新技术",
+      "designation": "轨道空间站"
+    },
+    "station1_midline": {
+      "op": 0,
+      "name": "轨道空间站",
+      "manufacturer": "中线技术",
+      "designation": "轨道空间站"
+    },
+    "station2": {
+      "op": 0,
+      "name": "作战基地",
+      "manufacturer": "低端技术",
+      "designation": "作战基地"
+    },
+    "station2_hightech": {
+      "op": 0,
+      "name": "作战基地",
+      "manufacturer": "高新技术",
+      "designation": "作战基地"
+    },
+    "station2_midline": {
+      "op": 0,
+      "name": "作战基地",
+      "manufacturer": "中线技术",
+      "designation": "作战基地"
+    },
+    "station3": {
+      "op": 0,
+      "name": "作战基地",
+      "manufacturer": "低端技术",
+      "designation": "星际要塞"
+    },
+    "station3_hightech": {
+      "op": 0,
+      "name": "作战基地",
+      "manufacturer": "高新技术",
+      "designation": "星际要塞"
+    },
+    "station3_midline": {
+      "op": 0,
+      "name": "作战基地",
+      "manufacturer": "中线技术",
+      "designation": "星际要塞"
+    },
+    "station_derelict_survey_mothership": {
+      "op": 0,
+      "name": "Derelict Survey Mothership",
+      "manufacturer": "开拓者",
+      "designation": "人之领勘探母舰"
+    },
+    "station_small": {
+      "op": 0,
+      "name": "模块测试舰",
+      "manufacturer": "中线技术",
+      "designation": "小型轨道空间站"
     }
   },
   "weapons": {
@@ -4959,39 +5283,52 @@
       ]
     },
     "derelict_mothership_bow_module": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Default variant derelict_mothership_bow_module_Standard: native vents/capacitors (2/8) are not invested; base hull flux retained for refit.",
+        "Equipped weapon pdlaser is approximate; see weapon status."
       ]
     },
     "derelict_mothership_pod_engine_left": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Default variant derelict_mothership_pod_engine_left_Standard: native vents/capacitors (10/2) are not invested; base hull flux retained for refit.",
+        "Equipped weapon miningblaster is approximate; see weapon status.",
+        "Equipped weapon pdlaser is approximate; see weapon status."
       ]
     },
     "derelict_mothership_pod_m_left": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Default variant derelict_mothership_pod_m_left_Standard: native vents/capacitors (6/6) are not invested; base hull flux retained for refit.",
+        "Equipped weapon miningblaster is approximate; see weapon status.",
+        "Equipped weapon mininglaser is approximate; see weapon status.",
+        "Equipped weapon pdlaser is approximate; see weapon status."
       ]
     },
     "derelict_mothership_pod_m_right": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Default variant derelict_mothership_pod_m_right_Standard: native vents/capacitors (9/0) are not invested; base hull flux retained for refit.",
+        "Equipped weapon miningblaster is approximate; see weapon status.",
+        "Equipped weapon pdlaser is approximate; see weapon status."
       ]
     },
     "derelict_mothership_pod_s_right": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Default variant derelict_mothership_pod_s_right_Standard: native vents/capacitors (7/3) are not invested; base hull flux retained for refit.",
+        "Equipped weapon mininglaser is approximate; see weapon status.",
+        "Equipped weapon pdlaser is approximate; see weapon status."
       ]
     },
     "derelict_mothership_sensor_mast": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Default variant derelict_mothership_sensor_mast_Standard: native vents/capacitors (9/8) are not invested; base hull flux retained for refit.",
+        "Equipped weapon miningblaster is approximate; see weapon status.",
+        "Equipped weapon mininglaser is approximate; see weapon status.",
+        "Equipped weapon pdlaser is approximate; see weapon status."
       ]
     },
     "dominator": {
@@ -6002,111 +6339,186 @@
       ]
     },
     "module_armour1": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Zero native flux capacity uses a 1-point runtime safety floor; fluxless entity semantics are not implemented.",
+        "Unimplemented built-in hullmod always_detaches: omitted from executable hull; source ID retained.",
+        "Source built-in hullmod always_detaches has no implemented Web behavior."
       ]
     },
     "module_armour2": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Zero native flux capacity uses a 1-point runtime safety floor; fluxless entity semantics are not implemented.",
+        "Unimplemented built-in hullmod always_detaches: omitted from executable hull; source ID retained.",
+        "Source built-in hullmod always_detaches has no implemented Web behavior."
       ]
     },
     "module_armour3": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Zero native flux capacity uses a 1-point runtime safety floor; fluxless entity semantics are not implemented.",
+        "Unimplemented built-in hullmod never_detaches: omitted from executable hull; source ID retained.",
+        "Unimplemented built-in hullmod do_not_fire_through: omitted from executable hull; source ID retained.",
+        "Source built-in hullmod never_detaches has no implemented Web behavior.",
+        "Source built-in hullmod do_not_fire_through has no implemented Web behavior."
       ]
     },
     "module_armour4": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Zero native flux capacity uses a 1-point runtime safety floor; fluxless entity semantics are not implemented.",
+        "Unimplemented built-in hullmod never_detaches: omitted from executable hull; source ID retained.",
+        "Unimplemented built-in hullmod do_not_fire_through: omitted from executable hull; source ID retained.",
+        "Source built-in hullmod never_detaches has no implemented Web behavior.",
+        "Source built-in hullmod do_not_fire_through has no implemented Web behavior."
       ]
     },
     "module_armour5": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Zero native flux capacity uses a 1-point runtime safety floor; fluxless entity semantics are not implemented.",
+        "Unimplemented built-in hullmod do_not_fire_through: omitted from executable hull; source ID retained.",
+        "Source built-in hullmod do_not_fire_through has no implemented Web behavior."
       ]
     },
     "module_bastion1_lowtech": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Unimplemented built-in hullmod do_not_fire_through: omitted from executable hull; source ID retained.",
+        "Unimplemented built-in hullmod always_detaches: omitted from executable hull; source ID retained.",
+        "Source built-in hullmod do_not_fire_through has no implemented Web behavior.",
+        "Source built-in hullmod always_detaches has no implemented Web behavior.",
+        "Equipped weapon vulcan is approximate; see weapon status.",
+        "Equipped weapon dualflak is approximate; see weapon status.",
+        "Equipped weapon swarmer is approximate; see weapon status."
       ]
     },
     "module_bastion_pd1": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Unimplemented built-in hullmod do_not_fire_through: omitted from executable hull; source ID retained.",
+        "Default variant module_bastion_pd1_Standard: native vents/capacitors (2/0) are not invested; base hull flux retained for refit.",
+        "Source built-in hullmod do_not_fire_through has no implemented Web behavior.",
+        "Equipped weapon vulcan is approximate; see weapon status.",
+        "Equipped weapon flak is approximate; see weapon status."
       ]
     },
     "module_blocker1": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Zero native flux capacity uses a 1-point runtime safety floor; fluxless entity semantics are not implemented.",
+        "Unimplemented built-in hullmod never_detaches: omitted from executable hull; source ID retained.",
+        "Unimplemented built-in hullmod do_not_fire_through: omitted from executable hull; source ID retained.",
+        "Source built-in hullmod never_detaches has no implemented Web behavior.",
+        "Source built-in hullmod do_not_fire_through has no implemented Web behavior."
       ]
     },
     "module_blocker2": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Zero native flux capacity uses a 1-point runtime safety floor; fluxless entity semantics are not implemented.",
+        "Unimplemented built-in hullmod never_detaches: omitted from executable hull; source ID retained.",
+        "Source built-in hullmod never_detaches has no implemented Web behavior."
       ]
     },
     "module_blocker2b": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Zero native flux capacity uses a 1-point runtime safety floor; fluxless entity semantics are not implemented.",
+        "Unimplemented built-in hullmod always_detaches: omitted from executable hull; source ID retained.",
+        "Unimplemented built-in hullmod do_not_fire_through: omitted from executable hull; source ID retained.",
+        "Source built-in hullmod always_detaches has no implemented Web behavior.",
+        "Source built-in hullmod do_not_fire_through has no implemented Web behavior."
       ]
     },
     "module_blocker2c": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Zero native flux capacity uses a 1-point runtime safety floor; fluxless entity semantics are not implemented.",
+        "Unimplemented built-in hullmod always_detaches: omitted from executable hull; source ID retained.",
+        "Unimplemented built-in hullmod do_not_fire_through: omitted from executable hull; source ID retained.",
+        "Source built-in hullmod always_detaches has no implemented Web behavior.",
+        "Source built-in hullmod do_not_fire_through has no implemented Web behavior."
       ]
     },
     "module_citadel1_lowtech": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Unimplemented built-in hullmod do_not_fire_through: omitted from executable hull; source ID retained.",
+        "Unimplemented built-in hullmod always_detaches: omitted from executable hull; source ID retained.",
+        "Source built-in hullmod do_not_fire_through has no implemented Web behavior.",
+        "Source built-in hullmod always_detaches has no implemented Web behavior.",
+        "Equipped weapon dualflak is approximate; see weapon status.",
+        "Equipped weapon gauss is approximate; see weapon status.",
+        "Equipped weapon vulcan is approximate; see weapon status.",
+        "Equipped weapon heavymauler is approximate; see weapon status.",
+        "Equipped weapon mjolnir is approximate; see weapon status."
       ]
     },
     "module_decor_midline1": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Zero native flux capacity uses a 1-point runtime safety floor; fluxless entity semantics are not implemented."
       ]
     },
     "module_decor_midline2": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Zero native flux capacity uses a 1-point runtime safety floor; fluxless entity semantics are not implemented."
       ]
     },
     "module_hightech_armour": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Zero native flux capacity uses a 1-point runtime safety floor; fluxless entity semantics are not implemented.",
+        "Unimplemented built-in hullmod always_detaches: omitted from executable hull; source ID retained.",
+        "Unimplemented built-in hullmod anchorrotation: omitted from executable hull; source ID retained.",
+        "Unimplemented built-in hullmod do_not_fire_through: omitted from executable hull; source ID retained.",
+        "Source built-in hullmod always_detaches has no implemented Web behavior.",
+        "Source built-in hullmod anchorrotation has no implemented Web behavior.",
+        "Source built-in hullmod do_not_fire_through has no implemented Web behavior."
       ]
     },
     "module_hightech_attack": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Default variant module_hightech_attack_Standard: native vents/capacitors (10/10) are not invested; base hull flux retained for refit.",
+        "Equipped weapon tachyonlance is approximate; see weapon status.",
+        "Equipped weapon ionpulser is approximate; see weapon status.",
+        "Equipped weapon gravitonbeam is approximate; see weapon status.",
+        "Equipped weapon ionbeam is approximate; see weapon status.",
+        "Equipped weapon pdlaser is approximate; see weapon status.",
+        "Equipped weapon ioncannon is approximate; see weapon status."
       ]
     },
     "module_hightech_attack_minelayer": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Default variant module_hightech_attack_minelayer_Standard: native vents/capacitors (10/10) are not invested; base hull flux retained for refit.",
+        "Equipped weapon tachyonlance is approximate; see weapon status.",
+        "Equipped weapon ionpulser is approximate; see weapon status.",
+        "Equipped weapon gravitonbeam is approximate; see weapon status.",
+        "Equipped weapon ionbeam is approximate; see weapon status.",
+        "Equipped weapon pdlaser is approximate; see weapon status.",
+        "Equipped weapon ioncannon is approximate; see weapon status."
       ]
     },
     "module_hightech_citadel": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Unimplemented built-in hullmod anchorrotation: omitted from executable hull; source ID retained.",
+        "Unimplemented built-in hullmod do_not_fire_through: omitted from executable hull; source ID retained.",
+        "Unimplemented built-in hullmod always_detaches: omitted from executable hull; source ID retained.",
+        "Default variant module_hightech_citadel_Standard: native vents/capacitors (10/10) are not invested; base hull flux retained for refit.",
+        "Source built-in hullmod anchorrotation has no implemented Web behavior.",
+        "Source built-in hullmod do_not_fire_through has no implemented Web behavior.",
+        "Source built-in hullmod always_detaches has no implemented Web behavior.",
+        "Equipped weapon plasma is approximate; see weapon status.",
+        "Equipped weapon gravitonbeam is approximate; see weapon status.",
+        "Equipped weapon pdlaser is approximate; see weapon status.",
+        "Equipped weapon irpulse is approximate; see weapon status.",
+        "Equipped weapon sabotpod is approximate; see weapon status."
       ]
     },
     "module_hightech_decor": {
@@ -6116,69 +6528,116 @@
       ]
     },
     "module_hightech_hangar": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Default variant module_hightech_hangar_Standard: native vents/capacitors (10/10) are not invested; base hull flux retained for refit.",
+        "Wing cobra_wing uses approximate fighter cobra; see its ship status.",
+        "Equipped weapon gravitonbeam is approximate; see weapon status.",
+        "Equipped weapon pdlaser is approximate; see weapon status.",
+        "Equipped weapon phasebeam is approximate; see weapon status."
       ]
     },
     "module_hightech_shield": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Unimplemented built-in hullmod anchorrotation: omitted from executable hull; source ID retained.",
+        "Unimplemented built-in hullmod always_detaches: omitted from executable hull; source ID retained.",
+        "Source built-in hullmod anchorrotation has no implemented Web behavior.",
+        "Source built-in hullmod always_detaches has no implemented Web behavior."
       ]
     },
     "module_hightech_strut": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Zero native flux capacity uses a 1-point runtime safety floor; fluxless entity semantics are not implemented.",
+        "Unimplemented built-in hullmod anchorrotation: omitted from executable hull; source ID retained.",
+        "Unimplemented built-in hullmod never_detaches: omitted from executable hull; source ID retained.",
+        "Source built-in hullmod anchorrotation has no implemented Web behavior.",
+        "Source built-in hullmod never_detaches has no implemented Web behavior."
       ]
     },
     "module_large1_lowtech": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Equipped weapon mark9 is approximate; see weapon status.",
+        "Equipped weapon hellbore is approximate; see weapon status.",
+        "Equipped weapon dualflak is approximate; see weapon status.",
+        "Equipped weapon typhoon is approximate; see weapon status.",
+        "Equipped weapon phasecl is approximate; see weapon status.",
+        "Equipped weapon sabotpod is approximate; see weapon status.",
+        "Equipped weapon vulcan is approximate; see weapon status."
       ]
     },
     "module_large2_lowtech": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Wing broadsword_wing uses approximate fighter broadsword; see its ship status.",
+        "Equipped weapon hveldriver is approximate; see weapon status.",
+        "Equipped weapon pilum is approximate; see weapon status.",
+        "Equipped weapon dualflak is approximate; see weapon status.",
+        "Equipped weapon vulcan is approximate; see weapon status.",
+        "Equipped weapon salamanderpod is approximate; see weapon status."
       ]
     },
     "module_midline_bastion": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Unimplemented built-in hullmod do_not_fire_through: omitted from executable hull; source ID retained.",
+        "Default variant module_midline_bastion_Standard1: native vents/capacitors (10/10) are not invested; base hull flux retained for refit.",
+        "Source built-in hullmod do_not_fire_through has no implemented Web behavior.",
+        "Equipped weapon dualflak is approximate; see weapon status.",
+        "Equipped weapon squall is approximate; see weapon status.",
+        "Equipped weapon vulcan is approximate; see weapon status."
       ]
     },
     "module_midline_broadside": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Default variant module_midline_broadside_Standard: native vents/capacitors (10/10) are not invested; base hull flux retained for refit.",
+        "Equipped weapon hephag is approximate; see weapon status.",
+        "Equipped weapon multineedler is approximate; see weapon status.",
+        "Equipped weapon mjolnir is approximate; see weapon status.",
+        "Equipped weapon gravitonbeam is approximate; see weapon status.",
+        "Equipped weapon vulcan is approximate; see weapon status."
       ]
     },
     "module_midline_citadel": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Default variant module_midline_citadel_Standard: native vents/capacitors (10/10) are not invested; base hull flux retained for refit.",
+        "Equipped weapon hephag is approximate; see weapon status.",
+        "Equipped weapon multineedler is approximate; see weapon status.",
+        "Equipped weapon gravitonbeam is approximate; see weapon status.",
+        "Equipped weapon vulcan is approximate; see weapon status."
       ]
     },
     "module_midline_support": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Unimplemented built-in hullmod do_not_fire_through: omitted from executable hull; source ID retained.",
+        "Default variant module_midline_support_Standard: native vents/capacitors (10/10) are not invested; base hull flux retained for refit.",
+        "Source built-in hullmod do_not_fire_through has no implemented Web behavior.",
+        "Wing hoplon_wing uses approximate fighter hoplon; see its ship status.",
+        "Wing broadsword_wing uses approximate fighter broadsword; see its ship status.",
+        "Equipped weapon pilum is approximate; see weapon status.",
+        "Equipped weapon heatseeker is approximate; see weapon status.",
+        "Equipped weapon vulcan is approximate; see weapon status."
       ]
     },
     "module_onslaught_armor_left": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Zero native flux capacity uses a 1-point runtime safety floor; fluxless entity semantics are not implemented.",
+        "Unimplemented built-in hullmod always_detaches: omitted from executable hull; source ID retained.",
+        "Source built-in hullmod always_detaches has no implemented Web behavior."
       ]
     },
     "module_onslaught_armor_right": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Zero native flux capacity uses a 1-point runtime safety floor; fluxless entity semantics are not implemented.",
+        "Unimplemented built-in hullmod always_detaches: omitted from executable hull; source ID retained.",
+        "Source built-in hullmod always_detaches has no implemented Web behavior."
       ]
     },
     "monitor": {
@@ -6327,9 +6786,20 @@
       ]
     },
     "onslaught_mk1": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Native engine visual style ONSLAUGHT_MKI uses HIGH_TECH Web engine rendering.",
+        "Unimplemented built-in hullmod automated: omitted from executable hull; source ID retained.",
+        "Unimplemented built-in hullmod rugged: omitted from executable hull; source ID retained.",
+        "Default variant onslaught_mk1_Ancient: native vents/capacitors (50/3) are not invested; base hull flux retained for refit.",
+        "Source built-in hullmod automated has no implemented Web behavior.",
+        "Source built-in hullmod rugged has no implemented Web behavior.",
+        "Equipped weapon arbalest is approximate; see weapon status.",
+        "Equipped weapon flak is approximate; see weapon status.",
+        "Equipped weapon heavy_adjudicator is approximate; see weapon status.",
+        "Equipped weapon devastator is approximate; see weapon status.",
+        "Equipped weapon pilum is approximate; see weapon status.",
+        "Module combat and attachment supported; station-specific scripted hullmods remain approximate where reported."
       ]
     },
     "onslaught_xiv": {
@@ -6447,9 +6917,11 @@
       "reasons": []
     },
     "platform1": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Default variant platform1_Standard: native vents/capacitors (8/0) are not invested; base hull flux retained for refit.",
+        "Equipped weapon mark9 is approximate; see weapon status.",
+        "Equipped weapon dualflak is approximate; see weapon status."
       ]
     },
     "prometheus": {
@@ -6536,15 +7008,21 @@
       ]
     },
     "remnant_armour3": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Zero native flux capacity uses a 1-point runtime safety floor; fluxless entity semantics are not implemented.",
+        "Unimplemented built-in hullmod always_detaches: omitted from executable hull; source ID retained.",
+        "Source built-in hullmod always_detaches has no implemented Web behavior."
       ]
     },
     "remnant_hangar1": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Default variant remnant_hangar1_Standard: native vents/capacitors (10/10) are not invested; base hull flux retained for refit.",
+        "Wing lux_wing uses approximate fighter lux; see its ship status.",
+        "Native wing role INTERCEPTOR uses basic fighter behavior.",
+        "Equipped weapon pulselaser is approximate; see weapon status.",
+        "Equipped weapon pdlaser is approximate; see weapon status."
       ]
     },
     "remnant_shield1": {
@@ -6554,33 +7032,42 @@
       ]
     },
     "remnant_shield2": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Default variant remnant_shield2_Standard: native vents/capacitors (10/10) are not invested; base hull flux retained for refit.",
+        "Equipped weapon guardian is approximate; see weapon status."
       ]
     },
     "remnant_station1": {
       "level": "unsupported",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "No compatible native default variant; hull registered with built-in equipment only.",
+        "No complete native module assembly: []"
       ]
     },
     "remnant_station2": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Module combat and attachment supported; station-specific scripted hullmods remain approximate where reported."
       ]
     },
     "remnant_weapon_platform1": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Default variant remnant_weapon_platform1_Standard: native vents/capacitors (10/10) are not invested; base hull flux retained for refit.",
+        "Equipped weapon hil is approximate; see weapon status.",
+        "Equipped weapon gauss is approximate; see weapon status.",
+        "Equipped weapon squall is approximate; see weapon status."
       ]
     },
     "remnant_weapon_platform2": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Default variant remnant_weapon_platform2_Standard: native vents/capacitors (10/10) are not invested; base hull flux retained for refit.",
+        "Equipped weapon autopulse is approximate; see weapon status.",
+        "Equipped weapon pulselaser is approximate; see weapon status.",
+        "Equipped weapon ionpulser is approximate; see weapon status.",
+        "Equipped weapon pdburst is approximate; see weapon status."
       ]
     },
     "remnant_weapon_platform3": {
@@ -6878,69 +7365,69 @@
       ]
     },
     "station1": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Module combat and attachment supported; station-specific scripted hullmods remain approximate where reported."
       ]
     },
     "station1_hightech": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Module combat and attachment supported; station-specific scripted hullmods remain approximate where reported."
       ]
     },
     "station1_midline": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Module combat and attachment supported; station-specific scripted hullmods remain approximate where reported."
       ]
     },
     "station2": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Module combat and attachment supported; station-specific scripted hullmods remain approximate where reported."
       ]
     },
     "station2_hightech": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Module combat and attachment supported; station-specific scripted hullmods remain approximate where reported."
       ]
     },
     "station2_midline": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Module combat and attachment supported; station-specific scripted hullmods remain approximate where reported."
       ]
     },
     "station3": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Module combat and attachment supported; station-specific scripted hullmods remain approximate where reported."
       ]
     },
     "station3_hightech": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Module combat and attachment supported; station-specific scripted hullmods remain approximate where reported."
       ]
     },
     "station3_midline": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Module combat and attachment supported; station-specific scripted hullmods remain approximate where reported."
       ]
     },
     "station_derelict_survey_mothership": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Module combat and attachment supported; station-specific scripted hullmods remain approximate where reported."
       ]
     },
     "station_small": {
-      "level": "unsupported",
+      "level": "approximate",
       "reasons": [
-        "Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull."
+        "Module combat and attachment supported; station-specific scripted hullmods remain approximate where reported."
       ]
     },
     "sunder": {

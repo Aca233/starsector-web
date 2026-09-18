@@ -1,3 +1,7 @@
+import { isImmutableMetadata } from '../extensions/Immutable';
+import type { InFlightFireBudget } from './InFlightFireBudget';
+import { fireTargetUtility } from './FireTargetUtility';
+import { shipPolicyAction } from './learning/CombatPolicy';
 import { sameTeam, combatTeam } from "../simulation/CombatTeams";
 import { nativeAutofireAim } from './NativeAim';
 import { Vector2 } from '../math/Vector2';
@@ -13,6 +17,7 @@ import { interceptTimeComponents, shipSegmentEntry, weaponMuzzle } from './FireC
 
 /** One world view per combat step; no renderer/UI or single-opponent dependency. */
 export interface FireControlWorld {
+  fireBudget?: InFlightFireBudget;
   ships: readonly Ship[];
   missiles: readonly Projectile[];
   asteroids: readonly Asteroid[];
@@ -70,7 +75,7 @@ function canTarget(ship: Ship, mount: WeaponMount, target: FireControlTarget, wo
       && !(p.isFlare && (hint(mount, 'IGNORES_FLARES') || ship.hullStats.pdIgnoresFlares > 0));
   }
   const other = target.entity;
-  if ((!knownPresent && !world.ships.includes(other)) || other.isDead || !other.isVisibleTo(ship.teamId) || other.isCollisionless || sameTeam(other, ship)) return false;
+  if ((!knownPresent && !world.ships.includes(other)) || other.hasVastBulk || other.isDead || !other.isVisibleTo(ship.teamId) || other.isCollisionless || sameTeam(other, ship)) return false;
   // Native private.java: PD_ONLY permits fighters only when ANTI_FTR is present.
   if (hint(mount, 'PD_ONLY') && !(hint(mount, 'ANTI_FTR') && fighter(other))) return false;
   if (fighter(other)) {
@@ -105,30 +110,37 @@ function outsideAcquisition(ship: Ship, mount: WeaponMount, target: FireControlT
   return query.speed > 0 && query.delay >= 0 && limit >= 0 && horizon >= 0 && Number.isFinite(reach) && distance > reach + pad;
 }
 
-/** Constant-velocity interception in the shooter's frame, including pending charge time.
- * Guided missiles use rated speed for acquisition, not a fictitious instantaneous launch speed. */
-export function solveWeaponAim(ship: Ship, mount: WeaponMount, target: FireControlTarget, prepared?: AimQuery): AimSolution | null {
-  if (prepared && outsideAcquisition(ship, mount, target, prepared)) return null;
-  const origin = prepared?.origin ?? weaponMuzzle(ship, mount);
-  const delay = prepared ? prepared.delay : mount.firingState === 'CHARGING' ? Math.max(0, mount.firingStateTimer)
-    : mount.firingState === 'IDLE' && mount.burstRemaining <= 0
-      ? (mount.spec.isBeam ? mount.spec.beamSourceChargeupTime ?? 0 : mount.spec.chargeTime ?? 0) : 0;
-  const speed = prepared ? prepared.speed : guided(mount) ? mount.spec.maxSpeed ?? mount.spec.projSpeed : combatProjectileSpeed(ship, mount.spec);
+/** Shared prediction for turret fire control and AI hull facing. This is not a firing
+ * permission: acquisition still enforces range/arcs, and decide traces the actual bore. */
+export function predictWeaponIntercept(ship: Ship, mount: WeaponMount, target: FireControlTarget,
+  query: AimQuery = prepareAimQuery(ship, mount)): AimSolution | null {
+  const { origin, delay, speed, range } = query;
   const vx = target.entity.vel.x - ship.vel.x, vy = target.entity.vel.y - ship.vel.y;
   const px = target.entity.pos.x - origin.x + vx * delay, py = target.entity.pos.y - origin.y + vy * delay;
   const time = mount.spec.isBeam ? 0 : interceptTimeComponents(px, py, vx, vy, speed);
   if (time === null) return null;
-  // Keep clone/add/addScaled's arithmetic order, not targetPos + v * (delay + time).
+  // Preserve the acquisition arithmetic order for native batched queries.
   const point = new Vector2(origin.x + px + vx * time, origin.y + py + vy * time);
-  const range = prepared?.range ?? combatWeaponRange(ship, mount.spec);
+  if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return null;
+  return { target, point, delay, speed, range };
+}
+
+/** Constant-velocity interception in the shooter's frame, including pending charge time.
+ * Guided missiles use rated speed for acquisition, not a fictitious instantaneous launch speed. */
+export function solveWeaponAim(ship: Ship, mount: WeaponMount, target: FireControlTarget, prepared?: AimQuery): AimSolution | null {
+  if (prepared && outsideAcquisition(ship, mount, target, prepared)) return null;
+  const query = prepared ?? prepareAimQuery(ship, mount);
+  const solution = predictWeaponIntercept(ship, mount, target, query);
+  if (!solution) return null;
+  const { origin } = query;
+  const { point, delay, range } = solution;
   const directionX = point.x - origin.x, directionY = point.y - origin.y;
   const distance = Math.hypot(directionX, directionY);
-  if (distance > range + targetRadius(target) || !Number.isFinite(distance)) return null;
+  if (distance > range + targetRadius(target)) return null;
   const base = ship.facingRad + mount.baseAngleDeg * Math.PI / 180;
   const targetHalfAngle = Math.asin(Math.min(1, targetRadius(target) / Math.max(1, distance)));
   const alwaysAim = guided(mount) && (mount.spec.alwaysFire || hint(mount, 'DO_NOT_AIM') || hint(mount, 'GUIDED_POOR'));
   if (!alwaysAim && mount.arcDeg < 360 && Math.abs(signedAngle(Math.atan2(directionY, directionX) - base)) > mount.arcDeg * Math.PI / 360 + targetHalfAngle) return null;
-  const solution = { target, point, delay, speed, range };
   if (!guided(mount)) {
     const contact = traceTarget(ship, mount, solution, origin, Math.atan2(directionY, directionX));
     if (!contact) return null;
@@ -157,6 +169,7 @@ export function shotObstruction(ship: Ship, mount: WeaponMount, solution: AimSol
   const start = new Vector2(), end = new Vector2();
   for (const other of world.ships) {
     if (other === ship || other.isDead || other.isPhased || !sameTeam(other, ship)) continue;
+    if (other.assemblyRoot === ship.assemblyRoot && !other.spec.sourceHullTraits?.includes('do_not_fire_through')) continue;
     if (fighter(other) && mount.spec.passThroughFighters && !mount.spec.passThroughFightersOnlyWhenDestroyed) continue;
     const vx = ship.vel.x - other.vel.x, vy = ship.vel.y - other.vel.y;
     start.set(origin.x + vx * solution.delay, origin.y + vy * solution.delay);
@@ -216,6 +229,33 @@ export class AutofireController {
     mount.fireControlTargetShipId = undefined;
   }
 
+  /** Tracking only: slow turrets should turn while closing, not start a 10-second
+   * traverse at the range boundary. Never return this as a firing solution. */
+  public preAim(ship: Ship, mount: WeaponMount, world: FireControlWorld): Vector2 | null {
+    if (mount.isDisabled || mount.mountType === 'HARDPOINT') return null;
+    const query = prepareAimQuery(ship, mount);
+    query.range *= 1.5;
+    const track = (other: Ship) => {
+      const target: FireControlTarget = { kind: 'SHIP', entity: other };
+      return canTarget(ship, mount, target, world, true) ? solveWeaponAim(ship, mount, target, query)?.point ?? null : null;
+    };
+    if (ship.currentTargetShip && world.ships.includes(ship.currentTargetShip)) {
+      const point = track(ship.currentTargetShip);
+      if (point) return point;
+    }
+    let nearest: Vector2 | null = null, distance = Infinity;
+    for (const other of world.ships) {
+      // Allies can never be a tracking target. Reject them before doing the
+      // per-mount distance/intercept work; preserve enemy order and tie breaks.
+      if (sameTeam(other, ship)) continue;
+      const d = query.origin.distanceTo(other.pos);
+      if (d >= distance) continue;
+      const point = track(other);
+      if (point) { nearest = point; distance = d; }
+    }
+    return nearest;
+  }
+
   public aim(dt: number, ship: Ship, mount: WeaponMount, world: FireControlWorld): AimSolution | null {
     const state = this.tracker(ship, mount);
     const previousTarget = state.target;
@@ -236,21 +276,57 @@ export class AutofireController {
         const solution = solve(target);
         if (solution) candidates.push(solution);
       };
-      for (const p of world.missiles) if (isPointDefense(mount) || p.isFighterDecoy) add({ kind: 'MISSILE', entity: p });
-      for (const other of world.ships) add({ kind: 'SHIP', entity: other });
+      // Only registered, deeply immutable hints may reuse their classification.
+      // Refit specs and the live PD flag remain mutable. Read the flag and hints
+      // in the original short-circuit order, even if a callback replaces a spec
+      // or installs an accessor during this scan; never cache across scans.
+      const scanSpec = nativeBatch && world.missiles.length > 1
+        ? Object.getOwnPropertyDescriptor(mount, 'spec')?.value as WeaponSpec | undefined : undefined;
+      const scanHints = scanSpec
+        ? Object.getOwnPropertyDescriptor(scanSpec, 'aiHints')?.value as string[] | undefined : undefined;
+      const trustedHints = scanHints && isImmutableMetadata(scanHints) ? scanHints : undefined;
+      const hasPD = trustedHints?.includes('PD') ?? false;
+      const hasPDOnly = trustedHints?.includes('PD_ONLY') ?? false;
+      const scanHint = (name: 'PD' | 'PD_ONLY') => {
+        const hints = mount.spec.aiHints;
+        return trustedHints && hints === trustedHints ? (name === 'PD' ? hasPD : hasPDOnly) : hints?.includes(name) ?? false;
+      };
+      for (const p of world.missiles) {
+        const pd = trustedHints
+          ? !!mount.spec.isPointDefense || scanHint('PD') || scanHint('PD_ONLY') : isPointDefense(mount);
+        if (pd || p.isFighterDecoy) add({ kind: 'MISSILE', entity: p });
+      }
+      // Like preAim, reject allies before allocating/scanning a target. The
+      // remaining hostile candidates keep their original order and validation.
+      for (const other of world.ships) if (!sameTeam(other, ship)) add({ kind: 'SHIP', entity: other });
       const origin = weaponMuzzle(ship, mount);
+      const autonomous = ship.fireControlMode === 'AI';
+      const policyAction = shipPolicyAction(ship);
       const priority = (s: AimSolution): number => {
         const pdFirst = isPointDefense(mount) && !hint(mount, 'PD_ALSO') && !hint(mount, 'STRIKE');
         if (s.target.kind === 'MISSILE') return s.target.entity.isFighterDecoy ? 2 : pdFirst ? 0 : 3;
+        if (autonomous) return 1; // Reachable hulls compete by weapon/surface utility.
         if (s.target.entity === ship.currentTargetShip) return 1;
         return 2;
       };
-      const rank = (s: AimSolution) => ({ solution: s, priority: priority(s), retained: sameTarget(state.target, s.target) ? 0 : 1,
-        threat: s.target.kind === 'MISSILE' ? impactTime(ship, s.target.entity) : Infinity,
-        traverse: Math.abs(signedAngle(s.point.clone().sub(origin).heading() - mount.currentAngleRad)) });
+      const rank = (s: AimSolution) => {
+        const retained = sameTarget(state.target, s.target);
+        const traverse = Math.abs(signedAngle(s.point.clone().sub(origin).heading() - mount.currentAngleRad));
+        const arrival = s.delay + (mount.spec.isBeam ? 0 : origin.distanceTo(s.point) / Math.max(1, s.speed));
+        const committed = autonomous && !isPointDefense(mount) && s.target.kind === 'SHIP'
+          ? world.fireBudget?.penalty(ship, s.target.entity, arrival) ?? 0 : 0;
+        const utility = autonomous && s.target.kind === 'SHIP'
+          ? fireTargetUtility(ship, mount, s.target.entity, coveredByShield(s.target.entity, origin), retained,
+            traverse, arrival, policyAction) - committed : 0;
+        return { solution: s, priority: priority(s), retained: retained ? 0 : 1, utility,
+          threat: s.target.kind === 'MISSILE' ? impactTime(ship, s.target.entity) : Infinity, traverse };
+      };
       const ranked = candidates.map(rank);
-      ranked.sort((a, b) => a.priority - b.priority || a.retained - b.retained
-        || (a.threat === b.threat ? 0 : a.threat - b.threat) || a.traverse - b.traverse
+      // An imminent missile outranks a retained, harmless missile. Hull stickiness is
+      // a bounded utility bonus, so it cannot hide an exposed kill/weapon matchup forever.
+      ranked.sort((a, b) => a.priority - b.priority
+        || (a.threat === b.threat ? 0 : a.threat - b.threat) || b.utility - a.utility
+        || a.retained - b.retained || a.traverse - b.traverse
         || String(a.solution.target.entity.id).localeCompare(String(b.solution.target.entity.id)));
       // Expensive safety geometry is lazy: first clear candidate wins; a blocked target
       // remains tracked only when no clear alternative exists. Safety is rechecked each step.
@@ -269,7 +345,16 @@ export class AutofireController {
       state.scanIn = current ? (.5 + state.random.next() * .5) * sizeScale : .05 + state.random.next() * .05;
     }
     if (!sameTarget(previousTarget, current?.target)) { state.firingTime = 0; state.idleFireTime = 0; }
-    if (current) current = { ...current, point: nativeAutofireAim(ship, mount, current, state.firingTime) };
+    if (current && !mount.spec.isBeam && !guided(mount)) {
+      const point = nativeAutofireAim(ship, mount, current, state.firingTime);
+      const origin = weaponMuzzle(ship, mount);
+      // Native approximate lead can miss the entire swept hull even at perfect traverse.
+      // Our strict bore gate would then wait forever (accuracy only grew AFTER firing).
+      // Keep native aim when viable; otherwise track the already-solved intercept.
+      if (traceTarget(ship, mount, current, origin, point.clone().sub(origin).heading())) {
+        current = { ...current, point };
+      }
+    }
     mount.fireControlTargetShipId = current?.target.kind === 'SHIP' ? current.target.entity.id : undefined;
     mount.fireControlTargetProjectileId = current?.target.kind === 'MISSILE' ? current.target.entity.id : undefined;
     mount.fireControl = { targetId: current?.target.entity.id, targetKind: current?.target.kind, reason: current ? 'ALIGNING' : 'NO_TARGET' };
@@ -318,6 +403,12 @@ export class AutofireController {
       } else state.ammoAllowed = true;
       if (!state.ammoAllowed) return done('CONSERVING_AMMO');
     }
+    return done(this.hasFluxBudget(ship, mount, dt) ? 'FIRE' : 'FLUX_BUDGET');
+  }
+
+  /** Recheck after earlier mounts emit/spend in this step, without retracing geometry. */
+  public hasFluxBudget(ship: Ship, mount: WeaponMount, dt: number): boolean {
+    const activeCycle = mount.burstRemaining > 0 || mount.firingState === 'CHARGING' || mount.firingState === 'ACTIVE';
     const cost = mount.spec.isBeam
       ? (mount.spec.fluxPerSecond ?? 0) * Math.max(dt, !activeCycle && mount.spec.beamVisualMode === 'BURST'
         ? (mount.spec.beamSourceChargeupTime ?? 0) + (mount.spec.beamDuration ?? 0) : dt)
@@ -325,7 +416,7 @@ export class AutofireController {
     // AI manager's 95% discretionary-fire ceiling. Manual pilot keeps control of their budget;
     // PD may spend the reserve. This is not the entire native shipwide flux-priority manager.
     const budget = ship.fireControlMode === 'AI' && !isPointDefense(mount) && !activeCycle ? .95 : 1;
-    if (cost > 0 && ship.flux.totalFlux + cost > ship.flux.maxFlux * budget) return done('FLUX_BUDGET');
-    return done('FIRE');
+    if (cost > 0 && ship.flux.totalFlux + cost * ship.system.getWeaponFluxCostMultiplier(mount.spec.weaponType) > ship.flux.maxFlux * budget) return false;
+    return true;
   }
 }

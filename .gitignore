@@ -23,3 +23,11 @@ artifacts/
 *.njsproj
 *.sln
 *.sw?
+# Local credentials and browser/preview caches
+.env
+.env.*
+!.env.example
+!.env.sample
+.tmp-*/
+.playwright-mcp/
+.vite/

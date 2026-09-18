@@ -1,3 +1,4 @@
+import { offensiveManeuverAllowed } from './SystemAI';
 import { Vector2 } from '../../math/Vector2';
 import { signedAngle } from '../../math/Angles';
 import type { WeaponMountSlotConfig } from '../../content/ShipSpec';
@@ -97,7 +98,7 @@ export const pulseDrives = (['orion_device','nova_burst'] as const).map(id => {
       if (state.compression < 0) { state.compression = 0; state.velocity = 0; }
     },
     advanceAI: ({ship,distance,angleDiff,tactical}) => {
-      if (tactical?.forwardClear !== false && Math.abs(angleDiff)<.35 && distance>(tactical?.desiredRange ?? 800)+(nova ? 850 : 400)) ship.system.activate();
+      if (offensiveManeuverAllowed(tactical) && Math.abs(angleDiff)<.35 && distance>(tactical?.desiredRange ?? 800)+(nova ? 850 : 400)) ship.system.activate();
     },
   });
 });

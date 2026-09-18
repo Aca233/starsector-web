@@ -1,7 +1,7 @@
 import { sameTeam } from "../simulation/CombatTeams";
 import { Vector2 } from '../math/Vector2';
 import { signedAngle } from '../math/Angles';
-import type { Ship } from '../simulation/Ship';
+import { nativeGetMotionStats, type Ship } from '../simulation/Ship';
 import type { TacticalWorld } from './TacticalWorld';
 import { tacticalPolicy as policy } from './TacticalWorld';
 import { cursorTurnCommand } from '../runtime/PlayerControls';
@@ -27,13 +27,31 @@ export function velocityToPosition(ship: Ship, point: Vector2, targetVelocity=ne
   if(desired.length()>stats.maxSpeed)desired.scale(stats.maxSpeed/desired.length());
   return desired;
 }
+const nativeDistanceTo = Vector2.prototype.distanceTo;
+const nativeVectorLength = Vector2.prototype.length;
 interface Obstacle { x:number;y:number;vx:number;vy:number;radius:number }
 function obstacles(ship: Ship,world: TacticalWorld,horizon:number): Obstacle[] {
   const result:Obstacle[]=[];
   const ownRadius=Math.max(ship.spec.collisionRadius,ship.shield.isActive && ship.shield.type!=='PHASE'?ship.shield.radius:0);
+  // The same observer speed was recomputed for every obstacle (including all
+  // system modifiers). Reuse it only for this read-only native scan, never across
+  // AI calls/ticks: systems and phase/flux state may change between those calls.
+  // Dependency/custom callbacks keep the original per-obstacle reads.
+  const reuseMotion = !world.noteNavigationObstacle && ship.getMotionStats === nativeGetMotionStats && ship.hasNativeThreatPhaseHooks;
+  let motion: { maxSpeed: number; speed: number } | undefined;
   const add=(pos:Vector2,vel:Vector2,radius:number)=>{
     const combined=ownRadius+radius+policy.collisionMargin;
-    if(ship.pos.distanceTo(pos)>combined+(ship.getMotionStats().maxSpeed+ship.vel.length()+vel.length())*horizon)return;
+    const own = reuseMotion ? motion ??= { maxSpeed: ship.getMotionStats().maxSpeed, speed: ship.vel.length() } : undefined;
+    if (own && horizon >= 0 && ship.pos.distanceTo === nativeDistanceTo && vel.length === nativeVectorLength) {
+      // L1 speed bounds Euclidean speed from above, while a coordinate gap
+      // bounds distance from below. Far obstacles need neither exact hypot.
+      // Keep rounding slack and fail open on non-finite bounds; near obstacles
+      // retain the original expression and its exact distance/radius comparison.
+      const reach = combined + (own.maxSpeed + own.speed + Math.abs(vel.x) + Math.abs(vel.y)) * horizon;
+      const gap = Math.max(Math.abs(ship.pos.x - pos.x), Math.abs(ship.pos.y - pos.y));
+      if (gap > reach + 1e-12 * Math.max(1, Math.abs(reach))) return;
+    }
+    if(ship.pos.distanceTo(pos)>combined+((own?.maxSpeed ?? ship.getMotionStats().maxSpeed)+(own?.speed ?? ship.vel.length())+vel.length())*horizon)return;
     result.push({x:pos.x,y:pos.y,vx:vel.x,vy:vel.y,radius:combined});
   };
   for(const other of world.ships){
@@ -115,18 +133,29 @@ export function rangeVelocity(ship:Ship,target:Ship,range:number,withdrawing:boo
   const unit=toward.clone().normalize();
   if(withdrawing)return unit.scale(-ship.getMotionStats().maxSpeed);
   const destination=target.pos.clone().addScaled(unit,-range);
-  return velocityToPosition(ship,destination,target.vel);
+  // Match the target's velocity for close stationkeeping, not the entire approach.
+  // Two closing AIs otherwise feed each other's opposite velocity into their thrust
+  // requests and settle at roughly half speed despite being well outside gun range.
+  const stats=ship.getMotionStats();
+  const brakingDistance=Math.max(64,stats.maxSpeed*stats.maxSpeed/(2*Math.max(1,stats.deceleration)));
+  const gap=Math.max(0,toward.length()-range-policy.positionTolerance);
+  const follow=Math.max(0,1-gap/brakingDistance);
+  return velocityToPosition(ship,destination,target.vel.clone().scale(follow));
 }
 export const facingError=(ship:Ship,facing:number)=>signedAngle(facing-ship.facingRad);
 /** Local cooperation: if this hull is the obstruction in an ally's current firing lane,
  * move toward the nearer edge. Does not pick fleet targets or rewrite explicit waypoints. */
 export function yieldFireLane(ship:Ship,desired:Vector2,world:TacticalWorld):{velocity:Vector2;yielding:boolean}{
   if(ship.isPhased)return {velocity:desired,yielding:false};
-  for(const ally of world.ships){
+  const lanes = world.friendlyFireLaneIndex?.get(world.ships);
+  // Preserve roster/mount order and the uncached path for custom AI or owner probes.
+  for(let i=0;i<(lanes?.length ?? world.ships.length);i++){
+    const ally=lanes ? lanes[i].ally : world.ships[i];
     if(ally===ship||ally.isDead||!sameTeam(ally, ship))continue;
-    for(const mount of ally.weapons){
+    for(const mount of lanes ? lanes[i].mounts : ally.weapons){
       if(mount.fireControl?.reason!=='FRIENDLY_BLOCKED'||mount.fireControl.targetKind!=='SHIP')continue;
-      const target=world.ships.find(s=>s.id===mount.fireControlTargetShipId&&!s.isDead&&!s.isPhased);
+      const target=lanes ? world.friendlyFireLaneIndex!.findTarget(mount.fireControlTargetShipId)
+        : world.ships.find(s=>s.id===mount.fireControlTargetShipId&&!s.isDead&&!s.isPhased);
       if(!target)continue;
       const origin=mount.relativePos.clone().rotate(ally.facingRad).add(ally.pos);
       const line=target.pos.clone().sub(origin),length=line.length();

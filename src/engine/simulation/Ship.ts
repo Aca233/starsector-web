@@ -1,3 +1,5 @@
+import { moduleOffset } from '../content/ModuleGeometry';
+import type { ShipModuleSpec } from '../content/ShipSpec';
 import { shipPresentationPose } from "../visual/ShipPresentation";
 import { sameTeam } from "./CombatTeams";
 import { RuntimeCombatModifiers } from '../extensions/RuntimeCombatModifiers';
@@ -5,7 +7,7 @@ import { advanceCombatSkills, polarizedArmorLevel } from '../extensions/CombatSk
 import { hasOnlyNativeRangeModifiers, installedHullMods, effectiveHullStats, hullModLoadoutErrors } from '../extensions/HullMods';
 import { i18n } from '../i18n/LocalizationManager';
 import { applyComponentDamage } from './systems/weapon/ComponentDamage';
-import { advanceShipMotion, shipMotionStats } from './systems/ShipMotion';
+import { advanceShipMotion, advanceAngularVelocity, shipMotionStats } from './systems/ShipMotion';
 import { EngineController } from './systems/EngineController';
 import { LowCRShipDamageSequence } from './systems/LowCRShipDamageSequence';
 import { finalizePermanentWeaponMalfunction } from './systems/ComponentMalfunctions';
@@ -96,6 +98,45 @@ function getArmorGridLocalRect(spec: ShipSpec): ArmorGridLocalRect {
 }
 
 export class Ship {
+  public parentShip: Ship | null = null;
+  public moduleMount: ShipModuleSpec | null = null;
+  public readonly childModules: Ship[] = [];
+  public moduleFluxBonus = 0;
+  public moduleHardFluxFraction = 0;
+  public get assemblyRoot(): Ship { return this.parentShip?.assemblyRoot ?? this; }
+  public get isStation(): boolean { return this.spec.sourceHullTraits?.includes('STATION') ?? false; }
+  public get isAttachedModule(): boolean { return this.parentShip !== null; }
+  public get hasVastBulk(): boolean { return !!(this.spec.builtInHullMods?.includes('vastbulk') || this.spec.hullMods?.includes('vastbulk')); }
+  public get isCombatModule(): boolean { return this.spec.moduleCombat ?? (this.weapons.length > 0 || this.hullStats.fighterBays > 0); }
+  public get assemblyShips(): Ship[] { return [this, ...this.childModules.flatMap(child => child.assemblyShips)]; }
+  public get deploymentRadius(): number {
+    return Math.max(this.spec.collisionRadius, ...this.childModules.map(child => {
+      const offset = moduleOffset(child.moduleMount!);
+      return Math.hypot(offset.x, offset.y) + child.deploymentRadius;
+    }));
+  }
+  /** Keep independent combat state, but inherit the rigid attachment and faction. */
+  public syncModulePose(resetInterpolation = false): void {
+    const parent = this.parentShip, mount = this.moduleMount;
+    if (!parent || !mount || this.isDead) return;
+    const local = moduleOffset(mount);
+    const offset = new Vector2(local.x, local.y).rotate(parent.facingRad);
+    this.pos.copy(parent.pos).add(offset);
+    if (!this.spec.sourceHullTraits?.includes('INDEPENDENT_ROTATION') || resetInterpolation) {
+      this.facingRad = parent.facingRad + mount.angleDeg * Math.PI / 180;
+      this.angularVelRad = parent.angularVelRad;
+    }
+    this.vel.copy(parent.vel).add(new Vector2(-offset.y, offset.x).scale(parent.angularVelRad));
+    this.teamId = parent.teamId; this.isPlayer = parent.isPlayer;
+    this.encounterEffects = parent.encounterEffects;
+    this.fighterRecall = parent.fighterRecall;
+    if (parent.isRetreated) this.retreatFromCombat();
+    if (resetInterpolation) { this.prevPos.copy(this.pos); this.prevFacingRad = this.facingRad; }
+  }
+  public syncModuleTree(resetInterpolation = false): void {
+    for (const child of this.childModules) { child.syncModulePose(resetInterpolation); child.syncModuleTree(resetInterpolation); }
+  }
+
   public readonly runtimeModifiers = new RuntimeCombatModifiers();
   /** Presentation-lab protection must intercept before one-shot lethal-damage listeners. */
   public hullDamageSuppressed = false;
@@ -114,13 +155,14 @@ export class Ship {
   /** Extra combat events charged to the persistent fleet member, not immediate in-combat CR. */
   public pendingCombatCRLoss = 0;
   public applyHullDamage(damage: number): number {
-    if (!(damage > 0) || this.isDead || this.isRetreated || this.hullDamageSuppressed) return 0;
+    if (!(damage > 0) || this.isDead || this.isRetreated || this.hullDamageSuppressed || this.hasVastBulk) return 0;
     for (const intercept of this.hullDamageInterceptors) if (intercept(damage)) return 0;
     const dealt = Math.min(this.hullHp,damage); this.hullHp -= dealt; return dealt;
   }
   public retreatFromCombat(): void {
     if (this.isDead || this.isRetreated) return;
     this.retreating = this.isRetreated = true;
+    for (const child of this.childModules) child.retreatFromCombat();
     this.clearInput(); this.shield.setActive(false); this.flux.cancelVenting();
     this.system.deactivate(); this.defenseSystem.deactivate();
     this.pos.set(0,-1000000); this.prevPos.copy(this.pos); this.vel.set(0,0);
@@ -387,6 +429,12 @@ export class Ship {
 
     // 初始化挂点武器与武器编组
     this.weaponControl.init(spec, initialFacingRad, this.weaponHealthMultiplier);
+    for (const [index, mount] of (spec.modules ?? []).entries()) {
+      const child = new Ship(`${id}:module:${index}`, mount.spec, isPlayer, initialPos.clone(), initialFacingRad, random, visualRandom);
+      child.parentShip = this; child.moduleMount = mount; child.fireControlMode = 'AI';
+      child.syncModulePose(true); child.syncModuleTree(true);
+      this.childModules.push(child);
+    }
 
     // All engine trackers start at installation, with independent repair/interval draws.
     this.engineController = new EngineController(spec, this.random, this.engineHealthMultiplier);
@@ -619,7 +667,7 @@ export class Ship {
     return this.isDocked || this.isRetreated ? 0 : alpha * (this.runtimeModifiers.value.visualAlphaMultiplier ?? 1);
   }
   public get isPhased(): boolean {
-    if (this.isDocked || this.isRetreated || this.shield.isPhased || this.system.isPhased) return true;
+    if (this.parentShip?.isPhased || this.isDocked || this.isRetreated || this.shield.isPhased || this.system.isPhased) return true;
     for (const effect of this.externalPhaseEffects.values()) if (effect() !== undefined) return true;
     return false;
   }
@@ -722,14 +770,16 @@ export class Ship {
 
   /** Adapt source D flux modifiers without mutating saved ShipSpec or FluxTracker defaults. */
   private advanceHullModFlux(dt: number): void {
+    if (this.parentShip?.spec.sourceHullTraits?.includes('shared_flux_sink')) this.flux.baseDissipation = this.hullStats.fluxDissipation + this.moduleFluxBonus;
     this.flux.dissipationMultiplier = this.system.getDissipationMultiplier();
+    const hardFraction = this.hullStats.hardFluxDissipationFraction + this.moduleHardFluxFraction;
     const boostTimer = this.flux.zeroFluxTimer;
     const fluxLocked = this.flux.isOverloaded || this.flux.isVenting;
-    if (dt > 0 && !fluxLocked && !this.system.blocksFluxDissipation && this.shield.isActive && this.hullStats.hardFluxDissipationFraction > 0) {
+    if (dt > 0 && !fluxLocked && !this.system.blocksFluxDissipation && this.shield.isActive && hardFraction > 0) {
       // D.cfr_renamed_4: soft flux consumes the full budget first; only the
       // remaining budget is scaled by the hard-flux dissipation fraction.
       const leftover = Math.max(0, this.flux.effectiveDissipation * dt - this.flux.softFlux);
-      this.flux.hardFlux = Math.max(0, this.flux.hardFlux - leftover * Math.min(1, this.hullStats.hardFluxDissipationFraction));
+      this.flux.hardFlux = Math.max(0, this.flux.hardFlux - leftover * Math.min(1, hardFraction));
     }
     this.flux.update(dt, this.shield.isActive, !this.system.blocksFluxDissipation);
     if ((this.hullStats.zeroFluxMinimumFluxLevel > 0 || this.hullStats.allowZeroFluxAtAnyLevel > 0) && dt > 0) {
@@ -763,6 +813,7 @@ export class Ship {
     // 记录上一物理帧状态，用于渲染亚帧平滑插值
     this.prevPos.copy(this.pos);
     this.prevFacingRad = this.facingRad;
+    this.syncModulePose();
     this.currentTargetShip = targetShip || null;
     this.combatShips = fireControlWorld?.ships ?? (this.combatShips.length ? this.combatShips : targetShip ? [this, targetShip] : [this]);
 
@@ -855,7 +906,14 @@ export class Ship {
 
     // 3. 护盾朝向与展开
     const aimAngle = Math.atan2(this.aimTargetWorld.y - this.pos.y, this.aimTargetWorld.x - this.pos.x);
-    this.shield.update(effectiveDt, this.facingRad, this.fireControlMode === 'AI' ? this.defenseFacingRad ?? aimAngle : aimAngle);
+    let shieldAimAngle = aimAngle;
+    if (this.shield.type === 'OMNI') {
+      // Shield arcs rotate around their own pivot, which can be offset from the hull.
+      const center = this.getShieldCenter();
+      const dx = this.aimTargetWorld.x - center.x, dy = this.aimTargetWorld.y - center.y;
+      shieldAimAngle = dx * dx + dy * dy > 1e-12 ? Math.atan2(dy, dx) : this.shield.facingAngleRad;
+    }
+    this.shield.update(effectiveDt, this.facingRad, this.fireControlMode === 'AI' ? this.defenseFacingRad ?? shieldAimAngle : shieldAimAngle);
 
     // 4. 武器挂点瞄准与开火解算
     this.weaponControl.update(effectiveDt, this, aimAngle, targetShip, spawnProjectile, spawnBeam, spawnMuzzleFlash, fireControlWorld);
@@ -896,6 +954,17 @@ export class Ship {
   public getMotionStats() { return shipMotionStats(this); }
 
   private updateMotion(dt: number): { accelerating: boolean; spreading: boolean } {
+    if (this.isStation || this.isAttachedModule) {
+      const independent = this.spec.sourceHullTraits?.includes('INDEPENDENT_ROTATION');
+      if (this.isStation || independent) {
+        const input = this.spec.sourceHullTraits?.includes('axialrotation') ? 1 : this.turnInput;
+        this.angularVelRad = advanceAngularVelocity(this.angularVelRad, input, dt,
+          this.spec.turnAccelerationDeg * Math.PI / 180, this.spec.maxTurnRateDeg * Math.PI / 180);
+        this.facingRad += this.angularVelRad * dt;
+      }
+      if (this.isStation) this.vel.set(0, 0);
+      return { accelerating: false, spreading: false };
+    }
     return advanceShipMotion(this, dt);
   }
 }
@@ -903,3 +972,6 @@ export class Ship {
 const shieldCenterRotations = new WeakMap<Ship, { facing: number; cos: number; sin: number }>();
 /** Identity gate for read-only geometry memoization; overridden callbacks stay uncached. */
 export const nativeGetShieldCenter = Ship.prototype.getShieldCenter;
+
+/** Identity gate for scan-local motion reads; custom readers keep per-obstacle calls. */
+export const nativeGetMotionStats = Ship.prototype.getMotionStats;

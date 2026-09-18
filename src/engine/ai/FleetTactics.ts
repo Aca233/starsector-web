@@ -4,7 +4,7 @@ import { isPointDefense } from './AutofireController';
 import { weaponDps, weaponRange } from './ShipCombatProfile';
 
 export type FleetRole = 'LINE' | 'BRAWLER' | 'ARTILLERY' | 'SKIRMISHER' | 'CARRIER' | 'UNARMED';
-export type FleetTask = 'PRESSURE' | 'FINISH' | 'SCREEN' | 'SUPPORT' | 'REGROUP' | 'SEARCH';
+export type FleetTask = 'PRESSURE' | 'FINISH' | 'SCREEN' | 'SUPPORT' | 'REGROUP' | 'DISENGAGE' | 'SEARCH';
 /** Frame-local advice, not a player order. Scalars/IDs only so owners can share the same plan. */
 export interface FleetAssignment {
   targetId: string | null;
@@ -24,9 +24,16 @@ export type FleetPlan = ReadonlyMap<string, FleetAssignment>;
 export const fleetPolicy = Object.freeze({
   closeRange: 650, artilleryRange: 1000, skirmisherSpeed: 120,
   commitmentSeconds: 6, travelSeconds: 8, targetStickiness: 1.4,
-  regroupPressure: 1.85, resumePressure: 1.2, lowHull: .25,
+  regroupPressure: 2.5, resumePressure: 1.6, lowHull: .25, disengageDistanceHysteresis: 200,
   maximumLaneAngle: .55, carrierRangeFallback: 2500,
 });
+/** An attack window, not an order to ram: retain own flux/hull and local-pressure reserves. */
+export function hasAttackOpportunity(ship: Ship, target: Ship, pressureRatio = 1): boolean {
+  if (ship.flux.fluxPercent > .7 || ship.hullHp / Math.max(1, ship.maxHullHp) < fleetPolicy.lowHull
+    || pressureRatio > fleetPolicy.regroupPressure || target.isCollisionless) return false;
+  return target.flux.isOverloaded || target.flux.isVenting || target.hullHp / Math.max(1, target.maxHullHp) < .3
+    || (target.flux.fluxPercent >= .75 && target.flux.fluxPercent - ship.flux.fluxPercent >= .2);
+}
 interface Readiness {
   ship: Ship; role: FleetRole; power: number; range: number; speed: number;
   hull: number; carrierRange: number;
@@ -68,7 +75,7 @@ function readiness(ship: Ship): Readiness {
  * Only team-visible enemies participate, including support estimates and approach lanes. */
 export function planFleetTactics(ships: readonly Ship[], orders: ReadonlyMap<string, TacticalOrder> = new Map(),
   manualIds: ReadonlySet<string> = new Set()): FleetPlan {
-  const units = ships.filter(alive).map(readiness);
+  const units = ships.filter(s => alive(s) && !s.hasVastBulk).map(readiness);
   const byId = new Map(units.map(u => [u.ship.id, u]));
   const actors = units.filter(u => capital(u.ship) && !u.ship.retreating);
   const orderFor = (s: Ship) => orders.get(s.id) ?? (s.isPlayer ? orders.get('fleet') : undefined);
@@ -140,14 +147,21 @@ export function planFleetTactics(ships: readonly Ship[], orders: ReadonlyMap<str
       const anchor = covers.reduce<Readiness | undefined>((best, a) => !best || distance(ship, a.ship) < distance(ship, best.ship)
         || distance(ship, a.ship) === distance(ship, best.ship) && compareId(a.ship.id, best.ship.id) < 0 ? a : best, undefined);
       const pressure = danger.get(ship.id) ?? 0;
-      const wasRegrouping = ship.tacticalAI?.fleetTask === 'REGROUP';
-      const nearFight = target && distance(ship, target) < Math.max(u.range, selected!.range) + ship.spec.collisionRadius + target.spec.collisionRadius + 400;
-      const regroup = !order && !!anchor && !ship.hullStats.doNotBackOff && (u.role === 'UNARMED'
-        || nearFight && (u.hull < fleetPolicy.lowHull || pressure > (wasRegrouping ? fleetPolicy.resumePressure : fleetPolicy.regroupPressure)));
-      const task: FleetTask = regroup ? 'REGROUP' : !target ? 'SEARCH' : u.role === 'CARRIER' ? 'SUPPORT'
-        : target.flux.isOverloaded || target.flux.isVenting || selected!.hull < .3 ? 'FINISH'
+      const wasBackingOff = ship.tacticalAI?.fleetTask === 'REGROUP' || ship.tacticalAI?.fleetTask === 'DISENGAGE';
+      const nearFight = target && distance(ship, target) < Math.max(u.range, selected!.range) + ship.spec.collisionRadius + target.spec.collisionRadius + 400
+        + (wasBackingOff ? fleetPolicy.disengageDistanceHysteresis : 0);
+      const opportunity = !!target && hasAttackOpportunity(ship, target, pressure);
+      // Retreat intent must not depend on finding cover. A supporting ally crossing
+      // 80% flux cannot make an outmatched ship charge back into the same danger.
+      // REGROUP and its no-cover fallback share pressure and distance hysteresis.
+      const backingOff = !order && !ship.hullStats.doNotBackOff && (u.role === 'UNARMED' && (!!anchor || !!target)
+        || nearFight && (u.hull < fleetPolicy.lowHull && (!!anchor || wasBackingOff) || !opportunity && pressure > (wasBackingOff ? fleetPolicy.resumePressure : fleetPolicy.regroupPressure)));
+      const regroup = backingOff && !!anchor;
+      const disengage = backingOff && !anchor && !!target;
+      const task: FleetTask = regroup ? 'REGROUP' : disengage ? 'DISENGAGE' : !target ? 'SEARCH' : u.role === 'CARRIER' ? 'SUPPORT'
+        : opportunity ? 'FINISH'
         : u.role === 'SKIRMISHER' ? 'SCREEN' : 'PRESSURE';
-      const committed = target && canContribute(u, target) && task !== 'REGROUP' ? u.power : 0;
+      const committed = target && canContribute(u, target) && !backingOff ? u.power : 0;
       if (target && committed) claim(target.id, committed);
       plans.set(ship.id, { targetId: target?.id ?? null, role: u.role, task, score: Number.isFinite(best) ? best : 0,
         pressureRatio: pressure, assignedPower: committed, carrierRange: u.carrierRange,
@@ -158,7 +172,7 @@ export function planFleetTactics(ships: readonly Ship[], orders: ReadonlyMap<str
     for (const target of candidates) {
       const group = autonomous.filter(u => {
         const p = plans.get(u.ship.id)!;
-        return p.targetId === target.ship.id && !orderFor(u.ship) && p.task !== 'REGROUP'
+        return p.targetId === target.ship.id && !orderFor(u.ship) && p.task !== 'REGROUP' && p.task !== 'DISENGAGE'
           && p.role !== 'CARRIER' && p.role !== 'UNARMED';
       });
       if (group.length < 2) continue;

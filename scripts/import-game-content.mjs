@@ -2,7 +2,8 @@ import { createServer } from 'vite';
 import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
 import { resolve, relative, isAbsolute, extname, basename } from 'node:path';
 
-const root = resolve(process.argv[2] ?? '../starsector-core');
+const modulesOnly = process.argv.includes('--modules-only');
+const root = resolve(process.argv.slice(2).find(arg => !arg.startsWith('--')) ?? '../starsector-core');
 const output = resolve('src/engine/data/generated');
 const server = await createServer({ configFile: false, cacheDir: 'node_modules/.vite-import-content', optimizeDeps: { noDiscovery: true, entries: [], include: [] },
   server: { middlewareMode: true, watch: null }, appType: 'custom', logLevel: 'silent' });
@@ -31,7 +32,7 @@ try {
   const allNative = selection.discovery?.allNative === true;
   const approximate = selection.discovery?.allowApproximate === true;
   const previous = {};
-  for (const name of ['ships','weapons','loadouts','weapon-adapters']) previous[name] = JSON.parse(await readFile(resolve(output, name + '.json'), 'utf8'));
+  for (const name of ['ships','weapons','loadouts','weapon-adapters','refit-source','runtime-import-report']) previous[name] = JSON.parse(await readFile(resolve(output, name + '.json'), 'utf8'));
   for (const [key, ids] of [['ships', selection.hulls], ['weapons', selection.weapons]]) {
     for (const id of ids) if (!previous[key][id]) throw new Error(`Missing curated baseline ${key}.${id}`);
   }
@@ -173,9 +174,10 @@ try {
       entry.sourceBuiltInHullMods = native.data.builtInMods ?? [];
       entry.sourceBuiltInWeapons = native.data.builtInWeapons ?? {};
       entry.sourceBuiltInWings = native.data.builtInWings ?? [];
-      if (/^(?:module_|remnant_armour|remnant_shield|remnant_weapon_platform)/.test(id) || moduleHulls.has(id) || native.data.moduleAnchor || native.data.weaponSlots?.some(s => s.type === 'STATION_MODULE') || /(?:^|,)\s*(STATION|STATION_MODULE)(?:,|$)/.test(native.row.hints)) throw new Error('Modular/station assembly requires parent transforms, independent module combat, and native module variants; not registered as a standalone hull.');
+
       if (id === 'dem_drone') throw new Error('Invisible DEM missile helper with no standalone collision hull; catalog-only.');
       let source = await dataLoader.loadShipFromSource(id, sourceReader, {shipJson:native.data, shipRow:native.row, reportApproximation: approximate ? reason => entry.reasons.push(reason) : undefined});
+      source.isModuleHull = moduleHulls.has(id) || !!native.data.moduleAnchor || (source.sourceHullTraits ?? []).includes('STATION_MODULE');
       if (source.systemType.startsWith('UNADAPTED_SOURCE_')) report.systems[entry.sourceSystemId] = systemRows.get(entry.sourceSystemId);
       if (selection.hulls.includes(id)) { source = structuredClone(previous.ships[id]); loadouts[id] = previous.loadouts[id]; entry.curated = true; }
       else {
@@ -192,7 +194,7 @@ try {
           entry.reasons.push(`Built-in weapon ${slot.defaultWeaponId} at ${slot.slotId} unavailable/incompatible; fixed slot remains empty.`);
           delete slot.defaultWeaponId;
         }
-        const candidates = (variantsByHull.get(id) ?? []).filter(v => !v.modules);
+        const candidates = (variantsByHull.get(id) ?? []);
         const score = v => {
           const equipped = Object.entries(Object.assign({}, ...(v.weaponGroups ?? []).map(g=>g.weapons)));
           const valid = equipped.filter(([slotId,w])=>source.weaponSlots.some(s=>s.slotId===slotId && compatible(s,w))).length;
@@ -323,6 +325,70 @@ try {
     Object.assign(entry,status(entry,true));
   }
   for (const entry of Object.values(report.ships)) if (!entry.registered) Object.assign(entry,status(entry,false));
+  // Resolve module variants only after every hull, weapon and wing is registered.
+  // Store full child fits so runtime never reads installation files or guesses a variant.
+  const modularVariants = {};
+  const compileVariant = (variant, chain = []) => {
+    if (chain.length > 8 || chain.includes(variant.variantId)) throw new Error('Cyclic/deep module variant: ' + variant.variantId);
+    const base = ships[variant.hullId];
+    if (!base) throw new Error('Unavailable module hull: ' + variant.hullId);
+    const spec = assembleShip(base);
+    spec.sourceHullId = base.id; spec.sourceVariantId = variant.variantId;
+    spec.moduleCombat = (shipMeta[base.id]?.op ?? 0) > 0 || (variant.weaponGroups?.length ?? 0) > 0 || (spec.fighterBays ?? 0) > 0;
+    spec.maxFlux += (variant.fluxCapacitors ?? 0) * 200;
+    spec.shieldUpkeepBaseDissipation = base.fluxDissipation;
+    spec.fluxDissipation += (variant.fluxVents ?? 0) * 10;
+    spec.hullMods = [];
+    for (const id of unique([...(variant.hullMods ?? []), ...(variant.permaMods ?? []), ...(variant.sMods ?? [])])) {
+      if (!spec.builtInHullMods.includes(id) && !hullModInstallReason(spec, id)) spec.hullMods.push(id);
+    }
+    spec.sMods = (variant.sMods ?? []).filter(id => spec.hullMods.includes(id) || spec.builtInHullMods.includes(id));
+    spec.defaultWeaponGroups = [];
+    for (const group of variant.weaponGroups ?? []) {
+      const slots = [];
+      for (const [slotId, weaponId] of Object.entries(group.weapons ?? {})) {
+        const slot = spec.weaponSlots.find(s => s.slotId === slotId);
+        if (!slot) throw new Error('Missing module weapon mount: ' + variant.variantId + '/' + slotId);
+        if (!slot.builtIn) {
+          if (!compatible(slot, weaponId)) throw new Error('Unavailable module weapon: ' + variant.variantId + '/' + weaponId);
+          slot.defaultWeaponId = weaponId;
+        }
+        if (slot.defaultWeaponId) slots.push(slotId);
+      }
+      if (slots.length) spec.defaultWeaponGroups.push({ index: spec.defaultWeaponGroups.length, weaponSlotIds: slots, mode: group.mode, isAutofire: true });
+    }
+    const ungrouped = spec.weaponSlots.filter(s => s.defaultWeaponId && !spec.defaultWeaponGroups.some(g => g.weaponSlotIds.includes(s.slotId))).map(s => s.slotId);
+    if (ungrouped.length) spec.defaultWeaponGroups.push({index:spec.defaultWeaponGroups.length,weaponSlotIds:ungrouped,mode:'LINKED',isAutofire:true});
+    if (spec.defaultWeaponGroups.length > 7) spec.defaultWeaponGroups[6].weaponSlotIds.push(...spec.defaultWeaponGroups.splice(7).flatMap(g => g.weaponSlotIds));
+    const wingIds = [...(report.ships[base.id].sourceBuiltInWings ?? []), ...(variant.wings ?? []).filter(Boolean)];
+    spec.fighterWings = wingIds.flatMap(id => {
+      const wing = report.wings[id];
+      return wing?.registered ? [{specId:wing.specId,role:wing.role === 'BOMBER' ? 'BOMBER' : 'FIGHTER',count:wing.count,rebuildSeconds:wing.rebuildSeconds,tags:wing.tags,range:wing.range}] : [];
+    }).slice(0, spec.fighterBays ?? 0);
+    const refs = Object.assign({}, ...(Array.isArray(variant.modules) ? variant.modules : [variant.modules ?? {}]));
+    spec.modules = Object.entries(refs).map(([slotId, id]) => {
+      const slot = base.moduleSlots?.find(s => s.slotId === slotId), child = findVariant(id)?.data;
+      if (!slot || !child) throw new Error('Missing module reference: ' + variant.variantId + '/' + slotId + '/' + id);
+      return {...slot, spec:compileVariant(child, [...chain, variant.variantId])};
+    });
+    return spec;
+  };
+  for (const {data:variant} of index.variant.values()) if (variant.modules && ships[variant.hullId]) {
+    try {
+      const spec = compileVariant(variant);
+      validateShipSpec(spec, {registry,allowExistingId:true,requireBundledAssets:false});
+      modularVariants[variant.variantId] = {hullId:variant.hullId, modules:spec.modules};
+    } catch (error) { modularVariants[variant.variantId] = {hullId:variant.hullId, error:error.message}; }
+  }
+  for (const [id, ship] of Object.entries(ships)) if (ship.moduleSlots?.length) {
+    const variantId = report.ships[id].defaultVariantId;
+    const preferred = modularVariants[variantId] ?? Object.values(modularVariants).find(v => v.hullId === id && v.modules);
+    if (!preferred?.modules?.length) { report.ships[id].registered = false; report.ships[id].reasons.push('No complete native module assembly: ' + JSON.stringify(Object.values(modularVariants).filter(v => v.hullId === id))); Object.assign(report.ships[id], status(report.ships[id],false)); delete ships[id]; delete shipMeta[id]; delete loadouts[id]; continue; }
+    ship.modules = preferred.modules;
+    ship.sourceVariantId = variantId;
+    report.ships[id].level = 'approximate';
+    report.ships[id].reasons.push('Module combat and attachment supported; station-specific scripted hullmods remain approximate where reported.');
+  }
   // Validate the final equipped graph, including carrier references, before publishing generated outputs.
   for (const [id,ship] of Object.entries(ships)) {
     validateShipSpec(assembleShip(ship,loadouts[id]), {registry,allowExistingId:true,requireBundledAssets:false});
@@ -345,7 +411,24 @@ try {
     sourceBuiltInWings: Object.fromEntries(Object.entries(report.ships).filter(([,entry])=>entry.sourceBuiltInWings?.length).map(([id,entry])=>[id,entry.sourceBuiltInWings])),
     ships:shipMeta,weapons:weaponMeta,wings:Object.fromEntries(Object.entries(report.wings).filter(([,e])=>e.registered).map(([id,e])=>[id,{specId:e.specId,role:e.role === 'BOMBER' ? 'BOMBER' : 'FIGHTER',count:e.count,rebuildSeconds:e.rebuildSeconds,tags:e.tags,op:e.op,name:e.name,displayName:e.displayName,sourceRole:e.sourceRole,roleDescription:e.roleDescription,category:e.category,range:e.range,formation:e.formation}])),shipStatus:Object.fromEntries(Object.entries(report.ships).map(([id,e])=>[id,status(e,e.registered)])),weaponStatus:Object.fromEntries(Object.entries(report.weapons).map(([id,e])=>[id,status(e,e.registered)]))};
   await mkdir(output,{recursive:true});
-  const outputs = {ships,weapons,loadouts,'weapon-sounds':weaponSounds,'weapon-adapters':previous['weapon-adapters'],provenance:{sourceFiles:[...sources].sort()},'runtime-import-report':report,'refit-source':refit};
+  const outputs = {ships,weapons,loadouts,'modular-variants':modularVariants,'weapon-sounds':weaponSounds,'weapon-adapters':previous['weapon-adapters'],provenance:{sourceFiles:[...sources].sort()},'runtime-import-report':report,'refit-source':refit};
+  if (modulesOnly) {
+    // A bounded content update must not refresh unrelated historical imports or drop legacy fits.
+    const modularIds = new Set([...moduleHulls, ...[...index.ship].filter(([,entry])=>entry.data.moduleAnchor || entry.data.weaponSlots?.some(slot=>slot.type==='STATION_MODULE')).map(([id])=>id), ...Object.entries(ships).filter(([,s]) => s.isModuleHull || s.moduleSlots?.length).map(([id])=>id)]);
+    const pick = rows => Object.fromEntries(Object.entries(rows).filter(([id])=>modularIds.has(id)));
+    outputs.ships = {...previous.ships, ...pick(ships)};
+    outputs.loadouts = {...previous.loadouts, ...pick(loadouts)};
+    outputs.weapons = previous.weapons;
+    outputs['refit-source'] = {...previous['refit-source']};
+    for (const key of ['ships','shipStatus','sourceBuiltInMods','sourceBuiltInWings']) outputs['refit-source'][key] = {...previous['refit-source'][key], ...pick(refit[key])};
+    outputs['refit-source'].hullmods = {...previous['refit-source'].hullmods, vastbulk:refit.hullmods.vastbulk, shared_flux_sink:refit.hullmods.shared_flux_sink};
+    outputs['runtime-import-report'] = {...previous['runtime-import-report'], ships:{...previous['runtime-import-report'].ships, ...pick(report.ships)}};
+    const merged = outputs['runtime-import-report'];
+    merged.counts = {...merged.counts, ships:{...merged.counts.ships,
+      registered:Object.keys(outputs.ships).length, nativeRegistered:Object.values(merged.ships).filter(e=>e.registered&&!e.sourceWingId).length,
+      nonFighters:Object.values(outputs.ships).filter(s=>s.hullSize!=='FIGHTER').length,
+      ...Object.fromEntries(['supported','approximate','unsupported'].map(level=>[level,Object.values(merged.ships).filter(e=>e.level===level).length]))}};
+  }
   for (const [name,data] of Object.entries(outputs)) await writeFile(resolve(output,name+'.json'),JSON.stringify(data,null,2)+'\n');
   console.log(JSON.stringify(report.counts,null,2));
   const failures = Object.entries(report.ships).filter(([,e])=>!e.registered && !e.reasons.some(r=>r.includes('Modular/station'))).map(([id,e])=>[id,e.reasons.at(-1)]);

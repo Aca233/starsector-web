@@ -6,7 +6,11 @@ import { visualObjectRandom } from '../RenderDeterminism';
 
 /** Standard (non-Omega) engine geometry and modulation from combat/entities/G.java. */
 export function renderShipEngines(ship: Ship, pos: Vector2, facing: number, ctx: WebGLPassContext, time: number): void {
-  const { batcher, ribbonBatcher: ribbon, textures, hitGlowTex, alpha } = ctx;
+  const { batcher, ribbonBatcher: ribbon, textures, hitGlowTex, alpha, viewport, zoom } = ctx;
+  const canCull = zoom > 0 && Number.isFinite(zoom)
+    && Number.isFinite(viewport.left) && Number.isFinite(viewport.right)
+    && Number.isFinite(viewport.bottom) && Number.isFinite(viewport.top)
+    && viewport.left <= viewport.right && viewport.bottom <= viewport.top;
   const phaseLevel = ship.shield.type === 'PHASE' ? ship.shield.phaseEffectLevel : 0;
   const opacity = (1 - phaseLevel) * ship.phaseVisualAlpha;
   if (opacity <= 0) return;
@@ -45,6 +49,29 @@ export function renderShipEngines(ship: Ship, pos: Vector2, facing: number, ctx:
     const angle = facing + slot.angleDeg * Math.PI / 180;
     const x = pos.x + slot.x * Math.cos(facing) - slot.y * Math.sin(facing);
     const y = pos.y + slot.x * Math.sin(facing) + slot.y * Math.cos(facing);
+    let glowSize = width * (2 + boost);
+    if (burn > 0 || phaseLevel > 0) {
+      const base = (width - unextendedWidth * widthExtension) * 2;
+      glowSize = base * (1 + 0.5 * boost + glowExtension);
+    }
+    const glowAlpha = Math.min(brightness, Math.max(0.6, boost * 0.25, spread / 180) * 0.75 * opacity);
+    if (fighter) glowSize *= 0.66;
+    if (glowAlpha < 0.5) glowSize *= 0.15 + 0.85 * glowAlpha / 0.5;
+    const diameter = glowSize * 2 + Math.min(glowSize, 15) * boost;
+
+    // Bound every rotated plume layer, its shifted nozzle, outline and both
+    // square glows. Offscreen engines need no geometry/uploads or batch switches;
+    // simulation and visual-state updates still run, and visible copies are unchanged.
+    const extent = Math.max(length + Math.abs(throat) / 2 + width / 2,
+      Math.abs(diameter) / 2, Math.abs(glowSize) * .375);
+    // Two screen pixels plus Float32/large-coordinate slack keep edge fragments.
+    // Exceptional inputs fail open rather than hiding an unbounded effect.
+    const padding = 2 / zoom + 1e-6 * Math.max(1, Math.abs(x), Math.abs(y), extent);
+    const bound = extent + padding;
+    if (canCull && Number.isFinite(bound)
+      && (x + bound < viewport.left || x - bound > viewport.right
+        || y + bound < viewport.bottom || y - bound > viewport.top)) continue;
+
     const color = (ENGINE_VISUAL_PROFILES[slot.style] ?? ENGINE_VISUAL_PROFILES.LOW_TECH).flameColor;
     const bend = -ship.angularVelRad * 0.15;
     const fan = (1 - lengthFactor) * spread * Math.PI / 180;
@@ -70,15 +97,6 @@ export function renderShipEngines(ship: Ship, pos: Vector2, facing: number, ctx:
       batcher.drawSprite(outline, x, y, length * 0.9, width, angle + Math.sin(time * 4) * Math.PI / 360,
         -0.5, 0, ...color, level * 50 / 255 * brightness, 0.01, 0.01, 0.99, 0.99);
     }
-    let glowSize = width * (2 + boost);
-    if (burn > 0 || phaseLevel > 0) {
-      const base = (width - unextendedWidth * widthExtension) * 2;
-      glowSize = base * (1 + 0.5 * boost + glowExtension);
-    }
-    const glowAlpha = Math.min(brightness, Math.max(0.6, boost * 0.25, spread / 180) * 0.75 * opacity);
-    if (fighter) glowSize *= 0.66;
-    if (glowAlpha < 0.5) glowSize *= 0.15 + 0.85 * glowAlpha / 0.5;
-    const diameter = glowSize * 2 + Math.min(glowSize, 15) * boost;
     batcher.drawSprite(hitGlowTex, x, y, diameter, diameter, 0, 0, 0, ...color, glowAlpha);
     batcher.drawSprite(hitGlowTex, x, y, glowSize * 0.75, glowSize * 0.75, 0, 0, 0, 1, 1, 1, glowAlpha);
   }

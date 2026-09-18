@@ -194,11 +194,14 @@ export function SourceModPicker({
                   "source-mod-row " + (installed ? "is-installed" : "")
                 }
                 key={id}
+                {...details.bind(id)}
                 data-unavailable={!!reason && !installed}
               >
-                <div role="cell" {...details.bind(id)}>
+                <div role="cell">
                   <button
                     className="source-mod-select"
+                    data-inspect-mod={id}
+                    aria-describedby={details.active?.id === id ? details.tooltipId : undefined}
                     type="button"
                     aria-label={
                       builtInModName(id) +
@@ -215,13 +218,13 @@ export function SourceModPicker({
                     <span>{builtInModName(id)}</span>
                   </button>
                 </div>
-                <div role="cell" {...details.bind(id)} onClick={toggle}>
+                <div role="cell" onClick={toggle}>
                   {data.hullmods[id].manufacturer}
                 </div>
-                <div role="cell" {...details.bind(id)} className="source-mod-cost" onClick={toggle}>
+                <div role="cell" className="source-mod-cost" onClick={toggle}>
                   {costOf(id)}
                 </div>
-                <div role="cell" {...details.bind(id)} className="source-mod-status" onClick={toggle}>
+                <div role="cell" className="source-mod-status" onClick={toggle}>
                   {installed ? (
                     <span className="source-mod-check" aria-label="已安装">
                       ✓

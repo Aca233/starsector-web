@@ -51,7 +51,7 @@ export function TacticalMap(props: TacticalMapProps) {
   const [span, setSpan] = useState(() => fitTacticalView(engine).span);
   const invalidate = () => { setSpan(view.current.span); refresh(tick => tick + 1); };
   const observers = tacticalObservers(engine);
-  const living = engine.capitalShips.filter(ship => tacticalContactVisible(ship, observers));
+  const living = engine.capitalShips.filter(ship => tacticalContactVisible(ship, observers, engine.playerShip.teamId, engine.openBattlefield));
   const friendly = living.filter(ship => sameTeam(ship,engine.playerShip));
   const inspected = living.find(ship => ship.id === (inspectedId ?? engine.selectedUnitId));
   const selected = engine.selectedUnitId;
@@ -64,7 +64,7 @@ export function TacticalMap(props: TacticalMapProps) {
   const fullAssault = engine.orders.get('fleet')?.type === 'ASSAULT';
   const close = () => { engine.toggleTacticalMap(); props.onClosed?.(); props.canvasRef?.current?.focus({ preventScroll: true }); };
   const selectFleet = () => { engine.selectUnit('fleet'); setInspectedId(null); invalidate(); };
-  const fit = () => { view.current = fitTacticalView(engine); invalidate(); };
+  const fit = () => { view.current = fitTacticalView(engine, mapRef.current?.clientWidth, mapRef.current?.clientHeight); invalidate(); };
   const cancel = () => {
     if(props.readOnlyCommands)return;
     if (!hasSelection || !selected) return;
@@ -120,7 +120,7 @@ export function TacticalMap(props: TacticalMapProps) {
     if (inputBlocked) return;
     if (item.unavailable) { setMessage(item.unavailable); return; }
     const enemy = inspected && !sameTeam(inspected,engine.playerShip) ? inspected : undefined;
-    if (enemy && !tacticalContactVisible(enemy,tacticalObservers(engine))) { setMessage('目标已离开己方视野。'); return; }
+    if (enemy && !tacticalContactVisible(enemy,tacticalObservers(engine),engine.playerShip.teamId,engine.openBattlefield)) { setMessage('目标已离开己方视野。'); return; }
     if (item.id === 'target' && enemy) { engine.setPlayerTarget(enemy.id); setMessage('旗舰目标：'+nameOf(enemy)); }
     else if (item.id === 'engage' && enemy) issue({type:'ENGAGE',targetShipId:enemy.id},!hasSelection);
     else if (item.id === 'avoid' && enemy) issue({type:'AVOID',targetShipId:enemy.id},!hasSelection);
@@ -156,12 +156,15 @@ export function TacticalMap(props: TacticalMapProps) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const painter = new TacticalMapPainter();
-    let frame = 0, last = -1000, size = canvas.clientWidth, height = canvas.clientHeight;
+    let frame = 0, last = -1000, size = canvas.clientWidth, height = canvas.clientHeight, fitted = false;
     const resize = () => {
       size = canvas.clientWidth; height = canvas.clientHeight;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = Math.max(1, Math.round(size * dpr)); canvas.height = Math.max(1,Math.round(height*dpr));
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (!fitted && size > 0 && height > 0) {
+        view.current = fitTacticalView(engine, size, height); fitted = true; invalidate();
+      }
     };
     const observer = new ResizeObserver(resize); observer.observe(canvas); resize();
     const draw = (now: number) => {
@@ -298,7 +301,7 @@ export function TacticalMap(props: TacticalMapProps) {
     </aside>
     <TacticalShipStatus ship={engine.playerShip} />
     {!props.readOnlyCommands&&groups.length>0&&<TacticalCommandDock groups={groups} onAction={runAction} />}
-    {showInfo&&<aside className="tactical-map-info" aria-label="战术信息"><strong>{inspected?nameOf(inspected):'全舰指令'}</strong><p>{inspected?'结构 '+Math.ceil(inspected.hullHp)+' / '+inspected.maxHullHp+' · 幅能 '+Math.round(inspected.flux.fluxPercent*100)+'%':''}</p><p>左键选择接触；右键空白处移动，右键敌舰集火。A 选择全舰，Del 取消指令。</p><p>拖动或方向键平移；滚轮 / ± 缩放。Home 全览，Tab 返回战斗。</p><p>灰蓝色为未探明区域，黑色为己方地图视野；当前使用原版基础半径 3000，尚未接入视野插件或战斗 AI 传感器。</p><button onClick={()=>setShowInfo(false)}>关闭 [F2]</button></aside>}
+    {showInfo&&<aside className="tactical-map-info" aria-label="战术信息"><strong>{inspected?nameOf(inspected):'全舰指令'}</strong><p>{inspected?'结构 '+Math.ceil(inspected.hullHp)+' / '+inspected.maxHullHp+' · 幅能 '+Math.round(inspected.flux.fluxPercent*100)+'%':''}</p><p>左键选择接触；右键空白处移动，右键敌舰集火。A 选择全舰，Del 取消指令。</p><p>拖动或方向键平移；滚轮 / ± 缩放。Home 全览，Tab 返回战斗。</p><p>{engine.openBattlefield ? "多队联机为公开战场：显示所有已部署且存活的舰船；队色与大厅一致。后备、入库和已撤退舰不显示。" : "灰蓝色为未探明区域，黑色为己方地图视野；基础传感器半径为 3000，受舰船和系统视野加成影响。"}</p><button onClick={()=>setShowInfo(false)}>关闭 [F2]</button></aside>}
     <footer className="tactical-map-help"><div role="status">{message}</div></footer>
   </section>;
 }

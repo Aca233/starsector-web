@@ -1,8 +1,17 @@
+import { LocalMuzzleEffects } from './LocalMuzzleEffects';
+import { MotionPresence } from '../ui/core/MotionPresence';
+import { lanTeamPresence } from "./LanBattleRoster";
+import { FullscreenButton } from '../ui/FullscreenButton';
 import { LanBattleReport } from "./LanBattleReport";
 import { MAX_BATTLE_REPORT_BYTES } from "./battle-report.mjs";
 import type { BattleEnded, BattleReport } from "./battle-report.mjs";
+import { LocalContrails } from "./LocalContrails";
+import { SnapshotPlayback } from "./SnapshotPlayback";
+import { LanSnapshotDecoder } from "./LanSnapshotDecoder";
+import type { SnapshotDecodeStats } from "./LanSnapshotDecoder";
 import { MotionPrediction } from "./MotionPrediction";
-import { UplinkPacer } from "./SnapshotPolicy";
+import { LAN_SNAPSHOT_HZ, SnapshotReceiveRate } from "./SnapshotPolicy";
+import type { HostPerformance } from "./SnapshotPolicy";
 import { FleetDeployment } from '../ui/tactical/FleetDeployment';
 import { TacticalMap } from '../ui/tactical/TacticalMap';
 import { sameTeam } from "../engine/simulation/CombatTeams";
@@ -28,11 +37,12 @@ import { CombatRadar } from "../ui/hud/CombatRadar";
 import { CombatContacts } from "../ui/hud/CombatContacts";
 import { getHudDensity } from "../ui/hud/HudLayout";
 import "../ui/combat-pause-menu.css";
-import { applyCombatSnapshot } from "./CombatSnapshot";
+import { applyCombatSnapshots } from "./CombatSnapshot";
 import type { CombatSnapshot } from "./CombatSnapshot";
-import { KEY_CODES, teamName, teamColor } from "./protocol";
+import { KEY_CODES, teamName, teamColor, LAN_BUILD } from "./protocol";
 import type { Action, LanConnection, Match, Seat, PlayerInput } from "./protocol";
 
+// Visual Lab geometry probes are opt-in, not part of normal multiplayer combat.
 const LAYERS = new Set([
   "background",
   "nebula",
@@ -43,9 +53,15 @@ const LAYERS = new Set([
   "beam",
   "shield",
   "explosion",
-  "markers",
   "identification",
 ]);
+interface AuthorityMulticore { mode: string; reason: string | null }
+function readAuthorityMulticore(value: unknown): AuthorityMulticore | null {
+  if (!value || typeof value !== "object") return null;
+  const status = value as { mode?: unknown; reason?: unknown };
+  if (typeof status.mode !== "string" || !status.mode.trim()) return null;
+  return { mode: status.mode.slice(0, 128), reason: typeof status.reason === "string" ? status.reason.slice(0, 512) : null };
+}
 interface HUD {
   hp: number;
   max: number;
@@ -61,8 +77,21 @@ interface HUD {
   jitter: number;
   acknowledgementMs: number | null;
   age: number;
-  hz: number;
+  hz: number | null;
   capture: number;
+  encode: number;
+  parse: number;
+  decodeQueue: SnapshotDecodeStats | null;
+  apply: number;
+  render: number;
+  gpu: number | null;
+  fps: number;
+  frameMs: number;
+  realtimeRatio: number | null;
+  combatRate: number | null;
+  playbackDelay: number;
+  authority: (HostPerformance & { ageMs: number }) | null;
+  multicore: AuthorityMulticore | null;
   px: number;
   py: number;
 }
@@ -126,6 +155,8 @@ export function LanBattle({
   }, [ended]);
   useEffect(() => {
     const canvas = canvasRef.current!;
+    let stopped = false;
+    let decoder: LanSnapshotDecoder | null = null;
     let disposed = false,
       ready = false,
       launched = false,
@@ -134,7 +165,6 @@ export function LanBattle({
       renderer: WebGLCombatRenderer | null = null;
     let engine: CombatEngine,
       latest: CombatSnapshot | null = null,
-      pending: CombatSnapshot | null = null,
       appliedTick = -1,
       receivedAt = 0,
       bytes = 0,
@@ -146,11 +176,19 @@ export function LanBattle({
       lastHUD = 0,
       lastInput = 0,
       lastSound = 0;
+    let fps = 0, frameCount = 0, fpsWindowAt = performance.now(), frameMs = 16.7;
+    let parseMs = 0, applyMs = 0, renderMs = 0, encodeMs = 0;
+    let authorityPerformance: HostPerformance | null = null, authorityPerformanceAt = 0;
+    let authorityMulticore: AuthorityMulticore | null = null;
     let synced = false, syncId = "", minSyncTick = Infinity, lastSyncRequest = 0;
-    let intervalMs = 1000 / match.snapshotHz, lastAckAt = 0, acknowledged = -1;
+    let lastAckAt = 0, acknowledged = -1;
+    const receiveRate = new SnapshotReceiveRate();
     let acknowledgementMs: number | null = null;
     const sentInputs = new Map<number, number>();
-    const prediction = new MotionPrediction(), pacer = new UplinkPacer();
+    const prediction = new MotionPrediction();
+    let playback = new SnapshotPlayback();
+    const localContrails = new LocalContrails();
+    const localMuzzles = new LocalMuzzleEffects();
     let finishedResult: {winner:number|"draw";report:BattleReport} | null = null;
     let lastFinish = 0;
     let failureReason = "";
@@ -179,11 +217,18 @@ export function LanBattle({
       if(!send({type:'deployment',requestId,operation,ids})){clearTimeout(timer);fleetRequests.delete(requestId);reject(Error('连接不可用，增援请求未发送。'));}
     });
     const stop = () => {
+      stopped = true;
+      decoder?.close();
       if (!disposed) setStatus("本局已停止");
       launched = false;
       synced = false;
       if (!disposed) setControlsReady(false);
-      if (engine) prediction.clear(engine.playerShip);
+      if (engine) {
+        prediction.clear(engine.playerShip); localContrails.reset(engine);
+        // A successful terminal flush may not have reached RAF yet. Keep its
+        // confirmed muzzle window for that last world; disposal/failure clears it.
+        if (disposed || failureReason) localMuzzles.reset(engine);
+      }
       for(const request of fleetRequests.values()){clearTimeout(request.timer);request.reject(Error('战斗已停止。'));}fleetRequests.clear();
       keys = 0;
       firing = false;
@@ -192,7 +237,7 @@ export function LanBattle({
     };
     stopRef.current = stop;
     const fail = (reason: string) => {
-      if (disposed || failureReason) return;
+      if (disposed || stopped || failureReason) return;
       failureReason = reason;
       setError(reason);
       stop();
@@ -209,11 +254,14 @@ export function LanBattle({
       }
     };
     const accept = (frame: CombatSnapshot) => {
-      if (frame.tick <= appliedTick || (pending && frame.tick <= pending.tick))
-        return;
-      pending = frame;
+      if (disposed || stopped || (syncId && frame.tick < minSyncTick)) return;
+      if (!playback.push(frame)) return;
+      // Discrete events are independent of the replaceable world endpoints.
+      // Playback may evict 8+ queued worlds or sample only the final pair; every
+      // decoded muzzle window must nevertheless be received in authority order.
+      localMuzzles.receive(frame.muzzleEvents);
       const now = performance.now();
-      if (receivedAt) intervalMs = intervalMs * .7 + Math.min(500, Math.max(50, now - receivedAt)) * .3;
+      receiveRate.receive(now);
       receivedAt = now;
       const ack = frame.acknowledged[seat];
       if (Number.isSafeInteger(ack) && ack > acknowledged) {
@@ -248,8 +296,26 @@ export function LanBattle({
           else sound.play(event.key, volume, rate);
         }
     };
+    if (seat === 0) decoder = new LanSnapshotDecoder({
+      acknowledge: tick => worker?.postMessage({ type: "snapshot-consumed", tick }),
+      consume: (frame, elapsed) => { parseMs = parseMs * .7 + elapsed * .3; accept(frame); },
+      error: error => fail(error instanceof Error ? error.message : "无法解析主机快照"),
+    });
     const unsubscribe = connection.subscribe((m) => {
       if (disposed) return;
+      if (m.type === "page-visibility") {
+        worker?.postMessage({ type: "visibility", hidden: m.hidden });
+        // Hidden tabs do not consume display tasks; release any retained credit
+        // now, rather than waiting for a throttled timer and blocking peer state.
+        if (m.hidden) decoder?.reset();
+        clear();
+        if (!m.hidden && launched && !endedRef.current) {
+          freeze("② 同步战场：已回到前台，等待最新状态后恢复操控…");
+          syncId = "";
+          if (connection.ready) send({ type: "resync" });
+        }
+        return;
+      }
       if (m.type === "reconnecting") {
         freeze("① 恢复连接：连接中断，正在自动重连（席位保留 30 秒）…");
         syncId = "";
@@ -274,36 +340,29 @@ export function LanBattle({
           loaded: boolean;
         }>;
         const host = members.find((member) => member.seat === 0);
-        const away = match.players.filter(
-          (player) =>
-            player.seat !== 0 &&
-            player.seat !== seat &&
-            !members.some(
-              (member) =>
-                member.seat === player.seat &&
-                member.connected &&
-                member.loaded,
-            ),
-        );
+        const others = match.players.filter(player => player.seat !== 0 && player.seat !== seat);
+        const away = others.filter(player => !members.some(member => member.seat === player.seat && member.connected));
+        const syncing = others.filter(player => members.some(member => member.seat === player.seat && member.connected && !member.loaded));
+        const peerStatus = [
+          away.length ? away.map(player => player.name).join("、") + "离线或已离开，舰船由 AI 接管。" : "",
+          syncing.length ? syncing.map(player => player.name).join("、") + "正在同步，舰船保持手动，暂不接受操作。" : "",
+        ].filter(Boolean).join(" ");
         setPeerAway(
           m.room.status !== "running"
             ? ""
             : !host?.connected || !host.loaded
               ? "计算主机连接中断或正在恢复，等待战斗同步…"
-              : away.length
-                ? away.map((player) => player.name).join("、") +
-                  "离线或已离开，舰船由 AI 接管。"
-                : "",
+              : peerStatus,
         );
         if (seat === 0)
           for (const player of match.players) {
-            if (player.seat === 0) continue;
             const member = members.find(
               (member) => member.seat === player.seat,
             );
             worker?.postMessage({
               type: "presence",
               seat: player.seat,
+              connected: !!member?.connected,
               online: !!member?.connected && !!member.loaded,
             });
           }
@@ -323,8 +382,13 @@ export function LanBattle({
       if (m.type === "input" && seat === 0)
         worker?.postMessage({ type: "input", seat: m.seat, input: m.input });
       if (m.type === "state" && seat !== 0) {
-        bytes = JSON.stringify(m.frame).length;
-        accept(m.frame);
+        try {
+          bytes = connection.snapshotBytes;
+          parseMs = parseMs * .7 + connection.snapshotParseMs * .3;
+          accept(m.frame);
+        } catch (error) {
+          fail(error instanceof Error ? error.message : "无法接收战斗快照事件");
+        }
       }
       if (m.type === "controls-ready" && m.syncId === syncId && !synced) {
         if (performance.now() - receivedAt > 1500 || appliedTick < minSyncTick) return;
@@ -342,6 +406,7 @@ export function LanBattle({
           sendFinish();
           return;
         }
+        if (stopped) return;
         if (syncId !== m.syncId) {
           freeze("② 同步战场：正在接收最新状态，完成前暂不可操控…");
           syncId = m.syncId;
@@ -377,8 +442,18 @@ export function LanBattle({
         worker.onerror = (event) =>
           fail("计算 Worker 启动失败：" + event.message);
         worker.onmessage = (event) => {
-          if (disposed) return;
+          if (disposed || stopped) return;
           const m = event.data;
+          // Recovery/error diagnostics remain useful when backpressure defers
+          // full world snapshots. Never mistake a stale display tick for physics.
+          if (m.type === "performance" || m.type === "recovered" || m.type === "error") {
+            const performanceSample: HostPerformance | undefined = m.type === "performance" ? m : m.diagnostics;
+            if (performanceSample) {
+              authorityPerformance = performanceSample;
+              authorityMulticore = readAuthorityMulticore((performanceSample as HostPerformance & { multicore?: unknown }).multicore);
+              authorityPerformanceAt = performance.now();
+            }
+          }
           if (m.type === "ready") {
             workerReady = true;
             loaded();
@@ -391,17 +466,28 @@ export function LanBattle({
           }
           if (m.type === "deployment-result") send(m);
           if (m.type === "snapshot") {
-            accept(m.frame);
-            bytes = JSON.stringify(m.frame).length;
-            if (launched && connection.ready) {
-              const delivery = connection.sendSnapshot({ type: "state", matchId: match.id, seq: stateSeq++, frame: m.frame });
-              if (delivery === "oversized") fail("战斗快照超过 16 MiB 通信安全预算，请减少舰队规模后重试。");
-              const hz = pacer.observe(delivery, performance.now());
-              worker?.postMessage({ type: "network-budget", hz });
-              // Skip replaceable frames before TCP enqueue; already queued bytes cannot be recalled.
+            try {
+              // Queue the authoritative state for peers before decoding our own
+              // presentation copy. Local display work must not delay the uplink.
+              bytes = m.bytes;
+              encodeMs = m.encodeMs;
+              if (launched && connection.ready) {
+                const delivery = connection.sendSnapshot(match.id, stateSeq++, m);
+                if (delivery === "oversized") { fail("战斗快照超过 16 MiB 通信安全预算，请减少舰队规模后重试。"); return; }
+              }
+              if (stopped) return;
+              // Upload first, then grant only reserved decode capacity. Parsing
+              // happens in a later task, not inside the host publication ACK.
+              // Hidden hosts keep publishing but deliberately skip presentation.
+              if (document.visibilityState !== "hidden") decoder!.enqueue(m);
+              else worker?.postMessage({ type: "snapshot-consumed", tick: m.tick });
+            } catch (error) {
+              fail(error instanceof Error ? error.message : "无法解析主机快照");
             }
           }
           if (m.type === "finished") {
+            decoder?.flush();
+            if (stopped) return;
             if (new TextEncoder().encode(JSON.stringify(m.report)).byteLength > MAX_BATTLE_REPORT_BYTES) {
               fail("战斗报告超过通信安全预算，无法完成结算，请减少舰队规模后重试。");
               return;
@@ -411,7 +497,7 @@ export function LanBattle({
             stop();
           }
         };
-        worker.postMessage({ type: "init", match });
+        worker.postMessage({ type: "init", match, hidden: document.visibilityState === "hidden", binarySnapshots: connection.transport === "lan" });
       }
       void (async () => {
         try {
@@ -465,11 +551,17 @@ export function LanBattle({
       actions = [];
     };
     const freeze = (message: string) => {
+      if (disposed || stopped) return;
+      // A new sync epoch must not apply queued old worlds or inherit their tick
+      // as evidence for sync-ready. Cancel tasks before releasing held credits.
+      decoder?.reset();
+      playback = new SnapshotPlayback();
+      latest = null; appliedTick = -1; receivedAt = 0; receiveRate.reset();
       synced = false;
       setControlsReady(false);
       resetInput();
       sentInputs.clear();
-      if (engine) prediction.clear(engine.playerShip);
+      if (engine) { prediction.clear(engine.playerShip); localContrails.reset(engine); localMuzzles.reset(engine); }
       for (const request of fleetRequests.values()) { clearTimeout(request.timer); request.reject(Error("同步中断，请检查最新部署状态后再操作。")); }
       fleetRequests.clear();
       setNetworkStatus(message);
@@ -495,7 +587,7 @@ export function LanBattle({
         const now = performance.now();
         sentInputs.set(input.seq, now);
         while (sentInputs.size > 120) sentInputs.delete(sentInputs.keys().next().value!);
-        if (seat !== 0) prediction.record(input, now);
+        prediction.record(input, now);
         actions = [];
       }
     };
@@ -580,8 +672,14 @@ export function LanBattle({
     const frame = (now: number) => {
       if (disposed) return;
       frameId = requestAnimationFrame(frame);
-      if (!ready || !renderer || !engine) return;
-      const dt = Math.min(0.05, Math.max(0, (now - lastFrame) / 1000));
+      // Some browsers still schedule background RAFs; never restore/render an
+      // invisible world or repeatedly request resync because its display is stale.
+      if (document.visibilityState === "hidden" || !ready || !renderer || !engine) return;
+      const gap = Math.max(0, now - lastFrame);
+      const dt = Math.min(0.05, gap / 1000);
+      frameMs = frameMs * .9 + gap * .1;
+      frameCount++;
+      if (now - fpsWindowAt >= 500) { fps = frameCount * 1000 / (now - fpsWindowAt); frameCount = 0; fpsWindowAt = now; }
       lastFrame = now;
       try {
         const rect = canvas.getBoundingClientRect(),
@@ -594,12 +692,17 @@ export function LanBattle({
         }
         // Renderer zoom is in backing pixels; DOM HUD positions are CSS pixels.
         hudZoomRef.current = zoom / (canvas.width / Math.max(1, rect.width));
-        if (pending) {
-          applyCombatSnapshot(engine, pending);
-          appliedTick = pending.tick;
-          latest = pending;
-          if (seat !== 0) prediction.receive(engine.playerShip, pending.acknowledged[seat], now);
-          pending = null;
+        const presentation = playback.sample(now, !launched || !synced);
+        if (presentation.frames.length) {
+          const started = performance.now();
+          applyCombatSnapshots(engine, presentation.frames, presentation.reset, snapshot => {
+            // Prediction needs the player pose at EACH restored endpoint, not
+            // all acknowledgements against the final world's pose.
+            appliedTick = snapshot.tick;
+            latest = snapshot;
+            prediction.receive(engine.playerShip, snapshot.acknowledged[seat], now);
+          }, { nativeTargeting: true }); // createLanWorld owns a native, non-Proxy graph.
+          applyMs = applyMs * .7 + (performance.now() - started) * .3;
         }
         if (launched && synced && (now - receivedAt > 1500 || now - lastAckAt > 2000 || (acknowledgementMs ?? 0) > 2000)) {
           freeze("② 同步战场：更新或输入确认中断，已停止操控，等待最新状态…");
@@ -614,16 +717,15 @@ export function LanBattle({
           } else if (now - lastSyncRequest > 1000) send({ type: "resync" });
           if ((syncId && appliedTick >= minSyncTick) || now - lastSyncRequest > 1000) lastSyncRequest = now;
         }
-        if (seat !== 0) {
+        // The host also renders a snapshot replica; its authority lives in the
+        // Worker. Predict only this display pose for every local pilot.
+        {
           const p = engine.playerShip;
           const aim = pointerActive ? clientToCombatWorld(pointer, canvas, camera, zoom) : p.aimTargetWorld;
           const nearCollision = engine.capitalShips.some(other => other !== p && !other.isDead && other.pos.distanceTo(p.pos) < p.spec.collisionRadius + other.spec.collisionRadius + 60);
           prediction.render(p, { seq, keys, aim: [aim.x, aim.y], firing: false, pointerActive, actions: [] }, now, active() && !nearCollision);
         }
-        const alpha = Math.min(
-          1,
-          Math.max(0, (now - receivedAt) / intervalMs),
-        );
+        const alpha = presentation.alpha;
         const focusShip = engine.playerShip.isDead
           ? (engine.capitalShips.find(
               (ship) =>
@@ -633,16 +735,25 @@ export function LanBattle({
         const focus = focusShip.interpolatedPos(alpha);
         cameraController.follow(camera, focus, canvas, zoom, dt, active() && !engine.isTacticalMap);
         const frameContext = {
-          visualTime: engine.combatTime,
+          visualTime: presentation.visualTime,
           random,
           layers: LAYERS,
           damageEnabled: true,
         };
+        const renderStarted = performance.now();
+        if (launched && synced) localContrails.update(engine, presentation.visualTime, alpha, presentation.reset);
+        else localContrails.reset(engine);
+        if (launched && synced) localMuzzles.update(engine, presentation.visualTime, presentation.reset);
+        else localMuzzles.reset(engine);
         renderer.updateVisual(engine, launched ? dt : 0, frameContext);
         renderer.render(engine, alpha, camera, zoom, frameContext);
+        renderMs = renderMs * .9 + (performance.now() - renderStarted) * .1;
         if (now - lastHUD > 100) {
           const p = engine.playerShip,
             e = engine.enemyShip;
+          const metrics = authorityPerformance && authorityPerformance.tick >= (latest?.tick ?? -1)
+            ? authorityPerformance : latest;
+          const metricsFresh = now - Math.max(receivedAt, authorityPerformanceAt) < 2500;
           setHud({
             hp: p.hullHp,
             max: p.maxHullHp,
@@ -652,14 +763,22 @@ export function LanBattle({
             capacity: p.flux.maxFlux,
             group: p.selectedGroupIndex + 1,
             tick: appliedTick,
-            sim: latest?.simulationMs ?? 0,
+            sim: metrics?.simulationMs ?? 0,
             bytes,
             rtt: connection.rttMs,
             jitter: connection.jitterMs,
             acknowledgementMs,
             age: Math.max(0, now - receivedAt),
-            hz: 1000 / intervalMs,
-            capture: latest?.captureMs ?? 0,
+            hz: receiveRate.sample(now),
+            capture: metrics?.captureMs ?? 0,
+            encode: seat === 0 ? encodeMs : latest?.encodeMs ?? 0,
+            parse: parseMs, decodeQueue: decoder?.stats ?? null, apply: applyMs, render: renderMs,
+            gpu: renderer.getResourceStats().gpuTimeMs, fps, frameMs,
+            realtimeRatio: metricsFresh ? metrics?.realtimeRatio ?? null : null,
+            combatRate: metricsFresh ? metrics?.combatRate ?? null : null,
+            authority: authorityPerformance ? { ...authorityPerformance, ageMs: Math.max(0, now - authorityPerformanceAt) } : null,
+            multicore: authorityMulticore,
+            playbackDelay: presentation.delayMs,
             px: p.pos.x,
             py: p.pos.y,
           });
@@ -707,6 +826,7 @@ export function LanBattle({
     onReturn();
   };
   const finished = !!(error || ended);
+  const teamPresence = displayEngine ? lanTeamPresence(match, displayEngine) : [];
   return (
     <main className="lan-battle">
       <canvas ref={canvasRef} className="lan-canvas" aria-label="局域网战场" />
@@ -760,11 +880,16 @@ export function LanBattle({
               )}{" "}
             · {seat === 0 ? "主机" : "玩家"}
           </span>
-          <span className="lan-battle-teams" aria-label="阵营颜色">{[...new Set([...match.players.map(p=>p.team),...match.options.aiHulls.flatMap((hulls,team)=>hulls.length?[team]:[])])].sort((a,b)=>a-b).map(team=><span key={team} style={{color:teamColor(team)}}>{teamName(team)}{team===match.players.find(p=>p.seat===seat)!.team?"（己方）":""}</span>)}</span>
-          {hud && <span className="lan-network-quality" data-quality={!controlsReady || hud.age > 1500 ? "syncing" : (hud.rtt ?? 0) > 180 || (hud.acknowledgementMs ?? 0) > 350 ? "slow" : "good"}
-            title={"服务器往返延迟，不含房主计算；输入确认包含服务器转发、主机处理及快照返回。打开菜单中的网络诊断查看详情。"}>
+          <span className="lan-battle-teams" aria-label="阵营与舰船数量">{teamPresence.map(row=><span key={row.team} style={{color:teamColor(row.team)}}
+            data-team={row.team} data-deployed={row.deployed} data-reserve={row.reserve} data-visible={row.visible}
+            title={teamName(row.team)+"：编成 "+row.total+" · 在场 "+row.deployed+" · 可见 "+row.visible+" · 后备 "+row.reserve+" · 损失 "+row.destroyed+" · 撤离 "+row.retreated+"。在场不等于当前镜头内；后备需部署后才显示。"}>
+            {teamName(row.team)}{row.team===displayEngine?.playerShip.teamId?"（己方）":""} · 场{row.deployed}/总{row.total}{row.reserve>0?" 待命"+row.reserve:""}
+            {(row.missing>0||row.invalidPosition>0||(displayEngine?.openBattlefield&&row.visible<row.deployed))&&" ⚠显示异常"}
+          </span>)}</span>
+          {hud && <span className="lan-network-quality" data-quality={!controlsReady || hud.age > 1500 ? "syncing" : (hud.rtt ?? 0) > 180 || (hud.acknowledgementMs ?? 0) > 350 || (hud.fps > 0 && hud.fps < 40) || (hud.realtimeRatio !== null && hud.realtimeRatio < .9) ? "slow" : "good"}
+            title={"服务器往返延迟，不含房主计算；输入确认包含服务器转发、主机处理及快照返回。低延迟不代表高帧率；打开菜单中的性能与网络诊断查看详情。"}>
             {!controlsReady ? "同步中" : "网络 " + (hud.rtt === null ? "测量中" : Math.round(hud.rtt) + " ms")}
-            {" · 主机 " + (hud.sim > 16.7 ? "计算偏慢" : "正常")}
+            {" · 画面 " + (hud.fps ? Math.round(hud.fps) + " FPS" : "测量中") + " · 状态 " + (hud.hz === null ? "测量中" : hud.hz.toFixed(0)) + " Hz · 战斗 " + (hud.combatRate === null ? "测量中" : hud.combatRate.toFixed(2) + "×")}
           </span>}
           <NativeButton shortcut="Tab" disabled={!controlsReady||mapOpen||deploymentOpen||!!menu||finished||!hud?.tick} onClick={()=>openMapRef.current()}>战术地图 / 增援</NativeButton>
           <NativeButton shortcut="Esc" onClick={() => openMenu("menu")}>
@@ -777,7 +902,7 @@ export function LanBattle({
           <span role="status">{networkStatus || peerAway || status}</span>
         </NativeFrame>
       )}
-      {!finished && menu === "menu" && (
+      <MotionPresence>{!finished && menu === "menu" && (
         <Modal
           title="联机菜单"
           eyebrow=""
@@ -804,6 +929,7 @@ export function LanBattle({
               )}
             </section>
             <div className="combat-pause-actions">
+              <FullscreenButton className="combat-pause-button" font="action" align="right" />
               <NativeButton
                 className="combat-pause-button"
                 font="action"
@@ -833,8 +959,8 @@ export function LanBattle({
             </div>
           </div>
         </Modal>
-      )}
-      {!finished && menu === "help" && (
+      )}</MotionPresence>
+      <MotionPresence>{!finished && menu === "help" && (
         <Modal
           title="操纵与联机说明"
           eyebrow=""
@@ -895,22 +1021,33 @@ export function LanBattle({
               30 秒，由 AI 临时接管。客机主动离开只退出自己，不能中途加入；房主结束本局会结束全场，刷新计算主机页面无法恢复战斗。
             </p>
             <details>
-              <summary>网络诊断</summary>
+              <summary>性能与网络诊断</summary>
+              <p>页面构建：<code>{LAN_BUILD}</code><br />当前地址：{window.location.host} · {displayEngine?.openBattlefield?"多队公开战场":"传感器视野"}</p>
+              {teamPresence.map(row=><p key={row.team}>{teamName(row.team)}：编成 {row.total} · 已同步 {row.known} · 在场 {row.deployed} · 可见 {row.visible} · 后备 {row.reserve} · 损失 {row.destroyed} · 撤离 {row.retreated}{row.missing>0?" · 缺少身份 "+row.missing:""}{row.invalidPosition>0?" · 坐标异常 "+row.invalidPosition:""}</p>)}
               {hud && (
                 <p>
-                  模拟步 {hud.tick} · 主机模拟 {hud.sim.toFixed(2)} ms/步 ·
-                  完整快照约 {(hud.bytes / 1024).toFixed(1)} KB
+                  显示状态步 {hud.tick} · 主机模拟 {hud.sim.toFixed(2)} ms/步 ·
+                  完整快照约 {(hud.bytes / 1024).toFixed(1)} KB<br />
+                  计算推进 {hud.realtimeRatio === null ? "测量中" : hud.realtimeRatio.toFixed(2) + "×"} · 战斗时间 {hud.combatRate === null ? "测量中" : hud.combatRate.toFixed(2) + "×"} · 显示缓冲 {Math.round(hud.playbackDelay)} ms
                 </p>
               )}
+              {hud?.authority && <p>
+                主机实际计算步 {hud.authority.tick} · 诊断更新于 {Math.round(hud.authority.ageMs)} ms 前{hud.authority.ageMs > 2500 ? "（已过期）" : ""}<br />
+                最近一步 {hud.authority.lastStepMs.toFixed(1)} ms · 采样窗口最慢一步 {hud.authority.maxStepMs.toFixed(1)} ms · 回调间隔 {hud.authority.callbackGapMs.toFixed(1)} ms · 待补计算 {hud.authority.backlogMs.toFixed(1)} ms。以上是墙钟耗时，可能包含线程等待，不等于纯 CPU 计算耗时；诊断不依赖完整快照发送。
+              </p>}
+              {hud?.authority && <p>AI 实际模式：{hud.multicore?.mode ?? "未报告（不能确认多核）"}{hud.multicore?.reason ? " · 原因：" + (hud.multicore.reason === "ai-workers-disabled" ? "已关闭 AI 多 Worker，不自动试跑" : hud.multicore.reason) : ""}。serial / fallback 表示串行或回退，并非多核运行。</p>}
               {hud && <p>服务器往返 {hud.rtt === null ? "测量中" : Math.round(hud.rtt) + " ms"} · 网络抖动 {Math.round(hud.jitter)} ms · 输入确认 {hud.acknowledgementMs === null ? "测量中" : Math.round(hud.acknowledgementMs) + " ms"}<br />
-                接收约 {hud.hz.toFixed(1)} 次/秒 · 最新状态距今 {Math.round(hud.age)} ms · 主机快照采集 {hud.capture.toFixed(1)} ms/次</p>}
+                目标 {LAN_SNAPSHOT_HZ} Hz · 实际接收约 {hud.hz === null ? "测量中" : hud.hz.toFixed(1)} 次/秒 · 最新状态距今 {Math.round(hud.age)} ms · 主机快照采集 {hud.capture.toFixed(1)} ms/次</p>}
+              {hud && <p>画面 {Math.round(hud.fps)} FPS · 帧间隔 {hud.frameMs.toFixed(1)} ms · 绘制提交 {hud.render.toFixed(1)} ms/帧 · GPU {hud.gpu === null ? "不可测" : hud.gpu.toFixed(1) + " ms"}<br />
+                快照编码 {hud.encode.toFixed(1)} ms（Worker） · 本机解析 {hud.parse.toFixed(1)} ms · 批量还原 {hud.apply.toFixed(1)} ms/批。计算推进 1.00× 表示每现实秒完成约 60 个物理步；低于 1.00× 表示主机实际落后。战斗时间还受舰船时间系统影响，不能仅凭 FPS 判断。</p>}
+              {hud?.decodeQueue && <p>本机解码队列 {hud.decodeQueue.queued}/2（另预留 1 个末帧槽） · 峰值 {hud.decodeQueue.peakQueued} 帧 / {(hud.decodeQueue.peakBytes / 1048576).toFixed(2)} MiB · 等待 {hud.decodeQueue.waitMs.toFixed(1)} ms（峰值 {hud.decodeQueue.maxWaitMs.toFixed(1)} ms） · 背压 {hud.decodeQueue.backpressure} 次。上行 ACK 受 credits 约束，解码不额外跨 Worker 克隆对象图。</p>}
               <p>客机仅对自己的舰船做最多 250 ms 的运动显示预测，接近舰船碰撞时停用。武器命中、伤害和胜负始终由房主判定。输入确认时间包含转发、主机处理及快照返回，不等于服务器延迟。</p>
-              <p>同步频率会按在场复杂度和网络拥塞调整；后备舰船数量不直接决定频率。短断线先同步战场再恢复操控。房主短暂停顿可有限恢复，持续过载、主机刷新或后台退出仍可能结束本局。</p>
+              <p>运动按连续战斗时间轴平滑，不再随每个网络包重新计时；断流时停止在已知状态，不虚构命中。同步目标固定 60Hz，不再按舰队规模或负载主动降频。计算不足或网络背压仍会使实际接收低于目标，不补发重复状态、不伪造 60Hz。短断线先同步战场再恢复操控。切回前台会先重新同步。房主后台暂停最多保留 5 分钟；真正断线仍须在 30 秒内重连。持续过载、主机刷新或页面被浏览器丢弃仍可能结束本局。</p>
             </details>
           </div>
         </Modal>
-      )}
-      {!finished && menu === "leave" && (
+      )}</MotionPresence>
+      <MotionPresence>{!finished && menu === "leave" && (
         <Modal
           title={seat === 0 ? "结束本局？" : "离开对局？"}
           eyebrow=""
@@ -933,7 +1070,7 @@ export function LanBattle({
             连接中断时，请等待重连后确认。
           </p>
         </Modal>
-      )}
+      )}</MotionPresence>
       {finished && <LanBattleReport match={match} seat={seat} result={ended} error={error} onReturn={returnToRoom} />}
     </main>
   );

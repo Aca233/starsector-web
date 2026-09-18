@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "observation": "flux-hull-window-mobility-target-pressure-v2",
+  "actions": [
+    "BALANCED",
+    "PRESSURE",
+    "FINISH",
+    "CAUTIOUS"
+  ],
+  "enabled": false,
+  "minVisits": 8,
+  "minAdvantage": 0.03,
+  "rows": {}
+}

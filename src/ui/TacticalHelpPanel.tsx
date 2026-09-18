@@ -11,8 +11,8 @@ const groups = [
       ["Q / E", "左移 / 右移"],
       ["Shift（按住）", "船头跟随鼠标，A / D 改为横移"],
       ["X", "沿当前速度方向制动"],
-      ["鼠标指针", "武器瞄准，镜头平滑偏向鼠标方向；当前已关闭船头跟随"],
-      ["U", "切换自动驾驶；自动驾驶时由 AI 接管推进、开火、系统和防御"],
+      ["鼠标指针", "武器瞄准、全向盾转向，镜头平滑偏向鼠标方向；当前已关闭船头跟随"],
+      ["U", "切换自动驾驶；按操舰键、左右键或点击武器/联队控制可立即接管并执行操作，左上角提示手动模式"],
     ],
   },
   {
@@ -20,6 +20,7 @@ const groups = [
     rows: [
       ["鼠标左键", "发射选定武器组"],
       ["鼠标右键", "优先使用独立防御；否则开关护盾 / 相位潜航"],
+      ["护盾朝向", "全向盾开启后随鼠标转动，无需按住 Shift；前向固定盾随舰首转动"],
       ["1–7", "选择武器组"],
       ["Ctrl + 1–7", "切换武器组自动开火"],
       ["Shift + 1–7", "切换武器组齐射 / 交替（不改变选中组）"],
@@ -97,7 +98,7 @@ export function TacticalHelpPanel({
           <p className="ui-caption">
             {defaultMouseSteering
               ? "当前：船头跟随鼠标，A/D 横移；按住 Shift 恢复 A/D 转向。Q/E 始终横移。"
-              : "当前：鼠标只瞄准武器，A/D 转向；按住 Shift 让船头跟随鼠标。Q/E 始终横移。"}
+              : "当前：鼠标瞄准武器并引导全向盾，A/D 转向；按住 Shift 让船头跟随鼠标。Q/E 始终横移。"}
           </p>
         </Section>
       )}
@@ -110,7 +111,7 @@ export function TacticalHelpPanel({
                   (key !== "Z" || hasFighters) &&
                   (key !== "Esc 菜单" || canRestart) &&
                   (key !== "F" || hasSystem) &&
-                  (key !== "鼠标右键" || hasShield),
+                  ((key !== "鼠标右键" && key !== "护盾朝向") || hasShield),
               )
               .map(([key, text]) => (
                 <div className="ui-help-row" key={key}>
@@ -122,7 +123,7 @@ export function TacticalHelpPanel({
                         : defaultMouseSteering && key === "Shift（按住）"
                           ? "暂停鼠标转向，A / D 改为转向"
                           : defaultMouseSteering && key === "鼠标指针"
-                            ? "武器瞄准并引导船头转向，镜头平滑偏向鼠标方向"
+                            ? "武器瞄准并引导船头、全向盾转向，镜头平滑偏向鼠标方向"
                             : text}
                   </span>
                   <Keycap>{key.replace("1–7", `1–${weaponGroupCount}`)}</Keycap>

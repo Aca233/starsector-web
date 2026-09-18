@@ -8526,5 +8526,1284 @@
       }
     ],
     "hullMods": []
+  },
+  "derelict_mothership_bow_module": {
+    "weapons": {
+      "WS 007": "pdlaser",
+      "WS 008": "pdlaser"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 007",
+          "WS 008"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      }
+    ],
+    "hullMods": []
+  },
+  "derelict_mothership_pod_engine_left": {
+    "weapons": {
+      "WS 013": "miningblaster",
+      "WS 014": "pdlaser",
+      "WS 015": "pdlaser"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 013"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 1,
+        "weaponSlotIds": [
+          "WS 014",
+          "WS 015"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      }
+    ],
+    "hullMods": []
+  },
+  "derelict_mothership_pod_m_left": {
+    "weapons": {
+      "WS 016": "miningblaster",
+      "WS 017": "mininglaser",
+      "WS 018": "pdlaser"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 016"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 1,
+        "weaponSlotIds": [
+          "WS 017"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 2,
+        "weaponSlotIds": [
+          "WS 018"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      }
+    ],
+    "hullMods": []
+  },
+  "derelict_mothership_pod_m_right": {
+    "weapons": {
+      "WS 019": "miningblaster",
+      "WS 020": "pdlaser"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 019"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 1,
+        "weaponSlotIds": [
+          "WS 020"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      }
+    ],
+    "hullMods": []
+  },
+  "derelict_mothership_pod_s_right": {
+    "weapons": {
+      "WS 021": "mininglaser",
+      "WS 022": "pdlaser"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 021"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 1,
+        "weaponSlotIds": [
+          "WS 022"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      }
+    ],
+    "hullMods": []
+  },
+  "derelict_mothership_sensor_mast": {
+    "weapons": {
+      "WS 009": "miningblaster",
+      "WS 010": "mininglaser",
+      "WS 011": "pdlaser",
+      "WS 012": "mininglaser"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 009",
+          "WS 010"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 1,
+        "weaponSlotIds": [
+          "WS 011"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 2,
+        "weaponSlotIds": [
+          "WS 012"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      }
+    ],
+    "hullMods": []
+  },
+  "module_armour1": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "module_armour2": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "module_armour3": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "module_armour4": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "module_armour5": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "module_bastion1_lowtech": {
+    "weapons": {
+      "WS 008": "swarmer",
+      "WS 001": "dualflak",
+      "WS 002": "dualflak",
+      "WS 000": "vulcan",
+      "WS 003": "vulcan",
+      "WS 004": "vulcan",
+      "WS 005": "vulcan"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 008"
+        ],
+        "mode": "ALTERNATING",
+        "isAutofire": false
+      },
+      {
+        "index": 1,
+        "weaponSlotIds": [
+          "WS 001",
+          "WS 002"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 2,
+        "weaponSlotIds": [
+          "WS 000",
+          "WS 003",
+          "WS 004",
+          "WS 005"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      }
+    ],
+    "hullMods": []
+  },
+  "module_bastion_pd1": {
+    "weapons": {
+      "WS 000": "vulcan",
+      "WS 001": "flak",
+      "WS 002": "flak",
+      "WS 003": "vulcan",
+      "WS 004": "vulcan",
+      "WS 005": "vulcan",
+      "WS 006": "vulcan",
+      "WS 007": "vulcan"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 000",
+          "WS 001",
+          "WS 002",
+          "WS 003",
+          "WS 004",
+          "WS 005",
+          "WS 006",
+          "WS 007"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      }
+    ],
+    "hullMods": [
+      "turretgyros"
+    ]
+  },
+  "module_blocker1": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "module_blocker2": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "module_blocker2b": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "module_blocker2c": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "module_citadel1_lowtech": {
+    "weapons": {
+      "WS 015": "mjolnir",
+      "WS 016": "mjolnir",
+      "WS 001": "gauss",
+      "WS 014": "gauss",
+      "WS 004": "heavymauler",
+      "WS 010": "heavymauler",
+      "WS 000": "dualflak",
+      "WS 002": "vulcan",
+      "WS 006": "dualflak",
+      "WS 007": "vulcan",
+      "WS 008": "vulcan",
+      "WS 009": "dualflak",
+      "WS 012": "vulcan",
+      "WS 013": "dualflak"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 015",
+          "WS 016"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 1,
+        "weaponSlotIds": [
+          "WS 001",
+          "WS 014"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 2,
+        "weaponSlotIds": [
+          "WS 004",
+          "WS 010"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 3,
+        "weaponSlotIds": [
+          "WS 000",
+          "WS 002",
+          "WS 006",
+          "WS 007",
+          "WS 008",
+          "WS 009",
+          "WS 012",
+          "WS 013"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      }
+    ],
+    "hullMods": []
+  },
+  "module_decor_midline1": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "module_decor_midline2": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "module_hightech_armour": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "module_hightech_attack": {
+    "weapons": {
+      "WS 000": "tachyonlance",
+      "WS 002": "tachyonlance",
+      "WS 001": "ionpulser",
+      "WS 003": "gravitonbeam",
+      "WS 004": "ionbeam",
+      "WS 005": "ionbeam",
+      "WS 006": "gravitonbeam",
+      "WS 009": "ioncannon",
+      "WS 010": "ioncannon",
+      "WS 008": "pdlaser",
+      "WS 011": "pdlaser"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 000",
+          "WS 002"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 1,
+        "weaponSlotIds": [
+          "WS 001"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 2,
+        "weaponSlotIds": [
+          "WS 003",
+          "WS 004",
+          "WS 005",
+          "WS 006"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 3,
+        "weaponSlotIds": [
+          "WS 009",
+          "WS 010"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 4,
+        "weaponSlotIds": [
+          "WS 008",
+          "WS 011"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      }
+    ],
+    "hullMods": [
+      "fluxbreakers"
+    ]
+  },
+  "module_hightech_attack_minelayer": {
+    "weapons": {
+      "WS 000": "tachyonlance",
+      "WS 002": "tachyonlance",
+      "WS 001": "ionpulser",
+      "WS 003": "gravitonbeam",
+      "WS 004": "ionbeam",
+      "WS 005": "ionbeam",
+      "WS 006": "gravitonbeam",
+      "WS 009": "ioncannon",
+      "WS 010": "ioncannon",
+      "WS 008": "pdlaser",
+      "WS 011": "pdlaser"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 000",
+          "WS 002"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 1,
+        "weaponSlotIds": [
+          "WS 001"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 2,
+        "weaponSlotIds": [
+          "WS 003",
+          "WS 004",
+          "WS 005",
+          "WS 006"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 3,
+        "weaponSlotIds": [
+          "WS 009",
+          "WS 010"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 4,
+        "weaponSlotIds": [
+          "WS 008",
+          "WS 011"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      }
+    ],
+    "hullMods": [
+      "fluxbreakers"
+    ]
+  },
+  "module_hightech_citadel": {
+    "weapons": {
+      "WS 000": "plasma",
+      "WS 001": "plasma",
+      "WS 010": "sabotpod",
+      "WS 012": "sabotpod",
+      "WS 002": "gravitonbeam",
+      "WS 003": "gravitonbeam",
+      "WS 006": "irpulse",
+      "WS 004": "pdlaser",
+      "WS 008": "pdlaser"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 000",
+          "WS 001"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 1,
+        "weaponSlotIds": [
+          "WS 010",
+          "WS 012"
+        ],
+        "mode": "ALTERNATING",
+        "isAutofire": false
+      },
+      {
+        "index": 2,
+        "weaponSlotIds": [
+          "WS 002",
+          "WS 003"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 3,
+        "weaponSlotIds": [
+          "WS 006"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 4,
+        "weaponSlotIds": [
+          "WS 004",
+          "WS 008"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      }
+    ],
+    "hullMods": [
+      "fluxbreakers"
+    ]
+  },
+  "module_hightech_hangar": {
+    "weapons": {
+      "WS 000": "gravitonbeam",
+      "WS 005": "gravitonbeam",
+      "WS 002": "phasebeam",
+      "WS 003": "phasebeam",
+      "WS 001": "pdlaser",
+      "WS 004": "pdlaser"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 000",
+          "WS 005"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 1,
+        "weaponSlotIds": [
+          "WS 002",
+          "WS 003"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 2,
+        "weaponSlotIds": [
+          "WS 001",
+          "WS 004"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      }
+    ],
+    "hullMods": [
+      "fluxbreakers"
+    ]
+  },
+  "module_hightech_shield": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "module_hightech_strut": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "module_large1_lowtech": {
+    "weapons": {
+      "WS 011": "sabotpod",
+      "WS 012": "sabotpod",
+      "WS 000": "mark9",
+      "WS 003": "mark9",
+      "WS 005": "typhoon",
+      "WS 008": "typhoon",
+      "WS 001": "hellbore",
+      "WS 002": "hellbore",
+      "WS 004": "dualflak",
+      "WS 006": "dualflak",
+      "WS 007": "dualflak",
+      "WS 009": "dualflak",
+      "WS 010": "phasecl",
+      "WS 013": "phasecl",
+      "WS 015": "vulcan",
+      "WS 018": "vulcan",
+      "WS 020": "vulcan",
+      "WS 021": "vulcan",
+      "WS 023": "vulcan",
+      "WS 026": "vulcan"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 011",
+          "WS 012"
+        ],
+        "mode": "ALTERNATING",
+        "isAutofire": false
+      },
+      {
+        "index": 1,
+        "weaponSlotIds": [
+          "WS 000",
+          "WS 003"
+        ],
+        "mode": "LINKED",
+        "isAutofire": false
+      },
+      {
+        "index": 2,
+        "weaponSlotIds": [
+          "WS 005",
+          "WS 008"
+        ],
+        "mode": "LINKED",
+        "isAutofire": false
+      },
+      {
+        "index": 3,
+        "weaponSlotIds": [
+          "WS 001",
+          "WS 002"
+        ],
+        "mode": "LINKED",
+        "isAutofire": false
+      },
+      {
+        "index": 4,
+        "weaponSlotIds": [
+          "WS 004",
+          "WS 006",
+          "WS 007",
+          "WS 009",
+          "WS 010",
+          "WS 013",
+          "WS 015",
+          "WS 018",
+          "WS 020",
+          "WS 021",
+          "WS 023",
+          "WS 026"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      }
+    ],
+    "hullMods": []
+  },
+  "module_large2_lowtech": {
+    "weapons": {
+      "WS 008": "salamanderpod",
+      "WS 009": "salamanderpod",
+      "WS 001": "pilum",
+      "WS 003": "pilum",
+      "WS 000": "hveldriver",
+      "WS 004": "hveldriver",
+      "WS 002": "dualflak",
+      "WS 005": "vulcan",
+      "WS 007": "vulcan",
+      "WS 010": "vulcan",
+      "WS 012": "vulcan"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 008",
+          "WS 009"
+        ],
+        "mode": "ALTERNATING",
+        "isAutofire": false
+      },
+      {
+        "index": 1,
+        "weaponSlotIds": [
+          "WS 001",
+          "WS 003"
+        ],
+        "mode": "ALTERNATING",
+        "isAutofire": false
+      },
+      {
+        "index": 2,
+        "weaponSlotIds": [
+          "WS 000",
+          "WS 004"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 3,
+        "weaponSlotIds": [
+          "WS 002",
+          "WS 005",
+          "WS 007",
+          "WS 010",
+          "WS 012"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      }
+    ],
+    "hullMods": []
+  },
+  "module_midline_bastion": {
+    "weapons": {
+      "WS 000": "dualflak",
+      "WS 003": "dualflak",
+      "WS 005": "vulcan",
+      "WS 006": "vulcan",
+      "WS 007": "vulcan",
+      "WS 001": "squall",
+      "WS 002": "squall"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 000",
+          "WS 003",
+          "WS 005",
+          "WS 006",
+          "WS 007"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 1,
+        "weaponSlotIds": [
+          "WS 001",
+          "WS 002"
+        ],
+        "mode": "ALTERNATING",
+        "isAutofire": false
+      }
+    ],
+    "hullMods": []
+  },
+  "module_midline_broadside": {
+    "weapons": {
+      "WS 000": "hephag",
+      "WS 002": "hephag",
+      "WS 003": "mjolnir",
+      "WS 005": "mjolnir",
+      "WS 006": "hephag",
+      "WS 008": "hephag",
+      "WS 001": "multineedler",
+      "WS 004": "multineedler",
+      "WS 007": "multineedler",
+      "WS 010": "gravitonbeam",
+      "WS 011": "gravitonbeam",
+      "WS 012": "gravitonbeam",
+      "WS 013": "gravitonbeam",
+      "WS 014": "gravitonbeam",
+      "WS 015": "gravitonbeam",
+      "WS 016": "vulcan",
+      "WS 017": "vulcan",
+      "WS 018": "vulcan",
+      "WS 019": "vulcan",
+      "WS 020": "vulcan",
+      "WS 021": "vulcan",
+      "WS 022": "vulcan"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 000",
+          "WS 002",
+          "WS 003",
+          "WS 005",
+          "WS 006",
+          "WS 008"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 1,
+        "weaponSlotIds": [
+          "WS 001",
+          "WS 004",
+          "WS 007"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 2,
+        "weaponSlotIds": [
+          "WS 010",
+          "WS 011",
+          "WS 012",
+          "WS 013",
+          "WS 014",
+          "WS 015"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 3,
+        "weaponSlotIds": [
+          "WS 016",
+          "WS 017",
+          "WS 018",
+          "WS 019",
+          "WS 020",
+          "WS 021",
+          "WS 022"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      }
+    ],
+    "hullMods": []
+  },
+  "module_midline_citadel": {
+    "weapons": {
+      "WS 000": "hephag",
+      "WS 002": "hephag",
+      "WS 001": "multineedler",
+      "WS 003": "gravitonbeam",
+      "WS 004": "gravitonbeam",
+      "WS 005": "vulcan",
+      "WS 006": "vulcan",
+      "WS 007": "vulcan"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 000",
+          "WS 002"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 1,
+        "weaponSlotIds": [
+          "WS 001"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 2,
+        "weaponSlotIds": [
+          "WS 003",
+          "WS 004"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 3,
+        "weaponSlotIds": [
+          "WS 005",
+          "WS 006",
+          "WS 007"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      }
+    ],
+    "hullMods": []
+  },
+  "module_midline_support": {
+    "weapons": {
+      "WS 000": "pilum",
+      "WS 001": "pilum",
+      "WS 002": "pilum",
+      "WS 003": "pilum",
+      "WS 004": "heatseeker",
+      "WS 009": "heatseeker",
+      "WS 005": "vulcan",
+      "WS 006": "vulcan",
+      "WS 007": "vulcan",
+      "WS 008": "vulcan"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 000",
+          "WS 001",
+          "WS 002",
+          "WS 003"
+        ],
+        "mode": "ALTERNATING",
+        "isAutofire": false
+      },
+      {
+        "index": 1,
+        "weaponSlotIds": [
+          "WS 004",
+          "WS 009"
+        ],
+        "mode": "ALTERNATING",
+        "isAutofire": false
+      },
+      {
+        "index": 2,
+        "weaponSlotIds": [
+          "WS 005",
+          "WS 006",
+          "WS 007",
+          "WS 008"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      }
+    ],
+    "hullMods": []
+  },
+  "module_onslaught_armor_left": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "module_onslaught_armor_right": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "onslaught_mk1": {
+    "weapons": {
+      "WS 021": "pilum",
+      "WS 024": "pilum",
+      "WS 001": "arbalest",
+      "WS 003": "arbalest",
+      "WS 007": "arbalest",
+      "WS 012": "arbalest",
+      "WS 013": "arbalest",
+      "WS 019": "devastator",
+      "WS 018": "devastator",
+      "WS 020": "devastator",
+      "WS 010": "flak",
+      "WS 011": "flak",
+      "WS 014": "arbalest",
+      "WS 015": "arbalest",
+      "WS 028": "arbalest",
+      "WS 029": "arbalest"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 016",
+          "WS 017"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 1,
+        "weaponSlotIds": [
+          "WS 021",
+          "WS 024"
+        ],
+        "mode": "ALTERNATING",
+        "isAutofire": false
+      },
+      {
+        "index": 2,
+        "weaponSlotIds": [
+          "WS 001",
+          "WS 003",
+          "WS 007",
+          "WS 012",
+          "WS 013"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 3,
+        "weaponSlotIds": [
+          "WS 019"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 4,
+        "weaponSlotIds": [
+          "WS 018",
+          "WS 020"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 5,
+        "weaponSlotIds": [
+          "WS 010",
+          "WS 011"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 6,
+        "weaponSlotIds": [
+          "WS 014",
+          "WS 015",
+          "WS 028",
+          "WS 029"
+        ],
+        "mode": "LINKED",
+        "isAutofire": false
+      }
+    ],
+    "hullMods": [
+      "armoredweapons",
+      "dedicated_targeting_core",
+      "fluxbreakers",
+      "insulatedengine",
+      "fluxdistributor",
+      "autorepair",
+      "magazines"
+    ]
+  },
+  "platform1": {
+    "weapons": {
+      "WS 002": "dualflak",
+      "WS 003": "dualflak",
+      "WS 001": "mark9"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 002",
+          "WS 003"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 1,
+        "weaponSlotIds": [
+          "WS 001"
+        ],
+        "mode": "LINKED",
+        "isAutofire": false
+      }
+    ],
+    "hullMods": []
+  },
+  "remnant_armour3": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "remnant_hangar1": {
+    "weapons": {
+      "WS 001": "pulselaser",
+      "WS 002": "pulselaser",
+      "WS 004": "pdlaser",
+      "WS 005": "pdlaser"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 001",
+          "WS 002"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 1,
+        "weaponSlotIds": [
+          "WS 004",
+          "WS 005"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      }
+    ],
+    "hullMods": []
+  },
+  "remnant_shield2": {
+    "weapons": {
+      "WS 001": "guardian",
+      "WS 002": "guardian"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 001",
+          "WS 002"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      }
+    ],
+    "hullMods": []
+  },
+  "remnant_station2": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "remnant_weapon_platform1": {
+    "weapons": {
+      "WS 004": "squall",
+      "WS 001": "hil",
+      "WS 002": "gauss"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 004"
+        ],
+        "mode": "ALTERNATING",
+        "isAutofire": false
+      },
+      {
+        "index": 1,
+        "weaponSlotIds": [
+          "WS 001"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 2,
+        "weaponSlotIds": [
+          "WS 002"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      }
+    ],
+    "hullMods": []
+  },
+  "remnant_weapon_platform2": {
+    "weapons": {
+      "WS 002": "autopulse",
+      "WS 006": "pdburst",
+      "WS 007": "pdburst",
+      "WS 003": "pulselaser",
+      "WS 004": "ionpulser"
+    },
+    "groups": [
+      {
+        "index": 0,
+        "weaponSlotIds": [
+          "WS 002"
+        ],
+        "mode": "LINKED",
+        "isAutofire": false
+      },
+      {
+        "index": 1,
+        "weaponSlotIds": [
+          "WS 006",
+          "WS 007"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      },
+      {
+        "index": 2,
+        "weaponSlotIds": [
+          "WS 003",
+          "WS 004"
+        ],
+        "mode": "LINKED",
+        "isAutofire": true
+      }
+    ],
+    "hullMods": []
+  },
+  "station1": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "station1_hightech": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "station1_midline": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "station2": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "station2_hightech": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "station2_midline": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "station3": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "station3_hightech": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "station3_midline": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "station_derelict_survey_mothership": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
+  },
+  "station_small": {
+    "weapons": {},
+    "groups": [],
+    "hullMods": []
   }
 }

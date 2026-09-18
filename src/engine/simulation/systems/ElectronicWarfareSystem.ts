@@ -3,7 +3,7 @@ import type { Ship } from '../Ship';
 export function updateElectronicWarfare(ships: readonly Ship[]): void {
   const teams = new Map<number, {ecm:number; nav:number}>();
   for (const ship of ships) {
-    if (ship.isDead || ship.isRetreated || ship.spec.hullSize === 'FIGHTER' || ship.spec.sourceHullTraits?.includes('STATION_MODULE')) continue;
+    if (ship.isDead || ship.isRetreated || ship.spec.hullSize === 'FIGHTER' || ship.isAttachedModule || ship.spec.sourceHullTraits?.includes('STATION_MODULE')) continue;
     const rating = teams.get(ship.teamId) ?? {ecm:0, nav:0};
     rating.ecm += ship.hullStats.ecmRating; rating.nav += ship.hullStats.navRating; teams.set(ship.teamId,rating);
   }

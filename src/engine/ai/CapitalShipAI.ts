@@ -1,3 +1,4 @@
+import { chooseCombatVelocity, type CombatPositionChoice } from './TacticalPositioning';
 import { planFleetTactics } from './FleetTactics';
 import { fleetApproachVelocity, fleetEngagementRange, regroupVelocity } from './FleetNavigation';
 import { sameTeam } from "../simulation/CombatTeams";
@@ -26,7 +27,7 @@ export class CapitalShipAI {
     const scene=world??{ships:[ship,this.targetShip],projectiles:[],beams:[],asteroids:[]};
     ship.combatShips = scene.ships;
     const assignment=(scene.fleetPlan ?? planFleetTactics(scene.ships, order ? new Map([[ship.id,order]]) : undefined)).get(ship.id);
-    const validTarget=(s:Ship)=>!s.isDead&&!s.isRetreated&&!s.isDocked&&s.isVisibleTo(ship.teamId)&&!sameTeam(s,ship);
+    const validTarget=(s:Ship)=>!s.hasVastBulk&&!s.isDead&&!s.isRetreated&&!s.isDocked&&s.isVisibleTo(ship.teamId)&&!sameTeam(s,ship);
     const orderedId=order?.type==='ENGAGE'||order?.type==='AVOID'?order.targetShipId:undefined;
     let target=scene.ships.find(s=>s.id===orderedId&&validTarget(s))
       ?? scene.ships.find(s=>s.id===assignment?.targetId&&validTarget(s));
@@ -48,11 +49,17 @@ export class CapitalShipAI {
     if (ship.system.tacticalMode === 'EXTRACT') { this.withdrawing = true; order = null; }
     const regroup= !order && assignment?.task==='REGROUP' && !ship.hullStats.doNotBackOff && ship.system.tacticalMode!=='ASSAULT' && ship.system.tacticalMode!=='EXTRACT'
       ? scene.ships.find(s=>s.id===assignment.anchorId&&!s.isDead&&!s.isRetreated&&sameTeam(s,ship)) : undefined;
-    ship.aiHoldOffensiveFire=(this.withdrawing||!!regroup) && !ship.system.forcesAutofire;
+    const disengaging = !order && assignment?.task==='DISENGAGE' && !ship.hullStats.doNotBackOff
+      && ship.system.tacticalMode!=='ASSAULT' && ship.system.tacticalMode!=='EXTRACT';
+    const withdrawing = this.withdrawing || disengaging;
+    // Movement retreat/regroup is not a ceasefire. Hold only while recovering high flux;
+    // safe in-range weapons can otherwise cover the withdrawal.
+    ship.aiHoldOffensiveFire=this.withdrawing && ship.flux.fluxPercent>policy.resumeAt && !ship.system.forcesAutofire;
     const escort=order?.type==='ESCORT'?scene.ships.find(other=>other.id===order.targetShipId&&sameTeam(other, ship)&&!other.isDead&&other!==ship):undefined;
     const defending=order?.type==='DEFEND';
     const avoiding=order?.type==='AVOID';
     const waypoint=order?.type==='WAYPOINT'||defending?order.targetPos:undefined;
+    let positioning: CombatPositionChoice | undefined;
     let facing=ship.facingRad,desired=new Vector2();
     if(regroup){
       desired=regroupVelocity(ship,regroup,target);
@@ -74,30 +81,36 @@ export class CapitalShipAI {
       desired=velocityToPosition(ship,new Vector2(waypoint.x,waypoint.y));
     }else if(target){
       facing=target.pos.clone().sub(ship.pos).heading()-profile.relativeBearing;
-      desired=fleetApproachVelocity(ship,target,profile.range,this.withdrawing,order?undefined:assignment);
+      desired=fleetApproachVelocity(ship,target,profile.range,withdrawing,order?undefined:assignment);
+      if (!order && !withdrawing && assignment?.role !== 'CARRIER' && !ship.system.tacticalMode) {
+        positioning = chooseCombatVelocity(ship,target,desired,profile,scene);
+        desired = positioning.velocity;
+      }
     } else {
       // No omniscient lock through fog: approach the public battlefield centre to search.
       const centre = new Vector2();
       desired=velocityToPosition(ship,centre);
       if (ship.pos.length()>policy.positionTolerance) facing=centre.sub(ship.pos).heading();
     }
-    const cooperation=waypoint||escort||avoiding||this.withdrawing||regroup?{velocity:desired,yielding:false}:yieldFireLane(ship,desired,scene);
+    const cooperation=waypoint||escort||avoiding||withdrawing||regroup||positioning?.adjusted?{velocity:desired,yielding:false}:yieldFireLane(ship,desired,scene);
     const avoidance=avoidCollisions(ship,cooperation.velocity,scene);
     driveVelocity(ship,avoidance.velocity,facing);
+    const allowOffensiveManeuver = !regroup && !withdrawing && !escort && !avoiding && !waypoint;
     if(target&&!ship.flux.isVenting&&!ship.flux.isOverloaded){
       // System callbacks decide activation only; they no longer rewrite stationkeeping or shield orders.
       const modifiers=ship.system.definition.modifiers?.({...ship.system,state:'ACTIVE',effectLevel:1} as typeof ship.system,ship.flux.maxFlux);
       const boostSpeed=ship.spec.maxSpeed+(modifiers?.speedFlat??0);
       ship.system.definition.advanceAI?.({ship,target,distance:ship.pos.distanceTo(target.pos),angleDiff:signedAngle(facing-ship.facingRad),
-        tactical:{desiredRange:profile.range,withdrawing:this.withdrawing||!!regroup,waypoint:!!waypoint,avoidingCollision:avoidance.avoiding||cooperation.yielding,
+        tactical:{allowOffensiveManeuver,desiredRange:profile.range,withdrawing:withdrawing||!!regroup,waypoint:!!waypoint,avoidingCollision:avoidance.avoiding||cooperation.yielding,
           forwardClear:forwardPathClear(ship,scene,Math.max(boostSpeed,ship.vel.length()),Math.max(policy.avoidanceLookahead,ship.system.chargeUpDuration+ship.system.chargeDownDuration)),
           quietFor:this.defense.quietFor,threat}});
     }
     if (target) ship.defenseSystem.definition.advanceAI?.({ ship, system: ship.defenseSystem, target, distance: ship.pos.distanceTo(target.pos), angleDiff: signedAngle(facing-ship.facingRad),
-      tactical: { desiredRange: profile.range, withdrawing: this.withdrawing||!!regroup, waypoint: !!waypoint, avoidingCollision: avoidance.avoiding, forwardClear: true, quietFor: this.defense.quietFor, threat } });
+      tactical: { allowOffensiveManeuver, desiredRange: profile.range, withdrawing: withdrawing||!!regroup, waypoint: !!waypoint, avoidingCollision: avoidance.avoiding, forwardClear: true, quietFor: this.defense.quietFor, threat } });
     const defense=this.defense.update(ship,threat);
-    ship.tacticalAI={fleetRole:assignment?.role,fleetTask:regroup?'REGROUP':assignment?.task==='REGROUP'?(target?'PRESSURE':'SEARCH'):assignment?.task,targetScore:assignment?.score,pressureRatio:assignment?.pressureRatio,assignedPower:assignment?.assignedPower,
-      mode:regroup?'WITHDRAW':escort?'ESCORT':avoiding?'AVOID':defending?'DEFEND':waypoint?'WAYPOINT':!target?'IDLE':this.withdrawing?'WITHDRAW':'ENGAGE',desiredRange:profile.range,
+    ship.tacticalAI={fleetRole:assignment?.role,fleetTask:regroup?'REGROUP':disengaging?'DISENGAGE':assignment?.task==='REGROUP'||assignment?.task==='DISENGAGE'?(target?'PRESSURE':'SEARCH'):assignment?.task,targetScore:assignment?.score,pressureRatio:assignment?.pressureRatio,assignedPower:assignment?.assignedPower,
+      mode:regroup?'WITHDRAW':escort?'ESCORT':avoiding?'AVOID':defending?'DEFEND':waypoint?'WAYPOINT':!target?'IDLE':withdrawing?'WITHDRAW':'ENGAGE',desiredRange:profile.range,
+      positioning:positioning?.reason,positionScoreGain:positioning?.scoreGain,clearFireFraction:positioning?.clearFire,
       desiredFacing:facing,availableFirepower:profile.firepower,avoidingCollision:avoidance.avoiding,yieldingFireLane:cooperation.yielding,
       incomingDamage:threat.imminentDamage,incomingShieldFlux:threat.imminentShieldFlux,
       earliestThreat:Number.isFinite(threat.earliest)?threat.earliest:null,ventSafe:defense.ventSafe,defense:defense.state};

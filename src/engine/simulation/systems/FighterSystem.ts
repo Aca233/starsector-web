@@ -71,6 +71,8 @@ export class FighterSystem {
   }
 
   public addCarrier(carrier: Ship, scenarioWings?: FighterWingSpec[]): void {
+    carrier.syncModuleTree(true);
+    for (const child of carrier.childModules) this.addCarrier(child);
     if (this.carriers.has(carrier.id)) return;
     const specs = scenarioWings ?? (carrier.spec.fighterWings ?? []).slice(0, carrier.hullStats.fighterBays);
     for (const spec of specs) {

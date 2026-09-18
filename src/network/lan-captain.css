@@ -1,0 +1,12 @@
+.lan-member-identity { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.lan-member-captain { width: 42px; height: 42px; flex: 0 0 42px; padding: 2px; border: 1px solid var(--ui-border); background: #061318; cursor: help; }
+.lan-member-captain img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.lan-member-captain:hover, .lan-member-captain:focus-visible { border-color: #aadeff; outline: 1px solid #aadeff; outline-offset: 1px; }
+.lan-member-identity .lan-member-heading { flex: 1; min-width: 0; flex-direction: column; gap: 2px; }
+.lan-captain-tooltip .lan-captain-skills { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 8px 0; padding: 0; list-style: none; }
+.lan-captain-skills li { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 5px; border: 1px solid #254552; background: #0a2029; }
+.lan-captain-skills img { width: 32px; height: 32px; flex: 0 0 32px; object-fit: contain; }
+.lan-captain-skills strong { display: block; font-size: 13px; font-weight: normal; overflow-wrap: anywhere; }
+.lan-captain-skills small { display: block; margin-top: 2px; font-size: 11px; color: #8ca8b6; }
+.lan-captain-skills [data-elite='true'] { border-color: #78602b; }
+.lan-captain-skills [data-elite='true'] small { color: #ffe000; }

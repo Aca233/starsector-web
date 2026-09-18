@@ -5,6 +5,7 @@ import { modManager } from '../engine/modding/ModManager';
 import { wireDesign } from './design-wire.mjs';
 
 export function lanHullUnavailable(spec: ShipSpec): string | null {
+  if (spec.isModuleHull) return '模块必须随母舰部署';
   if (spec.hullSize === 'FIGHTER') return '舰载机不能作为玩家旗舰';
   for (const id of [spec.systemType, spec.defenseSystemType ?? 'NONE']) {
     const system = shipSystemDefinitions.require(id);

@@ -3,7 +3,7 @@ import { Vector2 } from '../../math/Vector2';
 import { weaponDps, weaponRange } from '../ShipCombatProfile';
 import { weaponMuzzle, weaponMuzzleExtent } from '../FireControlGeometry';
 import type { Ship } from '../../simulation/Ship';
-import type { CapitalShipAI } from '../CapitalShipAI';
+import { CapitalShipAI } from '../CapitalShipAI';
 import type { CombatEngine } from '../../simulation/CombatEngine';
 import type { Fields, Part, Model, NumericPacket, Frame, Row } from './Types';
 export const controls = ['fireControlMode', 'isFiringMain', 'defenseFacingRad', 'aiHoldOffensiveFire', 'throttle', 'brakeInput', 'strafeInput', 'turnInput'];
@@ -33,7 +33,8 @@ export function matchesParts(s: Ship, ai: CapitalShipAI, expected: Part[]): bool
     return same(ai) && same(ai['defense']) && index === expected.length;
 }
 export const motionKeys = ['maxSpeed', 'acceleration', 'deceleration', 'maxTurnRate', 'turnAcceleration', 'turnDeceleration', 'driftAcceleration', 'strafeMultiplier'];
-const shipFields = ['pos.x', 'pos.y', 'vel.x', 'vel.y', 'facingRad', 'isDead', 'isPlayer', 'teamId', 'visibilityMask', 'visibilityOverflow', 'visibleToPlayer', 'visibleToEnemy', 'isPhased', 'shield.isActive', 'shield.radius', 'shield.currentArcDeg', 'shield.phaseChargeDownDuration', 'flux.isOverloaded', 'flux.overloadTimer', 'flux.isVenting', 'system.blocksWeapons', 'system.chargeDownDuration'];
+// Target observation/range policy consumes these scalars on read-only owner views too.
+const shipFields = ['hullHp', 'maxHullHp', 'hasVastBulk', 'isRetreated', 'isDocked', 'isCollisionless', 'flux.fluxPercent', 'pos.x', 'pos.y', 'vel.x', 'vel.y', 'facingRad', 'isDead', 'isPlayer', 'teamId', 'visibilityMask', 'visibilityOverflow', 'visibleToPlayer', 'visibleToEnemy', 'isPhased', 'shield.type', 'shield.isActive', 'shield.radius', 'shield.currentArcDeg', 'shield.phaseChargeDownDuration', 'flux.isOverloaded', 'flux.overloadTimer', 'flux.isVenting', 'system.blocksWeapons', 'system.chargeDownDuration'];
 const mountFields = ['currentAngleRad', 'ammo', 'isDisabled', 'firingState', 'firingStateTimer', 'burstRemaining', 'burstTimer', 'cooldownTimer', 'barrelIndex', 'fireControlTargetShipId', 'fireControl.reason', 'fireControl.targetKind'];
 const projectileFields = ['sourceShipId', 'isPlayer', 'isFlare', 'didDamage', 'damage', 'damageType', 'flightTimeRemaining', 'rangeRemaining', 'sourceMoveSpeed', 'fadeTime', 'fadeProgress', 'pos.x', 'pos.y', 'vel.x', 'vel.y', 'radius', 'proximityFuse.range', 'isGuided', 'targetShipId', 'facingRad', 'maxTurnRate', 'maxSpeed', 'teamId'] as const;
 export const shipPaths = shipFields.map(s => s.split('.'));
@@ -220,11 +221,19 @@ export class Publisher {
         this.ships = [...ships];
         this.indices = new Map(ships.map((s, i) => [s, i]));
         this.aiByShip = new Map(ais.map(a => [a.ship, a]));
+        // Missing/player AIs are encoding-only shadows, never scheduled or committed.
+        for (const ship of ships) if (!this.aiByShip.has(ship))
+            this.aiByShip.set(ship, new CapitalShipAI(ship, ship));
         this.nodes = ships.map(s => parts(s, this.aiByShip.get(s)!));
+        const copies = new Map<object, any>();
+        const copy = <T extends object>(value: T): T => {
+            if (!copies.has(value)) copies.set(value, structuredClone(value));
+            return copies.get(value);
+        };
         this.models = ships.map((s, index) => {
             const offset = this.ownSlots.length;
             const schema = this.nodes[index].map(([kind, node]) => {
-                let keys = [...new Set([...Object.keys(node).filter(k => primitive(node[k]) && !['tacticalAI', 'currentTargetShip', 'combatShips', 'activationTarget'].includes(k)), ...(kind === 'ship' ? controls : []), ...(kind === 'mount' ? ['fireControlTargetShipId'] : [])])];
+                let keys = [...new Set([...Object.keys(node).filter(k => primitive(node[k]) && !['tacticalAI', 'currentTargetShip', 'combatShips', 'activationTarget', 'parentShip', 'moduleMount', 'moduleFluxBonus', 'moduleHardFluxFraction'].includes(k)), ...(kind === 'ship' ? controls : []), ...(kind === 'mount' ? ['fireControlTargetShipId'] : [])])];
                 if (['engineController', 'engine', 'engineHealth', 'health'].includes(kind)) {
                     // Motion is published, not reimplemented by owners. Keep its original component
                     // inputs locally so validation need not recompute all derived motion/range/muzzles.
@@ -239,7 +248,7 @@ export class Publisher {
                     this.ownSlots.push([node, key]);
                 return { kind, keys };
             });
-            return { index, id: s.id, specId: s.spec.id, isPlayer: s.isPlayer, offset, schema, mountCount: s.weapons.length, mounts: s.weapons.map(m=>({spec:m.spec,slotId:m.slotId,mountType:m.mountType,baseAngleDeg:m.baseAngleDeg,arcDeg:m.arcDeg,x:m.relativePos.x,y:m.relativePos.y})) };
+            return { index, id: s.id, specId: s.spec.id, spec: copy(s.spec), isPlayer: s.isPlayer, offset, schema, mountCount: s.weapons.length, mounts: s.weapons.map(m=>({spec:copy(m.spec),slotId:m.slotId,mountType:m.mountType,baseAngleDeg:m.baseAngleDeg,arcDeg:m.arcDeg,x:m.relativePos.x,y:m.relativePos.y})) };
         });
         this.own = new NumericStore(this.ownSlots.length);
         this.world = new NumericStore(ships.reduce((n, s) => n + shipPaths.length + 1 + motionKeys.length + s.weapons.length * (mountPaths.length + 5), 0));
@@ -304,10 +313,29 @@ export class Publisher {
         return f;
     }
     /** Read/compare only: never overwrite a shared frame while an owner might read it. */
-    matches(engine: CombatEngine, ais: CapitalShipAI[], dt: number): boolean {
+    matches(engine: CombatEngine, ais: CapitalShipAI[], dt: number, derivedWorld = false): boolean {
         if (!this.lastFrame)
             return false;
         const old = this.lastFrame;
+        if (derivedWorld) {
+            // LAN may contain serial-only/read-only ships with dynamic modifier maps.
+            // Validate the values actually observed by owners, not merely scalar storage.
+            let q = 0;
+            const same = (v: unknown) => this.world.equals(q++, v);
+            const muzzle = new Vector2();
+            for (const s of this.ships) {
+                for (const path of shipPaths) if (!same(readPath(s, path))) return false;
+                if (!same(s.flux.getTimeToVent())) return false;
+                const motion = s.getMotionStats();
+                for (const key of motionKeys) if (!same(motion[key])) return false;
+                for (const m of s.weapons) {
+                    for (const path of mountPaths) if (!same(readPath(m, path))) return false;
+                    if (!same(weaponRange(s, m)) || !same(weaponDps(m)) || !same(weaponMuzzleExtent(m))) return false;
+                    weaponMuzzle(s, m, muzzle);
+                    if (!same(muzzle.x) || !same(muzzle.y)) return false;
+                }
+            }
+        }
         if (dt !== old.dt || engine.projectiles.length !== old.projectileCount || ais.length !== old.jobs.length) return false;
         for (const group of this.ownGroups)
             if (!group.codec.matches(this.own, group.node, group.offset)) return false;

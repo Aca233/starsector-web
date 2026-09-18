@@ -268,6 +268,7 @@ export class ShipWeaponControlSystem {
       : undefined;
 
     const manualSlots = manualFireSlots(ship, this.weapons, activeSlotSet, alternatingSlotId);
+    const fireRequests = new Set<string>();
     for (const mount of this.weapons) {
       mount.triggerHeld = false;
       if (mount.isDisabled) {
@@ -338,25 +339,27 @@ export class ShipWeaponControlSystem {
         }
 
         // Manual fire follows the group selection rule, not an invented alignment tolerance.
+        if (ship.isFiringMain && canShipFire && mount.cooldownTimer <= 0 && !mount.spec.isBeam
+          && (mount.firingState === 'CHARGING' || mount.burstRemaining > 0)) fireRequests.add(mount.slotId);
         if (ship.isFiringMain && canShipFire && mount.cooldownTimer <= 0 && manualSlots.has(mount.slotId)) {
           if (activeGroup.mode === 'LINKED') {
-            this.requestWeaponFire(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
+            fireRequests.add(mount.slotId);
           } else if (activeGroup.mode === 'ALTERNATING') {
             // 原版交替模式：本帧只把开火指令发给当前活动挂点，其余挂点禁止击发。
             // 活动权由 advanceAlternatingActive 按时间片轮换，因此两门炮会错开半个周期。
             if (mount.slotId === alternatingSlotId) {
-              this.requestWeaponFire(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
+              fireRequests.add(mount.slotId);
             }
           }
         }
       }
-      // Native advanceAutofire evaluates each weapon independently (including alternating groups).
+      // Aim/safety are per mount; the group scheduler gates new automatic firing cycles below.
       // AI owns all mounts; a manual pilot owns the selected group and opts others into autofire.
       else if (!manualControl || isAutofireSlot) {
         const solution = this.autofire.aim(dt, ship, mount, world);
-        aimTurret(solution?.point ?? null);
+        aimTurret(solution?.point ?? this.autofire.preAim(ship, mount, world));
         if (this.autofire.decide(ship, mount, solution, world, dt) === 'FIRE' && canShipFire && mount.cooldownTimer <= 0) {
-          this.requestWeaponFire(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash);
+          fireRequests.add(mount.slotId);
         }
       }
       // 3. 其余未激活且非自动开火挂点 (Inactive Manual Weapons: Starsector WeaponGroup.java:334)
@@ -372,7 +375,66 @@ export class ShipWeaponControlSystem {
         }
       }
 
+    }
+
+    // Resolve every mount before choosing an automatic group member: an out-of-arc,
+    // empty or obstructed first gun must not starve the rest of the group.
+    const automaticStarts = new Map<string, WeaponGroup>();
+    for (const group of this.weaponGroups) {
+      if (group.mode !== 'ALTERNATING' || (manualControl && (group === activeGroup || !group.isAutofire))) continue;
+      const chosen = this.chooseAutomaticAlternating(group, fireRequests, dt, ship);
+      if (chosen) automaticStarts.set(chosen, group);
+      for (const slotId of group.weaponSlotIds) {
+        const mount = this.weapons.find(w => w.slotId === slotId);
+        // Let an already-started charge/burst finish; alternating controls cycle starts,
+        // not the individual rounds within a burst. Sustained beams retain one owner.
+        const committed = mount && (mount.burstRemaining > 0 || mount.firingState === 'CHARGING'
+          || (mount.spec.isBeam && mount.spec.beamVisualMode === 'BURST' && mount.firingState === 'ACTIVE'));
+        if (slotId !== chosen && !committed) fireRequests.delete(slotId);
+      }
+    }
+    // Keep emission/lifecycle in authored mount order for flux and deterministic replays.
+    for (const mount of this.weapons) {
+      if (mount.isDisabled) continue;
+      if (fireRequests.has(mount.slotId) && (!manualControl || !activeSlotSet.has(mount.slotId))
+        && !this.autofire.hasFluxBudget(ship, mount, dt)) {
+        fireRequests.delete(mount.slotId);
+        mount.fireControl = { ...mount.fireControl, reason: 'FLUX_BUDGET' };
+      }
+      if (fireRequests.has(mount.slotId) && this.requestWeaponFire(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash)) {
+        const group = automaticStarts.get(mount.slotId);
+        if (group) {
+          group.alternatingIndex = group.weaponSlotIds.indexOf(mount.slotId);
+          group.alternatingElapsed = 0;
+          group.alternatingWasFiring = true;
+          group.alternatingJustSwitched = true;
+        }
+      }
       this.advanceWeaponLifecycle(mount.lifecycleDt ?? dt, mount, ship, canShipFire && ship.system.canFireWeapon(mount), spawnProjectile, spawnBeam, spawnMuzzleFlash);
+    }
+  }
+
+  /** Web automatic groups share the displayed mode, unlike the native independent autofire.
+   * Count real usable mounts and measure spacing from successful starts, never idle scans. */
+  private chooseAutomaticAlternating(group: WeaponGroup, requests: ReadonlySet<string>, dt: number, ship: Ship): string | undefined {
+    const mounts = group.weaponSlotIds.map(id => this.weapons.find(w => w.slotId === id));
+    if (!mounts.length) return;
+    const index = ((group.alternatingIndex % mounts.length) + mounts.length) % mounts.length;
+    const active = mounts[index];
+    // A just-spent launcher still contributes its running cycle to the spacing.
+    const usable = mounts.filter(m => m && !m.isDisabled && (m.ammo >= 1 || m.cooldownTimer > 0
+      || m.burstRemaining > 0 || m.firingState !== 'IDLE'));
+    if (group.alternatingWasFiring) {
+      group.alternatingElapsed = (group.alternatingElapsed ?? 0) + dt;
+      if (active?.spec.isBeam && active.spec.beamVisualMode !== 'BURST') {
+        if (requests.has(active.slotId) && active.firingState !== 'IDLE') return active.slotId;
+      } else if (active && (group.alternatingElapsed ?? 0) + 1e-9 < this.getAlternatingSlice(active, usable.length, ship)) return;
+    }
+    for (let offset = group.alternatingWasFiring ? 1 : 0; offset < mounts.length + (group.alternatingWasFiring ? 1 : 0); offset++) {
+      const mount = mounts[(index + offset) % mounts.length];
+      if (mount && requests.has(mount.slotId) && !mount.isDisabled && mount.ammo >= 1
+        && mount.firingState === 'IDLE' && mount.burstRemaining <= 0 && mount.cooldownTimer <= 0
+        && !(mount.reloadDelayRemaining! > 0)) return mount.slotId;
     }
   }
 
@@ -387,8 +449,8 @@ export class ShipWeaponControlSystem {
    *   爆发光束时间片 = (burstDuration + burstCooldown + chargeup + chargedown) / 炮数
    *   持续光束不轮换 (原版只在 isBurstBeam 分支里 selectNextActive)
    *
-   * 故障/无弹挂点会被立即跳过（原版 findNextWeaponFrom 跳过 getAmmo()<=0），
-   * 因此单个坏挂点既不会卡死整组，也不会白占一个时间片。
+   * 故障/开火前已无弹的挂点会被跳过；刚打出最后一发的挂点仍完成本次时间片，
+   * 避免单发鱼雷组在相邻帧把整组打空。
    */
   private advanceAlternatingActive(group: WeaponGroup, dt: number, ship: Ship): void {
     const slotIds = group.weaponSlotIds;
@@ -403,8 +465,12 @@ export class ShipWeaponControlSystem {
     let active = mountAt(activeIndex);
     let rotated = false;
 
-    // 活动挂点不可用时立即轮换到下一个可用挂点 (不让坏挂点白占时间片)
-    if (!isFireable(active)) {
+    // Empty BEFORE firing can be skipped. Empty BECAUSE the current trigger just
+    // launched its last round must finish its slice, or single-shot Reapers drain
+    // the whole group one frame apart and look like a linked salvo.
+    const finishingSpentCycle = !!active && !active.isDisabled && active.ammo < 1
+      && group.alternatingWasFiring && (active.cooldownTimer > 0 || active.burstRemaining > 0 || active.firingState !== 'IDLE');
+    if (!isFireable(active) && !finishingSpentCycle) {
       const nextIndex = this.findNextFireableAlternatingIndex(group, startIndex);
       if (nextIndex === undefined) {
         // 整组都不可击发：本帧不开火，指针保持不动 (不空转)
@@ -488,7 +554,10 @@ export class ShipWeaponControlSystem {
           ? 3.0
           : Math.max(0, burstSize - 1) * (spec.burstDelay ?? 0) + spec.refireDelay + (spec.chargeTime ?? 0);
     }
-    return Math.max(1 / 240, cycle / count / Math.max(.001, ship.system.getWeaponRateOfFireMultiplier(spec.weaponType)));
+    const rate = this.weaponClockRate(mount, ship);
+    if (spec.isBeam) cycle -= (spec.beamBurstDelay ?? 0) * (1 - 1 / rate);
+    else cycle /= rate;
+    return Math.max(1 / 240, cycle / count);
   }
 
   /** Native projectile controller ship/A/if.java and settings.json minRefireDelay=0.05.

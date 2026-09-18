@@ -1,3 +1,4 @@
+import { MotionPresence } from './ui/core/MotionPresence';
 import { DEFAULT_PLAYER_HULL } from "./engine/data/SandboxDefaults";
 import { readBattleSize } from "./engine/runtime/BattleSizeSettings";
 import { battleTeamLimit } from "./shared/battle-size.mjs";
@@ -311,7 +312,7 @@ export const CombatView: React.FC<{
     handleGameAction(() => game.restartCombat());
   };
 
-  useCombatInput({
+  const combatInput = useCombatInput({
     sessionRef: stableSessionRef,
     canvasRef,
     cameraPosRef,
@@ -386,7 +387,7 @@ export const CombatView: React.FC<{
           <small>本次损伤不改变设计方案</small>
         </div>
       )}
-      {isPauseMenuOpen && (
+      <MotionPresence>{isPauseMenuOpen && (
         <CombatPauseMenu
           spec={session.engine.playerShip.spec}
           shipName={designName}
@@ -397,7 +398,7 @@ export const CombatView: React.FC<{
           onRestart={game.mode !== "fleet" || !!game.getSnapshot().pendingCombat ? handleReset : undefined}
           onResume={() => setIsPauseMenuOpen(false)}
         />
-      )}
+      )}</MotionPresence>
       {isSettingsOpen && (
         <CombatSettingsMenu
           spec={session.engine.playerShip.spec}
@@ -450,10 +451,9 @@ export const CombatView: React.FC<{
         paused={pauseRequested}
         onPausedChange={setIsPaused}
         autopilot={isAutopilot}
-        onAutopilotChange={(enabled) => {
-          keysPressed.current = {}; isMouseDown.current = false; session.engine.playerShip.clearInput();
-          isAutopilotRef.current = enabled; setIsAutopilot(enabled);
-        }}
+        onAutopilotChange={combatInput.setAutopilot}
+        onShipCommand={combatInput.command}
+        controlNotice={combatInput.controlNotice}
         engine={session.engine}
         hudVisuals={session.hudVisuals}
         scheduler={session.scheduler}

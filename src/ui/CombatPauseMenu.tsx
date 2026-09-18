@@ -1,3 +1,5 @@
+import { MotionPresence } from './core/MotionPresence';
+import { FullscreenButton } from './FullscreenButton';
 import { LocalBattleSizeSettings } from "./BattleSizeControl";
 import { effectiveHullStats } from '../engine/extensions/HullMods';
 import { useState } from "react";
@@ -47,7 +49,10 @@ export function CombatPauseMenu({
           </div>
         </section>
         <div className="combat-pause-actions">
-          <NativeButton className="combat-pause-button" font="action" align="right" onClick={onSettings}>游戏设置</NativeButton>
+          <div className="combat-pause-end-actions">
+            <NativeButton className="combat-pause-button" font="action" align="right" onClick={onSettings}>游戏设置</NativeButton>
+            <FullscreenButton className="combat-pause-button" font="action" align="right" />
+          </div>
           <div className="combat-pause-end-actions">
             {onRestart && <NativeButton className="combat-pause-button" font="action" align="right" onClick={() => setConfirmRestart(true)}>{restartLabel}</NativeButton>}
             <NativeButton className="combat-pause-button" font="action" align="right" onClick={onEnd}>{endLabel}</NativeButton>
@@ -56,12 +61,12 @@ export function CombatPauseMenu({
         </div>
       </div>
     </Modal>
-    {confirmRestart && onRestart && <Modal title={restartLabel + '？'} eyebrow="操作确认" width="small"
+    <MotionPresence>{confirmRestart && onRestart && <Modal title={restartLabel + '？'} eyebrow="操作确认" width="small"
       description="本次战斗进度将被清空，舰船设计和已保存的装配方案不会改变。"
       onClose={() => setConfirmRestart(false)} footer={<>
         <NativeButton onClick={() => setConfirmRestart(false)}>取消</NativeButton>
         <NativeButton onClick={() => { setConfirmRestart(false); onRestart(); }}>确认{restartLabel}</NativeButton>
-      </>}><p>继续后将重新开始本次战斗。</p></Modal>}
+      </>}><p>继续后将重新开始本次战斗。</p></Modal>}</MotionPresence>
     </>
   );
 }

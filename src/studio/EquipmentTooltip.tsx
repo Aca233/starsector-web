@@ -1,10 +1,12 @@
+import { createPortal } from 'react-dom';
+import type { DwellHover, HoverAnchor } from './useDwellHover';
 import { useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
-import type { EquipmentHover } from './useEquipmentHover';
 import './equipment-tooltip.css';
+import { DwellScope, DwellStatus } from './DwellTooltip';
 
 export function EquipmentTooltip({ hover, children, className = '', preferSide = false, positionAnchor }: {
-  hover: EquipmentHover; children: ReactNode; className?: string; preferSide?: boolean | "left"; positionAnchor?: HTMLElement | null;
+  hover: DwellHover; children: ReactNode; className?: string; preferSide?: boolean | "left"; positionAnchor?: HoverAnchor | null;
 }) {
   const ref = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
@@ -25,6 +27,7 @@ export function EquipmentTooltip({ hover, children, className = '', preferSide =
     return () => observer.disconnect();
   }, [hover.active, preferSide, positionAnchor]);
   if (!hover.active) return null;
-  return <aside ref={ref} id={hover.tooltipId} role="tooltip" data-equipment-tooltip className={`equipment-tooltip ${className}`}
-    onMouseEnter={hover.keep} onMouseLeave={hover.leave} onFocus={hover.keep} onBlur={hover.leave}>{children}</aside>;
+  return createPortal(<aside ref={ref} id={hover.tooltipId} role="region" aria-label="装备详情"
+    data-dwell-id={hover.tooltipId} data-dwell-depth={hover.depth} data-dwell-owner={hover.ownerId} data-dwell-locked={hover.locked} data-equipment-tooltip className={`equipment-tooltip ${className}`}
+    onMouseEnter={hover.keep} onMouseLeave={hover.leave} onFocus={hover.keep} onBlur={hover.leave}><DwellScope hover={hover}><DwellStatus hover={hover} />{children}</DwellScope></aside>, hover.active.anchor.closest('.ui-modal') ?? document.body);
 }

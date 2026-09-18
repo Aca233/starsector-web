@@ -49,3 +49,11 @@
 .refit-weapon-tooltip .source-weapon-attribution { display: none; }
 .refit-weapon-tooltip .source-weapon-primary > .source-weapon-icon { width: 44px; height: 44px; align-self: center; justify-self: center; }
 .refit-weapon-tooltip .source-weapon-manufacturer span { color: #c5cbd0; }
+
+/* Dense assembly mounts must not be blocked by an adjacent mount's hover card.
+   F2 opens the full interactive details; keyboard focus can still enter the card. */
+.equipment-tooltip.refit-weapon-tooltip--assembly { pointer-events:none; }
+.equipment-tooltip.refit-weapon-tooltip--assembly:focus-within { pointer-events:auto; }
+.refit-vessel .studio-ship--assembly .studio-mount { --mount-size:12px; }
+.refit-vessel .studio-ship--assembly .studio-mount--medium { --mount-size:18px; }
+.refit-vessel .studio-ship--assembly .studio-mount--large { --mount-size:24px; }

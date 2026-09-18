@@ -310,7 +310,7 @@ export interface WeaponGroup {
   weaponSlotIds: string[];
   alternatingIndex: number;
   /**
-   * 交替射击组当前活动挂点已持续的时间 (秒)。
+   * 交替射击组当前活动挂点已持续的时间 (秒)；自动模式从成功开始的射击周期计时。
    * 对齐 WeaponGroup.advanceAlternating(): 同一时刻只允许活动挂点开火，
    * 活动权按 ((burstSize-1)*burstDelay + refireDelay + chargeTime)/炮数 的时间片轮换。
    */

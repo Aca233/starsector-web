@@ -32,6 +32,15 @@ export interface ContrailStats {
 export class ContrailEngine {
   private strips: Map<number | string, ContrailStrip> = new Map();
 
+  private enabled = true;
+
+  public get isEnabled(): boolean { return this.enabled; }
+  /** A LAN authority has no ribbon renderer; viewers build their own ribbons. */
+  public setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+    if (!enabled) this.clear();
+  }
+
   public addPoint(
     stripId: number | string,
     pos: Vector2,
@@ -42,6 +51,7 @@ export class ContrailEngine {
     color: [number, number, number, number] = [130, 130, 135, 160],
     blendMode: 'NORMAL' | 'GLOW' = 'NORMAL'
   ) {
+    if (!this.enabled) return;
     let strip = this.strips.get(stripId);
     if (!strip) {
       strip = {
@@ -87,6 +97,7 @@ export class ContrailEngine {
   }
 
   public update(dt: number) {
+    if (!this.enabled) return;
     const toDelete: (number | string)[] = [];
 
     for (const [id, strip] of this.strips) {

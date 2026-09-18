@@ -1,5 +1,6 @@
+import { POLICY_TUNING, shipPolicyAction } from './learning/CombatPolicy';
 import type { Ship } from '../simulation/Ship';
-import type { FleetAssignment } from './FleetTactics';
+import { hasAttackOpportunity, type FleetAssignment } from './FleetTactics';
 import { Vector2 } from '../math/Vector2';
 import { signedAngle } from '../math/Angles';
 import { rangeVelocity, velocityToPosition } from './TacticalNavigation';
@@ -7,8 +8,22 @@ import { rangeVelocity, velocityToPosition } from './TacticalNavigation';
 export function fleetEngagementRange(ship: Ship, target: Ship, gunRange: number, assignment?: FleetAssignment): number {
   const clearance = ship.spec.collisionRadius + target.spec.collisionRadius + 8;
   if (assignment?.role === 'CARRIER') return Math.max(clearance, assignment.carrierRange);
-  // The gun profile already stands at 90% of effective range; these stay inside that envelope.
-  return Math.max(clearance, gunRange * (assignment?.role === 'BRAWLER' ? .94 : 1));
+  // Spend weapon reach, not hull clearance: healthy line ships push enough of their
+  // battery into range rather than park at the longest guns' boundary. Artillery
+  // keeps its stand-off role; carriers never inherit the close-assault policy.
+  const role = assignment?.role;
+  const pressure = role === 'BRAWLER' ? .70 : role === 'SKIRMISHER' ? .80 : role === 'ARTILLERY' ? .92 : .84;
+  const caution = Math.max(0, Math.min(1, (ship.flux.fluxPercent - .65) / .25));
+  const opportunity = hasAttackOpportunity(ship, target, assignment?.pressureRatio);
+  const hull = ship.hullHp / Math.max(1, ship.maxHullHp);
+  const damaged = Math.max(0, Math.min(1, (.4 - hull) / .25));
+  const outmatched = Math.max(0, Math.min(1, ((assignment?.pressureRatio ?? 1) - 1.4) / 1.1));
+  const reserve = Math.max(caution, damaged, outmatched);
+  const fraction = (pressure + (1 - pressure) * reserve) * (opportunity ? .72 : 1);
+  let residual = POLICY_TUNING[shipPolicyAction(ship, target)].range;
+  // Learning cannot spend emergency reserves, turn artillery into brawlers or move carriers.
+  if (reserve > .4 || role === 'ARTILLERY') residual = Math.max(1, residual);
+  return clearance + Math.max(0, gunRange - clearance) * Math.min(1.12, fraction * residual);
 }
 
 /** Gentle tangential lane correction, not a direct chord through the enemy's hull. */

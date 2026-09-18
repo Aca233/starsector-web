@@ -28,7 +28,8 @@ export interface SystemWorld {
 }
 export interface SystemAIContext {
   ship: Ship; system?: ShipSystem; target: Ship; distance: number; angleDiff: number;
-  tactical?: { desiredRange:number; withdrawing:boolean; waypoint:boolean; avoidingCollision:boolean; forwardClear:boolean; quietFor:number; threat:import('../../ai/ThreatAssessment').ThreatAssessment };
+  /** False when another movement owner (withdrawal/order) must not be overridden by an attack drive. */
+  tactical?: { allowOffensiveManeuver?:boolean; desiredRange:number; withdrawing:boolean; waypoint:boolean; avoidingCollision:boolean; forwardClear:boolean; quietFor:number; threat:import('../../ai/ThreatAssessment').ThreatAssessment };
 }
 export type SystemWeaponType = 'BALLISTIC' | 'ENERGY' | 'MISSILE';
 export interface SystemWeaponModifiers {

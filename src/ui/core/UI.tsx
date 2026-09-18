@@ -1,3 +1,5 @@
+import { dismissTopHover } from './hover-layers';
+import { UI_EXIT_MS, useMotionExiting } from './motion-state';
 import React, { forwardRef, useId, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, AlertTriangle, Info, CheckCircle2 } from 'lucide-react';
@@ -39,21 +41,25 @@ function syncModalBackground() {
     element.inert = element !== top;
   }
 }
+function modalControls(panel: HTMLElement) {
+  return Array.from(panel.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex="0"]'))
+    .filter(element => element.getClientRects().length > 0 && !element.closest('[inert]'));
+}
 export function Modal({ title, eyebrow = '舰队指挥终端', description, onClose, children, footer, width = 'regular', onShortcut, role = 'dialog', initialFocus = 'first-control', surface = 'glass', titleFont = 'button', className = '' }: {
   title: string; eyebrow?: string; description?: string; onClose?: () => void; children: React.ReactNode;
   footer?: React.ReactNode; width?: 'small' | 'regular' | 'wide' | 'console'; role?: 'dialog' | 'alertdialog';
   onShortcut?: (key: string) => void; initialFocus?: 'first-control' | 'panel'; surface?: NativeSurface; titleFont?: NativeFont; className?: string;
 }) {
+  const exiting = useMotionExiting();
   const id = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const callbacks = useRef({ onClose, onShortcut });
-  useLayoutEffect(() => { callbacks.current = { onClose, onShortcut }; }, [onClose, onShortcut]);
+  const callbacks = useRef({ onClose, onShortcut, exiting });
+  useLayoutEffect(() => { callbacks.current = { onClose, onShortcut, exiting }; }, [onClose, onShortcut, exiting]);
   useLayoutEffect(() => {
     const root = rootRef.current!, panel = panelRef.current!;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const focusables = () => Array.from(panel.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex="0"]'))
-      .filter(element => element.getClientRects().length > 0 && !element.closest('[inert]'));
+    const focusables = () => modalControls(panel);
     modalRoots.push(root); syncModalBackground();
     (initialFocus === 'panel' ? panel : focusables()[0] ?? panel).focus();
     // Snap the viewport-sized backdrop, not the panel: transforming a panel
@@ -69,12 +75,17 @@ export function Modal({ title, eyebrow = '舰队指挥终端', description, onCl
     // Escape belongs to the top dialog even after clicking the dim backdrop
     // moves focus to body. Capture it before the combat window hotkeys.
     const escape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || !root.isConnected || modalRoots.at(-1) !== root) return;
+      if (!root.isConnected || modalRoots.at(-1) !== root) return;
+      // Inert content can move focus to body during exit. Do not let those keys
+      // fall through to combat or the dialog underneath while the fade finishes.
+      if (callbacks.current.exiting) { event.preventDefault(); event.stopImmediatePropagation(); return; }
+      if (event.key !== 'Escape') return;
       event.preventDefault(); event.stopImmediatePropagation();
-      if (!event.repeat) callbacks.current.onClose?.();
+      if (!event.repeat && !dismissTopHover()) callbacks.current.onClose?.();
     };
     const keydown = (event: KeyboardEvent) => {
       if (modalRoots.at(-1) !== root) return;
+      if (callbacks.current.exiting) { event.preventDefault(); event.stopImmediatePropagation(); return; }
       if (event.key === 'Tab') {
         const controls = focusables(), current = controls.indexOf(document.activeElement as HTMLElement);
         if (!controls.length) { event.preventDefault(); panel.focus(); }
@@ -97,14 +108,24 @@ export function Modal({ title, eyebrow = '舰队指挥终端', description, onCl
       observer.disconnect(); window.removeEventListener('resize', snap);
       root.removeEventListener('keydown', keydown);
       window.removeEventListener('keydown', escape, true);
+      const wasTop = modalRoots.at(-1) === root;
       const index = modalRoots.indexOf(root); if (index >= 0) modalRoots.splice(index, 1);
       syncModalBackground();
+      // An older dialog may finish fading beneath a newly opened one. Never
+      // steal focus from that new dialog when the older portal unmounts.
+      if (!wasTop) return;
       if (previousFocus?.isConnected && !previousFocus.closest('[inert]')) previousFocus.focus();
       else modalRoots.at(-1)?.querySelector<HTMLElement>('[role="dialog"], [role="alertdialog"]')?.focus();
     };
   }, [initialFocus]);
-  return createPortal(<div ref={rootRef} className="ui-modal-backdrop" data-combat-input-block>
-    <div ref={panelRef} role={role} aria-modal="true" aria-labelledby={`${id}-title`} aria-describedby={description ? `${id}-description` : undefined}
+  useLayoutEffect(() => {
+    const root = rootRef.current, panel = panelRef.current;
+    // A rapid reopen reuses the portal instead of remounting the focus owner.
+    if (exiting || !panel || modalRoots.at(-1) !== root || panel.contains(document.activeElement)) return;
+    (initialFocus === 'panel' ? panel : modalControls(panel)[0] ?? panel).focus();
+  }, [exiting, initialFocus]);
+  return createPortal(<div ref={rootRef} className="ui-modal-backdrop" data-motion-state={exiting ? "exiting" : "present"} style={{ "--ui-exit-duration": UI_EXIT_MS + "ms" } as React.CSSProperties} data-combat-input-block>
+    <div ref={panelRef} inert={exiting} role={role} aria-modal="true" aria-labelledby={`${id}-title`} aria-describedby={description ? `${id}-description` : undefined}
       tabIndex={-1} className={`ui-modal native-chrome ui-modal--${width} ${className}`} data-native-surface={surface}>
       <NativeBorder /><NativeMaterial />
       <header className="ui-modal-header"><div><div className="ui-eyebrow">{eyebrow}</div><h2 id={`${id}-title`}><NativeBitmapText font={titleFont}>{title}</NativeBitmapText></h2>

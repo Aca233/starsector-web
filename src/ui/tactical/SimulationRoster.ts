@@ -1,7 +1,7 @@
 import { deploymentCost } from '../../engine/simulation/CombatDeployment';
 import source from '../../engine/data/generated/simulation-roster.json';
-import variantText from '../../engine/data/generated/simulation-variants.json?raw';
-import { evaluate, data, hulls, createDesign } from '../../studio/DesignModel';
+import { nativeVariantsForHull } from '../../studio/NativeVariantCatalog';
+import { evaluate, data, hulls, createDesign, type Design } from '../../studio/DesignModel';
 import { importNativeVariant } from '../../studio/NativeVariantImport';
 import { modManager } from '../../engine/modding/ModManager';
 import { contentRegistry } from '../../engine/content/ContentRegistry';
@@ -11,8 +11,9 @@ export const simulationHullCost = (id: string): number => deploymentCost(modMana
 export interface SimulationOption {
   id: string; hullId: string; name: string; variantName: string; cost: number; spec: ShipSpec;
   warnings: string[]; errors: string[]; civilian: boolean; preset: boolean;
+  /** Exact inspected fit, populated lazily; not registered or deployed by reading. */
+  design?: Design;
 }
-const variants = JSON.parse(variantText) as Record<string, Record<string, unknown>[]>;
 const prepare = new WeakMap<SimulationOption, () => SimulationOption>();
 const prepared = new WeakMap<SimulationOption, SimulationOption>();
 /** All runtime refittable hulls and their native fits, not the 30-entry stock opponent shortlist.
@@ -23,16 +24,17 @@ export function simulationRoster(): SimulationOption[] {
   const civilian = new Set(source.roster.filter(entry=>entry.civilian).map(entry=>entry.variant.hullId));
   const roster:SimulationOption[]=[];
   for (const hull of hulls) {
-    const fits = variants[hull.id]?.length ? variants[hull.id] : [undefined];
-    for (const raw of fits) {
+    const nativeFits = nativeVariantsForHull(hull.id);
+    const fits = nativeFits.length ? nativeFits : [undefined];
+    for (const choice of fits) {
+      const raw=choice?.raw;
       const variantId=raw?String(raw.variantId):'default-'+hull.id;
-      const duplicated=!!raw&&fits.filter(fit=>fit?.variantId===raw.variantId).length>1;
-      const id=duplicated?variantId+'--'+Array.from(new TextEncoder().encode(String(raw.catalogSourcePath)),byte=>byte.toString(16).padStart(2,'0')).join(''):variantId;
+      const id=choice?.id??variantId;
       const errors:string[]=[];
       let cost=0;
       try { cost=deploymentCost(hull); } catch(error) { errors.push(error instanceof Error?error.message:String(error)); }
       const option:SimulationOption={id, hullId:hull.id, name:data.ships[hull.id].name,
-        variantName:raw ? String(raw.displayName ?? raw.variantId)+(duplicated?' · '+String(raw.catalogSourcePath).split('/').at(-1)?.replace('.variant',''):'') : '舰体默认装配',
+        variantName:choice?.name ?? '舰体默认装配',
         cost, spec:hull, errors, warnings:[], preset:presets.has(variantId),
         civilian:civilian.has(hull.id)||!!hull.sourceHullTraits?.includes('CIVILIAN')};
       prepare.set(option,()=>{
@@ -44,7 +46,7 @@ export function simulationRoster(): SimulationOption[] {
           const nameKey='sim.'+id+'.name';
           const spec:ShipSpec={...result.spec,id:'sim-'+id,sourceHullId:hull.id,deploymentPoints:cost,nameKey,
             i18n:{zh_CN:{[nameKey]:imported.design.name},en_US:{[nameKey]:imported.design.name}}};
-          return {...option,spec,warnings:imported.warnings,errors:result.errors};
+          return {...option,spec,design:imported.design,warnings:imported.warnings,errors:result.errors};
         } catch(error) { return {...option,errors:[error instanceof Error?error.message:String(error)]}; }
       });
       roster.push(option);
@@ -64,4 +66,16 @@ export function registerSimulationOption(option: SimulationOption): string {
   if(resolved.errors.length)throw new Error(resolved.name+'：'+resolved.errors.join('；'));
   modManager.registerShip(resolved.spec,{allowExistingId:!!contentRegistry.getShip(resolved.spec.id)});
   return resolved.spec.id;
+}
+
+export interface SimulationHull { hullId: string; options: SimulationOption[] }
+/** Keep the original catalog order, but show each hull only once in the deployment grid. */
+export function groupSimulationHulls(options: readonly SimulationOption[]): SimulationHull[] {
+  const groups = new Map<string, SimulationHull>();
+  for (const option of options) {
+    let group = groups.get(option.hullId);
+    if (!group) { group = { hullId: option.hullId, options: [] }; groups.set(option.hullId, group); }
+    group.options.push(option);
+  }
+  return [...groups.values()];
 }

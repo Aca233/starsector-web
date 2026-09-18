@@ -1695,5 +1695,35 @@
       "campaign": "not-applicable",
       "summary": "殉爆伤害×0.1，舰体外扩伤害半径×0.25；不错误缩小舰体本身半径或纯视觉爆炸。"
     }
+  },
+  "vastbulk": {
+    "name": "庞大体积",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [
+      "模块"
+    ],
+    "manufacturer": "通用",
+    "source": "data.hullmods.VastBulk",
+    "builtInOnly": true
+  },
+  "shared_flux_sink": {
+    "name": "共享幅散管道",
+    "cost": {
+      "FRIGATE": 0,
+      "DESTROYER": 0,
+      "CRUISER": 0,
+      "CAPITAL_SHIP": 0
+    },
+    "uiTags": [
+      "模块"
+    ],
+    "manufacturer": "通用",
+    "source": "com.fs.starfarer.api.impl.hullmods.SharedFluxSink",
+    "builtInOnly": true
   }
 }

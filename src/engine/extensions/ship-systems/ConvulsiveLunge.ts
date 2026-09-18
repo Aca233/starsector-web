@@ -1,3 +1,4 @@
+import { offensiveManeuverAllowed } from './SystemAI';
 import { nativeSystem } from './NativeSystemFactory';
 import { Vector2 } from '../../math/Vector2';
 import type { ShipSystem } from '../../simulation/ShipSystem';
@@ -26,5 +27,5 @@ export const convulsiveLunge=nativeSystem('convulsive_lunge',{
     }
     if(system.state==='OUT'||system.state==='IDLE'||system.state==='COOLDOWN')destinations.delete(system);
   },
-  advanceAI:({ship,target,distance,tactical})=>{if(distance>600&&distance<2200&&!tactical?.withdrawing){ship.aimTargetWorld.copy(target.pos);ship.system.activate();}},
+  advanceAI:({ship,target,distance,tactical})=>{if(distance>600&&distance<2200&&offensiveManeuverAllowed(tactical)){ship.aimTargetWorld.copy(target.pos);ship.system.activate();}},
 });

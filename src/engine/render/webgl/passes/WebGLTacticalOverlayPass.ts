@@ -193,7 +193,10 @@ export class WebGLTacticalOverlayPass {
       batcher.drawSprite(whiteTex, x, y, length, width, angle, -0.5, 0, color[0], color[1], color[2], alpha);
     };
     const drawShip = (ship: typeof engine.playerShip, pos: Vector2) => {
-      if (ship.isDead) return;
+      // Debug probes must follow hull visibility too, or hidden/reserve contacts
+      // look like untextured ships (and expose their mounts through sensor fog).
+      if (ship.isDead || ship.isDocked || ship.isRetreated
+        || !ship.isVisibleTo(engine.playerShip.teamId) || !engine.ships.includes(ship)) return;
       batcher.setBlendMode('ADDITIVE');
       // Rotation/pivot center cross.
       drawLine(pos.x - 11, pos.y, 0, 22, 1.5, [0.25, 1.0, 0.55]);

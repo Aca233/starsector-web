@@ -1,4 +1,6 @@
+import { localMuzzleLayer } from '../../LocalMuzzleLayer';
 import { renderMissileEngines, type MissileEngineRenderItem } from '../MissileEngineRenderer';
+import { contrailMayBeVisible } from '../ContrailVisibility';
 import { CombatEngine } from '../../../simulation/CombatEngine';
 import { WebGLPassContext } from '../WebGLPassContext';
 import { Vector2 } from '../../../math/Vector2';
@@ -31,7 +33,7 @@ export class WebGLProjectilePass {
       const contrailTex = textures.getTexture('/game-assets/graphics/fx/contrail64b.png', true);
       ribbonBatcher.begin(batcher.currentViewProj);
       for (const strip of engine.contrailEngine.getStrips()) {
-        if (strip.points.length < 2) continue;
+        if (strip.points.length < 2 || !contrailMayBeVisible(strip.points, ctx.viewport, ctx.zoom)) continue;
         ribbonBatcher.drawStrip(contrailTex, strip.points, strip.color, strip.blendMode);
       }
       ribbonBatcher.end();
@@ -79,11 +81,12 @@ export class WebGLProjectilePass {
     const { batcher, ribbonBatcher, textures, hitGlowTex, alpha } = ctx;
 
     // 3. 绘制枪口开火粒子与火光 (1:1 _class.java:29-54 & SmoothParticle.java)
-    if (engine.muzzleParticles && engine.muzzleParticles.length > 0) {
+    const localMuzzles = localMuzzleLayer(engine.fxSystem);
+    if (engine.muzzleParticles.length || localMuzzles.length) {
       const muzzlePartTex = textures.getTexture('/game-assets/graphics/fx/particlealpha32sq.png');
       for (const mode of ['NORMAL', 'ADDITIVE'] as const) {
         batcher.setBlendMode(mode);
-        for (const p of engine.muzzleParticles) {
+        for (const particles of [engine.muzzleParticles, localMuzzles]) for (const p of particles) {
           if ((p.blendMode ?? 'ADDITIVE') !== mode) continue;
           const brightness = Math.max(0, p.life / p.maxLife);
           const [r, g, b, a] = p.color;

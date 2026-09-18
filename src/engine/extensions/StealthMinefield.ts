@@ -6,7 +6,7 @@ import type { NativeMineWeapon } from './NativeMines';
 interface IncomingMine { point: Vector2; target: Ship; delay: number }
 interface Minefield { source: Ship; weapon: NativeMineWeapon; remaining: number; incoming: IncomingMine[] }
 const fields = new WeakMap<object, Minefield>();
-const eligible = (ship: Ship) => ship.spec.hullSize !== 'FIGHTER' && !ship.isSystemDrone
+const eligible = (ship: Ship) => !ship.isAttachedModule && ship.spec.hullSize !== 'FIGHTER' && !ship.isSystemDrone
   && !(ship.spec.sourceHullTraits ?? []).some(h => h === 'DRONE' || h === 'STATION' || h === 'STATION_MODULE');
 /** StealthMinefield/StealthMinefieldLT: one shared source across both teams/variants. */
 export function advanceStealthMinefield(ship: Ship, dt: number, world: SystemWorld): void {

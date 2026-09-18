@@ -1,3 +1,7 @@
+import { MotionPresence } from '../ui/core/MotionPresence';
+import { FullscreenButton } from '../ui/FullscreenButton';
+import { SteamStart } from "./SteamStart";
+import { steamRequest, type SteamStatus } from "./SteamApi";
 import { readBattleSize } from "../engine/runtime/BattleSizeSettings";
 import { normalizeBattleSize } from "../shared/battle-size.mjs";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
@@ -15,7 +19,8 @@ import type { Design } from "../studio/DesignModel";
 import "./lan.css";
 const LanRoomWorkbench = lazy(() => import("./LanRoomWorkbench").then(m=>({default:m.LanRoomWorkbench})));
 type RoomEntryIntent = {type:"create";battleSize:number} | {type:"join";code:string;password:string};
-export default function LanApp() {
+export default function LanApp({ transport = "lan" }: { transport?: "lan" | "steam" }) {
+  const [steamStatus, setSteamStatus] = useState<SteamStatus | null>(null);
   const [workbenchRoom, setWorkbenchRoom] = useState<Room|null>(null);
   const [lastIdentity,setLastIdentity] = useState("");
   const leavingWorkbench = useRef(false);
@@ -34,7 +39,7 @@ export default function LanApp() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [previewHull] = useState(() => LAN_SHIPS.find(ship=>ship.id===initialHost.get("hull"))?.id ?? LAN_SHIPS[0].id);
   const presetRef = useRef(previewHull);
-  const [connection] = useState(() => new LanConnection());
+  const [connection] = useState(() => new LanConnection(transport));
   const [name, setName] = useState(
       () =>
         initialHost.get("name")?.slice(0, 24) ||
@@ -60,9 +65,28 @@ export default function LanApp() {
     [available, setAvailable] = useState<boolean | null>(null),
     [addresses, setAddresses] = useState<string[]>([]);
   useEffect(() => {
-    document.title = "远行星号 · 局域网联机";
+    document.title = transport === "steam" ? "远行星号 · Steam 联机" : "远行星号 · 局域网联机";
     const abort = new AbortController();
-    fetch("/lan/info", { signal: abort.signal, cache: "no-store" })
+    let steamTimer: ReturnType<typeof setInterval> | undefined;
+    let triedResume = false;
+    if (transport === "steam") {
+      const refresh = async () => {
+        try {
+          const response = await fetch("/steam/status", { signal: abort.signal, cache: "no-store" });
+          if (!response.ok) throw Error("No Steam helper");
+          const status = await response.json() as SteamStatus;
+          if (status.service !== "starsector-web-steam" || abort.signal.aborted) return;
+          setSteamStatus(status); setAvailable(status.available);
+          if (status.name) setName(previous => previous === "玩家" ? status.name.slice(0, 24) : previous);
+          if (!triedResume && status.lobby && connection.saved) {
+            triedResume = true;
+            const saved = new URL(connection.saved.url);
+            if (saved.origin === location.origin.replace(/^http/, "ws") && saved.searchParams.get("lobby") === status.lobby.id) { setConnecting(true); connection.connect(saved.href, connection.saved.name); }
+          }
+        } catch { if (!abort.signal.aborted) { setSteamStatus(null); setAvailable(false); } }
+      };
+      void refresh(); steamTimer = setInterval(() => void refresh(), 2000);
+    } else fetch("/lan/info", { signal: abort.signal, cache: "no-store" })
       .then((r) => {
         if (!r.ok) throw Error("not LAN server");
         return r.json();
@@ -140,6 +164,7 @@ export default function LanApp() {
         }
       }
       if (m.type === "roomClosed" || m.type === "left") {
+        if (transport === "steam") { setWorkbenchRoom(null); setId(""); connection.close(false, false); void steamRequest("leave").then(setSteamStatus, () => {}); }
         activeMatch.current = null;
         setReportOpen(false);
         entryIntent.current=null;setEntering(false);
@@ -173,10 +198,11 @@ export default function LanApp() {
     });
     return () => {
       abort.abort();
+      clearInterval(steamTimer);
       unsub();
       connection.close(false);
     };
-  }, [connection, initialHost]);
+  }, [connection, initialHost, transport]);
   const me=room?.members.find(member=>member.id===id);
   const send=(message:unknown)=>{
     setError("");
@@ -196,6 +222,18 @@ export default function LanApp() {
       connection.connect(url.href,name.trim());
     }
   };
+  const resetSteam = () => {
+    connection.close(true, false); entryIntent.current = null; leavingWorkbench.current = false;
+    setId(""); setRoom(null); setWorkbenchRoom(null); setMatch(null); setConnecting(false); setEntering(false); setReconnecting("");
+  };
+  const selectSteam = (status: SteamStatus, kind: "create" | "join", password: string) => {
+    if (!status.lobby) return;
+    connection.close(false, false);
+    entryIntent.current = kind === "create" ? { type: "create", battleSize: readBattleSize() } : { type: "join", code: status.lobby.code, password };
+    setConnecting(true); setEntering(true); setError("");
+    const url = new URL("/steam/ws", location.href); url.protocol = "ws:"; url.searchParams.set("lobby", status.lobby.id);
+    connection.connect(url.href, name.trim());
+  };
   if(match&&me)return <LanBattle key={match.id} connection={connection} match={match} seat={me.seat as Seat} ended={ended}
     onReturn={()=>{setMatch(null);setEnded(null);}}/>;
   if(workbenchRoom)return <><Suspense fallback={<div className="native-loading">正在打开房间改装台…</div>}>
@@ -203,32 +241,32 @@ export default function LanApp() {
       connection={connection} addresses={addresses} message={error||reconnecting} initial={selectedDesign}
       onViewReport={lastBattle && workbenchRoom.match?.id === lastBattle.match.id ? ()=>setReportOpen(true) : undefined}
       onConfirmed={next=>{selectedRef.current=next;setSelectedDesign(next);rememberSelectedDesign(next);}}
-      onLeave={()=>{leavingWorkbench.current=!!room&&connection.ready;if(leavingWorkbench.current)send({type:"leave"});setWorkbenchRoom(null);}}/>
+      onLeave={()=>{if (transport === "steam") { resetSteam(); void steamRequest("leave").then(setSteamStatus, error=>setError(error.message)); return; } leavingWorkbench.current=!!room&&connection.ready;if(leavingWorkbench.current)send({type:"leave"});setWorkbenchRoom(null);}}/>
   </Suspense>
     {reportOpen && lastBattle && <LanBattleReport match={lastBattle.match} seat={lastBattle.match.players.find(player=>player.id===(id||lastIdentity))?.seat ?? -1} result={lastBattle.result} onReturn={()=>setReportOpen(false)} returnLabel="关闭战报"/>}
   </>;
   return <main className="native-refit-app lan-page lan-entry-page">
-    <h1 className="native-screen-tab"><NativeBitmapText font="caption">局域网联机</NativeBitmapText></h1>
+    <h1 className="native-screen-tab"><NativeBitmapText font="caption">{transport === "steam" ? "Steam 联机" : "局域网联机"}</NativeBitmapText></h1>
     <NativeFrame className="lan-entry-shell">
       <header className="lan-entry-heading"><h2><NativeBitmapText>创建或加入房间</NativeBitmapText></h2><p>选船、改装和分队，都在进入房间后进行。</p></header>
       <ol className="lan-workflow" aria-label="联机操作步骤"><li aria-current="step">1 · 创建 / 加入</li><li>2 · 房间内改装与分队</li><li>3 · 准备 / 开始</li></ol>
       {reconnecting&&<p className="lan-menu-note" role="status">{reconnecting}</p>}
       {error&&<p className="lan-error" role="alert">{error}</p>}
-      <LanStart design={selectedDesign} hull={previewHull} name={name} onNameChange={setName} available={available} connected={!!id}
+      {transport === "steam" ? <SteamStart status={steamStatus} name={name} onName={setName} busy={connecting||entering} onSelected={selectSteam} onRefresh={setSteamStatus} onReset={resetSteam}/> : <LanStart design={selectedDesign} hull={previewHull} name={name} onNameChange={setName} available={available} connected={!!id}
         connecting={connecting||entering||!!room} initialCode={initialCode}
-        onHost={()=>enterRoom({type:"create",battleSize:readBattleSize()})} onJoin={(code,password)=>enterRoom({type:"join",code,password})}/>
-      <footer className="lan-entry-footer"><NativeButton onClick={()=>setHelpOpen(true)}>联机说明</NativeButton><NativeButton onClick={()=>{connection.close();window.location.assign("./");}}>返回主菜单</NativeButton></footer>
+        onHost={()=>enterRoom({type:"create",battleSize:readBattleSize()})} onJoin={(code,password)=>enterRoom({type:"join",code,password})}/>}
+      <footer className="lan-entry-footer"><FullscreenButton /><NativeButton onClick={()=>{if (transport !== "steam") window.location.assign("?view=steam"); else void steamRequest<{url:string}>("lan").then(result=>window.location.assign(result.url),error=>setError(error.message));}} disabled={transport === "steam" && !steamStatus}>{transport === "steam" ? "使用局域网联机" : "Steam 联机"}</NativeButton><NativeButton onClick={()=>setHelpOpen(true)}>联机说明</NativeButton><NativeButton onClick={()=>{if (transport === "steam" && steamStatus) { resetSteam(); void steamRequest("leave").then(()=>window.location.assign("./"),error=>setError(error.message)); } else { connection.close(); window.location.assign("./"); }}}>返回主菜单</NativeButton></footer>
     </NativeFrame>
-      {helpOpen && (
+      <MotionPresence>{helpOpen && (
         <Modal
-          title="局域网联机"
+          title={transport === "steam" ? "Steam 联机说明" : "局域网联机"}
           eyebrow=""
           onClose={() => setHelpOpen(false)}
           footer={
             <NativeButton onClick={() => setHelpOpen(false)}>返回</NativeButton>
           }
         >
-          <div className="lan-help">
+          {transport === "steam" ? <div className="lan-help"><h3>浏览器＋本机启动器</h3><p>每个人先登录 Steam，再运行自己的启动器。创建或加入后，配装、分队、AI 编成和开战流程与局域网相同。</p><h3>邀请与网络</h3><p>在房间中复制完整 Steam 房间号给朋友；Steam 邀请回调只预填房间，不会强制离开当前对局。浏览器不保证显示 Steam 覆盖层。</p><p>当前接入 Steam P2P 消息接口，由 Steam 处理连接和可用中继，不保证特定 SDR 路由或固定延迟。房主仍计算整场战斗，启动器不是云端计算服务器。房主刷新、退出或发生 Steam 大厅所有权转移，不能迁移战斗。</p><h3>测试身份</h3><p>默认 Spacewar AppID 480，仅用于开发联调。正式使用应配置自己的 AppID，并满足 Steamworks 与资源授权要求。房间验证游戏标识和构建版本，避免混入其他 480 测试房间。</p></div> : <div className="lan-help">
             <h3>邀请朋友</h3>
             <p>创建房间后，在房间内点击「邀请朋友」。朋友打开邀请链接，确认房间码与密码后加入；不必单独点击连接服务器。</p>
             {addresses.length ? (
@@ -254,7 +292,7 @@ export default function LanApp() {
               先创建或加入房间，在房间里选择配装和队伍，最后准备。其他真人准备后，房主直接点击开始，无需再点准备；更换配装、队伍、AI 或人数会取消准备。创建房间的玩家负责战斗计算，服务器转发信息。
             </p>
             <h3>使用舰船设计</h3>
-            <p>进入房间后，点击自己的舰船或“更换舰船”，在房间中选船、改装，完成后点击“应用修改”。入房前不再选船，不必另开页面或先保存。编辑时保持房间连接并取消自己的准备，未应用的修改不会改变房间配装；只有明确另存方案才写入本机方案库。已存方案 / JSON 导入保留在次要入口。</p>
+            <p>进入房间后，点击自己的舰船或“更换舰船”，在房间中选船、改装，完成后客机可点击“应用并准备”，也可“仅应用配装”；房主满足条件时可“应用并开始”，有客机需重新确认时只应用配装。入房前不再选船，不必另开页面或先保存。编辑时保持房间连接并取消自己的准备，未应用的修改不会改变房间配装；只有明确另存方案才写入本机方案库。已存方案 / JSON 导入保留在次要入口。</p>
             <p>武器、插件、S-mod、幅能配置、武器组、支持的战斗技能及舰载机随方案同步。准备和加载阶段按同一版本的设计规则校验，开局后不能改装。</p>
             <h3>当前版本</h3>
             <p>
@@ -268,8 +306,8 @@ export default function LanApp() {
               接管；主动退出或席位过期后不能中途加入。房主结束本局会结束全场，刷新房主页面也无法恢复计算。大量舰船的流畅度取决于房主与客机性能和网络，仍有通信字节安全预算；暂不支持主机迁移。
             </p>
             <p>大厅延迟为服务器往返时间，不代表完整操作延迟。</p>
-          </div>
+          </div>}
         </Modal>
-      )}
+      )}</MotionPresence>
   </main>;
 }

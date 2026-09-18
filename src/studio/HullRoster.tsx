@@ -1,10 +1,12 @@
+import { HullInspection } from './HullInspection';
+import { RefitHint } from './RefitHint';
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import { NativeButton } from '../ui/NativeChrome';
 import { runtimeAssetUrl } from '../engine/runtime/RuntimePaths';
 import type { ShipSpec } from '../engine/content/ShipSpec';
 import { data, hulls, nativeRefit } from './DesignModel';
 import type { Design } from './DesignModel';
-import { matchesRefitSearch, refitSearchRank } from './RefitSearch';
+import { matchesRefitSearch, refitSearchRank, hullMatchesCategory, hullSearchAliases, hullAssemblyLabel } from './RefitSearch';
 import { FactionFilter } from './FactionFilter';
 import { factionIndex, matchesFaction } from './FactionModel';
 
@@ -24,10 +26,10 @@ export function HullRoster({ draft, spec, filter, onFilter, readScrollPosition, 
   const search = useRef<HTMLInputElement>(null);
   const locate = useRef(false);
   const matches = useMemo(() => hulls.filter(h => matchesRefitSearch(filter.query,
-    h.id, data.ships[h.id].name, data.ships[h.id].designation, data.ships[h.id].manufacturer,
+    h.id, data.ships[h.id].name, data.ships[h.id].designation, data.ships[h.id].manufacturer, hullSearchAliases(h),
   )), [filter.query]);
   const factionMatches = useMemo(() => matches.filter(h => matchesFaction(filter.faction, factionIndex.hullFactions[h.id])), [matches, filter.faction]);
-  const shown = useMemo(() => factionMatches.filter(h => !filter.hullClass || h.hullSize === filter.hullClass)
+  const shown = useMemo(() => factionMatches.filter(h => hullMatchesCategory(h, filter.hullClass))
     .sort((a, b) => refitSearchRank(filter.query, data.ships[a.id].name, a.id) - refitSearchRank(filter.query, data.ships[b.id].name, b.id)), [factionMatches, filter]);
   const changeFilter = (next: HullFilter) => { writeScrollPosition(0); onFilter(next); };
   useLayoutEffect(() => {
@@ -52,12 +54,17 @@ export function HullRoster({ draft, spec, filter, onFilter, readScrollPosition, 
         {filter.query && <button type="button" className="refit-search-clear" aria-label="清空舰船搜索" onClick={() => {changeFilter({...filter, query: ''}); search.current?.focus();}}>×</button>}
       </div>
       <div className="refit-class-chips" role="group" aria-label="舰级筛选">
-        {classes.map(([id, name]) => <NativeButton font="caption" key={id} aria-pressed={filter.hullClass === id}
-          title={id ? `${name}舰（${factionMatches.filter(h => h.hullSize === id).length} 艘）` : '显示所有舰级'}
-          onClick={() => changeFilter({...filter, hullClass: id})}>{name}</NativeButton>)}
+        {classes.map(([id, name]) => <RefitHint key={id} text={id ? `${name}舰（${factionMatches.filter(h => h.hullSize === id).length} 艘）` : '显示所有舰级'}><NativeButton font="caption" aria-pressed={filter.hullClass === id}
+
+          onClick={() => changeFilter({...filter, hullClass: id})}>{name}</NativeButton></RefitHint>)}
+      </div>
+      <div className="refit-assembly-chips" role="group" aria-label="模块化舰体筛选">
+        {([['STATION','空间站'],['MODULAR','模块化']] as const).map(([id,name]) => <RefitHint key={id} text={`显示全部${name}舰体；同时清除名称和势力筛选`}><NativeButton font="caption"
+          aria-pressed={filter.hullClass===id}
+          onClick={()=>changeFilter({query:'',hullClass:id,faction:''})}>{name} · {hulls.filter(h=>hullMatchesCategory(h,id)).length}</NativeButton></RefitHint>)}
       </div>
       <FactionFilter label="舰船势力筛选" value={filter.faction} onChange={faction => changeFilter({...filter, faction})}
-        memberships={matches.filter(h => !filter.hullClass || h.hullSize === filter.hullClass).map(h => factionIndex.hullFactions[h.id] ?? [])} />
+        memberships={matches.filter(h => hullMatchesCategory(h, filter.hullClass)).map(h => factionIndex.hullFactions[h.id] ?? [])} />
       <div className="refit-filter-actions">
         <button type="button" onClick={goToCurrent}>定位当前舰船</button>
         {(filter.query || filter.hullClass || filter.faction) && <button type="button" onClick={() => changeFilter({query: '', hullClass: '', faction: ''})}>重置筛选</button>}
@@ -67,16 +74,17 @@ export function HullRoster({ draft, spec, filter, onFilter, readScrollPosition, 
       {(inert ? [spec] : shown).map(h => {
         const active = h.id === draft.hullId;
         const unavailable = unavailableReason?.(h);
-        return <button type="button" key={h.id} data-hull-id={h.id} className={'refit-roster-ship ' + (active ? 'is-current' : '')}
-          disabled={!!unavailable} title={unavailable ?? undefined}
+        return <HullInspection key={h.id} spec={h} enabled={!inert} unavailable={unavailable}><button type="button" data-hull-id={h.id} className={'refit-roster-ship ' + (active ? 'is-current' : '')}
+          disabled={!!unavailable}
           aria-pressed={active} aria-label={'改装' + data.ships[h.id].name + '级'} onClick={() => {if (!active) onHull(h.id);}}>
           {/* Keep one image and sizing rule across selection; the detailed fitted ship belongs to the central stage. */}
           <img loading="lazy" draggable={false} className="refit-roster-thumbnail" src={runtimeAssetUrl(h.spriteUrl)} alt="" />
           <span><strong>{data.ships[h.id].name}</strong><small>{data.ships[h.id].designation}{active ? ' · 改装中' : ''}</small>
+            {!!h.modules?.length && <small className="refit-assembly-label">{hullAssemblyLabel(h)} · {h.modules.length} 模块</small>}
             {unavailable && <small className="refit-approx-label">{unavailable}</small>}
             {nativeRefit.shipStatus[h.id]?.level === 'approximate' && <small className="refit-approx-label">基础模拟</small>}
           </span>
-        </button>;
+        </button></HullInspection>;
       })}
       {!inert && !shown.length && <div className="refit-filter-empty"><strong>没有找到舰船</strong><p>试试其他名称、舰级或势力。</p><NativeButton onClick={() => changeFilter({query: '', hullClass: '', faction: ''})}>清除筛选</NativeButton></div>}
     </div>

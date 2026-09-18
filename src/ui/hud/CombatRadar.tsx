@@ -29,13 +29,17 @@ export const CombatRadar: React.FC<CombatRadarProps> = ({ engine }) => {
       const h = canvas.height;
       const cx = w / 2;
       const cy = h / 2;
-      const radarRange = 4000; // 雷达探测最大半径 (SU)
+      const player = engine.playerShip;
+      if (!player) return;
+      // Public multi-team arenas must not lose the far side of the spawn ring off-radar.
+      let radarRange = 4000;
+      if (engine.openBattlefield) for (const ship of engine.capitalShips) {
+        if (!ship.isDead && !ship.isRetreated && !ship.isDocked)
+          radarRange = Math.max(radarRange, player.pos.distanceTo(ship.pos) * 1.12);
+      }
       const scale = (w / 2) / radarRange;
 
       ctx.clearRect(0, 0, w, h);
-
-      const player = engine.playerShip;
-      if (!player) return;
 
       // 1. 战舰与目标投影映射函数 (以玩家为中心)
       const toRadarPos = (worldPos: Vector2) => {
@@ -56,9 +60,9 @@ export const CombatRadar: React.FC<CombatRadarProps> = ({ engine }) => {
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // 3. 绘制敌舰 (红色三角箭头，对齐 iconEnemyColor: [255, 0, 0])
+      // 3. 多队使用固定队色；单机保留原版敌我配色。
       for (const enemy of engine.capitalShips.filter(s => s !== player)) {
-      if (enemy && !enemy.isDead && !enemy.isRetreated && enemy.isVisibleTo(player.teamId)) {
+      if (enemy && !enemy.isDead && !enemy.isRetreated && !enemy.isDocked && enemy.isVisibleTo(player.teamId)) {
         const { rx, ry } = toRadarPos(enemy.pos);
         if (rx >= 0 && rx <= w && ry >= 0 && ry <= h) {
           ctx.save();
@@ -87,7 +91,7 @@ export const CombatRadar: React.FC<CombatRadarProps> = ({ engine }) => {
         ctx.fillStyle = '#4ade80';
         for (const ftr of engine.fighters) {
           ctx.fillStyle = engine.multiTeamBattle ? combatTeamColor(ftr.teamId) : sameTeam(ftr, player) ? '#4ade80' : '#ef4444';
-          if (ftr.isDead || !ftr.isVisibleTo(player.teamId)) continue;
+          if (ftr.isDead || ftr.isRetreated || ftr.isDocked || !ftr.isVisibleTo(player.teamId)) continue;
           const { rx, ry } = toRadarPos(ftr.pos);
           if (rx >= 2 && rx <= w - 2 && ry >= 2 && ry <= h - 2) {
             ctx.fillRect(rx - 1, ry - 1, 2, 2);
@@ -98,7 +102,7 @@ export const CombatRadar: React.FC<CombatRadarProps> = ({ engine }) => {
         ctx.fillStyle = '#60a5fa';
         for (const bmr of engine.bombers) {
           ctx.fillStyle = engine.multiTeamBattle ? combatTeamColor(bmr.teamId) : sameTeam(bmr, player) ? '#60a5fa' : '#ef4444';
-          if (bmr.isDead || !bmr.isVisibleTo(player.teamId)) continue;
+          if (bmr.isDead || bmr.isRetreated || bmr.isDocked || !bmr.isVisibleTo(player.teamId)) continue;
           const { rx, ry } = toRadarPos(bmr.pos);
           if (rx >= 2 && rx <= w - 2 && ry >= 2 && ry <= h - 2) {
             ctx.fillRect(rx - 1.5, ry - 1.5, 3, 3);
@@ -106,14 +110,14 @@ export const CombatRadar: React.FC<CombatRadarProps> = ({ engine }) => {
         }
       }
 
-      // 5. 绘制玩家旗舰 (翠绿三角箭头，对齐 iconFriendColor: [0, 255, 0])
-      if (!player.isDead) {
+      // 5. 旗舰用较大的箭头区分，颜色仍属于实际队伍，不能固定为绿色。
+      if (!player.isDead && !player.isRetreated && !player.isDocked && !engine.deployment.isReserve(player.id)) {
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(player.facingRad);
 
-        ctx.fillStyle = '#22c55e';
-        ctx.strokeStyle = '#86efac';
+        ctx.fillStyle = engine.multiTeamBattle ? combatTeamColor(player.teamId) : '#22c55e';
+        ctx.strokeStyle = engine.multiTeamBattle ? combatTeamColor(player.teamId) : '#86efac';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(8, 0);

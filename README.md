@@ -6,6 +6,29 @@ Current fidelity and verification status: [Visual Fidelity Audit](docs/visual-fi
 Historical M3/M4 completion records do not establish original-game visual parity.
 Project test files and the test runner were removed at the user's request. Do not recreate them or perform manual asset hash/size audits unless explicitly requested.
 
+AI/fire-control foundation and offline learning (experimental, learned policy disabled by default): [architecture, checks and training](docs/ai-learning-foundation-2026-09-18.md).
+
+Rule-based AI improvements: [in-flight fire budget, positioning and verification](docs/ai-fire-budget-and-positioning-2026-09-18.md).
+
+Residual learning on the existing rule AI: [fleet training, held-out evaluation and model status](docs/ai-residual-fleet-learning-2026-09-18.md).
+
+Fixed-mode diagnostics: [paired ablation against the original AI](docs/ai-fixed-mode-ablation-2026-09-18.md).
+
+Component diagnostics: [isolate engagement distance, target utility and observation context](docs/ai-component-ablation-2026-09-18.md).
+
+Distance-only learning: [matched range-feature control, multi-seed training and new holdout](docs/ai-distance-learning-2026-09-18.md).
+
+Fleet target-commitment experiment (rejected; not deployed): [development evidence, counterexamples and frozen validation](docs/ai-fleet-focus-2026-09-18.md).
+
+Shield-budget experiment (rejected; not deployed): [mechanism, counterexamples and frozen evaluation](docs/ai-shield-budget-certainty-2026-09-18.md).
+
+Combined focus/shield experiment (rejected, not deployed): [current-engine factorial controls and independent gates](docs/ai-focus-shield-coordination-2026-09-18.md).
+Multiship recovery diagnosis: [observed failures, rejected explanations](docs/ai-recovery-diagnosis-2026-09-18.md).
+Regroup/recovery priority experiment (rejected, not deployed): [one-expression candidate and causal branch](docs/ai-regroup-recovery-priority-2026-09-18.md).
+Predictive projectile evasion experiment (not deployed): [native motion rollout and real-hit diagnosis](docs/ai-predictive-evasion-2026-09-18.md). Core validation and replay audit pass (576 matches, 65.89% score including timeout half-points). The separate 128-match broad holdout and audit also pass (55.47% score). Current-source replay audit passes, but deployment is withheld: on the updated engine mean frame CPU cost is 3.01x baseline, above the sealed 2.5x limit. Evasion remains disabled pending behavior-preserving optimization.
+
+Navigation/system ownership [contract repair](docs/ai-decision-contracts-2026-09-18.md) is independently integrated: prevent attack drives overriding withdrawal/AVOID/ESCORT/waypoint intent while preserving manual activation and retreat-assisting jets. All 84 AI checks (including 12 permanent regressions), lint/build, exact current-source overlay parity and two neutral full replays pass. This is a command-correctness repair, not a measured win-rate gain, and is not mixed into the evasion results.
+
 ## Requirements
 
 - Node.js 20+ (validated on Node 24)
@@ -32,11 +55,29 @@ npm run dev
 
 The production build is written to `dist/`. There is no `/api/asset` endpoint and Vite is not allowed to read the parent directory.
 
+## Windows multiplayer portable package
+
+Run `npm run package:windows` on Windows x64 with Node 22+ to build a shareable ZIP in `artifacts/releases/`. The package includes the game, portable Node and runtime dependencies. Its default launcher opens multiplayer; friends join the host URL and room code over the same LAN or a separately configured virtual LAN. It does not install VPN software, change firewall rules, or provide a public relay. See [packaging and connection instructions](docs/windows-portable.md).
+
 ## Page navigation
 
 The main menu, ship designer (`?view=design`), character skills (`?view=skills`), and catalog (`?view=catalog`) use URL-backed navigation. Refresh reopens the current screen, and browser Back/Forward restores studio screens without discarding the in-memory design draft. Skills opened from the designer retain their return destination across refresh. Existing draft autosave and cross-tab conflict protection still apply; transient dialogs, filters, and undo history are not restored by the URL.
 
 A simulation launched inside the studio keeps its launching screen URL. Refresh returns to that screen instead of starting a fresh battle; live combat progress is not restored. Browser navigation out of a running simulation asks for confirmation. Explicit developer combat URLs and LAN connection/recovery behavior are unchanged.
+
+## Modular ships and stations
+
+Native modular assemblies are now deployable: the ancient Onslaught, the three station technology lines (tiers 1–3), the Remnant station (standard/damaged fits), the derelict survey mothership and the module test hull. The 13 parent hulls expose 15 source assemblies in the refit/simulation catalog. Module hulls are not separate fleet choices.
+
+Each attachment retains its native anchor, facing and loadout, with independent weapons, armor, hull, shields, flux and fighter decks. Stations remain stationary, rotate axially, and lose their core when their active combat modules are destroyed. Shared Flux Sink redistributes lost combat-module dissipation. Deployment points and fleet losses count the parent once; reserve deployment and LAN presentation snapshots include the complete assembly.
+
+The refit stage displays the complete structure. Click a module hull (polygon hit area) or choose its attachment slot from the module list to edit its weapons, groups, flux, hullmods and fighter decks with a separate OP budget **in place on the complete assembly**. Selection highlights the attachment and reveals its correctly rotated mounts without moving, rotating, resizing or replacing the parent view. Click another module or the parent to change editing context; wheel zoom and Shift-drag pan stay unchanged when switching modules. Clear/restore only the selected module, or undo normally. Edited module overrides are saved with the parent and retained by simulation, LAN and AI loadout identity; module hull replacement/free assembly is not exposed. Remaining native scripted/detachment behavior is still approximate. See [implementation and verification notes](docs/modular-ships-and-stations.md).
+
+To regenerate only this content without refreshing unrelated historical imports:
+
+```powershell
+npm run import:content -- --modules-only
+```
 
 ## Character skills
 
@@ -332,6 +373,14 @@ cross-weapon section in docs/visual-fidelity-audit.md for precise scope and evid
 
 Capital-ship AI now shares a phase-local target/allocation plan: reachable-target scoring, target retention, coarse firepower commitments, separate approach lanes, and cover-seeking for vulnerable ships. Available weapons, effective range, speed and wings select line/brawler/artillery/skirmisher/carrier roles; weak-gun carriers can stand off at wing range instead of being treated as unarmed. Explicit player orders and manual/remote ownership remain authoritative. The four-owner path consumes and validates the same plan, with unchanged simulation frequency. This is additional Web tactical policy, not a full native fleet AI or a measured win-rate improvement. See [scope, evidence, costs and limits](docs/fleet-tactics-2026-09-17.md).
 
+The [withdrawal behavior fix](docs/ai-withdrawal-behavior-2026-09-18.md) separates retreat intent from cover availability: losing a high-flux ally as cover now falls back to disengaging rather than immediately re-engaging under the same pressure. It is active rule code with 12 new regression checks, not an RL deployment or a demonstrated win-rate gain.
+
+The follow-up [cover-arrival velocity experiment](docs/ai-cover-navigation-experiment-2026-09-18.md) was **rejected and reverted**: eliminating reverse world-space requests did not improve mirrored old/new combat (8 wins, 10 losses, 6 timeouts; 45.83% score). The earlier withdrawal-intent fix remains active. Frozen per-team dispatch and head-to-head tooling are retained for further evaluation.
+
+The [fixed-battery precision experiment](docs/ai-fixed-battery-precision-2026-09-18.md) found a real aiming dead-zone stall and verified extra physical hits in an identical-state replay. However, the broad steering change failed its frozen old/new gate (11 wins, 14 losses, 47 timeouts; 47.92% score over 72 matches) and was **rejected and reverted**. Local damage improvement is not treated as overall AI-strength evidence.
+
+The subsequent [hard-flux recovery experiment](docs/ai-hard-flux-recovery-2026-09-18.md) was also **rejected and reverted** after 144 frozen old/new matches (48.26% score). The [fixed-bore targeting candidate](docs/ai-fixed-bore-targeting-2026-09-18.md) was **rejected and reverted** after its independent 288-match validation (49.48% score; interval crosses 50%). Its local firing opportunity gains did not establish overall AI strength.
+
 ## Native combat AI multicore
 
 Normal single-player combat can automatically use four persistent AI owners for supported 50–200 default native Onslaughts on an isolated browser with at least eight logical processors. Mixed/custom ships, unsupported effects/orders, small scenes, missing browser capabilities, and owner failures keep the synchronous path. Motion, weapons and damage remain authoritative on the main thread; no AI frequency or quality reduction is used.
@@ -357,3 +406,9 @@ The [shared AI/fire-control owner experiment](docs/shared-owner-fire-prototype-2
 The independently accepted [scalar ownership codec optimization](docs/simulation-wire-codec-2026-09-17.md) removes dynamic per-field access from the existing four-AI-worker snapshot path. Two opposite-order 600-step paired runs measured a combined **+5.214% complete-step throughput** (43.783 → 41.613 ms; individual gains +3.060% and +7.425%). Numeric semantics, unknown-schema fallback, input invalidation and tick-660 state hashes are preserved. This is an incremental frozen comparison, not cumulative gains, additional fire Workers or screen FPS.
 
 The follow-up [main-thread experiments](docs/simulation-main-thread-experiments-2026-09-17.md) were **not accepted**. Shield broadphase, missile-grid calculation/storage reuse and live target-location hints produced no reliable complete-step gain; two extended grid-reuse runs combined to **−0.328% throughput**. A target-hint boundary failure was also caught before deployment. No runtime code from this round was enabled; earlier accepted optimizations remain unchanged.
+
+## Steam browser launcher (protocol v17)
+
+Steam mode keeps the game in an ordinary browser. Every player runs a small local Steamworks helper; Electron is not required. Use npm run steam to build/start, npm run steam:serve to reuse a build, or npm run package:steam to produce a Windows x64 portable ZIP with a hidden launcher. The default AppID 480 is for Spacewar development testing, not a production release identity. The existing LAN launch/package scripts are preserved.
+
+Steam lobbies and P2P packets bridge into the same room, refit, teams, AI and battle protocol. Share the full Steam lobby ID, not localhost or the six-digit LAN code. Host computation, bounded snapshot recovery and no host migration remain unchanged. Native loading and simulated two-peer protocol checks do not establish real Steam-account or cross-network validation. See [Steam setup and limitations](docs/steam-multiplayer.md).

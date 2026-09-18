@@ -1,4 +1,5 @@
 import config from "./protocol.json";
+import { decodeBinaryState, encodeBinaryState } from "./BinarySnapshot.mjs";
 import { wireBytes } from "./room-fleet.mjs";
 import type { Design } from "../studio/DesignModel";
 export const LAN_PROTOCOL = config.version;
@@ -47,7 +48,7 @@ export interface Match {
   id: string;
   seed: number;
   players: Array<Pick<Member, "id" | "name" | "seat" | "team" | "hull" | "design">>;
-  snapshotHz: 2 | 5 | 10 | 20;
+  snapshotHz: 2 | 5 | 10 | 20 | 60;
   hostId: string;
 }
 export interface Room {
@@ -59,6 +60,7 @@ export interface Room {
   match: Match | null;
   reason?: string;
   options: RoomOptions;
+  network?: { kind: "steam"; lobbyId: string; appId: number };
   passwordProtected: boolean;
   chat: Array<{ id: string; name: string; text: string; time: number }>;
 }
@@ -108,6 +110,7 @@ export class LanConnection {
   private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
   private pingSent = 0;
   private pongAt = 0;
+  private background = false;
   inputSequence = 0;
   actionSequence = 0;
   saved: { token: string; name: string; url: string; build: string } | null =
@@ -124,9 +127,9 @@ export class LanConnection {
     crypto.getRandomValues(new Uint8Array(16)),
     (n) => n.toString(16).padStart(2, "0"),
   ).join("");
-  constructor() {
+  constructor(public readonly transport: "lan" | "steam" = "lan") {
     try {
-      const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY) ?? "null");
+      const saved = JSON.parse(sessionStorage.getItem(this.storageKey) ?? "null");
       if (
         saved?.build === LAN_BUILD &&
         typeof saved.token === "string" &&
@@ -139,6 +142,7 @@ export class LanConnection {
       /* Storage may be unavailable in a private/embedded browser. */
     }
   }
+  private get storageKey() { return STORAGE_KEY + (this.transport === "steam" ? ".steam" : ""); }
   subscribe(fn: Listener) {
     this.listeners.add(fn);
     return () => {
@@ -151,12 +155,37 @@ export class LanConnection {
   private forget() {
     this.saved = null;
     try {
-      sessionStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem(this.storageKey);
     } catch {
       /* optional */
     }
   }
+  /** Visibility, not focus: another window must not disable real network checks. */
+  private onVisibility = () => {
+    const hidden = document.visibilityState === "hidden";
+    if (hidden === this.background) return;
+    this.background = hidden;
+    if (!hidden) {
+      // Old probes/timestamps include browser suspension, not network latency.
+      this.pongAt = performance.now();
+      this.pingSent = 0;
+      this.rttMs = null;
+      this.jitterMs = 0;
+    }
+    if (this.ready) this.send({ type: "visibility", hidden });
+    this.emit({ type: "page-visibility", hidden });
+    if (!hidden) this.probe();
+  };
+  private probe() {
+    const socket = this.socket;
+    // Keep at most one outstanding probe, including while backgrounded.
+    if (!this.ready || !socket || this.pingSent || socket.bufferedAmount !== 0) return;
+    this.pingSent = performance.now();
+    if (!this.send({ type: "ping", sent: this.pingSent })) this.pingSent = 0;
+  }
   connect(url: string, name: string) {
+    this.background = document.visibilityState === "hidden";
+    document.addEventListener("visibilitychange", this.onVisibility);
     clearTimeout(this.retryTimer);
     this.stopped = false;
     this.deadline = 0;
@@ -176,13 +205,14 @@ export class LanConnection {
     old?.close();
     this.ready = false;
     const socket = (this.socket = new WebSocket(this.url));
+    socket.binaryType = "arraybuffer";
     this.handshakeTimer = setTimeout(
       () => {
         if (this.socket === socket && !this.ready) this.retry(socket, 1006);
       },
       Math.min(
-        5000,
-        this.deadline ? Math.max(1, this.deadline - Date.now()) : 5000,
+        this.transport === "steam" ? 15000 : 5000,
+        this.deadline ? Math.max(1, this.deadline - Date.now()) : (this.transport === "steam" ? 15000 : 5000),
       ),
     );
     socket.onopen = () => {
@@ -198,9 +228,18 @@ export class LanConnection {
     };
     socket.onmessage = (event) => {
       if (this.socket !== socket) return;
+      // Drop replaceable views already in flight when the page became hidden.
+      // Heartbeats, room changes and terminal reports must still be processed.
+      if (document.visibilityState === "hidden" && (event.data instanceof ArrayBuffer ||
+          (typeof event.data === "string" && event.data.startsWith('{"type":"state",')))) return;
       let m: any;
       try {
-        m = JSON.parse(event.data);
+        const started = performance.now();
+        m = event.data instanceof ArrayBuffer ? decodeBinaryState(event.data) : JSON.parse(event.data);
+        if (m.type === "state") {
+          this.snapshotBytes = event.data instanceof ArrayBuffer ? event.data.byteLength : event.data.length;
+          this.snapshotParseMs = performance.now() - started;
+        }
       } catch {
         this.emit({ type: "error", message: "无法解析服务器消息" });
         return;
@@ -210,19 +249,19 @@ export class LanConnection {
         this.ready = true;
         this.pongAt = performance.now();
         this.pingSent = 0;
+        this.background = document.visibilityState === "hidden";
+        this.send({ type: "visibility", hidden: this.background });
         clearInterval(this.heartbeatTimer);
         this.heartbeatTimer = setInterval(() => {
           if (this.socket !== socket || !this.ready) return;
+          // Visibility events can be queued behind the first resumed timer.
+          this.onVisibility();
           const now = performance.now();
-          if (now - this.pongAt > 10000) {
+          if (!this.background && now - this.pongAt > 10000) {
             this.retry(socket, 1006);
             return;
           }
-          // One outstanding probe; a blocked TCP queue must not grow with probes.
-          if (!this.pingSent && socket.bufferedAmount === 0) {
-            this.pingSent = now;
-            if (!this.send({ type: "ping", sent: now })) this.pingSent = 0;
-          }
+          this.probe();
         }, 1000);
         this.deadline = 0;
         this.attempts = 0;
@@ -235,15 +274,17 @@ export class LanConnection {
           build: LAN_BUILD,
         };
         try {
-          sessionStorage.setItem(STORAGE_KEY, JSON.stringify(this.saved));
+          sessionStorage.setItem(this.storageKey, JSON.stringify(this.saved));
         } catch {
           /* optional */
         }
       }
       if (m.type === "pong" && m.sent === this.pingSent && this.pingSent > 0) {
         const now = performance.now(), sample = Math.max(0, now - this.pingSent);
-        this.jitterMs = this.rttMs === null ? 0 : this.jitterMs * .8 + Math.abs(sample - this.rttMs) * .2;
-        this.rttMs = this.rttMs === null ? sample : this.rttMs * .7 + sample * .3;
+        if (!this.background) {
+          this.jitterMs = this.rttMs === null ? 0 : this.jitterMs * .8 + Math.abs(sample - this.rttMs) * .2;
+          this.rttMs = this.rttMs === null ? sample : this.rttMs * .7 + sample * .3;
+        }
         this.pongAt = now;
         this.pingSent = 0;
       }
@@ -291,16 +332,26 @@ export class LanConnection {
       Math.min(4000, 500 * 2 ** this.attempts++, remaining),
     );
   }
-  /** Bound snapshot backlog; allow tiny command packets ahead, never another substantial world. */
-  sendSnapshot(message: unknown): "sent" | "skipped" | "oversized" | "disconnected" {
+  /** Last received state packet length; a cheap approximate size for diagnostics. */
+  snapshotBytes = 0;
+  snapshotParseMs = 0;
+  /** Bound snapshot backlog; reuse the JSON and UTF-8 length produced by our own Worker. */
+  sendSnapshot(matchId: string, seq: number, frame: { json?: string; binary?: ArrayBuffer; bytes: number }): "sent" | "skipped" | "oversized" | "disconnected" {
     if (this.socket?.readyState !== WebSocket.OPEN) return "disconnected";
     if (this.socket.bufferedAmount > 16384) return "skipped";
     try {
-      const encoded = JSON.stringify(message);
-      if (new TextEncoder().encode(encoded).byteLength > LAN_MAX_SNAPSHOT_BYTES) return "oversized";
-      this.socket.send(encoded);
+      if (frame.binary instanceof ArrayBuffer) {
+        if (this.transport !== "lan" || frame.bytes !== frame.binary.byteLength) return "disconnected";
+        if (frame.bytes >= LAN_MAX_SNAPSHOT_BYTES) return "oversized";
+        this.socket.send(encodeBinaryState(matchId, seq, frame.binary));
+        return "sent";
+      }
+      if (typeof frame.json !== "string") return "disconnected";
+      const prefix = JSON.stringify({ type: "state", matchId, seq }).slice(0, -1) + ',"frame":';
+      if (!Number.isSafeInteger(frame.bytes) || frame.bytes < 0 || frame.bytes + new TextEncoder().encode(prefix).byteLength + 1 > LAN_MAX_SNAPSHOT_BYTES) return "oversized";
+      this.socket.send(prefix + frame.json + "}");
       return "sent";
-    } catch { return "disconnected"; }
+    } catch (error) { return error instanceof RangeError ? "oversized" : "disconnected"; }
   }
   send(message: unknown): boolean {
     if (
@@ -322,8 +373,9 @@ export class LanConnection {
       return false;
     }
   }
-  close(intentional = true) {
+  close(intentional = true, clearListeners = true) {
     this.stopped = true;
+    document.removeEventListener("visibilitychange", this.onVisibility);
     clearTimeout(this.handshakeTimer);
     clearTimeout(this.retryTimer);
     clearInterval(this.heartbeatTimer);
@@ -335,6 +387,6 @@ export class LanConnection {
     this.socket = null;
     this.ready = false;
     socket?.close();
-    this.listeners.clear();
+    if (clearListeners) this.listeners.clear();
   }
 }

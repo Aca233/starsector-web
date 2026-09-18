@@ -2,6 +2,13 @@ import { signedAngle } from '../../math/Angles';
 import { combatWeaponRange } from '../../simulation/WeaponRange';
 import type { SystemAIContext, SystemWeaponType } from './Types';
 
+/** Attack drives must respect the navigation owner; defensive jets/weapon boosts are separate.
+ * Optional context preserves direct/native callbacks without a navigation context. */
+export function offensiveManeuverAllowed(tactical: SystemAIContext['tactical']): boolean {
+  return tactical?.allowOffensiveManeuver !== false && !tactical?.withdrawing && !tactical?.waypoint
+    && !tactical?.avoidingCollision && tactical?.forwardClear !== false;
+}
+
 /** Conservative Web policies, not a claim to reproduce native system AI. */
 function canActivate({ ship }: SystemAIContext): boolean {
   return ship.system.available && !ship.system.disabled && !ship.system.isActive && !ship.system.isCoolingDown

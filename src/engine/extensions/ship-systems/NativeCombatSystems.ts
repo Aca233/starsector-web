@@ -4,7 +4,7 @@ import type { ShipSystem } from '../../simulation/ShipSystem';
 import type { SystemAIContext, SystemModifiers, SystemWorld, SystemWeaponModifiers } from './Types';
 import { nativeSystem } from './NativeSystemFactory';
 import { mineStrike } from './MineStrike';
-import { advanceJetsAI, advanceWeaponBoostAI } from './SystemAI';
+import { advanceJetsAI, advanceWeaponBoostAI, offensiveManeuverAllowed } from './SystemAI';
 
 const allWeapons = (value: SystemWeaponModifiers): SystemModifiers['weapons'] => ({ BALLISTIC: value, ENERGY: value, MISSILE: value });
 const alive = (ship: Ship) => !ship.isDead && ship.hullHp > 0;
@@ -21,8 +21,7 @@ function defensiveAI({ ship, system = ship.system, tactical }: SystemAIContext):
   }
 }
 function driveAI({ ship, target, distance, tactical, angleDiff }: SystemAIContext): void {
-  const useful = alive(target) && !!tactical?.forwardClear && !tactical.avoidingCollision
-    && !tactical.waypoint && !tactical.withdrawing && Math.abs(angleDiff) < .2
+  const useful = alive(target) && !!tactical && offensiveManeuverAllowed(tactical) && Math.abs(angleDiff) < .2
     && ship.getFlameoutRatio() < 1 && distance > tactical.desiredRange + 200;
   if (ship.system.isActive && ship.system.definition.toggle) {
     if (!useful) ship.system.deactivate();
