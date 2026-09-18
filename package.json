@@ -1,7 +1,7 @@
 {
   "name": "starsector-web",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -20,7 +20,7 @@
     "steam": "npm run build && node server/steam-launcher.mjs",
     "steam:serve": "node server/steam-launcher.mjs",
     "package:steam": "node scripts/package-windows.mjs --steam",
-    "ai:check": "tsc -p tsconfig.ai.json --pretty false && node scripts/check-combat-ai.mjs && node scripts/check-fleet-learning.mjs && node scripts/check-fleet-ablation.mjs && node scripts/check-fleet-components.mjs && node scripts/check-distance-learning.mjs && node scripts/check-ai-withdrawal.mjs && node scripts/check-ai-system-intent.mjs",
+    "ai:check": "tsc -p tsconfig.ai.json --pretty false && node scripts/check-combat-ai.mjs && node scripts/check-fleet-learning.mjs && node scripts/check-fleet-ablation.mjs && node scripts/check-fleet-components.mjs && node scripts/check-distance-learning.mjs && node scripts/check-ai-withdrawal.mjs && node scripts/check-ai-system-intent.mjs && node scripts/check-ai-advance.mjs",
     "ai:train": "node scripts/train-combat-ai.mjs",
     "ai:evaluate": "node scripts/train-combat-ai.mjs --episodes 0",
     "ai:benchmark": "node scripts/benchmark-combat-tactics.mjs",
@@ -29,10 +29,14 @@
     "ai:fleet-components": "node scripts/ablate-fleet-components.mjs",
     "ai:fleet-ablate": "node scripts/ablate-fleet-ai.mjs",
     "ai:fleet-evaluate": "node scripts/train-fleet-ai.mjs --episodes 0",
-    "release:manifest": "node scripts/create-update-manifest.mjs"
+    "release:manifest": "node scripts/create-update-manifest.mjs",
+    "desktop": "npm run build && electron .",
+    "desktop:start": "electron .",
+    "package:electron": "node scripts/package-electron.mjs"
   },
   "dependencies": {
     "@msgpack/msgpack": "3.1.3",
+    "electron-updater": "6.8.9",
     "lucide-react": "^1.45.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
@@ -46,10 +50,16 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^4.3.4",
+    "electron": "44.4.2",
+    "electron-builder": "26.15.3",
     "esbuild": "^0.25.12",
     "oxlint": "^1.81.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~5.7.2",
     "vite": "^6.2.0"
-  }
+  },
+  "main": "desktop/main.mjs",
+  "description": "Unofficial ship-design studio and combat sandbox for desktop and browser",
+  "author": "Aca233",
+  "license": "UNLICENSED"
 }

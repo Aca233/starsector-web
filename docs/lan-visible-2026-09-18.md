@@ -16,6 +16,6 @@ createLanWorld 之前仅在至少三队时开启公开战场；双队使用传�
 
 ## 运行状态
 
-候选构建：artifacts/lan-visible-preview。替换 3005 被执行策略拦截，未尝试绕过；当前 3005 仍为此前 fixed60 构建，修复尚未生效。
+构建：artifacts/lan-visible-preview。替换 3005 曾被执行策略拦截，原 3005 保持不变。用户随后明确要求启动新的实例，现已在 http://127.0.0.1:3007/?view=lan 正常启动修复版（PID 56528）；HTTP 200 与构建标识核对通过。3007 包含舰体可见性修复、固定 60Hz 目标，AI 多 Worker 默认关闭。
 
 证据位于 artifacts/lan-visible：before.json、after.json、render-result.json、deployment-status.json。诊断浏览器与临时 Vite 服务已经关闭。

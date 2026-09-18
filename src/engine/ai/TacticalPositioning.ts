@@ -1,6 +1,6 @@
 import type { Ship } from '../simulation/Ship';
 import type { WeaponMount } from '../simulation/Weapon';
-import type { TacticalWorld } from './TacticalWorld';
+import { tacticalPolicy, type TacticalWorld } from './TacticalWorld';
 import type { CombatProfile } from './ShipCombatProfile';
 import { weaponDps, weaponRange } from './ShipCombatProfile';
 import { isPointDefense } from './AutofireController';
@@ -35,13 +35,19 @@ export function forecastCombatPosition(ship: Ship, desired: Vector2): Vector2 {
   }
   return pos;
 }
-function battery(ship: Ship, world: TacticalWorld): Gun[] {
+function battery(ship: Ship, world: TacticalWorld, stationkeeping = false): Gun[] {
   const envelope = world.weaponThreatEnvelope?.get(ship);
   const guns = envelope ? envelope.mounts.map((mount, i) => ({ mount, range: envelope.ranges[i], power: envelope.dps[i] }))
     : ship.weapons.filter(m => !m.isDisabled && m.ammo >= 1).map(mount => ({ mount, range: weaponRange(ship, mount), power: weaponDps(mount) }));
   // A bounded advisory sample; actual firing still checks EVERY mount's exact geometry.
   const offense = guns.filter(g => !isPointDefense(g.mount) && g.power > 0 && Number.isFinite(g.range + g.power));
-  return offense.sort((a, b) => b.power - a.power || a.mount.slotId.localeCompare(b.mount.slotId)).slice(0, 8);
+  // Match navigation's sustained battery. A long-range missile shot must not make
+  // a gunship think it is already in a useful firing position. Enemy threat samples
+  // still include missiles; missile-only ships retain their actual offense.
+  const sustained = stationkeeping ? offense.filter(g => g.mount.spec.weaponType !== 'MISSILE'
+    && g.mount.spec.spawnType !== 'MISSILE' && !g.mount.spec.aiHints?.includes('STRIKE')) : [];
+  return (sustained.length ? sustained : offense)
+    .sort((a, b) => b.power - a.power || a.mount.slotId.localeCompare(b.mount.slotId)).slice(0, 8);
 }
 function intersects(start: Vector2, end: Vector2, center: Vector2, radius: number): boolean {
   const delta = end.clone().sub(start), length2 = delta.dot(delta);
@@ -59,7 +65,7 @@ export function chooseCombatVelocity(ship: Ship, target: Ship, desired: Vector2,
   if (ship.isPhased || ship.flux.isVenting || ship.flux.isOverloaded || ship.system.locksTurning
     || !target.isVisibleTo(ship.teamId) || !(stats.maxSpeed > 0) || !Number.isFinite(profile.range)
     || ship.pos.distanceTo(target.pos) > profile.range * 2.5) return unchanged();
-  const guns = battery(ship, world), ownPower = guns.reduce((n, g) => n + g.power, 0);
+  const guns = battery(ship, world, true), ownPower = guns.reduce((n, g) => n + g.power, 0);
   if (ownPower <= 0) return unchanged();
   const targetPos = target.pos.clone().addScaled(target.vel, HORIZON);
   const nearby = world.ships.filter(other => other !== ship && other !== target && !other.isDead && !other.isPhased
@@ -135,8 +141,15 @@ export function chooseCombatVelocity(ship: Ship, target: Ship, desired: Vector2,
     candidates.push(v);
   }
   candidates.push(desired.clone().scale(.5), new Vector2());
+  // This advisor may route around crossfire, not cancel an ENGAGE approach forever.
+  // Preserve at least the existing half-speed candidate's inward progress outside
+  // the requested range. Hard collision avoidance runs afterwards and may still stop;
+  // fleet/flux withdrawal and explicit orders never enter this advisor.
+  const minimumApproach = ship.pos.distanceTo(target.pos) > profile.range + tacticalPolicy.positionTolerance
+    ? Math.max(0, desired.dot(radial)) * .5 : 0;
   let best = baseline;
   for (const v of candidates) {
+    if (minimumApproach > 0 && v.dot(radial) < minimumApproach - 1e-8) continue;
     const candidate = score(v);
     if (candidate.total > best.total + .12) {
       best = candidate; result.velocity = v; result.adjusted = true;

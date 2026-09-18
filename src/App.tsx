@@ -14,6 +14,11 @@ export function App() {
   const [studioRequested, setStudioRequested] = useState(view === "catalog" || view === "skills" || view === "design");
   const [entryError, setEntryError] = useState("");
   const enterLan = async () => {
+    // The desktop host prepares the service when it sees this navigation.
+    // Do not probe a missing Steam endpoint or ask a browser launcher to start another server.
+    if (navigator.userAgent.includes("StarsectorDesktop/")) {
+      window.location.assign("?view=lan"); return;
+    }
     try {
       const response = await fetch("/steam/status", { cache: "no-store" });
       if (response.ok && (await response.json()).service === "starsector-web-steam") {

@@ -31,7 +31,7 @@ Navigation/system ownership [contract repair](docs/ai-decision-contracts-2026-09
 
 ## Requirements
 
-- Node.js 20+ (validated on Node 24)
+- Node.js 22.12+ (validated on Node 24; Electron tooling requires 22.12+)
 - npm
 - A modern browser with WebGL2 for combat rendering. Canvas2D remains in use for HUD/offscreen texture work, but it is not a combat fallback.
 
@@ -54,6 +54,10 @@ npm run dev
 ```
 
 The production build is written to `dist/`. There is no `/api/asset` endpoint and Vite is not allowed to read the parent directory.
+
+## Electron desktop application
+
+Run `npm run desktop` to open the game in Electron. `npm run package:electron` creates a Windows x64 NSIS installer and standalone ZIP, with isolated LAN/Steam backend processes and installer-specific updates. Browser launchers remain supported. See [desktop usage, packaging and data migration](docs/electron-desktop.md).
 
 ## Windows multiplayer portable package
 

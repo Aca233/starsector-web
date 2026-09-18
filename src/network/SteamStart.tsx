@@ -27,8 +27,8 @@ export function SteamStart({ status, name, onName, busy: connecting, onSelected,
     finally { setBusy(false); setConfirm(null); }
   };
   return <section className="lan-start lan-entry-controls" aria-label="Steam 创建或加入房间">
-    <p className="lan-menu-note">游戏仍在浏览器中运行。每位 Steam 玩家都要先登录 Steam，并运行自己的轻量启动器；不要把本机网页地址发给朋友。</p>
-    {!status ? <div className="lan-help"><h2>请先启动 Steam 联机启动器</h2><p>普通网页不能直接调用 Steam。请双击启动包内的「启动 Steam 联机」，它会自动打开本页面。不需要 Electron。</p><p>源码开发可在项目目录运行 <code>npm run steam</code>。</p></div> : <>
+    <p className="lan-menu-note">每位 Steam 玩家都要先登录 Steam，并运行自己的 Electron 桌面版或轻量启动器；不要把本机网页地址发给朋友。</p>
+    {!status ? <div className="lan-help"><h2>请先启动 Steam 联机启动器</h2><p>普通网页不能直接调用 Steam。Electron 桌面版点击 Steam 联机入口会自动启动后台；浏览器版请双击启动包内的「启动 Steam 联机」。</p><p>源码开发可在项目目录运行 <code>npm run steam</code>。</p></div> : <>
       <p role="status">{status.available ? 'Steam 已连接：' + status.name : status.error || 'Steam 尚未连接'}{status.testApp ? ' · Spacewar 480 开发测试' : ' · AppID ' + status.appId}</p>
       {!status.available && <NativeButton disabled={locked} onClick={() => void action('retry')}>已登录 Steam，重试连接</NativeButton>}
       {status.lobby && <div className="lan-help"><p>启动器仍在 Steam 房间 {status.lobby.id}。{status.occupied ? '请使用已经连接的游戏页面，不要重复打开多个控制页面。' : '可等待原页面重连；如需重建，请先离开旧房间。'}</p><NativeButton disabled={locked} onClick={() => setConfirm('leave')}>离开旧 Steam 房间</NativeButton></div>}

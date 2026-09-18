@@ -48,6 +48,7 @@ jobs:
       - run: npm run package:windows -- --version $env:RELEASE_VERSION
       - run: npm run package:steam -- --skip-build --version $env:RELEASE_VERSION
       - run: npm run release:manifest -- --version $env:RELEASE_VERSION
+      - run: npm run package:electron -- --skip-build --version $env:RELEASE_VERSION
       - name: Publish complete stable release
         shell: pwsh
         env:
@@ -60,6 +61,13 @@ jobs:
           $files = @($manifestPath)
           foreach ($variant in @('multiplayer', 'steam')) {
             $files += Join-Path $PWD "artifacts/releases/$($manifest.packages.$variant.asset)"
+          }
+          $desktop = Get-Content -LiteralPath (Join-Path $PWD 'artifacts/electron/latest-build.json') -Raw | ConvertFrom-Json
+          if ($desktop.version -ne $env:RELEASE_VERSION) { throw 'Electron version does not match release' }
+          foreach ($name in @("Starsector-Web-Desktop-Setup-${env:RELEASE_VERSION}-x64.exe", "Starsector-Web-Desktop-Setup-${env:RELEASE_VERSION}-x64.exe.blockmap", "Starsector-Web-Desktop-${env:RELEASE_VERSION}-x64.zip", 'latest.yml')) {
+            $asset = Join-Path $desktop.output $name
+            if (-not (Test-Path -LiteralPath $asset -PathType Leaf)) { throw "Missing Electron artifact: $name" }
+            $files += $asset
           }
           # Keep incomplete uploads out of /releases/latest. Never overwrite an existing version.
           gh release create $env:RELEASE_TAG @files --verify-tag --draft --generate-notes --title "Starsector Web $env:RELEASE_TAG"

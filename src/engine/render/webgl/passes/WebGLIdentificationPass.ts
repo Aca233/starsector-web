@@ -1,5 +1,5 @@
 import type { CombatEngine } from '../../../simulation/CombatEngine';
-import { HOSTILE_INDICATOR_COLOR, IDENTIFICATION_ALPHA, missileIdentification, shipIdentification, type IdentificationDiamond } from '../../../visual/IdentificationVisuals';
+import { IDENTIFICATION_ALPHA, missileIdentification, shipIdentification, type IdentificationDiamond } from '../../../visual/IdentificationVisuals';
 import type { WebGLPassContext } from '../WebGLPassContext';
 
 /** Native FF_INDICATORS_LAYER. Not debug geometry and not the selected-target bracket. */
@@ -21,10 +21,10 @@ export function renderIdentificationIndicators(engine: CombatEngine, ctx: WebGLP
     for (let i = 0; i < 3; i++) {
       ribbonBatcher.drawIdentificationDiamond(whiteTex, pos.x, pos.y,
         (radius - i * 0.25) * brightness, (thickness - i * 0.5) * brightness,
-        HOSTILE_INDICATOR_COLOR, Math.floor(255 * IDENTIFICATION_ALPHA * brightness * indicator.alpha) / 255);
+        indicator.color, Math.floor(255 * IDENTIFICATION_ALPHA * brightness * indicator.alpha) / 255);
     }
   };
-  if (layers.has('hull')) for (const ship of engine.ships) if (ship.isVisibleTo(engine.playerShip.teamId)) draw(shipIdentification(ship, engine.playerShip.teamId, alpha, engine.combatTime));
+  if (layers.has('hull')) for (const ship of engine.ships) if (ship !== engine.playerShip && ship.isVisibleTo(engine.playerShip.teamId)) draw(shipIdentification(ship, engine.playerShip.teamId, alpha, engine.combatTime));
   if (layers.has('weapon')) {
     const mineAges = new Map(engine.mines.map(mine => [mine.id, mine.age]));
     for (const projectile of engine.projectiles) draw(missileIdentification(projectile, engine.playerShip.teamId, alpha,
