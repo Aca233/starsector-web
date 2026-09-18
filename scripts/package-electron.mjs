@@ -67,9 +67,26 @@ const artifacts = await build({ projectDir: project, targets: Platform.WINDOWS.c
     directories: { output, buildResources: path.join(project, 'desktop') },
     extraMetadata: { version, main: 'desktop/main.mjs' }, asar: true, npmRebuild: false,
     files: ['desktop/**/*.mjs', 'package.json', '!node_modules/steamworks.js{,/**/*}', '!node_modules/@types{,/**/*}'],
-    extraResources: [{ from: backend, to: 'backend' }, { from: licenses, to: 'licenses' },
+    // electron-builder excludes a FileSet's root node_modules directory, even for extraResources.
+    // Map each backend dependency explicitly so the app never falls back to the developer checkout.
+    extraResources: [{ from: backend, to: 'backend' },
+      ...['ws', '@msgpack/msgpack', 'steamworks.js'].map(name => ({
+        from: path.join(backend, 'node_modules', name), to: 'backend/node_modules/' + name,
+      })), { from: licenses, to: 'licenses' },
       { from: path.join(project, 'docs', 'electron-desktop.md'), to: 'desktop-guide.md' }],
     extraFiles: [{ from: path.join(project, 'node_modules', 'steamworks.js', 'dist', 'win64', 'steam_api64.dll'), to: 'steam_api64.dll' }],
+    afterPack: async ({ appOutDir }) => {
+      const packagedBackend = path.join(appOutDir, 'resources', 'backend');
+      const require = createRequire(path.join(packagedBackend, 'package.json'));
+      for (const name of ['ws', '@msgpack/msgpack', 'steamworks.js']) {
+        const entry = require.resolve(name);
+        if (!entry.startsWith(path.join(packagedBackend, 'node_modules') + path.sep)) {
+          throw Error('Backend dependency escaped the packaged app: ' + name);
+        }
+      }
+      await fs.access(path.join(packagedBackend, 'node_modules', 'steamworks.js', 'dist', 'win64', 'steamworksjs.win32-x64-msvc.node'));
+      await fs.access(path.join(appOutDir, 'steam_api64.dll'));
+    },
     win: { artifactName: 'Starsector-Web-Desktop-${version}-${arch}.${ext}' },
     nsis: { artifactName: 'Starsector-Web-Desktop-Setup-${version}-${arch}.${ext}', oneClick: false,
       perMachine: false, allowElevation: false, allowToChangeInstallationDirectory: true,
