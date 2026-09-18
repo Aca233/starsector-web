@@ -1,0 +1,68 @@
+name: Windows release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing stable version tag, for example v0.1.0'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.13.1'
+          cache: npm
+      - name: Validate stable version tag
+        shell: pwsh
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$') { throw 'Expected stable tag vx.y.z' }
+          $tagCommit = git rev-parse "refs/tags/$env:RELEASE_TAG^{commit}"
+          if ($LASTEXITCODE -ne 0) { throw 'Release tag does not exist' }
+          if ($tagCommit -ne (git rev-parse HEAD)) { throw 'Checkout does not match release tag' }
+          "RELEASE_VERSION=$($env:RELEASE_TAG.Substring(1))" >> $env:GITHUB_ENV
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run package:windows -- --version $env:RELEASE_VERSION
+      - run: npm run package:steam -- --skip-build --version $env:RELEASE_VERSION
+      - run: npm run release:manifest -- --version $env:RELEASE_VERSION
+      - name: Publish complete stable release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if ($env:GH_REPO -cne 'Aca233/starsector-web') { throw 'Configure the updater repository before publishing from a fork' }
+          $manifestPath = Join-Path $PWD 'artifacts/releases/windows-updates.json'
+          $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+          $files = @($manifestPath)
+          foreach ($variant in @('multiplayer', 'steam')) {
+            $files += Join-Path $PWD "artifacts/releases/$($manifest.packages.$variant.asset)"
+          }
+          # Keep incomplete uploads out of /releases/latest. Never overwrite an existing version.
+          gh release create $env:RELEASE_TAG @files --verify-tag --draft --generate-notes --title "Starsector Web $env:RELEASE_TAG"
+          if ($LASTEXITCODE -ne 0) { throw 'Release creation/upload failed; inspect any draft before retrying' }
+          gh release edit $env:RELEASE_TAG --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Publishing draft release failed' }

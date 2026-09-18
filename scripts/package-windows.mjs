@@ -3,10 +3,16 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { build } from 'esbuild';
+import { BOOTSTRAP_VERSION, UPDATE_REPOSITORY, sha256File, versionParts } from '../server/portable-update.mjs';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
-if (args.some(arg => !['--skip-build', '--steam'].includes(arg))) throw Error('Supported options: --skip-build, --steam');
+let version = JSON.parse(await fs.readFile(path.join(project, 'package.json'), 'utf8')).version;
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === '--version' && args[i + 1]) version = args[++i];
+  else if (!['--skip-build', '--steam'].includes(args[i])) throw Error('Supported options: --skip-build, --steam, --version x.y.z');
+}
+versionParts(version);
 const steamMode = args.includes('--steam');
 if (process.platform !== 'win32' || process.arch !== 'x64' || Number(process.versions.node.split('.')[0]) < 22) {
   throw Error('请使用 Windows x64 的 Node.js 22+ 制作此免安装包。');
@@ -36,7 +42,7 @@ await fs.access(nodeLicense);
 
 // Use the parser's dependency graph, but copy the original modules. Bundling would change
 // import.meta.url and accidentally trigger lan-server.mjs's CLI entry inside the launcher.
-const graph = await build({ absWorkingDir: project, entryPoints: steamMode ? ['server/steam-launcher.mjs', 'server/portable-launcher.mjs'] : ['server/portable-launcher.mjs'], outdir: path.join(project, 'node_modules', '.tmp', 'portable-graph'),
+const graph = await build({ absWorkingDir: project, entryPoints: steamMode ? ['server/steam-launcher.mjs', 'server/portable-launcher.mjs', 'server/portable-bootstrap.mjs'] : ['server/portable-launcher.mjs', 'server/portable-bootstrap.mjs'], outdir: path.join(project, 'node_modules', '.tmp', 'portable-graph'),
   bundle: true, write: false, metafile: true, platform: 'node', format: 'esm', packages: 'external', logLevel: 'silent' });
 const inputs = Object.keys(graph.metafile.inputs).sort();
 for (const file of inputs) {
@@ -46,11 +52,11 @@ for (const file of inputs) {
 }
 const externals = new Set(Object.values(graph.metafile.inputs).flatMap(input => input.imports)
   .filter(i => i.external && !i.path.startsWith('node:')).map(i => i.path));
-if ([...externals].some(name => !['ws', '@msgpack/msgpack', ...(steamMode ? ['steamworks.js'] : [])].includes(name))) throw Error(`New external dependencies need packaging: ${[...externals]}`);
+if ([...externals].some(name => !['ws', '@msgpack/msgpack', 'yauzl', ...(steamMode ? ['steamworks.js'] : [])].includes(name))) throw Error(`New external dependencies need packaging: ${[...externals]}`);
 
 const stamp = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai', dateStyle: 'short', timeStyle: 'medium' })
   .format(new Date()).replace(/\D/g, '');
-const id = `Starsector-Web-${steamMode ? "Steam" : "Multiplayer"}-win-x64-${stamp}`;
+const id = `Starsector-Web-${steamMode ? "Steam" : "Multiplayer"}-${version}-win-x64-${stamp}`;
 const output = path.join(project, 'artifacts', 'releases');
 await fs.mkdir(output, { recursive: true });
 const stage = path.join(output, id);
@@ -66,6 +72,10 @@ await copy(nodeLicense, path.join(destination, 'runtime', 'LICENSE.txt'));
 await copy(path.join(project, 'node_modules', 'ws'), path.join(destination, 'node_modules', 'ws'));
 await copy(path.join(project, 'node_modules', '@msgpack', 'msgpack'), path.join(destination, 'node_modules', '@msgpack', 'msgpack'));
 await copy(path.join(project, 'node_modules', '@msgpack', 'msgpack', 'LICENSE'), path.join(destination, 'licenses', 'msgpack.txt'));
+for (const name of ['yauzl', 'pend']) {
+  await copy(path.join(project, 'node_modules', name), path.join(destination, 'node_modules', name));
+  await copy(path.join(project, 'node_modules', name, 'LICENSE'), path.join(destination, 'licenses', `${name}.txt`));
+}
 if (steamMode) {
   await copy(path.join(project, 'node_modules', 'steamworks.js'), path.join(destination, 'node_modules', 'steamworks.js'));
   await copy(path.join(project, 'node_modules', 'steamworks.js', 'LICENSE'), path.join(destination, 'licenses', 'steamworks.js.txt'));
@@ -75,13 +85,13 @@ for (const name of ['react', 'react-dom', 'scheduler', 'lucide-react', 'ws']) {
   await copy(path.join(project, 'node_modules', name, 'LICENSE'), path.join(destination, 'licenses', `${name}.txt`));
 }
 await fs.writeFile(path.join(destination, 'package.json'), JSON.stringify({ name: 'starsector-web-portable',
-  version: '0.0.0', private: true, type: 'module' }, null, 2) + '\n');
+  version, private: true, type: 'module' }, null, 2) + '\n');
 let revision = 'unknown', sourceDirty = true;
 try {
   revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: project, encoding: 'utf8', windowsHide: true }).trim();
   sourceDirty = !!execFileSync('git', ['status', '--porcelain'], { cwd: project, encoding: 'utf8', windowsHide: true }).trim();
 } catch { /* Source archives can be packaged without a git installation. */ }
-const manifest = { id, defaultMode: steamMode ? 'steam' : 'lan', build: buildId, createdAt: new Date().toISOString(), platform: 'win32', arch: 'x64',
+const manifest = { id, version, update: { schema: 1, repository: UPDATE_REPOSITORY, variant: steamMode ? 'steam' : 'multiplayer', bootstrapVersion: BOOTSTRAP_VERSION }, defaultMode: steamMode ? 'steam' : 'lan', build: buildId, createdAt: new Date().toISOString(), platform: 'win32', arch: 'x64',
   nodeVersion: process.version, sourceRevision: revision, sourceDirty, serverFiles: inputs };
 await fs.writeFile(path.join(destination, 'portable-manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 
@@ -91,7 +101,7 @@ const launcher = mode => [
   'if not exist "%~dp0runtime\\node.exe" (',
   '  echo Please extract the ENTIRE ZIP before starting the game.', '  pause', '  exit /b 1', ')',
   'pushd "%~dp0"', 'if errorlevel 1 exit /b 1',
-  `"%~dp0runtime\\node.exe" "%~dp0server\\portable-launcher.mjs"${mode === 'lan' ? ' --lan' : ' --local'} %*`,
+  `"%~dp0runtime\\node.exe" "%~dp0server\\portable-bootstrap.mjs"${mode === 'lan' ? ' --lan' : ' --local'} %*`,
   'set "RESULT=%ERRORLEVEL%"', 'popd', 'if not "%RESULT%"=="0" pause', 'exit /b %RESULT%', '',
 ].join('\r\n');
 if (steamMode) {
@@ -101,7 +111,7 @@ if (steamMode) {
     'base = fso.GetParentFolderName(WScript.ScriptFullName)',
     'shell.CurrentDirectory = base',
     'shell.Environment("PROCESS")("NODE_OPTIONS") = ""', 'shell.Environment("PROCESS")("NODE_PATH") = ""',
-    'command = Chr(34) & base & "\\runtime\\node.exe" & Chr(34) & " " & Chr(34) & base & "\\server\\steam-launcher.mjs" & Chr(34)',
+    'command = Chr(34) & base & "\\runtime\\node.exe" & Chr(34) & " " & Chr(34) & base & "\\server\\portable-bootstrap.mjs" & Chr(34) & " --steam"',
     'shell.Run command, 0, False', '',
   ].join('\r\n');
   await fs.writeFile(path.join(destination, 'SteamLauncher.vbs'), vbs);
@@ -109,10 +119,14 @@ if (steamMode) {
   await fs.writeFile(path.join(destination, '启动游戏.cmd'), hidden);
   await fs.writeFile(path.join(destination, '启动 Steam 联机.cmd'), hidden);
   await fs.writeFile(path.join(destination, '局域网联机.cmd'), launcher('lan'));
-  await fs.writeFile(path.join(destination, '诊断 Steam 联机.cmd'), launcher('lan').replace('portable-launcher.mjs" --lan', 'steam-launcher.mjs"'));
+  await fs.writeFile(path.join(destination, '诊断 Steam 联机.cmd'), launcher('lan').replace('portable-bootstrap.mjs" --lan', 'portable-bootstrap.mjs" --steam'));
   await copy(path.join(project, 'node_modules', 'steamworks.js', 'dist', 'win64', 'steam_api64.dll'), path.join(destination, 'runtime', 'steam_api64.dll'));
 } else await fs.writeFile(path.join(destination, '启动游戏.cmd'), launcher('lan'));
 await fs.writeFile(path.join(destination, '单机试玩.cmd'), launcher('local'));
+const maintenance = flag => launcher('lan').replace(' --lan %*', ' ' + flag + ' %*').replace('if not "%RESULT%"=="0" pause', 'pause');
+await fs.writeFile(path.join(destination, '检查更新.cmd'), maintenance('--check-update'));
+await fs.writeFile(path.join(destination, '回退上一版.cmd'), maintenance('--rollback'));
+await fs.writeFile(path.join(destination, '离线启动.cmd'), launcher('lan').replace(' --lan %*', (steamMode ? ' --steam' : ' --lan') + ' --no-update %*'));
 let readme = `远行星号 Web · Windows 联机免安装包
 
 【一起玩：先确定一位房主】
@@ -186,12 +200,17 @@ Steam 浮层可能无法显示在普通浏览器中，复制房间号始终是�
 
 【可选：原有局域网方式】
 ` + readme.replaceAll('启动游戏.cmd', '局域网联机.cmd');
+readme += `\n【自动更新】\n每次启动先检查 GitHub Releases 稳定版；下载并校验 SHA-256 后使用新版。无网络/校验失败时继续旧版。\n请始终使用最初解压目录的启动脚本。更新安装在 .updates 中，不覆盖旧版或浏览器方案库；开始对局后不更新。\n检查更新.cmd 仅检查；离线启动.cmd 跳过检查；回退上一版.cmd 切回旧版并跳过该问题版本。\n请先退出旧启动器再进行更新或回退。旧版本和失败下载会保留，可能占用额外磁盘空间。\nSteam 隐藏启动的更新进度可用诊断启动器或 .updates/launcher.log 查看。\n`;
 await fs.writeFile(path.join(destination, '先看这里.txt'), '\ufeff' + readme.replaceAll('\n', '\r\n'));
 console.log('创建可直接发送的 ZIP（包含顶层 Starsector-Web 文件夹）……');
 const powershell = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
 command(powershell, ['-NoProfile', '-NonInteractive', '-Command',
   '$ErrorActionPreference="Stop"; Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::CreateFromDirectory($env:STARSECTOR_PACKAGE_STAGE,$env:STARSECTOR_PACKAGE_ZIP,[System.IO.Compression.CompressionLevel]::Optimal,$false)'],
 { ...process.env, STARSECTOR_PACKAGE_STAGE: stage, STARSECTOR_PACKAGE_ZIP: zip });
-const report = { zip, folder: destination, zipBytes: (await fs.stat(zip)).size, ...manifest };
+const sha256 = await sha256File(zip);
+const report = { zip, folder: destination, sha256, zipBytes: (await fs.stat(zip)).size, ...manifest };
 await fs.writeFile(path.join(output, `${id}.json`), JSON.stringify(report, null, 2) + '\n');
+const updateEntry = { schema: 1, repository: UPDATE_REPOSITORY, version, variant: manifest.update.variant,
+  package: { id, asset: path.basename(zip), bytes: report.zipBytes, sha256, build: buildId, bootstrapVersion: BOOTSTRAP_VERSION } };
+await fs.writeFile(path.join(output, `${id}.update.json`), JSON.stringify(updateEntry, null, 2) + '\n');
 console.log(JSON.stringify({ zip, folder: destination, zipMiB: +(report.zipBytes / 1024 ** 2).toFixed(1), node: process.version }, null, 2));

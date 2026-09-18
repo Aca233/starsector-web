@@ -31,3 +31,6 @@ artifacts/
 .tmp-*/
 .playwright-mcp/
 .vite/
+
+# Portable updater state (never part of source or release packages)
+.updates/

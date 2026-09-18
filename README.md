@@ -59,6 +59,10 @@ The production build is written to `dist/`. There is no `/api/asset` endpoint an
 
 Run `npm run package:windows` on Windows x64 with Node 22+ to build a shareable ZIP in `artifacts/releases/`. The package includes the game, portable Node and runtime dependencies. Its default launcher opens multiplayer; friends join the host URL and room code over the same LAN or a separately configured virtual LAN. It does not install VPN software, change firewall rules, or provide a public relay. See [packaging and connection instructions](docs/windows-portable.md).
 
+## Automatic Windows updates
+
+New portable packages check GitHub Releases before launch, verify the matching ZIP with SHA-256, and install updates side by side. Offline startup and rollback scripts are included; browser storage is not modified. Old packages need one manual upgrade. See [automatic updates and release publishing](docs/automatic-updates.md).
+
 ## Page navigation
 
 The main menu, ship designer (`?view=design`), character skills (`?view=skills`), and catalog (`?view=catalog`) use URL-backed navigation. Refresh reopens the current screen, and browser Back/Forward restores studio screens without discarding the in-memory design draft. Skills opened from the designer retain their return destination across refresh. Existing draft autosave and cross-tab conflict protection still apply; transient dialogs, filters, and undo history are not restored by the URL.

@@ -1,7 +1,7 @@
 {
   "name": "starsector-web",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -28,7 +28,8 @@
     "ai:fleet-train": "node scripts/train-fleet-ai.mjs",
     "ai:fleet-components": "node scripts/ablate-fleet-components.mjs",
     "ai:fleet-ablate": "node scripts/ablate-fleet-ai.mjs",
-    "ai:fleet-evaluate": "node scripts/train-fleet-ai.mjs --episodes 0"
+    "ai:fleet-evaluate": "node scripts/train-fleet-ai.mjs --episodes 0",
+    "release:manifest": "node scripts/create-update-manifest.mjs"
   },
   "dependencies": {
     "@msgpack/msgpack": "3.1.3",
@@ -36,7 +37,8 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "steamworks.js": "0.4.0",
-    "ws": "^8.21.3"
+    "ws": "^8.21.3",
+    "yauzl": "3.4.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
