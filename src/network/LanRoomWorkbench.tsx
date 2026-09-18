@@ -41,6 +41,7 @@ export function LanRoomWorkbench({room,id,active,connection,addresses,message,in
   const [aiEditor,setAiEditor]=useState<AiEditTarget|null>(null);
   const [aiReturn,setAiReturn]=useState(false),[aiTeam,setAiTeam]=useState(1);
   const [aiQuery,setAiQuery]=useState(""),[aiBatch,setAiBatch]=useState("1");
+  const [aiHullClass,setAiHullClass]=useState(""),[aiFaction,setAiFaction]=useState("");
   const [aiScroll,setAiScroll]=useState<AiEditTarget["returnScroll"]>();
   const [aiSelection,setAiSelection]=useState<AiEditTarget["returnSelection"]>(null);
   const [seed]=useState(()=>{
@@ -115,7 +116,7 @@ export function LanRoomWorkbench({room,id,active,connection,addresses,message,in
         <LanRoomRoster room={room} id={id} editable={editable} connection={connection} onEdit={onPickHull} send={send} onAddAi={openAi}
           onBusyChange={reportAiBusy} collapsed={collapsedTeams} onToggleTeam={toggleTeam} readScroll={readRosterScroll} onScroll={saveRosterScroll}
           onEditAi={target=>{setAiReturn(false);setAiOpen(undefined);setAiEditor(target);}}/>
-        <div className="lan-room-ai"><LanAiFleet room={room} isHost={isHost} editable={editable&&!aiBusy} entryDisabled={aiBusy} connection={connection} currentDesign={draft} openRequest={aiOpen} openInitially={aiReturn} initialTeam={aiTeam} initialQuery={aiQuery} initialBatch={aiBatch} initialSelection={aiSelection} initialScroll={aiScroll} onEdit={target=>{setAiScroll(target.returnScroll);setAiOpen(undefined);setAiSelection(target.returnSelection);setAiQuery(target.returnQuery??"");setAiBatch(target.returnBatch??"1");setAiTeam(target.team);setAiReturn(true);setAiEditor(target);}}/></div>
+        <div className="lan-room-ai"><LanAiFleet room={room} isHost={isHost} editable={editable&&!aiBusy} entryDisabled={aiBusy} connection={connection} currentDesign={draft} openRequest={aiOpen} openInitially={aiReturn} initialTeam={aiTeam} initialQuery={aiQuery} initialHullClass={aiHullClass} initialFaction={aiFaction} initialBatch={aiBatch} initialSelection={aiSelection} initialScroll={aiScroll} onEdit={target=>{setAiScroll(target.returnScroll);setAiOpen(undefined);setAiSelection(target.returnSelection);setAiQuery(target.returnQuery??"");setAiHullClass(target.returnHullClass??"");setAiFaction(target.returnFaction??"");setAiBatch(target.returnBatch??"1");setAiTeam(target.team);setAiReturn(true);setAiEditor(target);}}/></div>
       </aside>,
       tools:<><LanRoomTools room={room} id={id} addresses={addresses} send={send} connected={active&&connection.ready&&!aiBusy} openSettingsRequest={settingsOpen}/><LanTeamControls room={room} id={id} editable={editable&&!aiBusy} send={send} openRequest={rulesOpen}/></>
     }}/>

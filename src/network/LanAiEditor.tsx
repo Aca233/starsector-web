@@ -10,7 +10,7 @@ export interface AiEditTarget {
   assignment:RoomOptions['assignment']; baseRevision:number;
   returnToRoster?:boolean;
   returnScroll?:{catalog:number;roster:number};
-  returnQuery?:string; returnBatch?:string; returnSelection?:{design:Design;source:string;nativeId?:string;warnings?:string[]}|null;
+  returnQuery?:string; returnHullClass?:string; returnFaction?:string; returnBatch?:string; returnSelection?:{design:Design;source:string;nativeId?:string;warnings?:string[]}|null;
 }
 /** Personal LanRefit stays mounted but suspended; this editor owns only its independent AI draft. */
 export function LanAiEditor({target,connection,roomCode,options,disabledReason,onDone}:{

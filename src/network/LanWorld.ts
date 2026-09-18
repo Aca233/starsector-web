@@ -44,7 +44,9 @@ export function createLanWorld(match: Match) {
   const controlled = new Map<Seat, Ship>();
   engine.multiTeamBattle = true;
   const teams = [...new Set(roster.map(entry=>entry.team))].sort((a,b)=>a-b);
-  engine.openBattlefield = teams.length >= 3;
+  // LAN rooms use an open arena for every team count. Keeping two-team rooms
+  // sensor-limited hid live hulls while their public projectiles/FX stayed visible.
+  engine.openBattlefield = true;
   const positions = new Map(teams.map(team => [team, 0]));
   const counts = new Map(teams.map(team => [team, 0]));
   for (const entry of roster) counts.set(entry.team, counts.get(entry.team)! + 1);
@@ -89,7 +91,7 @@ export function createLanWorld(match: Match) {
     craft.facingRad = craft.sourceCarrier.facingRad; craft.prevFacingRad = craft.facingRad;
   }
   for (const wing of [...engine.playerWings,...engine.enemyWings]) wing.teamId = engine.combatShips.find(ship=>ship.id===wing.carrierId)?.teamId;
-  // The initial frame obeys the same sensor policy as subsequent authority ticks.
+  // The initial frame obeys the same public-arena visibility as subsequent authority ticks.
   updateCombatVisibility(engine.ships, engine.openBattlefield);
   for (const ship of engine.capitalShips)
     ship.currentTargetShip = engine.findHostile(ship) ?? null;

@@ -6,7 +6,7 @@ import { data, hulls, createDesign, evaluate, type Design } from '../studio/Desi
 import { nativeVariantsForHull } from '../studio/NativeVariantCatalog';
 import { LoadoutFlyout, type LoadoutFlyoutOption } from '../ui/LoadoutFlyout';
 import { importNativeVariant } from '../studio/NativeVariantImport';
-import { matchesRefitSearch, hullSearchAliases, hullAssemblyLabel } from '../studio/RefitSearch';
+import { matchesRefitSearch, refitSearchRank, hullMatchesCategory, hullSearchAliases, hullAssemblyLabel } from '../studio/RefitSearch';
 import { lanHullUnavailable, validateLanDesign } from './LanDesign';
 import { roomTeams, teamName, teamColor, type LanConnection, type Room } from './protocol';
 import type { AiFleetEdit } from './room-fleet.mjs';
@@ -21,6 +21,9 @@ import { LanAiInspection } from './LanAiInspection';
 import { useInspectionCodex, type OpenWeaponCodex } from '../studio/useInspectionCodex';
 import { useDwellHover } from '../studio/useDwellHover';
 import { DwellScope } from '../studio/DwellTooltip';
+import { FactionFilter } from '../studio/FactionFilter';
+import { factionIndex, matchesFaction } from '../studio/FactionModel';
+import { RefitHint } from '../studio/RefitHint';
 import './lan-ai-fleet.css';
 
 const hullName = (hull: string) => data.ships[hull]?.name ?? hull;
@@ -99,11 +102,11 @@ function FleetGroupRow({ group, teams, team, revision, disabled, change, onEdit,
 }
 
 /** Selection is local; only explicit, acknowledged commands mutate the room. */
-export function LanAiFleet({ room, isHost, editable, connection, currentDesign, onEdit, openInitially = false, initialTeam = 1, initialQuery = '', initialBatch = '1', initialSelection = null, initialScroll, openRequest, entryDisabled = false }: {
+export function LanAiFleet({ room, isHost, editable, connection, currentDesign, onEdit, openInitially = false, initialTeam = 1, initialQuery = '', initialHullClass = '', initialFaction = '', initialBatch = '1', initialSelection = null, initialScroll, openRequest, entryDisabled = false }: {
   room: Room; isHost: boolean; editable: boolean; connection: LanConnection; currentDesign: Design; onEdit: (target: AiEditTarget) => void;
   entryDisabled?: boolean;
   initialScroll?:AiEditTarget["returnScroll"];
-  openRequest?: {sequence:number;team:number}; openInitially?: boolean; initialTeam?: number; initialQuery?: string; initialBatch?: string; initialSelection?: Selection | null;
+  openRequest?: {sequence:number;team:number}; openInitially?: boolean; initialTeam?: number; initialQuery?: string; initialHullClass?: string; initialFaction?: string; initialBatch?: string; initialSelection?: Selection | null;
 }) {
   const codex = useInspectionCodex();
   const [open, setOpen] = useState(!!openRequest||openInitially), [team, setTeam] = useState(openRequest?.team??initialTeam);
@@ -113,6 +116,8 @@ export function LanAiFleet({ room, isHost, editable, connection, currentDesign, 
   const scroll=useRef(initialScroll??{catalog:0,roster:0});
   useLayoutEffect(()=>{if(open){if(catalogElement.current)catalogElement.current.scrollTop=scroll.current.catalog;if(rosterElement.current)rosterElement.current.scrollTop=scroll.current.roster;}},[open]);
   const [query, setQuery] = useState(initialQuery), [batch, setBatch] = useState(initialBatch);
+  const [hullClass, setHullClass] = useState(initialHullClass), [faction, setFaction] = useState(initialFaction);
+  const searchElement = useRef<HTMLInputElement>(null);
   const [selection, setSelection] = useState<Selection | null>(initialSelection);
   const [error, setError] = useState(''), [notice, setNotice] = useState(''), [pending, setPending] = useState(false);
   const selectionErrors = useMemo(() => {
@@ -142,7 +147,12 @@ export function LanAiFleet({ room, isHost, editable, connection, currentDesign, 
   const allGroups = groupAiFleet(room.options), groups = allGroups.filter(g => solo || g.team === activeTeam);
   const total = allGroups.reduce((s, g) => s + g.count, 0), shown = groups.reduce((s, g) => s + g.count, 0);
   const teams = roomTeams(room.options), teamLabel = solo ? '个人战 · 每艘独立成队' : teamName(activeTeam);
-  const candidates = hulls.filter(spec => matchesRefitSearch(query, spec.id, data.ships[spec.id].name, data.ships[spec.id].designation, hullSearchAliases(spec)));
+  const searchMatches = hulls.filter(spec => matchesRefitSearch(query, spec.id, data.ships[spec.id].name, data.ships[spec.id].designation, data.ships[spec.id].manufacturer, hullSearchAliases(spec)));
+  const factionMatches = searchMatches.filter(spec => matchesFaction(faction, factionIndex.hullFactions[spec.id]));
+  const candidates = factionMatches.filter(spec => hullMatchesCategory(spec, hullClass))
+    .sort((a, b) => refitSearchRank(query, data.ships[a.id].name, a.id) - refitSearchRank(query, data.ships[b.id].name, b.id));
+  const filterChanged = () => { closePicker(); scroll.current.catalog = 0; if (catalogElement.current) catalogElement.current.scrollTop = 0; };
+  const resetFilters = () => { filterChanged(); setQuery(''); setHullClass(''); setFaction(''); };
   const count = Number(batch), validCount = Number.isSafeInteger(count) && count > 0;
   const change: FleetChange = async (edit, message, keepPicker=false) => {
     if (!canEdit || busy.current) return false;
@@ -171,7 +181,7 @@ export function LanAiFleet({ room, isHost, editable, connection, currentDesign, 
     if(await change({operation:'add',team:solo?0:targetTeam,design:option.selection.design,count},'已添加 '+count+' 艘至 '+destination,true)&&!solo)setTeam(targetTeam);
   };
   const switchTeam=(next:number)=>{if(busy.current)return;closePicker();setTeam(next);setError('');setNotice('');};
-  const returnState = () => ({ returnQuery: query, returnBatch: batch, returnSelection: selection, returnScroll:{...scroll.current} });
+  const returnState = () => ({ returnQuery: query, returnHullClass: hullClass, returnFaction: faction, returnBatch: batch, returnSelection: selection, returnScroll:{...scroll.current} });
   const editGroup = (group: AiFleetGroup, scope: 'group' | 'one') => {
     if (disabled) return;
     try {
@@ -207,14 +217,36 @@ export function LanAiFleet({ room, isHost, editable, connection, currentDesign, 
             <h3>1 · 选择舰船 / 方案</h3>
             <div className="lan-ai-source-tools"><NativeButton disabled={pending} onClick={() => selectDesign(currentDesign, '我的当前设计副本')}>复制我的当前设计</NativeButton>
               <LanDesignPicker disabled={pending} onSelect={design => selectDesign(design, '已存 / 导入方案')} returnLabel="返回 AI 编成"/></div>
-            <input className="lan-ai-search-input" aria-label="搜索 AI 舰船" value={query} onChange={event => { closePicker(); setQuery(event.target.value); }} placeholder="搜索名称 / 舰体 / 空间站 / 星堡"/>
-            <div className="lan-ai-assembly-filters" role="group" aria-label="AI 舰体快捷筛选">
-              {['全部','空间站','模块化'].map(label=><button key={label} type="button" disabled={pending}
-                aria-pressed={query===(label==='全部'?'':label)} onClick={()=>{closePicker();setQuery(label==='全部'?'':label);scroll.current.catalog=0;if(catalogElement.current)catalogElement.current.scrollTop=0;}}>{label}</button>)}
-              <span>{candidates.length} 种舰体</span>
+            <div className="refit-roster-filters lan-ai-catalog-filters" aria-label="AI 舰船筛选">
+              <div className="refit-search-field">
+                <input ref={searchElement} type="search" autoComplete="off" aria-label="搜索 AI 舰船" value={query}
+                  onChange={event => { filterChanged(); setQuery(event.target.value); }} placeholder="搜索舰船名称 / ID"
+                  onKeyDown={event => {
+                    if (event.key === 'Escape' && query) { event.preventDefault(); event.stopPropagation(); filterChanged(); setQuery(''); }
+                    if (event.key === 'ArrowDown') { event.preventDefault(); catalogElement.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus(); }
+                  }}/>
+                {query && <button type="button" className="refit-search-clear" aria-label="清空 AI 舰船搜索" onClick={() => { filterChanged(); setQuery(''); searchElement.current?.focus(); }}>×</button>}
+              </div>
+              <div className="refit-class-chips" role="group" aria-label="AI 舰级筛选">
+                {([['','全部'],['FRIGATE','护卫'],['DESTROYER','驱逐'],['CRUISER','巡洋'],['CAPITAL_SHIP','主力']] as const).map(([id, name]) =>
+                  <RefitHint key={id} text={id ? name+'舰（'+factionMatches.filter(spec => spec.hullSize === id).length+' 艘）' : '显示所有舰级'}>
+                    <NativeButton font="caption" aria-pressed={hullClass === id} onClick={() => { filterChanged(); setHullClass(id); }}>{name}</NativeButton>
+                  </RefitHint>)}
+              </div>
+              <div className="refit-assembly-chips" role="group" aria-label="AI 模块化舰体筛选">
+                {([['STATION','空间站'],['MODULAR','模块化']] as const).map(([id,name]) =>
+                  <RefitHint key={id} text={'显示全部'+name+'舰体；同时清除名称和势力筛选'}>
+                    <NativeButton font="caption" aria-pressed={hullClass === id} onClick={() => { filterChanged(); setHullClass(id); setQuery(''); setFaction(''); }}>{name} · {hulls.filter(spec => hullMatchesCategory(spec, id)).length}</NativeButton>
+                  </RefitHint>)}
+              </div>
+              <FactionFilter label="AI 舰船势力筛选" value={faction} onChange={value => { filterChanged(); setFaction(value); }}
+                memberships={searchMatches.filter(spec => hullMatchesCategory(spec, hullClass)).map(spec => factionIndex.hullFactions[spec.id] ?? [])}/>
+              <div className="refit-filter-actions"><span role="status">{candidates.length} / {hulls.length} 种舰体</span>
+                {(query || hullClass || faction) && <button type="button" onClick={resetFilters}>重置筛选</button>}
+              </div>
             </div>
             <div className="lan-ai-catalog-grid" ref={catalogElement} onScroll={event=>{scroll.current.catalog=event.currentTarget.scrollTop;}}>
-              {!candidates.length && <p className="lan-muted">没有匹配的舰船，试试其他名称或舰体 ID。</p>}
+              {!candidates.length && <p className="lan-muted">没有匹配的舰船，请调整条件或重置筛选。</p>}
               {candidates.map(spec => { const reason = lanHullUnavailable(spec), fits = nativeVariantsForHull(spec.id);
                 return <button type="button" className="lan-ai-catalog-choice" data-ai-loadout-anchor key={spec.id} disabled={pending || !!reason}
                   title={reason} aria-pressed={selection?.design.hullId === spec.id} aria-expanded={picker?.hullId === spec.id}
