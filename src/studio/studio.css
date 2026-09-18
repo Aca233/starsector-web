@@ -2856,3 +2856,8 @@ select:focus-visible {
 .assembly-editor small { color:#8caab6; }
 .native-refit-app .refit-grid.has-assembly .refit-vessel { left:0; }
 .refit-grid.has-assembly .refit-fighter-decks { top:calc(210 * var(--u)); }
+
+/* The Pages edition cannot run a native or LAN backend. */
+.native-static-note { margin: 10px 0; max-width: 360px; color: #a6c8d2; font-size: 13px; line-height: 1.7; text-align: center; }
+.native-static-note a { color: #ffda67; text-decoration: underline; }
+.native-static-note a:focus-visible { outline: 2px solid #ffda67; outline-offset: 3px; }

@@ -29,6 +29,14 @@ Predictive projectile evasion experiment (not deployed): [native motion rollout 
 
 Navigation/system ownership [contract repair](docs/ai-decision-contracts-2026-09-18.md) is independently integrated: prevent attack drives overriding withdrawal/AVOID/ESCORT/waypoint intent while preserving manual activation and retreat-assisting jets. All 84 AI checks (including 12 permanent regressions), lint/build, exact current-source overlay parity and two neutral full replays pass. This is a command-correctness repair, not a measured win-rate gain, and is not mixed into the evasion results.
 
+## 在线试玩 / GitHub Pages
+
+[打开浏览器版](https://aca233.github.io/starsector-web/) · [下载桌面版 / 联机版](https://github.com/Aca233/starsector-web/releases/latest)
+
+GitHub Pages 提供舰船设计、角色技能与本地模拟，不托管 LAN 服务，也不能调用本机 Steam。静态构建会将联机入口替换为桌面版下载提示。Pages 不提供本项目的 COOP/COEP 响应头；共享内存 AI 路径不可用时沿用现有串行回退，不关闭浏览器安全机制。
+
+推送到 `master` 后，`.github/workflows/github-pages.yml` 自动构建并部署 `dist`。子目录基路径由 GitHub Pages 配置提供；不上传源码、桌面后台、开发资料或存档。桌面版与浏览器便携包的发布流程保持独立。
+
 ## Requirements
 
 - Node.js 22.12+ (validated on Node 24; Electron tooling requires 22.12+)
