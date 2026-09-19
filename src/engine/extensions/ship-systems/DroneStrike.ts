@@ -1,3 +1,4 @@
+import { needsWings } from './Requirements';
 import { sameTeam } from "../../simulation/CombatTeams";
 import { nativeSystem } from './NativeSystemFactory';
 import { spawnSystemProjectile } from './SystemProjectile';
@@ -16,6 +17,7 @@ function targetFor(ship: Ship, system: ShipSystem): Ship | undefined {
   return target;
 }
 export const droneStrike=nativeSystem('drone_strike',{
+  installReason: needsWings,
   description:'每次消耗600软幅能，将一架现有舰载机从联队分离并转化为终结导弹；母舰正常重建缺员。无人机仍可被击毁，不凭空生成免费弹药。',
   implementationDetails:'DroneStrikeStats：最近机体、原生terminator_missile、系统范围修正、EMP抗性10000、100%抗诱骗、机体/导弹生命周期绑定。飞行采用Web制导，转化抖动不是逐帧原生表现。',
   resources:{weapons:['terminator_missile'],sounds:['system_termination_sequence']},
@@ -53,5 +55,5 @@ export const droneStrike=nativeSystem('drone_strike',{
       return false;
     });
   },
-  advanceAI:({ship,distance,tactical})=>{if(distance<=1500*ship.hullStats.systemRangeMultiplier&&!tactical?.withdrawing&&ship.flux.fluxPercent<.8)ship.system.activate();},
+  advanceAI:({ship,distance,tactical, system = ship.system})=>{if(distance<=1500*ship.hullStats.systemRangeMultiplier&&!tactical?.withdrawing&&ship.flux.fluxPercent<.8)system.activate();},
 });

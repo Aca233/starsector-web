@@ -1,3 +1,6 @@
+import { SystemLoadoutEditor } from './SystemLoadoutEditor';
+import { tacticalSystemIds } from '../engine/extensions/ship-systems/Loadout';
+import { systemBindingLabel } from '../engine/runtime/SystemBindings';
 import { WeaponGroupInspection } from './WeaponGroupInspection';
 import { WeaponInspection } from './WeaponInspection';
 import { useInspectionCodex } from './useInspectionCodex';
@@ -143,7 +146,7 @@ function RefitEditor(props: Props & {moduleContext: ModuleEditorContext}) {
   const { spec, op } = evaluation;
   const errors = [...new Set([...rootEvaluation.errors, ...evaluation.errors])];
   const stats = effectiveHullStats(spec);
-  const systems = [{ definition: shipSystemDefinitions.require(spec.systemType), label: '舰船系统', key: 'F' },
+  const systems = [...tacticalSystemIds(spec).map((id, index) => ({ definition: shipSystemDefinitions.require(id), label: '舰船技能 ' + (index + 1), key: systemBindingLabel(index) })),
     { definition: shipSystemDefinitions.require(spec.defenseSystemType ?? 'NONE'), label: '防御系统', key: '鼠标右键' }];
   const missingBuiltins = (nativeRefit.sourceBuiltInMods?.[draft.hullId] ?? []).filter(id => hullModDefinitions.get(id)?.status !== "implemented" && hullModDefinitions.get(id)?.support?.scope !== "campaign-only");
   const campaignBuiltins = (spec.builtInHullMods ?? []).filter(id => hullModDefinitions.get(id)?.support?.scope === "campaign-only");
@@ -424,6 +427,7 @@ function RefitEditor(props: Props & {moduleContext: ModuleEditorContext}) {
             />
           </div>
           <aside className="refit-stats" aria-label="舰船装配参数">
+            <SystemLoadoutEditor draft={draft} spec={spec} disabled={props.roomLayout?.locked} onChange={onChange}/>
             {caveats.length > 0 && <RefitInfoHover enabled={panel === null} className="refit-import-warning" title={`基础模拟 · ${caveats.length} 项适配说明`}><p>以下原作机制尚未完整重现；导入不等于战斗完全一致。</p><ul>{caveats.map((reason, i) => <li key={i}>{reason}</li>)}</ul></RefitInfoHover>}
             {systems.filter(s => s.definition.id !== 'NONE').map(({ definition: tacticalSystem, label, key }) => <RefitInfoHover key={label} enabled={panel === null} className="refit-system-readiness" available={!tacticalSystem.unavailable}
               title={`${label}：${tacticalSystem.name.replace(/^未适配[:：]\s*/, "")} · ${tacticalSystem.unavailable ? "未接入" : "可用"}`}>

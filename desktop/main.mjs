@@ -21,7 +21,8 @@ const origin = `http://127.0.0.1:${options.port}`;
 const settingsFile = path.join(app.getPath('userData'), 'desktop-settings.json');
 let settings = {};
 try { settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8')); } catch { /* First run or invalid local preferences. */ }
-let mode = options.mode ?? (['local', 'lan', 'steam'].includes(settings.mode) ? settings.mode : 'local');
+// Ordinary launches always start at home; explicit mode arguments also carry the Steam restart handoff.
+let mode = options.mode ?? 'local';
 let win, backend, updater, switching = false, quitting = false, quitPrompt = false, allowQuit = false, unloadCancelled = false;
 const backendRoot = app.isPackaged ? path.join(process.resourcesPath, 'backend') : project;
 let pendingSteamInvite = null, steamEntry = null;
@@ -96,6 +97,7 @@ function updateMenu() {
       { label: '重启并安装已下载的更新', enabled: updater?.ready() ?? false, click: () => updater?.install() },
     ] },
     { label: '帮助', submenu: [
+      { label: '打开联机日志', click: () => { log('[desktop] diagnostic-log version=' + app.getVersion()); shell.showItemInFolder(path.join(app.getPath('userData'), 'desktop.log')); } },
       { label: 'GitHub / 使用说明', click: () => void openProject('https://github.com/Aca233/starsector-web') },
       { label: '关于', click: () => void dialog.showMessageBox(win, { title: '关于 Starsector Web', message: `Starsector Web ${app.getVersion()}`,
         detail: `非官方舰船设计与战斗沙盒\nElectron ${process.versions.electron} · Chromium ${process.versions.chrome}\nSteam AppID ${options.appId}${options.appId === 480 ? '（仅开发测试）' : ''}\n素材权利属于原权利人，非官方发行。` }) },
@@ -187,6 +189,7 @@ function windowBounds() {
 }
 async function ready() {
   fs.mkdirSync(app.getPath('userData'), { recursive: true });
+  log(`[desktop] start version=${app.getVersion()} electron=${process.versions.electron} mode=${mode}`);
   backend = new DesktopBackend({ root: backendRoot, overlay: steamOverlay,
     port: options.port, appId: options.appId, log, failed: message => void backendFailed(message), quitRequested: () => void requestQuit() });
   if (pendingSteamInvite) { backend.receiveSteamInvite(pendingSteamInvite); pendingSteamInvite = null; }

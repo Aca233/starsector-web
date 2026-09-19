@@ -102,8 +102,8 @@ export const empEmitter = nativeSystem('emp', {
     state.elapsed=0;state.interval=nextInterval(world);
     if(s.isActive && s.effectLevel===1)dischargeEmpEmitter(ship,world,state);
   },
-  advanceAI: ({ship,target,distance,tactical}) => {
+  advanceAI: ({ship,target,distance,tactical, system = ship.system}) => {
     if(!target.isDead && !target.isPhased && distance<500+ship.spec.collisionRadius+target.spec.collisionRadius
-      && ship.flux.fluxPercent<.65 && !tactical?.withdrawing)ship.system.activate();
+      && ship.flux.fluxPercent<.65 && !tactical?.withdrawing)system.activate();
   },
 });

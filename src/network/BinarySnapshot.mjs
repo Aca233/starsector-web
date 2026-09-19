@@ -1,5 +1,14 @@
 import { Encoder, Decoder } from '@msgpack/msgpack';
 import protocol from './protocol.json' with { type: 'json' };
+import { KEY_DICTIONARY } from './KeyDictionary.mjs';
+
+// One bounded, frozen lookup constructed at module load, never per frame.
+const keyCodes = Object.freeze(Object.assign(Object.create(null),
+  Object.fromEntries(KEY_DICTIONARY.map((key, code) => [key, code]))));
+function dictionaryKey(code) {
+  if (!Number.isInteger(code) || code < 0 || code >= KEY_DICTIONARY.length) throw Error('Invalid binary snapshot key');
+  return KEY_DICTIONARY[code];
+}
 
 const LIMIT = protocol.maxSnapshotBytes, MAX_DEPTH = 128;
 // The library still owns traversal, undefined handling and transfer-safe copies.
@@ -35,6 +44,13 @@ const decoderOptions = {
   mapKeyConverter(key) {
     if (typeof key !== 'string' || ['__proto__', 'prototype', 'constructor'].includes(key)) throw Error('Invalid binary snapshot key');
     return key;
+  },
+};
+// Preserve legacy UTF-8 fallback while applying the same SWF2-only key rule.
+const dictionaryDecoderOptions = {
+  ...decoderOptions,
+  mapKeyConverter(key) {
+    return decoderOptions.mapKeyConverter(typeof key === 'number' ? dictionaryKey(key) : key);
   },
 };
 const utf8 = new TextEncoder(), text = new TextDecoder('utf-8', { fatal: true });
@@ -137,6 +153,64 @@ export function encodeBinaryFrame(frame) {
   if (encoded.byteLength > LIMIT) throw new RangeError('Binary snapshot exceeds budget');
   return encoded;
 }
+
+// This entry point is for captureCombat's newly-created declarative projection,
+// not a user object with accessors/iterators. Validate while writing instead of
+// traversing the large projection once in compatible() and again in Encoder.
+// Keep encodeBinaryFrame's legacy two-pass behavior for arbitrary callers.
+// No values/keys bypass validation. SWF2 prefixes a key-only MessagePack variant.
+// Numbers/scalars retain the production writers (non-integer numbers: float64).
+const incompatible = {};
+class ProjectedSnapshotEncoder extends SnapshotEncoder {
+  reinitializeState() {
+    super.reinitializeState();
+    this.writeU32(0x53574632); // SWF2, included in the library's one owned output copy.
+  }
+  doEncode(value, depth) {
+    if (depth > this.maxDepth) throw Error('Snapshot exceeds maximum depth');
+    if (value == null) this.encodeNil();
+    else if (typeof value === 'number') { if (!Number.isFinite(value)) throw incompatible; this.encodeNumber(value); }
+    else if (typeof value === 'string') { if (!validString(value)) throw incompatible; this.encodeString(value); }
+    else if (typeof value === 'boolean') this.encodeBoolean(value);
+    else if (typeof value !== 'object' || ArrayBuffer.isView(value) || value instanceof Date) throw incompatible;
+    else if (Array.isArray(value)) this.encodeArray(value, depth);
+    else this.encodeMap(value, depth);
+  }
+  encodeMap(value, depth) {
+    const keys = Object.keys(value);
+    let count = 0;
+    for (const key of keys) {
+      if (!validKey(key)) throw incompatible;
+      if (value[key] !== undefined) count++;
+    }
+    if (count < 16) this.writeU8(0x80 + count);
+    else if (count < 65536) { this.writeU8(0xde); this.writeU16(count); }
+    else { this.writeU8(0xdf); this.writeU32(count); }
+    for (const key of keys) {
+      const item = value[key];
+      if (item !== undefined) {
+        const code = keyCodes[key];
+        if (code === undefined) this.encodeString(key);
+        else this.writeU8(code); // 0..127 positive fixint, ONLY in map-key position.
+        this.doEncode(item, depth + 1);
+      }
+    }
+  }
+}
+const projectedEncoder = new ProjectedSnapshotEncoder({ ignoreUndefined: true, maxDepth: MAX_DEPTH });
+/** Fresh captureCombat projection only. Null retains the existing JSON fallback. */
+export function encodeProjectedBinaryFrame(frame) {
+  try {
+    // encode() owns its output; the next encode must not mutate transferred bytes.
+    const bytes = projectedEncoder.encode(frame);
+    if (bytes.length > LIMIT) throw new RangeError('Binary snapshot exceeds budget');
+    return bytes;
+  } catch (error) {
+    if (error === incompatible) return null;
+    throw error;
+  }
+}
+
 // A complete, preflighted frame needs no streaming container-state machine.
 // Cache only owned short string bytes, never a view into a received frame.
 const decodedStrings = new Array(1024);
@@ -145,7 +219,7 @@ const longText = new TextDecoder('utf-8');
 const legacyUtf8 = {};
 class SnapshotReader {
   offset = 0;
-  constructor(bytes) { this.bytes = bytes; this.view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength); }
+  constructor(bytes, dictionary = false) { this.bytes = bytes; this.view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength); this.dictionary = dictionary; }
   string(length) {
     const start = this.offset, end = start + length, bytes = this.bytes;
     this.offset = end;
@@ -176,7 +250,8 @@ class SnapshotReader {
   map(length) {
     const result = {};
     for (let i = 0; i < length; i++) {
-      const key = this.read();
+      let key = this.read();
+      if (this.dictionary && typeof key === 'number') key = dictionaryKey(key);
       if (typeof key !== 'string' || key === '__proto__' || key === 'prototype' || key === 'constructor') throw Error('Invalid binary snapshot key');
       result[key] = this.read();
     }
@@ -216,14 +291,18 @@ class SnapshotReader {
   }
 }
 export function decodeBinaryFrame(buffer) {
-  const bytes = bytesOf(buffer);
+  const packet = bytesOf(buffer);
+  const dictionary = packet.length >= 4 && packet[0] === 83 && packet[1] === 87 && packet[2] === 70 && packet[3] === 50;
+  // Count the SWF2 prefix toward the SAME total budget; preflight depth is unchanged.
+  if (dictionary && packet.length > LIMIT) throw new RangeError('Binary snapshot exceeds budget');
+  const bytes = dictionary ? packet.subarray(4) : packet;
   preflight(bytes);
-  try { return new SnapshotReader(bytes).read(); }
+  try { return new SnapshotReader(bytes, dictionary).read(); }
   catch (error) {
     // Preserve the pinned library's legacy handling of malformed short UTF-8.
     if (error !== legacyUtf8) throw error;
     // Decoder retains its input/partial stack; never share this instance.
-    return new Decoder(decoderOptions).decode(bytes);
+    return new Decoder(dictionary ? dictionaryDecoderOptions : decoderOptions).decode(bytes);
   }
 }
 function validHeader(header) {

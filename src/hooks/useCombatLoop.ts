@@ -32,7 +32,7 @@ export function syncCombatPresentationAudio(session: CombatSession, presentation
     weaponLoopAudio.set(session, weaponAudio);
   }
   weaponAudio.sync(session.engine.ships, presentationReady && session.state === 'running' && !session.engine.battleResult, sound);
-  syncSystemAudio(player.system, presentationReady && session.state === 'running' && !player.isDead && !session.engine.battleResult);
+  syncSystemAudio(player.allSystems, presentationReady && session.state === 'running' && !player.isDead && !session.engine.battleResult);
   if (!presentationReady || session.state !== 'running' || session.engine.battleResult) {
     sound.stopLoop('flux_flush_loop');
     return;

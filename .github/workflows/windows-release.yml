@@ -45,15 +45,24 @@ jobs:
           "RELEASE_VERSION=$($env:RELEASE_TAG.Substring(1))" >> $env:GITHUB_ENV
       - run: npm ci
       - run: npm run lint
+      # Keep failing network gates visible without denying users a preview build.
+      # Only a passing check run may replace the stable auto-update release.
+      - name: Check Steam transport release gates
+        id: steam_checks
+        continue-on-error: true
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          npm run steam:check
       - run: npm run package:windows -- --version $env:RELEASE_VERSION
       - run: npm run package:steam -- --skip-build --version $env:RELEASE_VERSION
       - run: npm run release:manifest -- --version $env:RELEASE_VERSION
       - run: npm run package:electron -- --skip-build --version $env:RELEASE_VERSION
-      - name: Publish complete stable release
+      - name: Publish complete release with checked stability
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          RELEASE_PRERELEASE: ${{ steps.steam_checks.outcome != 'success' }}
         run: |
           if ($env:GH_REPO -cne 'Aca233/starsector-web') { throw 'Configure the updater repository before publishing from a fork' }
           $manifestPath = Join-Path $PWD 'artifacts/releases/windows-updates.json'
@@ -70,7 +79,16 @@ jobs:
             $files += $asset
           }
           # Keep incomplete uploads out of /releases/latest. Never overwrite an existing version.
-          gh release create $env:RELEASE_TAG @files --verify-tag --draft --generate-notes --title "Starsector Web $env:RELEASE_TAG"
+          $preview = $env:RELEASE_PRERELEASE -eq 'true'
+          $releaseOptions = @()
+          if ($preview) {
+            $releaseOptions += @('--prerelease', '--notes', 'Preview build: Steam transport release gates did not all pass. This is not the latest stable release and is excluded from stable automatic updates. See the workflow Steam check log for known failures; real multi-account Steam validation remains outstanding.')
+          }
+          gh release create $env:RELEASE_TAG @files @releaseOptions --verify-tag --draft --generate-notes --title "Starsector Web $env:RELEASE_TAG"
           if ($LASTEXITCODE -ne 0) { throw 'Release creation/upload failed; inspect any draft before retrying' }
-          gh release edit $env:RELEASE_TAG --draft=false --latest
+          if ($preview) {
+            gh release edit $env:RELEASE_TAG --draft=false --prerelease --latest=false
+          } else {
+            gh release edit $env:RELEASE_TAG --draft=false --latest
+          }
           if ($LASTEXITCODE -ne 0) { throw 'Publishing draft release failed' }

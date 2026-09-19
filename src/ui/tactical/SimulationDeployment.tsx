@@ -11,7 +11,7 @@ import { runtimeAssetUrl } from '../../engine/runtime/RuntimePaths';
 import { Modal } from '../core/UI';
 import { NativeButton } from '../NativeChrome';
 import { NativeBitmapText } from '../NativeBitmapText';
-import { simulationRoster, groupSimulationHulls, prepareSimulationOption, simulationOptionErrors, registerSimulationOption, type SimulationOption, type SimulationHull } from './SimulationRoster';
+import { simulationRoster, groupSimulationHulls, prepareSimulationOption, simulationOptionErrors, registerSimulationOption, type SimulationOption } from './SimulationRoster';
 import { SimulationLoadoutPicker } from './SimulationLoadoutPicker';
 import './simulation-deployment.css';
 
@@ -26,7 +26,7 @@ export function SimulationDeployment({ engine, onClose, onDeployed }: {
   const [selected,setSelected]=useState<Record<Side,string[]>>({ally:[],enemy:[]});
   const [hover,setHover]=useState<SimulationOption|null>(null);
   const clearHover = useCallback(() => setHover(null), []);
-  const { picker, closePicker, dismissPicker, hullButtonProps, onRosterScroll, cancelClose, leavePicker, inspectionLockChanged } = useDeploymentPicker<SimulationHull>(codex.isOpen, clearHover);
+  const { picker, closePicker, dismissPicker, hullButtonProps, onRosterScroll, cancelClose, leavePicker, dwell } = useDeploymentPicker(codex.isOpen, clearHover);
   const [query,setQuery]=useState(''),[size,setSize]=useState(''),[scope,setScope]=useState('all');
   const [page,setPage]=useState(0),[error,setError]=useState('');
   const [,refresh]=useState(0);
@@ -34,6 +34,7 @@ export function SimulationDeployment({ engine, onClose, onDeployed }: {
   const options=useMemo(()=>roster.filter(option=>hullMatchesCategory(option.spec,size)&&(scope!=='preset'||option.preset)
     &&matchesRefitSearch(query,option.name,option.variantName,option.hullId,option.id,hullSearchAliases(option.spec))),[roster,size,scope,query]);
   const hulls=useMemo(()=>groupSimulationHulls(options),[options]);
+  const activeHull=picker?hulls.find(hull=>hull.hullId===picker.id):undefined;
   const pages=Math.max(1,Math.ceil(hulls.length/PAGE_SIZE)),shownPage=Math.min(page,pages-1);
   const picks={ally:roster.filter(option=>selected.ally.includes(option.id)),enemy:roster.filter(option=>selected.enemy.includes(option.id))};
   const costs={ally:picks.ally.reduce((sum,o)=>sum+o.cost,0),enemy:picks.enemy.reduce((sum,o)=>sum+o.cost,0)};
@@ -74,7 +75,7 @@ export function SimulationDeployment({ engine, onClose, onDeployed }: {
       <h2 data-side={side}><NativeBitmapText font="action" color="currentColor">{side==='enemy'?'选择敌方参战舰船':'选择友方参战舰船'}</NativeBitmapText></h2>
       {hover?<div className="sim-deployment-detail"><strong>{hover.name} · {hover.variantName}</strong><RefitHint text="部署点（DP）是此舰船入场占用的额度，不是装配点（OP）；友敌分别核算，模块随母舰入场，不重复添加。"><span>{hover.cost?hover.cost+' DP':'缺少独立部署费用'} · {hover.spec.designation??''}</span></RefitHint>
           {hover.errors.length?<small>不可部署：{hover.errors.join('；')}</small>:hover.warnings.length?<RefitInspection title="装配适配说明" content={<ul>{hover.warnings.map((warning,i)=><li key={i}>{warning}</li>)}</ul>}><button type="button" className="sim-inspection-note">装配适配说明（{hover.warnings.length}）</button></RefitInspection>:<small>使用已导入的原版装配方案</small>}</div>
-        :<p className="sim-deployment-hint">悬停预览配装，点击舰体固定窗口后选择。友敌选择分别保留，确认后一起入场。</p>}
+        :<p className="sim-deployment-hint">停留后移入选择，移出自动收起；点击舰体可立即进入。友敌选择分别保留，确认后一起入场。</p>}
     </div>
     <div className="sim-deployment-filters"><input aria-label="筛选模拟舰船" value={query} onChange={e=>{setQuery(e.target.value);filtered();}} placeholder="舰名 / 舰体ID / 装配"/>
       <select aria-label="筛选舰级" value={size} onChange={e=>{setSize(e.target.value);if(e.target.value==='STATION'||e.target.value==='MODULAR'){setScope('all');setQuery('');}filtered();}}><option value="">全部舰级</option><option value="STATION">空间站</option><option value="MODULAR">模块化舰体</option><option value="CAPITAL_SHIP">主力舰</option><option value="CRUISER">巡洋舰</option><option value="DESTROYER">驱逐舰</option><option value="FRIGATE">护卫舰</option></select>
@@ -83,19 +84,18 @@ export function SimulationDeployment({ engine, onClose, onDeployed }: {
       {hulls.slice(shownPage*PAGE_SIZE,(shownPage+1)*PAGE_SIZE).map(hull=>{
         const option=hull.options[0],count=hull.options.filter(fit=>selected[side].includes(fit.id)).length;
         return <button type="button" className="sim-deployment-ship" key={hull.hullId}
-          aria-label={option.name+' · '+hull.options.length+' 项配装'+(count?' · 已选 '+count:'')} aria-expanded={picker?.hull.hullId===hull.hullId}
-          aria-controls={picker?.hull.hullId===hull.hullId?'sim-loadout-picker':undefined}
+          aria-label={option.name+' · '+hull.options.length+' 项配装'+(count?' · 已选 '+count:'')}
           aria-pressed={count>0} data-unavailable={hull.options.every(fit=>simulationOptionErrors(fit).length>0)}
-          {...hullButtonProps(hull,()=>inspect(option))}>
+          {...hullButtonProps(hull.hullId,()=>inspect(option))}>
           <img src={runtimeAssetUrl(option.spec.spriteUrl)} alt="" draggable={false} style={{width:option.spec.spriteWidth*Math.min(.2,52/option.spec.spriteWidth,56/option.spec.spriteHeight)+'px',height:option.spec.spriteHeight*Math.min(.2,52/option.spec.spriteWidth,56/option.spec.spriteHeight)+'px'}}/>
           <b><NativeBitmapText font="caption" color="currentColor">{option.cost?String(option.cost):'—'}</NativeBitmapText></b>
           <span className="sim-hull-fits">{count?'✓ '+count:hull.options.length+' 配装'}</span>
         </button>;
       })}{!hulls.length&&<p className="sim-empty">没有符合筛选条件的舰船。</p>}
     </div>
-    {picker&&<SimulationLoadoutPicker anchor={picker} selected={selected[side]} onToggle={toggle} onInspect={inspect}
-      onEnter={cancelClose} onLeave={leavePicker} onClose={()=>{picker.element.focus();closePicker();}}
-      onLockChange={inspectionLockChanged} onOpenCodex={codex.open} inspectionEnabled={!codex.isOpen}/>}
+    {picker&&activeHull&&<SimulationLoadoutPicker dwell={dwell} anchor={{element:picker.element,hull:activeHull}} selected={selected[side]} onToggle={toggle} onInspect={inspect}
+      onEnter={cancelClose} onLeave={leavePicker} onClose={()=>{dismissPicker();}}
+      onOpenCodex={codex.open} inspectionEnabled={!codex.isOpen}/>}
     <div className="sim-deployment-pages"><span>{hulls.length} 种舰体 · {options.length} 项装配</span>
       <button type="button" aria-label="上一页舰船" disabled={shownPage===0} onClick={()=>{setPage(shownPage-1);closePicker();}}>上一页</button><span>{shownPage+1} / {pages}</span><button type="button" aria-label="下一页舰船" disabled={shownPage===pages-1} onClick={()=>{setPage(shownPage+1);closePicker();}}>下一页</button></div>
     <div className="sim-deployment-limit">

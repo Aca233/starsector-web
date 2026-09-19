@@ -9,17 +9,29 @@ export class SteamPacketCodec {
   constructor() { this.sequence = 0; this.pending = new Map(); this.bytes = 0; this.cache = null; }
   encode(connection, op, value) {
     if (!validConnection(connection) || !OPS.includes(op)) throw Error('无效 Steam 传输标识');
+    return this.frame(connection, op, this.prepare(op, value));
+  }
+  prepare(op, value) {
+    if (!OPS.includes(op)) throw Error('无效 Steam 操作');
     const raw = op === 'data' && typeof value === 'string' ? value : JSON.stringify(value);
     let prepared = this.cache?.raw === raw ? this.cache : null;
     if (!prepared) {
       const input = Buffer.from(raw);
       if (input.length > MAX_MESSAGE) throw Error('Steam 消息超过安全预算');
-      const compressed = input.length > 4096 ? deflateRawSync(input, { level: 1 }) : input;
+      // Tree patches often fall below the old full-snapshot compression cutoff.
+      // Compress modest delta envelopes too; control/input messages keep the
+      // original threshold and tiny packets are still sent directly.
+      const cutoff = op === 'data' && raw.startsWith('{"type":"steam-state",') ? 512 : 4096;
+      const compressed = input.length > cutoff ? deflateRawSync(input, { level: 1 }) : input;
       const zipped = compressed.length < input.length;
       prepared = { raw, payload: zipped ? compressed : input, rawBytes: input.length, zipped };
       // One broadcast snapshot is compressed once, independent of recipient nonce.
-      if (op === 'data' && raw.startsWith('{"type":"state",')) this.cache = prepared;
+      if (op === 'data' && (raw.startsWith('{"type":"state",') || raw.startsWith('{"type":"steam-state",'))) this.cache = prepared;
     }
+    return prepared;
+  }
+  frame(connection, op, prepared) {
+    if (!validConnection(connection) || !OPS.includes(op)) throw Error('无效 Steam 传输标识');
     const { payload, rawBytes, zipped } = prepared, id = this.sequence = (this.sequence + 1) >>> 0;
     const count = Math.max(1, Math.ceil(payload.length / CHUNK)), packets = [];
     for (let index = 0; index < count; index++) {

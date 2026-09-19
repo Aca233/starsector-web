@@ -31,7 +31,7 @@ export function advanceStealthMinefield(ship: Ship, dt: number, world: SystemWor
   const candidates: IncomingMine[] = [];
   for (const enemy of world.ships) {
     if (enemy === ship || enemy.isDead || enemy.hullHp <= 0 || enemy.isDocked || enemy.isRetreated || sameTeam(enemy, ship) || !eligible(enemy)) continue;
-    if ([enemy.system, enemy.defenseSystem].some(system => system.definition.sourceIds.includes('traveldrive') && system.isActive)) continue;
+    if (enemy.allSystems.some(system => system.definition.sourceIds.includes('traveldrive') && system.isActive)) continue;
     if (world.combatRandom.next() > .25) continue;
     const radius = enemy.spec.collisionRadius + 400;
     const point = enemy.pos.clone().add(Vector2.fromAngle(world.combatRandom.next() * Math.PI * 2, radius + 200 * world.combatRandom.next()));

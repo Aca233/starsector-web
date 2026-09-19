@@ -27,5 +27,5 @@ export const convulsiveLunge=nativeSystem('convulsive_lunge',{
     }
     if(system.state==='OUT'||system.state==='IDLE'||system.state==='COOLDOWN')destinations.delete(system);
   },
-  advanceAI:({ship,target,distance,tactical})=>{if(distance>600&&distance<2200&&offensiveManeuverAllowed(tactical)){ship.aimTargetWorld.copy(target.pos);ship.system.activate();}},
+  advanceAI:({ship,target,distance,tactical, system = ship.system})=>{if(distance>600&&distance<2200&&offensiveManeuverAllowed(tactical)){ship.aimTargetWorld.copy(target.pos);system.activate();}},
 });

@@ -1,3 +1,4 @@
+import { copySteamMetricsRuntime, steamMetricsExtraResources, verifySteamMetricsRuntime } from './package-steam-metrics-runtime.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -54,6 +55,7 @@ for (const name of ['ws', '@msgpack/msgpack']) await copy(path.join(project, 'no
 for (const file of ['index.js', 'package.json', 'LICENSE', 'dist/win64']) {
   await copy(path.join(project, 'node_modules', 'steamworks.js', file), path.join(backend, 'node_modules', 'steamworks.js', file));
 }
+await copySteamMetricsRuntime(project, backend, copy);
 await fs.writeFile(path.join(backend, 'package.json'), JSON.stringify({ name: 'starsector-desktop-backend', version, private: true, type: 'module' }));
 await fs.writeFile(path.join(backend, 'desktop-build.json'), JSON.stringify({ version, build: buildId, serverFiles: inputs }, null, 2));
 const licenses = path.join(staging, 'licenses');
@@ -71,6 +73,7 @@ const artifacts = await build({ projectDir: project, targets: Platform.WINDOWS.c
     // electron-builder excludes a FileSet's root node_modules directory, even for extraResources.
     // Map each backend dependency explicitly so the app never falls back to the developer checkout.
     extraResources: [{ from: backend, to: 'backend' },
+      ...steamMetricsExtraResources(backend),
       ...['ws', '@msgpack/msgpack', 'steamworks.js'].map(name => ({
         from: path.join(backend, 'node_modules', name), to: 'backend/node_modules/' + name,
       })), { from: licenses, to: 'licenses' },
@@ -78,6 +81,7 @@ const artifacts = await build({ projectDir: project, targets: Platform.WINDOWS.c
     extraFiles: [{ from: path.join(project, 'node_modules', 'steamworks.js', 'dist', 'win64', 'steam_api64.dll'), to: 'steam_api64.dll' }],
     afterPack: async ({ appOutDir }) => {
       const packagedBackend = path.join(appOutDir, 'resources', 'backend');
+      await verifySteamMetricsRuntime(packagedBackend);
       const require = createRequire(path.join(packagedBackend, 'package.json'));
       for (const name of ['ws', '@msgpack/msgpack', 'steamworks.js']) {
         const entry = require.resolve(name);

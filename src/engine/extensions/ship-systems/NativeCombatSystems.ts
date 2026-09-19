@@ -8,8 +8,8 @@ import { advanceJetsAI, advanceWeaponBoostAI, offensiveManeuverAllowed } from '.
 
 const allWeapons = (value: SystemWeaponModifiers): SystemModifiers['weapons'] => ({ BALLISTIC: value, ENERGY: value, MISSILE: value });
 const alive = (ship: Ship) => !ship.isDead && ship.hullHp > 0;
-const ready = (ship: Ship) => alive(ship) && !ship.flux.isOverloaded && !ship.flux.isVenting && !ship.system.isActive
-  && ship.flux.totalFlux + ship.system.fluxCostPerUse < ship.flux.maxFlux * .95;
+const ready = (ship: Ship, system = ship.system) => alive(ship) && !ship.flux.isOverloaded && !ship.flux.isVenting && !system.isActive
+  && ship.flux.totalFlux + system.fluxCostPerUse < ship.flux.maxFlux * .95;
 
 /** Web policy, not the native BasicShipAI: defend against assessed imminent damage, not proximity alone. */
 function defensiveAI({ ship, system = ship.system, tactical }: SystemAIContext): void {
@@ -17,15 +17,15 @@ function defensiveAI({ ship, system = ship.system, tactical }: SystemAIContext):
   if (system.definition.toggle && system.isActive) {
     if ((!threatened && (tactical?.quietFor ?? 0) > 1) || ship.flux.fluxPercent > .9) system.deactivate();
   } else if (threatened && alive(ship) && !ship.flux.isOverloaded && !ship.flux.isVenting) {
-    if (system === ship.defenseSystem) ship.activateDefenseSystem(); else if (ready(ship)) system.activate();
+    if (system === ship.defenseSystem) ship.activateDefenseSystem(); else if (ready(ship, system)) system.activate();
   }
 }
-function driveAI({ ship, target, distance, tactical, angleDiff }: SystemAIContext): void {
+function driveAI({ ship, system = ship.system, target, distance, tactical, angleDiff }: SystemAIContext): void {
   const useful = alive(target) && !!tactical && offensiveManeuverAllowed(tactical) && Math.abs(angleDiff) < .2
     && ship.getFlameoutRatio() < 1 && distance > tactical.desiredRange + 200;
-  if (ship.system.isActive && ship.system.definition.toggle) {
-    if (!useful) ship.system.deactivate();
-  } else if (useful && ready(ship)) ship.system.activate();
+  if (system.isActive && system.definition.toggle) {
+    if (!useful) system.deactivate();
+  } else if (useful && ready(ship, system)) system.activate();
 }
 const damper = nativeSystem('damper', {
   modifiers: (_system, _capacity, ship) => {
@@ -47,7 +47,7 @@ const infernium = nativeSystem('inferniuminjector', {
   modifiers: s => ({speedFlat:s.state === 'OUT'?0:50*s.effectLevel,speedPercent:s.state === 'OUT'?0:50*s.effectLevel,
     accelerationFlat:800*s.retainedEffectLevel,accelerationPercent:800*s.retainedEffectLevel,
     turnAccelerationPercent:400*s.retainedEffectLevel,turnRatePercent:s.state === 'OUT'?0:50*s.effectLevel}),
-  onAdvance: ship => { if (ship.engineController.isFlamedOut || ship.engineController.state === 'DISABLED') ship.system.deactivate(); },
+  onAdvance: (ship, _dt, _world, system) => { if (ship.engineController.isFlamedOut || ship.engineController.state === 'DISABLED') system.deactivate(); },
 });
 const microburn = nativeSystem('microburn', { modifiers: system => burnModifiers(system, 600, 1200), advanceAI: driveAI });
 const microburnOmega = nativeSystem('microburn_omega', {
@@ -68,14 +68,14 @@ const temporalShell = nativeSystem('temporalshell', {
 });
 const finiteMissiles = (ship: Ship) => ship.weapons.filter(w => w.spec.weaponType === 'MISSILE' && Number.isFinite(w.ammo) && w.spec.maxAmmo !== undefined);
 function reloadAI(context: SystemAIContext, cooldownOnly: boolean): void {
-  const { ship, target, tactical } = context;
-  if (!ready(ship) || !alive(target) || target.isPhased || tactical?.waypoint) return;
+  const { ship, system = ship.system, target, tactical } = context;
+  if (!ready(ship, system) || !alive(target) || target.isPhased || tactical?.waypoint) return;
   const weapons = finiteMissiles(ship).filter(w => !w.isDisabled);
-  const useful = weapons.filter(w => cooldownOnly ? w.ammo > 0 && w.burstRemaining === 0 && w.cooldownTimer > ship.system.chargeUpDuration : w.ammo < w.spec.maxAmmo! * .5);
-  if (useful.length && useful.length >= weapons.length * .5) ship.system.activate();
+  const useful = weapons.filter(w => cooldownOnly ? w.ammo > 0 && w.burstRemaining === 0 && w.cooldownTimer > system.chargeUpDuration : w.ammo < w.spec.maxAmmo! * .5);
+  if (useful.length && useful.length >= weapons.length * .5) system.activate();
 }
 const fastMissileRacks = nativeSystem('fastmissileracks', {
-  onActivate: ship => { for (const w of ship.weapons) if (w.spec.weaponType === 'MISSILE' && w.burstRemaining === 0 && w.cooldownTimer > ship.system.chargeUpDuration) w.cooldownTimer = ship.system.chargeUpDuration; },
+  onActivate: (ship, _world, system) => { for (const w of ship.weapons) if (w.spec.weaponType === 'MISSILE' && w.burstRemaining === 0 && w.cooldownTimer > system.chargeUpDuration) w.cooldownTimer = system.chargeUpDuration; },
   advanceAI: context => reloadAI(context, true),
 });
 const forgeVats = nativeSystem('forgevats', {
@@ -100,7 +100,7 @@ const entropyTarget = (ship: Ship) => selectTarget(ship, 1500, nonFighter);
 const disruptTarget = (ship: Ship) => selectTarget(ship, 500, target => nonFighter(target) && !target.flux.isOverloaded && !target.flux.isVenting);
 const interdictTarget = (ship: Ship) => selectTarget(ship, 1000, target => target.getFlameoutRatio() < 1 && target.engineController.engines.some(e => !e.isDisabled));
 function targetedAI(context: SystemAIContext): void {
-  if (ready(context.ship) && !context.tactical?.waypoint) context.ship.system.activate();
+  if (ready(context.ship, context.system) && !context.tactical?.waypoint) (context.system ?? context.ship.system).activate();
 }
 const entropyAmplifier = nativeSystem('entropyamplifier', {
   selectTarget: entropyTarget,

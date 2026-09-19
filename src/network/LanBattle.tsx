@@ -1,3 +1,5 @@
+import { readSystemBindings, selectNextSystem } from '../engine/runtime/SystemBindings';
+import { SystemBindingSettings } from '../ui/SystemBindingSettings';
 import { LocalMuzzleEffects } from './LocalMuzzleEffects';
 import { MotionPresence } from '../ui/core/MotionPresence';
 import { lanTeamPresence } from "./LanBattleRoster";
@@ -599,7 +601,7 @@ export function LanBattle({
       if (event.defaultPrevented || event.isComposing) return;
       if (isCombatTextEntry(event.target) || hasCombatModal()) return;
       if(event.code==='Tab'&&!event.repeat&&!event.ctrlKey&&!event.altKey&&!event.metaKey&&!inputBlockedRef.current){event.preventDefault();openMapRef.current();return;}
-      const command = shipCommandForKey(event);
+      const command = shipCommandForKey(event, engine.playerShip);
       if (event.ctrlKey || event.altKey || event.metaKey) {
         if (command && active()) {
           event.preventDefault();
@@ -607,9 +609,9 @@ export function LanBattle({
         } else clear();
         return;
       }
-      if (!event.repeat && !endedRef.current && !inputBlockedRef.current && ['Escape', 'KeyH', 'Space'].includes(event.code)) {
+      if (!event.repeat && !endedRef.current && !inputBlockedRef.current && ['Escape', 'F1', 'Space'].includes(event.code)) {
         event.preventDefault();
-        openMenu(event.code === 'KeyH' ? 'help' : 'menu');
+        openMenu(event.code === 'F1' ? 'help' : 'menu');
         return;
       }
       if (!active()) return;
@@ -657,6 +659,7 @@ export function LanBattle({
     const wheel = (event: WheelEvent) => {
       if (inputBlockedRef.current || event.ctrlKey || event.altKey || event.metaKey) return;
       event.preventDefault();
+      if (event.shiftKey && readSystemBindings().wheelSelect) { selectNextSystem(engine.playerShip, event.deltaY); return; }
       zoom = zoomCombatView(zoom, event.deltaY);
     };
     window.addEventListener("keydown", down);
@@ -863,7 +866,7 @@ export function LanBattle({
           <CombatContacts engine={displayEngine} cameraPosRef={cameraRef} zoomRef={hudZoomRef} canvasRef={canvasRef}
             blocked={!controlsReady || !!menu || finished || mapOpen || deploymentOpen} />
           <div className="hud-console-anchor pointer-events-auto absolute z-20">
-            <AuthenticTacticalConsole onToggleRecall={() => actionRef.current('recall')}
+            <AuthenticTacticalConsole onActivateSystem={value => actionRef.current('system', value)} onToggleRecall={() => actionRef.current('recall')}
               player={displayEngine.playerShip}
               engine={displayEngine}
               weaponControls={{
@@ -975,7 +978,7 @@ export function LanBattle({
           onClose={closeMenu}
           footer={<NativeButton onClick={closeMenu}>返回游戏</NativeButton>}
         >
-          <div className="lan-help">
+          <div className="lan-help"><SystemBindingSettings/>
             <dl className="lan-controls">
               <dt>
                 <kbd>W / S</kbd>
@@ -1004,7 +1007,7 @@ export function LanBattle({
               <dt>
                 <kbd>V / F</kbd>
               </dt>
-              <dd>排幅 / 舰船系统</dd>
+              <dd>排幅 / 技能槽 1（默认）；G / H 为技能槽 2 / 3，可改键或点击 HUD</dd>
               <dt><kbd>R / Z</kbd></dt>
               <dd>锁定鼠标下敌舰（再次按下取消）/ 当前舰船联队召回</dd>
               <dt>
@@ -1020,7 +1023,7 @@ export function LanBattle({
               </dt>
               <dd>联机菜单，不暂停对局</dd>
               <dt>
-                <kbd>H</kbd>
+                <kbd>F1</kbd>
               </dt>
               <dd>操纵说明</dd>
             </dl>

@@ -1,3 +1,5 @@
+import { tacticalSystemIds } from '../engine/extensions/ship-systems/Loadout';
+import { SystemBindingSettings } from './SystemBindingSettings';
 import { MotionPresence } from './core/MotionPresence';
 import { FullscreenButton } from './FullscreenButton';
 import { LocalBattleSizeSettings } from "./BattleSizeControl";
@@ -106,7 +108,7 @@ export function CombatSettingsMenu({
         footer={<NativeButton onClick={onClose}>返回</NativeButton>}
       >
         <div className="combat-settings">
-          <LocalBattleSizeSettings/>
+          <LocalBattleSizeSettings/><SystemBindingSettings slotCount={tacticalSystemIds(spec).length}/>
           <h3>操纵</h3>
           <label>
             <span>默认鼠标转向</span>
@@ -151,7 +153,7 @@ export function CombatSettingsMenu({
           shipActionLabel={shipActionLabel}
           weaponGroupCount={spec.defaultWeaponGroups?.length ?? 7}
           hasFighters={hasFighters}
-          hasSystem={spec.systemType !== "NONE"}
+          hasSystem={tacticalSystemIds(spec).length > 0}
           hasShield={effectiveHullStats(spec).shieldType !== "NONE" || (!!spec.defenseSystemType && spec.defenseSystemType !== "NONE")}
           canRestart={canRestart}
           defaultMouseSteering={defaultMouseSteering}

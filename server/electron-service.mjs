@@ -3,16 +3,18 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createLanServer } from './lan-server.mjs';
 import { SteamGateway } from './steam/gateway.mjs';
+import { DesktopLanBridge } from './desktop-lan-bridge.mjs';
 import { DesktopOverlayBridge } from './steam/desktop-overlay-bridge.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const send = message => process.parentPort ? process.parentPort.postMessage(message) : process.send?.(message);
-let started = false, stopping = false, app, gateway, overlayBridge;
+let started = false, stopping = false, app, gateway, overlayBridge, lanBridge;
 
 async function shutdown() {
   if (stopping) return;
   stopping = true;
   overlayBridge?.close();
+  lanBridge?.close();
   const timeout = setTimeout(() => process.exit(1), 4000);
   timeout.unref();
   try {
@@ -30,11 +32,12 @@ async function start({ mode, port, appId = 480, overlay, pendingInvite }) {
   const { build } = JSON.parse(await fs.readFile(path.join(root, 'dist', 'lan-build.json'), 'utf8'));
   if (mode === 'steam') {
     overlayBridge = new DesktopOverlayBridge(send, overlay);
-    gateway = new SteamGateway({ appId, build, overlay: overlayBridge });
+    gateway = new SteamGateway({ appId, build, overlay: overlayBridge, log: message => console.info(message) });
     if (/^[0-9]{16,20}$/.test(pendingInvite ?? '')) gateway.pendingInvite = pendingInvite;
   }
+  if (mode === 'lan') lanBridge = new DesktopLanBridge(port);
   app = await createLanServer({ host: mode === 'lan' ? '0.0.0.0' : '127.0.0.1', port,
-    dist: path.join(root, 'dist'), isolated: true, extension: gateway?.extension,
+    dist: path.join(root, 'dist'), isolated: true, extension: gateway?.extension ?? lanBridge?.extension,
     portable: { id: `desktop-${build}`, mode } });
   if (gateway) {
     gateway.relay = app;

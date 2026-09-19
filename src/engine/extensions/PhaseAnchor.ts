@@ -19,7 +19,7 @@ export function installPhaseAnchor(ship: Ship): void {
     if (!ship.isPhased) sound.play('phase_activate',1);
     ship.externalPhaseEffects.set(state,()=>Math.min(.25,state.alpha));
     ship.runtimeModifiers.set('phase_anchor_emergency',{hullDamageMultiplier:0});
-    ship.system.deactivate(); ship.defenseSystem.deactivate();
+    for (const system of ship.allSystems) system.deactivate();
     return true;
   });
 }

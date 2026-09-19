@@ -1,3 +1,4 @@
+import { tacticalSystemIds } from '../engine/extensions/ship-systems/Loadout';
 import { installedHullMods, effectiveHullStats } from '../engine/extensions/HullMods';
 import { shipSystemDefinitions } from '../engine/extensions/ship-systems/Registry';
 import React, { useState } from 'react';
@@ -31,7 +32,7 @@ export function ModManagerModal({ isOpen, onClose, onSelectShip, allowSandboxSwi
       {ship && <ShipPreview spec={ship} selectedSlot={slotId} onSelectSlot={setSlotId} />}
       <aside className="native-side">{ship && <>
         <h3>舰船参数</h3><Readout label="结构值" value={ship.hitpoints.toLocaleString()} /><Readout label="装甲值" value={stats!.armorRating.toLocaleString()} /><Readout label="幅能容量" value={stats!.maxFlux.toLocaleString()} /><Readout label="幅能耗散" value={stats!.fluxDissipation.toLocaleString()} /><Readout label="基础航速" value={ship.maxSpeed} />
-        {ship.systemType !== 'NONE' && <Readout label="战术系统" value={shipSystemDefinitions.require(ship.systemType).name} />}
+        {tacticalSystemIds(ship).map((id, index) => <Readout key={index} label={'技能 ' + (index + 1)} value={shipSystemDefinitions.require(id).name} />)}
         {installedHullMods(ship).map(mod => <Readout key={mod.id} label={mod.status === 'implemented' ? '生效舰装' : '尚未实现'} value={mod.name} />)}
         <h3>{slot ? '挂点 ' + slot.slotId : '武器'}</h3>
         {slot ? <><Readout label="尺寸" value={sizes[slot.slotSize]} /><Readout label="兼容类型" value={slots[slot.weaponType ?? ''] ?? '未声明'} />

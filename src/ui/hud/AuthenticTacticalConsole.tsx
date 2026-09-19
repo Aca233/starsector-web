@@ -1,3 +1,5 @@
+import { readSystemBindings, selectedSystemSlot, systemBindingLabel } from '../../engine/runtime/SystemBindings';
+import '../../studio/system-loadout.css';
 import React from 'react';
 import { Ship } from '../../engine/simulation/Ship';
 import { CombatEngine } from '../../engine/simulation/CombatEngine';
@@ -17,10 +19,11 @@ export interface AuthenticTacticalConsoleProps {
   hudVisuals?: CombatHudVisuals;
   weaponControls?: WeaponGroupControls;
   onToggleRecall?: () => void;
+  onActivateSystem?: (slot: number) => void;
 }
 
 /** Readable system text (user preference) and source meters; full layout is still being reconciled. */
-export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> = ({ player, engine, hudVisuals, weaponControls, onToggleRecall }) => {
+export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> = ({ player, engine, hudVisuals, weaponControls, onToggleRecall, onActivateSystem }) => {
   const isZeroFlux = player.flux.totalFlux <= 0 && !player.shield.isActive && !player.flux.isOverloaded;
   const speed = player.vel.length().toFixed(1);
   const totalFlux = Math.trunc(player.flux.totalFlux);
@@ -171,14 +174,16 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
           <span className="hud-meter-number"><span className="hud-text">{hullHp}</span></span>
         </div>
 
-        {/* Only installed systems have a status row. */}
-        {[{ system: player.system, key: 'F' }, { system: player.defenseSystem, key: '右键' }].filter(s => s.system.type !== 'NONE').map(({system, key}) => <div key={key} className="flex items-center justify-between h-[15px] mt-[1px] text-[11px]">
-          <span className="font-bold text-[#9bff00]"><span className="hud-text">{system.name} [{key}]</span></span>
-          <div className="flex items-center gap-2">
-            {system.maxCharges > 1 && <span>{system.charges}/{system.maxCharges}</span>}
-            <span className="text-[#9bff00]"><span className="hud-text">|&nbsp;{systemStatus(system)}</span></span>
-          </div>
-        </div>)}
+        <div className="hud-system-list" aria-label="舰船技能">
+          {player.systems.map((system, slot) => <button type="button" key={slot} className="hud-system-button"
+            aria-label={`激活技能 ${slot + 1}：${system.name}`} aria-current={readSystemBindings().wheelSelect && selectedSystemSlot(player) === slot}
+            disabled={!onActivateSystem || !!system.activationFailureReason} title={system.activationFailureReason ?? system.description}
+            onClick={() => onActivateSystem?.(slot)}>
+            <span>{system.name} [{systemBindingLabel(slot)}]</span>
+            <span>{system.definition.charges !== undefined ? `${system.charges}/${system.maxCharges} · ` : ''}{systemStatus(system)}</span>
+          </button>)}
+          {player.defenseSystem.type !== 'NONE' && <div className="hud-system-button"><span>{player.defenseSystem.name} [右键]</span><span>{systemStatus(player.defenseSystem)}</span></div>}
+        </div>
 
         {/* 军规折角分隔横线 (45 度左侧上挑转水平线，Web 布局（尚待原版对齐）) */}
         <svg className="w-[320px] h-[12px] my-[1px] overflow-visible pointer-events-none">

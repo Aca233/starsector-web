@@ -1,3 +1,4 @@
+import { needsLaunchers } from './Requirements';
 import { sameTeam } from "../../simulation/CombatTeams";
 import { Vector2 } from '../../math/Vector2';
 import type { Ship } from '../../simulation/Ship';
@@ -44,7 +45,7 @@ export function validLashTarget(ship: Ship, other: Ship): boolean {
   const range = 1500 * ship.hullStats.systemRangeMultiplier + ship.spec.collisionRadius + other.spec.collisionRadius;
   if (ship.pos.distanceTo(other.pos) > range) return false;
   if (!sameTeam(ship, other)) return other.isVisibleTo(ship.teamId);
-  return !!other.system.definition.onEnergyLash && !other.system.isActive && !other.system.isCoolingDown
+  return other.allSystems.some(system => system.definition.onEnergyLash && !system.isActive && !system.isCoolingDown)
     && !other.flux.isOverloaded && !other.flux.isVenting;
 }
 export function findLashTarget(ship: Ship): Ship | undefined {
@@ -63,6 +64,7 @@ function advanceDischarge(ship: Ship, dt: number, world: SystemWorld, s: ShipSys
   if (state.next >= state.slots.length) discharges.delete(s);
 }
 const energyLash = nativeSystem('energy_lash', {
+  installReason: needsLaunchers,
   description: '1500范围内激活友方受控系统；对敌方从每个SYSTEM挂点发射1500 EMP电弧，电弧间隔0.03秒。命中相位舰使其过载1秒；冷却随目标变化。',
   implementationDetails: '原版时序、逐挂点EMP、护盾拦截、相位过载与目标冷却；Web目标/战术策略及电弧表现。碎片蜂群相位转换依赖蜂群控制器，尚不计为完成。',
   canActivate: ship => !!findLashTarget(ship) && !!ship.spec.systemWeaponSlots?.length,
@@ -74,7 +76,7 @@ const energyLash = nativeSystem('energy_lash', {
       const slot = ship.spec.systemWeaponSlots?.find(p => p.slotSize === 'MEDIUM');
       const from = slot ? new Vector2(slot.x, slot.y).rotate(ship.facingRad).add(ship.pos) : ship.pos;
       world.spawnSystemArc?.(from, target.pos);
-      target.system.definition.onEnergyLash?.(target.system, target, ship);
+      for (const system of target.allSystems) if (!system.isActive && !system.isCoolingDown) system.definition.onEnergyLash?.(system, target, ship);
       s.maxCooldown = Math.min(10, 2 + (costs[target.spec.id] ?? 0) * .33) * ship.hullStats.systemCooldownMultiplier;
     } else {
       const phased = target.isPhased;
@@ -85,13 +87,13 @@ const energyLash = nativeSystem('energy_lash', {
     }
   },
   onAdvance: advanceDischarge, onReset:s=>{discharges.delete(s);},
-  advanceAI: ({ ship }) => {
-    if (ship.system.isActive || ship.system.isCoolingDown || ship.flux.isVenting || ship.flux.isOverloaded) return;
+  advanceAI: ({ ship, system = ship.system }) => {
+    if (system.isActive || system.isCoolingDown || ship.flux.isVenting || ship.flux.isOverloaded) return;
     const friendly = ship.combatShips.filter(t => validLashTarget(ship,t) && sameTeam(t, ship))
-      .find(t => t.system.type === 'DISPLACER_THREAT' ? t.system.charges < t.system.maxCharges : t.currentTargetShip !== null);
+      .find(t => t.allSystems.some(system => system.type === 'DISPLACER_THREAT' && system.charges < system.maxCharges) || t.currentTargetShip !== null);
     const previous = ship.currentTargetShip;
     if (friendly) ship.currentTargetShip = friendly;
-    if (findLashTarget(ship)) ship.system.activate();
+    if (findLashTarget(ship)) system.activate();
     ship.currentTargetShip = previous;
   },
 });
@@ -100,6 +102,6 @@ const conversion = nativeSystem('energy_conversion', {
   phase: { vulnerableChargeUp: false, vulnerableChargeDown: false },
   controls: { blockFluxDissipation: true, blockWeapons: true, blockShields: true },
   description: '原地相位：0.5秒进入、2秒退出，期间不可被常规攻击命中且不耗散；3次库存，每10秒恢复一次。不虚构增伤或能量转化。',
-  advanceAI: ({ ship, tactical }) => { if ((tactical?.threat.imminentDamage ?? 0) > 0) ship.system.activate(); },
+  advanceAI: ({ ship, tactical, system = ship.system }) => { if ((tactical?.threat.imminentDamage ?? 0) > 0) system.activate(); },
 });
 export const energyLashSystems = [incursion, extraction, threatDisplacer, energyLash, conversion];

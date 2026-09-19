@@ -1,3 +1,4 @@
+import { parseLanAddress } from './LanEndpoint';
 import { readBattleSize } from "../engine/runtime/BattleSizeSettings";
 import { useRef, useState } from "react";
 import { NativeButton } from "../ui/NativeChrome";
@@ -5,10 +6,11 @@ import { NativeBitmapText } from "../ui/NativeBitmapText";
 import type { Design } from "../studio/DesignModel";
 
 /** The entrance handles connection only. Ship selection and refit live inside the room. */
-export function LanStart({design,hull,name,onNameChange,available,connected,connecting,initialCode,onHost,onJoin}:{
+export function LanStart({design,hull,name,onNameChange,available,connected,connecting,initialCode,desktop=false,serverLabel,onHost,onJoin}:{
   design:Design|null;hull:string;name:string;onNameChange:(name:string)=>void;
   available:boolean|null;connected:boolean;connecting:boolean;initialCode:string;
-  onHost:()=>void;onJoin:(code:string,password:string)=>void;
+  desktop?:boolean;serverLabel?:string;
+  onHost:()=>void;onJoin:(code:string,password:string,remoteOrigin?:string)=>void;
 }) {
   const [address,setAddress]=useState("");
   const [code,setCode]=useState(initialCode), [password,setPassword]=useState("");
@@ -55,9 +57,21 @@ export function LanStart({design,hull,name,onNameChange,available,connected,conn
       setBusy(false);
     }
   };
+  let invitationCode = '';
+  if (desktop && address.trim()) { try { invitationCode = parseLanAddress(address).code; } catch { /* Show details on submit. */ } }
+  const effectiveCode = invitationCode || code;
   const join = () => {
     if (locked || !name.trim()) return;
     setError("");
+    if (desktop) {
+      try {
+        const target = parseLanAddress(address);
+        const room = target.code || code;
+        if (!/^[0-9A-F]{6}$/.test(room)) throw Error('请填写六位房间码，或粘贴包含房间码的邀请链接。');
+        onJoin(room, password, target.origin);
+      } catch (e) { setError(e instanceof Error ? e.message : '房主地址无效'); }
+      return;
+    }
     if (available === true) { if (/^[0-9A-F]{6}$/.test(code)) onJoin(code,password); return; }
     try {
       const value = address.trim();
@@ -83,7 +97,7 @@ export function LanStart({design,hull,name,onNameChange,available,connected,conn
     <div className="lan-entry-identity lan-form">
       <label htmlFor="lan-player-name">玩家名称</label>
       <input id="lan-player-name" value={name} maxLength={24} disabled={locked||connected} onChange={event=>onNameChange(event.target.value)} autoComplete="nickname"/>
-      <p className="lan-muted" role="status">{available===null?"正在检查联机服务…":connecting?"正在连接并进入房间…":available?((connected?"已连接：":"当前服务器：")+window.location.host):"进入房间后再选船、改装和分队。"}</p>
+      <p className="lan-muted" role="status">{available===null?"正在检查联机服务…":connecting?"正在连接并进入房间…":available?((connected?"已连接：":"当前服务器：")+(serverLabel || window.location.host)):"进入房间后再选船、改装和分队。"}</p>
     </div>
     <div className="lan-entry-options">
       <form className="lan-entry-option lan-form" aria-label="创建房间" onSubmit={event=>{event.preventDefault();void host();}}>
@@ -94,17 +108,22 @@ export function LanStart({design,hull,name,onNameChange,available,connected,conn
       </form>
       <form className="lan-entry-option lan-form" aria-label="加入房间" onSubmit={event=>{event.preventDefault();join();}}>
         <h2><NativeBitmapText font="caption">加入房间</NativeBitmapText></h2>
+        {desktop && <>
+          <label htmlFor="lan-host-address">邀请链接 / 房主地址</label>
+          <input id="lan-host-address" value={address} disabled={locked} onChange={event=>setAddress(event.target.value)} placeholder="粘贴邀请链接，或 26.12.34.56:32110" autoComplete="off" spellCheck={false}/>
+          <small className="lan-muted">直接在桌面内加入；裸 IP 默认端口 32110，网页启动器通常用 3001，以房主邀请链接为准。</small>
+        </>}
         {available===true?<>
           <label htmlFor="lan-code-input">房间码</label>
-          <input id="lan-code-input" value={code} maxLength={6} disabled={locked} onChange={event=>setCode(event.target.value.toUpperCase())} placeholder="六位房间码" autoComplete="off" spellCheck={false}/>
+          <input id="lan-code-input" value={effectiveCode} maxLength={6} disabled={locked||!!invitationCode} onChange={event=>setCode(event.target.value.toUpperCase())} placeholder="六位房间码" autoComplete="off" spellCheck={false}/>
           <label htmlFor="lan-password">房间密码（可选）</label>
           <input id="lan-password" type="password" value={password} maxLength={32} disabled={locked} onChange={event=>setPassword(event.target.value)} autoComplete="off"/>
         </>:<>
           <label htmlFor="lan-host-address">邀请链接 / 房主地址</label>
           <input id="lan-host-address" value={address} disabled={locked} onChange={event=>setAddress(event.target.value)} placeholder="例如 26.12.34.56:3001" autoComplete="off" spellCheck={false}/>
         </>}
-        <NativeButton type="submit" disabled={locked||!name.trim()||(available===true?!/^[0-9A-F]{6}$/.test(code):!address.trim())}>加入房间</NativeButton>
-        <small className="lan-muted">{available===true?"输入房主提供的房间码，加入后再选择自己的舰船。":"只连接朋友，不启动你的后台。支持局域网及 n2n / Radmin 虚拟网络地址。"}</small>
+        <NativeButton type="submit" disabled={locked||!name.trim()||(available===true?!/^[0-9A-F]{6}$/.test(effectiveCode):!address.trim())||(desktop&&!address.trim())}>加入房间</NativeButton>
+        <small className="lan-muted">{desktop?"邀请链接自动填入房间码；不跳转网页，不移动你的本地配装库。":available===true?"输入房主提供的房间码，加入后再选择自己的舰船。":"只连接朋友，不启动你的后台。支持局域网及 n2n / Radmin 虚拟网络地址。"}</small>
       </form>
     </div>
     {error&&<p className="lan-error" role="alert">{error}</p>}

@@ -1,3 +1,5 @@
+import { resolveSystemId, shipSystemDefinitions } from '../engine/extensions/ship-systems/Registry';
+import { systemLoadoutErrors } from '../engine/extensions/ship-systems/Loadout';
 import { nativeModules } from '../engine/content/ModularVariants';
 import { randomId } from "../shared/RandomId";
 import { validCaptainProfile, type CaptainProfile } from "./CaptainProfile";
@@ -100,6 +102,8 @@ export interface Design {
   name: string;
   hullId: string;
   sourceVariantId?: string;
+  /** Undefined inherits the native fit; [] intentionally removes all tactical skills. */
+  systemTypes?: string[];
   /** Only edited modules, keyed by native attachment slot (not hull ID). */
   modules?: Record<string, Design>;
   weapons: Record<string, string | null>;
@@ -387,6 +391,7 @@ function evaluateAssembly(d: Design, template: ShipSpec | undefined, state: { co
     nativeHull(d.hullId).fluxDissipation + d.vents * data.dissipationPerVent;
   spec.shieldUpkeepBaseDissipation = nativeHull(d.hullId).fluxDissipation;
   spec.sourceVariantId = d.sourceVariantId;
+  if (d.systemTypes !== undefined) spec.systemTypes = [...d.systemTypes];
   if (!template && spec.moduleSlots?.length && d.sourceVariantId) {
     try { spec.modules = nativeModules(d.hullId, d.sourceVariantId); }
     catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
@@ -435,6 +440,7 @@ function evaluateAssembly(d: Design, template: ShipSpec | undefined, state: { co
     }
     return { ...slot, defaultWeaponId: id ?? undefined };
   });
+  errors.push(...systemLoadoutErrors(spec));
   spec.defaultWeaponGroups = structuredClone(d.groups);
   return { spec, errors: [...new Set(errors)], op };
 }
@@ -551,6 +557,11 @@ function decodeAssembly(input: unknown, template: ShipSpec | undefined, state: {
   if (skillErrors.length) throw new Error(skillErrors.join("；"));
   const modErrors = hullModLoadoutErrors(designHullSpec(d));
   if (modErrors.length) throw new Error(modErrors.join("；"));
+  if (d.systemTypes !== undefined && (!Array.isArray(d.systemTypes) || d.systemTypes.length > 64 || d.systemTypes.some(id => typeof id !== 'string' || id.length > 160))) throw new Error('技能列表格式无效');
+  if (d.systemTypes !== undefined) {
+    const ids = d.systemTypes.map(resolveSystemId);
+    if (new Set(ids).size !== ids.length || ids.some(id => id === 'NONE' || !shipSystemDefinitions.get(id) || shipSystemDefinitions.require(id).unavailable)) throw new Error('技能重复或尚未接入');
+  }
   const decoded = structuredClone(d);
   if (d.modules !== undefined) decoded.modules = decodedModules;
   // Older web drafts had five groups. Preserve their assignments and append the

@@ -75,6 +75,7 @@ export function supportsOwnership(engine: CombatEngine, ais: CapitalShipAI[], pu
         return false;
     for (const ai of ais) {
         const s = ai.ship;
+        if (s.systems.length > 1) return false;
         if (!ships.includes(s) || ai.update !== nativeAI || Object.getPrototypeOf(ai) !== CapitalShipAI.prototype
             || s.spec !== originalSpec || Object.getPrototypeOf(s) !== Ship.prototype
             || s.getMotionStats !== nativeMotion || s.isVisibleTo !== nativeVisible

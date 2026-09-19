@@ -7,7 +7,8 @@ import { sound } from '../../audio/SoundManager';
 import type { Ship } from '../../simulation/Ship';
 const attractorSlot=(ship:Ship)=>ship.spec.systemWeaponSlots?.find(s=>s.slotSize==='MEDIUM');
 export const moteControl=nativeSystem('mote_control',{
-  description:'自动维持30枚光尘（感灵吸引场50枚），拦截导弹/战机。F将光尘引向3000范围内的点（10秒）或敌舰（20秒）；锁舰期间停止补充。',
+  installReason: spec => spec.systemWeaponSlots?.some(s => s.slotSize === 'MEDIUM') && spec.systemWeaponSlots.some(s => s.slotSize === 'SMALL') ? undefined : '需要中型吸引器和小型微光发射挂点',
+  description:'自动维持30枚光尘（感灵吸引场50枚），拦截导弹/战机。按技能键将光尘引向3000范围内的点（10秒）或敌舰（20秒）；锁舰期间停止补充。',
   implementationDetails:'原生SYSTEM光尘弹体、随机补充周期、母舰/吸引点范围、每目标最多2枚拦截、成群避让、近距锁舰追击与穿盾EMP。Web独立平移导引；未逐帧复刻光尘闪动、空地吸引场粒子及音量空间混合。',
   resources:{weapons:['motelauncher','motelauncher_hf'],sounds:['mote_attractor_system_activated','mote_attractor_launch_mote','mote_attractor_targeted_ship']},
   audio:{activate:'mote_attractor_system_activated'},
@@ -56,5 +57,5 @@ export const moteControl=nativeSystem('mote_control',{
       mote:{age:-world.combatRandom.next()*.5,turnSign:world.combatRandom.next()>.5?1:-1,scanRemaining:0}});
     state.motes.push(p);sound.playAtPos('mote_attractor_launch_mote',from,ship.pos,.25);
   },
-  advanceAI:({ship,target,distance})=>{const s=moteState(ship);if(distance<3000*ship.hullStats.systemRangeMultiplier&&s.motes.length>=6&&s.attractorRemaining<2){ship.aimTargetWorld.copy(target.pos);ship.system.activate();}},
+  advanceAI:({ship,target,distance, system = ship.system})=>{const s=moteState(ship);if(distance<3000*ship.hullStats.systemRangeMultiplier&&s.motes.length>=6&&s.attractorRemaining<2){ship.aimTargetWorld.copy(target.pos);system.activate();}},
 });

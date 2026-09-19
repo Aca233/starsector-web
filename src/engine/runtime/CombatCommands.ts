@@ -1,3 +1,4 @@
+import { readSystemBindings, selectedSystemSlot } from './SystemBindings';
 import type { Ship } from '../simulation/Ship';
 import type { Vector2 } from '../math/Vector2';
 import { pickCombatContact } from './CombatTargeting';
@@ -5,7 +6,8 @@ import { sound } from '../audio/SoundManager';
 
 /** Shared by local input, HUD, LAN authority and the Worker experiment. */
 export type ShipCommand =
-  | { kind: 'shield' | 'vent' | 'system' | 'target' | 'recall' }
+  | { kind: 'shield' | 'vent' | 'target' | 'recall' }
+  | { kind: 'system'; value?: number }
   | { kind: 'group' | 'mode' | 'autofire'; value: number };
 export interface CommandResult { accepted: boolean; reason?: string }
 export interface CombatKey { code: string; ctrlKey: boolean; altKey: boolean; metaKey: boolean; shiftKey: boolean }
@@ -18,7 +20,7 @@ export function flightKey(code: string): string | undefined {
   return (flightKeys as readonly string[]).includes(canonical) ? canonical : undefined;
 }
 /** Only declared chords are consumed; Ctrl+F/Ctrl+R/Alt+arrows stay browser commands. */
-export function shipCommandForKey(key: CombatKey): ShipCommand | undefined {
+export function shipCommandForKey(key: CombatKey, ship?: Ship): ShipCommand | undefined {
   if (key.altKey || key.metaKey) return undefined;
   const digit = /^(?:Digit|Numpad)([1-7])$/.exec(key.code);
   if (digit) {
@@ -26,7 +28,10 @@ export function shipCommandForKey(key: CombatKey): ShipCommand | undefined {
     return { kind: key.ctrlKey ? 'autofire' : key.shiftKey ? 'mode' : 'group', value: Number(digit[1]) - 1 };
   }
   if (key.ctrlKey) return undefined;
-  if (key.code === 'KeyF') return { kind: 'system' };
+  const bindings = readSystemBindings();
+  const slot = bindings.slots.indexOf(key.code);
+  if (slot >= 0) return { kind: 'system', value: slot };
+  if (bindings.wheelSelect && key.code === bindings.selectedKey && ship) return { kind: 'system', value: selectedSystemSlot(ship) };
   if (key.code === 'KeyV') return { kind: 'vent' };
   if (key.code === 'KeyR') return { kind: 'target' };
   if (key.code === 'KeyZ') return { kind: 'recall' };
@@ -41,7 +46,10 @@ export function shipCommandFailure(ship: Ship, command: ShipCommand): string | u
   }
   if (command.kind === 'target') return undefined;
   if (command.kind === 'recall') return ship.hullStats.fighterBays > 0 && ((ship.spec.fighterWings?.length ?? 0) > 0 || ship.deployedWingCraft.size > 0) ? undefined : '本舰没有舰载联队';
-  if (command.kind === 'system') return ship.system.activationFailureReason;
+  if (command.kind === 'system') {
+    const system = ship.getSystem(command.value ?? 0);
+    return system ? system.activationFailureReason : '该技能槽为空或不存在';
+  }
   if (command.kind === 'vent') return ship.ventFailureReason;
   return ship.defenseFailureReason;
 }
@@ -62,7 +70,7 @@ export function dispatchShipCommand(ship: Ship, command: ShipCommand, aim?: Vect
       setPlayerCombatTarget(ship, target?.id === ship.playerTargetId ? null : target ?? null);
       break;
     }
-    case 'system': accepted = ship.system.activate(); break;
+    case 'system': accepted = ship.getSystem(command.value ?? 0)!.activate(); break;
     case 'shield': accepted = ship.toggleDefense(); break;
     case 'vent': accepted = ship.startVenting(); break;
     case 'group': ship.selectWeaponGroup(command.value); break;

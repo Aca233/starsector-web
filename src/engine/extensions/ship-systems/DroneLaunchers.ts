@@ -1,3 +1,4 @@
+import { needsLaunchers } from './Requirements';
 import data from './native-drone-launchers.json';
 import { nativeSystem } from './NativeSystemFactory';
 import type { Ship } from '../../simulation/Ship';
@@ -29,8 +30,9 @@ export function droneDeployment(system: ShipSystem): DroneDeployment {
   return state;
 }
 export const droneLaunchers = (Object.keys(data) as (keyof typeof data)[]).map(id => nativeSystem(id, {
+  installReason: needsLaunchers,
   resources: { ships: [data[id].variant.hullId], weapons: data[id].variant.weaponGroups.flatMap(g=>Object.values<string>(g.weapons)) },
-  description: '按F在护航、自由（允许时）、回收之间切换。逐架释放，回收归还库存；战损不返还库存。',
+  description: '按技能键在护航、自由（允许时）、回收之间切换。逐架释放，回收归还库存；战损不返还库存。',
   implementationDetails: '原版DRONE_LAUNCHER库存/部署上限/释放间隔、SYSTEM挂点、指定变体、环绕半径/方向和目标优先级。运动控制使用Web转向与火控，未逐帧移植原生DroneAI或弹射/着舰动画。',
   onReset:(system,owner)=>{owner?.runtimeModifiers.delete('sensor_drones');const state=states.get(system);for(const craft of state?.drones ?? []){craft.isDocked=true;craft.clearInput();}states.delete(system);},
   usesChargesForActivation: false,

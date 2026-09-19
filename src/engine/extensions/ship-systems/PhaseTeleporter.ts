@@ -105,11 +105,11 @@ export function teleportDefinition(id: string, sourceId: string, name: string, r
       ship.facingRad = ship.prevFacingRad = plan.facing;
       if (!skimmer) ship.vel.scale(.5);
     },
-    onAdvance: ship => { if (!ship.system.isActive) plans.delete(ship.system); },
-    advanceAI: ({ ship, target, distance, tactical }) => {
-      if (!ship.system.available || ship.system.disabled || ship.system.isActive || ship.system.isCoolingDown
+    onAdvance: (_ship, _dt, _world, system) => { if (!system.isActive) plans.delete(system); },
+    advanceAI: ({ ship, target, distance, tactical, system = ship.system }) => {
+      if (!system.available || system.disabled || system.isActive || system.isCoolingDown
         || ship.isDead || ship.isPhased || ship.flux.isOverloaded || ship.flux.isVenting || target.isDead) return;
-      if (ship.system.charges <= 0 || tactical?.waypoint) return;
+      if (system.charges <= 0 || tactical?.waypoint) return;
       const desiredRange = tactical?.desiredRange ?? 600;
       if (skimmer) {
         const direction = ship.vel.length() > 5 ? ship.vel.heading() : ship.facingRad;
@@ -117,12 +117,12 @@ export function teleportDefinition(id: string, sourceId: string, name: string, r
         const after = endpoint.distanceTo(target.pos);
         const retreat = tactical?.withdrawing && after > distance + 100;
         const positioning = !tactical?.withdrawing && Math.abs(after - desiredRange) + 100 < Math.abs(distance - desiredRange);
-        if (retreat || positioning) ship.system.activate();
+        if (retreat || positioning) system.activate();
       } else if (!tactical?.withdrawing && distance > desiredRange + 700 && !target.isPhased) {
         // Web AI aims at a standoff point rather than teleporting into the target's hull.
         const away = ship.pos.clone().sub(target.pos).normalize();
         ship.aimTargetWorld.copy(target.pos.clone().addScaled(away, desiredRange));
-        ship.system.activate();
+        system.activate();
       }
     }
   };

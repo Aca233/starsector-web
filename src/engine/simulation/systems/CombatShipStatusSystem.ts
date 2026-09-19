@@ -97,7 +97,7 @@ export class CombatShipStatusSystem {
         const world: SystemWorld = { combatScope: this.combatScope, spawnNativeMine:ctx.spawnNativeMine, spawnShip:ctx.spawnShip, addCombatEffect:ctx.addCombatEffect, ships: ctx.componentShips ?? ships, asteroids: ctx.asteroids, combatRandom: ctx.combatRandom, deployReserveWing: ctx.deployReserveWing, recoverWingCraft: ctx.recoverWingCraft, detachWingCraft:ctx.detachWingCraft, retireCombatCraft:ctx.retireCombatCraft, advanceDroneLauncher: ctx.advanceDroneLauncher, deployMine: ctx.deployMine, projectiles: ctx.projectiles,
           spawnSystemArc: (from, to, color) => ctx.fx.spawnEmpArc(from, to, { coreColor: [255, 255, 255], glowColor: color ?? [130, 155, 145], thickness: 3, life: .3 }),
           spawnSystemSmoke: (spec, pos, facing, velocity) => ctx.fx.spawnLauncherSmoke(spec, pos, facing, velocity) };
-        for (const system of [ship.system, ship.defenseSystem]) system.dispatchEvents(ship, world, dt * ship.subjectiveTimeMultiplier);
+        for (const system of ship.allSystems) system.dispatchEvents(ship, world, dt * ship.subjectiveTimeMultiplier);
         for (const mod of installedHullMods(ship.spec)) mod.advanceCombat?.(ship, dt, world);
       }
       if (!ship.isDead) {

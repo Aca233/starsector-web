@@ -1,3 +1,4 @@
+import { needsLaunchers } from './Requirements';
 import { offensiveManeuverAllowed } from './SystemAI';
 import { Vector2 } from '../../math/Vector2';
 import { signedAngle } from '../../math/Angles';
@@ -25,6 +26,7 @@ export const pulseDrives = (['orion_device','nova_burst'] as const).map(id => {
   const nova = id === 'nova_burst', fade = nova ? 1 : .15, live = nova ? 0 : .25;
   const mods = (system: ShipSystem) => stateFor(system).mods;
   return nativeSystem(id, {
+    installReason: needsLaunchers,
     resources: { weapons: [nova ? 'nb_bomblauncher' : 'od_bomblauncher'] },
     description: nova ? '发射新星脉冲炸弹，1秒显形后引爆；依照推力板位置施加线性与角冲量，然后制动。可连续使用，不是瞬时加速数值加成。'
       : '从推力板发射核脉冲弹，0.15秒显形、0.25秒飞行后引爆；产生方向相关的线性与角冲量，然后有限速率制动。',
@@ -97,8 +99,8 @@ export const pulseDrives = (['orion_device','nova_burst'] as const).map(id => {
       if (state.compression > 1) { state.compression = 1; state.velocity = 0; }
       if (state.compression < 0) { state.compression = 0; state.velocity = 0; }
     },
-    advanceAI: ({ship,distance,angleDiff,tactical}) => {
-      if (offensiveManeuverAllowed(tactical) && Math.abs(angleDiff)<.35 && distance>(tactical?.desiredRange ?? 800)+(nova ? 850 : 400)) ship.system.activate();
+    advanceAI: ({ship,distance,angleDiff,tactical, system = ship.system}) => {
+      if (offensiveManeuverAllowed(tactical) && Math.abs(angleDiff)<.35 && distance>(tactical?.desiredRange ?? 800)+(nova ? 850 : 400)) system.activate();
     },
   });
 });

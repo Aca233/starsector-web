@@ -17,7 +17,10 @@ export function SteamStart({ status, name, onName, busy: connecting, onSelected,
   const action = async (operation: string) => {
     if (locked) return; setBusy(true); setError('');
     try {
-      if (operation === 'create' || operation === 'join') {
+      if (operation === 'resume') {
+        if (!status?.lobby || status.occupied) throw Error('此设备仍有游戏页面占用连接，请先关闭旧页面。');
+        onSelected(status, status.lobby.host ? 'create' : 'join', password);
+      } else if (operation === 'create' || operation === 'join') {
         const selected = await steamRequest(operation, operation === 'create' ? { visibility } : { lobby: targetLobby });
         onRefresh(selected); onSelected(selected, operation, password);
       } else if (operation === 'list') setRooms((await steamRequest<{rooms:NonNullable<typeof rooms>}>('list')).rooms);
@@ -31,7 +34,7 @@ export function SteamStart({ status, name, onName, busy: connecting, onSelected,
     {!status ? <div className="lan-help"><h2>请先启动 Steam 联机启动器</h2><p>普通网页不能直接调用 Steam。Electron 桌面版点击 Steam 联机入口会自动启动后台；浏览器版请双击启动包内的「启动 Steam 联机」。</p><p>源码开发可在项目目录运行 <code>npm run steam</code>。</p></div> : <>
       <p role="status">{status.available ? 'Steam 已连接：' + status.name : status.error || 'Steam 尚未连接'}{status.testApp ? ' · Spacewar 480 开发测试' : ' · AppID ' + status.appId}</p>
       {!status.available && <NativeButton disabled={locked} onClick={() => void action('retry')}>已登录 Steam，重试连接</NativeButton>}
-      {status.lobby && <div className="lan-help"><p>启动器仍在 Steam 房间 {status.lobby.id}。{status.occupied ? '请使用已经连接的游戏页面，不要重复打开多个控制页面。' : '可等待原页面重连；如需重建，请先离开旧房间。'}</p><NativeButton disabled={locked} onClick={() => setConfirm('leave')}>离开旧 Steam 房间</NativeButton></div>}
+      {status.lobby && <div className="lan-help"><p>启动器仍在 Steam 房间 {status.lobby.id}。{status.occupied ? '请使用已经连接的游戏页面，不要重复打开多个控制页面。' : '连接已释放，可在这里重新进入，不必先离开 Steam 房间。'}</p><NativeButton disabled={locked || !status.available || status.occupied} onClick={() => void action('resume')}>在当前窗口继续进入</NativeButton><NativeButton disabled={locked} onClick={() => setConfirm('leave')}>离开旧 Steam 房间</NativeButton></div>}
       <div className="lan-entry-identity lan-form"><label htmlFor="steam-player-name">玩家名称</label><input id="steam-player-name" value={name} maxLength={24} disabled={locked || !!status.lobby} onChange={e=>onName(e.target.value)} /></div>
       <div className="lan-entry-options">
         <form className="lan-entry-option lan-form" onSubmit={e=>{e.preventDefault();void action('create');}}>

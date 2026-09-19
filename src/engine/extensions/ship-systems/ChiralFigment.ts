@@ -17,6 +17,7 @@ function clear(ship: Ship, pos: Vector2, world: SystemWorld): boolean {
     && !world.asteroids.some(a=>pos.distanceTo(a.pos)<a.radius+padding);
 }
 export const chiralFigment = nativeSystem('chiral_figment', {
+  installReason: spec => variants[pairs[spec.sourceVariantId ?? '']] ? undefined : '需要已定义的配对镜像方案',
   description:'按原生方案的左右旋对应表生成镜像舰。1秒渐入、前0.75秒无碰撞；成形后可独立战斗但不能启用系统或防御。没有虚构20秒自动消失。',
   implementationDetails:'真实原生对侧方案、原舰舰长技能、碰撞安全检查和独立实体。共享Web舰船AI；抖动/受击扰动尚非原版逐帧效果。无原生方案身份的自造装配不能冒充原版映射。',
   resources:{ships:[...new Set(Object.values(variants).map(v=>v.hullId))],weapons:[...new Set(Object.values(variants).flatMap(v=>v.weaponGroups.flatMap(g=>Object.values(g.weapons))))]},

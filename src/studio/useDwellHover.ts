@@ -10,7 +10,7 @@ export type HoverAnchor = HTMLElement | SVGElement;
 type Anchor = { id: string; anchor: HoverAnchor };
 
 /** Shared B interaction for refit information, equipment and nested terms. */
-export function useDwellHover({ ownerId: parentOwner, depth = 0, enabled = true }: { ownerId?: string; depth?: number; enabled?: boolean } = {}) {
+export function useDwellHover({ ownerId: parentOwner, depth = 0, enabled = true, enterableOnShow = false }: { ownerId?: string; depth?: number; enabled?: boolean; enterableOnShow?: boolean } = {}) {
   const tooltipId = useId(), ownerId = parentOwner ?? tooltipId;
   const [active, setActive] = useState<Anchor | null>(null);
   const [locked, setLocked] = useState(false);
@@ -72,11 +72,11 @@ export function useDwellHover({ ownerId: parentOwner, depth = 0, enabled = true 
       if (!immediate && hoverLockedElsewhere(ownerId)) { timers.current.show = setTimeout(reveal, DWELL_LEAVE_MS); return; }
       announceHover(ownerId, depth, tooltipId);
       const rect = anchor.getBoundingClientRect(); bridge.current.inside({ x: (rect.left + rect.right) / 2, y: (rect.top + rect.bottom) / 2 });
-      activeRef.current = { id, anchor }; lockedRef.current = immediate;
-      setActive(activeRef.current); setLocked(immediate);
+      activeRef.current = { id, anchor }; lockedRef.current = immediate || enterableOnShow;
+      setActive(activeRef.current); setLocked(lockedRef.current);
     };
     if (immediate) reveal(); else timers.current.show = setTimeout(reveal, DWELL_SHOW_MS);
-  }, [enabled, keep, pin, hide, occupied, ownerId, depth, tooltipId]);
+  }, [enabled, enterableOnShow, keep, pin, hide, occupied, ownerId, depth, tooltipId]);
   const leave = useCallback(() => {
     clearTimeout(timers.current.show);
     if (!lockedRef.current) { hide(); return; }

@@ -40,6 +40,7 @@ export class DesktopBackend {
         });
         child.on('message', message => {
           if (message?.type === 'ready' && message.port === this.port && message.mode === mode) {
+            this.log(`[desktop-service] ready mode=${mode} build=${message.build} port=${this.port}`);
             finish(null, message);
             if (mode === 'steam' && this.pendingInvite) { child.postMessage({ type: 'steam-pending-invite', lobby: this.pendingInvite }); this.pendingInvite = null; }
           }

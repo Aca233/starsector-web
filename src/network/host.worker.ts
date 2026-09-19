@@ -1,3 +1,4 @@
+import { yieldHostTask } from './HostTaskYield';
 import { HostAiBudget } from './HostAiBudget';
 import { LanCombatMulticore } from '../engine/ai/multicore/LanCombatMulticore';
 import type { AIPhaseBatch } from '../engine/ai/multicore/Types';
@@ -16,7 +17,7 @@ import { dispatchShipCommand } from "../engine/runtime/CombatCommands";
 import { sound } from "../engine/audio/SoundManager";
 import type { CombatSound } from "./CombatSnapshot";
 import { captureCombat } from "./CombatSnapshot";
-import { encodeBinaryFrame } from "./BinarySnapshot.mjs";
+import { encodeProjectedBinaryFrame } from "./BinarySnapshot.mjs";
 import { blankInput, KEY_CODES } from "./protocol";
 import type { Match, PlayerInput, Seat, Action } from "./protocol";
 
@@ -118,7 +119,7 @@ function snapshot(final = false) {
     // Serialize once off the rendering thread. LAN transfers owned binary bytes;
     // Steam (and rare JSON-compatibility fallbacks) keeps the existing text path.
     const encodingStarted = performance.now();
-    const binary = binarySnapshots ? encodeBinaryFrame(frame) : null;
+    const binary = binarySnapshots ? encodeProjectedBinaryFrame(frame) : null;
     const json = binary ? undefined : JSON.stringify(frame);
     const bytes = binary?.byteLength ?? snapshotEncoder.encode(json!).byteLength;
     encodeMs = encodeMs * .7 + (performance.now() - encodingStarted) * .3;
@@ -174,6 +175,7 @@ async function step() {
   last = now;
   callbackGapMs = elapsed;
   let steps = 0;
+  let sliceStartedAt = now;
   try {
     const returningToForeground = foregroundPending;
     const backgroundPause = background || returningToForeground;
@@ -223,7 +225,7 @@ async function step() {
           if (!fresh) continue; // Expired edge commands must not fire after recovery.
           if (action.kind === 'group' || action.kind === 'mode' || action.kind === 'autofire') {
             dispatchShipCommand(ship, { kind: action.kind, value: action.value ?? 0 }, action.aim ? new Vector2(...action.aim) : undefined);
-          } else dispatchShipCommand(ship, { kind: action.kind }, action.aim ? new Vector2(...action.aim) : undefined, engine.ships);
+          } else dispatchShipCommand(ship, { kind: action.kind, ...(action.kind === 'system' ? {value: action.value ?? 0} : {}) }, action.aim ? new Vector2(...action.aim) : undefined, engine.ships);
         }
         if (state.online) state.acknowledged = input.seq;
       }
@@ -266,6 +268,15 @@ async function step() {
         if (timer) clearInterval(timer);
         timer = undefined;
         break;
+      }
+      // Only yield BETWEEN complete authority steps. Pending input/presence and
+      // snapshot credits can then run before another expensive catch-up step.
+      // Keep the original tick budget/publication cadence: yielding must not
+      // add captures, lower the 60 Hz target, or discard simulation debt.
+      if (accumulator >= 1000 / 60 && steps < 6 && performance.now() - sliceStartedAt >= 8) {
+        await yieldHostTask();
+        if (generation !== lifecycle || !running || engine !== authority) return;
+        sliceStartedAt = performance.now();
       }
     }
     // Bounded catch-up: do not accumulate minutes of stale simulation after a slow host.

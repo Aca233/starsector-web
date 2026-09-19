@@ -17,9 +17,9 @@ export const mineStrike: ShipSystemDefinition = {
     }
     world.deployMine(target, ship, 1000 * ship.hullStats.systemRangeMultiplier);
   },
-  advanceAI: ({ship, target, distance, tactical}) => {
+  advanceAI: ({ship, target, distance, tactical, system = ship.system}) => {
     if (target.isDead || target.isPhased || tactical?.withdrawing || tactical?.waypoint) return;
-    if (ship.flux.totalFlux + ship.system.fluxCostPerUse > ship.flux.maxFlux * .95) return;
-    if (ship.system.charges > 0 && !ship.system.isCoolingDown && distance < 1000 * ship.hullStats.systemRangeMultiplier + 200) ship.system.activate();
+    if (ship.flux.totalFlux + system.fluxCostPerUse > ship.flux.maxFlux * .95) return;
+    if (system.charges > 0 && !system.isCoolingDown && distance < 1000 * ship.hullStats.systemRangeMultiplier + 200) system.activate();
   }
 };

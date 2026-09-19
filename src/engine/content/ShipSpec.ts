@@ -104,7 +104,10 @@ export interface ShipSpec {
   sourceVariantId?: string;
   /** Stable base hull identity; refit, simulation and LAN runtime IDs may change. */
   sourceHullId?: string;
+  /** Legacy/default first slot; omitted list inherits this without changing native hull data. */
   systemType: ShipSystemType;
+  /** Ordered independent tactical skills. [] explicitly equips none. */
+  systemTypes?: ShipSystemType[];
   /** Independent right-button defense slot; phase cloak is still owned by Shield. */
   defenseSystemType?: ShipSystemType;
   weaponSlots: WeaponMountSlotConfig[];

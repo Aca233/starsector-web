@@ -98,12 +98,14 @@ export class CapitalShipAI {
     const allowOffensiveManeuver = !regroup && !withdrawing && !escort && !avoiding && !waypoint;
     if(target&&!ship.flux.isVenting&&!ship.flux.isOverloaded){
       // System callbacks decide activation only; they no longer rewrite stationkeeping or shield orders.
-      const modifiers=ship.system.definition.modifiers?.({...ship.system,state:'ACTIVE',effectLevel:1} as typeof ship.system,ship.flux.maxFlux);
-      const boostSpeed=ship.spec.maxSpeed+(modifiers?.speedFlat??0);
-      ship.system.definition.advanceAI?.({ship,target,distance:ship.pos.distanceTo(target.pos),angleDiff:signedAngle(facing-ship.facingRad),
-        tactical:{allowOffensiveManeuver,desiredRange:profile.range,withdrawing:withdrawing||!!regroup,waypoint:!!waypoint,avoidingCollision:avoidance.avoiding||cooperation.yielding,
-          forwardClear:forwardPathClear(ship,scene,Math.max(boostSpeed,ship.vel.length()),Math.max(policy.avoidanceLookahead,ship.system.chargeUpDuration+ship.system.chargeDownDuration)),
-          quietFor:this.defense.quietFor,threat}});
+      for (const system of ship.systems) {
+        const modifiers=system.definition.modifiers?.({...system,state:'ACTIVE',effectLevel:1} as typeof system,ship.flux.maxFlux);
+        const boostSpeed=ship.spec.maxSpeed+(modifiers?.speedFlat??0);
+        system.definition.advanceAI?.({ship,system,target,distance:ship.pos.distanceTo(target.pos),angleDiff:signedAngle(facing-ship.facingRad),
+          tactical:{allowOffensiveManeuver,desiredRange:profile.range,withdrawing:withdrawing||!!regroup,waypoint:!!waypoint,avoidingCollision:avoidance.avoiding||cooperation.yielding,
+            forwardClear:forwardPathClear(ship,scene,Math.max(boostSpeed,ship.vel.length()),Math.max(policy.avoidanceLookahead,system.chargeUpDuration+system.chargeDownDuration)),
+            quietFor:this.defense.quietFor,threat}});
+      }
     }
     if (target) ship.defenseSystem.definition.advanceAI?.({ ship, system: ship.defenseSystem, target, distance: ship.pos.distanceTo(target.pos), angleDiff: signedAngle(facing-ship.facingRad),
       tactical: { allowOffensiveManeuver, desiredRange: profile.range, withdrawing: withdrawing||!!regroup, waypoint: !!waypoint, avoidingCollision: avoidance.avoiding, forwardClear: true, quietFor: this.defense.quietFor, threat } });

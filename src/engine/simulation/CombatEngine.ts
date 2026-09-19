@@ -936,10 +936,7 @@ export class CombatEngine {
     ship.clearInput();
     if (ship.flux.isVenting) ship.flux.cancelVenting();
     ship.shield.setActive(false);
-    ship.system.deactivate();
-    ship.system.disabled = true;
-    ship.defenseSystem.deactivate();
-    ship.defenseSystem.disabled = true;
+    for (const system of ship.allSystems) { system.deactivate(); system.disabled = true; }
     const fighter = ship.spec.hullSize === 'FIGHTER';
     if (!fighter && !ship.isAttachedModule && !this.transientCombatShips.has(ship)) {
       this.shipLossNotifications.push({

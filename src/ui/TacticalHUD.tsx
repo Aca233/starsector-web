@@ -161,6 +161,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
             onToggleMode: value => onShipCommand({ kind: 'mode', value }),
             onToggleAutofire: value => onShipCommand({ kind: 'autofire', value }),
           } : undefined}
+          onActivateSystem={onShipCommand ? value => onShipCommand({ kind: 'system', value }) : undefined}
           onToggleRecall={onShipCommand ? () => onShipCommand({ kind: 'recall' }) : undefined}
         />
       </div>
@@ -187,7 +188,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
           weaponGroupCount={player.weaponGroups.length}
           defaultMouseSteering={defaultMouseSteering}
           onDefaultMouseSteeringChange={onDefaultMouseSteeringChange}
-          hasSystem={player.system.available}
+          hasSystem={player.systems.some(system => system.available)}
           hasShield={player.shield.type !== "NONE" || player.defenseSystem.type !== "NONE"}
           hasFighters={[...engine.playerWings, ...engine.enemyWings].some(wing => wing.carrierId === player.id)}
           canRestart={canRestart}

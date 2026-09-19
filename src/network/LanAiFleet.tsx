@@ -132,7 +132,7 @@ export function LanAiFleet({ room, isHost, editable, connection, currentDesign, 
   const [viewing, setViewing] = useState<{ hull: string; name: string; design: Design | null; warnings?: string[] } | null>(null);
   // The selector is the enterable parent of the inspection chain, not a permanently pinned window.
   // Depth -1 leaves all three information levels available below it.
-  const pickerHover = useDwellHover({ depth: -1, enabled: open });
+  const pickerHover = useDwellHover({ depth: -1, enterableOnShow: true, enabled: open });
   const { hide: closePicker, keep: cancelPickerClose, leave: leavePicker } = pickerHover;
   const picker = pickerHover.active ? { hullId: pickerHover.active.id, element: pickerHover.active.anchor as HTMLButtonElement } : null;
   const openPicker = (hullId: string, element: HTMLButtonElement, immediate: boolean) => {

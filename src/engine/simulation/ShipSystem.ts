@@ -11,7 +11,7 @@ export type ShipSystemState = 'IDLE' | 'IN' | 'ACTIVE' | 'OUT' | 'COOLDOWN';
 /** Shared lifecycle only. Timing, effects, AI, presentation and controls belong to definitions. */
 export class ShipSystem {
   public readonly definition: ShipSystemDefinition;
-  /** Primary slot reads composed modifiers/controls; lifecycles, charges and costs remain independent. */
+  /** Compatibility composition chain (other tactical slots, then defense); never advances siblings. */
   public auxiliary?: ShipSystem;
   public activationTarget?: Ship;
   /** Immutable command-edge inputs; live weapon aim may keep moving during IN. */
@@ -88,13 +88,13 @@ export class ShipSystem {
   public get forcesBraking(): boolean { return (this.available && !!this.definition.motionControl?.(this).forceBrake) || !!this.auxiliary?.forcesBraking; }
   public get blocksStrafing(): boolean { return (this.owner?.runtimeModifiers.value.disableMotion ?? 0) > 0 || (this.controlsActive && !!this.definition.controls?.blockStrafing) || !!this.auxiliary?.blocksStrafing; }
   public get forcesAutofire(): boolean { return (this.controlsActive && !!this.definition.controls?.forceAutofire) || !!this.auxiliary?.forcesAutofire; }
-  public get tacticalMode(): ShipSystemDefinition['tacticalMode'] { return this.isActive ? this.definition.tacticalMode : undefined; }
+  public get tacticalMode(): ShipSystemDefinition['tacticalMode'] { return (this.isActive ? this.definition.tacticalMode : undefined) ?? this.auxiliary?.tacticalMode; }
   public get blocksWeapons(): boolean { return (this.owner?.runtimeModifiers.value.disableWeapons ?? 0) > 0 || (this.controlsActive && !!this.definition.controls?.blockWeapons) || !!this.auxiliary?.blocksWeapons; }
   public get blocksShields(): boolean { return (this.owner?.runtimeModifiers.value.disableDefense ?? 0) > 0 || (this.controlsActive && !!this.definition.controls?.blockShields) || !!this.auxiliary?.blocksShields; }
   public get locksTurning(): boolean { return (this.owner?.runtimeModifiers.value.disableMotion ?? 0) > 0 || (this.controlsActive && !!this.definition.controls?.lockTurning) || !!this.auxiliary?.locksTurning; }
   public get forcesForward(): boolean { return (this.controlsActive && !!this.definition.controls?.forceForward) || !!this.auxiliary?.forcesForward; }
-  public get engineVisualLevel(): number { return this.definition.visuals?.engineBoost ? this.effectLevel : 0; }
-  public get fortressVisualLevel(): number { return this.definition.visuals?.fortressShield ? this.effectLevel : 0; }
+  public get engineVisualLevel(): number { return Math.max(this.definition.visuals?.engineBoost ? this.effectLevel : 0, this.auxiliary?.engineVisualLevel ?? 0); }
+  public get fortressVisualLevel(): number { return Math.max(this.definition.visuals?.fortressShield ? this.effectLevel : 0, this.auxiliary?.fortressVisualLevel ?? 0); }
 
   public reset(): void {
     this.definition.onReset?.(this,this.owner);
@@ -115,7 +115,7 @@ export class ShipSystem {
     if (ship?.retreating) return '撤退中';
     if (ship?.flux.isOverloaded) return '幅能过载';
     if (ship?.flux.isVenting) return '正在排散幅能';
-    if (ship && ship.flux.totalFlux + this.fluxCostPerUse + (ship.system?.reservedFluxCost ?? 0) + (ship.defenseSystem?.reservedFluxCost ?? 0) > ship.flux.maxFlux) return '幅能空间不足';
+    if (ship && ship.flux.totalFlux + this.fluxCostPerUse + ship.allSystems.reduce((total, system) => total + system.reservedFluxCost, 0) > ship.flux.maxFlux) return '幅能空间不足';
     if (this.definition.charges !== undefined && this.definition.usesChargesForActivation !== false && this.charges <= 0) return '充能耗尽';
     if (ship && this.definition.canActivate && !this.definition.canActivate(ship)) return '未满足系统使用条件';
     return undefined;

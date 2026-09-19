@@ -1,3 +1,4 @@
+import { readSystemBindings, selectNextSystem } from '../engine/runtime/SystemBindings';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Vector2 } from '../engine/math/Vector2';
 import { Ship } from '../engine/simulation/Ship';
@@ -170,6 +171,7 @@ export function useCombatInput({
     const onWheel = (e: WheelEvent) => {
       if (e.target !== canvas || e.ctrlKey || e.altKey || e.metaKey || blocked(e.target, true) || sessionRef.current.engine.isTacticalMap) return;
       e.preventDefault();
+      if (e.shiftKey && readSystemBindings().wheelSelect) { selectNextSystem(sessionRef.current.engine.playerShip, e.deltaY); return; }
       zoomRef.current = zoomCombatView(zoomRef.current, e.deltaY);
     };
 
@@ -178,7 +180,7 @@ export function useCombatInput({
       // Focused HUD buttons own Space/Enter activation, not the pause shortcut.
       if ((e.code === 'Space' || e.code === 'Enter') && isCombatPointerUi(e.target)) return;
       const engine = sessionRef.current.engine;
-      const action = shipCommandForKey(e);
+      const action = shipCommandForKey(e, engine.playerShip);
       if (e.ctrlKey || e.altKey || e.metaKey) {
         if (action && !engine.isTacticalMap) {
           e.preventDefault();

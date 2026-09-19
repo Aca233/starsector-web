@@ -1,7 +1,7 @@
 {
   "name": "starsector-web",
   "private": true,
-  "version": "0.2.1",
+  "version": "0.2.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -33,7 +33,9 @@
     "desktop": "npm run build && electron .",
     "desktop:start": "electron .",
     "package:electron": "node scripts/package-electron.mjs",
-    "steam:check": "node --test scripts/check-steam-overlay.mjs"
+    "steam:check:runtime": "node scripts/check-steam-session-runtime.mjs",
+    "steam:check:sockets-native": "node scripts/check-steam-sockets-native.mjs",
+    "steam:check": "node --test scripts/check-steam-overlay.mjs scripts/check-steam-transport.mjs scripts/check-steam-delta.mjs scripts/check-steam-host-budget.mjs scripts/check-steam-shared-link.mjs scripts/check-steam-session-metrics.mjs scripts/check-steam-anchored-snapshots.mjs scripts/check-steam-sockets-v012.mjs scripts/check-steam-sockets-lifecycle.mjs scripts/check-steam-sockets-session.mjs scripts/check-steam-sockets-status.mjs scripts/check-steam-sockets-room-pacer.mjs scripts/check-steam-sockets-room.mjs scripts/check-steam-sockets-flight-budget.mjs scripts/check-steam-sockets-state-codec.mjs scripts/check-steam-sockets-link.mjs scripts/check-steam-input-queue.mjs"
   },
   "dependencies": {
     "@msgpack/msgpack": "3.1.3",

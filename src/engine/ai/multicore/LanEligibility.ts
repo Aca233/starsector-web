@@ -82,6 +82,7 @@ export function lanSerialReason(engine: CombatEngine, ai: CapitalShipAI, audit =
     if (s.shield.damageTakenModifiers.size !== 1
         || !Object.is(s.shield.damageTakenModifiers.get('hullmods'), s.hullStats.shieldDamageMultiplier))
         return 'shield-modifiers';
+    if (s.systems.length > 1) return 'multi-system-loadout';
     for (const system of [s.system, s.defenseSystem]) {
         if (!nativeObject(system, ShipSystem.prototype) || !systemIds.has(system.type)
             || !auditedDefinition(system.definition, nativeSystems.get(system.definition), audit) || system.owner !== s)

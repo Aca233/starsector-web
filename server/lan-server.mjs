@@ -1,3 +1,4 @@
+import { LanStateCredits } from "./LanStateCredits.mjs";
 import { teamName, checkFleetBudget, editAiFleet } from "../src/network/room-fleet.mjs";
 import { MAX_BATTLE_REPORT_BYTES, validateBattleReport } from "../src/network/battle-report.mjs";
 import { summarizeCombatFrame, reusableStateText } from "./lan-state.mjs";
@@ -9,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { networkInterfaces, hostname } from "node:os";
 import { randomBytes, randomUUID, createHash } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
+import { isLanAddress, lanPerMessageDeflate } from "./lan-websocket.mjs";
 import { DEFAULT_BATTLE_SIZE, MAX_BATTLE_SIZE, validBattleSize, battleTeamCount, battleTeamLimit } from "../src/shared/battle-size.mjs";
 import protocol from "../src/network/protocol.json" with { type: "json" };
 import { aiHullId, aiLoadout, pruneAiLoadouts, aiDesignSignature } from "../src/network/ai-loadouts.mjs";
@@ -160,11 +162,10 @@ export async function createLanServer({
       res.end("Not found");
     }
   });
-  const wss = new WebSocketServer({
-    noServer: true,
-    maxPayload: protocol.maxSnapshotBytes,
-    perMessageDeflate: false,
-  });
+  // Separate immutable policies: browser <-> localhost stays uncompressed.
+  // Both groups share admission, transport handling and the original limits.
+  const websocketServers = [false, lanPerMessageDeflate()].map(perMessageDeflate =>
+    new WebSocketServer({ noServer: true, maxPayload: protocol.maxSnapshotBytes, perMessageDeflate }));
   const connected = (p) =>
     !p.disconnected && p.ws.readyState === WebSocket.OPEN;
   const sendEncoded = (p, encoded) => {
@@ -189,9 +190,16 @@ export async function createLanServer({
         if (!p.assetsLoaded || p.background) continue;
         // Forward every host tick to a ready peer. A busy socket still skips
         // replaceable state instead of accumulating stale megabyte snapshots.
-        if (p.ws.bufferedAmount > 0) continue;
+        // Steam uses ACK-based bounded pipeline credit; ordinary WebSockets keep
+        // their existing zero-buffer policy. This does not change simulation Hz.
+        if (p.ws.snapshotWritable === false || (p.ws.snapshotWritable === undefined && p.ws.bufferedAmount > 0)) continue;
       }
       encoded ??= JSON.stringify(message);
+      // TCP receipt does not prove that the guest renderer consumed the frame.
+      // This gates only replaceable, not-yet-sent states; never input/control.
+      // No stale payload is retained or retried after a terminal message.
+      if (message.type === "state" && p.stateCredits &&
+          !p.stateCredits.reserve(message.seq, Buffer.byteLength(encoded))) continue;
       sendEncoded(p, encoded);
     }
   };
@@ -249,6 +257,7 @@ export async function createLanServer({
   // Loading resources is not permission to send controls. A fresh full frame must
   // be applied and acknowledged with this connection's epoch first.
   const beginSync = (r, p) => {
+    p.stateCredits?.reset();
     p.loaded = false;
     p.sync = { id: randomUUID(), tick: Math.max(0, r.lastTick + 1), since: Date.now() };
     presence(r, p, false);
@@ -263,6 +272,7 @@ export async function createLanServer({
     publish(r);
   };
   const leave = (p, reason = "玩家在加载期间离开，请重新准备。") => {
+    p.stateCredits?.reset();
     const r = p.room;
     if (!r) return;
     p.room = null;
@@ -337,6 +347,7 @@ export async function createLanServer({
       )
         throw Error("upgrade");
       if (extension?.isUpgrade?.(req.url)) { extension.upgrade(req, socket, head); return; }
+      const wss = websocketServers[isLanAddress(socket.remoteAddress) ? 1 : 0];
       wss.handleUpgrade(req, socket, head, (ws) =>
         wss.emit("connection", ws, req),
       );
@@ -375,16 +386,25 @@ export async function createLanServer({
       lastChat: 0,
       lastResync: 0,
       background: false,
+      stateCredits: null,
+      nativeProbe: null,
     };
     peers.add(p);
-    ws.on("pong", () => {
-      if (p.ws === ws) p.lastPong = Date.now();
+    ws.on("pong", (data) => {
+      if (p.ws !== ws) return;
+      p.lastPong = Date.now();
+      if (p.stateCredits && p.nativeProbe && Buffer.isBuffer(data) && data.equals(p.nativeProbe.data)) {
+        p.stateCredits.recordNetworkRtt(performance.now() - p.nativeProbe.at);
+        p.nativeProbe = null;
+      }
     });
     ws.on("error", () => {});
     ws.on("close", () => {
       if (p.ws !== ws) return;
       peers.delete(p);
       if (!p.hello) return;
+      p.stateCredits?.reset();
+      p.nativeProbe = null;
       p.disconnected = Date.now();
       p.ready = false;
       p.loaded = false;
@@ -406,12 +426,24 @@ export async function createLanServer({
           p.window = now;
           p.count = 0;
         }
+        // Consumption receipts are transport flow control, not player requests.
+        // Only exact outstanding LAN credits may bypass the request budget; their
+        // count/bytes are already bounded by our sends. Invalid/duplicate receipts
+        // and malformed JSON still take the original 160-message request path.
+        // Otherwise a healthy backlog drain can consume the input/control budget.
+        let receipt;
+        if (!binary && p.stateCredits && raw.length <= 256 &&
+            p.room && p.room.hostId !== p.id) {
+          try { receipt = JSON.parse(raw.toString()); } catch { /* counted below */ }
+          if (receipt?.type === "state-consumed" && receipt.matchId === p.room.match?.id &&
+              p.stateCredits.ack(receipt.seq)) return;
+        }
         if (++p.count > 160) {
           ws.close(1008, "Rate limit");
           return;
         }
         const text = binary ? null : raw.toString();
-        const m = binary ? decodeBinaryState(raw) : JSON.parse(text);
+        const m = receipt ?? (binary ? decodeBinaryState(raw) : JSON.parse(text));
         if (!m || typeof m.type !== "string") throw Error("无效消息");
         if (["configure","ai","ready","start"].includes(m.type) && typeof m.requestId === "string" && /^[a-zA-Z0-9-]{1,64}$/.test(m.requestId)) requestId = m.requestId;
         if (m.type !== "state" && raw.length > (["configure","ai"].includes(m.type) ? MAX_DESIGN_BYTES * 4 + 4096 : m.type === "options" ? protocol.maxOptionsBytes + 4096 : m.type === "finish" ? MAX_BATTLE_REPORT_BYTES + 4096 : 16384)) {
@@ -497,8 +529,12 @@ export async function createLanServer({
           p.name = m.name.trim();
           p.instance = m.instance;
           p.hello = true;
+          // Explicit LAN-only capability. Steam has its own transport ACK windows.
+          p.stateCredits = !p.transport && m.stateCredits === 1 ? new LanStateCredits({maxBytes:protocol.maxSnapshotBytes*2}) : null;
+          p.nativeProbe = null;
           send(p, {
             type: "welcome",
+            ...(p.stateCredits ? {stateCredits:1} : {}),
             id: p.id,
             resumeToken: p.token,
             resumed,
@@ -537,11 +573,19 @@ export async function createLanServer({
             const r = p.room;
             r.recoveryUntil = Math.min(now + protocol.hostStateTimeoutMs, r.lastState + protocol.backgroundGraceMs);
           }
+          if (p.background !== m.hidden) p.stateCredits?.reset();
           p.background = m.hidden;
           return;
         }
         if (m.type === "ping") {
           send(p, { type: "pong", sent: m.sent });
+          return;
+        }
+        if (m.type === "state-consumed") {
+          // Exact sent-sequence validation is inside the window. A stale socket,
+          // old match, host ACK or forged/future sequence cannot create credit.
+          if (p.stateCredits && p.room && p.room.hostId !== p.id &&
+              m.matchId === p.room.match?.id) p.stateCredits.ack(m.seq);
           return;
         }
         if (m.type === "leave") {
@@ -920,6 +964,7 @@ export async function createLanServer({
                 "autofire",
               ].includes(a.kind) ||
               (a.aim !== undefined && (!Array.isArray(a.aim) || a.aim.length !== 2 || !a.aim.every((n) => Number.isFinite(n) && Math.abs(n) <= 100000))) ||
+              (a.kind === "system" && a.value !== undefined && (!Number.isInteger(a.value) || a.value < 0 || a.value >= 64)) ||
               (["group", "mode", "autofire"].includes(a.kind) &&
                 (!Number.isInteger(a.value) || a.value < 0 || a.value > 6))
             )
@@ -996,7 +1041,7 @@ export async function createLanServer({
       }
     });
   };
-  wss.on("connection", ws => acceptTransport(ws));
+  for (const wss of websocketServers) wss.on("connection", ws => acceptTransport(ws));
   const timer = setInterval(() => {
     const now = Date.now();
     for (const p of peers) {
@@ -1004,7 +1049,13 @@ export async function createLanServer({
         p.ws.terminate();
         continue;
       }
-      p.ws.ping();
+      if (p.stateCredits && !p.transport && p.ws.readyState === WebSocket.OPEN) {
+        if (!p.nativeProbe) {
+          const data = randomBytes(12);
+          p.nativeProbe = { data, at: performance.now() };
+          p.ws.ping(data);
+        }
+      } else p.ws.ping();
     }
     for (const [token, p] of sessions) {
       if (p.disconnected && now - p.disconnected > protocol.reconnectMs) {
@@ -1034,7 +1085,7 @@ export async function createLanServer({
     });
   } catch (error) {
     clearInterval(timer);
-    wss.close();
+    for (const wss of websocketServers) wss.close();
     throw error;
   }
   return {
@@ -1046,7 +1097,7 @@ export async function createLanServer({
     close: async () => {
       clearInterval(timer);
       for (const p of peers) p.ws.terminate();
-      await new Promise((resolve) => wss.close(resolve));
+      await Promise.all(websocketServers.map(wss => new Promise(resolve => wss.close(resolve))));
       await new Promise((resolve) => server.close(resolve));
     },
   };

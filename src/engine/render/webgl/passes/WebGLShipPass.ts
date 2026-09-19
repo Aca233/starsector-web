@@ -223,7 +223,7 @@ export class WebGLShipPass {
       if (!hulk) for (const decoration of ship.spec.decorativeWeapons ?? []) {
         const info = textures.getTextureInfo(decoration.spriteUrl);
         if (!info.texture || info.width <= 0 || info.height <= 0) continue;
-        const compression = decoration.tags?.includes('pusherplate') ? pulsePusherOffset(ship.system) : 0;
+        const compression = decoration.tags?.includes('pusherplate') ? Math.max(0, ...ship.allSystems.map(pulsePusherOffset)) : 0;
         const offset = new Vector2(decoration.x+compression,decoration.y).rotate(shipFacing);
         batcher.setBlendMode('NORMAL');
         batcher.drawSprite(info.texture,shipPos.x+offset.x,shipPos.y+offset.y,info.width,info.height,

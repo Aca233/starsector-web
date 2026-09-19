@@ -1,3 +1,4 @@
+import { lanSocketUrl, savedLanEndpoint } from './LanEndpoint';
 import { MotionPresence } from '../ui/core/MotionPresence';
 import { FullscreenButton } from '../ui/FullscreenButton';
 import { SteamStart } from "./SteamStart";
@@ -20,6 +21,10 @@ import "./lan.css";
 const LanRoomWorkbench = lazy(() => import("./LanRoomWorkbench").then(m=>({default:m.LanRoomWorkbench})));
 type RoomEntryIntent = {type:"create";battleSize:number} | {type:"join";code:string;password:string};
 export default function LanApp({ transport = "lan" }: { transport?: "lan" | "steam" }) {
+  const [desktopLan, setDesktopLan] = useState(false);
+  const [serverLabel, setServerLabel] = useState(location.host);
+  const localAddresses = useRef<string[]>([]);
+  const selectedEndpoint = useRef<string | null>(null);
   const [steamStatus, setSteamStatus] = useState<SteamStatus | null>(null);
   const [workbenchRoom, setWorkbenchRoom] = useState<Room|null>(null);
   const [lastIdentity,setLastIdentity] = useState("");
@@ -91,16 +96,27 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
         if (!r.ok) throw Error("not LAN server");
         return r.json();
       })
-      .then((info) => {
+      .then(async (info) => {
+        let desktop = false;
+        if (typeof info.portable?.id === 'string' && info.portable.id.startsWith('desktop-')) {
+          try {
+            const response = await fetch('/desktop/lan/info', { signal: abort.signal, cache: 'no-store' });
+            desktop = response.ok && (await response.json()).available === true;
+          } catch { /* Non-desktop/local-only services keep their browser entrance. */ }
+        }
         if (abort.signal.aborted) return;
+        setDesktopLan(desktop);
+        localAddresses.current = info.addresses ?? [];
         setAvailable(!!info.build);
         setAddresses(info.addresses ?? []);
         if (info.build && (autoHost.current || autoGuest.current || connection.saved)) {
           setConnecting(true);
-          const url = new URL("/lan/ws", window.location.href);
-          url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
+          const saved = !autoHost.current && !autoGuest.current ? savedLanEndpoint(connection.saved?.url, desktop) : null;
+          const socket = saved?.socket ?? lanSocketUrl();
+          selectedEndpoint.current = socket;
+          if (saved?.remote) { setAddresses([saved.remote + '/?view=lan']); setServerLabel(new URL(saved.remote).host); }
           connection.connect(
-            url.href,
+            socket,
             initialHost.get("name")?.trim().slice(0, 24) ||
               connection.saved?.name ||
               "玩家",
@@ -209,17 +225,22 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
     if(!connection.ready||!connection.send(message)){setError("连接尚未就绪，请重新连接服务器。");return false;}
     return true;
   };
-  const enterRoom=(intent:RoomEntryIntent)=>{
+  const enterRoom=(intent:RoomEntryIntent, remoteOrigin?:string)=>{
     if(!name.trim()||available!==true||connecting||entering||entryIntent.current)return;
+    const socket = lanSocketUrl(intent.type === 'join' && desktopLan ? remoteOrigin : undefined);
+    if (selectedEndpoint.current !== socket) {
+      connection.close(true, false); setId('');
+      selectedEndpoint.current = socket;
+    }
+    setServerLabel(remoteOrigin ? new URL(remoteOrigin).host : location.host);
+    setAddresses(remoteOrigin ? [remoteOrigin + '/?view=lan'] : localAddresses.current);
     entryIntent.current=intent;setError("");setEntering(true);
     if(connection.ready){
       pendingDesign.current=true;
       if(!send(intent)){entryIntent.current=null;setEntering(false);}
     }else{
       setConnecting(true);
-      const url=new URL("/lan/ws",window.location.href);
-      url.protocol=location.protocol==="https:"?"wss:":"ws:";
-      connection.connect(url.href,name.trim());
+      connection.connect(socket,name.trim());
     }
   };
   const resetSteam = () => {
@@ -253,8 +274,8 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
       {reconnecting&&<p className="lan-menu-note" role="status">{reconnecting}</p>}
       {error&&<p className="lan-error" role="alert">{error}</p>}
       {transport === "steam" ? <SteamStart status={steamStatus} name={name} onName={setName} busy={connecting||entering} onSelected={selectSteam} onRefresh={setSteamStatus} onReset={resetSteam}/> : <LanStart design={selectedDesign} hull={previewHull} name={name} onNameChange={setName} available={available} connected={!!id}
-        connecting={connecting||entering||!!room} initialCode={initialCode}
-        onHost={()=>enterRoom({type:"create",battleSize:readBattleSize()})} onJoin={(code,password)=>enterRoom({type:"join",code,password})}/>}
+        connecting={connecting||entering||!!room} initialCode={initialCode} desktop={desktopLan} serverLabel={serverLabel}
+        onHost={()=>enterRoom({type:"create",battleSize:readBattleSize()})} onJoin={(code,password,remoteOrigin)=>enterRoom({type:"join",code,password},remoteOrigin)}/>}
       <footer className="lan-entry-footer"><FullscreenButton /><NativeButton onClick={()=>{if (transport !== "steam") window.location.assign("?view=steam"); else void steamRequest<{url:string}>("lan").then(result=>window.location.assign(result.url),error=>setError(error.message));}} disabled={transport === "steam" && !steamStatus}>{transport === "steam" ? "使用局域网联机" : "Steam 联机"}</NativeButton><NativeButton onClick={()=>setHelpOpen(true)}>联机说明</NativeButton><NativeButton onClick={()=>{if (transport === "steam" && steamStatus) { resetSteam(); void steamRequest("leave").then(()=>window.location.assign("./"),error=>setError(error.message)); } else { connection.close(); window.location.assign("./"); }}}>返回主菜单</NativeButton></footer>
     </NativeFrame>
       <MotionPresence>{helpOpen && (

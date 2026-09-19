@@ -1,3 +1,4 @@
+import { tacticalSystemIds } from '../extensions/ship-systems/Loadout';
 import { systemWeaponSpec } from '../extensions/ship-systems/SystemWeaponCatalog';
 import { resolveSystemId, shipSystemDefinitions } from '../extensions/ship-systems/Registry';
 import { weaponEffects } from '../extensions/weapon-effects/Registry';
@@ -53,7 +54,7 @@ export function collectCombatTextureUrls(engine: CombatEngine): string[] {
   const addHull = (spec: ShipSpec) => {
     // Runtime refits can share an id but differ in systems; visit their resources before deduping artwork.
     for (const decoration of spec.decorativeWeapons ?? []) urls.add(decoration.spriteUrl);
-    for (const id of [spec.systemType, spec.defenseSystemType ?? 'NONE']) addResources(shipSystemDefinitions.require(resolveSystemId(id)).resources);
+    for (const id of [...tacticalSystemIds(spec), spec.defenseSystemType ?? 'NONE']) addResources(shipSystemDefinitions.require(resolveSystemId(id)).resources);
     for (const mod of installedHullMods(spec)) addResources(mod.resources);
     urls.add(spec.spriteUrl);
     if (spec.phaseHighlightSpriteUrl) urls.add(spec.phaseHighlightSpriteUrl);

@@ -1,3 +1,4 @@
+import { tacticalSystemIds } from '../extensions/ship-systems/Loadout';
 import { moduleOffset } from '../content/ModuleGeometry';
 import type { ShipModuleSpec } from '../content/ShipSpec';
 import { shipPresentationPose } from "../visual/ShipPresentation";
@@ -164,7 +165,7 @@ export class Ship {
     this.retreating = this.isRetreated = true;
     for (const child of this.childModules) child.retreatFromCombat();
     this.clearInput(); this.shield.setActive(false); this.flux.cancelVenting();
-    this.system.deactivate(); this.defenseSystem.deactivate();
+    for (const system of this.allSystems) system.deactivate();
     this.pos.set(0,-1000000); this.prevPos.copy(this.pos); this.vel.set(0,0);
   }
   public id: string;
@@ -200,7 +201,11 @@ export class Ship {
   public armor: ArmorGrid;
   public flux: FluxTracker;
   public shield: Shield;
+  /** Compatibility first-slot/stat facade. New lifecycle code iterates systems/allSystems. */
   public system: ShipSystem;
+  public systems: ShipSystem[];
+  public get allSystems(): ShipSystem[] { return [this.system, ...this.systems.slice(1), this.defenseSystem]; }
+  public getSystem(slot = 0): ShipSystem | undefined { return Number.isInteger(slot) && slot >= 0 ? this.systems[slot] : undefined; }
   public defenseSystem: ShipSystem;
   public readonly weaponControl: ShipWeaponControlSystem;
   private readonly random: SimulationRandom;
@@ -423,9 +428,11 @@ export class Ship {
     this.shield.phaseCooldownDuration *= refit.phaseCooldownMultiplier;
     // HUD/检查工具读取 upkeepRate：相位线圈的维持费即每秒硬幅能成本。
     if (this.shield.type === 'PHASE') this.shield.upkeepRate = this.shield.phaseUpkeepPerSecond;
-    this.system = new ShipSystem(spec.systemType, spec.maxFlux, this);
+    this.systems = tacticalSystemIds(spec).map(id => new ShipSystem(id, spec.maxFlux, this));
+    this.system = this.systems[0] ?? new ShipSystem('NONE', spec.maxFlux, this);
     this.defenseSystem = new ShipSystem(spec.defenseSystemType ?? 'NONE', spec.maxFlux, this);
-    this.system.auxiliary = this.defenseSystem;
+    const equipped = this.allSystems;
+    equipped.forEach((system, index) => { system.auxiliary = equipped[index + 1]; });
 
     // 初始化挂点武器与武器编组
     this.weaponControl.init(spec, initialFacingRad, this.weaponHealthMultiplier);
@@ -484,12 +491,10 @@ export class Ship {
   private applyCombatReadiness(dt: number) {
     const effects = this.crEffects;
 
-    this.system.disabled = effects.systemDisabled;
+    for (const system of this.systems) { system.disabled = effects.systemDisabled; if (effects.systemDisabled) system.deactivate(); }
     this.defenseSystem.disabled = effects.defenseDisabled;
     if (effects.defenseDisabled) this.defenseSystem.deactivate();
-    if (effects.systemDisabled && this.system.isActive) {
-      this.system.deactivate();
-    }
+
     if (effects.defenseDisabled && this.shield.isRaiseRequested) {
       this.lowerShieldWithFeedback();
     }
@@ -616,11 +621,11 @@ export class Ship {
 
   /** Current Web flame-length modifiers; zero-flux boost is a separate mechanism. */
   public get isEngineGlowExtended(): boolean {
-    return (this.system.definition.controls?.suppressZeroFlux && this.system.effectLevel > 0) || this.shield.phaseEffectLevel > 0;
+    return (this.allSystems.some(system => system.definition.controls?.suppressZeroFlux && system.effectLevel > 0)) || this.shield.phaseEffectLevel > 0;
   }
 
   private get engineDisableContext() {
-    return { extendedGlow: this.isEngineGlowExtended, systemActive: this.system.isActive };
+    return { extendedGlow: this.isEngineGlowExtended, systemActive: this.allSystems.some(system => system.isActive) };
   }
 
   public damageEngineComponent(engineIndex: number, damage: number): void {
@@ -667,7 +672,7 @@ export class Ship {
     return this.isDocked || this.isRetreated ? 0 : alpha * (this.runtimeModifiers.value.visualAlphaMultiplier ?? 1);
   }
   public get isPhased(): boolean {
-    if (this.parentShip?.isPhased || this.isDocked || this.isRetreated || this.shield.isPhased || this.system.isPhased) return true;
+    if (this.parentShip?.isPhased || this.isDocked || this.isRetreated || this.shield.isPhased || this.allSystems.some(system => system.isPhased)) return true;
     for (const effect of this.externalPhaseEffects.values()) if (effect() !== undefined) return true;
     return false;
   }
@@ -745,9 +750,7 @@ export class Ship {
     this.lowerShieldWithFeedback();
 
     // 2. 强制解除战术技能 (堡垒护盾 / 冲刺推进)
-    if (this.system.isActive) {
-      this.system.deactivate();
-    }
+    for (const system of this.systems) system.deactivate();
 
     // 3. 触发幅能排散状态
     const started = this.flux.startVenting();
@@ -844,19 +847,14 @@ export class Ship {
     advanceCombatSkills(this, effectiveDt);
 
     // 1. 更新战术技能与幅能
-    this.system.update(effectiveDt);
-    this.defenseSystem.update(effectiveDt);
+    for (const system of this.allSystems) system.update(effectiveDt);
 
     // 1.1 战备值惩罚：cr <= 0 时舰船系统与防御彻底失效；低战备触发故障机制
     this.applyCombatReadiness(effectiveDt);
 
     // Existing Web system-cancellation rules remain an adapter, not native controller behavior.
-    if (this.flux.isOverloaded || this.flux.isVenting) this.defenseSystem.deactivate();
-    if ((this.flux.isOverloaded || this.flux.isVenting) && this.system.isActive) {
-      this.system.deactivate();
-    }
-    if (this.system.isActive && this.system.definition.controls?.cancelOnFlameout && this.getFlameoutRatio() >= 1.0) {
-      this.system.deactivate();
+    for (const system of this.allSystems) {
+      if (this.flux.isOverloaded || this.flux.isVenting || (system.isActive && system.definition.controls?.cancelOnFlameout && this.getFlameoutRatio() >= 1)) system.deactivate();
     }
 
     // ship_systems.csv marks Burn Drive as noShield for its entire applied IN/ACTIVE/OUT lifecycle.
@@ -893,12 +891,10 @@ export class Ship {
     }
 
     // 系统激活成本 (ship_systems.csv flux/use)：空雷突袭每次使用消耗 10% 基础幅能容量。
-    const systemActivationFlux = this.system.consumePendingActivationFlux();
-    if (systemActivationFlux > 0) {
-      this.flux.increaseFlux(systemActivationFlux, this.system.generatesHardFlux);
+    for (const system of this.allSystems) {
+      const cost = system.consumePendingActivationFlux();
+      if (cost > 0) this.flux.increaseFlux(cost, system.generatesHardFlux);
     }
-    const defenseActivationFlux = this.defenseSystem.consumePendingActivationFlux();
-    if (defenseActivationFlux > 0) this.flux.increaseFlux(defenseActivationFlux, this.defenseSystem.generatesHardFlux);
     this.advanceHullModFlux(tacticalDt);
 
     // 2. 物理运动推力与转向 (相位下机动时限加速)

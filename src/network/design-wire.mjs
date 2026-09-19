@@ -29,6 +29,7 @@ function wireModule(input, state, depth) {
     ...(d.modules === undefined ? {} : {modules: Object.fromEntries(
       list(Object.entries(object(d.modules)), 127, ([slot, child]) => [text(slot), wireModule(child, state, depth + 1)])
     )}),
+    ...(d.systemTypes === undefined ? {} : {systemTypes:list(d.systemTypes,64,id=>text(id))}),
     weapons: Object.fromEntries(Object.entries(weapons).map(([slot,id])=>[text(slot),id === null ? null : text(id)])),
     hullMods:list(d.hullMods,64,id=>text(id)), sMods:list(d.sMods ?? [],64,id=>text(id)),
     captainSkills:Object.fromEntries(Object.entries(skills).map(([id,level])=>[text(id),level === 1 || level === 2 ? level : bad()])),

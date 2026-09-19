@@ -19,13 +19,17 @@ function VariantInformation({ design, warnings, saved, onOpenCodex }: {
   design: Design; warnings: string[]; saved?: boolean; onOpenCodex: OpenWeaponCodex;
 }) {
   const result = useMemo(() => evaluate(design), [design]);
-  const notices = [...new Set([...warnings, ...result.errors])];
+  const notices = [...new Set(warnings)].filter(text => !result.errors.includes(text));
   return <>
     <p className="equipment-state">{saved ? '已保存方案' : '原版方案'} · {data.ships[design.hullId]?.name}</p>
     <p className="refit-inspection-note">只查看此卡片的原始方案，不含左下附加选项。点击卡片选择预览，再点“确认”才会应用。</p>
     <LoadoutSection draft={design} spec={result.spec} onOpenCodex={onOpenCodex} />
-    {notices.length > 0 && <section className="refit-inspection-warnings"><h4>适配说明{result.errors.length > 0 && ' · 需修正后才能确认'}</h4>
-      <ul>{notices.map((text, index) => <li key={index}>{text}</li>)}</ul></section>}
+    {result.errors.length > 0 && <section className="refit-inspection-warnings"><h4>需修正后才能确认</h4>
+      <ul>{result.errors.map((text, index) => <li key={index}>{text}</li>)}</ul></section>}
+    {notices.length > 0 && <RefitInspection title="适配说明"
+      content={<ul>{notices.map((text, index) => <li key={index}>{text}</li>)}</ul>}>
+      <button type="button" className="refit-inspection-item"><span>适配说明</span><small>{notices.length} 项</small></button>
+    </RefitInspection>}
   </>;
 }
 /** Keep all module equipment at the same information depth; each has its own fitted context and OP budget. */

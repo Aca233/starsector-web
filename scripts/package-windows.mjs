@@ -1,3 +1,4 @@
+import { copySteamMetricsRuntime, verifySteamMetricsRuntime } from './package-steam-metrics-runtime.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -77,6 +78,9 @@ for (const name of ['yauzl', 'pend']) {
   await copy(path.join(project, 'node_modules', name, 'LICENSE'), path.join(destination, 'licenses', `${name}.txt`));
 }
 if (steamMode) {
+  await copySteamMetricsRuntime(project, destination, copy);
+  await verifySteamMetricsRuntime(destination);
+  await copy(path.join(project, 'node_modules', 'koffi', 'LICENSE.txt'), path.join(destination, 'licenses', 'koffi.txt'));
   await copy(path.join(project, 'node_modules', 'steamworks.js'), path.join(destination, 'node_modules', 'steamworks.js'));
   await copy(path.join(project, 'node_modules', 'steamworks.js', 'LICENSE'), path.join(destination, 'licenses', 'steamworks.js.txt'));
   await copy(path.join(project, 'docs', 'steam-multiplayer.md'), path.join(destination, 'docs', 'steam-multiplayer.md'));

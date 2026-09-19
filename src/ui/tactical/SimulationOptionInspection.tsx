@@ -4,11 +4,11 @@ import { LoadoutSection } from '../../studio/VariantInspection';
 import type { OpenWeaponCodex } from '../../studio/useInspectionCodex';
 import { prepareSimulationOption, type SimulationOption } from './SimulationRoster';
 
-export function SimulationOptionInspection({ option, children, onLockChange, onOpenCodex, enabled }: {
-  option: SimulationOption; children: InspectionTarget; onLockChange: (locked: boolean) => void; onOpenCodex: OpenWeaponCodex; enabled: boolean;
+export function SimulationOptionInspection({ option, children, onOpenCodex, enabled }: {
+  option: SimulationOption; children: InspectionTarget; onOpenCodex: OpenWeaponCodex; enabled: boolean;
 }) {
   return <RefitInspection title={option.name + ' · ' + option.variantName} className="refit-loadout-inspection simulation-option-inspection"
-    enabled={enabled} onLockChange={onLockChange} content={<SimulationOptionInformation option={option} onOpenCodex={onOpenCodex} />}>{children}</RefitInspection>;
+    enabled={enabled} content={<SimulationOptionInformation option={option} onOpenCodex={onOpenCodex} />}>{children}</RefitInspection>;
 }
 function SimulationOptionInformation({ option, onOpenCodex }: { option: SimulationOption; onOpenCodex: OpenWeaponCodex }) {
   const resolved = prepareSimulationOption(option);
@@ -18,6 +18,9 @@ function SimulationOptionInformation({ option, onOpenCodex }: { option: Simulati
     {resolved.errors.length > 0 && <section className="refit-inspection-warnings"><h4>不可部署</h4><ul>{resolved.errors.map((error,index) => <li key={index}>{error}</li>)}</ul></section>}
     {resolved.design ? <LoadoutSection draft={resolved.design} spec={resolved.spec} onOpenCodex={onOpenCodex} />
       : <p className="equipment-state">未能读取完整装配，不将舰体默认数据冒充此方案。</p>}
-    {resolved.warnings.length > 0 && <section className="refit-inspection-warnings"><h4>适配说明</h4><ul>{resolved.warnings.map((warning,index) => <li key={index}>{warning}</li>)}</ul></section>}
+    {resolved.warnings.length > 0 && <RefitInspection title="适配说明"
+      content={<ul>{resolved.warnings.map((warning,index) => <li key={index}>{warning}</li>)}</ul>}>
+      <button type="button" className="refit-inspection-item"><span>适配说明</span><small>{resolved.warnings.length} 项</small></button>
+    </RefitInspection>}
   </>;
 }

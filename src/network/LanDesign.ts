@@ -1,3 +1,4 @@
+import { tacticalSystemIds } from '../engine/extensions/ship-systems/Loadout';
 import { decodeDesign, evaluate, type Design } from '../studio/DesignModel';
 import type { ShipSpec } from '../engine/content/ShipSpec';
 import { shipSystemDefinitions } from '../engine/extensions/ship-systems/Registry';
@@ -7,7 +8,7 @@ import { wireDesign } from './design-wire.mjs';
 export function lanHullUnavailable(spec: ShipSpec): string | null {
   if (spec.isModuleHull) return '模块必须随母舰部署';
   if (spec.hullSize === 'FIGHTER') return '舰载机不能作为玩家旗舰';
-  for (const id of [spec.systemType, spec.defenseSystemType ?? 'NONE']) {
+  for (const id of [...tacticalSystemIds(spec), spec.defenseSystemType ?? 'NONE']) {
     const system = shipSystemDefinitions.require(id);
     if (system.unavailable) return system.name + '，暂不能作为联机旗舰';
   }

@@ -27,7 +27,7 @@ import { displacer, displacerDegraded, phaseTeleporter, droneSkimmer } from './P
 export const shipSystemDefinitions = new DefinitionRegistry<ShipSystemDefinition>('ship system', d => {
   if (typeof d.name !== 'string' || !d.name.trim() || !Array.isArray(d.sourceIds) || d.sourceIds.some(id=>typeof id !== 'string' || !id.trim()) || new Set(d.sourceIds).size !== d.sourceIds.length) throw new Error(d.id + ': invalid name/source IDs');
   for (const value of [d.description, d.implementationDetails]) if (value !== undefined && typeof value !== 'string') throw new Error(d.id + ': invalid description');
-  validateResources(d.resources); validateHooks(d, ['statusText','passiveModifiers','weaponEnabled','modifiers','onActivate','onActive','onAdvance','advanceAI','canActivate','initialize','onReset','selectTarget','isExecuting','onEnergyLash','canVent','preventAIVenting','motionControl']);
+  validateResources(d.resources); validateHooks(d, ['installReason','statusText','passiveModifiers','weaponEnabled','modifiers','onActivate','onActive','onAdvance','advanceAI','canActivate','initialize','onReset','selectTarget','isExecuting','onEnergyLash','canVent','preventAIVenting','motionControl']);
   for (const group of [d.controls,d.visuals,d.phase]) if (group) for (const value of Object.values(group)) if (typeof value !== 'boolean') throw new Error(d.id + ': invalid capability flag');
   for (const value of [d.toggle,d.hardFlux,d.unavailable,d.usesChargesForActivation]) if (value !== undefined && typeof value !== 'boolean') throw new Error(d.id + ': invalid boolean');
   for (const key of [d.audio?.activate,d.audio?.loop,d.audio?.deactivate]) if (key !== undefined) requireSound(key,false);

@@ -1,3 +1,4 @@
+import { tacticalSystemIds, systemLoadoutErrors } from '../extensions/ship-systems/Loadout';
 import { weaponFitsSlotType } from '../content/WeaponCompatibility';
 import { validateResources } from '../extensions/Dependencies';
 import { requireSound } from '../audio/SoundBank';
@@ -312,9 +313,11 @@ export function validateShipSpec(input: unknown, options: ShipValidationOptions 
   if (spec.visualProfile !== undefined) validateShipVisual(spec.visualProfile, id);
   if (spec.debrisColor !== undefined) colorTuple(spec.debrisColor, id + '.debrisColor', 3);
   const requireAssets = options.requireBundledAssets ?? assetManager.isLoaded;
-  for (const field of ['systemType', 'defenseSystemType'] as const) {
-    if (field === 'defenseSystemType' && spec[field] === undefined) continue;
-    const definition = shipSystemDefinitions.require(resolveSystemId(text(spec[field], id + '.' + field)), id);
+  text(spec.systemType, id + '.systemType');
+  const loadoutErrors = systemLoadoutErrors(spec as unknown as ShipSpec);
+  if (loadoutErrors.length) throw new Error(id + ': ' + loadoutErrors.join('；'));
+  for (const systemId of [...tacticalSystemIds(spec as unknown as ShipSpec), spec.defenseSystemType ?? 'NONE']) {
+    const definition = shipSystemDefinitions.require(resolveSystemId(text(systemId, id + '.systems')), id);
     validateResources(definition.resources, requireAssets);
     for (const key of [definition.audio?.activate,definition.audio?.loop,definition.audio?.deactivate]) if (key !== undefined) requireSound(key, requireAssets);
   }

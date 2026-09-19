@@ -83,6 +83,8 @@ export interface ShipSystemDefinition {
   modifiers?: (system: ShipSystem, baseCapacity: number, owner?: Ship) => SystemModifiers;
   /** Actual asynchronous execution, separate from CSV charge/cooldown timing (native weapon systems). */
   isExecuting?: (system: ShipSystem) => boolean;
+  /** Declarative fit requirement; never inferred from a particular hull ID. */
+  installReason?: (spec: import('../../content/ShipSpec').ShipSpec) => string | undefined;
   canActivate?: (ship: Ship) => boolean;
   canVent?: (system: ShipSystem) => boolean;
   /** Tactical AI policy only; never removes the player's vent command. */

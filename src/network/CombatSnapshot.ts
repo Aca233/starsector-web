@@ -17,6 +17,7 @@ const SKIP = new Set([
   "spec",
   "moduleMount",
   "definition",
+  "auxiliary", // Immutable skill composition is reconstructed from the local spec, not recursively sent.
   "hullStats",
   "random",
   "visualRandom",

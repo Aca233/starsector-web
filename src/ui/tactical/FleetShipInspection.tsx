@@ -9,11 +9,11 @@ import type { OpenWeaponCodex } from '../../studio/useInspectionCodex';
 import { ModInformation } from '../../studio/HullModInformation';
 import { WingInformation } from '../../studio/WingInformation';
 
-export function FleetShipInspection({ ship, name, cost, status, children, enabled, onLockChange, onOpenCodex }: {
+export function FleetShipInspection({ ship, name, cost, status, children, enabled, onOpenCodex }: {
   ship: Ship; name: string; cost: number; status: string; children: InspectionTarget; enabled: boolean;
-  onLockChange: (locked: boolean) => void; onOpenCodex: OpenWeaponCodex;
+  onOpenCodex: OpenWeaponCodex;
 }) {
-  return <RefitInspection title={name} className="refit-loadout-inspection simulation-option-inspection" enabled={enabled} onLockChange={onLockChange}
+  return <RefitInspection title={name} className="refit-loadout-inspection simulation-option-inspection" enabled={enabled}
     content={<FleetShipInformation ship={ship} cost={cost} status={status} onOpenCodex={onOpenCodex} />}>{children}</RefitInspection>;
 }
 function FleetShipInformation({ ship, cost, status, onOpenCodex }: { ship: Ship; cost: number; status: string; onOpenCodex: OpenWeaponCodex }) {

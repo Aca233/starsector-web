@@ -1,3 +1,4 @@
+import { createLanSocket, type LanSocket } from "./LanSocket";
 import config from "./protocol.json";
 import { decodeBinaryState, encodeBinaryState } from "./BinarySnapshot.mjs";
 import { wireBytes } from "./room-fleet.mjs";
@@ -102,14 +103,15 @@ export type Listener = (message: any) => void;
 const STORAGE_KEY = "starsector.lan.session.v5";
 /** Session token is tab-local. A new page can resume a guest, never reconstruct a host Worker. */
 export class LanConnection {
-  socket: WebSocket | null = null;
+  socket: LanSocket | null = null;
   ready = false;
+  private stateCredits = false;
   /** Browser-to-relay round trip, not host simulation or end-to-end input delay. */
   rttMs: number | null = null;
   jitterMs = 0;
   private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
   private pingSent = 0;
-  private pongAt = 0;
+  private lastMessageAt = 0;
   private background = false;
   inputSequence = 0;
   actionSequence = 0;
@@ -167,7 +169,7 @@ export class LanConnection {
     this.background = hidden;
     if (!hidden) {
       // Old probes/timestamps include browser suspension, not network latency.
-      this.pongAt = performance.now();
+      this.lastMessageAt = performance.now();
       this.pingSent = 0;
       this.rttMs = null;
       this.jitterMs = 0;
@@ -179,7 +181,9 @@ export class LanConnection {
   private probe() {
     const socket = this.socket;
     // Keep at most one outstanding probe, including while backgrounded.
-    if (!this.ready || !socket || this.pingSent || socket.bufferedAmount !== 0) return;
+    // A 60 Hz input/snapshot stream need not be completely idle to carry a tiny
+    // heartbeat. Still avoid measuring a probe buried behind a large upload.
+    if (!this.ready || !socket || this.pingSent || socket.bufferedAmount > 16384) return;
     this.pingSent = performance.now();
     if (!this.send({ type: "ping", sent: this.pingSent })) this.pingSent = 0;
   }
@@ -196,6 +200,7 @@ export class LanConnection {
     this.open();
   }
   private open() {
+    this.stateCredits = false;
     clearTimeout(this.handshakeTimer);
     clearInterval(this.heartbeatTimer);
     this.rttMs = null;
@@ -204,7 +209,7 @@ export class LanConnection {
     this.socket = null;
     old?.close();
     this.ready = false;
-    const socket = (this.socket = new WebSocket(this.url));
+    const socket = (this.socket = createLanSocket(this.url));
     socket.binaryType = "arraybuffer";
     this.handshakeTimer = setTimeout(
       () => {
@@ -219,6 +224,7 @@ export class LanConnection {
       if (this.socket === socket)
         this.send({
           type: "hello",
+          stateCredits: 1,
           protocol: LAN_PROTOCOL,
           build: LAN_BUILD,
           name: this.name,
@@ -244,10 +250,15 @@ export class LanConnection {
         this.emit({ type: "error", message: "无法解析服务器消息" });
         return;
       }
+      // Fresh state/control traffic also proves the connection is alive. A busy
+      // upload may postpone sending a probe; an UNSENT ping is not a lost pong.
+      if (typeof m?.type === "string") this.lastMessageAt = performance.now();
       if (m.type === "welcome") {
+        // Opt in only when the relay confirms; legacy LAN/Steam relays omit it.
+        this.stateCredits = m.stateCredits === 1;
         clearTimeout(this.handshakeTimer);
         this.ready = true;
-        this.pongAt = performance.now();
+        this.lastMessageAt = performance.now();
         this.pingSent = 0;
         this.background = document.visibilityState === "hidden";
         this.send({ type: "visibility", hidden: this.background });
@@ -257,7 +268,9 @@ export class LanConnection {
           // Visibility events can be queued behind the first resumed timer.
           this.onVisibility();
           const now = performance.now();
-          if (!this.background && now - this.pongAt > 10000) {
+          const silent = now - this.lastMessageAt > 10000;
+          const unanswered = this.pingSent > 0 && now - this.pingSent > 10000;
+          if (!this.background && (silent || unanswered)) {
             this.retry(socket, 1006);
             return;
           }
@@ -285,17 +298,22 @@ export class LanConnection {
           this.jitterMs = this.rttMs === null ? 0 : this.jitterMs * .8 + Math.abs(sample - this.rttMs) * .2;
           this.rttMs = this.rttMs === null ? sample : this.rttMs * .7 + sample * .3;
         }
-        this.pongAt = now;
+        this.lastMessageAt = now;
         this.pingSent = 0;
       }
       if (m.type === "error" && ["RESUME_EXPIRED", "VERSION"].includes(m.code))
         this.forget();
       this.emit(m);
+      // Application consumption credit, never a GPU/display ACK or RTT sample.
+      // Release only after the synchronous subscribers have retained the frame
+      // and its discrete events. Hidden/resync epochs are reset by the relay.
+      if (m.type === "state" && this.stateCredits && this.socket === socket)
+        this.send({type:"state-consumed",matchId:m.matchId,seq:m.seq});
     };
     socket.onclose = (event) => this.retry(socket, event.code);
     socket.onerror = () => {}; // close owns retry/error reporting.
   }
-  private retry(socket: WebSocket, code: number) {
+  private retry(socket: LanSocket, code: number) {
     if (this.socket !== socket || this.stopped) return;
     clearTimeout(this.handshakeTimer);
     clearInterval(this.heartbeatTimer);

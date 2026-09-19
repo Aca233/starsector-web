@@ -1,3 +1,4 @@
+import { needsWings } from './Requirements';
 import type { Ship } from '../../simulation/Ship';
 import type { ShipSystem } from '../../simulation/ShipSystem';
 import type { SystemWorld } from './Types';
@@ -22,6 +23,7 @@ function clear(system: ShipSystem): void {
 }
 
 export const recallDevice = nativeSystem('recalldevice', {
+  installReason: needsWings,
   description: '将本次选中的所属机翼战机相位化并回收至甲板，快速重新出击。不会复活被摧毁的战机。',
   implementationDetails: 'RecallDeviceStats固定目标名单、0.5秒预热/退出、50%基础容量使用消耗。甲板按原版快速间隔0.3–0.6秒逐架重新出击；省略入坞动画。',
   canActivate: ship => (ship.spec.fighterBays ?? 0) > 0 && !!ship.spec.fighterWings?.length,

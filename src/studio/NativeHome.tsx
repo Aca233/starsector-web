@@ -1,3 +1,4 @@
+import { SystemBindingSettings } from '../ui/SystemBindingSettings';
 import { MotionPresence } from '../ui/core/MotionPresence';
 import { FullscreenButton } from '../ui/FullscreenButton';
 import { useEffect, useState } from 'react';
@@ -45,7 +46,7 @@ export function NativeHome({ onEnter, onSkills, onLan, onSteam, entryError, stat
       <span className="native-home-version">
         Starsector Web · 舰船改装与模拟战斗
       </span>
-      <MotionPresence>{settingsOpen && <Modal title="游戏设置" eyebrow="" onClose={()=>setSettingsOpen(false)} footer={<NativeButton onClick={()=>setSettingsOpen(false)}>返回</NativeButton>}><LocalBattleSizeSettings/></Modal>}</MotionPresence>
+      <MotionPresence>{settingsOpen && <Modal title="游戏设置" eyebrow="" onClose={()=>setSettingsOpen(false)} footer={<NativeButton onClick={()=>setSettingsOpen(false)}>返回</NativeButton>}><LocalBattleSizeSettings/><SystemBindingSettings/></Modal>}</MotionPresence>
     </main>
   );
 }
