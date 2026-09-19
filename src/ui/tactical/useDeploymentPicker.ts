@@ -3,7 +3,7 @@ import { useDwellHover } from '../../studio/useDwellHover';
 
 /** The selector is an enterable parent, never a permanently pinned window. */
 export function useDeploymentPicker(isCodexOpen: boolean, onClear: () => void, enabled = true) {
-  const dwell = useDwellHover({ depth: -1, enterableOnShow: true, enabled: enabled && !isCodexOpen });
+  const dwell = useDwellHover({ depth: -1, enabled: enabled && !isCodexOpen });
   const { active, hide, show, tooltipId } = dwell;
   const picker = active ? { id: active.id, element: active.anchor as HTMLButtonElement } : null;
   const closePicker = useCallback(() => { hide(); onClear(); }, [hide, onClear]);

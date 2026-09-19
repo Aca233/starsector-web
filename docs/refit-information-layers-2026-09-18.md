@@ -257,3 +257,17 @@
 - 检测到用户关闭已安装EXE后，替换匹配的backend、app.asar、app.asar.unpacked；保留用户配置和存档及同版EXE运行时。备份：artifacts/installed-nested-dwell-backup-20260919162617289；更新报告：artifacts/installed-nested-dwell-update-latest.json。
 - 实际安装路径EXE用隔离profile再次验证：空间站资料首次即locked=true，鼠标直接进入后内外2层均保持，移出整组关闭，pageerror为0。测试禁用仅该隐藏验证窗口的后台节流；没有改生产设置。测试EXE已关闭。
 - 3005已切到匹配的打包backend，前后端build均为2026-09-19T08:12:25.912Z，仅监听127.0.0.1。独立53647验证服务已关闭。
+
+
+## 恢复真实进度条并修正鼠标穿透（2026-09-19，取代前两节自动锁定方案）
+
+- 用户明确要求进度条。此前 enterableOnShow 和共享owner自动锁定跳过了650ms计时，属于交互改偏；现已移除这项参数和所有调用覆盖，每个鼠标悬停打开的外层/资料/装备卡均恢复正常计时。点击或键盘立即打开逻辑保留。
+- 根因修复不是继续跳过计时：未锁定卡原有 pointer-events:none 会使鼠标穿透到后方舰船网格，leave 又会立刻关闭。现在可见卡在计时中也接收鼠标，进入卡内继续计时；未锁定的离开也走180ms/方向性通道，不会在移入时立即消失。
+- pin只结束锁定计时，不再清除已安排的移出关闭；避免进度刚满时取消关闭而留下永久卡。向当前窗口跨隙经过别的网格项时，不因show请求立即替换正在阅读的卡。
+- 原版状态显示“停留锁定中…”和80×3进度条，完成显示“已锁定 · 移出收起”。无新配色或额外面板。截图：artifacts/dwell-progress-live.png。
+- 730×776实测轨道空间站三层：每层首次bar=true/locked=false；资料卡在出现422ms时已移入，仍显示进度，之后三层保持；移出整组为0，已选敌军1艘/+50DP保留。真实舰队增援也有进度，移入保留；移出仅收窗，后备舰仍reserve，已选40DP保留。页面pageerror均为0。
+- 确定性时钟回归：计时500ms时移出，650ms时锁定完成，移出截止后仍正确关闭，没有被pin取消。
+- lint、TypeScript、生产构建、打包通过，仅既有Vite大分块提示；未增加测试文件或资产审计。版本0.2.3沿用工作区/安装版当前版本，本轮未改版本号。
+- 检测用户关闭正在运行的Steam模式EXE后，备份并替换匹配的backend/app.asar/app.asar.unpacked，不改用户配置或存档。备份：artifacts/installed-progress-backup-20260919174421755；记录：artifacts/installed-progress-update-latest.json。
+- 已从实际安装路径启动隔离profile重测：选择窗和资料卡首次bar=true/locked=false，倒计时中移入仍bar=true，完成后保持2层，移出整组为0，pageerror为0。仅测试窗口禁用后台节流并使用确定性时钟；未改变生产设置。测试窗口及53653临时服务已关闭。
+- 3005启动前没有监听进程，启动本任务预览至匹配的0.2.3打包backend；前后端build均为2026-09-19T09:36:28.349Z，protocol25，仅127.0.0.1。

@@ -17,7 +17,7 @@ export function DwellReader({ children }: { children: ReactNode }) {
 }
 export function DwellStatus({ hover, native = false }: { hover: DwellHover; native?: boolean }) {
   if (native) return <div className="dwell-status native-dwell-status" data-locked={hover.locked}>
-    <span>{hover.locked ? '可移入阅读 · 移出收起' : '停留后可移入阅读'}</span>
+    <span>{hover.locked ? '已锁定 · 移出收起' : '停留锁定中…'}</span>
     {hover.locked ? <NativeButton font="body" aria-label="关闭悬停提示" onClick={hover.dismiss}>Esc</NativeButton>
       : <span className="dwell-progress" aria-hidden="true"><i /></span>}
   </div>;

@@ -1,3 +1,4 @@
+import { downloadNetworkDiagnostics } from './NetworkDiagnosticLog';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { LanAiEditor, type AiEditTarget } from "./LanAiEditor";
 import { aiLoadout, aiHullId } from "./ai-loadouts.mjs";
@@ -109,6 +110,7 @@ export function LanRoomWorkbench({room,id,active,connection,addresses,message,in
       applyAction:draft=>roomApplyAction(room,id,draft),
       actionHint:isHost?'所有开战条件已满足，点击开始战斗。':me?.ready?'你已准备，等待房主开始；继续改装会取消准备。':'配装已同步，点击准备后等待房主开始。',
       sidebar:(onPickHull,draft)=><aside className="lan-room-sidebar lan-room-fleet-sidebar" aria-label="房间舰船"><header><strong>房间 {room.code}</strong><span>真人 {room.members.length}/{room.capacity}</span></header>
+        <NativeButton onClick={downloadNetworkDiagnostics}>导出联机性能日志</NativeButton>
         {(message||error)&&<p className="lan-error" role="alert">{error||message}</p>}
         <p className="lan-muted" aria-label="当前房间战斗规模">战斗规模 {room.options.battleSize} DP · 每队 {battleTeamLimit(room.options.battleSize,battleTeamCount(room.members,room.options.aiHulls))} DP</p>
         {onViewReport && <NativeButton onClick={onViewReport}>上一局战报</NativeButton>}

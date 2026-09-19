@@ -9,10 +9,9 @@ export const DWELL_LEAVE_MS = 180;
 export type HoverAnchor = HTMLElement | SVGElement;
 type Anchor = { id: string; anchor: HoverAnchor };
 
-/** Shared B interaction for refit information, equipment and nested terms.
- * Linked descendants inherit enterability from the locked parent instead of requiring
- * another lock delay on every level; standalone readers retain the normal dwell timer. */
-export function useDwellHover({ ownerId: parentOwner, depth = 0, enabled = true, enterableOnShow = parentOwner !== undefined }: { ownerId?: string; depth?: number; enabled?: boolean; enterableOnShow?: boolean } = {}) {
+/** Every pointer-opened card shows the dwell countdown, including linked descendants.
+ * Visible cards accept the pointer during that countdown; lock never means permanent pinning. */
+export function useDwellHover({ ownerId: parentOwner, depth = 0, enabled = true }: { ownerId?: string; depth?: number; enabled?: boolean } = {}) {
   const tooltipId = useId(), ownerId = parentOwner ?? tooltipId;
   const [active, setActive] = useState<Anchor | null>(null);
   const [locked, setLocked] = useState(false);
@@ -40,7 +39,8 @@ export function useDwellHover({ ownerId: parentOwner, depth = 0, enabled = true,
   }, [hide, tooltipId]);
   const pin = useCallback(() => {
     if (!activeRef.current) return;
-    clearTimeout(timers.current.lock); clearTimeout(timers.current.hide);
+    // Finishing the progress bar must not cancel a pending outside dismissal.
+    clearTimeout(timers.current.lock);
     lockedRef.current = true; setLocked(true);
   }, []);
   const keep = useCallback(() => { clearTimeout(timers.current.hide); timers.current.hide = undefined; }, []);
@@ -62,7 +62,8 @@ export function useDwellHover({ ownerId: parentOwner, depth = 0, enabled = true,
     interaction.current = immediate && anchor.matches(':focus-visible') ? 'keyboard' : 'pointer';
     pointerOutside.current = false;
     if (activeRef.current?.id === id && activeRef.current.anchor === anchor) { keep(); if (immediate) pin(); return; }
-    if (!immediate && lockedRef.current && occupied()) return;
+    // Crossing another grid item toward this card is not a request to replace it.
+    if (!immediate && activeRef.current && ((lockedRef.current && occupied()) || bridge.current.alive())) return;
     keep(); clearTimeout(timers.current.show);
     clearTimeout(timers.current.lock);
     // Fast scanning must not leave the previous row's explanation on a new target.
@@ -74,15 +75,16 @@ export function useDwellHover({ ownerId: parentOwner, depth = 0, enabled = true,
       if (!immediate && hoverLockedElsewhere(ownerId)) { timers.current.show = setTimeout(reveal, DWELL_LEAVE_MS); return; }
       announceHover(ownerId, depth, tooltipId);
       const rect = anchor.getBoundingClientRect(); bridge.current.inside({ x: (rect.left + rect.right) / 2, y: (rect.top + rect.bottom) / 2 });
-      activeRef.current = { id, anchor }; lockedRef.current = immediate || enterableOnShow;
+      activeRef.current = { id, anchor }; lockedRef.current = immediate;
       setActive(activeRef.current); setLocked(lockedRef.current);
     };
     if (immediate) reveal(); else timers.current.show = setTimeout(reveal, DWELL_SHOW_MS);
-  }, [enabled, enterableOnShow, keep, pin, hide, occupied, ownerId, depth, tooltipId]);
+  }, [enabled, keep, pin, hide, occupied, ownerId, depth, tooltipId]);
   const leave = useCallback(() => {
     clearTimeout(timers.current.show);
-    if (!lockedRef.current) { hide(); return; }
-    // Lock means enterable. Leaving the source and this reader's descendant chain closes it.
+    if (!activeRef.current) return;
+    // The countdown does not make a visible window disappear under an entering pointer.
+    // Both before and after lock, leaving the source and reader chain closes it.
     // Do not restart on every pointermove, otherwise moving outside would keep it open forever.
     if (timers.current.hide !== undefined) return;
     const expire = () => {
@@ -128,7 +130,7 @@ export function useDwellHover({ ownerId: parentOwner, depth = 0, enabled = true,
       else {
         const targets = [activeRef.current.anchor, ...Array.from(document.querySelectorAll<HTMLElement>('[data-dwell-id]')).filter(card =>
           card.getAttribute('data-dwell-owner') === ownerId && Number(card.getAttribute('data-dwell-depth') ?? 0) >= depth)];
-        if (lockedRef.current) bridge.current.travel(point, targets.map(target => target.getBoundingClientRect()));
+        bridge.current.travel(point, targets.map(target => target.getBoundingClientRect()));
         leave();
       }
     };

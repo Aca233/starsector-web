@@ -45,6 +45,8 @@ jobs:
           "RELEASE_VERSION=$($env:RELEASE_TAG.Substring(1))" >> $env:GITHUB_ENV
       - run: npm ci
       - run: npm run lint
+      - name: Check network diagnostics and heartbeat
+        run: node --test scripts/check-network-diagnostics.mjs scripts/check-snapshot-pipeline.mjs scripts/check-background-heartbeat.mjs
       # Keep failing network gates visible without denying users a preview build.
       # Only a passing check run may replace the stable auto-update release.
       - name: Check Steam transport release gates

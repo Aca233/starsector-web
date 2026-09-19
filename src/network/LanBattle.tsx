@@ -1,3 +1,4 @@
+import { downloadNetworkDiagnostics, nextDiagnosticBattle, recordNetworkDiagnostic } from "./NetworkDiagnosticLog";
 import { SnapshotPipelineDiagnostics } from "./SnapshotPipelineDiagnostics";
 import { FlowCounters } from "./SnapshotFlow.mjs";
 import type { FlowSample } from "./SnapshotFlow.mjs";
@@ -74,6 +75,9 @@ function readAuthorityMulticore(value: unknown): AuthorityMulticore | null {
   return { mode: status.mode.slice(0, 128), reason: typeof status.reason === "string" ? status.reason.slice(0, 512) : null };
 }
 interface HUD {
+  ships: number;
+  projectiles: number;
+  explosions: number;
   hp: number;
   max: number;
   enemy: number;
@@ -132,6 +136,29 @@ export function LanBattle({
   const [status, setStatus] = useState("正在准备战斗资源…"),
     [error, setError] = useState("");
   const [hud, setHud] = useState<HUD | null>(null);
+  const diagnosticHud = useRef<{ value: HUD; at: number } | null>(null);
+  const diagnosticSteam = useRef<{ value: unknown; at: number } | null>(null);
+  useEffect(() => { diagnosticSteam.current = { value: steamTransport, at: performance.now() }; }, [steamTransport]);
+  useEffect(() => {
+    const battle = nextDiagnosticBattle();
+    let previous = performance.now();
+    const write = (event: string) => {
+      const now = performance.now(), sample = diagnosticHud.current, steam = diagnosticSteam.current;
+      recordNetworkDiagnostic({ event, battle, transport: connection.transport, seat, role: seat === 0 ? 'host' : 'guest',
+        hidden: document.visibilityState === 'hidden', connected: connection.ready, socketBufferedBytes: connection.socket?.bufferedAmount ?? null,
+        sampleGapMs: event === 'sample' ? now - previous : null,
+        hudAgeMs: sample ? Math.max(0, now - sample.at) : null, hud: sample?.value,
+        pipelineAgeMs: connection.snapshotPipelineAt === null ? null : Math.max(0, now - connection.snapshotPipelineAt) + connection.snapshotPipelineRoundTripMs,
+        pipeline: connection.snapshotPipeline, lan: connection.lanTransport,
+        steamAgeMs: steam ? Math.max(0, now - steam.at) : null, steam: steam?.value });
+      if (event === 'sample') previous = now;
+    };
+    write('battle-start');
+    // Independent of RAF and the diagnostics panel. A blocked JS thread still delays
+    // this timer; sampleGapMs exposes the gap instead of inventing missed samples.
+    const timer = setInterval(() => write('sample'), 1000);
+    return () => { clearInterval(timer); write('battle-stop'); };
+  }, [connection, match.id, seat]);
   const [displayEngine, setDisplayEngine] = useState<CombatEngine | null>(null);
   const [menu, setMenu] = useState<"menu" | "help" | "settings" | "leave" | null>(null);
   const [density, setDensity] = useState(() =>
@@ -259,6 +286,7 @@ export function LanBattle({
     stopRef.current = stop;
     const fail = (reason: string) => {
       if (disposed || stopped || failureReason) return;
+      recordNetworkDiagnostic({ event: "battle-failed", transport: connection.transport, seat, role: seat === 0 ? "host" : "guest" });
       failureReason = reason;
       setError(reason);
       stop();
@@ -786,7 +814,8 @@ export function LanBattle({
           const metrics = authorityPerformance && authorityPerformance.tick >= (latest?.tick ?? -1)
             ? authorityPerformance : latest;
           const metricsFresh = now - Math.max(receivedAt, authorityPerformanceAt) < 2500;
-          setHud({
+          const nextHud: HUD = {
+            ships: engine.ships.length, projectiles: engine.projectiles.length, explosions: engine.explosions.length,
             hp: p.hullHp,
             max: p.maxHullHp,
             enemy: e.hullHp,
@@ -817,7 +846,9 @@ export function LanBattle({
             playbackDelay: presentation.delayMs,
             px: p.pos.x,
             py: p.pos.y,
-          });
+          };
+          diagnosticHud.current = { value: nextHud, at: now };
+          setHud(nextHud);
           lastHUD = now;
         }
         if (launched && receivedAt && now - receivedAt > 1200)
@@ -967,6 +998,7 @@ export function LanBattle({
             <div className="combat-pause-actions">
               <NativeButton className="combat-pause-button" font="action" align="right" onClick={() => openMenu("settings")}>声音与画面设置</NativeButton>
               <FullscreenButton className="combat-pause-button" font="action" align="right" />
+              <NativeButton className="combat-pause-button" font="action" align="right" onClick={downloadNetworkDiagnostics}>导出联机性能日志</NativeButton>
               <NativeButton
                 className="combat-pause-button"
                 font="action"
@@ -1065,6 +1097,8 @@ export function LanBattle({
             </p>
             <details>
               <summary>性能与网络诊断</summary>
+              <NativeButton onClick={downloadNetworkDiagnostics}>导出联机性能日志</NativeButton>
+              <p>自动每秒记录，保留最近约 10 分钟；断线后也可在联机入口或房间导出。桌面端另有自动落盘日志。无需保持此面板打开。</p>
               <SnapshotPipelineDiagnostics pipeline={hud?.pipeline}
                 ageMs={hud?.pipelineAgeMs ?? null}
                 receivedHz={hud?.hz ?? null} appliedHz={hud?.appliedHz ?? null} local={seat === 0 ? hud?.localFlow : undefined} />

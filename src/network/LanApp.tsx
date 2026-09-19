@@ -1,3 +1,4 @@
+import { downloadNetworkDiagnostics, recordNetworkDiagnostic } from './NetworkDiagnosticLog';
 import { lanSocketUrl, savedLanEndpoint } from './LanEndpoint';
 import { MotionPresence } from '../ui/core/MotionPresence';
 import { FullscreenButton } from '../ui/FullscreenButton';
@@ -45,6 +46,12 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
   const [previewHull] = useState(() => LAN_SHIPS.find(ship=>ship.id===initialHost.get("hull"))?.id ?? LAN_SHIPS[0].id);
   const presetRef = useRef(previewHull);
   const [connection] = useState(() => new LanConnection(transport));
+  useEffect(() => connection.subscribe(message => {
+    if (['welcome', 'reconnecting', 'disconnected', 'page-visibility', 'error', 'ended', 'left', 'roomClosed'].includes(message.type)) {
+      recordNetworkDiagnostic({ event: message.type, transport, connected: connection.ready,
+        hidden: document.visibilityState === 'hidden' });
+    }
+  }), [connection, transport]);
   const [name, setName] = useState(
       () =>
         initialHost.get("name")?.slice(0, 24) ||
@@ -276,7 +283,7 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
       {transport === "steam" ? <SteamStart status={steamStatus} name={name} onName={setName} busy={connecting||entering} onSelected={selectSteam} onRefresh={setSteamStatus} onReset={resetSteam}/> : <LanStart design={selectedDesign} hull={previewHull} name={name} onNameChange={setName} available={available} connected={!!id}
         connecting={connecting||entering||!!room} initialCode={initialCode} desktop={desktopLan} serverLabel={serverLabel}
         onHost={()=>enterRoom({type:"create",battleSize:readBattleSize()})} onJoin={(code,password,remoteOrigin)=>enterRoom({type:"join",code,password},remoteOrigin)}/>}
-      <footer className="lan-entry-footer"><FullscreenButton /><NativeButton onClick={()=>{if (transport !== "steam") window.location.assign("?view=steam"); else void steamRequest<{url:string}>("lan").then(result=>window.location.assign(result.url),error=>setError(error.message));}} disabled={transport === "steam" && !steamStatus}>{transport === "steam" ? "使用局域网联机" : "Steam 联机"}</NativeButton><NativeButton onClick={()=>setHelpOpen(true)}>联机说明</NativeButton><NativeButton onClick={()=>{if (transport === "steam" && steamStatus) { resetSteam(); void steamRequest("leave").then(()=>window.location.assign("./"),error=>setError(error.message)); } else { connection.close(); window.location.assign("./"); }}}>返回主菜单</NativeButton></footer>
+      <footer className="lan-entry-footer"><FullscreenButton /><NativeButton onClick={downloadNetworkDiagnostics}>导出联机性能日志</NativeButton><NativeButton onClick={()=>{if (transport !== "steam") window.location.assign("?view=steam"); else void steamRequest<{url:string}>("lan").then(result=>window.location.assign(result.url),error=>setError(error.message));}} disabled={transport === "steam" && !steamStatus}>{transport === "steam" ? "使用局域网联机" : "Steam 联机"}</NativeButton><NativeButton onClick={()=>setHelpOpen(true)}>联机说明</NativeButton><NativeButton onClick={()=>{if (transport === "steam" && steamStatus) { resetSteam(); void steamRequest("leave").then(()=>window.location.assign("./"),error=>setError(error.message)); } else { connection.close(); window.location.assign("./"); }}}>返回主菜单</NativeButton></footer>
     </NativeFrame>
       <MotionPresence>{helpOpen && (
         <Modal

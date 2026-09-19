@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, Menu, dialog, screen, session, shell } from 'electron';
+import { DesktopNetworkLog, attachDesktopNetworkLog } from './network-log.mjs';
 import { DesktopBackend } from './backend.mjs';
 import { DesktopSteamOverlay, loadDesktopSteam, steamRestartArgs } from './steam-overlay.mjs';
 import { desktopUpdater } from './updates.mjs';
@@ -18,6 +19,8 @@ if (options.profile) {
   app.setPath('userData', options.profile);
 } else app.setPath('userData', path.join(app.getPath('appData'), app.isPackaged ? 'Starsector Web' : 'Starsector Web Development'));
 const origin = `http://127.0.0.1:${options.port}`;
+const networkLogFile = path.join(app.getPath('userData'), 'network-performance.jsonl');
+const networkLog = new DesktopNetworkLog(networkLogFile);
 const settingsFile = path.join(app.getPath('userData'), 'desktop-settings.json');
 let settings = {};
 try { settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8')); } catch { /* First run or invalid local preferences. */ }
@@ -56,6 +59,7 @@ async function stopAll() {
   saveSettings();
   await session.defaultSession.flushStorageData();
   await backend?.stop();
+  await networkLog.flush();
 }
 async function requestQuit({ install } = {}) {
   if (quitting || quitPrompt || switching) return;
@@ -98,6 +102,7 @@ function updateMenu() {
       { label: '重启并安装已下载的更新', enabled: updater?.ready() ?? false, click: () => updater?.install() },
     ] },
     { label: '帮助', submenu: [
+      { label: '打开联机性能日志', click: async () => { await networkLog.flush(); if (fs.existsSync(networkLogFile)) shell.showItemInFolder(networkLogFile); else await dialog.showMessageBox(win, { title: '联机性能日志', message: '进入联机战斗后会自动记录。', detail: networkLogFile }); } },
       { label: '打开联机日志', click: () => { log('[desktop] diagnostic-log version=' + app.getVersion()); shell.showItemInFolder(path.join(app.getPath('userData'), 'desktop.log')); } },
       { label: 'GitHub / 使用说明', click: () => void openProject('https://github.com/Aca233/starsector-web') },
       { label: '关于', click: () => void dialog.showMessageBox(win, { title: '关于 Starsector Web', message: `Starsector Web ${app.getVersion()}`,
@@ -208,6 +213,8 @@ async function ready() {
   win.webContents.on('will-redirect', guardNavigation);
   win.webContents.on('will-attach-webview', event => event.preventDefault());
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  // No Node access/preload API is exposed; only bounded allowlisted metrics.
+  attachDesktopNetworkLog(win.webContents, origin, networkLog);
   win.webContents.on('page-title-updated', event => event.preventDefault());
   win.webContents.on('render-process-gone', (_, details) => { if (!quitting) void backendFailed('游戏画面进程退出：' + details.reason); });
   win.webContents.on('will-prevent-unload', event => {
