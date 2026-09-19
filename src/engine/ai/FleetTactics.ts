@@ -25,6 +25,7 @@ export const fleetPolicy = Object.freeze({
   closeRange: 650, artilleryRange: 1000, skirmisherSpeed: 120,
   commitmentSeconds: 6, travelSeconds: 8, targetStickiness: 1.4,
   regroupPressure: 2.5, resumePressure: 1.6, lowHull: .25, disengageDistanceHysteresis: 200,
+  pressureRetreatFlux: .75, pressureResumeFlux: .5, pressureRetreatHull: .5,
   maximumLaneAngle: .55, carrierRangeFallback: 2500,
 });
 /** An attack window, not an order to ram: retain own flux/hull and local-pressure reserves. */
@@ -151,11 +152,18 @@ export function planFleetTactics(ships: readonly Ship[], orders: ReadonlyMap<str
       const nearFight = target && distance(ship, target) < Math.max(u.range, selected!.range) + ship.spec.collisionRadius + target.spec.collisionRadius + 400
         + (wasBackingOff ? fleetPolicy.disengageDistanceHysteresis : 0);
       const opportunity = !!target && hasAttackOpportunity(ship, target, pressure);
+      // Estimated enemy DPS alone is not a retreat order. Healthy gunships must
+      // commit before their own guns can reach, even against a stronger contact.
+      // Carriers retain stand-off safety; recovered gunships rejoin without waiting
+      // for the enemy's paper firepower to disappear.
+      const reservesThreatened = u.role === 'CARRIER' || u.hull < fleetPolicy.pressureRetreatHull
+        || ship.flux.isOverloaded || ship.flux.isVenting
+        || ship.flux.fluxPercent >= (wasBackingOff ? fleetPolicy.pressureResumeFlux : fleetPolicy.pressureRetreatFlux);
       // Retreat intent must not depend on finding cover. A supporting ally crossing
       // 80% flux cannot make an outmatched ship charge back into the same danger.
       // REGROUP and its no-cover fallback share pressure and distance hysteresis.
       const backingOff = !order && !ship.hullStats.doNotBackOff && (u.role === 'UNARMED' && (!!anchor || !!target)
-        || nearFight && (u.hull < fleetPolicy.lowHull && (!!anchor || wasBackingOff) || !opportunity && pressure > (wasBackingOff ? fleetPolicy.resumePressure : fleetPolicy.regroupPressure)));
+        || nearFight && (u.hull < fleetPolicy.lowHull && (!!anchor || wasBackingOff) || !opportunity && reservesThreatened && pressure > (wasBackingOff ? fleetPolicy.resumePressure : fleetPolicy.regroupPressure)));
       const regroup = backingOff && !!anchor;
       const disengage = backingOff && !anchor && !!target;
       const task: FleetTask = regroup ? 'REGROUP' : disengage ? 'DISENGAGE' : !target ? 'SEARCH' : u.role === 'CARRIER' ? 'SUPPORT'

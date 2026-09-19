@@ -1,3 +1,7 @@
+import { publicAuthorityPerformance } from "./SnapshotFlow.mjs";
+import type { PublicAuthorityPerformance } from "./SnapshotFlow.mjs";
+import { LanDeltaReceiver, isLanDelta } from "./LanBinaryDelta.mjs";
+import { RealtimeSendGate } from "./RealtimeSendPolicy.mjs";
 import { createLanSocket, type LanSocket } from "./LanSocket";
 import config from "./protocol.json";
 import { decodeBinaryState, encodeBinaryState } from "./BinarySnapshot.mjs";
@@ -67,7 +71,7 @@ export interface Room {
 }
 export interface Action {
   id: number;
-  kind: "shield" | "vent" | "system" | "group" | "mode" | "autofire" | "target" | "recall";
+  kind: "shield" | "hullShield" | "vent" | "system" | "group" | "mode" | "autofire" | "target" | "recall";
   value?: number;
   /** Command-edge world point, independent of a later movement packet. */
   aim?: [number, number];
@@ -104,8 +108,35 @@ const STORAGE_KEY = "starsector.lan.session.v5";
 /** Session token is tab-local. A new page can resume a guest, never reconstruct a host Worker. */
 export class LanConnection {
   socket: LanSocket | null = null;
+  private readonly realtimeGate = new RealtimeSendGate();
+  canSendInput(): boolean {
+    return this.socket?.readyState === WebSocket.OPEN && this.realtimeGate.canSendInput(this.socket.bufferedAmount, performance.now());
+  }
   ready = false;
   private stateCredits = false;
+  private binaryDelta = false;
+  private readonly deltaReceiver = new LanDeltaReceiver();
+  /** Read-only LAN relay metrics from the existing pong; absent for Steam/old servers. */
+  lanTransport: unknown = null;
+  snapshotPipeline: unknown = null;
+  snapshotPipelineAt: number | null = null;
+  snapshotPipelineRoundTripMs = 0;
+  private pipelineEpoch = 0;
+  private pipelineProbeEpoch = -1;
+  private resetPipeline(): void {
+    this.snapshotPipeline = null;
+    this.snapshotPipelineAt = null;
+    this.snapshotPipelineRoundTripMs = 0;
+    this.pipelineEpoch++;
+  }
+  private authoritySample: { matchId: string; performance: PublicAuthorityPerformance; at: number } | null = null;
+  recordAuthorityPerformance(matchId: string, value: unknown): void {
+    const sample = publicAuthorityPerformance(value);
+    if (sample) this.authoritySample = { matchId, performance: sample, at: performance.now() };
+  }
+  clearAuthorityPerformance(matchId: string): void {
+    if (this.authoritySample?.matchId === matchId) this.authoritySample = null;
+  }
   /** Browser-to-relay round trip, not host simulation or end-to-end input delay. */
   rttMs: number | null = null;
   jitterMs = 0;
@@ -166,6 +197,8 @@ export class LanConnection {
   private onVisibility = () => {
     const hidden = document.visibilityState === "hidden";
     if (hidden === this.background) return;
+    this.deltaReceiver.reset();
+    this.resetPipeline();
     this.background = hidden;
     if (!hidden) {
       // Old probes/timestamps include browser suspension, not network latency.
@@ -185,7 +218,11 @@ export class LanConnection {
     // heartbeat. Still avoid measuring a probe buried behind a large upload.
     if (!this.ready || !socket || this.pingSent || socket.bufferedAmount > 16384) return;
     this.pingSent = performance.now();
-    if (!this.send({ type: "ping", sent: this.pingSent })) this.pingSent = 0;
+    this.pipelineProbeEpoch = this.pipelineEpoch;
+    const sample = this.authoritySample;
+    const ageMs = sample ? Math.max(0, performance.now() - sample.at) : Infinity;
+    const authority = sample && ageMs <= 5000 ? { matchId: sample.matchId, performance: sample.performance, ageMs } : undefined;
+    if (!this.send({ type: "ping", sent: this.pingSent, ...(authority ? { authority } : {}) })) this.pingSent = 0;
   }
   connect(url: string, name: string) {
     this.background = document.visibilityState === "hidden";
@@ -200,7 +237,12 @@ export class LanConnection {
     this.open();
   }
   private open() {
+    this.lanTransport = null;
+    this.resetPipeline();
+    this.authoritySample = null;
     this.stateCredits = false;
+    this.binaryDelta = false;
+    this.deltaReceiver.reset();
     clearTimeout(this.handshakeTimer);
     clearInterval(this.heartbeatTimer);
     this.rttMs = null;
@@ -225,6 +267,7 @@ export class LanConnection {
         this.send({
           type: "hello",
           stateCredits: 1,
+          ...(this.transport === "lan" ? { binaryDelta: 1 } : {}),
           protocol: LAN_PROTOCOL,
           build: LAN_BUILD,
           name: this.name,
@@ -241,12 +284,20 @@ export class LanConnection {
       let m: any;
       try {
         const started = performance.now();
-        m = event.data instanceof ArrayBuffer ? decodeBinaryState(event.data) : JSON.parse(event.data);
+        const binary = event.data instanceof ArrayBuffer;
+        const packet = binary && this.binaryDelta ? this.deltaReceiver.decode(event.data) : event.data;
+        m = binary ? decodeBinaryState(packet) : JSON.parse(packet);
+        if (!binary && (m.type === "state" || m.type === "match")) this.deltaReceiver.reset();
         if (m.type === "state") {
-          this.snapshotBytes = event.data instanceof ArrayBuffer ? event.data.byteLength : event.data.length;
+          this.snapshotBytes = event.data instanceof ArrayBuffer ? packet.byteLength : event.data.length;
           this.snapshotParseMs = performance.now() - started;
         }
       } catch {
+        if (this.binaryDelta && event.data instanceof ArrayBuffer && isLanDelta(event.data)) {
+          // Never ACK/consume a corrupt or missing-base state. Existing bounded
+          // reconnect/resume establishes a fresh anchor; no invented state.
+          this.deltaReceiver.reset(); this.retry(socket, 1006); return;
+        }
         this.emit({ type: "error", message: "无法解析服务器消息" });
         return;
       }
@@ -256,6 +307,7 @@ export class LanConnection {
       if (m.type === "welcome") {
         // Opt in only when the relay confirms; legacy LAN/Steam relays omit it.
         this.stateCredits = m.stateCredits === 1;
+        this.binaryDelta = this.transport === "lan" && this.stateCredits && m.binaryDelta === 1;
         clearTimeout(this.handshakeTimer);
         this.ready = true;
         this.lastMessageAt = performance.now();
@@ -292,8 +344,20 @@ export class LanConnection {
           /* optional */
         }
       }
+      if (m.type === "match" || m.type === "ended") {
+        this.resetPipeline();
+        if (m.type === "ended" || this.authoritySample?.matchId !== m.match?.id) this.authoritySample = null;
+      }
       if (m.type === "pong" && m.sent === this.pingSent && this.pingSent > 0) {
+        if (this.transport === "lan") this.lanTransport = m.lanTransport ?? null;
         const now = performance.now(), sample = Math.max(0, now - this.pingSent);
+        if (this.pipelineProbeEpoch === this.pipelineEpoch) {
+          this.snapshotPipeline = m.snapshotPipeline ?? null;
+          this.snapshotPipelineAt = this.snapshotPipeline === null ? null : now;
+          // Conservatively include the whole heartbeat round trip: a delayed
+          // pong must not make an old report look newly sampled.
+          this.snapshotPipelineRoundTripMs = sample;
+        }
         if (!this.background) {
           this.jitterMs = this.rttMs === null ? 0 : this.jitterMs * .8 + Math.abs(sample - this.rttMs) * .2;
           this.rttMs = this.rttMs === null ? sample : this.rttMs * .7 + sample * .3;
@@ -356,18 +420,20 @@ export class LanConnection {
   /** Bound snapshot backlog; reuse the JSON and UTF-8 length produced by our own Worker. */
   sendSnapshot(matchId: string, seq: number, frame: { json?: string; binary?: ArrayBuffer; bytes: number }): "sent" | "skipped" | "oversized" | "disconnected" {
     if (this.socket?.readyState !== WebSocket.OPEN) return "disconnected";
-    if (this.socket.bufferedAmount > 16384) return "skipped";
+    if (!this.realtimeGate.canSendSnapshot(this.socket.bufferedAmount, performance.now())) return "skipped";
     try {
       if (frame.binary instanceof ArrayBuffer) {
         if (this.transport !== "lan" || frame.bytes !== frame.binary.byteLength) return "disconnected";
         if (frame.bytes >= LAN_MAX_SNAPSHOT_BYTES) return "oversized";
         this.socket.send(encodeBinaryState(matchId, seq, frame.binary));
+        this.realtimeGate.snapshotSent(performance.now());
         return "sent";
       }
       if (typeof frame.json !== "string") return "disconnected";
       const prefix = JSON.stringify({ type: "state", matchId, seq }).slice(0, -1) + ',"frame":';
       if (!Number.isSafeInteger(frame.bytes) || frame.bytes < 0 || frame.bytes + new TextEncoder().encode(prefix).byteLength + 1 > LAN_MAX_SNAPSHOT_BYTES) return "oversized";
       this.socket.send(prefix + frame.json + "}");
+      this.realtimeGate.snapshotSent(performance.now());
       return "sent";
     } catch (error) { return error instanceof RangeError ? "oversized" : "disconnected"; }
   }
@@ -377,10 +443,15 @@ export class LanConnection {
       this.socket.bufferedAmount > LAN_MAX_SNAPSHOT_BYTES * 2
     )
       return false;
+    // Both routes share this browser/worker FIFO. Admit only a fresh batch
+    // (one input + one snapshot); reject further input before serialization.
+    // Action/sequence state advances only after a successful local admission.
+    if ((message as { type?: string } | null)?.type === "input" && !this.canSendInput()) return false;
     try {
       if (wireBytes(message) > LAN_MAX_SNAPSHOT_BYTES) return false;
       this.socket.send(JSON.stringify(message));
       const m = message as { type?: string; input?: PlayerInput };
+      if (m.type === "input") this.realtimeGate.inputSent(performance.now());
       if (m.type === "input" && m.input) {
         this.inputSequence = Math.max(this.inputSequence, m.input.seq);
         for (const a of m.input.actions)
@@ -393,6 +464,9 @@ export class LanConnection {
   }
   close(intentional = true, clearListeners = true) {
     this.stopped = true;
+    this.resetPipeline();
+    this.authoritySample = null;
+    this.realtimeGate.reset();
     document.removeEventListener("visibilitychange", this.onVisibility);
     clearTimeout(this.handshakeTimer);
     clearTimeout(this.retryTimer);

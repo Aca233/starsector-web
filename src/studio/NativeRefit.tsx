@@ -1,5 +1,5 @@
 import { SystemLoadoutEditor } from './SystemLoadoutEditor';
-import { tacticalSystemIds } from '../engine/extensions/ship-systems/Loadout';
+import { defenseSystemId, tacticalSystemIds } from '../engine/extensions/ship-systems/Loadout';
 import { systemBindingLabel } from '../engine/runtime/SystemBindings';
 import { WeaponGroupInspection } from './WeaponGroupInspection';
 import { WeaponInspection } from './WeaponInspection';
@@ -147,7 +147,7 @@ function RefitEditor(props: Props & {moduleContext: ModuleEditorContext}) {
   const errors = [...new Set([...rootEvaluation.errors, ...evaluation.errors])];
   const stats = effectiveHullStats(spec);
   const systems = [...tacticalSystemIds(spec).map((id, index) => ({ definition: shipSystemDefinitions.require(id), label: '舰船技能 ' + (index + 1), key: systemBindingLabel(index) })),
-    { definition: shipSystemDefinitions.require(spec.defenseSystemType ?? 'NONE'), label: '防御系统', key: '鼠标右键' }];
+    { definition: shipSystemDefinitions.require(defenseSystemId(spec)), label: '右键技能', key: '鼠标右键' }];
   const missingBuiltins = (nativeRefit.sourceBuiltInMods?.[draft.hullId] ?? []).filter(id => hullModDefinitions.get(id)?.status !== "implemented" && hullModDefinitions.get(id)?.support?.scope !== "campaign-only");
   const campaignBuiltins = (spec.builtInHullMods ?? []).filter(id => hullModDefinitions.get(id)?.support?.scope === "campaign-only");
   const info = data.ships[draft.hullId];
@@ -594,13 +594,15 @@ function RefitEditor(props: Props & {moduleContext: ModuleEditorContext}) {
             </div>
             <section className="refit-hullmods">
               <RefitHint text="S-mod 固化：外装固化免除 OP 费用，最多两项；内置插件增强不占这两个名额。"><h2>舰体插件 · S-mod {(draft.sMods ?? []).filter(id => !spec.builtInHullMods?.includes(id)).length}/2</h2></RefitHint>
-              {(spec.builtInHullMods ?? []).map((id) => modRow(id, true))}
-              {draft.hullMods.map((id) => modRow(id, false))}
-              {campaignBuiltins.map(id => <RefitInfoHover enabled={panel === null} className="refit-campaign-mods" key={id} title={builtInModName(id) + "：仅战役 · 当前无战役模拟"}><p><RefitExplanationText text={modDescriptions[id]} /></p></RefitInfoHover>)}
-              {!!missingBuiltins.length && <RefitInfoHover enabled={panel === null} className="refit-missing-mods" title={`${missingBuiltins.length} 项原作内置插件未完整接入`}>
-                <p>以下项目不应视为已实现的战斗加成；战役、后勤或特殊机制仍需单独移植。</p>
-                <ul>{missingBuiltins.map(id => <li key={id}>{nativeRefit.hullmods?.[id]?.name ?? builtInModName(id)}</li>)}</ul>
-              </RefitInfoHover>}
+              <div className="refit-hullmod-list" role="region" aria-label="已安装舰体插件" tabIndex={0}>
+                {(spec.builtInHullMods ?? []).map((id) => modRow(id, true))}
+                {draft.hullMods.map((id) => modRow(id, false))}
+                {campaignBuiltins.map(id => <RefitInfoHover enabled={panel === null} className="refit-campaign-mods" key={id} title={builtInModName(id) + "：仅战役 · 当前无战役模拟"}><p><RefitExplanationText text={modDescriptions[id]} /></p></RefitInfoHover>)}
+                {!!missingBuiltins.length && <RefitInfoHover enabled={panel === null} className="refit-missing-mods" title={`${missingBuiltins.length} 项原作内置插件未完整接入`}>
+                  <p>以下项目不应视为已实现的战斗加成；战役、后勤或特殊机制仍需单独移植。</p>
+                  <ul>{missingBuiltins.map(id => <li key={id}>{nativeRefit.hullmods?.[id]?.name ?? builtInModName(id)}</li>)}</ul>
+                </RefitInfoHover>}
+              </div>
               <NativeButton
                 shortcut="A"
                 aria-expanded={panel === "mods"}

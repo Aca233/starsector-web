@@ -18,7 +18,7 @@ function make(id,team,x,y,dps){
 }
 function fixture(){
   const ship=make('own',0,0,0,100),ally=make('ally',0,-350,500,200),target=make('enemy',1,900,0,500),other=make('other',1,900,500,500);
-  ship.currentTargetShip=target;
+  ship.currentTargetShip=target; ship.hullHp=ship.maxHullHp*.4; // Battle-worn; pressure retreat is warranted.
   const ships=[ship,ally,target,other],ai=new CapitalShipAI(ship,target);
   const scene={ships,projectiles:[],beams:[],asteroids:[]};
   function update(order=null){scene.fleetPlan=planFleetTactics(ships,order?new Map([[ship.id,order]]):undefined);ai.update(1/60,order,scene);return scene.fleetPlan.get(ship.id);}
@@ -111,7 +111,7 @@ test('retreated hull control is cleared; manual ships are not assigned autonomou
 test('worker owner and serial path agree on no-cover withdrawal over repeated frames',()=>{
   const env=new CombatLab(93,0,0,2),e=env.engine;e.switchPlayerShip('lasher','onslaught');
   e.asteroids.length=0;e.nebulae.length=0;
-  const s=e.playerShip,t=e.enemyShip;s.fireControlMode='AI';s.pos.set(0,0);s.facingRad=0;t.pos.set(900,0);t.facingRad=Math.PI;
+  const s=e.playerShip,t=e.enemyShip;s.hullHp=s.maxHullHp*.4;s.fireControlMode='AI';s.pos.set(0,0);s.facingRad=0;t.pos.set(900,0);t.facingRad=Math.PI;
   e.addShip(modManager.requireShip('onslaught'),false,new Vector2(900,650),Math.PI);
   for(const ship of e.ships)ship.shield.isActive=false;
   const ai=new CapitalShipAI(s,t),ais=[ai,...e.getNativeAIs()];

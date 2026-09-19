@@ -104,6 +104,8 @@ export interface Design {
   sourceVariantId?: string;
   /** Undefined inherits the native fit; [] intentionally removes all tactical skills. */
   systemTypes?: string[];
+  /** Undefined inherits the hull; NONE removes only the right-click skill, not its shield. */
+  rightClickSystemType?: string;
   /** Only edited modules, keyed by native attachment slot (not hull ID). */
   modules?: Record<string, Design>;
   weapons: Record<string, string | null>;
@@ -392,6 +394,7 @@ function evaluateAssembly(d: Design, template: ShipSpec | undefined, state: { co
   spec.shieldUpkeepBaseDissipation = nativeHull(d.hullId).fluxDissipation;
   spec.sourceVariantId = d.sourceVariantId;
   if (d.systemTypes !== undefined) spec.systemTypes = [...d.systemTypes];
+  if (d.rightClickSystemType !== undefined) spec.rightClickSystemType = d.rightClickSystemType;
   if (!template && spec.moduleSlots?.length && d.sourceVariantId) {
     try { spec.modules = nativeModules(d.hullId, d.sourceVariantId); }
     catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
@@ -562,6 +565,12 @@ function decodeAssembly(input: unknown, template: ShipSpec | undefined, state: {
     const ids = d.systemTypes.map(resolveSystemId);
     if (new Set(ids).size !== ids.length || ids.some(id => id === 'NONE' || !shipSystemDefinitions.get(id) || shipSystemDefinitions.require(id).unavailable)) throw new Error('技能重复或尚未接入');
   }
+  if (d.rightClickSystemType !== undefined) {
+    if (typeof d.rightClickSystemType !== 'string' || d.rightClickSystemType.length > 160) throw new Error('右键技能格式无效');
+    const id = resolveSystemId(d.rightClickSystemType), definition = shipSystemDefinitions.get(id);
+    if (!definition || definition.unavailable) throw new Error('右键技能尚未接入');
+    if (id !== 'NONE' && d.systemTypes?.some(type => resolveSystemId(type) === id)) throw new Error('右键与技能槽不能重复装配');
+  }
   const decoded = structuredClone(d);
   if (d.modules !== undefined) decoded.modules = decodedModules;
   // Older web drafts had five groups. Preserve their assignments and append the
@@ -699,6 +708,8 @@ export function designFromModule(spec: ShipSpec): Design {
     version: 1, id: ('module-' + spec.id).replace(/_/g, '-').slice(0, 80),
     name: (data.ships[spec.id].name + ' · 模块').slice(0, 48), hullId: spec.id,
     sourceVariantId: spec.sourceVariantId,
+    ...(spec.systemTypes === undefined ? {} : { systemTypes: [...spec.systemTypes] }),
+    ...(spec.rightClickSystemType === undefined ? {} : { rightClickSystemType: spec.rightClickSystemType }),
     weapons: Object.fromEntries(spec.weaponSlots.map(s => [s.slotId, s.defaultWeaponId ?? null])),
     hullMods: [...(spec.hullMods ?? [])], sMods: [...(spec.sMods ?? [])],
     capacitors: Math.round((spec.maxFlux - raw.maxFlux) / data.fluxPerCapacitor),

@@ -1,0 +1,34 @@
+.presentation-settings-tabs { display: flex; gap: 4px; margin: 0 0 10px; border-bottom: 1px solid #365d69; }
+.presentation-settings-tabs button { padding: 9px 24px; font: 15px var(--ui-font, sans-serif); color: #9db6c3; background: transparent; border: 0; border-bottom: 2px solid transparent; cursor: pointer; }
+.presentation-settings-tabs button[aria-selected="true"] { color: #d3f0ff; border-bottom-color: #93d5f3; background: #173a48; }
+.presentation-settings-tabs button:hover { background: #15313e; }
+.presentation-settings-tabs button:focus-visible { outline: 2px solid #b7e4f7; outline-offset: -2px; }
+.graphics-settings { border: 1px solid #365d69; background: linear-gradient(135deg, #10232ce6, #070f15e6); padding: 16px; margin: 0 0 20px; color: #dedede; font-family: var(--ui-font, sans-serif); }
+.graphics-settings .graphics-settings-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.graphics-settings .graphics-settings-heading h3 { display: flex; align-items: center; gap: 8px; margin: 0; padding: 0; background: none; font-size: 17px; color: #c2e7f6; }
+.graphics-settings-heading > span, .graphics-settings small { color: #94aeb9; font-size: 12px; line-height: 1.6; }
+.graphics-settings small { display: block; margin-top: 3px; }
+.graphics-settings .graphics-settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 0; margin: 0; border-bottom: 1px solid #2b4652; font-size: 14px; }
+.graphics-settings-row > span { min-width: 0; }
+.graphics-settings select { flex: 0 1 190px; min-width: 120px; max-width: 55%; color: #c2e7f6; background: #142e3a; border: 1px solid #477181; padding: 7px; font: 13px var(--ui-font, sans-serif); cursor: pointer; }
+.graphics-settings input[type="checkbox"] { flex-shrink: 0; width: 18px; height: 18px; accent-color: #94d2ee; cursor: pointer; }
+.graphics-settings-shake { margin-top: 16px; }
+.graphics-settings-shake > div { display: flex; align-items: center; justify-content: space-between; }
+.graphics-settings .graphics-settings-shake label { padding: 0; margin: 0; font-size: 14px; }
+.graphics-settings output { font: 18px var(--ui-mono, monospace); color: #c2e7f6; }
+.graphics-settings input[type="range"] { appearance: none; width: 100%; height: 24px; padding: 0; margin: 3px 0 2px; background: transparent; cursor: pointer; }
+.graphics-settings input[type="range"]::-webkit-slider-runnable-track { height: 5px; border-radius: 3px; background: linear-gradient(to right, #8dcfe9 var(--graphics-level), #263c48 var(--graphics-level)); }
+.graphics-settings input[type="range"]::-moz-range-track { height: 5px; border-radius: 3px; background: linear-gradient(to right, #8dcfe9 var(--graphics-level), #263c48 var(--graphics-level)); }
+.graphics-settings input[type="range"]::-webkit-slider-thumb { appearance: none; width: 14px; height: 18px; margin-top: -6.5px; background: #c2e7f6; border: 2px solid #527e8f; border-radius: 2px; }
+.graphics-settings input[type="range"]::-moz-range-thumb { width: 10px; height: 14px; background: #c2e7f6; border: 2px solid #527e8f; border-radius: 2px; }
+.graphics-settings-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.graphics-settings-actions > button { border: 1px solid #477181; padding: 7px 10px; color: #c2e7f6; background: #142e3a; font: 13px var(--ui-font, sans-serif); cursor: pointer; }
+.graphics-settings-actions > button:hover { background: #254959; }
+.graphics-settings :is(input, select, button):focus-visible { outline: 2px solid #b7e4f7; outline-offset: 3px; }
+.graphics-settings p[role="status"] { margin: 12px 0 0; padding: 0; color: #94aeb9; font-size: 12px; line-height: 1.6; }
+@media (max-width: 520px) {
+  .graphics-settings { padding: 12px; }
+  .graphics-settings .graphics-settings-heading { align-items: flex-start; flex-direction: column; gap: 5px; }
+  .graphics-settings .graphics-settings-row:has(select) { align-items: stretch; flex-direction: column; gap: 8px; }
+  .graphics-settings select { width: 100%; max-width: 100%; flex: auto; }
+}

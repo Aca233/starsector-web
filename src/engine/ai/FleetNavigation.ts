@@ -17,8 +17,9 @@ export function fleetEngagementRange(ship: Ship, target: Ship, gunRange: number,
   const opportunity = hasAttackOpportunity(ship, target, assignment?.pressureRatio);
   const hull = ship.hullHp / Math.max(1, ship.maxHullHp);
   const damaged = Math.max(0, Math.min(1, (.4 - hull) / .25));
-  const outmatched = Math.max(0, Math.min(1, ((assignment?.pressureRatio ?? 1) - 1.4) / 1.1));
-  const reserve = Math.max(caution, damaged, outmatched);
+  // Healthy gunships close to useful battery range even against stronger opposition.
+  // Actual flux/hull reserves, not paper DPS, determine the stand-off margin.
+  const reserve = Math.max(caution, damaged);
   const fraction = (pressure + (1 - pressure) * reserve) * (opportunity ? .72 : 1);
   let residual = POLICY_TUNING[shipPolicyAction(ship, target)].range;
   // Learning cannot spend emergency reserves, turn artillery into brawlers or move carriers.

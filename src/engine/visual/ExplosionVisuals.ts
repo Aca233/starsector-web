@@ -1,3 +1,4 @@
+import { beginExplosionPuffRecipe, rememberExplosionPuffs } from "./ExplosionPuffRecipe";
 import type { ExplosionAnimation, ExplosionPuff } from '../simulation/CombatTypes';
 import type { ShipSpec } from '../content/ShipSpec';
 import type { SimulationRandom } from '../simulation/SimulationRandom';
@@ -5,6 +6,7 @@ import { Vector2 } from '../math/Vector2';
 
 /** ExplosionParticleSystem / GenericTextureParticle: independent fixed-texture puffs. */
 export function createExplosionPuffs(diameter: number, random: SimulationRandom, rings: boolean, velocity = new Vector2()): ExplosionPuff[] {
+  const recipe = beginExplosionPuffRecipe(diameter, random, rings, velocity);
   const baseSize = 20 + 60 * diameter / 500;
   const count = Math.ceil(Math.max(5, Math.pow(diameter / 2 / (baseSize * 0.66), 2) * 6));
   const puffs: ExplosionPuff[] = [];
@@ -25,6 +27,7 @@ export function createExplosionPuffs(diameter: number, random: SimulationRandom,
       velocity: texture === 3 ? velocity.clone() : Vector2.fromAngle(angle, speed).add(velocity)
     });
   }
+  rememberExplosionPuffs(puffs, recipe);
   return puffs;
 }
 

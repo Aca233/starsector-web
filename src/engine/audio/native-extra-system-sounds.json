@@ -221,5 +221,19 @@
       "pitch": 1,
       "volume": 0.6
     }
+  ],
+  "system_phase_skimmer": [
+    {
+      "file": "sounds/sfx_systems/phase_skimmer_oneshot.ogg",
+      "pitch": 1,
+      "volume": 1
+    }
+  ],
+  "system_phase_teleporter": [
+    {
+      "file": "sounds/sfx_systems/phase_teleporter_oneshot.ogg",
+      "pitch": 1,
+      "volume": 1
+    }
   ]
 }

@@ -449,9 +449,8 @@ export class CombatSession {
     };
     this.performance.recordTiming('renderPreparationMs', performance.now() - prepStart);
     const submitStart = performance.now();
-    this.renderer.render(this.engine, alpha, cameraPos, zoom, {
-      ...frame
-    });
+    const rendered = this.renderer.render(this.engine, alpha, cameraPos, zoom, { ...frame });
+    if (!rendered) return;
     this.performance.recordTiming('drawSubmitMs', performance.now() - submitStart);
     const resourceStats = this.renderer.getResourceStats();
     const collisionTelemetry = this.engine.weaponSystem.collisionHandler.runtimeCollisionKernel.consumeTelemetry();

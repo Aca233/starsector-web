@@ -2,7 +2,9 @@
  * Per-receiver credit accounting for best-effort LAN state snapshots.
  *
  * Call recordNetworkRtt ONLY with externally measured native ping/pong RTT.
- * Application ACK timing must never feed this estimator: an ACK means main
+ * For probes sharing the state TCP stream, pass beginNetworkProbe() through
+ * to recordNetworkRtt(): busy/queued probes may lower, but never grow, the
+ * baseline window. Application ACK timing must never feed this estimator: an ACK means main
  * decoded and consumed a state, NOT that the GPU displayed it.
  *
  * Reserve immediately before sending a state. A false return means skip that
@@ -17,6 +19,10 @@ export class LanStateCredits {
   #maxFrames;
   #hz;
   #rtts = [];
+  #probeEpoch = { fresh: true };
+  #activity = 0;
+  #latestRtt = null;
+  #busySamples = 0;
   #inflight = new Map();
   #lastSeq = -1;
   #bytes = 0;
@@ -41,12 +47,38 @@ export class LanStateCredits {
     this.#hz = hz;
   }
 
-  // Invalid samples neither enter nor evict from the last-five sample window.
-  recordNetworkRtt(ms) {
-    if (!Number.isFinite(ms) || ms < 0) return false;
+  // Capture before ping enters the same FIFO as snapshots. Seeing an empty
+  // flight set only at pong time is insufficient: it may have just drained.
+  beginNetworkProbe() {
+    return { epoch: this.#probeEpoch, activity: this.#activity, idle: this.#inflight.size === 0 };
+  }
+
+  // Omitted probe means an independent, externally measured idle RTT (legacy
+  // callers/tests). The LAN server ALWAYS supplies the same-stream probe token.
+  // Only five CLEAN samples can raise the floor after a real idle route change;
+  // a busy sample cannot make a congested link grant itself more credits.
+  recordNetworkRtt(ms, probe) {
+    if (!Number.isFinite(ms) || ms < 0 || (probe && probe.epoch !== this.#probeEpoch)) return false;
+    this.#latestRtt = ms;
+    // A new connection's first idle ping is queued BEFORE its first snapshot.
+    // Later snapshots cannot get ahead of it in TCP. Accept that bootstrap even
+    // if a cached-resource battle starts before pong returns, or a high-RTT
+    // healthy link could remain stuck at two credits forever. Reset epochs are
+    // NOT fresh: they may still have old state bytes somewhere in the pipeline.
+    const bootstrap = this.#rtts.length === 0 && this.#probeEpoch.fresh === true && probe?.activity === 0;
+    const clean = !probe || (probe.idle && (bootstrap || (probe.activity === this.#activity && this.#inflight.size === 0)));
+    if (!clean && (this.#rtts.length === 0 || ms >= Math.min(...this.#rtts))) {
+      this.#busySamples++;
+      return true;
+    }
     if (this.#rtts.length === 5) this.#rtts.shift();
     this.#rtts.push(ms);
     return true;
+  }
+
+  networkStats() {
+    return { latestRttMs: this.#latestRtt, baselineRttMs: this.#rtts.length ? Math.min(...this.#rtts) : null,
+      busySamples: this.#busySamples };
   }
 
   get capacity() {
@@ -71,6 +103,7 @@ export class LanStateCredits {
     this.#lastSeq = seq;
     this.#bytes += bytes;
     this.#sent++;
+    this.#activity++;
     this.#peakCount = Math.max(this.#peakCount, this.#inflight.size);
     this.#peakBytes = Math.max(this.#peakBytes, this.#bytes);
     return true;
@@ -92,6 +125,8 @@ export class LanStateCredits {
   // New accounting epoch: clear window, seq, peaks and counters; retain RTTs.
   // New connections should construct a new instance, not reuse an old epoch.
   reset() {
+    this.#probeEpoch = {};
+    this.#activity = 0;
     this.#inflight.clear();
     this.#lastSeq = -1;
     this.#bytes = 0;

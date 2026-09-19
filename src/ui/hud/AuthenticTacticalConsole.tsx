@@ -39,7 +39,7 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
 
   // 战术系统名称与状态
   const systemStatus = (system: typeof player.system) => !system.available ? '未接入 · 不可激活' : player.isDead || system.disabled ? '离线'
-    : system.state === 'IN' ? '启动中' : system.state === 'OUT' ? '关闭中' : system.isActive ? '运行中'
+    : system.state === 'IN' ? '启动中' : system.state === 'OUT' ? '关闭中' : system.isActive ? system.statusText ?? '运行中'
     : system.isCoolingDown ? '冷却中 (' + system.cooldownTimer.toFixed(1) + 's)' : system.activationFailureReason ?? system.statusText ?? '就绪';
 
   // 原版参考战备与敌情感知 (RepairTracker.java & C.java)
@@ -177,12 +177,13 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
         <div className="hud-system-list" aria-label="舰船技能">
           {player.systems.map((system, slot) => <button type="button" key={slot} className="hud-system-button"
             aria-label={`激活技能 ${slot + 1}：${system.name}`} aria-current={readSystemBindings().wheelSelect && selectedSystemSlot(player) === slot}
-            disabled={!onActivateSystem || !!system.activationFailureReason} title={system.activationFailureReason ?? system.description}
+            disabled={!onActivateSystem || !!system.activationFailureReason} title={system.isActive ? system.statusText ?? system.description : system.activationFailureReason ?? system.description}
             onClick={() => onActivateSystem?.(slot)}>
             <span>{system.name} [{systemBindingLabel(slot)}]</span>
             <span>{system.definition.charges !== undefined ? `${system.charges}/${system.maxCharges} · ` : ''}{systemStatus(system)}</span>
           </button>)}
-          {player.defenseSystem.type !== 'NONE' && <div className="hud-system-button"><span>{player.defenseSystem.name} [右键]</span><span>{systemStatus(player.defenseSystem)}</span></div>}
+          {player.defenseSystem.type !== 'NONE' && <div className="hud-system-button" title={player.defenseSystem.isActive ? player.defenseSystem.statusText ?? player.defenseSystem.description : player.defenseSystem.activationFailureReason ?? player.defenseSystem.description}><span>{player.defenseSystem.name} [右键]</span><span>{player.defenseSystem.definition.charges !== undefined ? `${player.defenseSystem.charges}/${player.defenseSystem.maxCharges} · ` : ''}{systemStatus(player.defenseSystem)}</span></div>}
+          {player.defenseSystem.type !== 'NONE' && player.shield.type !== 'NONE' && <div className="hud-system-button"><span>{player.shield.type === 'PHASE' ? '相位潜航' : '舰体护盾'} [Shift + 右键]</span><span>{player.shield.isRaiseRequested ? '开启' : '关闭'}</span></div>}
         </div>
 
         {/* 军规折角分隔横线 (45 度左侧上挑转水平线，Web 布局（尚待原版对齐）) */}

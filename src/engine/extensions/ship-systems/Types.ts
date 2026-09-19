@@ -54,6 +54,19 @@ export interface SystemModifiers {
   turnAccelerationFlat?: number; turnAccelerationPercent?: number;
   weapons?: Partial<Record<SystemWeaponType, SystemWeaponModifiers>>;
 }
+export type SystemVisualColor = readonly [number, number, number, number];
+export interface SystemJitterVisual {
+  color: SystemVisualColor; copies: number; range: number; minRange: number; radiusFraction: number;
+}
+/** Source-authored presentation only. Never used to compute combat effects. */
+export interface SystemVisuals {
+  recipient?: 'WINGS';
+  engineBoost?: boolean; fortressShield?: boolean;
+  jitter?: SystemJitterVisual; jitterUnder?: SystemJitterVisual;
+  weaponGlow?: { color: SystemVisualColor; types: readonly SystemWeaponType[] };
+  engine?: { color?: SystemVisualColor; length: number; width: number; glow: number };
+  teleportCopy?: boolean;
+}
 export interface ShipSystemDefinition {
   resources?: ExtensionResources;
   id: string;
@@ -72,11 +85,11 @@ export interface ShipSystemDefinition {
   tacticalMode?: 'ASSAULT' | 'EXTRACT';
   /** Drone launchers spend stock on launch, never on an order change. */
   usesChargesForActivation?: boolean;
-  statusText?: (system: ShipSystem) => string;
+  statusText?: (system: ShipSystem) => string | undefined;
   fluxPerUseFraction?: number; fluxPerUseFlat?: number; fluxPerUseDissipationFraction?: number; hardFlux?: boolean;
   controls?: { blockWeapons?: boolean; blockShields?: boolean; lockTurning?: boolean; forceForward?: boolean; cancelOnFlameout?: boolean; suppressZeroFlux?: boolean; blockFluxDissipation?: boolean; blockVenting?: boolean; blockAcceleration?: boolean; blockStrafing?: boolean; forceAutofire?: boolean; releaseOnOut?: boolean };
   phase?: { vulnerableChargeUp?: boolean; vulnerableChargeDown?: boolean };
-  visuals?: { engineBoost?: boolean; fortressShield?: boolean };
+  visuals?: SystemVisuals;
   audio?: { activate?: string; loop?: string; loopVolume?: number; deactivate?: string };
   passiveModifiers?: (system: ShipSystem, owner?: Ship) => SystemModifiers;
   weaponEnabled?: (system: ShipSystem, mount: WeaponMount) => boolean;
@@ -85,6 +98,9 @@ export interface ShipSystemDefinition {
   isExecuting?: (system: ShipSystem) => boolean;
   /** Declarative fit requirement; never inferred from a particular hull ID. */
   installReason?: (spec: import('../../content/ShipSpec').ShipSpec) => string | undefined;
+  /** Explain a no-op before spending flux/stock (current weapons, ammo, etc.). */
+  activationReason?: (ship: Ship, system: ShipSystem) => string | undefined;
+  targetFailureReason?: (ship: Ship) => string;
   canActivate?: (ship: Ship) => boolean;
   canVent?: (system: ShipSystem) => boolean;
   /** Tactical AI policy only; never removes the player's vent command. */

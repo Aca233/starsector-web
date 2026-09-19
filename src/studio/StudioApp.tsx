@@ -1,6 +1,6 @@
 import { MotionPresence } from '../ui/core/MotionPresence';
 import { randomId } from "../shared/RandomId";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ComponentProps, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "../ui/core/UI";
 import { i18n } from "../engine/i18n/LocalizationManager";
 import { zh_CN } from "../engine/i18n/locales/zh_CN";
@@ -40,7 +40,8 @@ type Confirmation = {
   saveable?: boolean;
   action?: string;
 };
-export function StudioApp() {
+type HomeNavigation = Pick<ComponentProps<typeof NativeHome>, "onLan" | "onSteam" | "entryError" | "staticHosted">;
+export function StudioApp({ homeNavigation }: { homeNavigation: HomeNavigation }) {
   const [initialLocation] = useState(readStudioLocation);
   const currentUrl = useRef(window.location.href);
   const [initial] = useState(readLibrary);
@@ -402,7 +403,7 @@ export function StudioApp() {
           }} />
         </Suspense>
       ) : view === "home" ? (
-        <NativeHome onEnter={() => navigate("editor")} onSkills={() => openSkills("home")} onLan={() => window.location.assign("?view=lan")} />
+        <NativeHome {...homeNavigation} onEnter={() => navigate("editor")} onSkills={() => openSkills("home")} />
       ) : view === "skills" ? (
         <Suspense fallback={<div className="native-loading" role="status">正在准备角色技能…</div>}>
           <CaptainSkillsScreen value={draft.captainSkills ?? {}} profile={draft.captainProfile} designName={draft.name} hullName={data.ships[draft.hullId]?.name ?? draft.hullId}

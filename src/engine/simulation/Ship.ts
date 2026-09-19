@@ -1,4 +1,4 @@
-import { tacticalSystemIds } from '../extensions/ship-systems/Loadout';
+import { defenseSystemId, tacticalSystemIds } from '../extensions/ship-systems/Loadout';
 import { moduleOffset } from '../content/ModuleGeometry';
 import type { ShipModuleSpec } from '../content/ShipSpec';
 import { shipPresentationPose } from "../visual/ShipPresentation";
@@ -189,6 +189,9 @@ export class Ship {
   // 物理与刚体 (支持亚帧插值)
   public pos: Vector2;
   public prevPos: Vector2;
+  /** Persistent presentation markers; not physics or a temporary system effect. */
+  public teleportSequence = 0;
+  public teleportCameraOffset = new Vector2();
   public vel: Vector2;
   public facingRad: number;
   public prevFacingRad: number;
@@ -430,7 +433,7 @@ export class Ship {
     if (this.shield.type === 'PHASE') this.shield.upkeepRate = this.shield.phaseUpkeepPerSecond;
     this.systems = tacticalSystemIds(spec).map(id => new ShipSystem(id, spec.maxFlux, this));
     this.system = this.systems[0] ?? new ShipSystem('NONE', spec.maxFlux, this);
-    this.defenseSystem = new ShipSystem(spec.defenseSystemType ?? 'NONE', spec.maxFlux, this);
+    this.defenseSystem = new ShipSystem(defenseSystemId(spec), spec.maxFlux, this);
     const equipped = this.allSystems;
     equipped.forEach((system, index) => { system.auxiliary = equipped[index + 1]; });
 
@@ -492,8 +495,8 @@ export class Ship {
     const effects = this.crEffects;
 
     for (const system of this.systems) { system.disabled = effects.systemDisabled; if (effects.systemDisabled) system.deactivate(); }
-    this.defenseSystem.disabled = effects.defenseDisabled;
-    if (effects.defenseDisabled) this.defenseSystem.deactivate();
+    this.defenseSystem.disabled = this.spec.rightClickSystemType === undefined ? effects.defenseDisabled : effects.systemDisabled;
+    if (this.defenseSystem.disabled) this.defenseSystem.deactivate();
 
     if (effects.defenseDisabled && this.shield.isRaiseRequested) {
       this.lowerShieldWithFeedback();
@@ -684,10 +687,14 @@ export class Ship {
   public get defenseFailureReason(): string | undefined {
     if (this.isDead || this.hullHp <= 0 || this.isDocked || this.isRetreated) return '舰船不在战斗状态';
     if (this.defenseSystem.type !== 'NONE') {
-      if (!this.defenseSystem.isActive && (this.system.blocksShields || this.crEffects.defenseDisabled)) return '独立防御被禁用';
+      if (this.spec.rightClickSystemType === undefined && !this.defenseSystem.isActive && (this.system.blocksShields || this.crEffects.defenseDisabled)) return '独立防御被禁用';
       return this.defenseSystem.activationFailureReason;
     }
-    if (this.shield.type === 'NONE') return '没有护盾或独立防御';
+    return this.hullShieldFailureReason;
+  }
+  public get hullShieldFailureReason(): string | undefined {
+    if (this.isDead || this.hullHp <= 0 || this.isDocked || this.isRetreated) return '舰船不在战斗状态';
+    if (this.shield.type === 'NONE') return '没有舰体护盾或相位装置';
     if (this.shield.toggleLocked) return '护盾常开，不能手动关闭';
     if (this.shield.type === 'PHASE' && this.shield.phaseState === 'OUT') return '正在退出相位';
     if (this.shield.type === 'PHASE' && this.shield.phaseState === 'COOLDOWN') return '相位线圈冷却中';
@@ -704,6 +711,11 @@ export class Ship {
   public toggleDefense(): boolean {
     if (this.defenseFailureReason) return false;
     if (this.defenseSystem.type !== 'NONE') return this.activateDefenseSystem();
+    return this.toggleHullShield();
+  }
+  /** Shift+right-click retains access to hull-owned shields/phase when right-click is a skill. */
+  public toggleHullShield(): boolean {
+    if (this.hullShieldFailureReason) return false;
     const raising = this.shield.type === 'PHASE' ? this.shield.phaseState === 'IDLE' : !this.shield.isRaiseRequested;
     this.shield.toggle();
     // toggle() reports instantaneous protection, not whether the request was accepted.
@@ -751,6 +763,7 @@ export class Ship {
 
     // 2. 强制解除战术技能 (堡垒护盾 / 冲刺推进)
     for (const system of this.systems) system.deactivate();
+    if (this.spec.rightClickSystemType !== undefined) this.defenseSystem.deactivate();
 
     // 3. 触发幅能排散状态
     const started = this.flux.startVenting();

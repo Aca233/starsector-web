@@ -1,3 +1,4 @@
+import { activeSystemVisuals, renderSystemHull, weaponSystemGlows, systemTeleportCopies, systemTeleportBodyAlpha } from '../ShipSystemRenderer';
 import { pulsePusherOffset } from '../../../extensions/ship-systems/PulseDrive';
 import { visualRandom } from '../../RenderDeterminism';
 import { CombatEngine } from '../../../simulation/CombatEngine';
@@ -95,11 +96,13 @@ export class WebGLShipPass {
     textures.retainCanvasTextures(activeDamageTextures);
 
     // 2. 战舰与挂点渲染函数
-    const renderShip = (ship: Ship, shipPos: Vector2, shipFacing: number, hulk?: HulkFragment) => {
+    const renderShip = (ship: Ship, shipPos: Vector2, shipFacing: number, hulk?: HulkFragment, copyAlpha?: number) => {
       if (ship.isDead && !hulk) return;
       const shipVisual = getShipVisualProfile(ship.spec);
+      const systemVisuals = hulk ? [] : activeSystemVisuals(ship);
 
-      if (!hulk) renderShipEngines(ship, shipPos, shipFacing, ctx, nowSec);
+      const teleportAlpha = copyAlpha ?? (hulk ? 1 : systemTeleportBodyAlpha(ship));
+      if (!hulk) renderShipEngines(ship, shipPos, shipFacing, ctx, nowSec, teleportAlpha);
 
       // 2.2 舰船主体贴图
       batcher.setBlendMode('NORMAL');
@@ -121,7 +124,8 @@ export class WebGLShipPass {
       const pivotNormY = ship.spec.pivotY / height - 0.5;
       const hulkAppearance = hulk ? getHulkAppearance(hulk) : null;
       const tint = hulkAppearance?.tint ?? 1;
-      const shipAlpha = hulkAppearance?.alpha ?? ship.phaseVisualAlpha;
+      const shipAlpha = hulkAppearance?.alpha ?? ship.phaseVisualAlpha * teleportAlpha;
+      if (systemVisuals.length) renderSystemHull(systemVisuals, 'under', ship, shipPos, shipFacing, shipTex, shipAlpha, ctx);
       batcher.drawSprite(
         shipTex,
         shipPos.x,
@@ -136,6 +140,8 @@ export class WebGLShipPass {
         shipVisual.hullTint[2] * tint,
         shipAlpha
       );
+
+      if (systemVisuals.length) renderSystemHull(systemVisuals, 'over', ship, shipPos, shipFacing, shipTex, shipAlpha, ctx);
 
       // Cell-centered native damage tiles retain their randomized size and armor-derived opacity.
       // Decals use ship alpha, not the disabled hull RGB tint; pieces keep only overlapping cell decals.
@@ -238,7 +244,7 @@ export class WebGLShipPass {
         const mountOffset = new Vector2(mount.relativePos.x, mount.relativePos.y).rotate(shipFacing);
         const mountX = shipPos.x + mountOffset.x;
         const mountY = shipPos.y + mountOffset.y;
-        const mountFacing = isHardpoint ? (mount.baseAngleDeg * Math.PI) / 180 + shipFacing : mount.currentAngleRad + (hulk ? shipFacing - ship.facingRad : 0);
+        const mountFacing = isHardpoint ? (mount.baseAngleDeg * Math.PI) / 180 + shipFacing : mount.currentAngleRad + (hulk || copyAlpha !== undefined ? shipFacing - ship.facingRad : 0);
         const weaponVisual = getWeaponVisualProfile(mount.spec.id, mount.spec.spawnType, mount.spec.isRocket, mount.spec.isBeam);
 
         // Some built-in hardpoints (notably Onslaught's TPC) deliberately specify hardpointSprite:"".
@@ -330,6 +336,26 @@ export class WebGLShipPass {
           drawGun();
         }
 
+        // Skill glow is independent of firing glowAlpha: an idle gun still shows
+        // Ammo Feed/HEF. Prefer its native mask; otherwise tint the actual mount,
+        // never invent a large corona on weapons with no source glow sprite.
+        if (!hulk && !mount.isDisabled) for (const glow of weaponSystemGlows(systemVisuals, mount.spec.weaponType)) {
+          const [r, g, b, a] = glow.color;
+          const glowAlpha = a / 255 * glow.level * shipAlpha;
+          batcher.setBlendMode('ADDITIVE');
+          if (glowImgUrl) {
+            const info = textures.getTextureInfo(glowImgUrl);
+            batcher.drawSprite(info.texture, mountX, mountY, info.width || baseW, info.height || baseH,
+              mountFacing + Math.PI / 2, 0, 0, r / 255, g / 255, b / 255, glowAlpha);
+          } else {
+            if (baseTex) batcher.drawSprite(baseTex, mountX, mountY, baseW, baseH, mountFacing + Math.PI / 2,
+              0, 0, r / 255, g / 255, b / 255, glowAlpha);
+            if (gunTex) batcher.drawSprite(gunTex, mountX + recoilOff.x, mountY + recoilOff.y, gunW, gunH,
+              mountFacing + Math.PI / 2, 0, 0, r / 255, g / 255, b / 255, glowAlpha);
+          }
+          batcher.setBlendMode('NORMAL');
+        }
+
         // 武器充能微震
         if (!hulk && glowImgUrl && mount.glowAlpha > 0.01 && !mount.isDisabled) {
           const [gr, gg, gb] = mount.spec.glowColor || [255, 100, 100];
@@ -372,7 +398,12 @@ export class WebGLShipPass {
       if (!hulk) this.ventRendererFor(ship).render(batcher, ctx.ribbonBatcher, textures, ship, shipPos, shipFacing, shipAlpha);
     };
 
-    for (const ship of engine.ships) if (ship.isVisibleTo(engine.playerShip.teamId)) renderShip(ship, ship.interpolatedPos(alpha), ship.interpolatedFacing(alpha));
+    for (const ship of engine.ships) if (ship.isVisibleTo(engine.playerShip.teamId)) {
+      renderShip(ship, ship.interpolatedPos(alpha), ship.interpolatedFacing(alpha));
+      // Reuse hull/decorations/turrets/engines at the ghost pose, without mutating
+      // the simulation ship. Do not recursively produce copies of copies.
+      for (const copy of systemTeleportCopies(ship)) renderShip(ship, copy.position, copy.facing, undefined, copy.alpha);
+    }
 
     // Retain the actual hull, damage and mounted-weapon composition after death.
     for (const hulk of engine.hulkFragments) {

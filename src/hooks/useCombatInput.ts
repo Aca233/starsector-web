@@ -154,7 +154,7 @@ export function useCombatInput({
         isMouseDown.current = true;
       } else if (e.button === 2) {
         e.preventDefault();
-        command({ kind: 'shield' });
+        command({ kind: e.shiftKey ? 'hullShield' : 'shield' });
       }
     };
 

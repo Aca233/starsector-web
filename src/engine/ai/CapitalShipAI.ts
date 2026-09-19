@@ -98,7 +98,8 @@ export class CapitalShipAI {
     const allowOffensiveManeuver = !regroup && !withdrawing && !escort && !avoiding && !waypoint;
     if(target&&!ship.flux.isVenting&&!ship.flux.isOverloaded){
       // System callbacks decide activation only; they no longer rewrite stationkeeping or shield orders.
-      for (const system of ship.systems) {
+      const tacticalSystems = ship.spec.rightClickSystemType === undefined ? ship.systems : [...ship.systems, ship.defenseSystem];
+      for (const system of tacticalSystems) {
         const modifiers=system.definition.modifiers?.({...system,state:'ACTIVE',effectLevel:1} as typeof system,ship.flux.maxFlux);
         const boostSpeed=ship.spec.maxSpeed+(modifiers?.speedFlat??0);
         system.definition.advanceAI?.({ship,system,target,distance:ship.pos.distanceTo(target.pos),angleDiff:signedAngle(facing-ship.facingRad),
@@ -107,7 +108,7 @@ export class CapitalShipAI {
             quietFor:this.defense.quietFor,threat}});
       }
     }
-    if (target) ship.defenseSystem.definition.advanceAI?.({ ship, system: ship.defenseSystem, target, distance: ship.pos.distanceTo(target.pos), angleDiff: signedAngle(facing-ship.facingRad),
+    if (target && ship.spec.rightClickSystemType === undefined) ship.defenseSystem.definition.advanceAI?.({ ship, system: ship.defenseSystem, target, distance: ship.pos.distanceTo(target.pos), angleDiff: signedAngle(facing-ship.facingRad),
       tactical: { allowOffensiveManeuver, desiredRange: profile.range, withdrawing: withdrawing||!!regroup, waypoint: !!waypoint, avoidingCollision: avoidance.avoiding, forwardClear: true, quietFor: this.defense.quietFor, threat } });
     const defense=this.defense.update(ship,threat);
     ship.tacticalAI={fleetRole:assignment?.role,fleetTask:regroup?'REGROUP':disengaging?'DISENGAGE':assignment?.task==='REGROUP'||assignment?.task==='DISENGAGE'?(target?'PRESSURE':'SEARCH'):assignment?.task,targetScore:assignment?.score,pressureRatio:assignment?.pressureRatio,assignedPower:assignment?.assignedPower,

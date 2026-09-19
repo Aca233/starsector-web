@@ -3,7 +3,7 @@
  * Optional real Chromium freeze check: --browser (Playwright on NODE_PATH).
  * Uses an isolated loopback server/profile, never an existing room or save. */
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { test, afterEach } from 'node:test';
 import vm from 'node:vm';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -40,7 +40,7 @@ function client(hidden = false) {
     receive(message) { this.onmessage({ data: JSON.stringify(message) }); }
   }
   const context = vm.createContext({
-    console, TextEncoder, TextDecoder, crypto: webcrypto, document, WebSocket: Socket,
+    console, URL, DOMException, EventTarget, ArrayBuffer, Uint8Array, TextEncoder, TextDecoder, crypto: webcrypto, document, WebSocket: Socket,
     sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} },
     performance: { now: () => now }, Date: class extends Date { static now() { return now; } },
     setInterval(fn, ms) { const id = ++nextTimer; timers.set(id, { fn, ms, interval: true }); return id; },
@@ -148,61 +148,67 @@ test('background Worker gaps do not consume overload budget, but limits remain',
 });
 
 
+const testWorkers = new Set();
+afterEach(() => { for (const dispose of testWorkers) dispose(); testWorkers.clear(); });
 const workerBundle = (await build({
   stdin: {
-    contents: fs.readFileSync('src/network/host.worker.ts', 'utf8') + '\nself.inspectTestState = () => ({ controls, tick, running, accumulator }); self.setTestBacklog = n => { accumulator = n; }; self.installTestStepCost = ms => { const fixed = engine.fixedUpdate.bind(engine); engine.fixedUpdate = dt => { fixed(dt); self.consumeTestTime(ms); }; };',
+    contents: fs.readFileSync('src/network/host.worker.ts', 'utf8') + '\nself.stepTest = step; self.inspectTestState = () => ({ controls, tick, running, accumulator }); self.setTestBacklog = n => { accumulator = n; }; self.installTestStepCost = ms => { const fixed = engine.fixedUpdate.bind(engine); engine.fixedUpdate = dt => { fixed(dt); self.consumeTestTime(ms); }; };',
     resolveDir: path.resolve('src/network'), loader: 'ts',
   },
   bundle: true, write: false, format: 'iife', platform: 'browser',
-  define: { __LAN_BUILD_ID__: '"worker-test"', 'import.meta.url': '"http://localhost/worker.js"', 'import.meta.env.BASE_URL': '"/"' },
+  define: { __LAN_BUILD_ID__: '"worker-test"', 'import.meta.url': '"http://localhost/worker.js"', 'import.meta.env': '{"BASE_URL":"/","VITE_LAN_AI_WORKERS":"false"}' },
 })).outputFiles[0].text;
-function hostWorker(hidden = true) {
+function hostWorker(hidden = true, binarySnapshots = false) {
   let now = 100, callback;
+  const channels = [];
+  class TestMessageChannel extends MessageChannel { constructor() { super(); channels.push(this); } }
   const messages = [], self = { postMessage: m => messages.push(m), consumeTestTime: ms => { now += ms; } };
   // Same JS realm preserves the engine's strict plain-object definition checks.
-  new Function('self', 'performance', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', workerBundle)(
-    self, { now: () => now }, fn => (callback = fn, 1), () => { callback = null; }, () => 1, () => {},
+  new Function('self', 'performance', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', 'MessageChannel', workerBundle)(
+    self, { now: () => now }, fn => (callback = fn, 1), () => { callback = null; }, () => 1, () => {}, TestMessageChannel,
   );
+  const dispose = () => { self.onmessage({ data: { type: 'stop' } }); for (const c of channels) { c.port1.close(); c.port2.close(); } };
+  testWorkers.add(dispose);
   const send = data => self.onmessage({ data });
-  send({ type: 'init', hidden, match: {
+  send({ type: 'init', hidden, binarySnapshots, match: {
     id: 'test', hostId: 'host', seed: 1, snapshotHz: 20,
     options: { aiHulls: [[], []], assignment: 'teams', battleSize: 400 },
     players: [{ id: 'host', seat: 0, team: 0, hull: 'onslaught', design: null }, { id: 'guest', seat: 1, team: 1, hull: 'onslaught', design: null }],
   } });
   assert(messages.some(m => m.type === 'ready'), JSON.stringify(messages));
   send({ type: 'snapshot-consumed', tick: 0 }); send({ type: 'start' });
-  return { self, messages, send, step(ms) { now += ms; callback?.(); }, state: () => self.inspectTestState() };
+  return { self, messages, send, async step(ms) { now += ms; if (callback) await self.stepTest(); }, state: () => self.inspectTestState() };
 }
-test('actual host Worker resumes a two-minute background gap without replaying controls or catching up minutes', () => {
+test('actual host Worker resumes a two-minute background gap without replaying controls or catching up minutes', async () => {
   const w = hostWorker();
   w.send({ type: 'presence', seat: 0, connected: true, online: true });
   w.send({ type: 'input', seat: 0, input: { seq: 1, keys: 1, aim: [1, 1], firing: true, pointerActive: true, actions: [{ id: 1, kind: 'vent' }] } });
   assert.equal(w.state().controls.get(0).queued.length, 1);
-  w.step(120000);
+  await w.step(120000);
   const control = w.state().controls.get(0);
   assert.equal(control.online, false); assert.equal(control.input.keys, 0);
   assert.equal(control.input.firing, false); assert.equal(control.input.pointerActive, false);
   assert.equal(control.queued.length, 0); assert.equal(control.lastAction, 1);
   assert(w.messages.some(m => m.type === 'recovered'));
-  for (let i = 0; i < 6; i++) w.step(20);
+  for (let i = 0; i < 6; i++) await w.step(20);
   assert(w.state().tick > 0 && w.state().tick < 20);
   assert(w.messages.some(m => m.type === 'snapshot' && m.tick > 0));
   assert.equal(w.messages.some(m => m.type === 'error'), false);
   w.send({ type: 'stop' });
 });
-test('actual host Worker accepts foreground notification before the delayed timer, not a later foreground stall', () => {
+test('actual host Worker accepts foreground notification before the delayed timer, not a later foreground stall', async () => {
   const w = hostWorker();
-  w.send({ type: 'visibility', hidden: false }); w.step(120000);
+  w.send({ type: 'visibility', hidden: false }); await w.step(120000);
   assert.equal(w.state().running, true);
-  w.step(12000);
+  await w.step(12000);
   assert.equal(w.state().running, false);
   assert(w.messages.some(m => m.type === 'error'));
 });
 for (const gap of [120, 250, 500, 999, 1000, 1001, 2000]) {
-  test('background timer throttled to ' + gap + 'ms keeps the actual Worker alive and publishing', () => {
+  test('background timer throttled to ' + gap + 'ms keeps the actual Worker alive and publishing', async () => {
     const w = hostWorker();
     for (let i = 0; i < 12; i++) {
-      w.step(gap);
+      await w.step(gap);
       for (const m of w.messages.slice(-3)) if (m.type === 'snapshot') w.send({ type: 'snapshot-consumed', tick: m.tick });
     }
     assert.equal(w.state().running, true, w.messages.filter(m => m.type === 'error').map(m => m.message).join('; '));
@@ -212,49 +218,72 @@ for (const gap of [120, 250, 500, 999, 1000, 1001, 2000]) {
     w.send({ type: 'stop' });
   });
 }
-test('actual host Worker preserves ordinary computation cost while background-throttled', () => {
+test('actual host Worker preserves ordinary computation cost while background-throttled', async () => {
   const w = hostWorker(); w.self.installTestStepCost(10);
-  for (let i = 0; i < 30; i++) w.step(500);
+  for (let i = 0; i < 30; i++) await w.step(500);
   assert.equal(w.state().running, true);
   assert.equal(w.messages.filter(m => m.type === 'recovered').length, 1);
   w.send({ type: 'stop' });
 });
-for (const idle of [4, 500]) test('actual host Worker rejects genuine slow physics with ' + idle + 'ms background idle', () => {
+for (const idle of [4, 500]) test('actual host Worker rejects genuine slow physics with ' + idle + 'ms background idle', async () => {
   const w = hostWorker(); w.self.installTestStepCost(250);
-  for (let i = 0; i < 60 && w.state().running; i++) w.step(idle);
+  for (let i = 0; i < 60 && w.state().running; i++) await w.step(idle);
   assert.equal(w.state().running, false);
   assert(w.messages.some(m => m.type === 'error' && m.message.includes('持续过载')));
 });
-test('foreground resume clears pending background actions and returns to normal ticks', () => {
+test('foreground resume clears pending background actions and returns to normal ticks', async () => {
   const w = hostWorker();
-  w.step(500); w.step(500);
+  await w.step(500); await w.step(500);
   w.send({ type: 'presence', seat: 0, connected: true, online: true });
   w.send({ type: 'input', seat: 0, input: { seq: 2, keys: 1, aim: [1, 1], firing: true, pointerActive: true, actions: [{ id: 2, kind: 'vent' }] } });
-  w.send({ type: 'visibility', hidden: false }); w.step(500);
+  w.send({ type: 'visibility', hidden: false }); await w.step(500);
   assert.equal(w.state().controls.get(0).input.firing, false);
   assert.equal(w.state().controls.get(0).queued.length, 0);
   const tick = w.state().tick;
-  for (let i = 0; i < 10; i++) w.step(20);
+  for (let i = 0; i < 10; i++) await w.step(20);
   assert.equal(w.state().running, true); assert(w.state().tick > tick);
   assert.equal(w.messages.filter(m => m.type === 'recovered').length, 2);
   w.send({ type: 'stop' });
 });
-test('five-minute hard cap still applies after a throttled period has already recovered', () => {
-  const w = hostWorker(); w.step(500); w.step(config.backgroundGraceMs + 1);
+test('five-minute hard cap still applies after a throttled period has already recovered', async () => {
+  const w = hostWorker(); await w.step(500); await w.step(config.backgroundGraceMs + 1);
   assert.equal(w.state().running, false);
   assert(w.messages.some(m => m.type === 'error' && m.message.includes('5 分钟')));
 });
-test('actual host Worker rejects a background scheduler pause exceeding five minutes', () => {
-  const w = hostWorker(); w.step(config.backgroundGraceMs + 1);
+test('actual host Worker rejects a background scheduler pause exceeding five minutes', async () => {
+  const w = hostWorker(); await w.step(config.backgroundGraceMs + 1);
   assert.equal(w.state().running, false);
   assert(w.messages.some(m => m.type === 'error'));
 });
-test('actual host Worker still stops repeated physics backlog even when hidden', () => {
+test('actual host Worker still stops repeated physics backlog even when hidden', async () => {
   const w = hostWorker();
-  for (let i = 0; i < 3; i++) { w.self.setTestBacklog(1000); w.step(20); }
+  for (let i = 0; i < 3; i++) { w.self.setTestBacklog(1000); await w.step(20); }
   assert.equal(w.messages.filter(m => m.type === 'recovered').length, 2);
   assert.equal(w.state().running, false);
   assert(w.messages.some(m => m.type === 'error'));
+});
+
+for (const binary of [false, true]) test('actual host Worker flow separates simulation from blocked publication (' + (binary ? 'LAN binary' : 'Steam JSON') + ')', async () => {
+  const w = hostWorker(false, binary);
+  // The engine and publication path are real; only scheduler time is simulated.
+  // Withhold the decode credit: do not mistake healthy simulation for delivery.
+  for (let i = 0; i < 600; i++) await w.step(4);
+  let data = w.messages.findLast(m => m.type === 'performance').flow;
+  assert.ok(data.rates.simulated >= 55, JSON.stringify(data));
+  assert.ok(data.rates.produced <= 1, JSON.stringify(data));
+  assert.ok(data.rates.blocked > 60, JSON.stringify(data));
+  let acknowledged = 0;
+  for (let i = 0; i < 750; i++) {
+    const pending = w.messages.findLast(m => m.type === 'snapshot');
+    if (pending.tick > acknowledged) { acknowledged = pending.tick; w.send({ type: 'snapshot-consumed', tick: pending.tick }); }
+    await w.step(4);
+  }
+  data = w.messages.findLast(m => m.type === 'performance').flow;
+  assert.ok(data.rates.simulated >= 55, JSON.stringify(data));
+  assert.ok(data.rates.produced >= 55, JSON.stringify(data));
+  assert.equal(data.rates.blocked, 0);
+  assert.equal(w.messages.some(m => m.type === 'error'), false);
+  w.send({ type: 'stop' });
 });
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));

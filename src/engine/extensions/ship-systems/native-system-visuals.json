@@ -1,0 +1,453 @@
+{
+  "ammofeed": {
+    "weaponGlow": {
+      "color": [
+        255,
+        200,
+        0,
+        155
+      ],
+      "types": [
+        "BALLISTIC"
+      ]
+    }
+  },
+  "burndrive": {
+    "engine": {
+      "length": 2.5,
+      "width": 3,
+      "glow": 2
+    }
+  },
+  "combat_burn": {
+    "engine": {
+      "length": 1.5,
+      "width": 2,
+      "glow": 2
+    }
+  },
+  "damper": {
+    "jitter": {
+      "color": [
+        255,
+        165,
+        90,
+        55
+      ],
+      "copies": 2,
+      "range": 5,
+      "minRange": 0,
+      "radiusFraction": 0
+    },
+    "jitterUnder": {
+      "color": [
+        255,
+        165,
+        90,
+        155
+      ],
+      "copies": 25,
+      "range": 7,
+      "minRange": 0,
+      "radiusFraction": 0
+    }
+  },
+  "displacer": {
+    "jitter": {
+      "color": [
+        100,
+        165,
+        255,
+        155
+      ],
+      "copies": 10,
+      "range": 0,
+      "minRange": 0,
+      "radiusFraction": 0.5
+    },
+    "engine": {
+      "color": [
+        100,
+        165,
+        255,
+        125
+      ],
+      "length": 1,
+      "width": 1,
+      "glow": 1
+    },
+    "teleportCopy": true
+  },
+  "displacer_degraded": {
+    "jitter": {
+      "color": [
+        100,
+        165,
+        255,
+        155
+      ],
+      "copies": 10,
+      "range": 0,
+      "minRange": 0,
+      "radiusFraction": 0.5
+    },
+    "engine": {
+      "color": [
+        100,
+        165,
+        255,
+        125
+      ],
+      "length": 1,
+      "width": 1,
+      "glow": 1
+    },
+    "teleportCopy": true
+  },
+  "displacer_threat": {
+    "jitter": {
+      "color": [
+        130,
+        155,
+        145,
+        255
+      ],
+      "copies": 10,
+      "range": 0,
+      "minRange": 0,
+      "radiusFraction": 0.5
+    },
+    "engine": {
+      "color": [
+        130,
+        155,
+        145,
+        125
+      ],
+      "length": 1,
+      "width": 1,
+      "glow": 1
+    },
+    "teleportCopy": true
+  },
+  "dynamic_stabilizer": {
+    "engine": {
+      "length": 1,
+      "width": 1,
+      "glow": 2
+    }
+  },
+  "energy_conversion": {
+    "jitter": {
+      "color": [
+        200,
+        165,
+        255,
+        127
+      ],
+      "copies": 7,
+      "range": 30,
+      "minRange": 0,
+      "radiusFraction": 0
+    },
+    "teleportCopy": true
+  },
+  "highenergyfocus": {
+    "weaponGlow": {
+      "color": [
+        255,
+        0,
+        255,
+        255
+      ],
+      "types": [
+        "ENERGY"
+      ]
+    }
+  },
+  "incursion_mode": {
+    "weaponGlow": {
+      "color": [
+        130,
+        155,
+        145,
+        50
+      ],
+      "types": [
+        "BALLISTIC",
+        "ENERGY"
+      ]
+    }
+  },
+  "inferniuminjector": {
+    "engine": {
+      "color": [
+        255,
+        100,
+        225,
+        255
+      ],
+      "length": 0.5,
+      "width": 0.65,
+      "glow": 0
+    }
+  },
+  "maneuveringjets": {
+    "engine": {
+      "length": 1,
+      "width": 1,
+      "glow": 2
+    }
+  },
+  "microburn": {
+    "engine": {
+      "color": [
+        100,
+        255,
+        100,
+        255
+      ],
+      "length": 3,
+      "width": 1.5,
+      "glow": 3
+    }
+  },
+  "microburn_omega": {
+    "engine": {
+      "color": [
+        150,
+        50,
+        255,
+        255
+      ],
+      "length": 3,
+      "width": 1.5,
+      "glow": 3
+    }
+  },
+  "phasecloak": {
+    "engine": {
+      "color": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "length": 0,
+      "width": 0,
+      "glow": 0
+    }
+  },
+  "phaseteleporter": {
+    "jitter": {
+      "color": [
+        100,
+        165,
+        255,
+        150
+      ],
+      "copies": 5,
+      "range": 25,
+      "minRange": 0,
+      "radiusFraction": 0
+    },
+    "engine": {
+      "length": 0,
+      "width": 0,
+      "glow": 0
+    },
+    "teleportCopy": true
+  },
+  "plasmajets": {
+    "engine": {
+      "length": 1,
+      "width": 1,
+      "glow": 2
+    }
+  },
+  "skimmer_drone": {
+    "jitter": {
+      "color": [
+        100,
+        165,
+        255,
+        155
+      ],
+      "copies": 10,
+      "range": 0,
+      "minRange": 0,
+      "radiusFraction": 0.5
+    },
+    "engine": {
+      "color": [
+        100,
+        165,
+        255,
+        125
+      ],
+      "length": 1,
+      "width": 1,
+      "glow": 1
+    },
+    "teleportCopy": true
+  },
+  "traveldrive": {
+    "engine": {
+      "color": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "length": 4,
+      "width": 3,
+      "glow": 2
+    }
+  },
+  "temporalshell": {
+    "jitter": {
+      "color": [
+        90,
+        165,
+        255,
+        55
+      ],
+      "copies": 3,
+      "range": 0,
+      "minRange": 0,
+      "radiusFraction": 0
+    },
+    "jitterUnder": {
+      "color": [
+        90,
+        165,
+        255,
+        155
+      ],
+      "copies": 25,
+      "range": 7,
+      "minRange": 0,
+      "radiusFraction": 0
+    }
+  },
+  "damper_omega": {
+    "jitterUnder": {
+      "color": [
+        100,
+        165,
+        255,
+        255
+      ],
+      "copies": 15,
+      "range": 15,
+      "minRange": 0,
+      "radiusFraction": 0
+    },
+    "weaponGlow": {
+      "color": [
+        100,
+        165,
+        255,
+        255
+      ],
+      "types": [
+        "BALLISTIC",
+        "ENERGY",
+        "MISSILE"
+      ]
+    }
+  },
+  "cryoflux": {
+    "jitterUnder": {
+      "color": [
+        100,
+        165,
+        255,
+        255
+      ],
+      "copies": 15,
+      "range": 15,
+      "minRange": 0,
+      "radiusFraction": 0
+    },
+    "weaponGlow": {
+      "color": [
+        100,
+        165,
+        255,
+        255
+      ],
+      "types": [
+        "BALLISTIC",
+        "ENERGY",
+        "MISSILE"
+      ]
+    }
+  },
+  "acausaldisruptor": {
+    "jitter": {
+      "color": [
+        255,
+        155,
+        255,
+        75
+      ],
+      "copies": 4,
+      "range": 0,
+      "minRange": 0,
+      "radiusFraction": 0
+    },
+    "jitterUnder": {
+      "color": [
+        255,
+        155,
+        255,
+        155
+      ],
+      "copies": 21,
+      "range": 3,
+      "minRange": 0,
+      "radiusFraction": 0
+    }
+  },
+  "targetingfeed": {
+    "recipient": "WINGS",
+    "jitter": {
+      "color": [
+        255,
+        50,
+        0,
+        125
+      ],
+      "copies": 2,
+      "range": 1,
+      "minRange": 0,
+      "radiusFraction": 0
+    },
+    "jitterUnder": {
+      "color": [
+        255,
+        50,
+        0,
+        75
+      ],
+      "copies": 5,
+      "range": 0,
+      "minRange": 0,
+      "radiusFraction": 0
+    },
+    "weaponGlow": {
+      "color": [
+        255,
+        50,
+        0,
+        255
+      ],
+      "types": [
+        "BALLISTIC",
+        "ENERGY",
+        "MISSILE"
+      ]
+    }
+  }
+}

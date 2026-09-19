@@ -14,6 +14,7 @@ export class MotionPrediction {
   private lastRender = 0;
   private lastPose: { pos: Vector2; facing: number } | null = null;
   private lastAuthority: Vector2 | null = null;
+  private lastTeleportSequence: number | null = null;
   private correct = false;
   private offset = new Vector2();
   private angleOffset = 0;
@@ -24,7 +25,9 @@ export class MotionPrediction {
   receive(ship: Ship, acknowledged: number, now: number) {
     this.samples = this.samples.filter(sample => sample.input.seq > acknowledged);
     // Teleportation / a large authoritative collision correction cannot be replayed.
-    if (this.lastAuthority && this.lastAuthority.distanceTo(ship.pos) > Math.max(100, ship.spec.collisionRadius * 2)) this.clear(ship);
+    if ((this.lastTeleportSequence !== null && this.lastTeleportSequence !== ship.teleportSequence)
+      || (this.lastAuthority && this.lastAuthority.distanceTo(ship.pos) > Math.max(100, ship.spec.collisionRadius * 2))) this.clear(ship);
+    this.lastTeleportSequence = ship.teleportSequence;
     this.lastAuthority = ship.pos.clone();
     this.receivedAt = now;
     this.correct = true;

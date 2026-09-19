@@ -3,6 +3,7 @@ export interface SteamStatus {
   service: string; available: boolean; protocol: number; build: string; appId: number; testApp: boolean;
   name: string; steamId: string; error: string; busy: boolean; occupied: boolean; pendingInvite: string | null;
   overlay?: SteamOverlayStatus;
+  transport?: unknown;
   lobby: { id: string; owner: string; host: boolean; code: string } | null;
 }
 export async function steamRequest<T = SteamStatus>(operation: string, data: unknown = {}): Promise<T> {

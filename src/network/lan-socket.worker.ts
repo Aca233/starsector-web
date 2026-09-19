@@ -1,3 +1,4 @@
+import { LanDeltaReceiver } from "./LanBinaryDelta.mjs";
 import {
   Cell, LAN_SOCKET_QUEUE_BYTES, LAN_SOCKET_QUEUE_MESSAGES, LAN_SOCKET_SHARED_BYTES,
   payloadBytes, releaseIncoming, reserve,
@@ -17,6 +18,17 @@ let socket: WebSocket | undefined;
 let ended = false;
 let connectStarted = false;
 let nativeBuffered = 0;
+const deltaReceiver = new LanDeltaReceiver();
+let offeredDelta = false, enabledDelta = false, hidden = false;
+// Canonical protocol controls always put type first. Inspect only these bounded
+// small messages, not every 60Hz input or any multi-megabyte state/design.
+function outgoingDeltaControl(data: unknown): void {
+  if (typeof data !== "string" || data.length > 4096 || !/^\{"type":"(?:hello|visibility|leave)"/.test(data)) return;
+  const m = JSON.parse(data);
+  if (m.type === "hello") { offeredDelta = m.binaryDelta === 1 && m.stateCredits === 1; enabledDelta = false; deltaReceiver.reset(); }
+  if (m.type === "visibility") { hidden = m.hidden === true; deltaReceiver.reset(); }
+  if (m.type === "leave") deltaReceiver.reset();
+}
 let poll: ReturnType<typeof setTimeout> | undefined;
 
 function post(message: FromLanWorker, transfer: Transferable[] = []): void {
@@ -73,10 +85,23 @@ function connect(url: string): void {
   };
   socket.onmessage = event => {
     if (ended || Atomics.load(cells!, Cell.closing)) return;
-    const data = event.data as string | ArrayBuffer;
+    let data = event.data as string | ArrayBuffer;
     if (typeof data !== "string" && !(data instanceof ArrayBuffer)) {
       fail("Unexpected I/O payload"); return;
     }
+    try {
+      if (typeof data === "string") {
+        if (data.length <= 16384 && data.startsWith('{"type":"welcome"')) {
+          const m = JSON.parse(data); enabledDelta = offeredDelta && m.stateCredits === 1 && m.binaryDelta === 1;
+          deltaReceiver.reset();
+        } else if (data.startsWith('{"type":"match"') || data.startsWith('{"type":"state"')) deltaReceiver.reset();
+      } else if (enabledDelta && !hidden) {
+        // Restore in the existing I/O worker, before transferring to the render
+        // thread. Accounting below uses EXPANDED bytes, not the smaller patch.
+        const bytes = deltaReceiver.decode(data);
+        data = bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength ? bytes.buffer : bytes.slice().buffer;
+      }
+    } catch { fail("Invalid LAN delta baseline"); return; }
     const size = payloadBytes(data);
     if (!reserve(cells!, Cell.inboundMessages, 1, LAN_SOCKET_QUEUE_MESSAGES)) {
       fail("I/O receive queue full"); return;
@@ -128,6 +153,7 @@ scope.onmessage = event => {
         try {
           // Native send silently drops CLOSING/CLOSED data; explicitly reject it.
           if (socket.readyState !== 1) throw new Error("Socket not open");
+          outgoingDeltaControl(message.data);
           socket.send(message.data);
         } catch { failure = true; }
         finally {

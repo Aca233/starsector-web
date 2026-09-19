@@ -66,8 +66,9 @@ test('high flux still withdraws and explicit AVOID/WAYPOINT still own navigation
     assert.equal(f.ship.tacticalAI.positioning, undefined);
   }
 });
-test('unsafe fleet pressure still disengages instead of receiving an approach floor', () => {
+test('battle-worn ships still disengage under unsafe pressure instead of receiving an approach floor', () => {
   const f = fixture('lasher'), scene = world(f);
+  f.ship.hullHp = f.ship.maxHullHp * .4;
   scene.ships = scene.ships.filter(s => s === f.ship || s.teamId !== f.ship.teamId);
   scene.fleetPlan = lab.planFleetTactics(scene.ships);
   f.ai.update(1 / 60, null, scene);

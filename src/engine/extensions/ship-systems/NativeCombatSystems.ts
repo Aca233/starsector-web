@@ -28,6 +28,7 @@ function driveAI({ ship, system = ship.system, target, distance, tactical, angle
   } else if (useful && ready(ship, system)) system.activate();
 }
 const damper = nativeSystem('damper', {
+  statusText: system => system.isActive ? '装甲 / 船体 / EMP 减伤中' : undefined,
   modifiers: (_system, _capacity, ship) => {
     const mult = ship?.spec.hullSize === 'CRUISER' || ship?.spec.hullSize === 'CAPITAL_SHIP' ? .5 : .33;
     return { armorDamageMultiplier: mult, hullDamageMultiplier: mult, empDamageMultiplier: mult };
@@ -75,14 +76,18 @@ function reloadAI(context: SystemAIContext, cooldownOnly: boolean): void {
   if (useful.length && useful.length >= weapons.length * .5) system.activate();
 }
 const fastMissileRacks = nativeSystem('fastmissileracks', {
+  activationReason: (ship, system) => ship.weapons.some(w => w.spec.weaponType === 'MISSILE' && !w.isDisabled && w.ammo !== 0 && w.burstRemaining === 0 && w.cooldownTimer > system.chargeUpDuration)
+    ? undefined : '需要正在冷却且仍有弹药的导弹发射器',
   onActivate: (ship, _world, system) => { for (const w of ship.weapons) if (w.spec.weaponType === 'MISSILE' && w.burstRemaining === 0 && w.cooldownTimer > system.chargeUpDuration) w.cooldownTimer = system.chargeUpDuration; },
   advanceAI: context => reloadAI(context, true),
 });
 const forgeVats = nativeSystem('forgevats', {
+  activationReason: ship => finiteMissiles(ship).some(w => w.ammo < w.spec.maxAmmo!) ? undefined : '没有需要补充弹药的有限弹药导弹',
   onActivate: ship => { for (const w of finiteMissiles(ship)) w.ammo = Math.min(w.spec.maxAmmo!, w.ammo + (w.baseMaxAmmo ?? w.spec.maxAmmo!)); },
   advanceAI: context => reloadAI(context, false),
 });
 const forgeVatsStation = nativeSystem('forgevats_station', {
+  activationReason: ship => finiteMissiles(ship).some(w => w.ammo < w.spec.maxAmmo!) ? undefined : '没有需要补充弹药的有限弹药导弹',
   onActivate: ship => { for (const w of finiteMissiles(ship)) w.ammo = w.spec.maxAmmo!; },
   advanceAI: context => reloadAI(context, false),
 });
@@ -104,6 +109,7 @@ function targetedAI(context: SystemAIContext): void {
 }
 const entropyAmplifier = nativeSystem('entropyamplifier', {
   selectTarget: entropyTarget,
+  targetFailureReason: ship => `需要可见、未相位的非战机敌舰（射程 ${Math.round(1500 * ship.hullStats.systemRangeMultiplier)}）；已选目标无效时请重新选定`,
   onActivate: (ship, _world, source) => {
     const target = source.activationTarget; if (!target) return;
     const serial = source.activationSerial, key = 'entropy:' + ship.id + ':' + source.type;
@@ -114,6 +120,7 @@ const entropyAmplifier = nativeSystem('entropyamplifier', {
 });
 const acausalDisruptor = nativeSystem('acausaldisruptor', {
   selectTarget: disruptTarget,
+  targetFailureReason: ship => `需要未过载、未排幅的非战机敌舰（射程 ${Math.round(500 * ship.hullStats.systemRangeMultiplier)}）；已选目标无效时请重新选定`,
   onActive: (_ship, _world, system) => {
     const target = system.activationTarget;
     if (target && alive(target) && !target.flux.isOverloaded && !target.flux.isVenting) target.flux.overloadFor(1);
@@ -133,6 +140,7 @@ function interdictEngines(target: Ship, world: SystemWorld): void {
 }
 const interdictor = nativeSystem('interdictor', {
   selectTarget: interdictTarget,
+  targetFailureReason: ship => `需要仍有可用引擎的敌舰（射程 ${Math.round(1000 * ship.hullStats.systemRangeMultiplier)}）；已选目标无效时请重新选定`,
   onActive: (_ship, world, system) => {
     const target = system.activationTarget; if (!target || !alive(target)) return;
     const targets = target.spec.hullSize === 'FIGHTER' ? world.ships.filter(other => alive(other) && other.spec.hullSize === 'FIGHTER'

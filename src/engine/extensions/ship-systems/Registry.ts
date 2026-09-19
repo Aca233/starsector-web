@@ -1,3 +1,4 @@
+import { withNativeSystemVisuals, validateSystemVisuals } from './NativeSystemVisuals';
 import { validateResources, validateHooks } from '../Dependencies';
 import { requireSound } from '../../audio/SoundBank';
 import { DefinitionRegistry } from '../DefinitionRegistry';
@@ -27,8 +28,9 @@ import { displacer, displacerDegraded, phaseTeleporter, droneSkimmer } from './P
 export const shipSystemDefinitions = new DefinitionRegistry<ShipSystemDefinition>('ship system', d => {
   if (typeof d.name !== 'string' || !d.name.trim() || !Array.isArray(d.sourceIds) || d.sourceIds.some(id=>typeof id !== 'string' || !id.trim()) || new Set(d.sourceIds).size !== d.sourceIds.length) throw new Error(d.id + ': invalid name/source IDs');
   for (const value of [d.description, d.implementationDetails]) if (value !== undefined && typeof value !== 'string') throw new Error(d.id + ': invalid description');
-  validateResources(d.resources); validateHooks(d, ['installReason','statusText','passiveModifiers','weaponEnabled','modifiers','onActivate','onActive','onAdvance','advanceAI','canActivate','initialize','onReset','selectTarget','isExecuting','onEnergyLash','canVent','preventAIVenting','motionControl']);
-  for (const group of [d.controls,d.visuals,d.phase]) if (group) for (const value of Object.values(group)) if (typeof value !== 'boolean') throw new Error(d.id + ': invalid capability flag');
+  validateSystemVisuals(d.visuals);
+  validateResources(d.resources); validateHooks(d, ['activationReason','targetFailureReason','installReason','statusText','passiveModifiers','weaponEnabled','modifiers','onActivate','onActive','onAdvance','advanceAI','canActivate','initialize','onReset','selectTarget','isExecuting','onEnergyLash','canVent','preventAIVenting','motionControl']);
+  for (const group of [d.controls,d.phase]) if (group) for (const value of Object.values(group)) if (typeof value !== 'boolean') throw new Error(d.id + ': invalid capability flag');
   for (const value of [d.toggle,d.hardFlux,d.unavailable,d.usesChargesForActivation]) if (value !== undefined && typeof value !== 'boolean') throw new Error(d.id + ': invalid boolean');
   for (const key of [d.audio?.activate,d.audio?.loop,d.audio?.deactivate]) if (key !== undefined) requireSound(key,false);
   if (d.audio?.loopVolume !== undefined && (!Number.isFinite(d.audio.loopVolume) || d.audio.loopVolume < 0)) throw new Error(d.id + ': invalid volume');
@@ -40,7 +42,7 @@ export const shipSystemDefinitions = new DefinitionRegistry<ShipSystemDefinition
   for (const alias of d.sourceIds) if (shipSystemDefinitions.all().some(other => other.sourceIds.includes(alias))) throw new Error(`Duplicate source system ${alias}`);
 });
 shipSystemDefinitions.register({id:'NONE', sourceIds:[], name:'无', chargeUp:0, active:0, chargeDown:0, cooldown:0});
-for (const definition of [burnDrive, fortressShield, mineStrike, maneuveringJets, plasmaJets, highEnergyFocus, ammoFeed, displacer, displacerDegraded, phaseTeleporter, droneSkimmer, canisterFlak, targetingFeed, reserveWing, lidarArray, recallDevice, ...droneLaunchers, ...energyLashSystems, ...pulseDrives, empEmitter, chiralFigment, droneStrike, moteControl, convulsiveLunge, ...flareSystems, ...nativeCombatSystems]) shipSystemDefinitions.register(definition);
+for (const definition of [burnDrive, fortressShield, mineStrike, maneuveringJets, plasmaJets, highEnergyFocus, ammoFeed, displacer, displacerDegraded, phaseTeleporter, droneSkimmer, canisterFlak, targetingFeed, reserveWing, lidarArray, recallDevice, ...droneLaunchers, ...energyLashSystems, ...pulseDrives, empEmitter, chiralFigment, droneStrike, moteControl, convulsiveLunge, ...flareSystems, ...nativeCombatSystems]) shipSystemDefinitions.register(withNativeSystemVisuals(definition));
 // Only this audited set has side-effect-free modifiers/passiveModifiers/isExecuting.
 // Registration by external extensions does not confer this property.
 const nativeStatDefinitions = new WeakSet(shipSystemDefinitions.all());

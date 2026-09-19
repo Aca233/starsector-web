@@ -255,7 +255,7 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
     const url = new URL("/steam/ws", location.href); url.protocol = "ws:"; url.searchParams.set("lobby", status.lobby.id);
     connection.connect(url.href, name.trim());
   };
-  if(match&&me)return <LanBattle key={match.id} connection={connection} match={match} seat={me.seat as Seat} ended={ended}
+  if(match&&me)return <LanBattle key={match.id} connection={connection} match={match} seat={me.seat as Seat} ended={ended} steamTransport={steamStatus?.transport}
     onReturn={()=>{setMatch(null);setEnded(null);}}/>;
   if(workbenchRoom)return <><Suspense fallback={<div className="native-loading">正在打开房间改装台…</div>}>
     <LanRoomWorkbench key={workbenchRoom.code} room={workbenchRoom} id={id||lastIdentity} active={room?.code===workbenchRoom.code&&!!id}

@@ -453,9 +453,22 @@ select:focus-visible {
   top: calc(3 * var(--u));
   right: calc(5 * var(--u));
   width: calc(294 * var(--u));
-  max-height: calc(100% - 145 * var(--u));
+  bottom: calc(160 * var(--u));
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   overflow: visible;
   z-index: 4;
+  pointer-events: auto;
+}
+.refit-stats > * {
+  flex-shrink: 0;
+}
+/* Validation messages must not push the hullmod controls into the footer either. */
+.refit-stats > .native-errors {
+  max-height: calc(54 * var(--u));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   pointer-events: auto;
 }
 .refit-op-heading {
@@ -638,11 +651,26 @@ select:focus-visible {
   color: #ffd200;
 }
 .refit-hullmods {
+  flex: 0 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   margin-top: calc(12 * var(--u));
   padding-left: calc(5 * var(--u));
+}
+/* Only the installed list scrolls; the heading and install/back action stay put. */
+.refit-hullmods > :not(.refit-hullmod-list) {
+  flex-shrink: 0;
+}
+.refit-hullmod-list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #436b7b #061017;
+  scrollbar-gutter: stable;
+  pointer-events: auto;
 }
 .refit-hullmods h2 {
   text-align: right;

@@ -3,6 +3,7 @@ import config from "./protocol.json";
 /** Small Worker-local telemetry, independent of delivery of a world snapshot.
  * Step/callback timings are wall time, not CPU samples or server RTT. */
 export interface HostPerformance {
+  flow?: import("./SnapshotFlow.mjs").FlowSample;
   tick: number;
   callbackGapMs: number;
   lastStepMs: number;

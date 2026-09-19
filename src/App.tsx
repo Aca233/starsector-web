@@ -44,10 +44,17 @@ export function App() {
         <CombatView />
       </Suspense>
     );
-  if (!studioRequested) return <NativeHome onEnter={() => enterStudio("editor")} onSkills={() => enterStudio("skills")} entryError={entryError} onLan={staticHosted ? undefined : () => void enterLan()} onSteam={staticHosted ? undefined : () => window.location.assign("?view=steam")} staticHosted={staticHosted} />;
+  // Both the initial menu and the studio's return menu use the same host policy and launchers.
+  const homeNavigation = {
+    entryError,
+    onLan: staticHosted ? undefined : () => void enterLan(),
+    onSteam: staticHosted ? undefined : () => window.location.assign("?view=steam"),
+    staticHosted,
+  };
+  if (!studioRequested) return <NativeHome {...homeNavigation} onEnter={() => enterStudio("editor")} onSkills={() => enterStudio("skills")} />;
   return (
     <Suspense fallback={<div className="native-loading" role="status">正在准备舰船设计…</div>}>
-      <StudioApp />
+      <StudioApp homeNavigation={homeNavigation} />
     </Suspense>
   );
 }

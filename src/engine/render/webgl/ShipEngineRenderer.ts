@@ -1,3 +1,4 @@
+import { systemEngineVisual } from './ShipSystemRenderer';
 import type { Ship } from '../../simulation/Ship';
 import type { Vector2 } from '../../math/Vector2';
 import type { WebGLPassContext } from './WebGLPassContext';
@@ -5,20 +6,21 @@ import { ENGINE_VISUAL_PROFILES } from '../../visual/VisualProfiles';
 import { visualObjectRandom } from '../RenderDeterminism';
 
 /** Standard (non-Omega) engine geometry and modulation from combat/entities/G.java. */
-export function renderShipEngines(ship: Ship, pos: Vector2, facing: number, ctx: WebGLPassContext, time: number): void {
+export function renderShipEngines(ship: Ship, pos: Vector2, facing: number, ctx: WebGLPassContext, time: number, opacityMultiplier = 1): void {
   const { batcher, ribbonBatcher: ribbon, textures, hitGlowTex, alpha, viewport, zoom } = ctx;
   const canCull = zoom > 0 && Number.isFinite(zoom)
     && Number.isFinite(viewport.left) && Number.isFinite(viewport.right)
     && Number.isFinite(viewport.bottom) && Number.isFinite(viewport.top)
     && viewport.left <= viewport.right && viewport.bottom <= viewport.top;
   const phaseLevel = ship.shield.type === 'PHASE' ? ship.shield.phaseEffectLevel : 0;
-  const opacity = (1 - phaseLevel) * ship.phaseVisualAlpha;
+  const opacity = (1 - phaseLevel) * ship.phaseVisualAlpha * opacityMultiplier;
   if (opacity <= 0) return;
   const boost = ship.prevEngineBoostLevel + (ship.engineBoostLevel - ship.prevEngineBoostLevel) * alpha;
-  const burn = ship.system.engineVisualLevel;
-  const lengthExtension = 1.5 * burn - phaseLevel;
-  const widthExtension = 2 * burn - phaseLevel;
-  const glowExtension = burn - phaseLevel;
+  const systemVisual = systemEngineVisual(ship);
+  const burn = systemVisual.level;
+  const lengthExtension = systemVisual.length - 1 - phaseLevel;
+  const widthExtension = systemVisual.width - 1 - phaseLevel;
+  const glowExtension = systemVisual.glow - 1 - phaseLevel;
   const fighter = ship.flux.hullSize === 'FIGHTER';
   const copies = fighter ? 3 : 6;
   const accelerating = ship.engineController.flameAccelerating;
@@ -31,7 +33,7 @@ export function renderShipEngines(ship: Ship, pos: Vector2, facing: number, ctx:
     if (!status) continue;
     let level = Math.max(0, Math.min(1, status.prevThrust + (status.currentThrust - status.prevThrust) * alpha));
     // G scales system-only engines by the regular system's flame-length shift.
-    // Burn Drive is the current Web system supplying that shift (not phase cloak).
+    // Any equipped source-authored engine system can supply the activation level.
     if (slot.systemActivated) level *= Math.max(0, Math.min(1, burn));
     const shapeLevel = slot.systemActivated ? Math.max(0, (level - .25) / .75) : level;
     if (level <= 0) continue;
@@ -72,7 +74,12 @@ export function renderShipEngines(ship: Ship, pos: Vector2, facing: number, ctx:
       && (x + bound < viewport.left || x - bound > viewport.right
         || y + bound < viewport.bottom || y - bound > viewport.top)) continue;
 
-    const color = (ENGINE_VISUAL_PROFILES[slot.style] ?? ENGINE_VISUAL_PROFILES.LOW_TECH).flameColor;
+    const baseColor = (ENGINE_VISUAL_PROFILES[slot.style] ?? ENGINE_VISUAL_PROFILES.LOW_TECH).flameColor;
+    const color: [number, number, number] = [...baseColor];
+    for (const tint of systemVisual.colors) {
+      const mix = tint.level * tint.color[3] / 255;
+      for (let c = 0; c < 3; c++) color[c] += (tint.color[c] / 255 - color[c]) * mix;
+    }
     const bend = -ship.angularVelRad * 0.15;
     const fan = (1 - lengthFactor) * spread * Math.PI / 180;
     const phase = visualObjectRandom(`engine:${ship.id}:${i}`) - time;

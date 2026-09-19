@@ -1,8 +1,9 @@
+import { FlowCounters } from './SnapshotFlow.mjs';
 import { yieldHostTask } from './HostTaskYield';
 import { HostAiBudget } from './HostAiBudget';
 import { LanCombatMulticore } from '../engine/ai/multicore/LanCombatMulticore';
 import type { AIPhaseBatch } from '../engine/ai/multicore/Types';
-import { HostMuzzleEvents } from './HostMuzzleEvents';
+import type { HostMuzzleEvents } from './HostMuzzleEvents';
 import { HostRecoveryBudget, LAN_SNAPSHOT_HZ } from "./SnapshotPolicy";
 import type { HostPerformance } from "./SnapshotPolicy";
 import config from "./protocol.json";
@@ -16,7 +17,7 @@ import { DEFAULT_MOUSE_STEERING } from "../engine/runtime/CombatControlSettings"
 import { dispatchShipCommand } from "../engine/runtime/CombatCommands";
 import { sound } from "../engine/audio/SoundManager";
 import type { CombatSound } from "./CombatSnapshot";
-import { captureCombat } from "./CombatSnapshot";
+import { captureHostCombat, configureHostCosmetics } from "./HostSnapshot";
 import { encodeProjectedBinaryFrame } from "./BinarySnapshot.mjs";
 import { blankInput, KEY_CODES } from "./protocol";
 import type { Match, PlayerInput, Seat, Action } from "./protocol";
@@ -75,6 +76,7 @@ sound.playAtPos = (key, pos, _listener, volume = 0.8, rate = 1) => {
 };
 const send = (message: unknown, transfer: Transferable[] = []) =>
   (self as unknown as { postMessage(message: unknown, transfer: Transferable[]): void }).postMessage(message, transfer);
+const snapshotFlow = new FlowCounters(['simulated', 'produced', 'blocked']);
 let lastSnapshotTick = -1;
 let clockAt = 0, clockTick = 0, clockCombat = 0;
 let realtimeRatio: number | undefined, combatRate: number | undefined;
@@ -90,24 +92,24 @@ function diagnostics(): HostPerformance & { multicore: LanCombatMulticore["statu
   const owners: LanCombatMulticore["status"] = multicore?.status ?? {
     mode: 'serial', reason: 'ai-workers-disabled', workers: 0, metrics: null,
   };
-  return { tick, callbackGapMs, lastStepMs, maxStepMs, backlogMs: accumulator,
+  return { flow: snapshotFlow.sample(), tick, callbackGapMs, lastStepMs, maxStepMs, backlogMs: accumulator,
     simulationMs: samples ? elapsedCost / samples : lastStepMs, captureMs, encodeMs, realtimeRatio, combatRate, multicore: { ...owners, reason: owners.workers || owners.reason !== "not-started" ? owners.reason : aiBudget.status.reason, budget: aiBudget.status } };
 }
 function snapshot(final = false) {
+  if (tick !== lastSnapshotTick && !final && snapshotInFlight !== null) snapshotFlow.count('blocked');
   if (tick === lastSnapshotTick || (!final && snapshotInFlight !== null)) return;
   lastSnapshotTick = tick;
   if (engine) {
     const started = performance.now();
-    const frame = captureCombat(
+    const frame = captureHostCombat(
       engine,
       tick,
       Object.fromEntries(
         [...controls].map(([seat, state]) => [seat, state.acknowledged]),
       ),
       samples ? elapsedCost / samples : 0,
-      true, // Every viewer, including the host window, owns its cosmetic ribbons.
+      muzzleEvents,
     );
-    if (muzzleEvents) frame.muzzleEvents = muzzleEvents.snapshot();
     captureMs = captureMs * .7 + (performance.now() - started) * .3;
     frame.snapshotHz = LAN_SNAPSHOT_HZ;
     frame.captureMs = captureMs;
@@ -126,6 +128,7 @@ function snapshot(final = false) {
     snapshotInFlight = tick;
     if (binary) send({ type: "snapshot", binary: binary.buffer, bytes, tick, encodeMs }, [binary.buffer]);
     else send({ type: "snapshot", json, bytes, tick, encodeMs });
+    snapshotFlow.count("produced");
   }
   elapsedCost = 0;
   samples = 0;
@@ -249,6 +252,7 @@ async function step() {
       try { authority.fixedUpdate(1 / 60, { aiBatch }); }
       finally { aiBatch?.finish(); }
       tick++;
+      snapshotFlow.count('simulated');
       accumulator -= 1000 / 60;
       steps++;
       lastStepMs = performance.now() - start;
@@ -319,8 +323,7 @@ self.onmessage = (event: MessageEvent) => {
       const match = m.match as Match;
       const world = createLanWorld(match);
       engine = world.engine;
-      engine.contrailEngine.setEnabled(false);
-      muzzleEvents = new HostMuzzleEvents(engine.fxSystem, () => world.engine.combatTime);
+      muzzleEvents = configureHostCosmetics(engine);
       controlled = world.controlled;
       controls.clear();
       deploymentReplies.clear();
@@ -340,6 +343,7 @@ self.onmessage = (event: MessageEvent) => {
         });
       }
       tick = 0;
+      snapshotFlow.reset();
       lastSnapshotTick = -1;
       snapshotInFlight = null;
       captureMs = encodeMs = 0;
@@ -396,6 +400,7 @@ self.onmessage = (event: MessageEvent) => {
       // preload tick-0 snapshot may never have been sent to the relay.
       if (running) return;
       running = true;
+      snapshotFlow.reset();
       last = lastCallbackFinishedAt = performance.now();
       clockAt = last; clockTick = tick; clockCombat = engine.combatTime;
       accumulator = 0;

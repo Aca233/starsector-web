@@ -14,16 +14,17 @@ export async function bundleGateway(entry=path.join(root,'server/steam/gateway.m
  return result.outputFiles[0].text;
 }
 const quantile=(values,q)=>{if(!values.length)return null;const sorted=[...values].sort((a,b)=>a-b);return sorted[Math.min(sorted.length-1,Math.floor(sorted.length*q))];};
-export function simulateSharedLink(bundle,{guests=3,durationMs=40000,rttMs=300,upBytesPerSecond=128000,afterBytesPerSecond=upBytesPerSecond,changeAtMs=Infinity,stallAtMs=Infinity,stallMs=0,initialWindow=null,guestRtts=null,rotation=false}={}) {
+export function simulateSharedLink(bundle,{guests=3,durationMs=40000,rttMs=300,upBytesPerSecond=128000,afterBytesPerSecond=upBytesPerSecond,changeAtMs=Infinity,stallAtMs=Infinity,stallMs=0,initialWindow=null,guestRtts=null,rotation=false,jitterMs=0,trace=false}={}) {
  const start=1000,clock={now:start},NativeDate=Date;
  const context=vm.createContext({module:{exports:{}},require,console,Buffer,URL,setTimeout,clearTimeout,setInterval,clearInterval,Date:class extends NativeDate{static now(){return clock.now;}},performance:{now:()=>clock.now}});
  new vm.Script(bundle).runInContext(context);const {SteamGateway}=context.module.exports;
- const ids=Array.from({length:guests+1},(_,i)=>String(76561198000000001n+BigInt(i))),inboxes=ids.map(()=>[]),links=ids.map(()=>({queue:[],bytes:0,peak:0,sent:0})),propagation=[],closes=[],peers=[],logs=[];
+ const ids=Array.from({length:guests+1},(_,i)=>String(76561198000000001n+BigInt(i))),inboxes=ids.map(()=>[]),links=ids.map(()=>({queue:[],bytes:0,peak:0,sent:0,byOp:{}})),propagation=[],closes=[],peers=[],logs=[];
  let budgetViolations=0,maxTotalFlightBytes=0,maxQueueAge=0,seq=0,nextState=start+500,nextInput=start+500,nextPing=start+1000,rotor=0;
+ const samples=[], lastDelivery=new Map(); let nextTrace=start;
  const totals=ids.map(()=>({states:[],pongs:[],inputs:0,peakFrames:0,peakBytes:0,decodeFailures:0}));
  const gateways=ids.map((id,index)=>new SteamGateway({build:'shared-uplink-test',log:line=>{const value=JSON.parse(line.slice('[steam-transport] '.length));if(['peer-close','invalid-packet'].includes(value.event))logs.push({at:clock.now-start,index,...value});},client:{networking:{
   sendP2PPacket(remote,type,data){if(type!==2)throw Error('Reliable framing changed');const target=ids.indexOf(String(remote));if(target<0)throw Error('Unknown test peer');
-   const packet={data:Buffer.from(data),steamId:id,target,remaining:data.length,enqueued:clock.now};const link=links[index];link.queue.push(packet);link.bytes+=data.length;link.peak=Math.max(link.peak,link.bytes);link.sent+=data.length;return true;},
+   const packet={data:Buffer.from(data),steamId:id,target,remaining:data.length,enqueued:clock.now};const link=links[index];link.queue.push(packet);link.bytes+=data.length;link.peak=Math.max(link.peak,link.bytes);link.sent+=data.length;link.byOp[data[5]]=(link.byOp[data[5]]??0)+data.length;return true;},
   isP2PPacketAvailable(){return inboxes[index][0]?.data.length??0;},readP2PPacket(){return inboxes[index].shift();}
  }}}));
  for(let i=0;i<gateways.length;i++){const g=gateways[i];g.owner=ids[i];g.initialized=true;g.selected={id:'10977524000000001',owner:ids[0],code:'ABCDEF',lobby:{getMembers:()=>ids,getOwner:()=>ids[0]}};}
@@ -42,7 +43,10 @@ export function simulateSharedLink(bundle,{guests=3,durationMs=40000,rttMs=300,u
   if(index===0&&elapsed>=stallAtMs&&elapsed<stallAtMs+stallMs)return;
   let available=(index===0?(elapsed>=changeAtMs?afterBytesPerSecond:upBytesPerSecond):1000000)*ms/1000;
   while(available>0&&link.queue.length){const packet=link.queue[0],used=Math.min(available,packet.remaining);packet.remaining-=used;link.bytes-=used;available-=used;maxQueueAge=Math.max(maxQueueAge,clock.now-packet.enqueued);
-   if(packet.remaining<=.000001){link.queue.shift();const rtt=guestRtts?.[(index||packet.target)-1]??rttMs;propagation.push({...packet,at:clock.now+rtt/2});}}
+   if(packet.remaining<=.000001){link.queue.shift();const rtt=guestRtts?.[(index||packet.target)-1]??rttMs;const key=index+':'+packet.target;
+    const variation=jitterMs*(.5+.5*Math.sin(clock.now*.009));
+    const arrival=Math.max(lastDelivery.get(key)??0,clock.now+rtt/2+variation);
+    lastDelivery.set(key,arrival);propagation.push({...packet,at:arrival});}}
  };
  for(;clock.now<start+durationMs;clock.now+=8){
   if(clock.now>=nextState){nextState+=1000/60;seq++;
@@ -61,10 +65,11 @@ export function simulateSharedLink(bundle,{guests=3,durationMs=40000,rttMs=300,u
   for(const g of gateways)g.poll();
   let sum=0;for(let i=1;i<peers.length;i++){const peer=peers[i];if(!peer)continue;sum+=peer.inflightBytes;totals[i].peakFrames=Math.max(totals[i].peakFrames,peer.inflight.size);totals[i].peakBytes=Math.max(totals[i].peakBytes,peer.inflightBytes);}
   maxTotalFlightBytes=Math.max(maxTotalFlightBytes,sum);
+  if(trace&&clock.now>=nextTrace){nextTrace+=1000;samples.push({at:clock.now-start,queued:links[0].bytes,wireByOp:{...links[0].byOp},shared:host.snapshotBudget.diagnostics(),peers:peers.slice(1).map(p=>({window:p.snapshotWindow.limit,base:p.snapshotWindow.baseRtt,ack:p.ackMs,sent:p.sentStates,oldest:p.diagnostics().oldestAckMs,bytes:p.inflightBytes}))});}
  }
  const rows=totals.slice(1).map((t,index)=>{const steady=t.states.filter(s=>s.at>=durationMs-5000),healthy=t.states.filter(s=>s.at>=5000&&s.at<Math.min(changeAtMs,durationMs));
   return {index:index+1,states:t.states.length,steadyHz:steady.length/5,steadyAgeP95:quantile(steady.map(s=>s.age),.95),maxAge:quantile(t.states.map(s=>s.age),1),healthyAgeP95:quantile(healthy.map(s=>s.age),.95),maxPongAge:quantile(t.pongs.map(s=>s.age),1),inputs:t.inputs,coalesced:gateways[index+1].guestOutbound?.diagnostics().coalesced??null,peakFrames:t.peakFrames,peakBytes:t.peakBytes,decodeFailures:t.decodeFailures,transport:peers[index+1]?.diagnostics(),lastStateAt:t.states.at(-1)?.at??null};});
- const result={config:{guests,durationMs,rttMs,upBytesPerSecond,afterBytesPerSecond,changeAtMs,stallAtMs,stallMs,initialWindow,guestRtts,rotation},offeredStates:seq,budgetViolations,peers:rows,closes,logs,peakHostQueueBytes:links[0].peak,maxTotalFlightBytes,maxQueueAge,hostBytesSent:links[0].sent,remainingHostQueueBytes:links[0].bytes,sharedBudget:host.snapshotBudget?.diagnostics()??null};
+ const result={config:{guests,durationMs,rttMs,upBytesPerSecond,afterBytesPerSecond,changeAtMs,stallAtMs,stallMs,initialWindow,guestRtts,rotation,jitterMs},samples,offeredStates:seq,budgetViolations,peers:rows,closes,logs,peakHostQueueBytes:links[0].peak,maxTotalFlightBytes,maxQueueAge,hostBytesSent:links[0].sent,remainingHostQueueBytes:links[0].bytes,sharedBudget:host.snapshotBudget?.diagnostics()??null};
  for(const gateway of gateways)gateway.wss.close();
  return result;
 }

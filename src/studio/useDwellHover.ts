@@ -9,8 +9,10 @@ export const DWELL_LEAVE_MS = 180;
 export type HoverAnchor = HTMLElement | SVGElement;
 type Anchor = { id: string; anchor: HoverAnchor };
 
-/** Shared B interaction for refit information, equipment and nested terms. */
-export function useDwellHover({ ownerId: parentOwner, depth = 0, enabled = true, enterableOnShow = false }: { ownerId?: string; depth?: number; enabled?: boolean; enterableOnShow?: boolean } = {}) {
+/** Shared B interaction for refit information, equipment and nested terms.
+ * Linked descendants inherit enterability from the locked parent instead of requiring
+ * another lock delay on every level; standalone readers retain the normal dwell timer. */
+export function useDwellHover({ ownerId: parentOwner, depth = 0, enabled = true, enterableOnShow = parentOwner !== undefined }: { ownerId?: string; depth?: number; enabled?: boolean; enterableOnShow?: boolean } = {}) {
   const tooltipId = useId(), ownerId = parentOwner ?? tooltipId;
   const [active, setActive] = useState<Anchor | null>(null);
   const [locked, setLocked] = useState(false);

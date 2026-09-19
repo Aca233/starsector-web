@@ -5,6 +5,7 @@
  */
 import { assetResolver } from '../assets/AssetResolver';
 import { soundPaths, soundVariants, soundBankRevision } from './SoundBank';
+import { getAudioSettings, subscribeAudioSettings, updateAudioSettings, type AudioChannel } from './AudioSettings';
 type SoundVariant = { bufferKey: string; pitch: number; volume: number };
 
 export class SoundManager {
@@ -16,7 +17,7 @@ export class SoundManager {
   private preloadPromise: Promise<void> | null = null;
   private loadingBuffers: Map<string, Promise<AudioBuffer | null>> = new Map();
 
-  // 循环音效源 (冲刺推进 / 堡垒护盾 / 战役背景乐)
+  // 循环音效源 (冲刺推进 / 堡垒护盾)
   private sampleLoads = new Map<string, Promise<AudioBuffer | null>>();
   private loopingSources: Map<string, AudioBufferSourceNode> = new Map();
   private lastPlayTimes: Map<string, number> = new Map();
@@ -27,8 +28,40 @@ export class SoundManager {
   private masterGain: GainNode | null = null;
   private masterFilter: BiquadFilterNode | null = null;
   private isMuffled = false;
+  private channelGains: Partial<Record<AudioChannel, GainNode>> = {};
 
-  private constructor() {}
+  private constructor() {
+    subscribeAudioSettings(() => this.applyMixerSettings());
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => this.applyMixerSettings());
+  }
+
+  /** Route imported/mod sounds using their actual sample path, not a fragile key allowlist. */
+  private channelFor(key: string): AudioChannel {
+    return /(?:^|[\\/])sfx_interface[\\/]/i.test(this.SOUND_MAP[key] ?? '') ? 'interface' : 'effects';
+  }
+
+  private outputMuted(): boolean {
+    const settings = getAudioSettings();
+    return this.getMuted() || (settings.muteInBackground && typeof document !== 'undefined' && document.hidden);
+  }
+
+  private canHear(channel: AudioChannel): boolean {
+    const settings = getAudioSettings();
+    return !this.outputMuted() && settings.masterVolume > 0 && settings[channel === 'effects' ? 'effectsVolume' : 'interfaceVolume'] > 0;
+  }
+
+  private applyMixerSettings(immediate = false): void {
+    if (!this.ctx || !this.masterGain) return;
+    const settings = getAudioSettings();
+    const set = (node: GainNode | undefined, value: number) => {
+      if (!node) return;
+      if (immediate) node.gain.value = value;
+      else node.gain.setTargetAtTime(value, this.ctx!.currentTime, 0.015);
+    };
+    set(this.masterGain, this.outputMuted() ? 0 : settings.masterVolume);
+    set(this.channelGains.effects, settings.effectsVolume);
+    set(this.channelGains.interface, settings.interfaceVolume);
+  }
 
   /** Select actual sounds.json variants, not generic pitch jitter or substitute samples. */
   private shotVariant(key: string): SoundVariant {
@@ -53,16 +86,21 @@ export class SoundManager {
         this.ctx = new AudioCtx();
         // 创建主混音总线与动态低通滤波 (用于过载/排能低沉静默音效)
         this.masterGain = this.ctx.createGain();
-        this.masterGain.gain.value = this.isMuted ? 0 : 1;
+        this.channelGains.effects = this.ctx.createGain();
+        this.channelGains.interface = this.ctx.createGain();
         this.masterFilter = this.ctx.createBiquadFilter();
         this.masterFilter.type = 'lowpass';
         this.masterFilter.frequency.value = 22000; // 默认全频放开
-        this.masterGain.connect(this.masterFilter);
-        this.masterFilter.connect(this.ctx.destination);
+        // Only combat effects are muffled; UI warnings remain intelligible.
+        this.channelGains.effects.connect(this.masterFilter);
+        this.masterFilter.connect(this.masterGain);
+        this.channelGains.interface.connect(this.masterGain);
+        this.masterGain.connect(this.ctx.destination);
+        this.applyMixerSettings(true);
       }
     }
     if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume();
+      void this.ctx.resume().catch(() => { /* Retry at the next user gesture. */ });
     }
   }
 
@@ -128,24 +166,27 @@ export class SoundManager {
   }
 
   private playOneShot(key: string, volume: number, playbackRate: number, pan?: number) {
-    if (this.isMuted) return;
+    const channel = this.channelFor(key);
+    if (!this.canHear(channel)) return;
     this.initContext();
     if (!this.ctx) return;
     const variant = this.shotVariant(key);
     const emit = (buffer: AudioBuffer | null) => {
-      if (!buffer || !this.ctx || this.isMuted) return;
+      if (!buffer || !this.ctx || !this.canHear(channel)) return;
       const source = this.ctx.createBufferSource();
       source.buffer = buffer;
       source.playbackRate.value = playbackRate * variant.pitch;
       const gain = this.ctx.createGain();
       gain.gain.value = volume * variant.volume;
+      let panner: StereoPannerNode | undefined;
       if (pan !== undefined && this.ctx.createStereoPanner) {
-        const panner = this.ctx.createStereoPanner();
+        panner = this.ctx.createStereoPanner();
         panner.pan.value = pan;
         source.connect(panner);
         panner.connect(gain);
       } else source.connect(gain);
-      gain.connect(this.masterGain ?? this.ctx.destination);
+      gain.connect(this.channelGains[channel] ?? this.ctx.destination);
+      source.onended = () => { source.disconnect(); panner?.disconnect(); gain.disconnect(); };
       source.start(0);
     };
     const buffer = this.audioBuffers.get(variant.bufferKey);
@@ -189,7 +230,8 @@ export class SoundManager {
    * 播放循环音效 (如冲刺推进持续轰鸣 / 堡垒护盾蜂鸣)
    */
   public startLoop(key: string, volume = 0.6) {
-    if (this.isMuted || this.loopingSources.has(key)) return;
+    // Keep loop transport alive while silent, so unmuting never loses a sustained sound.
+    if (this.loopingSources.has(key)) return;
     this.initContext();
     if (!this.ctx) return;
 
@@ -209,11 +251,8 @@ export class SoundManager {
     gainNode.gain.value = volume * (soundVariants(key) ? variant.volume : 1);
 
     source.connect(gainNode);
-    if (this.masterGain) {
-      gainNode.connect(this.masterGain);
-    } else {
-      gainNode.connect(this.ctx.destination);
-    }
+    gainNode.connect(this.channelGains[this.channelFor(key)] ?? this.ctx.destination);
+    source.onended = () => { source.disconnect(); gainNode.disconnect(); };
     source.start(0);
 
     this.loopingSources.set(key, source);
@@ -231,25 +270,32 @@ export class SoundManager {
     }
   }
 
-  public getMuted(): boolean { return this.isMuted; }
+  /** Preview real samples through the same buses as gameplay; never bypass user mute. */
+  public async preview(channel: AudioChannel): Promise<boolean> {
+    if (!this.canHear(channel)) return false;
+    this.initContext();
+    if (!this.ctx) return false;
+    const key = channel === 'interface' ? 'ui_button_press' : 'heavyblaster_fire';
+    const buffer = await this.loadBuffer(key, this.SOUND_MAP[key]);
+    if (!buffer || !this.canHear(channel) || this.ctx.state !== 'running') return false;
+    this.play(key, 0.65, 1);
+    return true;
+  }
 
+  public getMuted(): boolean { return this.isMuted || getAudioSettings().muted; }
+
+  /** Runtime override for silent simulation workers; does not overwrite user preferences. */
   public setMuted(muted: boolean): void {
     this.isMuted = muted;
-    if (this.masterGain && this.ctx) {
-      try {
-        this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : 1, this.ctx.currentTime);
-      } catch {
-        this.masterGain.gain.value = this.isMuted ? 0 : 1;
-      }
-    }
-    if (this.isMuted) {
-      for (const key of Array.from(this.loopingSources.keys())) this.stopLoop(key);
-    }
+    this.applyMixerSettings();
   }
 
   public toggleMute(): boolean {
-    this.setMuted(!this.isMuted);
-    return this.isMuted;
+    const muted = !this.getMuted();
+    this.isMuted = false;
+    updateAudioSettings({ muted });
+    this.applyMixerSettings();
+    return muted;
   }
 }
 

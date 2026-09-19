@@ -1,4 +1,4 @@
-import { tacticalSystemIds, systemLoadoutErrors } from '../extensions/ship-systems/Loadout';
+import { defenseSystemId, tacticalSystemIds, systemLoadoutErrors } from '../extensions/ship-systems/Loadout';
 import { weaponFitsSlotType } from '../content/WeaponCompatibility';
 import { validateResources } from '../extensions/Dependencies';
 import { requireSound } from '../audio/SoundBank';
@@ -316,7 +316,7 @@ export function validateShipSpec(input: unknown, options: ShipValidationOptions 
   text(spec.systemType, id + '.systemType');
   const loadoutErrors = systemLoadoutErrors(spec as unknown as ShipSpec);
   if (loadoutErrors.length) throw new Error(id + ': ' + loadoutErrors.join('；'));
-  for (const systemId of [...tacticalSystemIds(spec as unknown as ShipSpec), spec.defenseSystemType ?? 'NONE']) {
+  for (const systemId of [...tacticalSystemIds(spec as unknown as ShipSpec), defenseSystemId(spec as unknown as ShipSpec)]) {
     const definition = shipSystemDefinitions.require(resolveSystemId(text(systemId, id + '.systems')), id);
     validateResources(definition.resources, requireAssets);
     for (const key of [definition.audio?.activate,definition.audio?.loop,definition.audio?.deactivate]) if (key !== undefined) requireSound(key, requireAssets);

@@ -115,7 +115,7 @@ export function useCombatLoop({
                 session.cameraController.observe(cameraPosRef.current, keysPressed.current, zoomRef.current, session.scheduler.renderDeltaTime, canObserve);
               } else {
                 session.cameraController.follow(cameraPosRef.current, targetCam, canvas, zoomRef.current, session.scheduler.renderDeltaTime,
-                  !inputBlockedRef.current && !engine.isTacticalMap && document.visibilityState === 'visible');
+                  !inputBlockedRef.current && !engine.isTacticalMap && document.visibilityState === 'visible', engine.playerShip);
               }
             }
             session.render(renderAlpha, cameraPosRef.current, zoomRef.current);

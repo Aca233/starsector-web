@@ -6,7 +6,7 @@ import { sound } from '../audio/SoundManager';
 
 /** Shared by local input, HUD, LAN authority and the Worker experiment. */
 export type ShipCommand =
-  | { kind: 'shield' | 'vent' | 'target' | 'recall' }
+  | { kind: 'shield' | 'hullShield' | 'vent' | 'target' | 'recall' }
   | { kind: 'system'; value?: number }
   | { kind: 'group' | 'mode' | 'autofire'; value: number };
 export interface CommandResult { accepted: boolean; reason?: string }
@@ -51,6 +51,7 @@ export function shipCommandFailure(ship: Ship, command: ShipCommand): string | u
     return system ? system.activationFailureReason : '该技能槽为空或不存在';
   }
   if (command.kind === 'vent') return ship.ventFailureReason;
+  if (command.kind === 'hullShield') return ship.hullShieldFailureReason;
   return ship.defenseFailureReason;
 }
 /** Aim is sampled at the command edge, not at the preceding simulation frame. */
@@ -72,6 +73,7 @@ export function dispatchShipCommand(ship: Ship, command: ShipCommand, aim?: Vect
     }
     case 'system': accepted = ship.getSystem(command.value ?? 0)!.activate(); break;
     case 'shield': accepted = ship.toggleDefense(); break;
+    case 'hullShield': accepted = ship.toggleHullShield(); break;
     case 'vent': accepted = ship.startVenting(); break;
     case 'group': ship.selectWeaponGroup(command.value); break;
     case 'mode': ship.toggleFireMode(command.value); break;

@@ -205,7 +205,7 @@ export class WorkerLabController {
       this.input.aim = [aim.x, aim.y];
       this.input.pointerActive = true;
     };
-    const mouseDown = (event: MouseEvent) => { this.canvas.focus(); move(event); if (event.button === 0) this.input.firing = true; if (event.button === 2) this.action('shield'); };
+    const mouseDown = (event: MouseEvent) => { this.canvas.focus(); move(event); if (event.button === 0) this.input.firing = true; if (event.button === 2) this.action(event.shiftKey ? 'hullShield' : 'shield'); };
     const mouseUp = () => { this.input.firing = false; };
     const leave = () => { this.input.pointerActive = false; this.input.firing = false; this.submitInput(); };
     const context = (event: Event) => event.preventDefault();

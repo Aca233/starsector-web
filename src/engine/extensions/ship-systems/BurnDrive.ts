@@ -7,6 +7,7 @@ export const burnDrive: ShipSystemDefinition = {
   visuals: { engineBoost: true },
   audio: { activate: 'burn_drive_activate', loop: 'burn_drive_loop', loopVolume: .65, deactivate: 'burn_drive_deactivate' },
   // BurnDriveStats.java / ship_systems.csv. OUT removes speed but retains acceleration.
+  statusText: system => system.isActive ? `推进中 · 航速 +${Math.round(system.state === 'OUT' ? 0 : 200 * system.effectLevel)}` : undefined,
   modifiers: system => ({ softFluxPerSecond: 1,
     speedFlat: system.state === 'OUT' ? 0 : 200 * system.effectLevel,
     accelerationFlat: system.state === 'OUT' ? 200 : 200 * system.effectLevel }),

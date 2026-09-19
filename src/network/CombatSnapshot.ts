@@ -1,3 +1,8 @@
+import { compactProjectileColumns, projectileColumnPlan } from "./ProjectileColumns";
+import { CombatFXSystem } from "../engine/simulation/systems/CombatFXSystem";
+import { explosionPuffRecipe, explosionPuffCount } from "../engine/visual/ExplosionPuffRecipe";
+import { EXPLOSION_PUFF_KEYS, ExplosionPuffDecoder, puffRecipeBudget, reservePuffRecipe } from "./ExplosionPuffCodec";
+import type { PuffRecipeBudget } from "./ExplosionPuffCodec";
 import { CombatEngine } from "../engine/simulation/CombatEngine";
 import { Ship } from "../engine/simulation/Ship";
 import { Vector2 } from "../engine/math/Vector2";
@@ -35,6 +40,10 @@ const SKIP = new Set([
 type Wire = any;
 /** Each snapshot carries its own field dictionary: reconnect never needs a baseline. */
 class SnapshotLayouts {
+  readonly puffBudget = puffRecipeBudget();
+  // Frame-owned, immutable wire marker; decoded viewer objects are never shared.
+  readonly absent = Object.freeze({ $undefined: 1 });
+  constructor(readonly compactPuffs = false, readonly compactProjectiles = false) {}
   readonly keys: string[][] = [];
   private byFirst = new Map<string, Map<number, number[]>>();
   record(keys: string[], values: Wire[]): Wire | null {
@@ -57,21 +66,23 @@ class SnapshotLayouts {
     return { $record: id, values };
   }
 }
-function snapshotLayouts(value: unknown): string[][] {
-  if (value === undefined) return [];
+interface DecodeLayouts { keys: string[][]; puffDecoder: ExplosionPuffDecoder; puffBudget: PuffRecipeBudget }
+function snapshotLayouts(value: unknown, puffDecoder: ExplosionPuffDecoder): DecodeLayouts {
+  if (value === undefined) value = [];
   if (!Array.isArray(value) || value.length > 1024) throw Error('Invalid snapshot layouts');
   for (const keys of value) {
     if (!Array.isArray(keys) || keys.length > 2048 || keys.some(key => typeof key !== 'string' || key.length > 256 || SKIP.has(key)) || new Set(keys).size !== keys.length)
       throw Error('Invalid snapshot layout keys');
   }
-  return value;
+  return { keys: value, puffDecoder, puffBudget: puffRecipeBudget() };
 }
 // Projection is path-scoped: an unrelated "cells"/"armor"/"healthTracker" is never filtered.
-enum CaptureProjection { None, Ship, World, Damage, WeaponControl, EngineControl, Weapons, Engines, Projectiles, Weapon, Engine, Projectile }
+enum CaptureProjection { None, Ship, World, Damage, WeaponControl, EngineControl, Weapons, Engines, Projectiles, Weapon, Engine, Projectile, FX, Explosions, Explosion, ExplosionPuffs }
 const capturePrototypes: object[] = [
   Object.prototype, Ship.prototype, Object.prototype, ShipDamageState.prototype,
   ShipWeaponControlSystem.prototype, EngineController.prototype, Array.prototype,
   Array.prototype, Array.prototype, Object.prototype, Object.prototype, Object.prototype,
+  CombatFXSystem.prototype, Array.prototype, Object.prototype, Array.prototype,
 ];
 // Full generic reads/recursion below are retained even for omitted fields, so
 // accessor scans are unnecessary. Only the path and exact prototype limit projection.
@@ -88,6 +99,13 @@ function captureChildProjection(projection: CaptureProjection, key: string): Cap
       break;
     case CaptureProjection.World:
       if (key === 'projectiles') return CaptureProjection.Projectiles;
+      if (key === 'fxSystem') return CaptureProjection.FX;
+      break;
+    case CaptureProjection.FX:
+      if (key === 'explosions') return CaptureProjection.Explosions;
+      break;
+    case CaptureProjection.Explosion:
+      if (key === 'puffs') return CaptureProjection.ExplosionPuffs;
       break;
     case CaptureProjection.WeaponControl:
       if (key === 'weapons') return CaptureProjection.Weapons;
@@ -111,12 +129,16 @@ function omitCapturedField(projection: CaptureProjection, key: string): boolean 
   }
 }
 function pack(value: any, seen: object[], refs: Map<string, Ship>, layouts: SnapshotLayouts, plain = false, projection = CaptureProjection.None): Wire {
-  if (value === undefined) return { $undefined: 1 };
+  if (value === undefined) return layouts.compactProjectiles ? layouts.absent : { $undefined: 1 };
   if (typeof value === "number" && !Number.isFinite(value)) return { $number: String(value) };
   if (value === null || typeof value !== "object") return typeof value === "function" ? { $undefined: 1 } : value;
   if (value instanceof Ship && !plain) { refs.set(value.id, value); return { $ship: value.id }; }
   if (value instanceof Vector2) return { $vector: [value.x, value.y] };
   if (ArrayBuffer.isView(value)) return { $typed: value.constructor.name, values: Array.from(value as any) };
+  if (projection === CaptureProjection.ExplosionPuffs && layouts.compactPuffs && Array.isArray(value)) {
+    const recipe = explosionPuffRecipe(value);
+    if (recipe && reservePuffRecipe(layouts.puffBudget, explosionPuffCount(recipe[1]))) return { $explosionPuffs: recipe };
+  }
   // Only ancestors can form a cycle. A short path stack avoids Set add/delete
   // churn for every record, while repeated non-cyclic references still expand.
   if (seen.includes(value)) return { $undefined: 1 };
@@ -127,12 +149,19 @@ function pack(value: any, seen: object[], refs: Map<string, Ship>, layouts: Snap
   else if (Array.isArray(value)) {
     const memberProjection = projection === CaptureProjection.Weapons ? CaptureProjection.Weapon
       : projection === CaptureProjection.Engines ? CaptureProjection.Engine
-      : projection === CaptureProjection.Projectiles ? CaptureProjection.Projectile : CaptureProjection.None;
+      : projection === CaptureProjection.Projectiles ? CaptureProjection.Projectile
+      : projection === CaptureProjection.Explosions ? CaptureProjection.Explosion : CaptureProjection.None;
     // Custom array classes/mappers retain their original generic traversal.
     const nativeMembers = memberProjection && Object.getPrototypeOf(value) === Array.prototype && !Object.hasOwn(value, 'map');
     const rows: Wire[] = nativeMembers
       ? value.map(v => pack(v, seen, refs, layouts, false, memberProjection))
       : value.map(v => pack(v, seen, refs, layouts));
+    // Factor identical fields before text/binary encoding, after all original
+    // getter/Proxy reads and Ship-reference discovery. No generic traversal is
+    // skipped or cached, and no temporal snapshot baseline is introduced.
+    const columns = projection === CaptureProjection.Projectiles && nativeMembers && layouts.compactProjectiles
+      ? compactProjectileColumns(rows, layouts.keys) : null;
+    if (columns) { seen.pop(); return columns; }
     const id = rows[0]?.$record;
     let shared = rows.length > 1 && Number.isInteger(id);
     if (shared) for (const row of rows) if (row?.$record !== id) { shared = false; break; }
@@ -193,7 +222,7 @@ const typed: Record<string, any> = {
 };
 /** Copy scalar record fields directly; only tagged/structured values need recursive decoding.
  * Keep the same depth budget even for primitives at the final level. */
-function unpackRecord(values: Wire[], keys: string[], output: any, ships: Map<string, Ship>, layouts: string[][], depth: number) {
+function unpackRecord(values: Wire[], keys: string[], output: any, ships: Map<string, Ship>, layouts: DecodeLayouts, depth: number) {
   for (let i = 0; i < keys.length; i++) {
     const key = keys[i], value = values[i], previous = output[key];
     if (depth > 64) throw Error("Snapshot nesting exceeds limit");
@@ -204,13 +233,13 @@ function unpack(
   value: Wire,
   target: any,
   ships: Map<string, Ship>,
-  layouts: string[][],
+  layouts: DecodeLayouts,
   depth = 0,
 ): any {
   if (depth > 64) throw Error("Snapshot nesting exceeds limit");
   if (value === null || typeof value !== "object") return value;
   if (Object.hasOwn(value, '$record')) {
-    const keys = Number.isInteger(value.$record) && value.$record >= 0 ? layouts[value.$record] : undefined;
+    const keys = Number.isInteger(value.$record) && value.$record >= 0 ? layouts.keys[value.$record] : undefined;
     if (!keys || !Array.isArray(value.values) || value.values.length !== keys.length) throw Error('Invalid snapshot record');
     const output = target && typeof target === 'object' && !Array.isArray(target) ? target : {};
     unpackRecord(value.values, keys, output, ships, layouts, depth + 1);
@@ -278,7 +307,7 @@ function unpack(
   // Batch detection comes after vectors/typed values: hot scalar records do not
   // pay another marker lookup for every coordinate in a particle trail.
   if (Object.hasOwn(value, '$records')) {
-    const keys = Number.isInteger(value.$records) && value.$records >= 0 ? layouts[value.$records] : undefined;
+    const keys = Number.isInteger(value.$records) && value.$records >= 0 ? layouts.keys[value.$records] : undefined;
     if (!keys || !Array.isArray(value.values)) throw Error('Invalid snapshot records');
     const rows = value.values;
     if (rows.length && depth + 1 > 64) throw Error("Snapshot nesting exceeds limit");
@@ -294,6 +323,21 @@ function unpack(
     output.length = rows.length;
     return output;
   }
+  // Like batched records, recipes are cold relative to vector decoding.
+  if (Object.hasOwn(value, '$explosionPuffs')) {
+    if (Object.keys(value).length !== 1) throw Error('Invalid explosion puff envelope');
+    const rows = layouts.puffDecoder.expand(value.$explosionPuffs, layouts.puffBudget);
+    if (depth + 2 > 64) throw Error('Snapshot nesting exceeds limit');
+    const output = Array.isArray(target) ? target : [];
+    for (let row = 0; row < rows.length; row++) {
+      const previous = output[row];
+      const record = previous && typeof previous === 'object' && !Array.isArray(previous) ? previous : {};
+      unpackRecord(rows[row] as Wire[], EXPLOSION_PUFF_KEYS, record, ships, layouts, depth + 2);
+      output[row] = record;
+    }
+    output.length = rows.length;
+    return output;
+  }
   const output =
     target && typeof target === "object" && !Array.isArray(target)
       ? target
@@ -304,6 +348,26 @@ function unpack(
     if (depth >= 64) throw Error("Snapshot nesting exceeds limit");
     output[k] = v === null || typeof v !== 'object' ? v : unpack(v, previous, ships, layouts, depth + 1);
   }
+  return output;
+}
+/** Direct restoration: retain row/field write order and viewer-owned nested
+ * objects, even for fields stored only once on the wire. Never alias templates
+ * into the engine or assume a renderer/mod has not changed a prior value. */
+function unpackProjectileColumns(value: Wire, target: any, ships: Map<string, Ship>, layouts: DecodeLayouts): any[] {
+  const plan = projectileColumnPlan(value, layouts.keys);
+  const output = Array.isArray(target) ? target : [];
+  for (let i = 0; i < plan.rows.length; i++) {
+    const row = plan.rows[i], previous = output[i];
+    if (!Array.isArray(row)) { output[i] = unpack(row, previous, ships, layouts, 1); continue; }
+    const template = plan.templates[row[0]];
+    const record = previous && typeof previous === 'object' && !Array.isArray(previous) ? previous : {};
+    for (let col = 0; col < template.keys.length; col++) {
+      const key = template.keys[col], item = template.dynamic[col] ? row[template.dynamic[col]] : template.fixed[col], prior = record[key];
+      record[key] = item === null || typeof item !== 'object' ? item : unpack(item, prior, ships, layouts, 2);
+    }
+    output[i] = record;
+  }
+  output.length = plan.rows.length;
   return output;
 }
 export interface CombatSound {
@@ -353,6 +417,8 @@ export function captureCombat(
   acknowledged: Record<Seat, number>,
   simulationMs: number,
   localContrails = false,
+  compactPuffs = false,
+  compactProjectiles = false,
 ): CombatSnapshot {
   const world: Record<string, unknown> = {};
   // Ribbons are client cosmetics in LAN. Keep the default projection available
@@ -360,7 +426,7 @@ export function captureCombat(
   for (const k of WORLD_KEYS) if (k !== 'contrailEngine' || !localContrails) world[k] = engine[k];
   const capitals = new Set(engine.allCapitalShips);
   const refs = new Map(engine.ships.map(ship => [ship.id, ship]));
-  const layouts = new SnapshotLayouts();
+  const layouts = new SnapshotLayouts(compactPuffs, compactProjectiles);
   // Root ship/world fields remain named for server validation and playback clocks.
   // Enumerate ship roots directly; nested Ship values still become references.
   const project = (value: unknown, projection = CaptureProjection.Ship) => pack(value, [], refs, layouts, true, projection);
@@ -389,6 +455,7 @@ export function captureCombat(
   }
   return {tick,acknowledged,simulationMs,ships,crafts,craftSpecs,layouts:layouts.keys,world:projectedWorld, ...(engine.deployment.enabled ? {deployment:engine.deployment.snapshot()} : {})};
 }
+const puffDecoders = new WeakMap<CombatEngine, ExplosionPuffDecoder>();
 const displayCrafts = new WeakMap<CombatEngine, Map<string, Ship>>();
 const validatedSpecs = new WeakMap<CombatEngine, Set<string>>();
 const displayTicks = new WeakMap<CombatEngine, number>();
@@ -468,7 +535,9 @@ function restoreCombatSnapshot(
     throw Error("Invalid combat snapshot");
   if (!Array.isArray(frame.crafts) || !Array.isArray(frame.craftSpecs))
     throw Error('Invalid dynamic craft snapshot');
-  const layouts = snapshotLayouts(frame.layouts);
+  let puffDecoder = puffDecoders.get(engine);
+  if (!puffDecoder) { puffDecoder = new ExplosionPuffDecoder(); puffDecoders.set(engine, puffDecoder); }
+  const layouts = snapshotLayouts(frame.layouts, puffDecoder);
   const previousTick = displayTicks.get(engine);
   const continuous = !resetInterpolation && previousTick !== undefined && frame.tick > previousTick && frame.tick - previousTick <= 60;
   // Arrays are unpacked/reused by index, but projectiles are identified by ID.
@@ -515,16 +584,19 @@ function restoreCombatSnapshot(
     if (!ship) throw Error("Unknown ship");
     const wasReserve=engine.deployment.isReserve(ship.id);
     const pos = ship.pos.clone(),
-      angle = ship.facingRad;
+      angle = ship.facingRad,
+      teleportSequence = ship.teleportSequence;
     unpack(row.state, ship, ships, layouts);
-    const snap = !continuous || wasReserve || (!(capitalSet ? capitalSet.has(ship) : engine.allCapitalShips.includes(ship)) && !previous.has(ship.id));
+    const snap = !continuous || wasReserve || ship.teleportSequence !== teleportSequence || (!(capitalSet ? capitalSet.has(ship) : engine.allCapitalShips.includes(ship)) && !previous.has(ship.id));
     ship.prevPos = snap ? ship.pos.clone() : pos;
     ship.prevFacingRad = snap ? ship.facingRad : angle;
   }
   // Only permit presentation fields, never methods or subsystem ownership from the wire.
   for (const key of WORLD_KEYS)
     if (Object.hasOwn(frame.world, key))
-      (engine as any)[key] = unpack(frame.world[key], engine[key], ships, layouts);
+      (engine as any)[key] = key === "projectiles" && frame.world[key] && Object.hasOwn(frame.world[key], "$projectileColumns")
+        ? unpackProjectileColumns(frame.world[key], engine[key], ships, layouts)
+        : unpack(frame.world[key], engine[key], ships, layouts);
   for (const p of engine.projectiles) {
     const prior = projectilePoses.get(p.id);
     p.prevPos = prior?.pos ?? p.pos.clone();

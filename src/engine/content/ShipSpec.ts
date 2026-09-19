@@ -110,6 +110,8 @@ export interface ShipSpec {
   systemTypes?: ShipSystemType[];
   /** Independent right-button defense slot; phase cloak is still owned by Shield. */
   defenseSystemType?: ShipSystemType;
+  /** Absent inherits native defense; NONE uses hull shield/phase; otherwise a right-click skill. */
+  rightClickSystemType?: ShipSystemType;
   weaponSlots: WeaponMountSlotConfig[];
   /** Dedicated native SYSTEM launchers, never ordinary refit weapon slots. */
   systemWeaponSlots?: WeaponMountSlotConfig[];

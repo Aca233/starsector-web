@@ -246,3 +246,14 @@
 - 安装版已同步匹配的 backend、app.asar 和 app.asar.unpacked，未改 EXE 运行时、用户配置或存档。原资源备份：artifacts/installed-hover-backup-20260919110905740；更新记录：artifacts/installed-hover-update-latest.json。
 - 再次启动真实安装路径 EXE，用隔离 profile（预置旧 LAN mode）验证普通启动仍为主菜单；增援刚出现就移入保持、移出收起、勾选保留，明确点“部署友军”才从 reserve 变为 deployed，pageerror为0。所有临时验证 EXE / 浏览器已关闭。
 - 已将本任务自己的3005预览服务切换至验证成品 backend/dist。/lan/info 和 /lan-build.json 均为 build `2026-09-19T03:02:40.587Z`，protocol25；仅绑定127.0.0.1。浏览器刷新与安装版重开后均使用新版。
+
+
+## 截图复查：嵌套说明继承可移入状态（2026-09-19）
+
+- 用户截图对应模拟增援的低科轨道空间站配装窗。按730×776复现：外层选择窗 locked=true，但配装行的资料卡首次显示 locked=false；立即移入资料卡后内外两层均消失。上一轮只修了选择窗，漏掉内层重新等待650ms的问题。
+- `useDwellHover` 在提供共享 ownerId 时默认继承可移入状态；调用方仍要求父卡已锁定才允许显示子卡。资料、装备、术语整条链不再每层重复等待，独立根说明仍保留原220ms显示/650ms停留计时。移出、方向性跨隙保护、Esc和显式选择/部署语义未改。
+- 按截图尺寸验证空间站：资料卡首次出现即locked=true，立即移入保持；插件子卡同样可移入，深度-1/0/1均保持；移出整组清空全部层，已选敌军1艘/+50DP保留。独立方案根卡首次false，停留后true，原交互未退化。无pageerror。
+- lint、TypeScript和生产构建通过；未增加测试文件。构建/打包版本0.2.2沿用工作区当前版本，未自行改版本号，protocol25/60Hz未变。
+- 检测到用户关闭已安装EXE后，替换匹配的backend、app.asar、app.asar.unpacked；保留用户配置和存档及同版EXE运行时。备份：artifacts/installed-nested-dwell-backup-20260919162617289；更新报告：artifacts/installed-nested-dwell-update-latest.json。
+- 实际安装路径EXE用隔离profile再次验证：空间站资料首次即locked=true，鼠标直接进入后内外2层均保持，移出整组关闭，pageerror为0。测试禁用仅该隐藏验证窗口的后台节流；没有改生产设置。测试EXE已关闭。
+- 3005已切到匹配的打包backend，前后端build均为2026-09-19T08:12:25.912Z，仅监听127.0.0.1。独立53647验证服务已关闭。

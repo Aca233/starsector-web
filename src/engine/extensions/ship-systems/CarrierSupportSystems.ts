@@ -19,7 +19,7 @@ export const reserveWing = nativeSystem('reservewing', {
 export const targetingFeed = nativeSystem('targetingfeed', {
   installReason: needsWings,
   description: '本舰所属战机和轰炸机的武器伤害随系统展开程度提高，完全生效时 +50%；持续20秒。不强化航母自身或其他航母的舰载机。',
-  implementationDetails: '原版 TargetingFeedStats、CSV 0.5/20/0.5秒阶段、10秒冷却、基础容量50%使用消耗；按真实母舰归属动态作用于弹体和持续光束。新补充舰载机同样生效，退出或母舰战沉后撤除。不包含原版专用抖动特效。',
+  implementationDetails: '原版 TargetingFeedStats、CSV 0.5/20/0.5秒阶段、10秒冷却、基础容量50%使用消耗；按真实母舰归属动态作用于弹体和持续光束。新补充舰载机同样生效，退出或母舰战沉后撤除。武器辉光与舰体抖动作用于所属战机，而非航母；动态抖动范围采用 Web 近似。',
   modifiers: system => ({ fighterDamageMultiplier: 1 + .5 * system.effectLevel }),
   advanceAI: ({ship, target, system = ship.system, tactical}) => {
     if (system.isActive || !system.available || ship.isDead || target.isDead || tactical?.waypoint) return;

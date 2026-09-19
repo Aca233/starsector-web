@@ -16,7 +16,7 @@ export interface RendererResourceStats {
 export interface ICombatRenderer {
   prepareAssets(engine?: CombatEngine): Promise<void>;
   updateVisual(engine: CombatEngine, dt: number, frame: RenderFrameContext): void;
-  render(engine: CombatEngine, alpha: number, cameraPos: Vector2, zoom: number, frame: RenderFrameContext): void;
+  render(engine: CombatEngine, alpha: number, cameraPos: Vector2, zoom: number, frame: RenderFrameContext): boolean;
   getResourceStats(): RendererResourceStats;
   resetVisualState(): void;
   dispose(): void;

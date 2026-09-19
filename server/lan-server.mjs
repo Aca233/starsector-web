@@ -1,4 +1,7 @@
+import { acceptAuthorityPerformance, countSnapshotStage, snapshotPipelineMetrics } from "./SnapshotPipelineMetrics.mjs";
+import { LanDeltaSender, lanDeltaTarget } from "./LanDeltaTransport.mjs";
 import { LanStateCredits } from "./LanStateCredits.mjs";
+import { createLanFlowMetrics, lanTransportMetrics } from "./LanTransportDiagnostics.mjs";
 import { teamName, checkFleetBudget, editAiFleet } from "../src/network/room-fleet.mjs";
 import { MAX_BATTLE_REPORT_BYTES, validateBattleReport } from "../src/network/battle-report.mjs";
 import { summarizeCombatFrame, reusableStateText } from "./lan-state.mjs";
@@ -178,9 +181,25 @@ export async function createLanServer({
     return true;
   };
   const send = (p, message) => sendEncoded(p, JSON.stringify(message));
+  const probeLanPeer = p => {
+    if (!p.stateCredits || p.transport || p.nativeProbe || !connected(p)) return;
+    const data = randomBytes(12), token = p.stateCredits.beginNetworkProbe();
+    // Large non-state control messages can also be ahead of this ping. Still
+    // send the heartbeat, but do not learn a larger baseline from that queue.
+    if (p.ws.bufferedAmount > 0) token.idle = false;
+    p.nativeProbe = { data, at: performance.now(), token };
+    p.ws.ping(data);
+  };
   const broadcast = (r, message, except, encoded) => {
     // Encode lazily, once per broadcast; validated host states can reuse their text.
-    for (const p of r.peers) {
+    let deltaTarget;
+    let recipients = r.peers;
+    if (message.type === "state" && r.peers.some(p => p.lanDelta)) {
+      const start = (r.deltaRotation ?? 0) % r.peers.length;
+      recipients = r.peers.slice(start).concat(r.peers.slice(0, start));
+      r.deltaRotation = start + 1;
+    }
+    for (const p of recipients) {
       if (p === except || !connected(p)) continue;
       // Snapshots are replaceable. Do not queue stale views behind a slow receiver.
       if (message.type === "state") {
@@ -192,15 +211,36 @@ export async function createLanServer({
         // replaceable state instead of accumulating stale megabyte snapshots.
         // Steam uses ACK-based bounded pipeline credit; ordinary WebSockets keep
         // their existing zero-buffer policy. This does not change simulation Hz.
-        if (p.ws.snapshotWritable === false || (p.ws.snapshotWritable === undefined && p.ws.bufferedAmount > 0)) continue;
+        if (p.ws.snapshotWritable === false || (p.ws.snapshotWritable === undefined && p.ws.bufferedAmount > 0)) {
+          if (p.lanFlow) p.lanFlow.skippedSocket++;
+          countSnapshotStage(p, "skippedSocket");
+          continue;
+        }
       }
       encoded ??= JSON.stringify(message);
       // TCP receipt does not prove that the guest renderer consumed the frame.
       // This gates only replaceable, not-yet-sent states; never input/control.
       // No stale payload is retained or retried after a terminal message.
       if (message.type === "state" && p.stateCredits &&
-          !p.stateCredits.reserve(message.seq, Buffer.byteLength(encoded))) continue;
-      sendEncoded(p, encoded);
+          !p.stateCredits.reserve(message.seq, Buffer.byteLength(encoded))) {
+        if (p.lanFlow) p.lanFlow.skippedCredit++;
+        countSnapshotStage(p, "skippedCredit");
+        continue;
+      }
+      let delivery = encoded, choice = null;
+      if (message.type === "state" && p.lanDelta) {
+        if (ArrayBuffer.isView(encoded)) deltaTarget ??= lanDeltaTarget(encoded, message.seq);
+        if (deltaTarget) { choice = p.lanDelta.prepare(deltaTarget); delivery = choice.packet; }
+        else p.lanDelta.reset(); // JSON/small/oversized fallback establishes no delta base.
+      }
+      const sent = sendEncoded(p, delivery);
+      if (sent && choice) p.lanDelta.commit(choice);
+      if (sent && message.type === "state") countSnapshotStage(p, "queued");
+      if (sent && message.type === "state" && p.lanFlow) {
+        p.lanFlow.sent++;
+        p.lanFlow.lastBytes = Buffer.byteLength(encoded);
+        p.lanFlow.lastSeq = message.seq;
+      }
     }
   };
   const view = (r) => ({
@@ -258,6 +298,7 @@ export async function createLanServer({
   // be applied and acknowledged with this connection's epoch first.
   const beginSync = (r, p) => {
     p.stateCredits?.reset();
+    p.lanDelta?.reset();
     p.loaded = false;
     p.sync = { id: randomUUID(), tick: Math.max(0, r.lastTick + 1), since: Date.now() };
     presence(r, p, false);
@@ -273,6 +314,7 @@ export async function createLanServer({
   };
   const leave = (p, reason = "玩家在加载期间离开，请重新准备。") => {
     p.stateCredits?.reset();
+    p.lanDelta?.reset();
     const r = p.room;
     if (!r) return;
     p.room = null;
@@ -387,6 +429,8 @@ export async function createLanServer({
       lastResync: 0,
       background: false,
       stateCredits: null,
+      lanFlow: null,
+      lanDelta: null,
       nativeProbe: null,
     };
     peers.add(p);
@@ -394,7 +438,7 @@ export async function createLanServer({
       if (p.ws !== ws) return;
       p.lastPong = Date.now();
       if (p.stateCredits && p.nativeProbe && Buffer.isBuffer(data) && data.equals(p.nativeProbe.data)) {
-        p.stateCredits.recordNetworkRtt(performance.now() - p.nativeProbe.at);
+        p.stateCredits.recordNetworkRtt(performance.now() - p.nativeProbe.at, p.nativeProbe.token);
         p.nativeProbe = null;
       }
     });
@@ -404,6 +448,7 @@ export async function createLanServer({
       peers.delete(p);
       if (!p.hello) return;
       p.stateCredits?.reset();
+      p.lanDelta?.reset();
       p.nativeProbe = null;
       p.disconnected = Date.now();
       p.ready = false;
@@ -436,12 +481,13 @@ export async function createLanServer({
             p.room && p.room.hostId !== p.id) {
           try { receipt = JSON.parse(raw.toString()); } catch { /* counted below */ }
           if (receipt?.type === "state-consumed" && receipt.matchId === p.room.match?.id &&
-              p.stateCredits.ack(receipt.seq)) return;
+              p.stateCredits.ack(receipt.seq)) { p.lanDelta?.ack(receipt.seq); countSnapshotStage(p, "consumed"); return; }
         }
         if (++p.count > 160) {
           ws.close(1008, "Rate limit");
           return;
         }
+        const decodeStarted = performance.now();
         const text = binary ? null : raw.toString();
         const m = receipt ?? (binary ? decodeBinaryState(raw) : JSON.parse(text));
         if (!m || typeof m.type !== "string") throw Error("无效消息");
@@ -531,10 +577,15 @@ export async function createLanServer({
           p.hello = true;
           // Explicit LAN-only capability. Steam has its own transport ACK windows.
           p.stateCredits = !p.transport && m.stateCredits === 1 ? new LanStateCredits({maxBytes:protocol.maxSnapshotBytes*2}) : null;
+          p.lanFlow = p.stateCredits ? createLanFlowMetrics() : null;
+          // Remote LAN only: loopback never gains codec CPU work, Steam stays on
+          // its own transport. Both sides must explicitly negotiate the feature.
+          p.lanDelta = p.stateCredits && m.binaryDelta === 1 && ws.extensions?.includes("permessage-deflate") ? new LanDeltaSender() : null;
           p.nativeProbe = null;
           send(p, {
             type: "welcome",
             ...(p.stateCredits ? {stateCredits:1} : {}),
+            ...(p.lanDelta ? {binaryDelta:1} : {}),
             id: p.id,
             resumeToken: p.token,
             resumed,
@@ -543,6 +594,7 @@ export async function createLanServer({
             actionId: p.action,
             reconnectMs: protocol.reconnectMs,
           });
+          probeLanPeer(p);
           if (p.room) {
             const r = p.room;
             if (r.hostId === p.id) r.recoveryUntil = Math.min(now + 3000, r.lastState + protocol.reconnectMs);
@@ -573,19 +625,22 @@ export async function createLanServer({
             const r = p.room;
             r.recoveryUntil = Math.min(now + protocol.hostStateTimeoutMs, r.lastState + protocol.backgroundGraceMs);
           }
-          if (p.background !== m.hidden) p.stateCredits?.reset();
+          if (p.background !== m.hidden) { p.stateCredits?.reset(); p.lanDelta?.reset(); }
           p.background = m.hidden;
           return;
         }
         if (m.type === "ping") {
-          send(p, { type: "pong", sent: m.sent });
+          acceptAuthorityPerformance(p, m.authority);
+          const snapshotPipeline = snapshotPipelineMetrics(p);
+          const lanTransport = lanTransportMetrics(p);
+          send(p, { type: "pong", sent: m.sent, ...(lanTransport ? { lanTransport } : {}), ...(snapshotPipeline ? { snapshotPipeline } : {}) });
           return;
         }
         if (m.type === "state-consumed") {
           // Exact sent-sequence validation is inside the window. A stale socket,
           // old match, host ACK or forged/future sequence cannot create credit.
           if (p.stateCredits && p.room && p.room.hostId !== p.id &&
-              m.matchId === p.room.match?.id) p.stateCredits.ack(m.seq);
+              m.matchId === p.room.match?.id && p.stateCredits.ack(m.seq)) { p.lanDelta?.ack(m.seq); countSnapshotStage(p, "consumed"); }
           return;
         }
         if (m.type === "leave") {
@@ -955,6 +1010,7 @@ export async function createLanServer({
               a.id < 0 ||
               ![
                 "shield",
+                "hullShield",
                 "target",
                 "recall",
                 "vent",
@@ -997,6 +1053,12 @@ export async function createLanServer({
           if (!Number.isSafeInteger(m.seq) || m.seq <= r.lastSeq) return;
           const f = m.frame;
           const summary = summarizeCombatFrame(f, expectedShips(r), r.lastTick);
+          if (p.lanFlow) {
+            p.lanFlow.received++;
+            p.lanFlow.lastReceivedBytes = raw.length;
+            p.lanFlow.lastReceiveMs = performance.now() - decodeStarted;
+          }
+          countSnapshotStage(p, "received");
           r.lastSeq = m.seq;
           r.lastTick = f.tick;
           r.lastState = now;
@@ -1050,11 +1112,7 @@ export async function createLanServer({
         continue;
       }
       if (p.stateCredits && !p.transport && p.ws.readyState === WebSocket.OPEN) {
-        if (!p.nativeProbe) {
-          const data = randomBytes(12);
-          p.nativeProbe = { data, at: performance.now() };
-          p.ws.ping(data);
-        }
+        probeLanPeer(p);
       } else p.ws.ping();
     }
     for (const [token, p] of sessions) {

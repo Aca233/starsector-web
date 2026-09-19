@@ -1,3 +1,4 @@
+import { getGraphicsSettings } from '../../../runtime/GraphicsSettings';
 import { nativeMineSpec } from '../../../extensions/NativeMines';
 import { visualRandom, visualObjectRandom } from '../../RenderDeterminism';
 import { CombatEngine } from '../../../simulation/CombatEngine';
@@ -31,6 +32,8 @@ export class WebGLFXPass {
     const { batcher, textures, shieldShader, hitGlowTex, whiteTex } = ctx;
     const renderShieldLayer = layers.shield;
     const renderExplosionLayer = layers.explosion;
+    // Cosmetic only: never suppress projectiles, mines, shields, EMP arcs or explosion cores.
+    const detail = getGraphicsSettings().detailedParticles;
 
     // 1. 绘制折跃空间水雷 (Spatial Mines)
     if (renderExplosionLayer && engine.mines.length > 0) {
@@ -147,7 +150,7 @@ export class WebGLFXPass {
     }
 
     // 6. 通用现代粒子层：按材质分组以减少纹理/Blend 切换，并让火花、辉光、烟尘拥有不同的形状语义。
-    if (renderExplosionLayer && engine.particles && engine.particles.length > 0) {
+    if (detail && renderExplosionLayer && engine.particles && engine.particles.length > 0) {
       const sparkTex = textures.getTexture('/game-assets/graphics/fx/particlealpha32sq.png');
       const smokeTex = textures.getTexture('/game-assets/graphics/fx/contrail64b.png');
 
@@ -190,7 +193,7 @@ export class WebGLFXPass {
     }
 
     // 6.5 绘制战损青烟与尾迹扩散云团 (Contrails & Smoke Puffs: 1:1 contrail64b.png 柔和带旋转烟雾)
-    if (renderExplosionLayer && engine.contrails && engine.contrails.length > 0) {
+    if (detail && renderExplosionLayer && engine.contrails && engine.contrails.length > 0) {
       const smokeTex = textures.getTexture('/game-assets/graphics/fx/contrail64b.png');
       for (const c of engine.contrails) {
         const progress = Math.min(1.0, c.life / c.maxLife);
@@ -374,7 +377,7 @@ export class WebGLFXPass {
     }
 
     // 8. 绘制金属装甲战损碎片 (1:1 DebrisParticleSystem.java: 正方形真实金属破片贴图与熔融火光)
-    if (renderExplosionLayer && engine.debris && engine.debris.length > 0) {
+    if (detail && renderExplosionLayer && engine.debris && engine.debris.length > 0) {
       for (const d of engine.debris) {
         const alphaVal = Math.min(1.0, Math.max(0, d.life / (d.maxLife * 0.35)));
         if (alphaVal <= 0.01) continue;

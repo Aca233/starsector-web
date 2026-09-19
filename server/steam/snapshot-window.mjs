@@ -7,6 +7,7 @@ export const MAX_SNAPSHOT_WINDOW = 32;
 export class SnapshotSendWindow {
   constructor() {
     this.limit = INITIAL_SNAPSHOT_WINDOW;
+    this.recentRtts = []; this.queueRtt = null; this.jitterUntil = -Infinity; this.jitterAllowance = 0;
     this.baseRtt = null;
     this.samples = [];
     this.roundAt = null;
@@ -14,6 +15,9 @@ export class SnapshotSendWindow {
   }
   acknowledge(sample, now, flightSize) {
     if (!Number.isFinite(sample) || sample <= 0) return;
+    this.queueRtt = sample;
+    this.recentRtts.push({ at: now, rtt: sample });
+    while (this.recentRtts.length > 256 || this.recentRtts[0].at < now - 1000) this.recentRtts.shift();
     if (this.probe === 'drain') {
       // The final old ACK means the pipe is empty. Measure the NEXT frame alone,
       // not this last queued frame, before accepting a higher path baseline.
@@ -23,6 +27,7 @@ export class SnapshotSendWindow {
     if (this.probe === 'measure') {
       if (flightSize !== 1) return;
       this.baseRtt = sample; this.samples.length = 0; this.roundSamples.length = 0;
+      this.recentRtts = [{ at: now, rtt: sample }]; this.jitterUntil = -Infinity; this.jitterAllowance = 0;
       this.limit = this.restoreLimit; this.roundAt = now; this.probe = null;
     }
     // One minimum per second retains a real 30s history at both 5 and 60Hz. A
@@ -42,9 +47,19 @@ export class SnapshotSendWindow {
     }
     this.baseRtt = this.baseRtt === null ? recentFloor : Math.min(this.baseRtt, recentFloor);
     this.roundAt ??= now;
+    // Only discount a transient after it actually returned to the path floor.
+    // A rising queue must NOT receive a grace period or inflate the RTT baseline.
+    // The allowance expires unless another spike recovers, and large/persistent
+    // delays still train the original congestion controller immediately.
+    const peak = Math.max(...this.recentRtts.map(item => item.rtt));
+    if (sample <= this.baseRtt + Math.max(8, this.baseRtt * .1) && peak > this.baseRtt + Math.max(100, this.baseRtt * .5)) {
+      this.jitterAllowance = Math.min(200, peak - this.baseRtt);
+      this.jitterUntil = now + 1000;
+    }
+    if (now < this.jitterUntil) this.queueRtt = Math.max(this.baseRtt, sample - this.jitterAllowance);
     // The same delay can be one queued small frame or several large ones. This
     // is Vegas-style queue estimation, not a native Steam RTT/bandwidth reading.
-    this.roundSamples.push({ queued: flightSize * Math.max(0, 1 - this.baseRtt / sample), full: flightSize >= this.limit });
+    this.roundSamples.push({ queued: flightSize * Math.max(0, 1 - this.baseRtt / this.queueRtt), full: flightSize >= this.limit });
     if (this.roundSamples.length > 256) this.roundSamples.shift();
     if (now - this.roundAt < Math.max(100, this.baseRtt)) return;
     const values = this.roundSamples.map(item => item.queued).sort((a, b) => a - b);

@@ -1,4 +1,4 @@
-import { tacticalSystemIds } from '../engine/extensions/ship-systems/Loadout';
+import { defenseSystemId, tacticalSystemIds } from '../engine/extensions/ship-systems/Loadout';
 import type { ShipSpec } from '../engine/content/ShipSpec';
 import { effectiveHullStats, hullModDefinitions } from '../engine/extensions/HullMods';
 import { shipSystemDefinitions } from '../engine/extensions/ship-systems/Registry';
@@ -21,7 +21,7 @@ function HullBaselineInformation({ spec, unavailable }: { spec: ShipSpec; unavai
     hullMods: [], sMods: [], captainSkills: undefined };
   const stats = effectiveHullStats(baseline);
   const mods = [...new Set([...(spec.builtInHullMods ?? []), ...(nativeRefit.sourceBuiltInMods?.[spec.id] ?? [])])];
-  const systems = [...tacticalSystemIds(spec).map((id, index) => ({id, label: '舰船技能 ' + (index + 1)})), {id:spec.defenseSystemType ?? 'NONE', label:'防御系统'}]
+  const systems = [...tacticalSystemIds(spec).map((id, index) => ({id, label: '舰船技能 ' + (index + 1)})), {id:defenseSystemId(spec), label:'右键技能'}]
     .filter(system => system.id !== 'NONE');
   const name = data.ships[spec.id];
   const status = nativeRefit.shipStatus[spec.id];

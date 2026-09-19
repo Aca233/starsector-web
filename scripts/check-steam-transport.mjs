@@ -123,7 +123,7 @@ function simulate(t, { window = STEAM_SNAPSHOT_WINDOW, rtt = 200, bandwidth = 12
 test('200ms RTT: removes stop-and-wait ceiling without unbounded reliable backlog', t => {
   const old = simulate(t, { window: 1 }), current = simulate(t);
   assert.ok(old.steadyHz < 5.1); assert.ok(current.steadyHz > old.steadyHz * 3);
-  assert.ok(current.maxAge < 200); assert.ok(current.peakFrames <= STEAM_SNAPSHOT_WINDOW);
+  assert.ok(current.maxAge < 200, JSON.stringify(current)); assert.ok(current.peakFrames <= STEAM_SNAPSHOT_WINDOW);
   assert.ok(current.peakBytes <= STEAM_SNAPSHOT_BYTES);
   console.log(JSON.stringify({ scenario: '200ms RTT, 1.024Mbps', old, current }));
 });

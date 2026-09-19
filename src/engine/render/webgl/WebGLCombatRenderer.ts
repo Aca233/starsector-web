@@ -1,3 +1,5 @@
+import { getGraphicsSettings, RenderFrameLimiter } from '../../runtime/GraphicsSettings';
+import { RenderResolutionTarget } from './RenderResolutionTarget';
 import { beginRenderFrame, endRenderFrame, visualRandom, visualNowMs } from '../RenderDeterminism';
 import type { RenderFrameContext } from '../RenderFrameContext';
 import { CombatEngine } from '../../simulation/CombatEngine';
@@ -58,6 +60,9 @@ export class WebGLCombatRenderer implements ICombatRenderer {
   private lastGpuTimeMs: number | null = null;
   private restoreGeneration = 0;
   private disposed = false;
+  private resolutionTarget: RenderResolutionTarget;
+  private frameLimiter = new RenderFrameLimiter();
+  private graphicsSettings = getGraphicsSettings();
   private requiredTextures: readonly string[] = ESSENTIAL_TEXTURE_URLS;
   private readonly lifecycle: WebGLRendererLifecycle;
 
@@ -79,6 +84,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
   constructor(canvas: HTMLCanvasElement, gl: WebGL2RenderingContext, lifecycle: WebGLRendererLifecycle = {}) {
     this.canvas = canvas;
     this.gl = gl;
+    this.resolutionTarget = new RenderResolutionTarget(gl);
     this.lifecycle = lifecycle;
     let textures: WebGLTextureManager | null = null;
     let batcher: SpriteBatcher | null = null;
@@ -157,6 +163,8 @@ export class WebGLCombatRenderer implements ICombatRenderer {
       }
 
       this.gl = nextGl;
+      this.resolutionTarget = new RenderResolutionTarget(nextGl);
+      this.frameLimiter.reset();
       this.textures = nextTextures;
       this.batcher = nextBatcher;
       this.effectBatcher = nextEffectBatcher;
@@ -240,7 +248,10 @@ export class WebGLCombatRenderer implements ICombatRenderer {
   }
 
   public render(engine: CombatEngine, alpha: number, cameraPos: Vector2, zoom: number, frame: RenderFrameContext) {
-    if (this.contextLost) return;
+    if (this.contextLost || this.disposed) return false;
+    const graphics = getGraphicsSettings();
+    if (graphics !== this.graphicsSettings) { this.graphicsSettings = graphics; this.frameLimiter.reset(); }
+    if (!this.frameLimiter.shouldRender(performance.now(), graphics.maxFrameRate)) return false;
     beginRenderFrame(frame);
     const gpuQuery = this.beginGpuTimer();
     try {
@@ -250,12 +261,12 @@ export class WebGLCombatRenderer implements ICombatRenderer {
     const nowSec = visualNowMs() * 0.001;
 
     // 1. 视口与背景清屏 (纯黑深空)
-    gl.viewport(0, 0, width, height);
+    this.resolutionTarget.begin(width, height, graphics.renderScale);
     gl.clearColor(0.02, 0.027, 0.05, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     // 2. 震屏微扰
-    const shake = engine.cameraShakeIntensity;
+    const shake = engine.cameraShakeIntensity * graphics.screenShake;
     const shakeX = (visualRandom('webgl/WebGLCombatRenderer.ts#1') - 0.5) * 2 * shake;
     const shakeY = (visualRandom('webgl/WebGLCombatRenderer.ts#2') - 0.5) * 2 * shake;
     const actualCam = new Vector2(cameraPos.x + shakeX, cameraPos.y + shakeY);
@@ -295,7 +306,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
     this.shieldShader.drawCalls = 0;
 
     // 4.1 通道 1: 深空背景、远景/中景星云与小行星。V09 将三类环境层独立开关。
-    if (frame.layers.has('background')) this.environmentPass.renderBackground(ctx, actualCam, engine.environment);
+    if (graphics.background && frame.layers.has('background')) this.environmentPass.renderBackground(ctx, actualCam, engine.environment);
     if (frame.layers.has('nebula')) this.environmentPass.renderNebulae(engine, ctx);
     if (frame.layers.has('asteroid')) this.environmentPass.renderAsteroids(engine, ctx);
 
@@ -347,7 +358,10 @@ export class WebGLCombatRenderer implements ICombatRenderer {
 
     // 5. 提交所有剩余 GPU 绘制调用
     this.batcher.end();
+    this.resolutionTarget.present(width, height);
+    return true;
     } finally {
+      this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
       this.endGpuTimer(gpuQuery);
       endRenderFrame();
     }
@@ -391,7 +405,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
     return {
       ...this.textures.getStats(),
       resourceRecreations: this.resourceRecreations,
-      drawCalls: this.batcher.drawCalls + this.effectBatcher.drawCalls + this.ribbonBatcher.drawCalls + this.shieldShader.drawCalls,
+      drawCalls: this.batcher.drawCalls + this.effectBatcher.drawCalls + this.ribbonBatcher.drawCalls + this.shieldShader.drawCalls + this.resolutionTarget.drawCalls,
       gpuTimerAvailable: !!this.gpuTimerExt,
       gpuTimeMs: this.lastGpuTimeMs
     };
@@ -406,6 +420,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
     if (!this.contextLost) {
       for (const query of this.pendingGpuQueries) this.gl.deleteQuery(query);
       this.pendingGpuQueries = [];
+      this.resolutionTarget.dispose();
       this.textures.dispose();
       this.batcher.dispose();
       this.effectBatcher.dispose();

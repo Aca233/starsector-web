@@ -41,15 +41,23 @@ class SteamPeer extends EventEmitter {
     super(); this.gateway = gateway; this.remote = remote; this.connection = connection; this.readyState = 1;
     this.inflight = new Map(); this.inflightBytes = 0; this.snapshotSender = new SteamSnapshotSender(); this.snapshotWindow = new SnapshotSendWindow();
     this.sentStates = 0; this.skippedStates = 0; this.ackedStates = 0; this.ackMs = null;
+    this.lastSnapshot = null; this.lastSnapshotSkip = null;
     this.supportsConsumption = supportsConsumption; this.requestedConsumption = false; this.helloSeen = false; this.consumption = null;
   }
   get bufferedAmount() { return this.inflightBytes; }
   // One extra consumption slot covers the local WS/renderer hop. Only the
   // existing network ACK controller may grow this bounded window.
   get consumptionLimit() { return Math.min(MAX_SNAPSHOT_WINDOW, this.snapshotWindow.limit + 1); }
-  get snapshotWritable() { return this.readyState === 1 && this.inflight.size < this.snapshotWindow.limit && this.inflightBytes < STEAM_SNAPSHOT_BYTES && (!this.consumption || this.consumption.writable(this.consumptionLimit)); }
+  get snapshotBlockReason() {
+    if (this.readyState !== 1) return 'disconnected';
+    if (this.inflight.size >= this.snapshotWindow.limit) return 'frame-window';
+    if (this.inflightBytes >= STEAM_SNAPSHOT_BYTES) return 'wire-byte-window';
+    if (this.consumption && !this.consumption.writable(this.consumptionLimit)) return 'renderer-consumption';
+    return null;
+  }
+  get snapshotWritable() { return this.snapshotBlockReason === null; }
   diagnostics(now = Date.now()) {
-    return { consumption: { enabled: !!this.consumption, inflight: this.consumption?.pending.size ?? 0, bytes: this.consumption?.bytes ?? 0, rawBytes: this.consumption?.rawBytes ?? 0, consumed: this.consumption?.consumed ?? 0, oldestMs: this.consumption?.oldestMs(now) ?? 0 }, nativeSession: this.gateway.sessionMetrics.get(this.remote, now), delta: this.snapshotSender.diagnostics(), window: this.snapshotWindow.limit, probing: this.snapshotWindow.probe, baseAckMs: this.snapshotWindow.baseRtt === null ? null : Math.round(this.snapshotWindow.baseRtt), sentStates: this.sentStates, skippedStates: this.skippedStates, ackedStates: this.ackedStates,
+    return { blockedBy: this.snapshotBlockReason, lastSnapshot: this.lastSnapshot, lastSnapshotSkip: this.lastSnapshotSkip, consumption: { enabled: !!this.consumption, inflight: this.consumption?.pending.size ?? 0, bytes: this.consumption?.bytes ?? 0, rawBytes: this.consumption?.rawBytes ?? 0, consumed: this.consumption?.consumed ?? 0, oldestMs: this.consumption?.oldestMs(now) ?? 0 }, nativeSession: this.gateway.sessionMetrics.get(this.remote, now), delta: this.snapshotSender.diagnostics(), window: this.snapshotWindow.limit, probing: this.snapshotWindow.probe, baseAckMs: this.snapshotWindow.baseRtt === null ? null : Math.round(this.snapshotWindow.baseRtt), sentStates: this.sentStates, skippedStates: this.skippedStates, ackedStates: this.ackedStates, queueAckMs: this.snapshotWindow.queueRtt === null ? null : Math.round(this.snapshotWindow.queueRtt),
       ackMs: this.ackMs === null ? null : Math.round(this.ackMs), inflight: this.inflight.size,
       inflightBytes: this.inflightBytes, oldestAckMs: this.inflight.size ? now - this.inflight.values().next().value.since : 0 };
   }
@@ -59,7 +67,7 @@ class SteamPeer extends EventEmitter {
     const now = Date.now(), sample = now - frame.since, sharedBytes = this.gateway.snapshotBudget.totalBytes();
     this.snapshotWindow.acknowledge(sample, now, this.inflight.size);
     this.inflight.delete(id); this.inflightBytes -= frame.bytes; this.ackedStates++;
-    this.gateway.snapshotBudget.acknowledge(sample, this.snapshotWindow.baseRtt, now, sharedBytes);
+    this.gateway.snapshotBudget.acknowledge(this.snapshotWindow.queueRtt ?? sample, this.snapshotWindow.baseRtt, now, sharedBytes);
     this.ackMs = this.ackMs === null ? sample : this.ackMs * .8 + sample * .2;
   }
   send(encoded) {
@@ -72,21 +80,26 @@ class SteamPeer extends EventEmitter {
         this.consumption ??= new SteamConsumptionWindow({ maxFrames: MAX_SNAPSHOT_WINDOW, maxBytes: STEAM_SNAPSHOT_BYTES, maxRawBytes: protocol.maxSnapshotBytes * 2 });
         encoded = JSON.stringify({ ...JSON.parse(encoded), stateCredits: 1 });
       }
-      if (state && !this.snapshotWritable) { this.gateway.snapshotBudget.remove(this); this.skippedStates++; return; }
+      if (state && !this.snapshotWritable) { this.lastSnapshotSkip = this.snapshotBlockReason; this.gateway.snapshotBudget.remove(this); this.skippedStates++; return; }
+      const prepareAt = state ? performance.now() : 0;
       const choice = state ? this.snapshotSender.prepare(encoded, this.gateway.snapshotEncoder, this.gateway.codec) : null;
       const payload = choice?.prepared ?? this.gateway.codec.prepare('data', encoded);
-      const rawBytes = state && this.consumption ? Buffer.byteLength(encoded) : 0;
-      if (state && this.consumption && !this.consumption.allows(payload.payload.length, rawBytes, this.consumptionLimit)) { this.gateway.snapshotBudget.remove(this); this.skippedStates++; return; }
+      const rawBytes = state ? Buffer.byteLength(encoded) : 0;
+      if (state && this.consumption && !this.consumption.allows(payload.payload.length, rawBytes, this.consumptionLimit)) { this.lastSnapshotSkip = 'renderer-consumption'; this.gateway.snapshotBudget.remove(this); this.skippedStates++; return; }
       // A frame larger than the byte window may travel alone (original size limit
       // still applies), but must not be stacked behind other snapshots.
-      if (state && this.inflight.size && this.inflightBytes + payload.payload.length > STEAM_SNAPSHOT_BYTES) { this.gateway.snapshotBudget.remove(this); this.skippedStates++; return; }
-      if (state && !this.gateway.snapshotBudget.allows(this, payload.payload.length)) { this.skippedStates++; return; }
+      if (state && this.inflight.size && this.inflightBytes + payload.payload.length > STEAM_SNAPSHOT_BYTES) { this.lastSnapshotSkip = 'wire-byte-window'; this.gateway.snapshotBudget.remove(this); this.skippedStates++; return; }
+      if (state && !this.gateway.snapshotBudget.allows(this, payload.payload.length)) { this.lastSnapshotSkip = 'shared-uplink-window'; this.skippedStates++; return; }
       const prepared = this.gateway.codec.frame(this.connection, 'data', payload);
       this.gateway.transmitEncoded(this.remote, prepared);
       if (choice) this.snapshotSender.commit(choice);
       if (state) {
         this.inflight.set(prepared.id, { bytes: prepared.bytes, since: Date.now() });
         this.inflightBytes += prepared.bytes; this.sentStates++;
+        this.lastSnapshotSkip = null;
+        this.lastSnapshot = { rawBytes, wireBytes: prepared.packets.reduce((sum, packet) => sum + packet.length, 0), fragments: prepared.packets.length,
+          prepareMs: Math.round((performance.now() - prepareAt) * 1000) / 1000,
+          format: choice?.delta ? 'delta' : choice?.target ? 'full' : 'legacy-full' };
         this.consumption?.track(prepared.id, prepared.bytes, rawBytes);
       }
     } catch { this.close(1013, 'Steam 发送失败，正在重新连接'); }

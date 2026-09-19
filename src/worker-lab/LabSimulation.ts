@@ -13,7 +13,7 @@ export interface LabInput {
   firing: boolean;
   pointerActive: boolean;
 }
-export type LabAction = 'shield' | 'vent' | 'system' | 'group1' | 'group2' | 'group3';
+export type LabAction = 'shield' | 'hullShield' | 'vent' | 'system' | 'group1' | 'group2' | 'group3';
 export const neutralInput = (): LabInput => ({ sequence: 0, autopilot: true, keys: {}, aim: [0, 0], firing: false, pointerActive: false });
 export function validateConfig(config: LabConfig): void {
   if (![2, 10, 50, 100].includes(config.ships) || !Number.isSafeInteger(config.seed))
@@ -59,7 +59,7 @@ export class LabSimulation {
       applyPlayerControls(ship, this.input.keys, new Vector2(...this.input.aim), this.input.firing, undefined, this.input.pointerActive);
     }
     for (const action of this.actions.splice(0)) {
-      const command = action === 'shield' || action === 'vent' || action === 'system'
+      const command = action === 'shield' || action === 'hullShield' || action === 'vent' || action === 'system'
         ? { kind: action } as const : { kind: 'group', value: Number(action.slice(-1)) - 1 } as const;
       dispatchShipCommand(ship, command, this.input.pointerActive ? new Vector2(...this.input.aim) : undefined);
     }

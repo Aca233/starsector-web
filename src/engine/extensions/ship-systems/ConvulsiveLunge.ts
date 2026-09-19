@@ -18,7 +18,9 @@ export const convulsiveLunge=nativeSystem('convulsive_lunge',{
   motionControl:system=>({blockAcceleration:system.isActive&&system.effectLevel>0,forceBrake:system.isActive&&system.effectLevel>0}),
   onAdvance:(ship,dt,_world,system)=>{
     if(system.effectLevel>.85&&system.state!=='OUT'){
-      ship.runtimeModifiers.set('convulsive_lunge',{disableDefense:1});ship.shield.setActive(false);ship.defenseSystem.deactivate();
+      ship.runtimeModifiers.set('convulsive_lunge',{disableDefense:1});ship.shield.setActive(false);
+      // A custom right-click skill is not hull defense (and may be this very lunge).
+      if (ship.spec.rightClickSystemType === undefined) ship.defenseSystem.deactivate();
     }else ship.runtimeModifiers.delete('convulsive_lunge');
     const dest=destinations.get(system);
     if(dest&&system.state==='ACTIVE'){

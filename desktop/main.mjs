@@ -93,6 +93,7 @@ function updateMenu() {
     ] },
     { label: '更新', submenu: [
       { label: updater?.label() ?? '正在初始化', enabled: false },
+      ...(updater?.detail() ? [{ label: updater.detail(), enabled: false }] : []),
       { label: '检查更新', click: () => void updater?.check(true) },
       { label: '重启并安装已下载的更新', enabled: updater?.ready() ?? false, click: () => updater?.install() },
     ] },

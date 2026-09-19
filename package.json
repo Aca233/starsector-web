@@ -20,7 +20,7 @@
     "steam": "npm run build && node server/steam-launcher.mjs",
     "steam:serve": "node server/steam-launcher.mjs",
     "package:steam": "node scripts/package-windows.mjs --steam",
-    "ai:check": "tsc -p tsconfig.ai.json --pretty false && node scripts/check-combat-ai.mjs && node scripts/check-fleet-learning.mjs && node scripts/check-fleet-ablation.mjs && node scripts/check-fleet-components.mjs && node scripts/check-distance-learning.mjs && node scripts/check-ai-withdrawal.mjs && node scripts/check-ai-system-intent.mjs && node scripts/check-ai-advance.mjs",
+    "ai:check": "tsc -p tsconfig.ai.json --pretty false && node scripts/check-combat-ai.mjs && node scripts/check-fleet-learning.mjs && node scripts/check-fleet-ablation.mjs && node scripts/check-fleet-components.mjs && node scripts/check-distance-learning.mjs && node scripts/check-ai-withdrawal.mjs && node scripts/check-ai-system-intent.mjs && node scripts/check-ai-advance.mjs && node scripts/check-ai-aggression.mjs",
     "ai:train": "node scripts/train-combat-ai.mjs",
     "ai:evaluate": "node scripts/train-combat-ai.mjs --episodes 0",
     "ai:benchmark": "node scripts/benchmark-combat-tactics.mjs",

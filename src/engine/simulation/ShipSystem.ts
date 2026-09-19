@@ -16,6 +16,12 @@ export class ShipSystem {
   public activationTarget?: Ship;
   /** Immutable command-edge inputs; live weapon aim may keep moving during IN. */
   public activationInput?: { point: Vector2; origin: Vector2; velocity: Vector2; facing: number; target: Ship | null };
+  /** Accepted teleport plan / successful departure for presentation and LAN snapshots.
+   * Independent of current aim and command-edge origin; never drives collision/motion. */
+  public teleportVisual?: {
+    serial: number; destination: Vector2; destinationFacing: number;
+    origin?: Vector2; originFacing?: number;
+  };
   public activationSerial = 0;
   public state: ShipSystemState = 'IDLE';
   public effectLevel = 0;
@@ -99,7 +105,7 @@ export class ShipSystem {
   public reset(): void {
     this.definition.onReset?.(this,this.owner);
     this.state = 'IDLE'; this.effectLevel = 0; this.isActive = false; this.isCoolingDown = false;
-    this.activationTarget = undefined; this.activationInput = undefined; this.activationSerial++;
+    this.activationTarget = undefined; this.activationInput = undefined; this.teleportVisual = undefined; this.activationSerial++;
     this.activeTimer = this.cooldownTimer = this.stageTimer = this.chargeRegenTimer = this.outEntryEffectLevel = 0;
     this.charges = this.definition.initialCharges ?? this.maxCharges; this.pendingActivationFlux = this.pendingActiveEvents = this.pendingActivationEvents = 0;
   }
@@ -117,6 +123,9 @@ export class ShipSystem {
     if (ship?.flux.isVenting) return '正在排散幅能';
     if (ship && ship.flux.totalFlux + this.fluxCostPerUse + ship.allSystems.reduce((total, system) => total + system.reservedFluxCost, 0) > ship.flux.maxFlux) return '幅能空间不足';
     if (this.definition.charges !== undefined && this.definition.usesChargesForActivation !== false && this.charges <= 0) return '充能耗尽';
+    const reason = ship && this.definition.activationReason?.(ship, this);
+    if (reason) return reason;
+    if (ship && this.definition.selectTarget && !this.definition.selectTarget(ship)) return this.definition.targetFailureReason?.(ship) ?? '射程内没有有效目标';
     if (ship && this.definition.canActivate && !this.definition.canActivate(ship)) return '未满足系统使用条件';
     return undefined;
   }

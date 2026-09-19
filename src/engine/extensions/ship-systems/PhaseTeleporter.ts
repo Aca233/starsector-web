@@ -73,15 +73,19 @@ export function teleportDefinition(id: string, sourceId: string, name: string, r
     description: skimmer
       ? `沿当前速度方向闪现最多 ${range} 距离（低速时向前）；短暂相位免疫，储存 ${charges} 次，恢复速率 ${regen}/秒。`
       : '向瞄准点传送最多 1500 距离，传送后速度减半；预热时可受击，退相位期间免疫，冷却 15 秒。',
-    implementationDetails: '按原版时序、方向、相位窗口与速度规则执行；用接受指令时的输入锁定目的地，到达前复查舰船/小行星。沿用圆形净空与确定性环搜索，限制最大跳距；无安全落点则原地消耗次数/冷却，不使用原版随机重叠回退。系统期间禁止武器/护盾；Web AI，无专用残影/镜头/音效。',
+    implementationDetails: '按原版时序、方向、相位窗口与速度规则执行；用接受指令时的输入锁定目的地，到达前复查舰船/小行星。沿用圆形净空与确定性环搜索，限制最大跳距；无安全落点则原地消耗次数/冷却，不使用原版随机重叠回退。系统期间禁止武器/护盾；Web AI；已接入原版落点预影、实际起点残影、舰体/武器淡入淡出、原版配色抖动、对应瞬移音效与镜头偏移补偿。',
     chargeUp: skimmer ? .25 : .5, active: 0, chargeDown: skimmer ? .25 : .5, cooldown: skimmer ? 0 : 15,
     ...(skimmer ? { charges, chargeRegen: regen } : {}),
     hardFlux: true,
+    audio: { activate: skimmer ? 'system_phase_skimmer' : 'system_phase_teleporter' },
+    resources: { sounds: [skimmer ? 'system_phase_skimmer' : 'system_phase_teleporter'] },
     phase: { vulnerableChargeUp: !skimmer, vulnerableChargeDown: false },
     controls: { blockWeapons: true, blockShields: true, blockFluxDissipation: skimmer },
+    onReset: system => { plans.delete(system); system.teleportVisual = undefined; },
     onActivate: (ship, world, system) => {
       const effectiveRange = range * ship.hullStats.systemRangeMultiplier;
       plans.delete(system);
+      system.teleportVisual = undefined;
       const input=system.activationInput;
       let desired: Vector2;
       if (skimmer) {
@@ -90,22 +94,42 @@ export function teleportDefinition(id: string, sourceId: string, name: string, r
         desired = (input?.origin??ship.pos).clone().add(Vector2.fromAngle(direction, effectiveRange));
       } else desired = (input?.point??ship.aimTargetWorld).clone();
       const destination = findTeleportDestination(ship, desired, effectiveRange, world);
-      if (destination) plans.set(system, { destination, facing: facingAfterJump(ship, destination, world, skimmer, input) });
+      if (destination) {
+        const facing = facingAfterJump(ship, destination, world, skimmer, input);
+        plans.set(system, { destination, facing });
+        system.teleportVisual = { serial: system.activationSerial, destination: destination.clone(), destinationFacing: facing };
+      }
     },
     onActive: (ship, world, system) => {
       const plan = plans.get(system);
       plans.delete(system);
-      if (!plan || ship.isDead || ship.hullHp <= 0 || ship.flux.isOverloaded || ship.flux.isVenting) return;
+      if (!plan || ship.isDead || ship.hullHp <= 0 || ship.flux.isOverloaded || ship.flux.isVenting) { system.teleportVisual = undefined; return; }
       // Ships and asteroids can move during charge-up. Never trust a stale clearance result.
       const destination = findTeleportDestination(ship, plan.destination, range * ship.hullStats.systemRangeMultiplier, world);
-      if (!destination) return;
+      if (!destination) { system.teleportVisual = undefined; return; }
+      // Capture the actual departure AFTER drift during IN and the revalidated
+      // destination. Never fake a departure copy for a failed/cancelled jump.
+      system.teleportVisual = { serial: system.activationSerial, destination: destination.clone(), destinationFacing: plan.facing,
+        origin: ship.pos.clone(), originFacing: ship.facingRad };
+      // Native int.systemActivated compensates the view mouse offset, preserving
+      // the world under the cursor at the jump. Accumulate so a slow render or
+      // network snapshot cannot miss a jump after its brief OUT effect has ended.
+      ship.teleportSequence++;
+      if (ship.pos.distanceTo(destination) < 2000) {
+        ship.teleportCameraOffset.x += ship.pos.x - destination.x;
+        ship.teleportCameraOffset.y += ship.pos.y - destination.y;
+      }
       ship.pos.copy(destination);
       // A jump is not a swept movement segment; do not collide/render across the intervening space.
       ship.prevPos.copy(destination);
       ship.facingRad = ship.prevFacingRad = plan.facing;
       if (!skimmer) ship.vel.scale(.5);
     },
-    onAdvance: (_ship, _dt, _world, system) => { if (!system.isActive) plans.delete(system); },
+    onAdvance: (_ship, _dt, _world, system) => {
+      if (!system.isActive || (system.state !== 'IN' && !system.teleportVisual?.origin)) {
+        plans.delete(system); system.teleportVisual = undefined;
+      }
+    },
     advanceAI: ({ ship, target, distance, tactical, system = ship.system }) => {
       if (!system.available || system.disabled || system.isActive || system.isCoolingDown
         || ship.isDead || ship.isPhased || ship.flux.isOverloaded || ship.flux.isVenting || target.isDead) return;

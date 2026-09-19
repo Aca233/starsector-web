@@ -43,22 +43,6 @@ export const CombatView: React.FC<{
   React.useEffect(() => { preloadNativeMenuFonts(); }, []);
   const [isPauseMenuOpen, setIsPauseMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isSoundMuted, setIsSoundMuted] = useState(() => {
-    try {
-      const stored = localStorage.getItem("starsector-web:muted");
-      return stored === null ? sound.getMuted() : stored === "true";
-    } catch {
-      return sound.getMuted();
-    }
-  });
-  React.useEffect(() => {
-    sound.setMuted(isSoundMuted);
-    try {
-      localStorage.setItem("starsector-web:muted", String(isSoundMuted));
-    } catch {
-      /* Session setting still works. */
-    }
-  }, [isSoundMuted]);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const initialShipId =
     prototypeId ||
@@ -404,8 +388,6 @@ export const CombatView: React.FC<{
           spec={session.engine.playerShip.spec}
           defaultMouseSteering={defaultMouseSteering}
           onDefaultMouseSteeringChange={setDefaultMouseSteering}
-          muted={isSoundMuted}
-          onMutedChange={setIsSoundMuted}
           hasFighters={session.engine.fighterSystem.playerWings.length > 0}
           canRestart={
             game.mode !== "fleet" || !!game.getSnapshot().pendingCombat
