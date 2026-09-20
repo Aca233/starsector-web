@@ -22,6 +22,7 @@ const hudSchema = { ...numbers('tick sim bytes rtt jitter acknowledgementMs age 
   input: numbers('sentSequence acknowledgedSequence trackedPending oldestTrackedPendingMs pendingActions'),
   decodeQueue: numbers('queued queuedBytes peakQueued peakBytes decoded backpressure waitMs maxWaitMs') };
 const lanSchema = { mode: choice('lan-websocket'), role: choice('host', 'guest'), relaySeq: numeric,
+  compressionFanout: numbers('requests jobs shared savedInputBytes retries fallback activeJobs activeBytes'),
   authority: numbers('received lastBytes receiveMs'), receivers: list({ seat: numeric, compression: bool, bufferedBytes: numeric,
     credits: numbers('inflight capacity idleCapacity deliveryHz bytes peakCount peakBytes sent acked rejected'), network: numbers('latestRttMs baselineRttMs busySamples'),
     flow: numbers('sent skippedSocket skippedCredit lastBytes lastSeq'), delta: numbers('full delta originalBytes encodedBytes budgetFallbacks motionDeltas anchors baseSeq pendingSeq retainedBytes') }) };

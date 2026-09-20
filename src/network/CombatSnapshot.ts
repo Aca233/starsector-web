@@ -38,12 +38,13 @@ const SKIP = new Set([
   "lowCRDamageSequence",
 ]);
 type Wire = any;
+const captureArrayMap = Array.prototype.map;
 /** Each snapshot carries its own field dictionary: reconnect never needs a baseline. */
 class SnapshotLayouts {
   readonly puffBudget = puffRecipeBudget();
   // Frame-owned, immutable wire marker; decoded viewer objects are never shared.
   readonly absent = Object.freeze({ $undefined: 1 });
-  constructor(readonly compactPuffs = false, readonly compactProjectiles = false) {}
+  constructor(readonly compactPuffs = false, readonly compactProjectiles = false, readonly nativeCapture = false) {}
   readonly keys: string[][] = [];
   private byFirst = new Map<string, Map<number, number[]>>();
   record(keys: string[], values: Wire[]): Wire | null {
@@ -84,8 +85,8 @@ const capturePrototypes: object[] = [
   Array.prototype, Array.prototype, Object.prototype, Object.prototype, Object.prototype,
   CombatFXSystem.prototype, Array.prototype, Object.prototype, Array.prototype,
 ];
-// Full generic reads/recursion below are retained even for omitted fields, so
-// accessor scans are unnecessary. Only the path and exact prototype limit projection.
+// Path/prototype checks limit omissions. Generic capture still traverses omitted
+// fields; only an explicit native-graph caller may skip them before packing.
 function nativeCaptureProjection(value: object, projection: CaptureProjection): CaptureProjection {
   return projection && Object.getPrototypeOf(value) === capturePrototypes[projection]
     ? projection : CaptureProjection.None;
@@ -132,9 +133,15 @@ function pack(value: any, seen: object[], refs: Map<string, Ship>, layouts: Snap
   if (value === undefined) return layouts.compactProjectiles ? layouts.absent : { $undefined: 1 };
   if (typeof value === "number" && !Number.isFinite(value)) return { $number: String(value) };
   if (value === null || typeof value !== "object") return typeof value === "function" ? { $undefined: 1 } : value;
-  if (value instanceof Ship && !plain) { refs.set(value.id, value); return { $ship: value.id }; }
-  if (value instanceof Vector2) return { $vector: [value.x, value.y] };
-  if (ArrayBuffer.isView(value)) return { $typed: value.constructor.name, values: Array.from(value as any) };
+  // Native capture owns this graph. Arrays cannot be any of the tagged leaf
+  // classes; avoid repeated prototype walks for every nested row/value array.
+  // Generic/custom callers retain their original instanceof/read ordering.
+  const nativeArray = layouts.nativeCapture && Array.isArray(value);
+  if (!nativeArray) {
+    if (value instanceof Ship && !plain) { refs.set(value.id, value); return { $ship: value.id }; }
+    if (value instanceof Vector2) return { $vector: [value.x, value.y] };
+    if (ArrayBuffer.isView(value)) return { $typed: value.constructor.name, values: Array.from(value as any) };
+  }
   if (projection === CaptureProjection.ExplosionPuffs && layouts.compactPuffs && Array.isArray(value)) {
     const recipe = explosionPuffRecipe(value);
     if (recipe && reservePuffRecipe(layouts.puffBudget, explosionPuffCount(recipe[1]))) return { $explosionPuffs: recipe };
@@ -144,17 +151,29 @@ function pack(value: any, seen: object[], refs: Map<string, Ship>, layouts: Snap
   if (seen.includes(value)) return { $undefined: 1 };
   seen.push(value);
   let result: Wire;
-  if (value instanceof Map) result = { $map: [...value.entries()].map(([k, v]) => [pack(k, seen, refs, layouts), pack(v, seen, refs, layouts)]) };
-  else if (value instanceof Set) result = { $set: [...value].map(v => pack(v, seen, refs, layouts)) };
-  else if (Array.isArray(value)) {
+  if (!nativeArray && value instanceof Map) result = { $map: [...value.entries()].map(([k, v]) => [pack(k, seen, refs, layouts), pack(v, seen, refs, layouts)]) };
+  else if (!nativeArray && value instanceof Set) result = { $set: [...value].map(v => pack(v, seen, refs, layouts)) };
+  else if (nativeArray || Array.isArray(value)) {
     const memberProjection = projection === CaptureProjection.Weapons ? CaptureProjection.Weapon
       : projection === CaptureProjection.Engines ? CaptureProjection.Engine
       : projection === CaptureProjection.Projectiles ? CaptureProjection.Projectile
       : projection === CaptureProjection.Explosions ? CaptureProjection.Explosion : CaptureProjection.None;
     // Custom array classes/mappers retain their original generic traversal.
     const nativeMembers = memberProjection && Object.getPrototypeOf(value) === Array.prototype && !Object.hasOwn(value, 'map');
-    const rows: Wire[] = nativeMembers
-      ? value.map(v => pack(v, seen, refs, layouts, false, memberProjection))
+    let rows: Wire[];
+    if (nativeArray && Object.getPrototypeOf(value) === Array.prototype &&
+        !Object.hasOwn(value, 'map') && !Object.hasOwn(value, 'constructor') &&
+        value.map === captureArrayMap && value.constructor === Array && Array[Symbol.species] === Array) {
+      // Same captured length and HasProperty semantics as map (including holes),
+      // without a recursive call/callback for each scalar cell. Never reuse rows.
+      rows = new Array(value.length);
+      for (let i = 0; i < rows.length; i++) if (i in value) {
+        const v = value[i];
+        rows[i] = v === null || typeof v === 'string' || typeof v === 'boolean'
+          || (typeof v === 'number' && Number.isFinite(v)) ? v
+          : pack(v, seen, refs, layouts, false, nativeMembers ? memberProjection : CaptureProjection.None);
+      }
+    } else rows = nativeMembers ? value.map(v => pack(v, seen, refs, layouts, false, memberProjection))
       : value.map(v => pack(v, seen, refs, layouts));
     // Factor identical fields before text/binary encoding, after all original
     // getter/Proxy reads and Ship-reference discovery. No generic traversal is
@@ -173,35 +192,48 @@ function pack(value: any, seen: object[], refs: Map<string, Ship>, layouts: Snap
     } else result = rows;
   }
   else {
-    // Keep the two read passes (including getter order), but avoid allocating
-    // callbacks and recursively dispatching every scalar in particle/ship rows.
-    // Compact this fresh key array, not the source object. Still read every
-    // allowed property in the first pass before packing any in the second.
     const keys = Object.keys(value);
     if (projection) projection = nativeCaptureProjection(value, projection);
-    let count = 0;
-    for (const key of keys) {
-      if (!SKIP.has(key) && typeof value[key] !== 'function') keys[count++] = key;
-    }
-    if (count !== keys.length) keys.length = count;
-    const values: Wire[] = new Array(keys.length);
-    for (let i = 0; i < keys.length; i++) {
-      const field = value[keys[i]];
-      values[i] = field === null || typeof field === 'string' || typeof field === 'boolean'
-        || (typeof field === 'number' && Number.isFinite(field))
-        ? field : pack(field, seen, refs, layouts, false, captureChildProjection(projection, keys[i]));
-    }
-    // Deliberately finish BOTH original read passes and recursive packing before
-    // omission. Getter/Proxy reads, cycles, exceptions and Ship-reference discovery
-    // must not disappear just because a field is simulation-only. This conservative
-    // projection reduces payload, not the cost of visiting the omitted subtrees.
-    if (projection === CaptureProjection.Damage || projection === CaptureProjection.Weapon
-      || projection === CaptureProjection.Engine || projection === CaptureProjection.Projectile) {
-      let kept = 0;
-      for (let i = 0; i < keys.length; i++) if (!omitCapturedField(projection, keys[i])) {
-        keys[kept] = keys[i]; values[kept++] = values[i];
+    let values: Wire[];
+    if (layouts.nativeCapture) {
+      // Explicitly trusted, locally constructed authority graph: no getters or
+      // Proxies. Read retained fields once, and never allocate simulation-only
+      // subtrees merely to discard them. Do not infer this contract from a proto.
+      values = [];
+      let count = 0;
+      for (const key of keys) {
+        if (SKIP.has(key) || omitCapturedField(projection, key)) continue;
+        const field = value[key];
+        if (typeof field === 'function') continue;
+        keys[count++] = key;
+        values.push(field === null || typeof field === 'string' || typeof field === 'boolean'
+          || (typeof field === 'number' && Number.isFinite(field))
+          ? field : pack(field, seen, refs, layouts, false, captureChildProjection(projection, key)));
       }
-      keys.length = values.length = kept;
+      keys.length = count;
+    } else {
+      // Generic callers retain BOTH read passes and recursive packing before
+      // omission: getter/Proxy reads, exceptions and Ship discovery are observable.
+      let count = 0;
+      for (const key of keys) {
+        if (!SKIP.has(key) && typeof value[key] !== 'function') keys[count++] = key;
+      }
+      if (count !== keys.length) keys.length = count;
+      values = new Array(keys.length);
+      for (let i = 0; i < keys.length; i++) {
+        const field = value[keys[i]];
+        values[i] = field === null || typeof field === 'string' || typeof field === 'boolean'
+          || (typeof field === 'number' && Number.isFinite(field))
+          ? field : pack(field, seen, refs, layouts, false, captureChildProjection(projection, keys[i]));
+      }
+      if (projection === CaptureProjection.Damage || projection === CaptureProjection.Weapon
+        || projection === CaptureProjection.Engine || projection === CaptureProjection.Projectile) {
+        let kept = 0;
+        for (let i = 0; i < keys.length; i++) if (!omitCapturedField(projection, keys[i])) {
+          keys[kept] = keys[i]; values[kept++] = values[i];
+        }
+        keys.length = values.length = kept;
+      }
     }
     result = plain ? null : layouts.record(keys, values);
     if (!result) { result = {}; for (let i = 0; i < keys.length; i++) result[keys[i]] = values[i]; }
@@ -419,6 +451,9 @@ export function captureCombat(
   localContrails = false,
   compactPuffs = false,
   compactProjectiles = false,
+  // Opt in only for a locally constructed, non-Proxy native engine graph.
+  // Not a property inferred from prototypes or untrusted wire data.
+  nativeCapture = false,
 ): CombatSnapshot {
   const world: Record<string, unknown> = {};
   // Ribbons are client cosmetics in LAN. Keep the default projection available
@@ -426,7 +461,7 @@ export function captureCombat(
   for (const k of WORLD_KEYS) if (k !== 'contrailEngine' || !localContrails) world[k] = engine[k];
   const capitals = new Set(engine.allCapitalShips);
   const refs = new Map(engine.ships.map(ship => [ship.id, ship]));
-  const layouts = new SnapshotLayouts(compactPuffs, compactProjectiles);
+  const layouts = new SnapshotLayouts(compactPuffs, compactProjectiles, nativeCapture);
   // Root ship/world fields remain named for server validation and playback clocks.
   // Enumerate ship roots directly; nested Ship values still become references.
   const project = (value: unknown, projection = CaptureProjection.Ship) => pack(value, [], refs, layouts, true, projection);

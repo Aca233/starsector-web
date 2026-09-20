@@ -1,0 +1,11 @@
+import {build} from 'esbuild';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
+const frozen=await fs.readFile(process.argv[2]??'artifacts/guest-bottomup-20260920/CombatSnapshot.before.txt','utf8');
+const pack=frozen.slice(frozen.indexOf('function pack('),frozen.indexOf('const typed:')).replace(/\bpack\(/g,'packDispatchBaseline(');
+const capture=frozen.slice(frozen.indexOf('export function captureCombat('),frozen.indexOf('const puffDecoders')).replace('captureCombat(', 'captureCombatDispatchBaseline(').replace(/\bpack\(/g,'packDispatchBaseline(');
+if(!pack||!capture)throw Error('Frozen baseline functions missing');
+const out=path.resolve(process.argv[3]??'artifacts/guest-bottomup-20260920/capture-comparison.mjs');
+await build({entryPoints:['scripts/check-snapshot-array-dispatch.mts'],outfile:out,bundle:true,platform:'node',format:'esm',packages:'external',define:{__LAN_BUILD_ID__:'"array-dispatch-test"','import.meta.env':'{"BASE_URL":"/","DEV":false,"VITE_LAN_AI_WORKERS":"false"}'},plugins:[{name:'independent-capture-baseline',setup(b){b.onLoad({filter:/[\\/]src[\\/]network[\\/]CombatSnapshot\.ts$/},async a=>({contents:await fs.readFile(a.path,'utf8')+'\n'+pack+'\n'+capture,loader:'ts',resolveDir:path.dirname(a.path)}));}}],logLevel:'warning'});
+await import(pathToFileURL(out));

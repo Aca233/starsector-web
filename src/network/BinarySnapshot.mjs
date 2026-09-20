@@ -13,7 +13,8 @@ function dictionaryKey(code) {
 const LIMIT = protocol.maxSnapshotBytes, MAX_DEPTH = 128;
 // The library still owns traversal, undefined handling and transfer-safe copies.
 // Specialize the string writer from pinned @msgpack/msgpack 3.1.3 only. Its
-// internal hooks must be rechecked when upgrading; all numbers use the library.
+// internal hooks must be rechecked when upgrading. The conservative numeric writer
+// stays with the library; shared authorities opt into the exact writer below.
 class SnapshotEncoder extends Encoder {
   strings = new Map();
   encodeString(value) {
@@ -159,7 +160,7 @@ export function encodeBinaryFrame(frame) {
 // traversing the large projection once in compatible() and again in Encoder.
 // Keep encodeBinaryFrame's legacy two-pass behavior for arbitrary callers.
 // No values/keys bypass validation. SWF2 prefixes a key-only MessagePack variant.
-// Numbers/scalars retain the production writers (non-integer numbers: float64).
+// Numeric wire semantics stay unchanged (non-integer numbers: float64).
 const incompatible = {};
 class ProjectedSnapshotEncoder extends SnapshotEncoder {
   reinitializeState() {
@@ -197,12 +198,56 @@ class ProjectedSnapshotEncoder extends SnapshotEncoder {
     }
   }
 }
+// Shared-authority opt-in. Same MessagePack numeric widths and values as pinned
+// @msgpack/msgpack 3.1.3, with one capacity check and direct tag+payload writes.
+// Keep its original 64-bit integer helper for the uncommon >32-bit safe integers.
+// This private instance uses fixed defaults: no forceFloat32/forceIntegerToFloat.
+class FastProjectedSnapshotEncoder extends ProjectedSnapshotEncoder {
+  encodeArray(value, depth) {
+    const size = value.length;
+    if (size < 16) this.writeU8(0x90 + size);
+    else if (size < 65536) { this.writeU8(0xdc); this.writeU16(size); }
+    else if (size < 4294967296) { this.writeU8(0xdd); this.writeU32(size); }
+    else throw Error(`Too large array: ${size}`);
+    // Preserve the library's iterator, holes, accessor and live-length behavior.
+    // Check depth AFTER advancing the iterator, just as doEncode would, even
+    // when a custom iterator yields values for an initially empty array.
+    for (const item of value) {
+      if (depth >= this.maxDepth) throw Error('Snapshot exceeds maximum depth');
+      if (typeof item === 'number') {
+        if (!Number.isFinite(item)) throw incompatible;
+        this.encodeNumber(item);
+      } else if (item == null) this.encodeNil();
+      else this.doEncode(item, depth + 1);
+    }
+  }
+  encodeNumber(value) {
+    this.ensureBufferSizeToWrite(9);
+    const at = this.pos, bytes = this.bytes, view = this.view;
+    if (!Number.isSafeInteger(value)) {
+      bytes[at] = 0xcb; view.setFloat64(at + 1, value); this.pos = at + 9;
+    } else if (value >= 0) {
+      if (value < 128) { bytes[at] = value; this.pos = at + 1; }
+      else if (value < 256) { bytes[at] = 0xcc; bytes[at + 1] = value; this.pos = at + 2; }
+      else if (value < 65536) { bytes[at] = 0xcd; view.setUint16(at + 1, value); this.pos = at + 3; }
+      else if (value < 4294967296) { bytes[at] = 0xce; view.setUint32(at + 1, value); this.pos = at + 5; }
+      else super.encodeNumber(value);
+    } else {
+      if (value >= -32) { bytes[at] = 256 + value; this.pos = at + 1; }
+      else if (value >= -128) { bytes[at] = 0xd0; view.setInt8(at + 1, value); this.pos = at + 2; }
+      else if (value >= -32768) { bytes[at] = 0xd1; view.setInt16(at + 1, value); this.pos = at + 3; }
+      else if (value >= -2147483648) { bytes[at] = 0xd2; view.setInt32(at + 1, value); this.pos = at + 5; }
+      else super.encodeNumber(value);
+    }
+  }
+}
+const fastProjectedEncoder = new FastProjectedSnapshotEncoder({ ignoreUndefined: true, maxDepth: MAX_DEPTH });
 const projectedEncoder = new ProjectedSnapshotEncoder({ ignoreUndefined: true, maxDepth: MAX_DEPTH });
 /** Fresh captureCombat projection only. Null retains the existing JSON fallback. */
-export function encodeProjectedBinaryFrame(frame) {
+export function encodeProjectedBinaryFrame(frame, fastNumbers = false) {
   try {
     // encode() owns its output; the next encode must not mutate transferred bytes.
-    const bytes = projectedEncoder.encode(frame);
+    const bytes = (fastNumbers ? fastProjectedEncoder : projectedEncoder).encode(frame);
     if (bytes.length > LIMIT) throw new RangeError('Binary snapshot exceeds budget');
     return bytes;
   } catch (error) {
@@ -244,7 +289,18 @@ class SnapshotReader {
   }
   array(length) {
     const result = new Array(length);
-    for (let i = 0; i < length; i++) result[i] = this.read();
+    // preflight() has already checked every tag, bound and container depth.
+    // Numeric tuples dominate compact combat arrays; avoid recursive dispatch
+    // for their common tags, retaining read() for all other MessagePack values.
+    const bytes = this.bytes, view = this.view;
+    for (let i = 0; i < length; i++) {
+      const at = this.offset, tag = bytes[at];
+      if (tag < 128) { result[i] = tag; this.offset = at + 1; }
+      else if (tag >= 224) { result[i] = tag - 256; this.offset = at + 1; }
+      else if (tag === 0xcb) { result[i] = view.getFloat64(at + 1); this.offset = at + 9; }
+      else if (tag === 0xc0) { result[i] = null; this.offset = at + 1; }
+      else result[i] = this.read();
+    }
     return result;
   }
   map(length) {

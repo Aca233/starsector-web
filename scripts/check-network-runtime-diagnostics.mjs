@@ -204,3 +204,12 @@ test('worker diagnostics preserve bounded timing/counts but no world or identity
     else assert.equal(result.steam.snapshotWorker[key], value);
   }
 });
+
+
+test('relay compression sharing counters are scalar-only and distinct from wire savings', () => {
+  const compressionFanout = { requests: 9, jobs: 1, shared: 8, savedInputBytes: 65536, retries: 0, fallback: 0, activeJobs: 0, activeBytes: 0, payload: 'private', identity: 'private' };
+  const result = normalizeNetworkRecord(sample({ transport: 'lan', lan: { compressionFanout } }));
+  for (const [key, value] of Object.entries(compressionFanout)) {
+    assert.equal(result.lan.compressionFanout[key], ['payload', 'identity'].includes(key) ? undefined : value);
+  }
+});

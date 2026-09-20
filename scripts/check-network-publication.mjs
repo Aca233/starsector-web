@@ -29,7 +29,7 @@ const source=fs.readFileSync('src/network/host.worker.ts','utf8');
 const ast=ts.createSourceFile('host.worker.ts',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
 const fn=ast.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='acknowledgeSnapshot');assert.ok(fn);
 const code=(await transform(fn.getText(ast),{loader:'ts',target:'es2022'})).code;
-function authority(overrides={}){const c={snapshotInFlight:1,steppingLifecycle:null,running:true,tick:9,lastSnapshotTick:1,sent:[],...overrides};vm.createContext(c);vm.runInContext('function snapshot(){ if (tick===lastSnapshotTick || snapshotInFlight!==null) return; lastSnapshotTick=tick; snapshotInFlight=tick; sent.push(tick); }\n'+code,c);return c;}
+function authority(overrides={}){const c={snapshotInFlight:1,steppingLifecycle:null,running:true,tick:9,lastSnapshotTick:1,sent:[],sounds:[{id:1}],...overrides};vm.createContext(c);vm.runInContext('function snapshot(){ if (tick===lastSnapshotTick || snapshotInFlight!==null) return; lastSnapshotTick=tick; snapshotInFlight=tick; sent.push(tick); }\n'+code,c);return c;}
 test('returned host credit immediately publishes newest completed tick without another timer/physics step',()=>{
  const c=authority();c.acknowledgeSnapshot(1);assert.deepEqual([...c.sent],[9]);assert.equal(c.snapshotInFlight,9);assert.equal(c.tick,9);
  c.acknowledgeSnapshot(1);c.acknowledgeSnapshot(99);assert.deepEqual([...c.sent],[9]);c.acknowledgeSnapshot(9);assert.equal(c.snapshotInFlight,null);assert.deepEqual([...c.sent],[9]);
@@ -37,5 +37,11 @@ test('returned host credit immediately publishes newest completed tick without a
 test('stopped/in-progress authorities never publish from an ACK; tail remains the serialization barrier',()=>{
  for(const extra of [{running:false},{steppingLifecycle:4}]){const c=authority(extra);c.acknowledgeSnapshot(1);assert.equal(c.snapshotInFlight,null);assert.equal(c.sent.length,0);}
  const c=authority({snapshotInFlight:null});c.acknowledgeSnapshot(null);assert.equal(c.sent.length,0);
- assert.match(source,/else if \(m.type === "snapshot-consumed"\) \{\s*acknowledgeSnapshot\(m.tick\)/);
+ assert.match(source,/else if \(m.type === "snapshot-consumed"\) \{\s*acknowledgeSnapshot\(m.tick, m.discardSounds === true\)/);
+});
+
+test('only exact explicit idle-resume credit discards stale sounds; ordinary LAN ACKs retain them',()=>{
+ const ordinary=authority();ordinary.acknowledgeSnapshot(1);assert.equal(ordinary.sounds.length,1);
+ const resumed=authority();resumed.acknowledgeSnapshot(99,true);assert.equal(resumed.sounds.length,1);
+ resumed.acknowledgeSnapshot(1,true);assert.equal(resumed.sounds.length,0);assert.deepEqual([...resumed.sent],[9]);
 });

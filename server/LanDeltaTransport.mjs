@@ -7,7 +7,7 @@ import { LAN_DELTA_MAX_BYTES, createLanBytePatch, encodeLanPacket, lanBytes } fr
 export function lanDeltaTarget(value, seq, now = performance.now()) {
   const bytes = lanBytes(value);
   if (bytes.length < 4096 || bytes.length > LAN_DELTA_MAX_BYTES) return null;
-  return { bytes, seq, crc: crc32(bytes), now, patches: new WeakMap(), motionPatches: new WeakMap(), patchBuilds: 0, patchMs: 0 };
+  return { bytes, seq, crc: crc32(bytes), now, patches: new WeakMap(), motionPatches: new WeakMap(), patchBuilds: 0, patchMs: 0, packets: new WeakMap(), packetBuilds: 0 };
 }
 export class LanDeltaSender {
   constructor({ ordered = false, motionReference = false } = {}) { this.ordered = ordered; this.motionReference = motionReference === true; this.reset(); this.totals = { full: 0, delta: 0, anchors: 0, originalBytes: 0, encodedBytes: 0, budgetFallbacks: 0, motionDeltas: 0 }; }
@@ -47,7 +47,14 @@ export class LanDeltaSender {
       patch = this.motionReference ? cached?.patch ?? null : cached ?? null;
       motionSteps = this.motionReference ? cached?.steps ?? 0 : 0;
     }
-    const packet = encodeLanPacket(target, this.base, patch, anchor, motionSteps);
+    // Prepared packets are immutable broadcast payloads. Equal patch objects
+    // still need matching wire base metadata/flags; full packets ignore bases.
+    const payload = patch ?? target.bytes;
+    let packets = target.packets.get(payload);
+    if (!packets) { packets = new Map(); target.packets.set(payload, packets); }
+    const key = [patch ? this.base.seq : 0, patch ? this.base.crc : 0, anchor, motionSteps].join(':');
+    let packet = packets.get(key);
+    if (!packet) { packet = encodeLanPacket(target, this.base, patch, anchor, motionSteps); packets.set(key, packet); target.packetBuilds++; }
     const choice = { packet, target, anchor, budgetFallback, delta: !!patch, motionSteps, generation: this.generation, revision: this.revision };
     this.choices.add(choice); return choice;
   }

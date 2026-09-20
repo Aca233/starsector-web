@@ -1,3 +1,4 @@
+import { lanCompressionStats } from './LanBroadcastCompression.mjs';
 // Read-only, bounded LAN metrics carried by the existing application pong.
 // Wire/compressed bytes are deliberately NOT inferred from bufferedAmount.
 export function createLanFlowMetrics() {
@@ -18,6 +19,8 @@ export function lanTransportMetrics(p) {
   const authority = p.room?.peers[0]?.lanFlow;
   return { mode: 'lan-websocket', role: host ? 'host' : 'guest',
     relaySeq: p.room?.lastSeq ?? null,
+    // Aggregate of this relay process, not per-room traffic or a wire ratio.
+    compressionFanout: lanCompressionStats(p.ws),
     authority: authority ? { received: authority.received, lastBytes: authority.lastReceivedBytes, receiveMs: authority.lastReceiveMs } : null,
     receivers: host ? p.room.peers.filter(q => q !== p && !q.transport && !q.disconnected).slice(0, 9).map(receiver) : [receiver(p)] };
 }

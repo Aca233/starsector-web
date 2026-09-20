@@ -1,12 +1,13 @@
 {
   "name": "starsector-web",
   "private": true,
-  "version": "0.2.5",
+  "version": "0.2.6",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false",
+    "network:check:shared": "node scripts/check-native-capture.mjs && node --test scripts/check-shared-snapshot-codec.mjs && node scripts/check-shared-authority-transports.mjs && node --test scripts/check-network-publication.mjs scripts/check-snapshot-pipeline.mjs scripts/check-snapshot-delivery-window.mjs scripts/check-snapshot-broadcast-order.mjs scripts/check-steam-binary-host.mjs scripts/check-steam-binary-gateway.mjs scripts/check-steam-snapshot-prepare.mjs",
     "lint": "oxlint",
     "benchmark:collision": "node scripts/benchmark-collision.mjs",
     "import:content": "node scripts/import-game-content.mjs",

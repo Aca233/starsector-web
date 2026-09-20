@@ -37,8 +37,8 @@ export function isLanDelta(value) {
   const b = lanBytes(value);
   return b.length >= 4 && new DataView(b.buffer, b.byteOffset, b.byteLength).getUint32(0) === MAGIC;
 }
-/** Pure bounded prototype-free matcher. At most two 16-byte candidates per
- * position; no quadratic chain walk for repetitive/adversarial input. */
+/** Pure bounded prototype-free matcher. One continuity candidate plus two hash
+ * candidates per position; no chain walk or retained cross-snapshot history. */
 export function createLanBytePatch(before, after) {
   const base = lanBytes(before), target = lanBytes(after);
   if (!base.length || base.length > LAN_DELTA_MAX_BYTES || !target.length || target.length > LAN_DELTA_MAX_BYTES) return null;
@@ -46,12 +46,12 @@ export function createLanBytePatch(before, after) {
   const a = new DataView(base.buffer, base.byteOffset, base.byteLength), b = new DataView(target.buffer, target.byteOffset, target.byteLength);
   const hash = (v, i) => Math.imul(v.getUint32(i, true) ^ v.getUint32(i + 8, true), 0x9e3779b1) >>> 16;
   // Four-byte indexing finds unchanged float32-aligned runs that eight-byte
-  // sampling misses. Hash slots, two candidates, 16-byte minimum copies and
+  // sampling misses. Hash slots, 16-byte minimum copies and
   // the output/work budgets stay bounded; the SLD1 decoder is unchanged.
   for (let i = 0; i + 16 <= base.length; i += 4) { const h = hash(a, i); older[h] = newest[h]; newest[h] = i; }
   // Abort on non-beneficial patches instead of allocating an expansion. Require
   // >50% raw saving to offset copy metadata before permessage-deflate.
-  const out = new Uint8Array(Math.ceil(target.length / 2)); let pos = 0, literalAt = 0, i = 0;
+  const out = new Uint8Array(Math.ceil(target.length / 2)); let pos = 0, literalAt = 0, i = 0, shift = 0;
   const vint = n => { while (n >= 128) { out[pos++] = (n & 127) | 128; n >>>= 7; } out[pos++] = n; };
   const literal = end => {
     const length = end - literalAt;
@@ -60,16 +60,24 @@ export function createLanBytePatch(before, after) {
   };
   while (i + 16 <= target.length) {
     const h = hash(b, i); let best = -1, length = 0;
-    for (let slot = 0; slot < 2; slot++) {
-      const c = slot ? older[h] : newest[h]; if (c < 0) continue;
-      let n = 0; while (n < 16 && base[c + n] === target[i + n]) n++;
-      if (n < 16) continue;
+    // Record layouts usually keep the previous copy's displacement even
+    // after a changed numeric field. That exact candidate can survive hash
+    // collisions and need not be four-byte aligned. It is never a prediction:
+    // every copied byte must match. Prefer it on ties for stable copy offsets.
+    for (let slot = 0; slot < 3; slot++) {
+      const c = slot === 0 ? i + shift : slot === 1 ? newest[h] : older[h];
+      if (c < 0 || c + 16 > base.length) continue;
+      if (a.getUint32(c) !== b.getUint32(i) || a.getUint32(c + 4) !== b.getUint32(i + 4) ||
+          a.getUint32(c + 8) !== b.getUint32(i + 8) || a.getUint32(c + 12) !== b.getUint32(i + 12)) continue;
+      let n = 16;
+      while (c + n + 4 <= base.length && i + n + 4 <= target.length &&
+          a.getUint32(c + n) === b.getUint32(i + n)) n += 4;
       while (c + n < base.length && i + n < target.length && base[c + n] === target[i + n]) n++;
       if (n > length) { best = c; length = n; }
     }
     if (length >= 16) {
       if (!literal(i) || pos + 10 > out.length) return null;
-      vint(length * 2 + 1); vint(best); i += length; literalAt = i;
+      shift = best - i; vint(length * 2 + 1); vint(best); i += length; literalAt = i;
     } else i++;
   }
   if (!literal(target.length)) return null;

@@ -48,9 +48,9 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - name: Check network diagnostics and heartbeat
-        run: node --test scripts/check-network-diagnostics.mjs scripts/check-network-session-log.mjs scripts/check-network-session-integration.mjs scripts/check-network-n2n.mjs scripts/check-network-runtime-diagnostics.mjs scripts/check-snapshot-pipeline.mjs scripts/check-background-heartbeat.mjs scripts/check-network-publication.mjs scripts/check-lan-binary-delta.mjs scripts/check-lan-delta-relay.mjs scripts/check-lan-delta-client.mjs scripts/check-lan-delta-worker.mjs scripts/check-lan-ordered-websocket.mjs scripts/check-snapshot-broadcast-order.mjs scripts/check-snapshot-delivery-window.mjs scripts/check-snapshot-motion-reference.mjs scripts/check-lan-motion-reference.mjs scripts/check-lan-congestion.mjs scripts/check-lan-diagnostics.mjs
-      # Keep failing network gates visible without denying users a preview build.
-      # Only a passing check run may replace the stable auto-update release.
+        run: node --test scripts/check-network-diagnostics.mjs scripts/check-network-session-log.mjs scripts/check-network-session-integration.mjs scripts/check-network-n2n.mjs scripts/check-network-runtime-diagnostics.mjs scripts/check-snapshot-pipeline.mjs scripts/check-background-heartbeat.mjs scripts/check-network-publication.mjs scripts/check-lan-binary-delta.mjs scripts/check-lan-delta-relay.mjs scripts/check-lan-delta-client.mjs scripts/check-lan-delta-worker.mjs scripts/check-lan-ordered-websocket.mjs scripts/check-snapshot-broadcast-order.mjs scripts/check-snapshot-delivery-window.mjs scripts/check-snapshot-motion-reference.mjs scripts/check-lan-motion-reference.mjs scripts/check-lan-congestion.mjs scripts/check-lan-diagnostics.mjs scripts/check-lan-broadcast-compression.mjs scripts/check-lan-delta-continuity.mjs
+      # Keep failing gates visible and retain a draft for explicit release review.
+      # Only passing gates may automatically replace the stable update release.
       - name: Check Steam transport release gates
         id: steam_checks
         continue-on-error: true
@@ -61,12 +61,12 @@ jobs:
       - run: npm run package:steam -- --skip-build --version $env:RELEASE_VERSION
       - run: npm run release:manifest -- --version $env:RELEASE_VERSION
       - run: npm run package:electron -- --skip-build --version $env:RELEASE_VERSION
-      - name: Publish complete release with checked stability
+      - name: Publish checked release or retain draft for review
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_PRERELEASE: ${{ steps.steam_checks.outcome != 'success' }}
+          RELEASE_NEEDS_REVIEW: ${{ steps.steam_checks.outcome != 'success' }}
         run: |
           if ($env:GH_REPO -cne 'Aca233/starsector-web') { throw 'Configure the updater repository before publishing from a fork' }
           $manifestPath = Join-Path $PWD 'artifacts/releases/windows-updates.json'
@@ -83,16 +83,15 @@ jobs:
             $files += $asset
           }
           # Keep incomplete uploads out of /releases/latest. Never overwrite an existing version.
-          $preview = $env:RELEASE_PRERELEASE -eq 'true'
+          $needsReview = $env:RELEASE_NEEDS_REVIEW -eq 'true'
           $releaseOptions = @()
-          if ($preview) {
-            $releaseOptions += @('--prerelease', '--notes', 'Preview build: Steam transport release gates did not all pass. This is not the latest stable release and is excluded from stable automatic updates. See the workflow Steam check log for known failures; real multi-account Steam validation remains outstanding.')
-          }
+          $notes = Join-Path $PWD "docs/releases/$($env:RELEASE_TAG).md"
+          if (Test-Path -LiteralPath $notes -PathType Leaf) { $releaseOptions += @('--notes-file', $notes) }
           gh release create $env:RELEASE_TAG @files @releaseOptions --verify-tag --draft --generate-notes --title "Starsector Web $env:RELEASE_TAG"
           if ($LASTEXITCODE -ne 0) { throw 'Release creation/upload failed; inspect any draft before retrying' }
-          if ($preview) {
-            gh release edit $env:RELEASE_TAG --draft=false --prerelease --latest=false
+          if ($needsReview) {
+            Write-Warning 'Steam gates did not all pass. Assets remain in a non-public draft for explicit review; no prerelease or stable update was published.'
           } else {
-            gh release edit $env:RELEASE_TAG --draft=false --latest
+            gh release edit $env:RELEASE_TAG --draft=false --prerelease=false --latest
+            if ($LASTEXITCODE -ne 0) { throw 'Publishing draft release failed' }
           }
-          if ($LASTEXITCODE -ne 0) { throw 'Publishing draft release failed' }

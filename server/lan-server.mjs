@@ -5,7 +5,8 @@ import { createLanFlowMetrics, lanTransportMetrics } from "./LanTransportDiagnos
 import { teamName, checkFleetBudget, editAiFleet } from "../src/network/room-fleet.mjs";
 import { MAX_BATTLE_REPORT_BYTES, validateBattleReport } from "../src/network/battle-report.mjs";
 import { summarizeCombatFrame, reusableStateText } from "./lan-state.mjs";
-import { decodeBinaryState, encodeBinaryState } from "../src/network/BinarySnapshot.mjs";
+import { prepareAuthoritySnapshot } from "./authority-snapshot.mjs";
+import { decodeBinaryState } from "../src/network/BinarySnapshot.mjs";
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -13,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import { networkInterfaces, hostname } from "node:os";
 import { randomBytes, randomUUID, createHash } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
+import { LanBroadcastCompression } from "./LanBroadcastCompression.mjs";
 import { isLanAddress, lanPerMessageDeflate } from "./lan-websocket.mjs";
 import { DEFAULT_BATTLE_SIZE, MAX_BATTLE_SIZE, validBattleSize, battleTeamCount, battleTeamLimit } from "../src/shared/battle-size.mjs";
 import protocol from "../src/network/protocol.json" with { type: "json" };
@@ -177,6 +179,7 @@ export async function createLanServer({
   // Both groups share admission, transport handling and the original limits.
   const websocketServers = [false, lanPerMessageDeflate()].map(perMessageDeflate =>
     new WebSocketServer({ noServer: true, maxPayload: protocol.maxSnapshotBytes, perMessageDeflate }));
+  const broadcastCompression = new LanBroadcastCompression();
   const connected = (p) =>
     !p.disconnected && p.ws.readyState === WebSocket.OPEN;
   const sendEncoded = (p, encoded, snapshot = null) => {
@@ -255,6 +258,7 @@ export async function createLanServer({
         relaySnapshot ??= { state: message, bytes: encoded };
         snapshot = relaySnapshot;
       }
+      if (message.type === "state" && !p.transport) broadcastCompression.share(delivery);
       const sent = sendEncoded(p, delivery, snapshot);
       if (sent && choice) p.lanDelta.commit(choice);
       if (sent && message.type === "state") countSnapshotStage(p, "queued");
@@ -309,6 +313,22 @@ export async function createLanServer({
     broadcast(r, { type: "room", room: view(r) });
     extension?.roomChanged?.(r);
   };
+  // Server-only capture credit: an unobserved battle still simulates at 60 Hz.
+  // Keep a scalar tick, never a queued payload or a client-side authority owner.
+  const hasSnapshotAudience = r => r.peers.some(p => connected(p) && p.assetsLoaded && !p.background);
+  const resumeAuthoritySnapshots = r => {
+    if (!authorityFactory || r.status !== "running" || r.authoritySnapshotTick == null || !hasSnapshotAudience(r)) return;
+    const tick = r.authoritySnapshotTick;
+    r.authoritySnapshotTick = null;
+    // Grant ONE normal snapshot timeout from resumed demand, not on each ping,
+    // visibility message or resync. The next frame must really arrive.
+    r.authorityDemandSince = Date.now();
+    r.authority?.postMessage({type:"snapshot-consumed", tick, discardSounds:true});
+  };
+  const consumeAuthoritySnapshot = (r, tick) => {
+    if (r.status === "running" && !hasSnapshotAudience(r)) r.authoritySnapshotTick = tick;
+    else r.authority?.postMessage({type:"snapshot-consumed", tick});
+  };
   const toAuthority = (r, message) => authorityFactory ? r.authority?.postMessage(message) : send(r.peers[0], message);
   const presence = (r, p, online) =>
     toAuthority(r, {
@@ -327,8 +347,9 @@ export async function createLanServer({
     p.sync = { id: randomUUID(), tick: Math.max(0, r.lastTick + 1), since: Date.now() };
     presence(r, p, false);
     send(p, { type: "launch", matchId: r.match.id, syncId: p.sync.id, minTick: p.sync.tick });
+    resumeAuthoritySnapshots(r);
   };
-  const stopAuthority = r => { const handle = r.authority; r.authority = null; r.authorityReady = false; return handle?.terminate(); };
+  const stopAuthority = r => { const handle = r.authority; r.authority = null; r.authorityReady = false; r.authoritySnapshotTick = null; return handle?.terminate(); };
   const abort = (r, reason) => {
     if (!["loading", "running"].includes(r.status)) return;
     r.status = "ended";
@@ -426,13 +447,16 @@ export async function createLanServer({
         try {
           if (r.status !== "running") return;
           const seq = r.lastSeq + 1;
-          const bytes = message.binary ? encodeBinaryState(matchId, seq, new Uint8Array(message.binary)) : null;
-          const frame = bytes ? decodeBinaryState(bytes).frame : JSON.parse(message.json);
-          const summary = summarizeCombatFrame(frame, expectedShips(r), r.lastTick);
-          r.lastTick = frame.tick; r.lastSeq = seq; r.lastState = Date.now(); r.frame = summary;
+          const needsFrame = r.peers.some(p => typeof p.ws.sendSnapshot === "function");
+          const {bytes, frame, summary} = prepareAuthoritySnapshot(message, matchId, seq, expectedShips(r), r.lastTick, needsFrame);
+          r.lastTick = summary.tick; r.lastSeq = seq; r.lastState = Date.now(); r.frame = summary;
           broadcast(r, {type:"state", matchId, seq, frame}, undefined, bytes);
-        } finally { r.authority?.postMessage({type:"snapshot-consumed", tick:message.tick}); }
+        } finally { consumeAuthoritySnapshot(r, message.tick); }
       } else if (message.type === "performance") {
+        if (Number.isSafeInteger(message.tick) && message.tick > (r.authorityProgressTick ?? -1)) {
+          r.authorityProgressTick = message.tick;
+          r.authorityProgressAt = Date.now();
+        }
         r.authorityPerformance = message;
         broadcast(r, {type:"authority-performance", matchId, performance:message});
       } else if (message.type === "recovered") {
@@ -476,6 +500,7 @@ export async function createLanServer({
     }
   });
   const acceptTransport = (ws, transport = null) => {
+    if (!transport) broadcastCompression.attach(ws);
     let p = {
       ws,
       transport,
@@ -708,6 +733,7 @@ export async function createLanServer({
           }
           if (p.background !== m.hidden) { p.stateCredits?.reset(); p.lanDelta?.reset(); }
           p.background = m.hidden;
+          if (p.room) resumeAuthoritySnapshots(p.room);
           return;
         }
         if (m.type === "ping") {
@@ -972,6 +998,9 @@ export async function createLanServer({
           r.reason = "";
           r.since = now;
           r.lastState = now;
+          r.authoritySnapshotTick = null;
+          r.authorityProgressTick = -1;
+          r.authorityProgressAt = r.authorityDemandSince = now;
           r.lastSeq = -1;
           r.lastTick = -1;
           r.frame = null;
@@ -1217,7 +1246,9 @@ export async function createLanServer({
         r.status === "running" &&
         (authorityFactory || connected(r.peers[0])) &&
         now > (r.recoveryUntil ?? 0) &&
-        now - r.lastState > (!authorityFactory && r.peers[0].background ? protocol.backgroundGraceMs : protocol.hostStateTimeoutMs)
+        now - (authorityFactory
+          ? Math.max(r.lastState, r.authoritySnapshotTick != null ? r.authorityProgressAt : r.authorityDemandSince)
+          : r.lastState) > (!authorityFactory && r.peers[0].background ? protocol.backgroundGraceMs : protocol.hostStateTimeoutMs)
       )
         abort(r, !authorityFactory && r.peers[0].background
           ? "计算主机后台超过 5 分钟未更新，恢复超时，本局停止。"

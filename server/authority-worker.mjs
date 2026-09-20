@@ -18,4 +18,4 @@ globalThis.postMessage = (message, transfer = []) => parentPort.postMessage(mess
 await assetManager.ensureManifestLoaded();
 await import('../src/network/host.worker.ts');
 parentPort.on('message', message => globalThis.onmessage({ data: message }));
-globalThis.onmessage({ data: { type: 'init', match: workerData.match, hidden: false, binarySnapshots: true } });
+globalThis.onmessage({ data: { type: 'init', match: workerData.match, hidden: false, binarySnapshots: true, authoritySummaries: true } });

@@ -1,3 +1,4 @@
+import { summarizeCombatFrame } from './CombatFrameSummary.mjs';
 import { FlowCounters } from './SnapshotFlow.mjs';
 import { yieldHostTask } from './HostTaskYield';
 import { HostAiBudget } from './HostAiBudget';
@@ -17,7 +18,7 @@ import { DEFAULT_MOUSE_STEERING } from "../engine/runtime/CombatControlSettings"
 import { dispatchShipCommand } from "../engine/runtime/CombatCommands";
 import { sound } from "../engine/audio/SoundManager";
 import type { CombatSound } from "./CombatSnapshot";
-import { captureHostCombat, configureHostCosmetics } from "./HostSnapshot";
+import { captureAuthorityCombat, configureHostCosmetics } from "./HostSnapshot";
 import { encodeProjectedBinaryFrame } from "./BinarySnapshot.mjs";
 import { blankInput, KEY_CODES } from "./protocol";
 import type { Match, PlayerInput, Seat, Action } from "./protocol";
@@ -43,6 +44,8 @@ const controls = new Map<Seat, Controls>();
 const deploymentReplies = new Map<string, Record<string, unknown>>();
 let captureMs = 0, encodeMs = 0;
 let snapshotInFlight: number | null = null;
+// Only the dedicated Node adapter opts in; browser LAN/Steam defaults are unchanged.
+let authoritySummaryShips: number | null = null;
 let muzzleEvents: HostMuzzleEvents | null = null;
 const snapshotEncoder = new TextEncoder();
 const recoveryBudget = new HostRecoveryBudget();
@@ -81,8 +84,11 @@ let lastSnapshotTick = -1;
 let clockAt = 0, clockTick = 0, clockCombat = 0;
 let realtimeRatio: number | undefined, combatRate: number | undefined;
 let telemetryAt = 0, callbackGapMs = 0, lastStepMs = 0, maxStepMs = 0;
-function acknowledgeSnapshot(consumedTick: number) {
+function acknowledgeSnapshot(consumedTick: number, discardSounds = false) {
   if (snapshotInFlight === null || consumedTick !== snapshotInFlight) return;
+  // A dedicated room with no viewers may have held this credit for a while.
+  // Do not play its bounded but now stale one-shot sounds when a viewer returns.
+  if (discardSounds) sounds.length = 0;
   snapshotInFlight = null;
   // A completed tick may have been withheld while main admitted the previous
   // packet. Publish that latest tick now, not after another timer/physics batch.
@@ -110,7 +116,7 @@ function snapshot(final = false) {
   lastSnapshotTick = tick;
   if (engine) {
     const started = performance.now();
-    const frame = captureHostCombat(
+    const frame = captureAuthorityCombat(
       engine,
       tick,
       Object.fromEntries(
@@ -128,14 +134,15 @@ function snapshot(final = false) {
     frame.combatRate = combatRate;
     frame.sounds = sounds.splice(0);
     // Serialize once off the rendering thread. LAN transfers owned binary bytes;
-    // Steam (and rare JSON-compatibility fallbacks) keeps the existing text path.
+    // Steam binary uses the same exact codec; legacy peers/fallbacks keep JSON.
     const encodingStarted = performance.now();
-    const binary = binarySnapshots ? encodeProjectedBinaryFrame(frame) : null;
+    const summary = authoritySummaryShips === null ? undefined : summarizeCombatFrame(frame, authoritySummaryShips, tick - 1);
+    const binary = binarySnapshots ? encodeProjectedBinaryFrame(frame, true) : null;
     const json = binary ? undefined : JSON.stringify(frame);
     const bytes = binary?.byteLength ?? snapshotEncoder.encode(json!).byteLength;
     encodeMs = encodeMs * .7 + (performance.now() - encodingStarted) * .3;
     snapshotInFlight = tick;
-    if (binary) send({ type: "snapshot", binary: binary.buffer, bytes, tick, encodeMs }, [binary.buffer]);
+    if (binary) send({ type: "snapshot", binary: binary.buffer, bytes, tick, encodeMs, ...(summary ? {summary} : {}) }, [binary.buffer]);
     else send({ type: "snapshot", json, bytes, tick, encodeMs });
     snapshotFlow.count("produced");
   }
@@ -330,6 +337,8 @@ self.onmessage = (event: MessageEvent) => {
       foregroundPending = false;
       backgroundThrottled = false;
       const match = m.match as Match;
+      authoritySummaryShips = binarySnapshots && m.authoritySummaries === true
+        ? match.players.length + match.options.aiHulls.reduce((n, rows) => n + rows.length, 0) : null;
       const world = createLanWorld(match);
       engine = world.engine;
       muzzleEvents = configureHostCosmetics(engine);
@@ -382,7 +391,7 @@ self.onmessage = (event: MessageEvent) => {
       send(response);
 
     } else if (m.type === "snapshot-consumed") {
-      acknowledgeSnapshot(m.tick);
+      acknowledgeSnapshot(m.tick, m.discardSounds === true);
     } else if (m.type === "presence" && engine) {
       const state = controls.get(m.seat),
         ship = controlled.get(m.seat);
