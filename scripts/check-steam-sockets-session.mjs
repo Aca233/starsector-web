@@ -257,3 +257,15 @@ test('a stale packed-state nonce is inert before checking the current session en
  const before=f.guest.stats.staleSessionPackets;f.guest.receive({ticket:f.gt,kind:'snapshot',data:b},1);
  assert.equal(f.guest.state,'ready');assert.equal(f.guest.stats.staleSessionPackets,before+1);assert.equal(f.budget.bytes,0);f.host.close();f.guest.close();
 });
+
+test('coalesced offered states do not compress full snapshots while awaiting stream admission',()=>{
+ for(const hostFlight of [false,true]){
+  const f=fixture({hostFlight});f.ready();const original=f.host.codec.prepare.bind(f.host.codec);let fulls=0;
+  f.host.codec.prepare=(op,value)=>{if(typeof value==='string'&&value.startsWith('{"type":"steam-state",'))fulls++;return original(op,value);};
+  const ballast=seededText(12000);
+  for(let seq=1;seq<=100;seq++)assert.equal(f.host.offerState(JSON.stringify(state(seq,ballast)),seq).status,'queued');
+  assert.equal(fulls,0);assert.equal(f.host.latest.seq,100);f.exchange(101);
+  assert.equal(fulls,1);assert.deepEqual(f.guest.takeEvents(),[{type:'state',data:state(100,ballast)}]);
+  assert.equal(f.closed.length,0);
+ }
+});

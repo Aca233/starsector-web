@@ -85,3 +85,35 @@ test('seeded changing-length payloads reconstruct exactly across delayed ACKs an
  }
  assert.ok(delivered>220);assert.ok(s.stats().delta>200);
 });
+
+test('ordered LAN advances only on successful send, independently of delayed consumption ACKs',()=>{
+ const s=new LanDeltaSender({ordered:true}),r=new LanDeltaReceiver();
+ for(let seq=1;seq<=120;seq++){
+  if(seq%7===0){s.prepare(target(seq));continue;} // Socket/credit refusal: no commit, no base.
+  const prior=s.stats().baseSeq,c=deliver(s,r,target(seq));
+  assert.equal(c.anchor,true);assert.equal(c.delta,prior!==null);
+  assert.equal(s.stats().baseSeq,seq);assert.equal(s.stats().pendingSeq,null);
+  s.ack(Math.max(0,seq-18));assert.equal(s.stats().baseSeq,seq,'late ACK cannot rewind base');
+  assert.ok(s.stats().retainedBytes<=LAN_DELTA_MAX_BYTES);
+  assert.ok(r.retainedBytes<=LAN_DELTA_MAX_BYTES*2);
+ }
+});
+test('ordered LAN fails closed after a missing/corrupt committed frame and restarts full on reset',()=>{
+ const s=new LanDeltaSender({ordered:true}),r=new LanDeltaReceiver();deliver(s,r,target(1));
+ const missing=s.prepare(target(2));s.commit(missing);
+ assert.throws(()=>r.decode(s.prepare(target(3)).packet),'never ACK a broken FIFO');
+ s.reset();r.reset();assert.equal(deliver(s,r,target(4)).delta,false);
+ assert.equal(deliver(s,r,target(5)).delta,true);
+ const corrupt=s.prepare(target(6));corrupt.packet[corrupt.packet.length-1]^=1;
+ assert.throws(()=>r.decode(corrupt.packet));assert.equal(r.retainedBytes,0);
+});
+
+test('four-byte-offset copy islands are indexed without changing the lossless packet contract',()=>{
+ let seed=121;const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed>>>24;};
+ const base=encodeBinaryState('dense-index',1,Uint8Array.from({length:8192},random));
+ const islands=Array.from({length:128},(_,i)=>base.subarray(132+i*32,148+i*32));
+ const bytes=encodeBinaryState('dense-index',2,Buffer.concat(islands));
+ const a={bytes:base,seq:1,crc:crc32(base)},b={bytes,seq:2,crc:crc32(bytes)},patch=createLanBytePatch(base,bytes);
+ assert.ok(patch,'16-byte copies at offsets 4 mod 8 should not fall back to full');assert.ok(patch.length<bytes.length/2);
+ const receiver=new LanDeltaReceiver();receiver.decode(encodeLanPacket(a,null,null,true));assert.deepEqual(receiver.decode(encodeLanPacket(b,a,patch,true)),bytes);
+});

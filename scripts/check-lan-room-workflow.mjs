@@ -13,10 +13,14 @@ test('solo host can apply and start against AI; with no enemy only apply',()=>{
   assert.equal(roomWorkflow(room,'host').opponentTeam,1);
   room.options.assignment='solo';assert.equal(roomWorkflow(room,'host').opponentTeam,0);
 });
-test('host apply predicts readiness reset, never starts over ready guests',()=>{
+test('host applies and starts without clearing ready guests; prediction does not mutate the room',()=>{
   const room=makeRoom();room.members.push({...member('guest',1),ready:true});
   const next=roomApplyAction(room,'host',draft);
-  assert.equal(next.label,'应用配装');assert.match(next.hint,/等待玩家准备/);
+  assert.equal(next.label,'应用并开始');assert.equal(next.continueToAction,true);
+  room.members[1].editing=true;assert.equal(roomApplyAction(room,'host',draft).continueToAction,false);
+  room.members[1].editing=false;room.members[1].ready=false;
+  assert.match(roomApplyAction(room,'host',draft).hint,/等待玩家准备/);
+  room.members[1].ready=true;
   assert.equal(room.members[1].ready,true,'prediction must not mutate live room');
 });
 test('guest applies and readies regardless of another pending editor',()=>{
@@ -106,7 +110,46 @@ test('real relay returns correlated ready/start failures and confirms ready togg
     guest.conn.send({type:'editing',editing:false});await response;
     await submitRoomAction(guest.conn,code,guest.id,{type:'ready',ready:true});
     await submitRoomAction(guest.conn,code,guest.id,{type:'ready',ready:false});
-    assert.equal(host.conn.listeners.size,0);assert.equal(guest.conn.listeners.size,0);
+    // Three-player readiness must not ping-pong as each player applies a draft.
+    const guest2=await connect('guest2');response=next(guest2.conn,m=>m.type==='room');
+    guest2.conn.send({type:'join',code,password:''});await response;
+    const peer=player=>app.rooms.get(code).peers.find(p=>p.id===player.id);
+    let revision=0;
+    const configure=async player=>{
+      const requestId='configure-'+(++revision), done=next(player.conn,m=>m.type==='configured'&&m.requestId===requestId);
+      player.conn.send({type:'configure',requestId,roomCode:code,baseRevision:peer(player).designRevision,hull:'onslaught',design:null});
+      await done;
+    };
+    await submitRoomAction(guest.conn,code,guest.id,{type:'ready',ready:true});
+    await submitRoomAction(guest2.conn,code,guest2.id,{type:'ready',ready:true});
+    await configure(guest2);
+    assert.equal(peer(guest).ready,true,'another player applying does not cancel my ready');
+    assert.equal(peer(guest2).ready,false,'the changed player must confirm their own fit');
+    await submitRoomAction(guest2.conn,code,guest2.id,{type:'ready',ready:true});
+    await configure(host);
+    assert.equal(peer(guest).ready,true);assert.equal(peer(guest2).ready,true);
+    response=next(guest.conn,m=>m.type==='room'&&m.room.members.find(p=>p.id===guest.id)?.editing);
+    guest.conn.send({type:'editing',editing:true});await response;
+    assert.equal(peer(guest).ready,false);assert.equal(peer(guest2).ready,true);
+    await assert.rejects(submitRoomAction(host.conn,code,host.id,{type:'start'}),/应用改装/);
+    await configure(guest);await submitRoomAction(guest.conn,code,guest.id,{type:'ready',ready:true});
+    response=next(host.conn,m=>m.type==='room'&&m.room.options.battleSize===600);
+    host.conn.send({type:'options',options:{battleSize:600}});await response;
+    assert.equal(peer(guest).ready,false,'shared rules still reset all players');
+    assert.equal(peer(guest2).ready,false);
+    await submitRoomAction(guest.conn,code,guest.id,{type:'ready',ready:true});
+    await submitRoomAction(guest2.conn,code,guest2.id,{type:'ready',ready:true});
+    response=next(host.conn,m=>m.type==='room'&&m.room.members.find(p=>p.id===guest2.id)?.team===1);
+    host.conn.send({type:'team',id:guest2.id,team:1});await response;
+    assert.equal(peer(guest).ready,false,'team changes still reset all players');
+    assert.equal(peer(guest2).ready,false);
+    await assert.rejects(submitRoomAction(host.conn,code,host.id,{type:'start'}),/等待玩家准备/);
+    await submitRoomAction(guest.conn,code,guest.id,{type:'ready',ready:true});
+    await submitRoomAction(guest2.conn,code,guest2.id,{type:'ready',ready:true});
+    await configure(host);
+    await submitRoomAction(host.conn,code,host.id,{type:'start'});
+    assert.equal(app.rooms.get(code).status,'loading','host can apply then start without another ready cycle');
+    assert.equal(host.conn.listeners.size,0);assert.equal(guest.conn.listeners.size,0);assert.equal(guest2.conn.listeners.size,0);
   } finally {
     for(const ws of clients)ws.terminate();await app?.close();
     for(const name of ['index.html','lan-build.json'])fs.unlinkSync(path.join(dir,name));

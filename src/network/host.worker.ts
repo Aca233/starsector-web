@@ -81,6 +81,15 @@ let lastSnapshotTick = -1;
 let clockAt = 0, clockTick = 0, clockCombat = 0;
 let realtimeRatio: number | undefined, combatRate: number | undefined;
 let telemetryAt = 0, callbackGapMs = 0, lastStepMs = 0, maxStepMs = 0;
+function acknowledgeSnapshot(consumedTick: number) {
+  if (snapshotInFlight === null || consumedTick !== snapshotInFlight) return;
+  snapshotInFlight = null;
+  // A completed tick may have been withheld while main admitted the previous
+  // packet. Publish that latest tick now, not after another timer/physics batch.
+  // During an async/yielding step only return credit: its normal tail publishes
+  // after the authority mutation is complete. No extra physics or payload queue.
+  if (running && steppingLifecycle === null) snapshot();
+}
 function measureClock(now: number) {
   const elapsed = now - clockAt;
   if (!running || !engine || elapsed < 2000) return;
@@ -373,7 +382,7 @@ self.onmessage = (event: MessageEvent) => {
       send(response);
 
     } else if (m.type === "snapshot-consumed") {
-      if (m.tick === snapshotInFlight) snapshotInFlight = null;
+      acknowledgeSnapshot(m.tick);
     } else if (m.type === "presence" && engine) {
       const state = controls.get(m.seat),
         ship = controlled.get(m.seat);

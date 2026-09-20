@@ -93,9 +93,16 @@ export class SteamSnapshotEncoder {
     if (size > DELTA_MAX_BYTES) return null;
     const token = this.sequence = (this.sequence + 1) >>> 0;
     const hash = digest(canonical);
-    const envelope = { type: 'steam-state', v: 1, token, base: null, size, hash, body: value };
-    const full = codec.prepare('data', JSON.stringify(envelope));
-    return this.current = { text, value, token, size, hash, full, deltas: new WeakMap() };
+    // Sockets validates every offered state, even while stream/credit admission
+    // is blocked. Do not full-compress states that will be superseded unsent.
+    // The first actual sender choice materializes exactly the old envelope;
+    // every peer then shares it. Each target owns its cache across clear/reuse.
+    let full;
+    return this.current = { text, value, token, size, hash,
+      get full() {
+        return full ??= codec.prepare('data', JSON.stringify({ type: 'steam-state', v: 1, token, base: null, size, hash, body: value }));
+      },
+      deltas: new WeakMap() };
   }
 }
 export class SteamSnapshotSender {
@@ -151,17 +158,19 @@ export class SteamSnapshotReceiver {
     if (envelope.base !== null && this.base?.token !== envelope.base) {
       this.base = null; this.misses++; return { data: null, needsFull: true };
     }
-    // Inspect the patch BEFORE applying it, then the reconstructed target. Both
-    // trees are bounded; unique indices/keys prevent copying one large subtree
-    // an attacker-selected number of times. Never trust the declared size alone.
+    // Inspect full bodies once. For deltas, inspect the patch BEFORE applying
+    // it, then the reconstructed target. Both trees stay bounded; unique
+    // indices/keys prevent subtree amplification. Never trust declared size.
     inspect(envelope.body);
     const value = envelope.base === null ? envelope.body : applyStateDelta(this.base.value, envelope.body);
-    inspect(value);
+    if (envelope.base !== null) inspect(value);
     if (!isState(value)) invalid();
     const canonical = JSON.stringify(value), size = Buffer.byteLength(canonical);
     if (size !== envelope.size || digest(canonical) !== envelope.hash) invalid();
     this.base = { token: envelope.token, value, size };
     if (envelope.base === null) this.fullStates++; else this.deltaStates++;
-    return { data: value, needsFull: false };
+    // This text has passed size/hash validation; callers may reuse it for the
+    // local browser hop. Keep it per-result, not in the retained baseline.
+    return { data: value, canonicalText: canonical, needsFull: false };
   }
 }

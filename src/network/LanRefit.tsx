@@ -5,7 +5,7 @@ import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRe
 import { NativeRefit } from '../studio/NativeRefit';
 import { NativeButton } from '../ui/NativeChrome';
 import { Modal } from '../ui/core/UI';
-import { createDesign, data, decodeDesign, evaluate, readLibrary, writeLibrary, storageKey, type Design } from '../studio/DesignModel';
+import { withDesignCaptain, createDesign, data, decodeDesign, evaluate, readLibrary, writeLibrary, storageKey, type Design } from '../studio/DesignModel';
 import { HullRoster, type HullFilter } from '../studio/HullRoster';
 import { lanHullUnavailable, validateLanDesign } from './LanDesign';
 import { modManager } from '../engine/modding/ModManager';
@@ -16,7 +16,7 @@ const signature = (d: Design) => JSON.stringify({...d,updatedAt:0});
 type Confirmation = {title:string; text:string; run:()=>void};
 export interface LanEditorRoom {
   title: string; hasAppliedDesign: boolean; leaveDescription: string;
-  sidebar: (onPickHull:()=>void, draft:Design, onChange:(draft:Design)=>void) => ReactNode;
+  sidebar: (onPickHull:()=>void, draft:Design, onChange:(draft:Design)=>void, pending:boolean) => ReactNode;
   backLabel?:string;
   tools: ReactNode;
   actionLabel: string; actionBlocked: string; onAction:()=>void|Promise<void>;
@@ -74,7 +74,7 @@ export function LanRefit({initial,disabledReason,onApply,onCancel,room,suspended
   const attempt=(run:()=>void)=>{try{run();}catch(e){setError(e instanceof Error?e.message:'操作失败');}};
   const chooseHull=(id:string,empty=false)=>attempt(()=>{
     const reason=lanHullUnavailable(modManager.requireShip(id));if(reason)throw Error(reason);
-    change(createDesign(id,empty?'empty':'standard'));
+    change(withDesignCaptain(createDesign(id,empty?'empty':'standard'),draft));
     setPickingHull(false);
     setNotice('已选择'+(data.ships[id]?.name??id)+'；可继续改装或直接应用，切换前的配装可撤消。');
   });
@@ -97,7 +97,7 @@ export function LanRefit({initial,disabledReason,onApply,onCancel,room,suspended
         if(!acknowledged)throw Error('未收到服务器确认，草稿已保留');
         const accepted=acknowledged;
         setDraft(accepted);setBaseline(structuredClone(accepted));setConfirmed(true);setHistory([]);
-        room.onDirtyChange(false);setNotice('配装已同步到房间，其他玩家需要重新准备。');
+        room.onDirtyChange(false);setNotice('配装已同步到房间。');
       }
       setPhase('idle');
       if(continueToAction&&mounted.current)await runAction();
@@ -108,6 +108,7 @@ export function LanRefit({initial,disabledReason,onApply,onCancel,room,suspended
   const syncLabel=actionBusy?'正在确认操作…':phase==='syncing'?'正在同步…':phase==='error'?'同步失败 · 草稿已保留':needsApply?'我的配装 · 尚未应用':'我的配装 · 已同步';
   const primaryLabel=busy?'等待服务器确认…':!room?'应用并返回房间':needsApply?applyAction?.label??'应用修改':room.actionLabel;
   const primaryBlocked=busy?'正在等待服务器确认':needsApply||!room?applyBlocked:disabledReason||room.actionBlocked;
+  const actionHint=busy?'等待服务器确认，暂不能准备或开始':actionError||syncError||disabledReason||(needsApply?evaluation.errors.join('；')||applyAction?.hint||'其他人仍看到上一次已应用的配装':room?.actionBlocked||room?.actionHint||'配装已确认，可以准备 / 开始');
   const primary=async()=>{
     if(primaryBlocked||submitting.current||performance.now()-lastPrimary.current<350)return;
     lastPrimary.current=performance.now();
@@ -144,25 +145,25 @@ export function LanRefit({initial,disabledReason,onApply,onCancel,room,suspended
   return <>
     {skills ? <Suspense fallback={<div className="native-loading">正在准备战斗技能…</div>}>
       <CaptainSkillsScreen value={draft.captainSkills??{}} profile={draft.captainProfile} designName={draft.name} hullName={data.ships[draft.hullId]?.name??draft.hullId}
-        status={notice} dirty={dirty} warning={disabledReason||library.error} backLabel="返回联机改装" launchLabel={room?"应用修改":"应用并返回房间"}
+        status={room?`${syncLabel} · ${actionHint}`:notice} dirty={dirty} warning={disabledReason||library.error} backLabel="返回联机改装" launchLabel={primaryLabel}
         onChange={captainSkills=>change({...draft,captainSkills})} onProfileChange={captainProfile=>change({...draft,captainProfile})}
-        onBack={()=>setSkills(false)} onRefit={()=>setSkills(false)} onLaunch={()=>void apply()} launchDisabledReason={(busy?"正在等待服务器确认":!needsApply&&room?"配装没有未应用修改":applyBlocked)||null}
+        onBack={()=>setSkills(false)} onRefit={()=>setSkills(false)} onLaunch={()=>void primary()} launchDisabledReason={primaryBlocked||null}
         canUndo={!!history.length} onUndo={undo} onSave={()=>save()} onExport={exportDesign} onImport={()=>file.current?.click()} />
     </Suspense> : <NativeRefit
-      embedded={{title:room?.title??'联机改装',backLabel:room?.backLabel??(room?'离开房间':'返回房间'),primaryLabel:room?'应用修改':'应用并返回房间',disabledReason:busy?'正在同步':!needsApply&&room?'配装没有未应用修改':applyBlocked}} hullUnavailableReason={lanHullUnavailable}
-      roomLayout={room?{sidebar:room.sidebar(()=>setPickingHull(true),draft,change),onPickHull:()=>setPickingHull(true),locked:busy||!!disabledReason,
-        footer:<footer ref={footer} className="lan-editor-footer"><div className="lan-editor-sync" data-sync={actionError?'error':phase} role="status"><strong>{syncLabel}</strong><span>{busy?'等待服务器确认，暂不能准备或开始':actionError||syncError||disabledReason||(needsApply?evaluation.errors.join('；')||applyAction?.hint||'其他人仍看到上一次已应用的配装':room.actionBlocked||room.actionHint||'配装已确认，可以准备 / 开始')}</span></div>
-          <div className="lan-editor-primary"><NativeButton disabled={busy} onClick={()=>save()}>另存方案</NativeButton>{dirty&&<NativeButton disabled={busy} onClick={discard}>放弃修改</NativeButton>}{needsApply&&applyAction?.continueToAction&&<NativeButton disabled={busy||!!applyBlocked} onClick={()=>void apply()}>仅应用配装</NativeButton>}<NativeButton disabled={!!primaryBlocked} title={primaryBlocked||undefined} onClick={primary}>{primaryLabel}</NativeButton></div>
+      embedded={{title:room?.title??'联机改装',backLabel:room?.backLabel??(room?'离开房间':'返回房间'),primaryLabel,disabledReason:primaryBlocked}} hullUnavailableReason={lanHullUnavailable}
+      roomLayout={room?{sidebar:room.sidebar(()=>setPickingHull(true),draft,change,needsApply),onPickHull:()=>setPickingHull(true),locked:busy||!!disabledReason,
+        footer:<footer ref={footer} className="lan-editor-footer"><div className="lan-editor-sync" data-sync={actionError?'error':phase} role="status"><strong>{syncLabel}</strong><span>{actionHint}</span></div>
+          <div className="lan-editor-primary"><NativeButton disabled={busy} onClick={()=>save()}>另存方案</NativeButton>{dirty&&<NativeButton disabled={busy} onClick={discard}>放弃修改</NativeButton>}<NativeButton disabled={!!primaryBlocked} title={primaryBlocked||undefined} onClick={primary}>{primaryLabel}</NativeButton></div>
           <div className="lan-editor-tools">{room.tools}{(disabledReason||phase==="error")&&<NativeButton disabled={busy} onClick={exportDesign}>导出草稿</NativeButton>}<NativeButton disabled={busy} onClick={cancel}>{room.backLabel??'离开房间'}</NativeButton><small>中间直接改装 · 窄屏可左右滑动</small></div></footer>}:undefined}
       draft={draft} designs={library.library.designs} dirty={needsApply} status={notice} warning={disabledReason||library.error||(room?null:notice)}
       canUndo={!!history.length} onUndo={undo} onChange={change} onHull={chooseHull} onOpen={change} onSave={save}
       onRename={(design,name)=>{try{const text=name.trim();if(!text||text.length>48)throw Error('名称需为 1–48 字');updateLibrary(items=>items.map(d=>d.id===design.id?{...d,name:text,updatedAt:Date.now()}:d));return true;}catch(e){setError(e instanceof Error?e.message:'重命名失败');return false;}}}
       onDelete={design=>setConfirm({title:'删除本机方案？',text:'只删除已保存的「'+design.name+'」，不会删除房间配装或当前草稿。',run:()=>attempt(()=>updateLibrary(items=>items.filter(d=>d.id!==design.id)))})}
       onCopy={()=>change({...draft,id:randomId(),name:draft.name.slice(0,43)+' · 副本'})} onNew={()=>chooseHull(draft.hullId,true)}
-      onClear={()=>setConfirm({title:'清空装配？',text:'清空本地改装草稿的外装装备，原房间配装不变，可撤消恢复。',run:()=>change({...createDesign(draft.hullId,'empty'),id:draft.id,name:draft.name,captainSkills:draft.captainSkills,captainProfile:draft.captainProfile})})}
-      onExport={exportDesign} onImport={()=>file.current?.click()} onLaunch={()=>void apply()} onHome={cancel} onSkills={()=>setSkills(true)}
+      onClear={()=>setConfirm({title:'清空装配？',text:'清空本地改装草稿的外装装备，原房间配装不变，可撤消恢复。',run:()=>change({...withDesignCaptain(createDesign(draft.hullId,'empty'),draft),id:draft.id,name:draft.name})})}
+      onExport={exportDesign} onImport={()=>file.current?.click()} onLaunch={()=>void primary()} onHome={cancel} onSkills={()=>setSkills(true)}
       hullFilter={filter} onHullFilter={setFilter} readHullScroll={readScroll} writeHullScroll={writeScroll} />}
-    {!room && !skills && <div className="lan-refit-mobile-actions"><small>左右滑动查看完整改装台</small><div><NativeButton onClick={cancel}>返回房间</NativeButton><NativeButton disabled={busy||!!applyBlocked} onClick={()=>void apply()}>应用并返回房间</NativeButton></div></div>}
+    {!room && !skills && <div className="lan-refit-mobile-actions"><small>左右滑动查看完整改装台</small><div><NativeButton onClick={cancel}>返回房间</NativeButton><NativeButton disabled={!!primaryBlocked} onClick={()=>void primary()}>{primaryLabel}</NativeButton></div></div>}
     <MotionPresence>{room&&pickingHull&&<Modal title="更换舰船" eyebrow="选择后只修改本地草稿" width="small" onClose={()=>setPickingHull(false)} footer={<NativeButton onClick={()=>setPickingHull(false)}>返回改装</NativeButton>}><div className="lan-room-hull-picker"><HullRoster draft={draft} spec={evaluation.spec} filter={filter} onFilter={setFilter} readScrollPosition={readScroll} writeScrollPosition={writeScroll} onHull={chooseHull} inert={busy} unavailableReason={lanHullUnavailable}/></div></Modal>}</MotionPresence>
     {!room&&syncError&&<p className="lan-error" role="alert">{syncError}</p>}
     <input ref={file} hidden type="file" accept=".json,application/json" onChange={async event=>{

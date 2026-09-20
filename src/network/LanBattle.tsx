@@ -1,4 +1,5 @@
 import { downloadNetworkDiagnostics, nextDiagnosticBattle, recordNetworkDiagnostic } from "./NetworkDiagnosticLog";
+import { NetworkRuntimeDiagnostics } from "./NetworkRuntimeDiagnostics";
 import { SnapshotPipelineDiagnostics } from "./SnapshotPipelineDiagnostics";
 import { FlowCounters } from "./SnapshotFlow.mjs";
 import type { FlowSample } from "./SnapshotFlow.mjs";
@@ -91,6 +92,8 @@ interface HUD {
   rtt: number | null;
   jitter: number;
   acknowledgementMs: number | null;
+  input?: { sentSequence: number; acknowledgedSequence: number | null;
+    trackedPending: number; oldestTrackedPendingMs: number | null; pendingActions: number };
   age: number;
   hz: number | null;
   appliedHz: number | null;
@@ -136,18 +139,23 @@ export function LanBattle({
   const [status, setStatus] = useState("正在准备战斗资源…"),
     [error, setError] = useState("");
   const [hud, setHud] = useState<HUD | null>(null);
+  const diagnosticBattle = useRef<number | null>(null);
   const diagnosticHud = useRef<{ value: HUD; at: number } | null>(null);
+  const diagnosticInput = useRef<((now: number) => HUD["input"]) | null>(null);
   const diagnosticSteam = useRef<{ value: unknown; at: number } | null>(null);
   useEffect(() => { diagnosticSteam.current = { value: steamTransport, at: performance.now() }; }, [steamTransport]);
   useEffect(() => {
-    const battle = nextDiagnosticBattle();
+    const battle = nextDiagnosticBattle(); diagnosticBattle.current = battle;
     let previous = performance.now();
+    const runtime = new NetworkRuntimeDiagnostics(previous);
+    diagnosticHud.current = null;
     const write = (event: string) => {
       const now = performance.now(), sample = diagnosticHud.current, steam = diagnosticSteam.current;
       recordNetworkDiagnostic({ event, battle, transport: connection.transport, seat, role: seat === 0 ? 'host' : 'guest',
         hidden: document.visibilityState === 'hidden', connected: connection.ready, socketBufferedBytes: connection.socket?.bufferedAmount ?? null,
         sampleGapMs: event === 'sample' ? now - previous : null,
-        hudAgeMs: sample ? Math.max(0, now - sample.at) : null, hud: sample?.value,
+        runtime: runtime.sample(now, event === 'sample'),
+        hudAgeMs: sample ? Math.max(0, now - sample.at) : null, hud: sample ? { ...sample.value, input: diagnosticInput.current?.(now) } : null,
         pipelineAgeMs: connection.snapshotPipelineAt === null ? null : Math.max(0, now - connection.snapshotPipelineAt) + connection.snapshotPipelineRoundTripMs,
         pipeline: connection.snapshotPipeline, lan: connection.lanTransport,
         steamAgeMs: steam ? Math.max(0, now - steam.at) : null, steam: steam?.value });
@@ -157,7 +165,7 @@ export function LanBattle({
     // Independent of RAF and the diagnostics panel. A blocked JS thread still delays
     // this timer; sampleGapMs exposes the gap instead of inventing missed samples.
     const timer = setInterval(() => write('sample'), 1000);
-    return () => { clearInterval(timer); write('battle-stop'); };
+    return () => { clearInterval(timer); try { write('battle-stop'); } finally { runtime.dispose(); } };
   }, [connection, match.id, seat]);
   const [displayEngine, setDisplayEngine] = useState<CombatEngine | null>(null);
   const [menu, setMenu] = useState<"menu" | "help" | "settings" | "leave" | null>(null);
@@ -245,6 +253,11 @@ export function LanBattle({
       actions: Action[] = [],
       pointer = { x: 0, y: 0 },
       zoom = 0.65;
+    // Read only on the existing diagnostic timer, not each RAF/HUD refresh.
+    diagnosticInput.current = now => ({ sentSequence: seq, acknowledgedSequence: acknowledged >= 0 ? acknowledged : null,
+      trackedPending: sentInputs.size,
+      oldestTrackedPendingMs: sentInputs.size ? Math.max(0, now - sentInputs.values().next().value!) : null,
+      pendingActions: actions.length });
     const camera = cameraRef.current,
       cameraController = new CameraController(),
       random = new VisualRandom(match.seed);
@@ -284,9 +297,9 @@ export function LanBattle({
       worker?.postMessage({ type: "stop" });
     };
     stopRef.current = stop;
-    const fail = (reason: string) => {
+    const fail = (reason: string, failureStage: string = "unknown") => {
       if (disposed || stopped || failureReason) return;
-      recordNetworkDiagnostic({ event: "battle-failed", transport: connection.transport, seat, role: seat === 0 ? "host" : "guest" });
+      recordNetworkDiagnostic({ event: "battle-failed", battle: diagnosticBattle.current, failureStage, transport: connection.transport, seat, role: seat === 0 ? "host" : "guest" });
       failureReason = reason;
       setError(reason);
       stop();
@@ -348,7 +361,7 @@ export function LanBattle({
     if (seat === 0) decoder = new LanSnapshotDecoder({
       acknowledge: tick => worker?.postMessage({ type: "snapshot-consumed", tick }),
       consume: (frame, elapsed) => { parseMs = parseMs * .7 + elapsed * .3; accept(frame); },
-      error: error => fail(error instanceof Error ? error.message : "无法解析主机快照"),
+      error: error => fail(error instanceof Error ? error.message : "无法解析主机快照", "snapshot-decode"),
     });
     const unsubscribe = connection.subscribe((m) => {
       if (disposed) return;
@@ -379,7 +392,7 @@ export function LanBattle({
         return;
       }
       if (m.type === "error") {
-        fail(m.message || "服务器拒绝了战斗消息");
+        fail(m.message || "服务器拒绝了战斗消息", "server-rejected");
         return;
       }
       if (m.type === "room") {
@@ -436,7 +449,7 @@ export function LanBattle({
           parseMs = parseMs * .7 + connection.snapshotParseMs * .3;
           accept(m.frame);
         } catch (error) {
-          fail(error instanceof Error ? error.message : "无法接收战斗快照事件");
+          fail(error instanceof Error ? error.message : "无法接收战斗快照事件", "snapshot-apply");
         }
       }
       if (m.type === "controls-ready" && m.syncId === syncId && !synced) {
@@ -481,15 +494,15 @@ export function LanBattle({
       });
       if (!gl) throw Error("当前浏览器无法创建 WebGL2 战斗画面");
       renderer = new WebGLCombatRenderer(canvas, gl, {
-        onContextLost: () => fail("显卡上下文丢失，请返回房间重试。"),
-        onContextRestoreFailed: () => fail("显卡恢复失败"),
+        onContextLost: () => fail("显卡上下文丢失，请返回房间重试。", "graphics-context"),
+        onContextRestoreFailed: () => fail("显卡恢复失败", "graphics-context"),
       });
       if (seat === 0) {
         worker = new Worker(new URL("./host.worker.ts", import.meta.url), {
           type: "module",
         });
         worker.onerror = (event) =>
-          fail("计算 Worker 启动失败：" + event.message);
+          fail("计算 Worker 启动失败：" + event.message, "worker-start");
         worker.onmessage = (event) => {
           if (disposed || stopped) return;
           const m = event.data;
@@ -508,7 +521,7 @@ export function LanBattle({
             workerReady = true;
             loaded();
           }
-          if (m.type === "error") fail(m.message);
+          if (m.type === "error") fail(m.message, "worker-runtime");
           if (m.type === "recovered") {
             freeze("② 同步战场：房主短暂停顿后恢复，正在重新同步…");
             syncId = "";
@@ -525,7 +538,7 @@ export function LanBattle({
                 const delivery = connection.sendSnapshot(match.id, stateSeq++, m);
                 if (delivery === "sent") localFlow.count("uploaded");
                 else if (delivery === "skipped") localFlow.count("uploadSkipped");
-                if (delivery === "oversized") { fail("战斗快照超过 16 MiB 通信安全预算，请减少舰队规模后重试。"); return; }
+                if (delivery === "oversized") { fail("战斗快照超过 16 MiB 通信安全预算，请减少舰队规模后重试。", "snapshot-size"); return; }
               }
               if (stopped) return;
               // Upload first, then grant only reserved decode capacity. Parsing
@@ -534,14 +547,14 @@ export function LanBattle({
               if (document.visibilityState !== "hidden") decoder!.enqueue(m);
               else worker?.postMessage({ type: "snapshot-consumed", tick: m.tick });
             } catch (error) {
-              fail(error instanceof Error ? error.message : "无法解析主机快照");
+              fail(error instanceof Error ? error.message : "无法解析主机快照", "snapshot-decode");
             }
           }
           if (m.type === "finished") {
             decoder?.flush();
             if (stopped) return;
             if (new TextEncoder().encode(JSON.stringify(m.report)).byteLength > MAX_BATTLE_REPORT_BYTES) {
-              fail("战斗报告超过通信安全预算，无法完成结算，请减少舰队规模后重试。");
+              fail("战斗报告超过通信安全预算，无法完成结算，请减少舰队规模后重试。", "report-size");
               return;
             }
             finishedResult = {winner:m.winner, report:m.report};
@@ -562,11 +575,11 @@ export function LanBattle({
           ready = true;
           loaded();
         } catch (e) {
-          fail(e instanceof Error ? e.message : String(e));
+          fail(e instanceof Error ? e.message : String(e), "resource-load");
         }
       })();
     } catch (e) {
-      fail(e instanceof Error ? e.message : String(e));
+      fail(e instanceof Error ? e.message : String(e), "initialization");
     }
     openMapRef.current=()=>{if(!engine||!launched||!synced||endedRef.current)return;clearInputRef.current();inputBlockedRef.current=true;engine.isTacticalMap=true;setMapOpen(true);};
     const active = () =>
@@ -855,13 +868,14 @@ export function LanBattle({
           setStatus("等待计算主机更新…");
         else if (launched && now - lastInput < 100) setStatus("战斗进行中");
       } catch (e) {
-        fail(e instanceof Error ? e.message : String(e));
+        fail(e instanceof Error ? e.message : String(e), "frame-loop");
         ready = false;
       }
     };
     frameId = requestAnimationFrame(frame);
     return () => {
       disposed = true;
+      diagnosticInput.current = null;
       stop();
       clearInterval(inputTimer);
       cancelAnimationFrame(frameId);
@@ -1098,7 +1112,7 @@ export function LanBattle({
             <details>
               <summary>性能与网络诊断</summary>
               <NativeButton onClick={downloadNetworkDiagnostics}>导出联机性能日志</NativeButton>
-              <p>自动每秒记录，保留最近约 10 分钟；断线后也可在联机入口或房间导出。桌面端另有自动落盘日志。无需保持此面板打开。</p>
+              <p>自动每秒记录，无需保持此面板打开。桌面端从本次启动到退出保存同一日志，Steam/LAN 切换与重连不会清空，导出为整个桌面会话；普通浏览器仅保留最近约 10 分钟，刷新页面会清空。断线后也可在联机入口或房间导出。</p>
               <SnapshotPipelineDiagnostics pipeline={hud?.pipeline}
                 ageMs={hud?.pipelineAgeMs ?? null}
                 receivedHz={hud?.hz ?? null} appliedHz={hud?.appliedHz ?? null} local={seat === 0 ? hud?.localFlow : undefined} />

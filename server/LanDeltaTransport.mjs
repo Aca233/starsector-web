@@ -1,7 +1,7 @@
 import { crc32 } from 'node:zlib';
 import { LAN_DELTA_MAX_BYTES, createLanBytePatch, encodeLanPacket, lanBytes } from '../src/network/LanBinaryDelta.mjs';
 
-// One target per broadcast, with shared patch results for equal acknowledged
+// One target per broadcast, with shared patch results for equal retained
 // anchors. No global history: the target/cache dies after that broadcast.
 export function lanDeltaTarget(value, seq, now = performance.now()) {
   const bytes = lanBytes(value);
@@ -9,12 +9,14 @@ export function lanDeltaTarget(value, seq, now = performance.now()) {
   return { bytes, seq, crc: crc32(bytes), now, patches: new WeakMap(), patchBuilds: 0, patchMs: 0 };
 }
 export class LanDeltaSender {
-  constructor() { this.reset(); this.totals = { full: 0, delta: 0, anchors: 0, originalBytes: 0, encodedBytes: 0, budgetFallbacks: 0 }; }
+  constructor({ ordered = false } = {}) { this.ordered = ordered; this.reset(); this.totals = { full: 0, delta: 0, anchors: 0, originalBytes: 0, encodedBytes: 0, budgetFallbacks: 0 }; }
   reset() { this.base = null; this.pending = null; this.generation = (this.generation ?? 0) + 1; this.revision = 0; this.choices = new WeakSet(); }
   prepare(target) {
-    // Promote at most one reconstructed view per consumption-ACK cycle. The
-    // candidate itself may be a delta: no periodic full-frame bandwidth spike.
-    const anchor = !this.pending;
+    // On a reliable ordered WebSocket, the previous successful send is already
+    // a safe base: receiver reconstruction precedes consumption/ACK. Waiting an
+    // RTT for that ACK needlessly ages the base and inflates moving-state deltas.
+    // Keep confirmed-anchor mode for non-FIFO callers and controlled comparisons.
+    const anchor = this.ordered || !this.pending;
     let patch = null, budgetFallback = false;
     if (this.base) {
       if (!target.patches.has(this.base.bytes)) {
@@ -38,7 +40,9 @@ export class LanDeltaSender {
     if (choice.anchor) {
       // Target bytes belong to the immutable incoming WS message and may be
       // shared by peers. Only the confirmed and one pending anchor are retained.
-      this.pending = { bytes: choice.target.bytes, seq: choice.target.seq, crc: choice.target.crc, at: choice.target.now };
+      const base = { bytes: choice.target.bytes, seq: choice.target.seq, crc: choice.target.crc, at: choice.target.now };
+      if (this.ordered) this.base = base;
+      else this.pending = base;
       this.totals.anchors++;
     }
     this.totals[choice.delta ? 'delta' : 'full']++;
@@ -49,7 +53,7 @@ export class LanDeltaSender {
   // Called ONLY after the existing exact LAN consumption-credit membership and
   // match validation succeeds. Cumulative confirmation may cover a pending anchor.
   ack(seq) {
-    if (this.pending && seq >= this.pending.seq) { this.base = this.pending; this.pending = null; this.revision++; }
+    if (!this.ordered && this.pending && seq >= this.pending.seq) { this.base = this.pending; this.pending = null; this.revision++; }
   }
   stats() {
     return { ...this.totals, baseSeq: this.base?.seq ?? null, pendingSeq: this.pending?.seq ?? null,

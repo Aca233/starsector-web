@@ -1,6 +1,7 @@
 import { decodeBinaryFrame } from './BinarySnapshot.mjs';
 import type { CombatSnapshot } from './CombatSnapshot';
 import config from './protocol.json';
+import { scheduleNetworkTask } from './NetworkTaskScheduler';
 
 export interface EncodedHostSnapshot {
   tick: number;
@@ -52,10 +53,7 @@ export class LanSnapshotDecoder {
     acknowledge: (tick: number) => void;
     consume: (frame: CombatSnapshot, parseMs: number) => void;
     error: (error: unknown) => void;
-  }, private readonly schedule: Schedule = task => {
-    const timer = setTimeout(task, 0);
-    return () => clearTimeout(timer);
-  }) {}
+  }, private readonly schedule: Schedule = scheduleNetworkTask) {}
 
   get stats(): SnapshotDecodeStats {
     return { queued: this.queue.length, queuedBytes: this.queuedBytes,

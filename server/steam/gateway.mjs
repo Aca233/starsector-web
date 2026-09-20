@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { WebSocketServer } from 'ws';
 import protocol from '../../src/network/protocol.json' with { type: 'json' };
 import { SteamPacketCodec } from './packet-codec.mjs';
+import { SteamReceiptDiagnostics, SteamPollDiagnostics } from './receipt-diagnostics.mjs';
 import { SnapshotHostBudget } from './snapshot-host-budget.mjs';
 import { SteamSessionMetrics, loadSteamSessionReader } from './session-metrics.mjs';
 import { SteamSnapshotEncoder, SteamSnapshotSender, SteamSnapshotReceiver } from './snapshot-delta.mjs';
@@ -36,9 +37,11 @@ const wait = (promise, ms = 20000) => {
 export const STEAM_SNAPSHOT_WINDOW = MAX_SNAPSHOT_WINDOW;
 export const STEAM_INITIAL_SNAPSHOT_WINDOW = INITIAL_SNAPSHOT_WINDOW;
 export const STEAM_SNAPSHOT_BYTES = 64 * 1024;
+export const STEAM_INPUT_ACK_DELAY_MS = 32;
 class SteamPeer extends EventEmitter {
-  constructor(gateway, remote, connection, supportsConsumption = false) {
+  constructor(gateway, remote, connection, supportsConsumption = false, cumulativeInputAck = false) {
     super(); this.gateway = gateway; this.remote = remote; this.connection = connection; this.readyState = 1;
+    this.cumulativeInputAck = cumulativeInputAck; this.inputAck = null;
     this.inflight = new Map(); this.inflightBytes = 0; this.snapshotSender = new SteamSnapshotSender(); this.snapshotWindow = new SnapshotSendWindow();
     this.sentStates = 0; this.skippedStates = 0; this.ackedStates = 0; this.ackMs = null;
     this.lastSnapshot = null; this.lastSnapshotSkip = null;
@@ -104,12 +107,26 @@ class SteamPeer extends EventEmitter {
       }
     } catch { this.close(1013, 'Steam 发送失败，正在重新连接'); }
   }
+  acknowledgeInput(id, deferred = false, now = Date.now()) {
+    if (!this.cumulativeInputAck) { this.gateway.transmit(this.remote, this.connection, 'ack', { id }); return; }
+    this.inputAck ??= { id, since: now };
+    this.inputAck.id = id;
+    this.flushInputAck(now, !deferred);
+  }
+  flushInputAck(now = Date.now(), force = false) {
+    if (this.readyState !== 1 || !this.inputAck || (!force && now - this.inputAck.since < STEAM_INPUT_ACK_DELAY_MS)) return;
+    // Only receipts are batched, never input execution. A discrete action or
+    // control flushes immediately, cumulatively covering earlier FIFO inputs.
+    const id = this.inputAck.id;
+    this.gateway.transmit(this.remote, this.connection, 'ack', { id, cumulative: true });
+    this.inputAck = null;
+  }
   ping() { if (this.readyState === 1) { try { this.gateway.transmit(this.remote, this.connection, 'ping', {}); } catch { this.terminate(); } } }
   close(code = 1000, reason = '') {
     if (this.readyState !== 1) return;
     this.gateway.report('peer-close', { code, reason, ...this.diagnostics() });
     this.gateway.snapshotBudget.remove(this); this.gateway.sessionMetrics.forget(this.remote);
-    this.readyState = 3; this.inflight.clear(); this.inflightBytes = 0; this.snapshotSender.reset(); this.consumption?.clear();
+    this.readyState = 3; this.inputAck = null; this.inflight.clear(); this.inflightBytes = 0; this.snapshotSender.reset(); this.consumption?.clear();
     try { this.gateway.transmit(this.remote, this.connection, 'close', { code, reason }); } catch { /* already disconnected */ }
     this.emit('close');
     if (this.gateway.peers.get(this.remote) === this) this.gateway.peers.delete(this.remote);
@@ -122,6 +139,8 @@ export class SteamGateway {
     if (socketRoomFactory !== null && typeof socketRoomFactory !== 'function') throw Error('Invalid socket room factory');
     this.socketRoomFactory = socketRoomFactory; this.socketRoom = null;
     this.sessionMetrics = new SteamSessionMetrics({ read: sessionReader, reason: client ? 'injected-client' : 'not-initialized' });
+    this.receiptTrace = new SteamReceiptDiagnostics(); this.pollTrace = new SteamPollDiagnostics();
+    this.fastAckTokens = 1200; this.fastAckAt = performance.now();
     this.log = log; this.receivedStates = 0; this.lastStateAt = 0; this.lastTransportLog = 0; this.lastRoomStatus = null;
     this.overlay = overlay; this.appId = appId; this.build = build; this.client = client; this.initialized = false; this.networkLost = false; this.error = '';
     this.selected = null; this.pendingInvite = null; this.renderer = null; this.guestConnection = null; this.guestOutbound = null;
@@ -175,6 +194,7 @@ export class SteamGateway {
     return { mode: LEGACY_TRANSPORT, role: !this.selected ? null : this.selected.owner === this.owner ? 'host' : 'guest',
       nativeSessions: this.sessionMetrics.status(), nativeHostSession: this.selected && this.selected.owner !== this.owner ? this.sessionMetrics.get(this.selected.owner, now) : null,
       sharedSnapshots: this.snapshotBudget.diagnostics(now), outbound: this.guestOutbound?.diagnostics(now) ?? null, incomingSnapshots: this.snapshotReceiver?.diagnostics() ?? null,
+      receipts: this.receiptTrace.snapshot(now), polling: this.pollTrace.snapshot(now),
       receivedStates: this.receivedStates, lastStateAgeMs: this.lastStateAt ? now - this.lastStateAt : null,
       peers: [...this.peers.values()].map(peer => peer.diagnostics(now)) };
   }
@@ -250,7 +270,28 @@ export class SteamGateway {
   }
   transmit(remote, connection, op, data) {
     const encoded = this.codec.encode(connection, op, data);
-    return this.transmitEncoded(remote, encoded);
+    const trace = op === 'ack' && this.selected && this.selected.owner !== this.owner ? this.receiptTrace : null;
+    const consumed = data?.consumed === true; trace?.attempt(consumed);
+    // ACKs carry no gameplay mutations. A tiny UnreliableNoDelay duplicate may
+    // bypass reliable reverse-stream head-of-line blocking. Keep
+    // the identical reliable copy: loss/refusal of the fast path cannot strand
+    // a credit, and exact nonce/id membership makes duplicate ACKs idempotent.
+    // Never send state, inputs, lifecycle or multi-fragment data this way.
+    if (op === 'ack' && this.selected && this.selected.owner !== this.owner && encoded.packets.length === 1 && encoded.packets[0].length <= 1200) {
+      // Only the guest-to-host snapshot receipts use this path. Duplicating
+      // every input ACK on the shared host uplink steals state bandwidth and
+      // defeats input coalescing on narrow links. Guest copies are bounded.
+      const now = performance.now();
+      this.fastAckTokens = Math.min(1200, this.fastAckTokens + Math.max(0, now - this.fastAckAt) * 8.192);
+      this.fastAckAt = Math.max(this.fastAckAt, now);
+      if (encoded.packets[0].length <= this.fastAckTokens) {
+        this.fastAckTokens -= encoded.packets[0].length;
+        try { const accepted = this.client.networking.sendP2PPacket(BigInt(remote), 1, encoded.packets[0]); trace?.fast(!!accepted); }
+        catch { trace?.fast(false); /* optional fast copy; reliable fallback is unchanged */ }
+      }
+    }
+    try { const sent = this.transmitEncoded(remote, encoded); trace?.accepted(consumed); return sent; }
+    catch (error) { trace?.failed(consumed); throw error; }
   }
   transmitEncoded(remote, encoded) {
     // Reliable=2 preserves ordering without ReliableWithBuffering/Nagle (=3).
@@ -270,11 +311,12 @@ export class SteamGateway {
     }
     if (this.socketRoom) { this.socketRoom.attachBrowser(ws); return; }
     const connection = this.guestConnection = randomBytes(16).toString('hex');
+    this.receiptTrace = new SteamReceiptDiagnostics();
     this.snapshotReceiver = new SteamSnapshotReceiver();
     this.rendererReceipts = null; this.rendererRequestedCredits = false;
     const outbound = this.guestOutbound = new SteamReliableQueue(text => this.transmit(selected.owner, connection, 'data', text));
     // Reliable open/data ordering preserves the existing hello/welcome handshake.
-    try { this.transmit(selected.owner, connection, 'open', { lobby: selected.id, build: this.build, protocol: protocol.version, stateConsumption: 1 }); }
+    try { this.transmit(selected.owner, connection, 'open', { lobby: selected.id, build: this.build, protocol: protocol.version, stateConsumption: 1, cumulativeInputAck: 1 }); }
     catch { ws.close(1013, 'Steam connection failed'); return; }
     ws.on('message', (raw, binary) => {
       if (this.renderer !== ws || this.guestConnection !== connection) return;
@@ -308,7 +350,7 @@ export class SteamGateway {
         if (data?.lobby !== selected.id || data?.build !== this.build || data?.protocol !== protocol.version) { this.transmit(remote, connection, 'close', { code: 1008, reason: 'Steam room version mismatch' }); return; }
         if (peer?.connection === connection) return;
         peer?.close(1001, 'Connection replaced');
-        peer = new SteamPeer(this, remote, connection, data.stateConsumption === 1); this.peers.set(remote, peer);
+        peer = new SteamPeer(this, remote, connection, data.stateConsumption === 1, data.cumulativeInputAck === 1); this.peers.set(remote, peer);
         this.relay.acceptTransport(peer, { identity: remote, scope: selected.id, canHost: false, appId: this.appId });
         this.transmit(remote, connection, 'opened', {}); return;
       }
@@ -319,7 +361,7 @@ export class SteamGateway {
           peer.requestedConsumption = peer.supportsConsumption && data.stateCredits === 1;
         }
         peer.emit('message', Buffer.from(JSON.stringify(data)), false);
-        if (peer.readyState === 1) this.transmit(remote, connection, 'ack', { id });
+        if (peer.readyState === 1) peer.acknowledgeInput(id, data?.type === 'input' && Array.isArray(data.input?.actions) && data.input.actions.length === 0);
       }
       else if (op === 'pong') peer.emit('pong');
       else if (op === 'ack') {
@@ -351,13 +393,23 @@ export class SteamGateway {
         if (delivered?.type === 'state') { this.receivedStates++; this.lastStateAt = Date.now(); }
         if (data?.type === 'ended' || data?.type === 'roomClosed') this.report('match-ended', { reason: String(data.reason ?? data.message ?? '').slice(0, 200) });
         if (ws.bufferedAmount > protocol.maxSnapshotBytes * 2) { ws.close(1013, 'Browser too slow'); return; }
-        const text = JSON.stringify(delivered);
+        // Only the receiver's validated canonical result can bypass stringify;
+        // ordinary legacy data still follows the original serialization path.
+        const text = incoming.canonicalText ?? JSON.stringify(delivered);
         if (delivered?.type === 'state' && this.rendererReceipts && !this.rendererReceipts.track(delivered, id, Buffer.byteLength(text))) {
           ws.close(1013, 'Steam renderer receipt budget exceeded'); return;
         }
-        ws.send(text, error => { if (!error && delivered?.type === 'state' && this.selected === selected && this.renderer === ws && this.guestConnection === connection) { try { this.transmit(remote, connection, 'ack', { id }); } catch {} } });
+        const trace = delivered?.type === 'state' ? this.receiptTrace : null, write = trace?.beginWrite();
+        try {
+          ws.send(text, error => {
+            trace?.endWrite(write, error);
+            if (!error && delivered?.type === 'state' && this.selected === selected && this.renderer === ws && this.guestConnection === connection) {
+              try { this.transmit(remote, connection, 'ack', { id }); } catch { /* trace records SDK refusal; transport behavior is unchanged */ }
+            }
+          });
+        } catch (error) { trace?.endWrite(write, error); throw error; }
       } else if (op === 'ack') {
-        try { this.guestOutbound?.ack(data?.id); }
+        try { this.guestOutbound?.ack(data?.id, data?.cumulative === true); }
         catch { ws.close(1013, 'Steam send failed'); }
       } else if (op === 'ping') this.transmit(remote, connection, 'pong', {});
       else if (op === 'close') {
@@ -383,18 +435,25 @@ export class SteamGateway {
       } catch { this.socketRoom.close(1013, 'Steam transport failed'); this.error = 'Steam 实验传输已关闭，请离开房间后重试'; }
       return;
     }
+    const pollTrace = this.pollTrace, pollAt = pollTrace.begin();
     try {
       const started = performance.now();
-      for (let count = 0; count < 64 && performance.now() - started < 5; count++) {
+      let count = 0;
+      for (; count < 64 && performance.now() - started < 5; count++) {
         const size = this.client.networking.isP2PPacketAvailable(); if (!size) break;
-        // SDK caps reliable packets at 1 MiB. Do not allocate attacker-declared message sizes.
-        if (size > 1024 * 1024) break;
+        if (size > 1024 * 1024) { pollTrace.counts.oversizedHeads++; break; }
         const packet = this.client.networking.readP2PPacket(size), remote = idString(packet.steamId);
-        if (!this.allowed(remote) || (this.faults.get(remote)?.until ?? 0) > Date.now()) continue;
+        pollTrace.counts.packetsRead++;
+        if (!this.allowed(remote) || (this.faults.get(remote)?.until ?? 0) > Date.now()) { pollTrace.counts.discardedPackets++; continue; }
         try { const message = this.codec.receive(remote, packet.data); if (message) this.dispatch(remote, message); }
-        catch (error) { this.report('invalid-packet', { reason: String(error.message ?? error).slice(0, 120) }); this.faults.set(remote, { until: Date.now() + 10000 }); this.codec.forget(remote); this.peers.get(remote)?.terminate(); }
+        catch (error) { pollTrace.counts.invalidPackets++; this.report('invalid-packet', { reason: String(error.message ?? error).slice(0, 120) }); this.faults.set(remote, { until: Date.now() + 10000 }); this.codec.forget(remote); this.peers.get(remote)?.terminate(); }
       }
+      if (count === 64 || performance.now() - started >= 5) pollTrace.counts.budgetHits++;
       const now = Date.now();
+      for (const peer of this.peers.values()) {
+        try { peer.flushInputAck(now); }
+        catch { peer.terminate('Steam 输入确认发送失败'); }
+      }
       if (now - this.lastAudit > 1000) {
         this.lastAudit = now; this.codec.sweep(now);
         this.sessionMetrics.sample((this.selected.owner === this.owner ? [...this.peers.keys()] : [this.selected.owner]).filter(remote => this.allowed(remote)), now);
@@ -412,7 +471,8 @@ export class SteamGateway {
           void this.leave();
         }
       }
-    } catch { this.error = 'Steam 网络暂不可用，请检查客户端连接'; }
+    } catch { pollTrace.counts.errors++; this.error = 'Steam 网络暂不可用，请检查客户端连接'; }
+    finally { pollTrace.end(pollAt); }
   }
   async leave() {
     ++this.generation;
@@ -425,7 +485,7 @@ export class SteamGateway {
     this.report('leave', this.transportStatus());
     this.rendererReceipts?.clear(); this.rendererReceipts = null; this.rendererRequestedCredits = false;
     this.selected = null; this.codec.clear(); this.sessionMetrics.clear(); this.snapshotBudget.clear(); this.snapshotEncoder.clear(); this.snapshotReceiver = null; this.faults.clear(); this.lastRoomStatus = null;
-    this.receivedStates = 0; this.lastStateAt = 0;
+    this.receivedStates = 0; this.lastStateAt = 0; this.receiptTrace = new SteamReceiptDiagnostics(); this.pollTrace = new SteamPollDiagnostics();
     try { selected?.lobby.leave(); } catch { /* disconnected from Steam */ }
     return this.status();
   }

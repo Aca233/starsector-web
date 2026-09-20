@@ -121,6 +121,17 @@ export interface Design {
   groups: Group[];
   updatedAt: number;
 }
+/** Changing a hull or applying equipment keeps the current captain, not the fit's captain.
+ * Copy the values so editing the new draft cannot mutate a saved design or Undo history.
+ * Opening/importing a complete design deliberately does not use this helper. */
+export function withDesignCaptain(design: Design, captain: Pick<Design, 'captainSkills' | 'captainProfile'>): Design {
+  return {
+    ...design,
+    captainSkills: structuredClone(captain.captainSkills ?? {}),
+    captainProfile: captain.captainProfile ? { ...captain.captainProfile } : undefined,
+  };
+}
+
 export interface DesignLibrary {
   version: 1;
   baseline?: Design;

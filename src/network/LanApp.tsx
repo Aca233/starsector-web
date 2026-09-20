@@ -1,5 +1,6 @@
 import { downloadNetworkDiagnostics, recordNetworkDiagnostic } from './NetworkDiagnosticLog';
 import { lanSocketUrl, savedLanEndpoint } from './LanEndpoint';
+import { readLegacyPlayerName, readPlayerName, rememberPlayerName, resolvePlayerName, validPlayerName } from './PlayerName';
 import { MotionPresence } from '../ui/core/MotionPresence';
 import { FullscreenButton } from '../ui/FullscreenButton';
 import { SteamStart } from "./SteamStart";
@@ -52,12 +53,8 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
         hidden: document.visibilityState === 'hidden' });
     }
   }), [connection, transport]);
-  const [name, setName] = useState(
-      () =>
-        initialHost.get("name")?.slice(0, 24) ||
-        connection.saved?.name ||
-        "玩家",
-    ),
+  const [initialName] = useState(() => resolvePlayerName(initialHost.get("name")?.slice(0,24), readPlayerName(), connection.saved?.name??readLegacyPlayerName(transport)));
+  const [name, setName] = useState(initialName.name),
     [initialCode] = useState(
       () =>
         new URLSearchParams(location.search)
@@ -67,6 +64,14 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
     ),
     [id, setId] = useState(""),
     [connecting, setConnecting] = useState(false);
+  const [nameError,setNameError] = useState('');
+  const currentName = useRef(name), customName = useRef(initialName.custom);
+  const saveName = (value:string) => setNameError(rememberPlayerName(value));
+  const changeName = (value:string) => {
+    customName.current=true;currentName.current=value;setName(value);saveName(value);
+  };
+  // oxlint-disable-next-line react/set-state-in-effect -- Report storage failure after migrating a legacy/redirect nickname.
+  useEffect(() => { if(initialName.custom)setNameError(rememberPlayerName(initialName.name)); },[initialName]);
   const [room, setRoom] = useState<Room | null>(null),
     [match, setMatch] = useState<Match | null>(null),
     [ended, setEnded] = useState<BattleEnded|null>(null);
@@ -89,11 +94,14 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
           const status = await response.json() as SteamStatus;
           if (status.service !== "starsector-web-steam" || abort.signal.aborted) return;
           setSteamStatus(status); setAvailable(status.available);
-          if (status.name) setName(previous => previous === "玩家" ? status.name.slice(0, 24) : previous);
+          if (!customName.current) {
+            const fallback=validPlayerName(status.name?.slice(0,24));
+            if(fallback){currentName.current=fallback;setName(fallback);}
+          }
           if (!triedResume && status.lobby && connection.saved) {
             triedResume = true;
             const saved = new URL(connection.saved.url);
-            if (saved.origin === location.origin.replace(/^http/, "ws") && saved.searchParams.get("lobby") === status.lobby.id) { setConnecting(true); connection.connect(saved.href, connection.saved.name); }
+            if (saved.origin === location.origin.replace(/^http/, "ws") && saved.searchParams.get("lobby") === status.lobby.id) { setConnecting(true); setNameError(rememberPlayerName(currentName.current)); connection.connect(saved.href, currentName.current); }
           }
         } catch { if (!abort.signal.aborted) { setSteamStatus(null); setAvailable(false); } }
       };
@@ -122,12 +130,8 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
           const socket = saved?.socket ?? lanSocketUrl();
           selectedEndpoint.current = socket;
           if (saved?.remote) { setAddresses([saved.remote + '/?view=lan']); setServerLabel(new URL(saved.remote).host); }
-          connection.connect(
-            socket,
-            initialHost.get("name")?.trim().slice(0, 24) ||
-              connection.saved?.name ||
-              "玩家",
-          );
+          setNameError(rememberPlayerName(currentName.current));
+          connection.connect(socket,currentName.current.trim());
         }
       })
       .catch(() => {
@@ -234,6 +238,7 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
   };
   const enterRoom=(intent:RoomEntryIntent, remoteOrigin?:string)=>{
     if(!name.trim()||available!==true||connecting||entering||entryIntent.current)return;
+    saveName(name);
     const socket = lanSocketUrl(intent.type === 'join' && desktopLan ? remoteOrigin : undefined);
     if (selectedEndpoint.current !== socket) {
       connection.close(true, false); setId('');
@@ -256,6 +261,7 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
   };
   const selectSteam = (status: SteamStatus, kind: "create" | "join", password: string) => {
     if (!status.lobby) return;
+    saveName(name);
     connection.close(false, false);
     entryIntent.current = kind === "create" ? { type: "create", battleSize: readBattleSize() } : { type: "join", code: status.lobby.code, password };
     setConnecting(true); setEntering(true); setError("");
@@ -266,7 +272,7 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
     onReturn={()=>{setMatch(null);setEnded(null);}}/>;
   if(workbenchRoom)return <><Suspense fallback={<div className="native-loading">正在打开房间改装台…</div>}>
     <LanRoomWorkbench key={workbenchRoom.code} room={workbenchRoom} id={id||lastIdentity} active={room?.code===workbenchRoom.code&&!!id}
-      connection={connection} addresses={addresses} message={error||reconnecting} initial={selectedDesign}
+      connection={connection} addresses={addresses} message={error||reconnecting||nameError} initial={selectedDesign}
       onViewReport={lastBattle && workbenchRoom.match?.id === lastBattle.match.id ? ()=>setReportOpen(true) : undefined}
       onConfirmed={next=>{selectedRef.current=next;setSelectedDesign(next);rememberSelectedDesign(next);}}
       onLeave={()=>{if (transport === "steam") { resetSteam(); void steamRequest("leave").then(setSteamStatus, error=>setError(error.message)); return; } leavingWorkbench.current=!!room&&connection.ready;if(leavingWorkbench.current)send({type:"leave"});setWorkbenchRoom(null);}}/>
@@ -280,7 +286,8 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
       <ol className="lan-workflow" aria-label="联机操作步骤"><li aria-current="step">1 · 创建 / 加入</li><li>2 · 房间内改装与分队</li><li>3 · 准备 / 开始</li></ol>
       {reconnecting&&<p className="lan-menu-note" role="status">{reconnecting}</p>}
       {error&&<p className="lan-error" role="alert">{error}</p>}
-      {transport === "steam" ? <SteamStart status={steamStatus} name={name} onName={setName} busy={connecting||entering} onSelected={selectSteam} onRefresh={setSteamStatus} onReset={resetSteam}/> : <LanStart design={selectedDesign} hull={previewHull} name={name} onNameChange={setName} available={available} connected={!!id}
+      {nameError&&<p className="lan-error" role="alert">{nameError}</p>}
+      {transport === "steam" ? <SteamStart status={steamStatus} name={name} onName={changeName} busy={connecting||entering} onSelected={selectSteam} onRefresh={setSteamStatus} onReset={resetSteam}/> : <LanStart design={selectedDesign} hull={previewHull} name={name} onNameChange={changeName} available={available} connected={!!id}
         connecting={connecting||entering||!!room} initialCode={initialCode} desktop={desktopLan} serverLabel={serverLabel}
         onHost={()=>enterRoom({type:"create",battleSize:readBattleSize()})} onJoin={(code,password,remoteOrigin)=>enterRoom({type:"join",code,password},remoteOrigin)}/>}
       <footer className="lan-entry-footer"><FullscreenButton /><NativeButton onClick={downloadNetworkDiagnostics}>导出联机性能日志</NativeButton><NativeButton onClick={()=>{if (transport !== "steam") window.location.assign("?view=steam"); else void steamRequest<{url:string}>("lan").then(result=>window.location.assign(result.url),error=>setError(error.message));}} disabled={transport === "steam" && !steamStatus}>{transport === "steam" ? "使用局域网联机" : "Steam 联机"}</NativeButton><NativeButton onClick={()=>setHelpOpen(true)}>联机说明</NativeButton><NativeButton onClick={()=>{if (transport === "steam" && steamStatus) { resetSteam(); void steamRequest("leave").then(()=>window.location.assign("./"),error=>setError(error.message)); } else { connection.close(); window.location.assign("./"); }}}>返回主菜单</NativeButton></footer>

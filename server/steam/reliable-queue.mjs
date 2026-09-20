@@ -8,10 +8,19 @@ export class SteamSendWindow {
     const bytes = encoded.packets.reduce((sum, packet) => sum + packet.length, 0);
     this.pending.set(encoded.id, { bytes, since: now }); this.bytes += bytes;
   }
-  ack(id) {
+  ack(id, cumulative = false) {
     const item = this.pending.get(id);
     if (!item) return false;
-    this.pending.delete(id); this.bytes -= item.bytes; return true;
+    if (cumulative) {
+      // Exact membership FIRST, then insertion order (not numeric ID order).
+      // Data travels on one reliable FIFO; packet IDs may skip and wrap uint32.
+      // Future/duplicate/old-connection receipts cannot release newer controls.
+      for (const [pendingId, entry] of this.pending) {
+        this.pending.delete(pendingId); this.bytes -= entry.bytes;
+        if (pendingId === id) break;
+      }
+    } else { this.pending.delete(id); this.bytes -= item.bytes; }
+    return true;
   }
   expired(now = Date.now()) {
     const oldest = this.pending.values().next().value;
@@ -52,8 +61,8 @@ export class SteamReliableQueue {
       this.pending.push(item); this.bytes += item.bytes;
     }
   }
-  ack(id) {
-    if (!this.window.ack(id)) return;
+  ack(id, cumulative = false) {
+    if (!this.window.ack(id, cumulative)) return;
     while (this.pending.length && !this.window.full) {
       const item = this.pending[0];
       this.window.track(this.send(item.text));

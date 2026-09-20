@@ -109,13 +109,13 @@ export function LanRoomWorkbench({room,id,active,connection,addresses,message,in
       onDirtyChange:reportDirty,actionLabel:isHost?'开始战斗':me?.ready?'取消准备':'准备',actionBlocked:blocked,onAction:act,
       applyAction:draft=>roomApplyAction(room,id,draft),
       actionHint:isHost?'所有开战条件已满足，点击开始战斗。':me?.ready?'你已准备，等待房主开始；继续改装会取消准备。':'配装已同步，点击准备后等待房主开始。',
-      sidebar:(onPickHull,draft)=><aside className="lan-room-sidebar lan-room-fleet-sidebar" aria-label="房间舰船"><header><strong>房间 {room.code}</strong><span>真人 {room.members.length}/{room.capacity}</span></header>
+      sidebar:(onPickHull,draft,_change,pending)=><aside className="lan-room-sidebar lan-room-fleet-sidebar" aria-label="房间舰船"><header><strong>房间 {room.code}</strong><span>真人 {room.members.length}/{room.capacity}</span></header>
         <NativeButton onClick={downloadNetworkDiagnostics}>导出联机性能日志</NativeButton>
         {(message||error)&&<p className="lan-error" role="alert">{error||message}</p>}
         <p className="lan-muted" aria-label="当前房间战斗规模">战斗规模 {room.options.battleSize} DP · 每队 {battleTeamLimit(room.options.battleSize,battleTeamCount(room.members,room.options.aiHulls))} DP</p>
         {onViewReport && <NativeButton onClick={onViewReport}>上一局战报</NativeButton>}
         <LanRoomProgress room={room} id={id} editable={editable&&!aiBusy} onAddOpponent={()=>openAi(Math.max(0,workflow.opponentTeam))} onRules={()=>setRulesOpen(value=>value+1)} onSettings={()=>setSettingsOpen(value=>value+1)}/>
-        <LanRoomRoster room={room} id={id} editable={editable} connection={connection} onEdit={onPickHull} send={send} onAddAi={openAi}
+        <LanRoomRoster room={room} localDraft={pending?draft:undefined} id={id} editable={editable} connection={connection} onEdit={onPickHull} send={send} onAddAi={openAi}
           onBusyChange={reportAiBusy} collapsed={collapsedTeams} onToggleTeam={toggleTeam} readScroll={readRosterScroll} onScroll={saveRosterScroll}
           onEditAi={target=>{setAiReturn(false);setAiOpen(undefined);setAiEditor(target);}}/>
         <div className="lan-room-ai"><LanAiFleet room={room} isHost={isHost} editable={editable&&!aiBusy} entryDisabled={aiBusy} connection={connection} currentDesign={draft} openRequest={aiOpen} openInitially={aiReturn} initialTeam={aiTeam} initialQuery={aiQuery} initialHullClass={aiHullClass} initialFaction={aiFaction} initialBatch={aiBatch} initialSelection={aiSelection} initialScroll={aiScroll} onEdit={target=>{setAiScroll(target.returnScroll);setAiOpen(undefined);setAiSelection(target.returnSelection);setAiQuery(target.returnQuery??"");setAiHullClass(target.returnHullClass??"");setAiFaction(target.returnFaction??"");setAiBatch(target.returnBatch??"1");setAiTeam(target.team);setAiReturn(true);setAiEditor(target);}}/></div>

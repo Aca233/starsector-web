@@ -74,13 +74,45 @@ test('desktop independently limits console spam and resumes next window', async 
   for(let i=0;i<12;i++){assert.equal(log.accept(message(),true),true);await log.flush();}
   assert.equal(log.accept(message(),true),false);now=1001;assert.equal(log.accept(message(),true),true);await log.flush();
 });
-test('real filesystem rotation replaces previous file and stays bounded on Windows too', async () => {
+test('real filesystem appends beyond the former limit without rotating or losing early rows', async () => {
   await fs.mkdir(path.resolve('artifacts'),{recursive:true});
-const dir=await fs.mkdtemp(path.resolve('artifacts/network-log-test-'));
+  const dir=await fs.mkdtemp(path.resolve('artifacts/network-log-test-'));
   const file=path.join(dir,'network-performance.jsonl');let now=0;
   const log=new DesktopNetworkLog(file,{maxBytes:4500,now:()=>now});
   for(let i=0;i<12;i++){now+=1000;assert.equal(log.accept(message({battle:i}),true),true);await log.flush();}
-  const current=await fs.readFile(file,'utf8'),previous=await fs.readFile(file+'.previous','utf8');
-  assert.ok(Buffer.byteLength(current)<=4500);assert.ok(Buffer.byteLength(previous)<=4500);
-  assert.equal(JSON.parse(current.trim().split('\n').at(-1)).battle,11);assert.ok(JSON.parse(previous.trim().split('\n').at(-1)).battle<11);
+  const current=await fs.readFile(file,'utf8');
+  assert.ok(Buffer.byteLength(current)>4500);
+  assert.deepEqual(current.trim().split('\n').map(line=>JSON.parse(line).battle),Array.from({length:12},(_,i)=>i));
+  await assert.rejects(fs.stat(file+'.previous'),{code:'ENOENT'});
+});
+
+test('export preserves ACK path stages, exact host consumption and native unavailability without identities',()=>{
+ const r=normalizeNetworkRecord(sample({transport:'steam',steam:{mode:'legacy-p2p',role:'guest',receipts:{rendererPending:1,rendererWritten:12,networkAttempts:12,networkAccepted:11,networkErrors:1,networkAgeMs:42,secret:'SECRET'},
+  polling:{calls:70,packetsRead:12,maxGapMs:1001,errors:2,secret:'SECRET'},
+  nativeHostSession:{available:false,reason:'interface-unavailable',ip:'SECRET'},
+  peers:[{ackedStates:12,sentStates:15,consumption:{enabled:true,inflight:3,consumed:12,oldestMs:8100,rawBytes:2000},nativeSession:{available:false,reason:'SECRET'}}]}}));
+ assert.equal(r.steam.receipts.networkErrors,1);assert.equal(r.steam.receipts.consumptionAccepted,null);assert.equal(r.steam.polling.maxGapMs,1001);
+ assert.equal(r.steam.peers[0].consumption.inflight,3);assert.equal(r.steam.peers[0].ackedStates,12);assert.equal(r.steam.nativeHostSession.reason,'interface-unavailable');
+ assert.equal(r.steam.peers[0].nativeSession.reason,null);assert.ok(!JSON.stringify(r).includes('SECRET'));
+});
+test('bounded per-transport lifecycle summaries survive sample eviction without pretending old Steam samples remain',()=>{
+ const ring=new NetworkDiagnosticBuffer({maxRecords:3});
+ ring.write(sample({event:'battle-failed',transport:'steam',battle:1,failureStage:'worker-runtime',reason:'SECRET',monotonicMs:1}));
+ ring.write(sample({event:'disconnected',transport:'steam',monotonicMs:2}));
+ for(let i=1;i<=20;i++)ring.write(sample({transport:'lan',monotonicMs:i*1000}));
+ const [header,...rows]=ring.text().trim().split('\n').map(JSON.parse);
+ assert.deepEqual(header.retainedByTransport,{lan:3,steam:0});assert.deepEqual(header.writtenByTransport,{lan:20,steam:2});assert.deepEqual(header.evictedByTransport,{lan:17,steam:2});
+ assert.equal(header.latestEvents.find(e=>e.event==='battle-failed').failureStage,'worker-runtime');assert.equal(header.latestEvents.length,2);assert.ok(rows.every(r=>r.transport==='lan'));assert.ok(!ring.text().includes('SECRET'));
+ ring.write(sample({event:'battle-failed',transport:'steam',battle:2,failureStage:'SECRET',monotonicMs:22000}));
+ const latest=JSON.parse(ring.text().split('\n')[0]).latestEvents;assert.equal(latest.length,2);assert.equal(latest.at(-1).battle,2);assert.equal(latest.at(-1).failureStage,null);
+ assert.ok(JSON.stringify(header).length<MAX_RECORD_BYTES);
+});
+test('nine complete Steam receipt/consumption diagnostics fit the existing record budget',()=>{
+ const numberFields='rendererPending rendererWritten rendererWriteErrors maxRendererWriteMs networkAttempts networkAccepted networkErrors consumptionAttempts consumptionAccepted consumptionErrors fastAttempts fastAccepted fastRejected networkAgeMs consumptionAgeMs';
+ const receipts=Object.fromEntries(numberFields.split(' ').map(k=>[k,Number.MAX_SAFE_INTEGER]));
+ const peer={inflight:32,window:32,inflightBytes:65536,oldestAckMs:8000,ackMs:300,baseAckMs:100,sentStates:10000,skippedStates:9000,ackedStates:9000,
+  consumption:{enabled:true,inflight:32,bytes:65536,rawBytes:33554432,consumed:9000,oldestMs:8000},nativeSession:{available:true,active:true,connecting:false,usingRelay:true,queuedBytes:65536,queuedPackets:32,errorCode:0,sampleAgeMs:1000},
+  lastSnapshot:{rawBytes:800000,wireBytes:60000,fragments:2,prepareMs:4},delta:{fullStates:100,deltaStates:9000,legacyStates:0}};
+ const record=normalizeNetworkRecord(sample({transport:'steam',steam:{mode:'legacy-p2p',role:'host',receipts,peers:Array.from({length:9},()=>peer)}}));
+ assert.ok(new TextEncoder().encode(JSON.stringify(record)).length<MAX_RECORD_BYTES);const ring=new NetworkDiagnosticBuffer();assert.equal(ring.write(record),true);
 });

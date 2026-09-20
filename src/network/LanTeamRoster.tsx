@@ -1,3 +1,4 @@
+import type { Design } from "../studio/DesignModel";
 import { MotionPresence } from '../ui/core/MotionPresence';
 import { LanCaptainTooltip, LanCaptainPortrait } from './LanCaptainTooltip';
 import { useEquipmentHover } from '../studio/useEquipmentHover';
@@ -11,6 +12,7 @@ import { runtimeAssetUrl } from "../engine/runtime/RuntimePaths";
 
 export function LanTeamRoster({
   room,
+  localDraft,
   id,
   editable,
   onEdit,
@@ -18,6 +20,7 @@ export function LanTeamRoster({
   send, renderAi, collapsed, onToggleTeam, readScroll, onScroll,
 }: {
   room: Room;
+  localDraft?: Design;
   id: string;
   editable: boolean;
   onEdit: () => void;
@@ -40,17 +43,20 @@ export function LanTeamRoster({
     return () => cancelAnimationFrame(frame);
   }, [readScroll]);
   const [inspectedId,setInspectedId] = useState<string | null>(null);
-  const inspected = room.members.find(member=>member.id===inspectedId);
+  // Presentation only: never mutate the authoritative room, readiness or launch validation.
+  const members = room.members.map(member => member.id === id && localDraft
+    ? { ...member, hull: localDraft.hullId, design: localDraft, ready: false, editing: true } : member);
+  const inspected = members.find(member=>member.id===inspectedId);
   const isHost = room.hostId === id;
   const captainHover = useEquipmentHover();
-  const hoveredCaptain = room.members.find(member => member.id === captainHover.active?.id);
+  const hoveredCaptain = members.find(member => member.id === captainHover.active?.id);
   return (
     <div className="lan-teams" ref={list} onScroll={event=>onScroll(event.currentTarget.scrollTop)}>
-      {hoveredCaptain && <LanCaptainTooltip member={hoveredCaptain} hover={captainHover} />}
+      {hoveredCaptain && <LanCaptainTooltip member={hoveredCaptain} hover={captainHover} localPreview={!!localDraft&&hoveredCaptain.id===id} />}
       <MotionPresence>{inspected && <LanLoadoutDetails member={inspected} onClose={()=>setInspectedId(null)} />}</MotionPresence>
       {roomTeams(room.options).filter(team=>room.options.assignment!=="solo"||room.members.some(member=>member.team===team)).map((team) => {
         const folded = collapsed.has(team);
-        const humans = room.members.filter((member) => member.team === team);
+        const humans = members.filter((member) => member.team === team);
         return (
           <section
             className="lan-team"
@@ -77,6 +83,8 @@ export function LanTeamRoster({
               <article
                 className="lan-team-member"
                 data-local={member.id === id}
+                data-preview={!!localDraft && member.id === id}
+                data-hull={member.hull}
                 key={member.id}
               >
                 <div className="lan-member-identity">
@@ -97,6 +105,7 @@ export function LanTeamRoster({
                   <span className={member.ready ? "lan-ready" : "lan-muted"}>
                     {!member.connected
                       ? "断线重连中"
+                      : localDraft && member.id === id ? "本地预览 · 待同步"
                       : member.editing ? "正在改装 · 未应用"
                       : member.id === room.hostId
                         ? "房主 · 负责开始"

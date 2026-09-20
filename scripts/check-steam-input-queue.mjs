@@ -26,9 +26,9 @@ function fixture(code,{rtt=300,outage=null}={}){
   const {SteamGateway}=context.module.exports;
   const ids=['76561198000000001','76561198000000002'];
   const pending=[], inbox=[[],[]], lastDue=[0,0], traffic=[[],[]], received=[], states=[], closes=[];
-  let accepted=null, heldAck=null;
+  let accepted=null, heldAck=null, refusedFastAcks=0;
   const clients=ids.map((_,i)=>({networking:{
-    sendP2PPacket(remote,type,packet){check(type===2,'all traffic remains Reliable, not Nagle/unreliable');const due=Math.max(lastDue[i],clock.now+rtt/2,outage&&clock.now>=outage[0]&&clock.now<outage[1]?outage[1]:0);lastDue[i]=due;
+    sendP2PPacket(remote,type,packet){if(type===1){refusedFastAcks++;return false;}check(type===2,'fallback traffic remains Reliable; optional fast ACK route explicitly refuses');const due=Math.max(lastDue[i],clock.now+rtt/2,outage&&clock.now>=outage[0]&&clock.now<outage[1]?outage[1]:0);lastDue[i]=due;
       pending.push({i:1-i,remote:ids[i],data:Buffer.from(packet),due});traffic[i].push({at:clock.now,packet:Buffer.from(packet)});return true;},
     isP2PPacketAvailable(){return inbox[i][0]?.data.length??0;},readP2PPacket(){const p=inbox[i].shift();return {steamId:p.remote,data:p.data};}
   }}));
@@ -54,10 +54,10 @@ function fixture(code,{rtt=300,outage=null}={}){
     for(const g of gateways)g.poll();
   }};
   const input=(seq,actions=[],extra={})=>({type:'input',matchId:'battle',syncId:'sync',input:{seq,keys:seq%2,aim:[seq,0],pointerActive:true,firing:false,actions},...extra});
-  return {clock,gateways,ws,send,step,input,received,states,closes,traffic,pending,get peer(){return accepted;},holdAcks(){heldAck=[];return heldAck;}};
+  return {clock,gateways,ws,send,step,input,received,states,closes,traffic,pending,get peer(){return accepted;},get refusedFastAcks(){return refusedFastAcks;},holdAcks(){heldAck=[];return heldAck;}};
 }
 function snapshotRun(code){const f=fixture(code);f.step(1000);let next=1000,seq=0;f.step(6000,()=>{if(f.clock.now>=next){next+=1000/60;seq++;if(f.peer.readyState===1&&(f.peer.snapshotWritable??(f.peer.bufferedAmount===0)))f.peer.send(JSON.stringify({type:'state',seq,frame:{inputSeq:seq}}));}});f.step(6600);
-  check(f.closes.length===0,'snapshot simulation stays connected');return {offered:seq,received:f.states.length,spanMs:5000,rtt:300};}
+  check(f.closes.length===0,'snapshot simulation stays connected');check(f.refusedFastAcks>0,'exercise explicit fast ACK refusal and reliable fallback');return {offered:seq,received:f.states.length,refusedFastAcks:f.refusedFastAcks,spanMs:5000,rtt:300};}
 function outageRun(code){const f=fixture(code,{outage:[1000,4000]});f.step(1000);let next=1000,seq=0;f.step(5000,()=>{if(f.clock.now>=next&&f.ws.readyState===1){next+=1000/60;f.send(f.input(++seq));}});f.step(6000);
   return {offered:seq,received:f.received.filter(x=>x.data.type==='input').length,maxRelayWindowCount:Math.max(...f.received.map(x=>x.count)),closes:f.closes,lastSeq:f.received.filter(x=>x.data.type==='input').at(-1)?.data.input.seq};}
 const report={scope:'Real SteamGateway and codec with virtual reliable link and relay/browser doubles; no Valve routing or actual gameplay.'};

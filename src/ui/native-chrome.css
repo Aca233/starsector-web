@@ -1,3 +1,4 @@
+@import "./native-font-faces.css";
 /* Shared native UI skin. Source: class/I.java, class/o0oo_0.java, ui/u_0.java.
  * Geometry and behavior belong to callers; this module owns fonts and material. */
 @font-face {

@@ -1,11 +1,11 @@
 import { roomDeploymentBlockReason } from './room-deployment.mjs';
 import { roomStartBlockReason } from './room-start.mjs';
 
-/** Preview the real configure semantics: applying clears everyone's ready flag. */
+/** Preview configure: only the submitting player's ready flag is cleared. */
 export function roomApplyAction(room, id, draft) {
   if (room.hostId !== id) return { label: '应用并准备', continueToAction: true, hint: '先确认配装，再自动准备；不会替其他玩家准备。' };
-  const members = room.members.map(member => ({ ...member, ready: false,
-    ...(member.id === id ? { editing: false, hull: draft.hullId, design: draft } : {}) }));
+  const members = room.members.map(member => member.id === id
+    ? { ...member, ready: false, editing: false, hull: draft.hullId, design: draft } : member);
   const blocked = roomStartBlockReason({ ...room, members, aiHulls: room.options.aiHulls });
   return blocked
     ? { label: '应用配装', continueToAction: false, hint: '应用后不会自动开战。' + blocked }

@@ -7,6 +7,7 @@ import { zh_CN } from "../engine/i18n/locales/zh_CN";
 import { en_US } from "../engine/i18n/locales/en_US";
 import {
   createDesign,
+  withDesignCaptain,
   data,
   decodeDesign,
   evaluate,
@@ -322,7 +323,7 @@ export function StudioApp({ homeNavigation }: { homeNavigation: HomeNavigation }
     try {
       const { importNativeVariant } = await import("./NativeVariantImport");
       const { design, warnings } = importNativeVariant(spec);
-      const enter = () => { open(design); navigate("editor"); };
+      const enter = () => { open(withDesignCaptain(design, draft)); navigate("editor"); };
       guard(() => {
         if (warnings.length) setConfirmation({title: "以基础适配载入原版方案？", body: warnings.join("\n"), action: "载入并查看", run: enter});
         else enter();
@@ -398,7 +399,7 @@ export function StudioApp({ homeNavigation }: { homeNavigation: HomeNavigation }
       {catalogOpen ? (
         <Suspense fallback={<div className="native-loading">正在加载原版内容…</div>}>
           <NativeCatalog onVariant={loadNativeVariant} onClose={() => navigate("home")} onRefit={(id) => {
-            const enter = () => { if (id !== draft.hullId) open(createDesign(id)); navigate("editor"); };
+            const enter = () => { if (id !== draft.hullId) open(withDesignCaptain(createDesign(id), draft)); navigate("editor"); };
             if (id === draft.hullId) enter(); else guard(enter, "更换舰体？");
           }} />
         </Suspense>
@@ -430,7 +431,7 @@ export function StudioApp({ homeNavigation }: { homeNavigation: HomeNavigation }
           onChange={change}
           onHull={(id) => {
             if (id !== draft.hullId)
-              guard(() => open(createDesign(id)), "更换舰体？");
+              guard(() => open(withDesignCaptain(createDesign(id), draft)), "更换舰体？");
           }}
           onOpen={(d) => guard(() => open(d), "打开装配方案？")}
           onSave={save}
@@ -467,7 +468,7 @@ export function StudioApp({ homeNavigation }: { homeNavigation: HomeNavigation }
           }
           onNew={() =>
             guard(
-              () => open(createDesign(draft.hullId, "empty")),
+              () => open(withDesignCaptain(createDesign(draft.hullId, "empty"), draft)),
               "新建空白方案？",
             )
           }

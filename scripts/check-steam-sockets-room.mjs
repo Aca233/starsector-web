@@ -251,7 +251,10 @@ test('host broadcast preparation is shared without sharing per-peer anchors, fra
  room.add({handle:1,lease:'1',remote:GUEST,scope:ROOM},0);room.add({handle:2,lease:'2',remote:'76561198000000003',scope:ROOM},0);
  const [a,b]=[...room.records.values()].map(r=>r.session);assert.equal(a.encoder,b.encoder);assert.equal(a.codec,b.codec);assert.notEqual(a.sender,b.sender);assert.notEqual(a.localNonce,b.localNonce);
  const text=JSON.stringify({type:'state',matchId:'cache',seq:1,frame:{tick:1,moving:Array.from({length:100},(_,i)=>({x:Math.sin(i),y:Math.cos(i)}))}});
- const first=a.encoder.prepare(text,a.codec),count=room.codec.packedPreparations;for(let i=0;i<9;i++)assert.equal(b.encoder.prepare(text,b.codec),first);
- assert.equal(count,1);assert.equal(room.codec.packedPreparations,count);a.close();assert.equal(room.encoder.current,first);assert.notEqual(room.codec.packedCache,null);
+ const first=a.encoder.prepare(text,a.codec);for(let i=0;i<9;i++)assert.equal(b.encoder.prepare(text,b.codec),first);
+ assert.equal(room.codec.packedPreparations,0,'validation alone does not full-compress superseded states');
+ const selected=a.sender.prepare(text,a.encoder,a.codec,0);assert.equal(room.codec.packedPreparations,1);
+ for(let i=0;i<9;i++)assert.equal(b.sender.prepare(text,b.encoder,b.codec,0).prepared,selected.prepared);
+ assert.equal(room.codec.packedPreparations,1,'the selected broadcast is still compressed only once');a.close();assert.equal(room.encoder.current,first);assert.notEqual(room.codec.packedCache,null);
  room.close();assert.equal(room.encoder.current,null);assert.equal(room.codec.cache,null);assert.equal(room.codec.packedCache,null);assert.equal(room.wireBudget.bytes,0);
 });

@@ -193,10 +193,15 @@ export async function createLanServer({
   const broadcast = (r, message, except, encoded) => {
     // Encode lazily, once per broadcast; validated host states can reuse their text.
     let deltaTarget;
-    let recipients = r.peers;
-    if (message.type === "state" && r.peers.some(p => p.lanDelta)) {
-      const start = (r.deltaRotation ?? 0) % r.peers.length;
-      recipients = r.peers.slice(start).concat(r.peers.slice(0, start));
+    // Rotate actual ready recipients, not the excluded host slot. Shared Steam
+    // byte credit and bounded LAN patch work must not favor the first seat on
+    // every broadcast. Lifecycle/control delivery retains its existing order.
+    let recipients = message.type === "state"
+      ? r.peers.filter(p => p !== except && connected(p) && p.assetsLoaded && !p.background)
+      : r.peers;
+    if (message.type === "state" && recipients.length > 1) {
+      const start = (r.deltaRotation ?? 0) % recipients.length;
+      recipients = recipients.slice(start).concat(recipients.slice(0, start));
       r.deltaRotation = start + 1;
     }
     for (const p of recipients) {
@@ -580,7 +585,7 @@ export async function createLanServer({
           p.lanFlow = p.stateCredits ? createLanFlowMetrics() : null;
           // Remote LAN only: loopback never gains codec CPU work, Steam stays on
           // its own transport. Both sides must explicitly negotiate the feature.
-          p.lanDelta = p.stateCredits && m.binaryDelta === 1 && ws.extensions?.includes("permessage-deflate") ? new LanDeltaSender() : null;
+          p.lanDelta = p.stateCredits && m.binaryDelta === 1 && ws.extensions?.includes("permessage-deflate") ? new LanDeltaSender({ ordered: true }) : null;
           p.nativeProbe = null;
           send(p, {
             type: "welcome",
@@ -842,8 +847,9 @@ export async function createLanServer({
           p.design = design;
           p.designRevision++;
           p.editing = false;
-          // Everyone must confirm the new opposing/allied loadout before a start.
-          for (const member of r.peers) member.ready = false;
+          // A personal refit invalidates only its owner's readiness. Room-wide
+          // rules, team changes and roster edits still require everyone to confirm.
+          p.ready = false;
           publish(r);
           if (requestId) send(p, {type:"configured", requestId, roomCode:r.code, revision:p.designRevision, design:p.design, hull:p.hull});
           return;

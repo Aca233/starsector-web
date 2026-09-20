@@ -23,7 +23,7 @@ export function LanCaptainPortrait({ member, hover }: { member: Member; hover: E
   </button>;
 }
 
-export function LanCaptainTooltip({ member, hover }: { member: Member; hover: EquipmentHover }) {
+export function LanCaptainTooltip({ member, hover, localPreview = false }: { member: Member; hover: EquipmentHover; localPreview?: boolean }) {
   const profile = memberCaptainProfile(member);
   const loadout = member.design ? member.design.captainSkills : modManager.getShip(member.hull)?.captainSkills;
   const skills = Object.entries(loadout ?? {}).filter(([, level]) => level === 1 || level === 2)
@@ -39,6 +39,6 @@ export function LanCaptainTooltip({ member, hover }: { member: Member; hover: Eq
         <span><strong>{definitions.get(id)?.name ?? native?.name ?? id}</strong><small>{level === 2 ? '精英' : '普通'}</small></span>
       </li>;
     })}</ul> : <p>尚未配置战斗技能</p>}
-    <p className="equipment-state">{member.editing ? '正在改装；此处仍显示已应用的参战技能。' : '当前已应用的参战技能。'}</p>
+    <p className="equipment-state">{localPreview ? '本地草稿技能；准备或开始时自动同步，其他玩家暂不可见。' : member.editing ? '正在改装；此处仍显示已应用的参战技能。' : '当前已应用的参战技能。'}</p>
   </EquipmentTooltip>, document.body);
 }

@@ -26,6 +26,7 @@ function fixture() {
     stream.commit(choice);
     const result = destination.receive(wire);
     assert.equal(result.needsFull, false); assert.equal(json(result.data), json(value));
+    assert.equal(result.canonicalText, wire.type === 'steam-state' ? json(value) : undefined);
     return { choice, wire };
   };
   return { codec, decoder, encoder, sender, receiver, decode, send };
@@ -195,4 +196,69 @@ test('busy streams still checkpoint after 1s once prior deltas pay for the full 
   assert.ok(seq < 1000); assert.ok(f.sender.deltaBytesSinceFull > 0);
   assert.equal(f.send(state(seq + 2), 999).choice.delta, true);
   assert.equal(f.send(state(seq + 3), 1000).choice.delta, false);
+});
+
+test('validated but superseded Steam targets defer full compression and preserve immutable cache ownership',()=>{
+ const encoder=new SteamSnapshotEncoder(),codec=new SteamPacketCodec(),original=codec.prepare.bind(codec);let prepared=0;
+ codec.prepare=(op,value)=>{prepared++;return original(op,value);};
+ const first=encoder.prepare(json(state(1)),codec);for(let i=2;i<=100;i++)encoder.prepare(json(state(i)),codec);
+ assert.equal(prepared,0,'offered states awaiting admission must not be full-compressed');
+ const latest=encoder.current,full=latest.full;assert.equal(prepared,1);assert.equal(latest.full,full);assert.equal(prepared,1);
+ assert.deepEqual(JSON.parse(full.raw).body,state(100));const old=first.full;assert.equal(prepared,2);assert.deepEqual(JSON.parse(old.raw).body,state(1));
+ encoder.clear();assert.equal(encoder.current,null);assert.equal(latest.full,full);assert.equal(first.full,old);
+ const next=encoder.prepare(json(state(100)),codec);assert.notEqual(next,latest);assert.notEqual(next.full,full);assert.equal(prepared,3);
+});
+
+
+test('full receiver inspects the body once, returns verified canonical text without retaining it', () => {
+  const value = state(1, { precision: [Math.PI, -1e-200, Number.MAX_VALUE], unicode: '中文😀\ud800' });
+  const wire = envelope(value); let traversals = 0;
+  value.frame = new Proxy(value.frame, { ownKeys(target) { traversals++; return Reflect.ownKeys(target); } });
+  const receiver = new SteamSnapshotReceiver(), result = receiver.receive(wire);
+  assert.equal(traversals, 2, 'one inspect traversal plus one canonical stringify, not two inspections');
+  assert.equal(result.canonicalText, json(value));
+  assert.equal(Buffer.byteLength(result.canonicalText), wire.size);
+  assert.equal(createHash('sha256').update(result.canonicalText).digest('hex'), wire.hash);
+  assert.deepEqual(Object.keys(receiver).sort(), ['base', 'deltaStates', 'fullStates', 'misses']);
+  assert.deepEqual(Object.keys(receiver.base).sort(), ['size', 'token', 'value']);
+});
+
+test('delta keeps both patch and reconstructed target budgets, including unchanged subtrees', () => {
+  const receiver = new SteamSnapshotReceiver();
+  const before = state(1, { many: new Array(33000).fill(0) });
+  receiver.receive(envelope(before)); const saved = receiver.base;
+  const after = state(2, { many: before.frame.many, extra: new Array(33000).fill(0) });
+  const wire = envelope(after, { token: 2, base: 1, body: createStateDelta(before, after) });
+  assert.ok(wire.size < DELTA_MAX_BYTES, 'reconstructed target fails node budget, not declared byte size');
+  assert.throws(() => receiver.receive(wire), /差分/);
+  assert.equal(receiver.base, saved, 'failed validation must not commit a baseline');
+  // A valid patch can exceed the inspection node budget even though applying
+  // it and inspecting its target both fit. Metadata must also be bounded.
+  const other = new SteamSnapshotReceiver();
+  const a = state(1, { many: new Array(24000).fill(0) });
+  const b = state(2, { many: new Array(24000).fill(1) });
+  other.receive(envelope(a)); const otherBase = other.base;
+  const patch = createStateDelta(a, b);
+  assert.deepEqual(applyStateDelta(a, patch), b, 'patch itself is structurally valid');
+  assert.doesNotThrow(() => new SteamSnapshotReceiver().receive(envelope(b)));
+  assert.throws(() => other.receive(envelope(b, { base: 1, body: patch })), /差分/);
+  assert.equal(other.base, otherBase);
+});
+
+test('canonical text is absent on legacy and missing-base results; hash/size tampering never commits', () => {
+  const receiver = new SteamSnapshotReceiver(); receiver.receive(envelope(state(1)));
+  const saved = receiver.base;
+  for (const base of [null, 1]) {
+    const target = state(2), body = base === null ? target : createStateDelta(saved.value, target);
+    for (const overrides of [{ hash: '0'.repeat(64) }, { size: 1 }]) {
+      assert.throws(() => receiver.receive(envelope(target, { base, body, ...overrides })), /差分/);
+      assert.equal(receiver.base, saved);
+    }
+  }
+  assert.deepEqual(receiver.receive({ type: 'ping' }), { data: { type: 'ping' }, needsFull: false });
+  assert.equal(receiver.base, saved);
+  const legacy = state(3);
+  assert.deepEqual(receiver.receive(legacy), { data: legacy, needsFull: false });
+  assert.equal(receiver.base, null);
+  assert.deepEqual(receiver.receive(envelope(state(4), { base: 1 })), { data: null, needsFull: true });
 });

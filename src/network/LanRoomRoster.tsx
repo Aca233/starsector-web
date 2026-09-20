@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { NativeButton } from '../ui/NativeChrome';
 import { MotionPresence } from '../ui/core/MotionPresence';
-import { createDesign, data } from '../studio/DesignModel';
+import { createDesign, data, type Design } from '../studio/DesignModel';
 import type { LanConnection, Room } from './protocol';
 import type { AiEditTarget } from './LanAiEditor';
 import { groupAiFleet, type AiFleetGroup } from './LanAiGroups';
@@ -42,8 +42,8 @@ function AiRow({ group, revision, host, disabled, change, onEdit, onView, onOpen
 }
 
 /** One scrollable roster and one acknowledged transaction at a time, for every team. */
-export function LanRoomRoster({ room, id, editable, connection, onEdit, onEditAi, onAddAi, send, onBusyChange, collapsed, onToggleTeam, readScroll, onScroll }: {
-  room: Room; id: string; editable: boolean; connection: LanConnection;
+export function LanRoomRoster({ room, localDraft, id, editable, connection, onEdit, onEditAi, onAddAi, send, onBusyChange, collapsed, onToggleTeam, readScroll, onScroll }: {
+  room: Room; localDraft?: Design; id: string; editable: boolean; connection: LanConnection;
   onEdit: () => void; onEditAi: (target: AiEditTarget) => void; onAddAi: (team: number) => void;
   send: (message: unknown) => void; onBusyChange: (busy: boolean) => void;
   collapsed: ReadonlySet<number>; onToggleTeam: (team: number) => void; readScroll: () => number; onScroll: (top: number) => void;
@@ -84,7 +84,7 @@ export function LanRoomRoster({ room, id, editable, connection, onEdit, onEditAi
       <span>{pending ? '正在确认 AI 编成…' : error || notice}</span>
       {!pending && <button type="button" aria-label="关闭编成提示" onClick={() => { setError(''); setNotice(''); }}>×</button>}
     </p>}
-    <LanTeamRoster room={room} id={id} editable={!disabled} onEdit={onEdit} onAddAi={onAddAi} send={send}
+    <LanTeamRoster room={room} localDraft={localDraft} id={id} editable={!disabled} onEdit={onEdit} onAddAi={onAddAi} send={send}
       collapsed={collapsed} onToggleTeam={onToggleTeam} readScroll={readScroll} onScroll={onScroll}
       renderAi={team => groups.filter(group => group.team === team).map(group => <AiRow key={group.key} group={group}
         revision={room.options.aiRevision ?? 0} host={host} disabled={disabled} change={change} onEdit={edit} onView={setViewing} onOpenCodex={codex.open}/>)}/>

@@ -41,7 +41,10 @@ export function createLanBytePatch(before, after) {
   const slots = 65536, newest = new Int32Array(slots).fill(-1), older = new Int32Array(slots).fill(-1);
   const a = new DataView(base.buffer, base.byteOffset, base.byteLength), b = new DataView(target.buffer, target.byteOffset, target.byteLength);
   const hash = (v, i) => Math.imul(v.getUint32(i, true) ^ v.getUint32(i + 8, true), 0x9e3779b1) >>> 16;
-  for (let i = 0; i + 16 <= base.length; i += 8) { const h = hash(a, i); older[h] = newest[h]; newest[h] = i; }
+  // Four-byte indexing finds unchanged float32-aligned runs that eight-byte
+  // sampling misses. Hash slots, two candidates, 16-byte minimum copies and
+  // the output/work budgets stay bounded; the SLD1 decoder is unchanged.
+  for (let i = 0; i + 16 <= base.length; i += 4) { const h = hash(a, i); older[h] = newest[h]; newest[h] = i; }
   // Abort on non-beneficial patches instead of allocating an expansion. Require
   // >50% raw saving to offset copy metadata before permessage-deflate.
   const out = new Uint8Array(Math.ceil(target.length / 2)); let pos = 0, literalAt = 0, i = 0;

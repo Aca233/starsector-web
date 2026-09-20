@@ -10,7 +10,7 @@ import { runtimeAssetUrl } from "../engine/runtime/RuntimePaths";
 import { contentRegistry } from "../engine/content/ContentRegistry";
 import { ShipStage } from "./ShipStage";
 import { importNativeVariant } from "./NativeVariantImport";
-import { autoGroups, baseHull, budget, compatibility, createDesign, evaluate, isBuiltIn, modReason, weaponOPCost, weapons } from "./DesignModel";
+import { withDesignCaptain, autoGroups, baseHull, budget, compatibility, createDesign, evaluate, isBuiltIn, modReason, weaponOPCost, weapons } from "./DesignModel";
 import type { Design } from "./DesignModel";
 import { nativeVariantsForHull } from "./NativeVariantCatalog";
 
@@ -52,7 +52,7 @@ export function SourceVariantPicker({ draft, designs, onClose, onApply, onSave, 
   const choice = [...nativeChoices, ...savedChoices].find(c => c.id === selected);
   const options = [...nativeChoices.filter(c => !hidden.includes(c.id)), ...savedChoices];
   const planned = (() => {
-    const d = structuredClone(automatic ?? choice?.design ?? draft);
+    const d = withDesignCaptain(structuredClone(automatic ?? choice?.design ?? draft), draft);
     const warnings: string[] = [];
     if (!clear && choice && !automatic) {
       for (const [slot, id] of Object.entries(draft.weapons)) if (!d.weapons[slot] && id) d.weapons[slot] = id;

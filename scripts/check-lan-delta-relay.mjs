@@ -22,10 +22,11 @@ test('production relay negotiates remote LAN only, uses exact ACKs, and survives
   let seq=0;const frame=(ballast='component-'.repeat(5000))=>({tick:seq,ships:[{id:'a',state:{teamId:0,ballast}},{id:'b',state:{teamId:1}}],crafts:[],craftSpecs:[],world:{time:seq/60}});
   const state=(options={})=>{seq++;const m={type:'state',matchId:room.match.id,seq,frame:frame(options.ballast)};if(options.json)host.receive(m);else host.binary(encodeBinaryState(m.matchId,seq,encodeProjectedBinaryFrame(m.frame)));return m;};
   const peer=()=>room.peers[1],ack=n=>guest.receive({type:'state-consumed',matchId:room.match.id,seq:n});
-  const first=state();assert.ok(isLanDelta(guest.packets.at(-1)));assert.deepEqual(guest.rows.at(-1),first);assert.equal(peer().lanDelta.stats().baseSeq,null);
-  ack(seq+100);assert.equal(peer().lanDelta.stats().baseSeq,null);ack(seq);assert.equal(peer().lanDelta.stats().baseSeq,seq);
-  const next=state();assert.ok(guest.packets.at(-1).length<1000);assert.deepEqual(guest.rows.at(-1),next);const pending=peer().lanDelta.stats().pendingSeq;
-  guest.bufferedAmount=1;state();guest.bufferedAmount=0;assert.equal(peer().lanDelta.stats().pendingSeq,pending);ack(pending);
+  const first=state();assert.ok(isLanDelta(guest.packets.at(-1)));assert.deepEqual(guest.rows.at(-1),first);assert.equal(peer().lanDelta.stats().baseSeq,seq);
+  const creditsBefore = peer().stateCredits.stats();
+  ack(seq+100);assert.deepEqual(peer().stateCredits.stats(),creditsBefore);assert.equal(peer().lanDelta.stats().baseSeq,seq);ack(seq);assert.equal(peer().lanDelta.stats().baseSeq,seq);
+  const next=state();assert.ok(guest.packets.at(-1).length<1000);assert.deepEqual(guest.rows.at(-1),next);const pending=peer().lanDelta.stats().baseSeq;
+  guest.bufferedAmount=1;state();guest.bufferedAmount=0;assert.equal(peer().lanDelta.stats().baseSeq,pending);ack(pending);
   assert.deepEqual(guest.rows.at(-1),next);const afterSkip=state();assert.deepEqual(guest.rows.at(-1),afterSkip);
   while(peer().stateCredits.stats().inflight<peer().stateCredits.capacity)state();const before=peer().lanDelta.stats();state();assert.deepEqual(peer().lanDelta.stats(),before);
   const last=guest.rows.filter(m=>m.type==='state').at(-1);ack(last.seq);assert.ok(peer().lanDelta.stats().baseSeq>0);
@@ -35,7 +36,7 @@ test('production relay negotiates remote LAN only, uses exact ACKs, and survives
   state({json:true});ack(seq);assert.equal(peer().lanDelta.stats().retainedBytes,0);state();ack(seq);
   state({ballast:'x'.repeat(2*1024*1024)});ack(seq);assert.equal(isLanDelta(guest.packets.at(-1)),false);assert.equal(peer().lanDelta.stats().retainedBytes,0);state();ack(seq);
   const old=guest,token=peer().token;guest.close();guest=client({token});guest.receive({type:'loaded',matchId:room.match.id});assert.equal(peer().lanDelta.stats().retainedBytes,0);state();assert.deepEqual(guest.rows.at(-1).frame,frame());
-  old.receive({type:'state-consumed',matchId:room.match.id,seq});assert.equal(peer().lanDelta.stats().baseSeq,null);ack(seq);assert.equal(peer().lanDelta.stats().baseSeq,seq);
+  const beforeOldAck = peer().stateCredits.stats();old.receive({type:'state-consumed',matchId:room.match.id,seq});assert.deepEqual(peer().stateCredits.stats(),beforeOldAck);assert.equal(peer().lanDelta.stats().baseSeq,seq);ack(seq);assert.equal(peer().lanDelta.stats().baseSeq,seq);
   const legacy=client({delta:0});assert.equal(legacy.rows[0].binaryDelta,undefined);
   const steam=client({transport:{canHost:true,scope:'steam-test',identity:'test'}});assert.equal(steam.rows[0].binaryDelta,undefined);
   host.receive({type:'end',matchId:room.match.id});assert.equal(room.status,'ended');assert.ok(guest.rows.some(m=>m.type==='ended'));
