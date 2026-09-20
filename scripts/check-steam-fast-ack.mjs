@@ -1,3 +1,4 @@
+// Explicit synchronous reference fixture; real-worker coverage lives in check-steam-snapshot-prepare.mjs.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { SteamGateway } from '../server/steam/gateway.mjs';
@@ -7,7 +8,7 @@ import { bundleGateway, simulateSharedLink } from './steam-shared-link-model.mjs
 const remote='76561198000000002', connection='a'.repeat(32);
 test('only tiny ACKs get identical fast + reliable copies; loss/refusal never removes reliable fallback',()=>{
  for(const failure of ['none','false','throw']) {
-  const sent=[];const g=new SteamGateway({build:'test',client:{networking:{sendP2PPacket(_remote,type,data){sent.push({type,data:Buffer.from(data)});if(type===1&&failure==='throw')throw Error('best effort unavailable');return type===1&&failure==='false'?false:true;}}}});
+  const sent=[];const g=new SteamGateway({ snapshotPreparation: false,build:'test',client:{networking:{sendP2PPacket(_remote,type,data){sent.push({type,data:Buffer.from(data)});if(type===1&&failure==='throw')throw Error('best effort unavailable');return type===1&&failure==='false'?false:true;}}}});
   g.owner=remote;g.selected={owner:'76561198000000001'};
   try {
    for(const data of [{id:17},{id:18,consumed:true},{id:19,needsFull:true}]){
@@ -22,7 +23,7 @@ test('only tiny ACKs get identical fast + reliable copies; loss/refusal never re
 });
 test('duplicate ACK cannot drain twice, consume a later control, or suppress a reliable send error',()=>{
  let id=0;const q=new SteamReliableQueue(()=>({id:++id,packets:[Buffer.alloc(20)]}));q.enqueue('{}');q.enqueue('{}');q.ack(1);const before=q.diagnostics();q.ack(1);q.ack(999);assert.deepEqual(q.diagnostics(),before);
- const g=new SteamGateway({build:'test',client:{networking:{sendP2PPacket(_r,type){return type===1;}}}});
+ const g=new SteamGateway({ snapshotPreparation: false,build:'test',client:{networking:{sendP2PPacket(_r,type){return type===1;}}}});
  try{assert.throws(()=>g.transmit(remote,connection,'ack',{id:1}),/Steam/);}finally{g.wss.close();}
 });
 test('production gateways keep state flowing during reverse reliable HOL; dropping every fast copy still recovers',async()=>{
@@ -35,7 +36,7 @@ test('production gateways keep state flowing during reverse reliable HOL; droppi
 
 test('guest fast-copy byte budget is bounded across bursts, clock reversal and peer changes',t=>{
  let now=1000; t.mock.method(performance,'now',()=>now);const packets=[];
- const g=new SteamGateway({build:'budget',client:{networking:{sendP2PPacket(_r,type,p){packets.push({type,bytes:p.length});return true;}}}});g.owner=remote;g.selected={owner:'76561198000000001'};
+ const g=new SteamGateway({ snapshotPreparation: false,build:'budget',client:{networking:{sendP2PPacket(_r,type,p){packets.push({type,bytes:p.length});return true;}}}});g.owner=remote;g.selected={owner:'76561198000000001'};
  try {
   const send=()=>{for(let i=0;i<100;i++)g.transmit(g.selected.owner,connection,'ack',{id:i,consumed:true});};
   send();assert.ok(packets.filter(p=>p.type===1).reduce((n,p)=>n+p.bytes,0)<=1200);

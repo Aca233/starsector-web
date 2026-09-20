@@ -5,7 +5,7 @@ import { createLanFlowMetrics, lanTransportMetrics } from "./LanTransportDiagnos
 import { teamName, checkFleetBudget, editAiFleet } from "../src/network/room-fleet.mjs";
 import { MAX_BATTLE_REPORT_BYTES, validateBattleReport } from "../src/network/battle-report.mjs";
 import { summarizeCombatFrame, reusableStateText } from "./lan-state.mjs";
-import { decodeBinaryState } from "../src/network/BinarySnapshot.mjs";
+import { decodeBinaryState, encodeBinaryState } from "../src/network/BinarySnapshot.mjs";
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -52,7 +52,13 @@ export async function createLanServer({
   // Plain HTTP LAN-IP guests remain supported without SharedArrayBuffer.
   isolated = true,
   portable = null,
+  authorityFactory = null,
+  publicOrigin = null,
+  maxRooms = 16,
 } = {}) {
+  if (authorityFactory && extension) throw Error("Dedicated authority cannot share a Steam extension");
+  const exposed = publicOrigin ? new URL(publicOrigin) : null;
+  if (exposed && (!["http:","https:"].includes(exposed.protocol) || exposed.username || exposed.password || exposed.pathname !== "/" || exposed.search || exposed.hash)) throw Error("PUBLIC_ORIGIN must be an exact HTTP(S) origin");
   const root = fs.realpathSync(dist);
   const { build } = JSON.parse(
     fs.readFileSync(path.join(root, "lan-build.json"), "utf8"),
@@ -70,6 +76,7 @@ export async function createLanServer({
   const validHost = (req) => {
     try {
       const authority = new URL("http://" + req.headers.host);
+      if (exposed && req.headers.host === exposed.host) return true;
       return (
         (allowedHosts.has(authority.hostname.toLowerCase()) ||
           Object.values(networkInterfaces())
@@ -121,6 +128,7 @@ export async function createLanServer({
         res.end(
           JSON.stringify({
             service: "starsector-web-lan",
+            ...(authorityFactory ? { authority: "server" } : {}),
             protocol: protocol.version,
             build,
             addresses: addresses(),
@@ -171,13 +179,14 @@ export async function createLanServer({
     new WebSocketServer({ noServer: true, maxPayload: protocol.maxSnapshotBytes, perMessageDeflate }));
   const connected = (p) =>
     !p.disconnected && p.ws.readyState === WebSocket.OPEN;
-  const sendEncoded = (p, encoded) => {
+  const sendEncoded = (p, encoded, snapshot = null) => {
     if (!connected(p)) return false;
     if (p.ws.bufferedAmount > protocol.maxSnapshotBytes * 2) {
       p.ws.close(1013, "Client too slow");
       return false;
     }
-    p.ws.send(encoded);
+    if (snapshot) p.ws.sendSnapshot(snapshot);
+    else p.ws.send(encoded);
     return true;
   };
   const send = (p, message) => sendEncoded(p, JSON.stringify(message));
@@ -192,7 +201,7 @@ export async function createLanServer({
   };
   const broadcast = (r, message, except, encoded) => {
     // Encode lazily, once per broadcast; validated host states can reuse their text.
-    let deltaTarget;
+    let deltaTarget, relaySnapshot;
     // Rotate actual ready recipients, not the excluded host slot. Shared Steam
     // byte credit and bounded LAN patch work must not favor the first seat on
     // every broadcast. Lifecycle/control delivery retains its existing order.
@@ -238,7 +247,15 @@ export async function createLanServer({
         if (deltaTarget) { choice = p.lanDelta.prepare(deltaTarget); delivery = choice.packet; }
         else p.lanDelta.reset(); // JSON/small/oversized fallback establishes no delta base.
       }
-      const sent = sendEncoded(p, delivery);
+      // Steam's native peer can reuse the already-decoded/validated local-host
+      // SWB1, avoiding JSON -> parse -> binary on every broadcast. Old negotiated
+      // peers are converted to their original text format inside SteamPeer.
+      let snapshot = null;
+      if (message.type === "state" && ArrayBuffer.isView(encoded) && typeof p.ws.sendSnapshot === "function") {
+        relaySnapshot ??= { state: message, bytes: encoded };
+        snapshot = relaySnapshot;
+      }
+      const sent = sendEncoded(p, delivery, snapshot);
       if (sent && choice) p.lanDelta.commit(choice);
       if (sent && message.type === "state") countSnapshotStage(p, "queued");
       if (sent && message.type === "state" && p.lanFlow) {
@@ -250,6 +267,7 @@ export async function createLanServer({
   };
   const view = (r) => ({
     code: r.code,
+    ...(authorityFactory ? { authority: "server" } : {}),
     capacity: r.capacity,
     hostId: r.hostId,
     status: r.status,
@@ -291,8 +309,9 @@ export async function createLanServer({
     broadcast(r, { type: "room", room: view(r) });
     extension?.roomChanged?.(r);
   };
+  const toAuthority = (r, message) => authorityFactory ? r.authority?.postMessage(message) : send(r.peers[0], message);
   const presence = (r, p, online) =>
-    send(r.peers[0], {
+    toAuthority(r, {
       type: "presence",
       matchId: r.match?.id,
       seat: p.seat,
@@ -309,9 +328,11 @@ export async function createLanServer({
     presence(r, p, false);
     send(p, { type: "launch", matchId: r.match.id, syncId: p.sync.id, minTick: p.sync.tick });
   };
+  const stopAuthority = r => { const handle = r.authority; r.authority = null; r.authorityReady = false; return handle?.terminate(); };
   const abort = (r, reason) => {
     if (!["loading", "running"].includes(r.status)) return;
     r.status = "ended";
+    void stopAuthority(r);
     r.reason = reason;
     r.result = { type: "ended", matchId: r.match?.id, reason };
     broadcast(r, r.result);
@@ -324,7 +345,15 @@ export async function createLanServer({
     if (!r) return;
     p.room = null;
     p.ready = false;
-    if (r.hostId === p.id) {
+    if (authorityFactory) {
+      presence(r, p, false);
+      r.peers = r.peers.filter(other => other !== p);
+      if (!r.peers.length) { void stopAuthority(r); rooms.delete(r.code); return; }
+      if (r.hostId === p.id) r.hostId = (r.peers.find(connected) ?? r.peers[0]).id;
+      if (r.status === "loading") abort(r, reason);
+      for (const other of r.peers) other.ready = false;
+      publish(r);
+    } else if (r.hostId === p.id) {
       broadcast(
         r,
         { type: "roomClosed", message: "计算主机已离开，房间关闭。" },
@@ -382,6 +411,48 @@ export async function createLanServer({
   const expectedShips = (r) =>
     r.match.players.length +
     r.match.options.aiHulls.reduce((total,hulls)=>total+hulls.length,0);
+  const launchReady = r => {
+    if (r.status !== "loading" || (authorityFactory && !r.authorityReady) || !r.peers.every(p => p.assetsLoaded && connected(p))) return;
+    r.status = "running"; r.since = r.lastState = Date.now();
+    for (const member of r.peers) beginSync(r, member);
+    publish(r);
+    if (authorityFactory) r.authority.postMessage({type:"start"});
+  };
+  const receiveAuthority = (r, matchId, message) => {
+    if (rooms.get(r.code) !== r || r.match?.id !== matchId || !["loading","running"].includes(r.status)) return;
+    try {
+      if (message.type === "ready") { r.authorityReady = true; launchReady(r); }
+      else if (message.type === "snapshot") {
+        try {
+          if (r.status !== "running") return;
+          const seq = r.lastSeq + 1;
+          const bytes = message.binary ? encodeBinaryState(matchId, seq, new Uint8Array(message.binary)) : null;
+          const frame = bytes ? decodeBinaryState(bytes).frame : JSON.parse(message.json);
+          const summary = summarizeCombatFrame(frame, expectedShips(r), r.lastTick);
+          r.lastTick = frame.tick; r.lastSeq = seq; r.lastState = Date.now(); r.frame = summary;
+          broadcast(r, {type:"state", matchId, seq, frame}, undefined, bytes);
+        } finally { r.authority?.postMessage({type:"snapshot-consumed", tick:message.tick}); }
+      } else if (message.type === "performance") {
+        r.authorityPerformance = message;
+        broadcast(r, {type:"authority-performance", matchId, performance:message});
+      } else if (message.type === "recovered") {
+        for (const member of r.peers) if (connected(member) && member.assetsLoaded) beginSync(r, member);
+        publish(r);
+      } else if (message.type === "deployment-result") {
+        const member = r.peers.find(p => p.seat === message.seat);
+        if (member) send(member, {...message, matchId});
+      } else if (message.type === "finished") {
+        const teams = new Set([...r.match.players.map(p => p.team), ...r.match.options.aiHulls.flatMap((rows, team) => rows.length ? [team] : [])]);
+        if (message.winner !== "draw" && !teams.has(message.winner)) throw Error("服务器返回无效胜者");
+        const report = validateBattleReport(message.report, r.match, r.frame);
+        r.status = "ended";
+        const winner = r.match.options.assignment === "solo" ? r.match.players.find(p => p.team === message.winner)?.name : null;
+        r.reason = message.winner === "draw" ? "所有阵营均被消灭，平局" : (winner ?? teamName(message.winner)) + "获胜";
+        r.result = {type:"ended", matchId, winner:message.winner, reason:r.reason, report};
+        void stopAuthority(r); broadcast(r, r.result); publish(r);
+      } else if (message.type === "error") abort(r, "服务器战斗停止：" + String(message.message).slice(0,300));
+    } catch (error) { abort(r, "服务器战斗处理失败：" + error.message); }
+  };
   server.on("upgrade", (req, socket, head) => {
     try {
       const origin = new URL(req.headers.origin ?? "");
@@ -390,11 +461,12 @@ export async function createLanServer({
         (req.url !== "/lan/ws" && !extension?.isUpgrade?.(req.url)) ||
         !["http:", "https:"].includes(origin.protocol) ||
         origin.host !== req.headers.host ||
+        (exposed && req.headers.host === exposed.host && origin.origin !== exposed.origin) ||
         peers.size >= 64
       )
         throw Error("upgrade");
       if (extension?.isUpgrade?.(req.url)) { extension.upgrade(req, socket, head); return; }
-      const wss = websocketServers[isLanAddress(socket.remoteAddress) ? 1 : 0];
+      const wss = websocketServers[(exposed && req.headers.host === exposed.host) || isLanAddress(socket.remoteAddress) ? 1 : 0];
       wss.handleUpgrade(req, socket, head, (ws) =>
         wss.emit("connection", ws, req),
       );
@@ -469,8 +541,8 @@ export async function createLanServer({
       if (p.ws !== ws) return;
       let requestId;
       try {
-        if (binary && (!p.hello || p.transport || !p.room || p.room.hostId !== p.id))
-          throw Error("只有局域网计算主机可以发送二进制状态");
+        if (binary && (authorityFactory || !p.hello || p.transport && !p.binaryHost || !p.room || p.room.hostId !== p.id))
+          throw Error("只有已协商的计算主机可以发送二进制状态");
         const now = Date.now();
         if (now - p.window >= 1000) {
           p.window = now;
@@ -483,7 +555,7 @@ export async function createLanServer({
         // Otherwise a healthy backlog drain can consume the input/control budget.
         let receipt;
         if (!binary && p.stateCredits && raw.length <= 256 &&
-            p.room && p.room.hostId !== p.id) {
+            p.room && (authorityFactory || p.room.hostId !== p.id)) {
           try { receipt = JSON.parse(raw.toString()); } catch { /* counted below */ }
           if (receipt?.type === "state-consumed" && receipt.matchId === p.room.match?.id &&
               p.stateCredits.ack(receipt.seq)) { p.lanDelta?.ack(receipt.seq); countSnapshotStage(p, "consumed"); return; }
@@ -549,7 +621,7 @@ export async function createLanServer({
             peers.delete(p);
             const old = previous.ws;
             hostReload =
-              previous.room?.hostId === previous.id &&
+              !authorityFactory && previous.room?.hostId === previous.id &&
               previous.instance !== m.instance;
             p = previous;
             p.ws = ws;
@@ -580,17 +652,21 @@ export async function createLanServer({
           p.name = m.name.trim();
           p.instance = m.instance;
           p.hello = true;
+          // binaryHost is a local gateway identity capability, not hello data.
+          p.binaryHost = p.transport?.binaryHost === true && p.transport.canHost === true && m.binarySnapshots === 1;
           // Explicit LAN-only capability. Steam has its own transport ACK windows.
           p.stateCredits = !p.transport && m.stateCredits === 1 ? new LanStateCredits({maxBytes:protocol.maxSnapshotBytes*2}) : null;
           p.lanFlow = p.stateCredits ? createLanFlowMetrics() : null;
           // Remote LAN only: loopback never gains codec CPU work, Steam stays on
           // its own transport. Both sides must explicitly negotiate the feature.
-          p.lanDelta = p.stateCredits && m.binaryDelta === 1 && ws.extensions?.includes("permessage-deflate") ? new LanDeltaSender({ ordered: true }) : null;
+          p.lanDelta = p.stateCredits && m.binaryDelta === 1 && ws.extensions?.includes("permessage-deflate") ? new LanDeltaSender({ ordered: true, motionReference: m.motionReference === 1 }) : null;
           p.nativeProbe = null;
           send(p, {
             type: "welcome",
+            ...(p.binaryHost ? {binarySnapshots:1} : {}),
             ...(p.stateCredits ? {stateCredits:1} : {}),
             ...(p.lanDelta ? {binaryDelta:1} : {}),
+            ...(p.lanDelta?.motionReference ? {motionReference:1} : {}),
             id: p.id,
             resumeToken: p.token,
             resumed,
@@ -626,7 +702,7 @@ export async function createLanServer({
         if (m.type === "visibility") {
           if (typeof m.hidden !== "boolean") throw Error("无效页面可见状态");
           // Repeating a visibility message never renews the inactivity deadline.
-          if (p.background && !m.hidden && p.room?.hostId === p.id && p.room.status === "running") {
+          if (!authorityFactory && p.background && !m.hidden && p.room?.hostId === p.id && p.room.status === "running") {
             const r = p.room;
             r.recoveryUntil = Math.min(now + protocol.hostStateTimeoutMs, r.lastState + protocol.backgroundGraceMs);
           }
@@ -635,7 +711,7 @@ export async function createLanServer({
           return;
         }
         if (m.type === "ping") {
-          acceptAuthorityPerformance(p, m.authority);
+          if (!authorityFactory) acceptAuthorityPerformance(p, m.authority);
           const snapshotPipeline = snapshotPipelineMetrics(p);
           const lanTransport = lanTransportMetrics(p);
           send(p, { type: "pong", sent: m.sent, ...(lanTransport ? { lanTransport } : {}), ...(snapshotPipeline ? { snapshotPipeline } : {}) });
@@ -644,7 +720,7 @@ export async function createLanServer({
         if (m.type === "state-consumed") {
           // Exact sent-sequence validation is inside the window. A stale socket,
           // old match, host ACK or forged/future sequence cannot create credit.
-          if (p.stateCredits && p.room && p.room.hostId !== p.id &&
+          if (p.stateCredits && p.room && (authorityFactory || p.room.hostId !== p.id) &&
               m.matchId === p.room.match?.id && p.stateCredits.ack(m.seq)) { p.lanDelta?.ack(m.seq); countSnapshotStage(p, "consumed"); }
           return;
         }
@@ -656,7 +732,7 @@ export async function createLanServer({
         if (m.type === "create") {
           if (p.transport && !p.transport.canHost) throw Error("只有 Steam 大厅房主可以创建游戏房间。");
           if (p.room) throw Error("请先离开当前房间");
-          if (rooms.size >= 16) throw Error("房间数量已满");
+          if (rooms.size >= maxRooms) throw Error("房间数量已满");
           const battleSize = m.battleSize ?? DEFAULT_BATTLE_SIZE;
           if (!validBattleSize(battleSize)) throw Error("战斗规模须为 200–3200 DP，步进 20");
           const password = m.password ?? "";
@@ -869,7 +945,13 @@ export async function createLanServer({
             members: r.peers.map(member => ({id:member.id, name:member.name, hull:member.hull, design:member.design, team:member.team, ready:member.ready, editing:member.editing, connected:connected(member)})),
           });
           if (blocked) throw Error(blocked);
+          if (authorityFactory) {
+            // Controller seats stay frozen during a match; only a new match can remap them.
+            r.peers.sort((a,b) => Number(b.id === r.hostId) - Number(a.id === r.hostId));
+            r.peers.forEach((member, index) => { member.seat = index; });
+          }
           r.match = {
+            ...(authorityFactory ? { authority: "server" } : {}),
             id: randomUUID(),
             hostId: r.hostId,
             seed: randomBytes(4).readUInt32LE(),
@@ -902,6 +984,11 @@ export async function createLanServer({
           }
           publish(r);
           broadcast(r, { type: "match", match: r.match });
+          if (authorityFactory) {
+            const matchId = r.match.id;
+            try { r.authority = authorityFactory(r.match, message => receiveAuthority(r, matchId, message)); }
+            catch (error) { abort(r, "服务器无法开始战斗：" + error.message); }
+          }
           return;
         }
         if (m.matchId !== r.match?.id) {
@@ -909,6 +996,8 @@ export async function createLanServer({
           if(m.type==='deployment-result'||m.type==='finish')return;
           throw Error("已过期的对局消息");
         }
+        if (authorityFactory && ["state", "finish", "deployment-result", "host-recovered"].includes(m.type))
+          throw Error("此房间由服务器计算，客户端不能提交权威状态或结果。");
         if (m.type === "end") {
           isHost(p, r);
           abort(r, "房主结束了本局，可以重新准备。");
@@ -917,7 +1006,7 @@ export async function createLanServer({
         if (m.type === "fail") {
           const reason =
             "客户端无法继续：" + String(m.reason ?? "未知错误").slice(0, 180);
-          if (p.id === r.hostId) abort(r, reason);
+          if (!authorityFactory && p.id === r.hostId) abort(r, reason);
           else {
             leave(p, reason);
             send(p, {
@@ -934,13 +1023,7 @@ export async function createLanServer({
           if (r.status === "running") {
             beginSync(r, p);
             publish(r);
-          } else if (r.peers.every((x) => x.assetsLoaded && connected(x))) {
-            r.status = "running";
-            r.since = now;
-            r.lastState = now;
-            for (const member of r.peers) beginSync(r, member);
-            publish(r);
-          }
+          } else launchReady(r);
           return;
         }
         if (m.type === "sync-ready") {
@@ -976,7 +1059,7 @@ export async function createLanServer({
           const team=r.match.players.find(member=>member.seat===p.seat)?.team;
           if(team===undefined){reject("当前玩家没有参战席位。");return;}
           if(r.frame && m.ids.some(id=>!r.frame.deployment?.rows.some(row=>row.id===id&&row.teamId===team))){reject("只能操作本队战前编成中的舰船。");return;}
-          send(r.peers[0],{type:"deployment",matchId:r.match.id,seat:p.seat,requestId:m.requestId,operation:m.operation,ids:m.ids});return;
+          toAuthority(r,{type:"deployment",matchId:r.match.id,seat:p.seat,requestId:m.requestId,operation:m.operation,ids:m.ids});return;
         }
         if (m.type === "deployment-result") {
           isHost(p,r);
@@ -1038,7 +1121,7 @@ export async function createLanServer({
           }
           p.seq = i.seq;
           p.action = watermark;
-          send(r.peers[0], {
+          toAuthority(r, {
             type: "input",
             matchId: r.match.id,
             seat: p.seat,
@@ -1132,11 +1215,11 @@ export async function createLanServer({
         abort(r, "资源准备超时，请重试。");
       if (
         r.status === "running" &&
-        connected(r.peers[0]) &&
+        (authorityFactory || connected(r.peers[0])) &&
         now > (r.recoveryUntil ?? 0) &&
-        now - r.lastState > (r.peers[0].background ? protocol.backgroundGraceMs : protocol.hostStateTimeoutMs)
+        now - r.lastState > (!authorityFactory && r.peers[0].background ? protocol.backgroundGraceMs : protocol.hostStateTimeoutMs)
       )
-        abort(r, r.peers[0].background
+        abort(r, !authorityFactory && r.peers[0].background
           ? "计算主机后台超过 5 分钟未更新，恢复超时，本局停止。"
           : "计算主机超过 12 秒未更新，恢复超时，本局停止。");
     }
@@ -1156,10 +1239,18 @@ export async function createLanServer({
     server,
     rooms,
     acceptTransport,
-    closeRoom: code => { const room = rooms.get(code); if (room) leave(room.peers[0]); },
+    closeRoom: code => {
+      const room = rooms.get(code); if (!room) return;
+      if (!authorityFactory) { leave(room.peers[0]); return; }
+      void stopAuthority(room);
+      broadcast(room, {type:"roomClosed", message:"服务器关闭了房间。"});
+      for (const member of room.peers) member.room = null;
+      rooms.delete(code);
+    },
     addresses: addresses(),
     close: async () => {
       clearInterval(timer);
+      await Promise.all([...rooms.values()].map(stopAuthority));
       for (const p of peers) p.ws.terminate();
       await Promise.all(websocketServers.map(wss => new Promise(resolve => wss.close(resolve))));
       await new Promise((resolve) => server.close(resolve));
@@ -1167,6 +1258,7 @@ export async function createLanServer({
   };
 }
 if (
+  path.basename(fileURLToPath(import.meta.url)) === "lan-server.mjs" &&
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {

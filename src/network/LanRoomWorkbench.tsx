@@ -105,7 +105,7 @@ export function LanRoomWorkbench({room,id,active,connection,addresses,message,in
   const blocked=isHost?workflow.blocked:"";
   return <><LanRefit suspended={!!aiEditor} initial={seed.draft} disabledReason={disabledReason||(aiBusy?"AI 编成正在同步，请等待服务器确认":"")} onApply={apply} onCancel={onLeave}
     room={{title:"联机房间",hasAppliedDesign:seed.applied,
-      leaveDescription:isHost?"你是房主，离开会关闭整个房间。已保存的单机方案不受影响。":"离开只退出你自己；已保存的方案不受影响。",
+      leaveDescription:room.authority === "server" ? "只退出你自己；房间内还有玩家时会保留房间，并自动移交房主管理。已保存的方案不受影响。" : isHost?"你是房主，离开会关闭整个房间。已保存的单机方案不受影响。":"离开只退出你自己；已保存的方案不受影响。",
       onDirtyChange:reportDirty,actionLabel:isHost?'开始战斗':me?.ready?'取消准备':'准备',actionBlocked:blocked,onAction:act,
       applyAction:draft=>roomApplyAction(room,id,draft),
       actionHint:isHost?'所有开战条件已满足，点击开始战斗。':me?.ready?'你已准备，等待房主开始；继续改装会取消准备。':'配装已同步，点击准备后等待房主开始。',

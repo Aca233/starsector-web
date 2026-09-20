@@ -1,3 +1,4 @@
+import { SnapshotDeliveryWindow } from './SnapshotDeliveryWindow.mjs';
 /**
  * Per-receiver credit accounting for best-effort LAN state snapshots.
  *
@@ -15,6 +16,7 @@
  * 1/60, target 60 Hz, AIowners0, or any Steam path.
  */
 export class LanStateCredits {
+  #delivery;
   #maxBytes;
   #maxFrames;
   #hz;
@@ -32,7 +34,7 @@ export class LanStateCredits {
   #acked = 0;
   #rejected = 0;
 
-  constructor({ maxBytes = 33554432, maxFrames = 64, hz = 60 } = {}) {
+  constructor({ maxBytes = 33554432, maxFrames = 64, hz = 60, now } = {}) {
     if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) {
       throw new RangeError('maxBytes must be a positive safe integer');
     }
@@ -42,6 +44,7 @@ export class LanStateCredits {
     if (!Number.isFinite(hz) || hz <= 0) {
       throw new RangeError('hz must be positive and finite');
     }
+    this.#delivery = new SnapshotDeliveryWindow({ now });
     this.#maxBytes = maxBytes;
     this.#maxFrames = maxFrames;
     this.#hz = hz;
@@ -81,10 +84,14 @@ export class LanStateCredits {
       busySamples: this.#busySamples };
   }
 
+  get idleCapacity() {
+    if (this.#rtts.length === 0) return 2;
+    return Math.max(2, Math.min(this.#maxFrames, Math.ceil(Math.min(...this.#rtts) * this.#hz / 1000) + 1));
+  }
+
   get capacity() {
     if (this.#rtts.length === 0) return 2;
-    const rtt = Math.min(...this.#rtts);
-    return Math.max(2, Math.min(this.#maxFrames, Math.ceil(rtt * this.#hz / 1000) + 1));
+    return this.#delivery.limit(this.idleCapacity, Math.min(...this.#rtts), this.#latestRtt);
   }
 
   // Only successful reservations advance the sequence high-water mark.
@@ -113,18 +120,21 @@ export class LanStateCredits {
   // do not alter counters, the sequence high-water mark, credits, or RTTs.
   ack(seq) {
     if (!Number.isSafeInteger(seq) || seq < 0 || !this.#inflight.has(seq)) return false;
+    let released = 0;
     for (const [pendingSeq, bytes] of this.#inflight) {
       if (pendingSeq > seq) break;
       this.#inflight.delete(pendingSeq);
       this.#bytes -= bytes;
-      this.#acked++;
+      this.#acked++; released++;
     }
+    this.#delivery.acknowledge(released);
     return true;
   }
 
   // New accounting epoch: clear window, seq, peaks and counters; retain RTTs.
   // New connections should construct a new instance, not reuse an old epoch.
   reset() {
+    this.#delivery.reset();
     this.#probeEpoch = {};
     this.#activity = 0;
     this.#inflight.clear();
@@ -142,6 +152,8 @@ export class LanStateCredits {
   stats() {
     return {
       capacity: this.capacity,
+      idleCapacity: this.idleCapacity,
+      deliveryHz: this.#delivery.deliveryHz,
       inflight: this.#inflight.size,
       bytes: this.#bytes,
       peakCount: this.#peakCount,

@@ -124,6 +124,7 @@ export function LanBattle({
   ended,
   onReturn,
   steamTransport,
+  roomHost,
 }: {
   connection: LanConnection;
   match: Match;
@@ -131,7 +132,11 @@ export function LanBattle({
   ended: BattleEnded | null;
   onReturn: () => void;
   steamTransport?: unknown;
+  roomHost?: boolean;
 }) {
+  const serverAuthority = match.authority === "server";
+  const computesAuthority = seat === 0 && !serverAuthority;
+  const canEndBattle = serverAuthority ? roomHost === true : seat === 0;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [networkStatus, setNetworkStatus] = useState("");
   const [controlsReady, setControlsReady] = useState(false);
@@ -212,7 +217,7 @@ export function LanBattle({
     let disposed = false,
       ready = false,
       launched = false,
-      workerReady = seat !== 0,
+      workerReady = !computesAuthority,
       worker: Worker | null = null,
       renderer: WebGLCombatRenderer | null = null;
     let engine: CombatEngine,
@@ -358,7 +363,7 @@ export function LanBattle({
           else sound.play(event.key, volume, rate);
         }
     };
-    if (seat === 0) decoder = new LanSnapshotDecoder({
+    if (computesAuthority) decoder = new LanSnapshotDecoder({
       acknowledge: tick => worker?.postMessage({ type: "snapshot-consumed", tick }),
       consume: (frame, elapsed) => { parseMs = parseMs * .7 + elapsed * .3; accept(frame); },
       error: error => fail(error instanceof Error ? error.message : "无法解析主机快照", "snapshot-decode"),
@@ -402,7 +407,7 @@ export function LanBattle({
           loaded: boolean;
         }>;
         const host = members.find((member) => member.seat === 0);
-        const others = match.players.filter(player => player.seat !== 0 && player.seat !== seat);
+        const others = match.players.filter(player => (serverAuthority || player.seat !== 0) && player.seat !== seat);
         const away = others.filter(player => !members.some(member => member.seat === player.seat && member.connected));
         const syncing = others.filter(player => members.some(member => member.seat === player.seat && member.connected && !member.loaded));
         const peerStatus = [
@@ -412,11 +417,11 @@ export function LanBattle({
         setPeerAway(
           m.room.status !== "running"
             ? ""
-            : !host?.connected || !host.loaded
+            : !serverAuthority && (!host?.connected || !host.loaded)
               ? "计算主机连接中断或正在恢复，等待战斗同步…"
               : peerStatus,
         );
-        if (seat === 0)
+        if (computesAuthority)
           for (const player of match.players) {
             const member = members.find(
               (member) => member.seat === player.seat,
@@ -431,19 +436,24 @@ export function LanBattle({
         return;
       }
       if (m.matchId !== match.id) return;
+      if (serverAuthority && m.type === "authority-performance") {
+        authorityPerformance = m.performance;
+        authorityPerformanceAt = performance.now();
+        return;
+      }
       if (m.type === "resume") {
         stateSeq = Math.max(stateSeq, m.stateSeq + 1);
         loaded();
       }
-      if(m.type==='deployment'&&seat===0)worker?.postMessage(m);
+      if(m.type==='deployment'&&computesAuthority)worker?.postMessage(m);
       if(m.type==='deployment-result'){
         const request=fleetRequests.get(m.requestId);
         if(request){clearTimeout(request.timer);fleetRequests.delete(m.requestId);if(m.ok)request.resolve();else request.reject(Error(m.message||'主机拒绝了舰队操作。'));}
       }
-      if (m.type === "presence" && seat === 0) worker?.postMessage(m);
-      if (m.type === "input" && seat === 0)
+      if (m.type === "presence" && computesAuthority) worker?.postMessage(m);
+      if (m.type === "input" && computesAuthority)
         worker?.postMessage({ type: "input", seat: m.seat, input: m.input });
-      if (m.type === "state" && seat !== 0) {
+      if (m.type === "state" && !computesAuthority) {
         try {
           bytes = connection.snapshotBytes;
           parseMs = parseMs * .7 + connection.snapshotParseMs * .3;
@@ -497,7 +507,7 @@ export function LanBattle({
         onContextLost: () => fail("显卡上下文丢失，请返回房间重试。", "graphics-context"),
         onContextRestoreFailed: () => fail("显卡恢复失败", "graphics-context"),
       });
-      if (seat === 0) {
+      if (computesAuthority) {
         worker = new Worker(new URL("./host.worker.ts", import.meta.url), {
           type: "module",
         });
@@ -562,7 +572,7 @@ export function LanBattle({
             stop();
           }
         };
-        worker.postMessage({ type: "init", match, hidden: document.visibilityState === "hidden", binarySnapshots: connection.transport === "lan" });
+        worker.postMessage({ type: "init", match, hidden: document.visibilityState === "hidden", binarySnapshots: connection.canSendBinarySnapshots });
       }
       void (async () => {
         try {
@@ -849,7 +859,7 @@ export function LanBattle({
             pipeline: connection.snapshotPipeline,
             pipelineAgeMs: connection.snapshotPipelineAt === null ? null : Math.max(0, now - connection.snapshotPipelineAt) + connection.snapshotPipelineRoundTripMs,
             capture: metrics?.captureMs ?? 0,
-            encode: seat === 0 ? encodeMs : latest?.encodeMs ?? 0,
+            encode: computesAuthority ? encodeMs : latest?.encodeMs ?? 0,
             parse: parseMs, decodeQueue: decoder?.stats ?? null, apply: applyMs, render: renderMs,
             gpu: renderer.getResourceStats().gpuTimeMs, fps, frameMs,
             realtimeRatio: metricsFresh ? metrics?.realtimeRatio ?? null : null,
@@ -894,9 +904,9 @@ export function LanBattle({
       canvas.removeEventListener("contextmenu", context);
       canvas.removeEventListener("wheel", wheel);
     };
-  }, [connection, match, seat, openMenu]);
+  }, [connection, match, seat, openMenu, computesAuthority, serverAuthority]);
   const returnToRoom = () => {
-    if (connection.ready && !ended && seat !== 0) connection.send({ type: "leave" });
+    if (connection.ready && !ended && !canEndBattle) connection.send({ type: "leave" });
     else if (connection.ready && !ended)
       connection.send({
         type: error ? "fail" : "end",
@@ -959,7 +969,7 @@ export function LanBattle({
               teamName(
                 match.players.find((player) => player.seat === seat)!.team
               )}{" "}
-            · {seat === 0 ? "主机" : "玩家"}
+            · {serverAuthority ? "服务器计算" : seat === 0 ? "主机" : "玩家"}
           </span>
           <span className="lan-battle-teams" aria-label="阵营与舰船数量">{teamPresence.map(row=><span key={row.team} style={{color:teamColor(row.team)}}
             data-team={row.team} data-deployed={row.deployed} data-reserve={row.reserve} data-visible={row.visible}
@@ -1028,7 +1038,7 @@ export function LanBattle({
                   align="right"
                   onClick={() => openMenu("leave")}
                 >
-                  {seat === 0 ? "结束本局" : "离开对局"}
+                  {canEndBattle ? "结束本局" : "离开对局"}
                 </NativeButton>
                 <NativeButton
                   className="combat-pause-button"
@@ -1115,7 +1125,7 @@ export function LanBattle({
               <p>自动每秒记录，无需保持此面板打开。桌面端从本次启动到退出保存同一日志，Steam/LAN 切换与重连不会清空，导出为整个桌面会话；普通浏览器仅保留最近约 10 分钟，刷新页面会清空。断线后也可在联机入口或房间导出。</p>
               <SnapshotPipelineDiagnostics pipeline={hud?.pipeline}
                 ageMs={hud?.pipelineAgeMs ?? null}
-                receivedHz={hud?.hz ?? null} appliedHz={hud?.appliedHz ?? null} local={seat === 0 ? hud?.localFlow : undefined} />
+                receivedHz={hud?.hz ?? null} appliedHz={hud?.appliedHz ?? null} local={computesAuthority ? hud?.localFlow : undefined} />
               <LanNetworkDiagnostics transport={connection.lanTransport} />
               <SteamNetworkDiagnostics transport={steamTransport} />
               <p>页面构建：<code>{LAN_BUILD}</code><br />当前地址：{window.location.host} · {displayEngine?.openBattlefield?"联机公开战场":"传感器视野"}</p>
@@ -1137,15 +1147,15 @@ export function LanBattle({
               {hud && <p>画面 {Math.round(hud.fps)} FPS · 帧间隔 {hud.frameMs.toFixed(1)} ms · 绘制提交 {hud.render.toFixed(1)} ms/帧 · GPU {hud.gpu === null ? "不可测" : hud.gpu.toFixed(1) + " ms"}<br />
                 快照编码 {hud.encode.toFixed(1)} ms（Worker） · 本机解析 {hud.parse.toFixed(1)} ms · 批量还原 {hud.apply.toFixed(1)} ms/批。计算推进 1.00× 表示每现实秒完成约 60 个物理步；低于 1.00× 表示主机实际落后。战斗时间还受舰船时间系统影响，不能仅凭 FPS 判断。</p>}
               {hud?.decodeQueue && <p>本机解码队列 {hud.decodeQueue.queued}/2（另预留 1 个末帧槽） · 峰值 {hud.decodeQueue.peakQueued} 帧 / {(hud.decodeQueue.peakBytes / 1048576).toFixed(2)} MiB · 等待 {hud.decodeQueue.waitMs.toFixed(1)} ms（峰值 {hud.decodeQueue.maxWaitMs.toFixed(1)} ms） · 背压 {hud.decodeQueue.backpressure} 次。上行 ACK 受 credits 约束，解码不额外跨 Worker 克隆对象图。</p>}
-              <p>客机仅对自己的舰船做最多 250 ms 的运动显示预测，接近舰船碰撞时停用。武器命中、伤害和胜负始终由房主判定。输入确认时间包含转发、主机处理及快照返回，不等于服务器延迟。</p>
-              <p>运动按连续战斗时间轴平滑，不再随每个网络包重新计时；断流时停止在已知状态，不虚构命中。同步目标固定 60Hz，不再按舰队规模或负载主动降频。计算不足或网络背压仍会使实际接收低于目标，不补发重复状态、不伪造 60Hz。短断线先同步战场再恢复操控。切回前台会先重新同步。房主后台暂停最多保留 5 分钟；真正断线仍须在 30 秒内重连。持续过载、主机刷新或页面被浏览器丢弃仍可能结束本局。</p>
+              <p>客机仅对自己的舰船做最多 250 ms 的运动显示预测，接近舰船碰撞时停用。武器命中、伤害和胜负始终由{serverAuthority ? "服务器" : "房主"}判定。输入确认时间包含转发、主机处理及快照返回，不等于服务器延迟。</p>
+              <p>运动按连续战斗时间轴平滑，不再随每个网络包重新计时；断流时停止在已知状态，不虚构命中。同步目标固定 60Hz，不再按舰队规模或负载主动降频。计算不足或网络背压仍会使实际接收低于目标，不补发重复状态、不伪造 60Hz。短断线先同步战场再恢复操控。切回前台会先重新同步。{serverAuthority ? "服务器持续计算；任一玩家刷新或断线不停止模拟，断线席位保留 30 秒。服务器持续过载或退出会明确结束本局。" : "房主后台暂停最多保留 5 分钟；真正断线仍须在 30 秒内重连。持续过载、主机刷新或页面被浏览器丢弃仍可能结束本局。"}</p>
             </details>
           </div>
         </Modal>
       )}</MotionPresence>
       <MotionPresence>{!finished && menu === "leave" && (
         <Modal
-          title={seat === 0 ? "结束本局？" : "离开对局？"}
+          title={canEndBattle ? "结束本局？" : "离开对局？"}
           eyebrow=""
           width="small"
           onClose={() => openMenu("menu")}
@@ -1154,13 +1164,13 @@ export function LanBattle({
             <>
               <NativeButton onClick={() => openMenu("menu")}>取消</NativeButton>
               <NativeButton disabled={!connection.ready} onClick={returnToRoom}>
-                {seat === 0 ? "结束并返回房间" : "离开对局并退出房间"}
+                {canEndBattle ? "结束并返回房间" : "离开对局并退出房间"}
               </NativeButton>
             </>
           }
         >
           <p className="lan-menu-note">
-            {seat === 0
+            {canEndBattle
               ? "这会结束所有人的战斗，房间保留，可以重新准备再开一局。"
               : "只退出你自己，舰船由 AI 接管，其他玩家继续战斗。主动退出后不能中途重新加入。"}
             连接中断时，请等待重连后确认。

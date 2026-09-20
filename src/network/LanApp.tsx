@@ -23,6 +23,7 @@ import "./lan.css";
 const LanRoomWorkbench = lazy(() => import("./LanRoomWorkbench").then(m=>({default:m.LanRoomWorkbench})));
 type RoomEntryIntent = {type:"create";battleSize:number} | {type:"join";code:string;password:string};
 export default function LanApp({ transport = "lan" }: { transport?: "lan" | "steam" }) {
+  const [dedicatedServer, setDedicatedServer] = useState(import.meta.env.VITE_SERVER_AUTHORITY === "true");
   const [desktopLan, setDesktopLan] = useState(false);
   const [serverLabel, setServerLabel] = useState(location.host);
   const localAddresses = useRef<string[]>([]);
@@ -120,6 +121,7 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
           } catch { /* Non-desktop/local-only services keep their browser entrance. */ }
         }
         if (abort.signal.aborted) return;
+        setDedicatedServer(info.authority === "server");
         setDesktopLan(desktop);
         localAddresses.current = info.addresses ?? [];
         setAvailable(!!info.build);
@@ -268,7 +270,7 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
     const url = new URL("/steam/ws", location.href); url.protocol = "ws:"; url.searchParams.set("lobby", status.lobby.id);
     connection.connect(url.href, name.trim());
   };
-  if(match&&me)return <LanBattle key={match.id} connection={connection} match={match} seat={me.seat as Seat} ended={ended} steamTransport={steamStatus?.transport}
+  if(match&&me)return <LanBattle key={match.id} connection={connection} match={match} seat={me.seat as Seat} roomHost={room?.hostId === id} ended={ended} steamTransport={steamStatus?.transport}
     onReturn={()=>{setMatch(null);setEnded(null);}}/>;
   if(workbenchRoom)return <><Suspense fallback={<div className="native-loading">正在打开房间改装台…</div>}>
     <LanRoomWorkbench key={workbenchRoom.code} room={workbenchRoom} id={id||lastIdentity} active={room?.code===workbenchRoom.code&&!!id}
@@ -280,9 +282,9 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
     {reportOpen && lastBattle && <LanBattleReport match={lastBattle.match} seat={lastBattle.match.players.find(player=>player.id===(id||lastIdentity))?.seat ?? -1} result={lastBattle.result} onReturn={()=>setReportOpen(false)} returnLabel="关闭战报"/>}
   </>;
   return <main className="native-refit-app lan-page lan-entry-page">
-    <h1 className="native-screen-tab"><NativeBitmapText font="caption">{transport === "steam" ? "Steam 联机" : "局域网联机"}</NativeBitmapText></h1>
+    <h1 className="native-screen-tab"><NativeBitmapText font="caption">{transport === "steam" ? "Steam 联机" : dedicatedServer ? "服务器战斗房间" : "局域网联机"}</NativeBitmapText></h1>
     <NativeFrame className="lan-entry-shell">
-      <header className="lan-entry-heading"><h2><NativeBitmapText>创建或加入房间</NativeBitmapText></h2><p>选船、改装和分队，都在进入房间后进行。</p></header>
+      <header className="lan-entry-heading"><h2><NativeBitmapText>创建或加入房间</NativeBitmapText></h2><p>{dedicatedServer ? "直接在浏览器中开房游玩，服务器负责战斗计算。" : "选船、改装和分队，都在进入房间后进行。"}</p></header>
       <ol className="lan-workflow" aria-label="联机操作步骤"><li aria-current="step">1 · 创建 / 加入</li><li>2 · 房间内改装与分队</li><li>3 · 准备 / 开始</li></ol>
       {reconnecting&&<p className="lan-menu-note" role="status">{reconnecting}</p>}
       {error&&<p className="lan-error" role="alert">{error}</p>}
@@ -290,7 +292,7 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
       {transport === "steam" ? <SteamStart status={steamStatus} name={name} onName={changeName} busy={connecting||entering} onSelected={selectSteam} onRefresh={setSteamStatus} onReset={resetSteam}/> : <LanStart design={selectedDesign} hull={previewHull} name={name} onNameChange={changeName} available={available} connected={!!id}
         connecting={connecting||entering||!!room} initialCode={initialCode} desktop={desktopLan} serverLabel={serverLabel}
         onHost={()=>enterRoom({type:"create",battleSize:readBattleSize()})} onJoin={(code,password,remoteOrigin)=>enterRoom({type:"join",code,password},remoteOrigin)}/>}
-      <footer className="lan-entry-footer"><FullscreenButton /><NativeButton onClick={downloadNetworkDiagnostics}>导出联机性能日志</NativeButton><NativeButton onClick={()=>{if (transport !== "steam") window.location.assign("?view=steam"); else void steamRequest<{url:string}>("lan").then(result=>window.location.assign(result.url),error=>setError(error.message));}} disabled={transport === "steam" && !steamStatus}>{transport === "steam" ? "使用局域网联机" : "Steam 联机"}</NativeButton><NativeButton onClick={()=>setHelpOpen(true)}>联机说明</NativeButton><NativeButton onClick={()=>{if (transport === "steam" && steamStatus) { resetSteam(); void steamRequest("leave").then(()=>window.location.assign("./"),error=>setError(error.message)); } else { connection.close(); window.location.assign("./"); }}}>返回主菜单</NativeButton></footer>
+      <footer className="lan-entry-footer"><FullscreenButton /><NativeButton onClick={downloadNetworkDiagnostics}>导出联机性能日志</NativeButton>{!dedicatedServer && <NativeButton onClick={()=>{if (transport !== "steam") window.location.assign("?view=steam"); else void steamRequest<{url:string}>("lan").then(result=>window.location.assign(result.url),error=>setError(error.message));}} disabled={transport === "steam" && !steamStatus}>{transport === "steam" ? "使用局域网联机" : "Steam 联机"}</NativeButton>}<NativeButton onClick={()=>setHelpOpen(true)}>联机说明</NativeButton><NativeButton onClick={()=>{if (transport === "steam" && steamStatus) { resetSteam(); void steamRequest("leave").then(()=>window.location.assign("./"),error=>setError(error.message)); } else { connection.close(); window.location.assign("./"); }}}>返回主菜单</NativeButton></footer>
     </NativeFrame>
       <MotionPresence>{helpOpen && (
         <Modal
@@ -314,17 +316,18 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
               <p>启动联机服务后，终端会显示可用的局域网地址。</p>
             )}
             <p>
-              建议使用有线连接，并允许 Windows 专用网络通信。无需公网 IP
-              或端口转发。
+              {dedicatedServer ? "玩家不需要公网 IP 或端口转发；浏览器必须能访问服务器提供的 HTTP(S) 与 WebSocket 地址。" : "建议使用有线连接，并允许 Windows 专用网络通信。无需公网 IP 或端口转发。"}
             </p>
-            <h3>n2n / Radmin VPN</h3>
+            {!dedicatedServer && <><h3>n2n / Radmin VPN</h3>
             <p>
               异地玩家先加入同一个虚拟网络，再打开房主虚拟网卡对应的地址。只有房主需要后台；加入者不需要另开服务器。虚拟网络须允许玩家之间访问
               TCP 3001，具体还受防火墙与网络路由影响。
             </p>
+            </>}
+            {dedicatedServer && <p>直接用浏览器打开同一服务器网址即可创建或加入房间。无需桌面客户端、Steam 或组网软件。服务器退出、环境休眠或持续过载仍会结束对局。</p>}
             <h3>对局方式</h3>
             <p>
-              先创建或加入房间，在房间里选择配装和队伍，最后准备。其他真人准备后，房主直接点击开始，无需再点准备；更换配装、队伍、AI 或人数会取消准备。创建房间的玩家负责战斗计算，服务器转发信息。
+              先创建或加入房间，在房间里选择配装和队伍，最后准备。其他真人准备后，房主直接点击开始，无需再点准备；更换配装、队伍、AI 或人数会取消准备。{dedicatedServer ? "战斗由服务器计算，所有玩家直接在浏览器中操作，不需要本机后台或 Steam。" : "创建房间的玩家负责战斗计算，服务器转发信息。"}
             </p>
             <h3>使用舰船设计</h3>
             <p>进入房间后，点击自己的舰船或“更换舰船”，在房间中选船、改装，完成后客机可点击“应用并准备”，也可“仅应用配装”；房主满足条件时可“应用并开始”，有客机需重新确认时只应用配装。入房前不再选船，不必另开页面或先保存。编辑时保持房间连接并取消自己的准备，未应用的修改不会改变房间配装；只有明确另存方案才写入本机方案库。已存方案 / JSON 导入保留在次要入口。</p>
@@ -338,7 +341,7 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
               编成会取消所有人的准备；至少两个阵营需有舰船。菜单不暂停；断线保留席位
               30
               秒，客机可刷新后重连。开战后客机离开仅退出自己，舰船由 AI
-              接管；主动退出或席位过期后不能中途加入。房主结束本局会结束全场，刷新房主页面也无法恢复计算。大量舰船的流畅度取决于房主与客机性能和网络，仍有通信字节安全预算；暂不支持主机迁移。
+              接管；主动退出或席位过期后不能中途加入。{dedicatedServer ? "房主主动结束本局会结束全场；仅刷新、关闭浏览器或断线不会停止服务器模拟。席位过期或主动离房时移交房主管理。" : <>房主结束本局会结束全场，刷新房主页面也无法恢复计算。大量舰船的流畅度取决于房主与客机性能和网络，仍有通信字节安全预算；暂不支持主机迁移。 </>}
             </p>
             <p>大厅延迟为服务器往返时间，不代表完整操作延迟。</p>
           </div>}

@@ -1,3 +1,4 @@
+import { advanceSourceMissile, hasSourceMissileLifecycle, initializeSourceMissile } from './weapon/SourceMissileLifecycle';
 import { sameTeam } from "../CombatTeams";
 import { sound } from '../../audio/SoundManager';
 import { ProjectileInterceptionIndex } from '../collision/ProjectileInterceptionIndex';
@@ -104,7 +105,14 @@ export class WeaponSimulationSystem {
       if (p.armingTimeRemaining !== undefined) {
         p.armingTimeRemaining = Math.max(0, p.armingTimeRemaining - dt);
       }
-      if (p.flightTimeRemaining !== undefined) {
+      if (hasSourceMissileLifecycle(p)) {
+        // Also support restored/custom source projectiles lacking construction state.
+        if (p.armedWhileFizzling === undefined) initializeSourceMissile(p, ctx.random);
+        const wasFizzling = p.missileFizzleTime !== undefined;
+        const expired = advanceSourceMissile(p, dt);
+        if (!wasFizzling && p.missileFizzleTime !== undefined) ctx.contrailEngine?.detach(p.id);
+        if (expired) { removeProjectileAt(i); continue; }
+      } else if (p.flightTimeRemaining !== undefined) {
         p.flightTimeRemaining -= dt;
         if (p.flightTimeRemaining <= 0) {
           if (p.isRocket) ctx.contrailEngine?.detach(p.id);
@@ -124,7 +132,7 @@ export class WeaponSimulationSystem {
 
       // 1. 导弹自主航行与比例导引制导
       if (p.angularVelocityRad) p.facingRad = (p.facingRad ?? p.vel.heading()) + p.angularVelocityRad * dt;
-      if (p.isRocket && !p.inertialFlight && !p.isFlare) {
+      if (p.isRocket && !p.inertialFlight && !p.isFlare && p.missileFizzleTime === undefined && !p.isDisarmed) {
         const spoofedOrDetonated = this.missileGuidance.updateMissile(
           p,
           dt,

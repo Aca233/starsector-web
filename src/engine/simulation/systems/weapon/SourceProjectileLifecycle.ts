@@ -3,8 +3,8 @@ import type { Projectile } from '../../Weapon';
 
 /** Native BallisticProjectile/OoOO and MovingRay/L, independent of world-velocity range. */
 export function hasSourceProjectileLifecycle(p: Projectile): boolean {
-  return !p.isRocket && !p.isFlare && (p.spawnType === 'BALLISTIC' || p.spawnType === 'BALLISTIC_AS_BEAM')
-    && (p.fadeTime ?? 0) > 0 && (p.projLength ?? 0) > 0;
+  return !p.isRocket && !p.isFlare && (p.spawnType === 'BALLISTIC' || p.spawnType === 'BALLISTIC_AS_BEAM' || p.spawnType === 'PLASMA')
+    && (p.fadeTime ?? 0) > 0 && (p.spawnType === 'PLASMA' || (p.projLength ?? 0) > 0);
 }
 
 export function initializeSourceProjectile(p: Projectile, speed: number, inherited = new Vector2()): void {
@@ -26,6 +26,17 @@ export function advanceSourceProjectile(p: Projectile, dt: number): boolean {
   p.unfadedEmp ??= p.empDamage ?? 0;
   const fade = p.fadeProgress ?? 0;
   p.prevFadeProgress = fade;
+  if (p.spawnType === 'PLASMA') {
+    // PlasmaShot.advance drains health before evaluating this frame's damage.
+    const nextFade = p.rangeRemaining <= 0 ? Math.min(1, fade + dt / p.fadeTime!) : fade;
+    p.fadeProgress = nextFade;
+    p.damage = p.unfadedDamage * (1 - nextFade);
+    p.empDamage = p.unfadedEmp * (1 - nextFade);
+    p.softFlux = nextFade > 0;
+    p.pos.addScaled(p.vel, dt);
+    p.rangeRemaining -= speed * dt;
+    return nextFade >= 1;
+  }
   // Native damage multiplier is evaluated before this advance's fade increment.
   const scale = p.didDamage ? 0 : (1 - fade) ** 2;
   p.damage = p.unfadedDamage * scale;
@@ -58,7 +69,7 @@ export function advanceSourceProjectile(p: Projectile, dt: number): boolean {
 export function markSourceProjectileImpact(p: Projectile, point = p.pos): boolean {
   // Impact identity also matters to attached-entity systems; non-beam missiles still retire immediately.
   p.didDamage = true;
-  if (!hasSourceProjectileLifecycle(p)) return false;
+  if (!hasSourceProjectileLifecycle(p) || p.spawnType === 'PLASMA') return false;
   p.pos.copy(point);
   p.didDamage = true;
   p.damage = 0;

@@ -121,6 +121,15 @@ export function validateWeaponSpec(input: unknown, requireBundledAssets = assetM
   }
   // Native hit-glow radii may be negative (projectile disable / beam auto).
   if (spec.hitGlowRadius !== undefined) finite(spec.hitGlowRadius, `${id}.hitGlowRadius`);
+  if (spec.missileLifecycleSpec !== undefined) {
+    const lifecycle = object(spec.missileLifecycleSpec, id + '.missileLifecycleSpec');
+    for (const key of ['flameoutTime', 'noEngineGlowTime', 'fadeTime', 'dudProbabilityOnFlameout']) finite(lifecycle[key], id + '.missileLifecycleSpec.' + key, 0);
+    if (finite(lifecycle.dudProbabilityOnFlameout, id + ".dudProbabilityOnFlameout", 0) > 1) throw new Error(id + ': dud probability must be <= 1');
+    enumValue(lifecycle.collisionClassAfterFlameout, id + '.collisionClassAfterFlameout', new Set(['NONE', 'MISSILE_NO_FF', 'MISSILE_FF']));
+    for (const key of ['fizzleOnReachingWeaponRange', 'noCollisionWhileFading', 'reduceDamageWhileFading']) {
+      if (typeof lifecycle[key] !== 'boolean') throw new Error(id + ': invalid missile lifecycle ' + key);
+    }
+  }
   if (spec.fadeTime !== undefined) finite(spec.fadeTime, `${id}.fadeTime`, 0);
   if (spec.pixelsPerTexel !== undefined) {
     const pixelsPerTexel = finite(spec.pixelsPerTexel, `${id}.pixelsPerTexel`, 0);
@@ -131,8 +140,8 @@ export function validateWeaponSpec(input: unknown, requireBundledAssets = assetM
   for (const key of ['renderBarrelBelow', 'renderTargetIndicator', 'isRocket', 'isGuided', 'isTwoStage', 'alwaysFire'] as const) {
     if (spec[key] !== undefined && typeof spec[key] !== 'boolean') throw new Error(`${id}.${key} 必须是布尔值`);
   }
-  if (spec.spawnType !== undefined) enumValue(spec.spawnType, `${id}.spawnType`, new Set(['BALLISTIC', 'BALLISTIC_AS_BEAM', 'MISSILE', 'BEAM']));
-  if (spec.visualSpawnType !== undefined) enumValue(spec.visualSpawnType, `${id}.visualSpawnType`, new Set(['BALLISTIC', 'BALLISTIC_AS_BEAM', 'MISSILE', 'BEAM']));
+  if (spec.spawnType !== undefined) enumValue(spec.spawnType, `${id}.spawnType`, new Set(['BALLISTIC', 'BALLISTIC_AS_BEAM', 'PLASMA', 'MISSILE', 'BEAM']));
+  if (spec.visualSpawnType !== undefined) enumValue(spec.visualSpawnType, `${id}.visualSpawnType`, new Set(['BALLISTIC', 'BALLISTIC_AS_BEAM', 'PLASMA', 'MISSILE', 'BEAM']));
   if (spec.beamVisualMode !== undefined) enumValue(spec.beamVisualMode, `${id}.beamVisualMode`, new Set(['BURST', 'SUSTAINED']));
   if (spec.textureType !== undefined) enumValue(spec.textureType, `${id}.textureType`, new Set(['ROUGH', 'SMOOTH']));
   for (const key of ['fringeColor', 'coreColor', 'glowColor'] as const) {

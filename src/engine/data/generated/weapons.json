@@ -333,7 +333,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "amsrm_fire"
+    "soundKey": "amsrm_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 0.5,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": true,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": true
+    }
   },
   "annihilator": {
     "id": "annihilator",
@@ -473,7 +483,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "annihilator_fire"
+    "soundKey": "annihilator_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 1,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "annihilator_fighter": {
     "id": "annihilator_fighter",
@@ -597,7 +617,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "annihilator_fire"
+    "soundKey": "annihilator_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 1,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "annihilatorpod": {
     "id": "annihilatorpod",
@@ -721,7 +751,17 @@
     "soundKey": "annihilator_fire",
     "weaponType": "MISSILE",
     "isPointDefense": false,
-    "aiHints": []
+    "aiHints": [],
+    "missileLifecycleSpec": {
+      "flameoutTime": 1,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "arbalest": {
     "id": "arbalest",
@@ -939,7 +979,17 @@
       ],
       "useHitGlowWhenDealingDamage": false
     },
-    "soundKey": "assaying_rift_fire"
+    "soundKey": "assaying_rift_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 0.2,
+      "noEngineGlowTime": 0.2,
+      "fadeTime": 0.2,
+      "dudProbabilityOnFlameout": 0,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": true,
+      "noCollisionWhileFading": true,
+      "reduceDamageWhileFading": false
+    }
   },
   "atropos": {
     "id": "atropos",
@@ -1091,7 +1141,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "atropos_fire"
+    "soundKey": "atropos_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "atropos_single": {
     "id": "atropos_single",
@@ -1238,7 +1298,17 @@
     "alwaysFire": true,
     "aiHints": [
       "GUIDED_POOR"
-    ]
+    ],
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "autopulse": {
     "id": "autopulse",
@@ -1437,7 +1507,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "bomb_bay_fire"
+    "soundKey": "bomb_bay_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "breach": {
     "id": "breach",
@@ -1574,7 +1654,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "breach_fire"
+    "soundKey": "breach_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 0.5,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "breachpod": {
     "id": "breachpod",
@@ -1719,7 +1809,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "breach_fire"
+    "soundKey": "breach_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 0.5,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "chaingun": {
     "id": "chaingun",
@@ -1912,6 +2012,16 @@
         255
       ],
       "useHitGlowWhenDealingDamage": true
+    },
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
     }
   },
   "cryoblaster": {
@@ -2264,7 +2374,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "reaper_fire"
+    "soundKey": "reaper_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 3,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "devastator": {
     "id": "devastator",
@@ -2473,7 +2593,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "devouring_swarm_fire"
+    "soundKey": "devouring_swarm_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 0.5,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": true,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": true
+    }
   },
   "disintegrator": {
     "id": "disintegrator",
@@ -2757,7 +2887,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "dragonfire_fire"
+    "soundKey": "dragonfire_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "dragon_payload": {
     "id": "dragon_payload",
@@ -3025,7 +3165,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "dragonfire_fire"
+    "soundKey": "dragonfire_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "dualflak": {
     "id": "dualflak",
@@ -3339,6 +3489,16 @@
         255
       ],
       "useHitGlowWhenDealingDamage": true
+    },
+    "missileLifecycleSpec": {
+      "flameoutTime": 0.05,
+      "noEngineGlowTime": 0.05,
+      "fadeTime": 0.05,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
     }
   },
   "gauss": {
@@ -3574,7 +3734,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "gazer_fire"
+    "soundKey": "gazer_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "gazer_payload": {
     "id": "gazer_payload",
@@ -3805,7 +3975,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "gazer_fire"
+    "soundKey": "gazer_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "gigacannon": {
     "id": "gigacannon",
@@ -4036,7 +4216,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "gorgon_fire"
+    "soundKey": "gorgon_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "gorgon_payload": {
     "id": "gorgon_payload",
@@ -4259,7 +4449,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "gorgon_fire"
+    "soundKey": "gorgon_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "gravitonbeam": {
     "id": "gravitonbeam",
@@ -4612,7 +4812,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "hammer_fire"
+    "soundKey": "hammer_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 3,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "hammer_single": {
     "id": "hammer_single",
@@ -4755,7 +4965,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "hammer_fire"
+    "soundKey": "hammer_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 3,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "hammerrack": {
     "id": "hammerrack",
@@ -4910,7 +5130,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "hammer_fire"
+    "soundKey": "hammer_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 3,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "harpoon": {
     "id": "harpoon",
@@ -5041,7 +5271,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "harpoon_fire"
+    "soundKey": "harpoon_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "harpoon_single": {
     "id": "harpoon_single",
@@ -5164,7 +5404,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "harpoon_fire"
+    "soundKey": "harpoon_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "harpoonpod": {
     "id": "harpoonpod",
@@ -5291,7 +5541,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "harpoon_fire"
+    "soundKey": "harpoon_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "heatseeker": {
     "id": "heatseeker",
@@ -5414,7 +5674,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "salamander_fire"
+    "soundKey": "salamander_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "heavy_adjudicator": {
     "id": "heavy_adjudicator",
@@ -6701,7 +6971,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "hurricane_mirv_fire"
+    "soundKey": "hurricane_mirv_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "hveldriver": {
     "id": "hveldriver",
@@ -6916,7 +7196,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "hydra_fire"
+    "soundKey": "hydra_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "hydra_payload": {
     "id": "hydra_payload",
@@ -7983,7 +8273,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "hammer_fire"
+    "soundKey": "hammer_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 3,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "kinetic_fragments": {
     "id": "kinetic_fragments",
@@ -8071,7 +8371,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "kinetic_fragments_fire"
+    "soundKey": "kinetic_fragments_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 0.5,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": true,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": true
+    }
   },
   "kineticblaster": {
     "id": "kineticblaster",
@@ -9042,7 +9352,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "swarmer_fire"
+    "soundKey": "swarmer_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "lrpdlaser": {
     "id": "lrpdlaser",
@@ -9342,6 +9662,16 @@
         255
       ],
       "useHitGlowWhenDealingDamage": true
+    },
+    "missileLifecycleSpec": {
+      "flameoutTime": 0.1,
+      "noEngineGlowTime": 0.05,
+      "fadeTime": 0.1,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
     }
   },
   "minelayer2": {
@@ -9452,6 +9782,16 @@
         255
       ],
       "useHitGlowWhenDealingDamage": true
+    },
+    "missileLifecycleSpec": {
+      "flameoutTime": 0.1,
+      "noEngineGlowTime": 0.05,
+      "fadeTime": 0.1,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
     }
   },
   "miningblaster": {
@@ -10049,6 +10389,16 @@
         255
       ],
       "useHitGlowWhenDealingDamage": true
+    },
+    "missileLifecycleSpec": {
+      "flameoutTime": 0.05,
+      "noEngineGlowTime": 0.05,
+      "fadeTime": 0.05,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": true,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
     }
   },
   "neoferric_quadcoil": {
@@ -10294,7 +10644,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "neutron_torpedo_fire"
+    "soundKey": "neutron_torpedo_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 2,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": true
+    }
   },
   "od_bomblauncher": {
     "id": "od_bomblauncher",
@@ -10405,6 +10765,16 @@
         255
       ],
       "useHitGlowWhenDealingDamage": true
+    },
+    "missileLifecycleSpec": {
+      "flameoutTime": 0.05,
+      "noEngineGlowTime": 0.05,
+      "fadeTime": 0.05,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": true,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
     }
   },
   "pdburst": {
@@ -10898,7 +11268,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "proximity_charge_launcher_fire"
+    "soundKey": "proximity_charge_launcher_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 0.1,
+      "noEngineGlowTime": 0.05,
+      "fadeTime": 0.1,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "phasecl_bomber": {
     "id": "phasecl_bomber",
@@ -11011,7 +11391,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "proximity_charge_launcher_fighter_fire"
+    "soundKey": "proximity_charge_launcher_fighter_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 0.1,
+      "noEngineGlowTime": 0.05,
+      "fadeTime": 0.1,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "pilum": {
     "id": "pilum",
@@ -11143,7 +11533,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "pilum_lrm_fire"
+    "soundKey": "pilum_lrm_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "pilum_large": {
     "id": "pilum_large",
@@ -11287,7 +11687,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "pilum_lrm_fire"
+    "soundKey": "pilum_lrm_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "plasma": {
     "id": "plasma",
@@ -11341,7 +11751,7 @@
     "animationType": "GLOW_AND_FLASH",
     "hardpointUsesHullSprite": false,
     "visualRecoil": 0,
-    "spawnType": "BALLISTIC",
+    "spawnType": "PLASMA",
     "fadeTime": 0.5,
     "fringeColor": [
       0,
@@ -11712,7 +12122,17 @@
       ],
       "useHitGlowWhenDealingDamage": false
     },
-    "soundKey": "realitydisruptor_fire"
+    "soundKey": "realitydisruptor_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 0.5,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": true,
+      "noCollisionWhileFading": true,
+      "reduceDamageWhileFading": false
+    }
   },
   "reaper": {
     "id": "reaper",
@@ -11875,7 +12295,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "reaper_fire"
+    "soundKey": "reaper_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 3,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "resonatormrm": {
     "id": "resonatormrm",
@@ -12010,7 +12440,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "resonator_fire"
+    "soundKey": "resonator_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 0.5,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": true,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": true
+    }
   },
   "rift_lightning": {
     "id": "rift_lightning",
@@ -12529,7 +12969,17 @@
       ],
       "useHitGlowWhenDealingDamage": false
     },
-    "soundKey": "rifttorpedo_fire"
+    "soundKey": "rifttorpedo_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 0.2,
+      "noEngineGlowTime": 0.2,
+      "fadeTime": 0.2,
+      "dudProbabilityOnFlameout": 0,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": true,
+      "noCollisionWhileFading": true,
+      "reduceDamageWhileFading": false
+    }
   },
   "sabot": {
     "id": "sabot",
@@ -12727,7 +13177,17 @@
     "alwaysFire": true,
     "aiHints": [
       "GUIDED_POOR"
-    ]
+    ],
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "sabot_fighter": {
     "id": "sabot_fighter",
@@ -12919,7 +13379,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "sabot_srm_fire"
+    "soundKey": "sabot_srm_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "sabot_single": {
     "id": "sabot_single",
@@ -13110,7 +13580,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "sabot_srm_fire"
+    "soundKey": "sabot_srm_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "sabotpod": {
     "id": "sabotpod",
@@ -13305,7 +13785,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "sabot_srm_fire"
+    "soundKey": "sabot_srm_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "salamanderpod": {
     "id": "salamanderpod",
@@ -13432,7 +13922,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "salamander_fire"
+    "soundKey": "salamander_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "seeker_fragment": {
     "id": "seeker_fragment",
@@ -13544,7 +14044,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "seeker_fragment_fire"
+    "soundKey": "seeker_fragment_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 0.5,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": true,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": true
+    }
   },
   "shockrepeater": {
     "id": "shockrepeater",
@@ -13857,7 +14367,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "squall_fire"
+    "soundKey": "squall_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 1,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "swarm_launcher": {
     "id": "swarm_launcher",
@@ -13941,7 +14461,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "threat_swarm_launched"
+    "soundKey": "threat_swarm_launched",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "swarmer": {
     "id": "swarmer",
@@ -14079,7 +14609,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "swarmer_fire"
+    "soundKey": "swarmer_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 1,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "swarmer_fighter": {
     "id": "swarmer_fighter",
@@ -14218,7 +14758,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "swarmer_fire"
+    "soundKey": "swarmer_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 1,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "tachyonlance": {
     "id": "tachyonlance",
@@ -14845,6 +15395,16 @@
         255
       ],
       "useHitGlowWhenDealingDamage": true
+    },
+    "missileLifecycleSpec": {
+      "flameoutTime": 0.5,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": true,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
     }
   },
   "tpc": {
@@ -15098,7 +15658,17 @@
     "isPointDefense": false,
     "aiHints": [
       "STRIKE"
-    ]
+    ],
+    "missileLifecycleSpec": {
+      "flameoutTime": 3,
+      "noEngineGlowTime": 0.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "unstable_fragment": {
     "id": "unstable_fragment",
@@ -15191,7 +15761,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "unstable_fragment_fire"
+    "soundKey": "unstable_fragment_fire",
+    "missileLifecycleSpec": {
+      "flameoutTime": 0.1,
+      "noEngineGlowTime": 0.05,
+      "fadeTime": 0.1,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "voidblaster": {
     "id": "voidblaster",
@@ -15360,7 +15940,7 @@
         255
       ]
     },
-    "spawnType": "BALLISTIC",
+    "spawnType": "PLASMA",
     "fadeTime": 0.5,
     "fringeColor": [
       130,
@@ -15547,7 +16127,17 @@
       ],
       "useHitGlowWhenDealingDamage": true
     },
-    "soundKey": "shrouded_vortex_launch"
+    "soundKey": "shrouded_vortex_launch",
+    "missileLifecycleSpec": {
+      "flameoutTime": 4,
+      "noEngineGlowTime": 2.5,
+      "fadeTime": 0.5,
+      "dudProbabilityOnFlameout": 0.5,
+      "collisionClassAfterFlameout": "MISSILE_FF",
+      "fizzleOnReachingWeaponRange": false,
+      "noCollisionWhileFading": false,
+      "reduceDamageWhileFading": false
+    }
   },
   "vpdriver": {
     "id": "vpdriver",

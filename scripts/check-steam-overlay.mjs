@@ -1,3 +1,4 @@
+// Explicit synchronous reference fixture; real-worker coverage lives in check-steam-snapshot-prepare.mjs.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createServer } from 'node:http';
@@ -51,7 +52,7 @@ test('IPC correlation, duplicate gate, propagated error, timeout, shutdown and l
   await assert.rejects(bridge.invite(lobby,owner),/已停止/);
 });
 test('HTTP invitation uses selected lobby, never headless native dialog; browser/offline/cross-origin denied', async () => {
-  const requests=[]; const gateway = new SteamGateway({build:'test',overlay:{status:()=>({supported:true,available:true,reason:''}),invite:async(...args)=>{requests.push(args);return {ok:true,note:'requested'};}}});
+  const requests=[]; const gateway = new SteamGateway({ snapshotPreparation: false,build:'test',overlay:{status:()=>({supported:true,available:true,reason:''}),invite:async(...args)=>{requests.push(args);return {ok:true,note:'requested'};}}});
   gateway.initialized=true; gateway.owner=owner;
   const server=createServer((req,res)=>{if(!gateway.http(req,res)){res.writeHead(404);res.end();}});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve)); const origin='http://127.0.0.1:'+server.address().port;

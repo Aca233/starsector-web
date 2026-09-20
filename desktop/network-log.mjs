@@ -24,7 +24,12 @@ function project(value, schema) {
   return Object.fromEntries(Object.entries(schema).map(([key, normalize]) =>
     [key, typeof normalize === 'function' ? normalize(value[key]) : project(value[key], normalize)]));
 }
+const tunnelCounters = numbers('p2pTx p2pRx relayTx relayRx');
+const tunnelSchema = { ...numbers('peerP2p peerRelay peerUnknown intervalMs'),
+  trafficRoute: choice('unknown', 'idle', 'p2p', 'relay', 'mixed'), totals: tunnelCounters, delta: tunnelCounters };
 const EVENTS = new Map([
+  ['n2n-sample', { mode, status: choice('available', 'partial', 'unavailable', 'not-detected'),
+    tunnels: value => Array.isArray(value) ? value.slice(0, 3).map(row => project(row, tunnelSchema)) : null }],
   ['mode-change', { from: mode, to: mode, mode, previousMode: mode, stage: choice('requested', 'ready', 'failed', 'relaunch') }],
   ['backend-ready', { mode, build: token }],
   ['backend-failed', { mode, reason, exitCode, signal: choice('SIGTERM', 'SIGKILL', 'SIGINT', 'SIGABRT', 'SIGSEGV', 'SIGHUP', 'SIGBREAK') }],

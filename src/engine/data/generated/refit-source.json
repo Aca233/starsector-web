@@ -7810,32 +7810,29 @@
     "amsrm": {
       "level": "approximate",
       "reasons": [
-        "Native projectile dudProbabilityOnFlameout=0 uses the generic Web flight/collision lifecycle.",
-        "Native projectile fizzleOnReachingWeaponRange=true uses the generic Web flight/collision lifecycle.",
-        "Native projectile flameoutTime=0.5 uses the generic Web flight/collision lifecycle.",
-        "Native projectile reduceDamageWhileFading=true uses the generic Web flight/collision lifecycle."
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "annihilator": {
       "level": "approximate",
       "reasons": [
-        "Native projectile flameoutTime=1 uses the generic Web flight/collision lifecycle.",
         "Native weapon animation SMOKE uses static base mount sprites.",
-        "Per-barrel native firing angles are not applied; mount aim direction used."
+        "Per-barrel native firing angles are not applied; mount aim direction used.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "annihilator_fighter": {
       "level": "approximate",
       "reasons": [
-        "Native projectile flameoutTime=1 uses the generic Web flight/collision lifecycle.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "annihilatorpod": {
       "level": "approximate",
       "reasons": [
-        "Native projectile flameoutTime=1 uses the generic Web flight/collision lifecycle.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "arbalest": {
@@ -7849,23 +7846,22 @@
       "reasons": [
         "Unimplemented everyFrameEffect com.fs.starfarer.api.impl.combat.dweller.AssayingRiftEffect: special hook omitted; base damage/flux/trajectory retained.",
         "Unimplemented onHitEffect com.fs.starfarer.api.impl.combat.dweller.AssayingRiftEffect: special hook omitted; base damage/flux/trajectory retained.",
-        "Native projectile dudProbabilityOnFlameout=0 uses the generic Web flight/collision lifecycle.",
-        "Native projectile fizzleOnReachingWeaponRange=true uses the generic Web flight/collision lifecycle.",
-        "Native projectile flameoutTime=0.2 uses the generic Web flight/collision lifecycle.",
-        "Native projectile noCollisionWhileFading=true uses the generic Web flight/collision lifecycle.",
-        "Negative native proximity-fuse range requires a scripted activation; fuse omitted, ordinary impact damage only."
+        "Negative native proximity-fuse range requires a scripted activation; fuse omitted, ordinary impact damage only.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "atropos": {
       "level": "approximate",
       "reasons": [
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "atropos_single": {
       "level": "approximate",
       "reasons": [
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "autopulse": {
@@ -7887,23 +7883,25 @@
       ]
     },
     "bomb": {
-      "level": "supported",
-      "reasons": []
+      "level": "approximate",
+      "reasons": [
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
+      ]
     },
     "breach": {
       "level": "approximate",
       "reasons": [
         "Unimplemented onHitEffect com.fs.starfarer.api.impl.combat.BreachOnHitEffect: special hook omitted; base damage/flux/trajectory retained.",
-        "Native projectile flameoutTime=0.5 uses the generic Web flight/collision lifecycle.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "breachpod": {
       "level": "approximate",
       "reasons": [
         "Unimplemented onHitEffect com.fs.starfarer.api.impl.combat.BreachOnHitEffect: special hook omitted; base damage/flux/trajectory retained.",
-        "Native projectile flameoutTime=0.5 uses the generic Web flight/collision lifecycle.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "canister_flak": {
@@ -7919,8 +7917,10 @@
       ]
     },
     "clusterbomb": {
-      "level": "supported",
-      "reasons": []
+      "level": "approximate",
+      "reasons": [
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
+      ]
     },
     "cryoblaster": {
       "level": "approximate",
@@ -7944,8 +7944,8 @@
     "cyclone": {
       "level": "approximate",
       "reasons": [
-        "Native projectile flameoutTime=3 uses the generic Web flight/collision lifecycle.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "devastator": {
@@ -7959,13 +7959,10 @@
       "reasons": [
         "Unimplemented everyFrameEffect com.fs.starfarer.api.impl.combat.threat.DevouringSwarmMissileEffect: special hook omitted; base damage/flux/trajectory retained.",
         "Unimplemented onHitEffect com.fs.starfarer.api.impl.combat.threat.DevouringSwarmMissileEffect: special hook omitted; base damage/flux/trajectory retained.",
-        "Native projectile dudProbabilityOnFlameout=0 uses the generic Web flight/collision lifecycle.",
-        "Native projectile fizzleOnReachingWeaponRange=true uses the generic Web flight/collision lifecycle.",
-        "Native projectile flameoutTime=0.5 uses the generic Web flight/collision lifecycle.",
-        "Native projectile reduceDamageWhileFading=true uses the generic Web flight/collision lifecycle.",
         "Native ammo reload batches (3) use continuous Web ammo regeneration.",
         "Native weapon animation GLOW uses static base mount sprites.",
-        "Linked multi-barrel discharge uses sequential Web barrel cycling."
+        "Linked multi-barrel discharge uses sequential Web barrel cycling.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "disintegrator": {
@@ -7981,7 +7978,8 @@
       "reasons": [
         "Projectile on-fire hook com.fs.starfarer.api.impl.combat.dem.DEMEffect omitted; no native spawn-time callback.",
         "Unimplemented projectile behavior {\"behavior\":\"CUSTOM\",\"minDelayBeforeTriggering\":1,\"triggerDistance\":[700,750],\"preferredMinFireDistance\":[700,750],\"turnRateBoost\":100,\"targetingTime\":3,\"firingTime\":1,\"targetingLaserId\":\"targetinglaser3\",\"targetingLaserFireOffset\":[8,0,8,0],\"targetingLaserSweepAngles\":[0,-7,0,7],\"payloadWeaponId\":\"dragon_payload\",\"targetingLaserRange\":900,\"targetingLaserArc\":10,\"bombPumped\":true,\"fadeOutEngineWhenFiring\":false,\"destroyMissleWhenDoneFiring\":false,\"snapFacingToTargetIfCloseEnough\":false,\"withShapedExplosion\":true,\"shapedExplosionNumParticles\":50,\"shapedExplosionMinParticleDur\":0.7,\"shapedExplosionMaxParticleDur\":1.1,\"shapedExplosionMinParticleSize\":50,\"shapedExplosionMaxParticleSize\":70,\"shapedExplosionArc\":45,\"shapedExplosionMinParticleVel\":50,\"shapedExplosionMaxParticleVel\":250,\"shapedExplosionColor\":[255,40,40,155],\"shapedExplosionEndSizeMin\":1,\"shapedExplosionEndSizeMax\":2,\"shapedExplosionScatter\":100}: ordinary projectile/guided-missile trajectory used; special behavior omitted.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "dragon_payload": {
@@ -7996,7 +7994,8 @@
       "reasons": [
         "Projectile on-fire hook com.fs.starfarer.api.impl.combat.dem.DEMEffect omitted; no native spawn-time callback.",
         "Unimplemented projectile behavior {\"behavior\":\"CUSTOM\",\"minDelayBeforeTriggering\":1,\"triggerDistance\":[700,750],\"preferredMinFireDistance\":[700,750],\"turnRateBoost\":100,\"targetingTime\":3,\"firingTime\":1,\"targetingLaserId\":\"targetinglaser3\",\"targetingLaserFireOffset\":[8,0,8,0],\"targetingLaserSweepAngles\":[0,-7,0,7],\"payloadWeaponId\":\"dragon_payload\",\"targetingLaserRange\":900,\"targetingLaserArc\":10,\"bombPumped\":true,\"fadeOutEngineWhenFiring\":false,\"destroyMissleWhenDoneFiring\":false,\"snapFacingToTargetIfCloseEnough\":false,\"withShapedExplosion\":true,\"shapedExplosionNumParticles\":50,\"shapedExplosionMinParticleDur\":0.7,\"shapedExplosionMaxParticleDur\":1.1,\"shapedExplosionMinParticleSize\":50,\"shapedExplosionMaxParticleSize\":70,\"shapedExplosionArc\":45,\"shapedExplosionMinParticleVel\":50,\"shapedExplosionMaxParticleVel\":250,\"shapedExplosionColor\":[255,40,40,155],\"shapedExplosionEndSizeMin\":1,\"shapedExplosionEndSizeMax\":2,\"shapedExplosionScatter\":100}: ordinary projectile/guided-missile trajectory used; special behavior omitted.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "dualflak": {
@@ -8038,8 +8037,8 @@
     "fragbomb": {
       "level": "approximate",
       "reasons": [
-        "Native projectile flameoutTime=0.05 uses the generic Web flight/collision lifecycle.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "gauss": {
@@ -8053,7 +8052,8 @@
       "reasons": [
         "Projectile on-fire hook com.fs.starfarer.api.impl.combat.dem.DEMEffect omitted; no native spawn-time callback.",
         "Unimplemented projectile behavior {\"behavior\":\"CUSTOM\",\"minDelayBeforeTriggering\":0,\"triggerDistance\":[800,850],\"preferredMinFireDistance\":[700,750],\"turnRateBoost\":50,\"targetingTime\":1,\"firingTime\":10.5,\"targetingLaserId\":\"targetinglaser1\",\"targetingLaserFireOffset\":[8,0],\"payloadWeaponId\":\"gazer_payload\",\"targetingLaserRange\":0,\"targetingLaserArc\":3,\"bombPumped\":false,\"snapFacingToTargetIfCloseEnough\":true,\"fadeOutEngineWhenFiring\":false,\"randomStrafe\":true,\"destroyMissleWhenDoneFiring\":true,\"destroyedExplosionColor\":[5,135,175,255]}: ordinary projectile/guided-missile trajectory used; special behavior omitted.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "gazer_payload": {
@@ -8067,7 +8067,8 @@
       "reasons": [
         "Projectile on-fire hook com.fs.starfarer.api.impl.combat.dem.DEMEffect omitted; no native spawn-time callback.",
         "Unimplemented projectile behavior {\"behavior\":\"CUSTOM\",\"minDelayBeforeTriggering\":0,\"triggerDistance\":[800,850],\"preferredMinFireDistance\":[700,750],\"turnRateBoost\":50,\"targetingTime\":1,\"firingTime\":10.5,\"targetingLaserId\":\"targetinglaser1\",\"targetingLaserFireOffset\":[8,0],\"payloadWeaponId\":\"gazer_payload\",\"targetingLaserRange\":0,\"targetingLaserArc\":3,\"bombPumped\":false,\"snapFacingToTargetIfCloseEnough\":true,\"fadeOutEngineWhenFiring\":false,\"randomStrafe\":true,\"destroyMissleWhenDoneFiring\":true,\"destroyedExplosionColor\":[5,135,175,255]}: ordinary projectile/guided-missile trajectory used; special behavior omitted.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "gigacannon": {
@@ -8081,7 +8082,8 @@
       "reasons": [
         "Projectile on-fire hook com.fs.starfarer.api.impl.combat.dem.DEMEffect omitted; no native spawn-time callback.",
         "Unimplemented projectile behavior {\"behavior\":\"CUSTOM\",\"minDelayBeforeTriggering\":0,\"triggerDistance\":[500,550],\"preferredMinFireDistance\":[500,550],\"turnRateBoost\":100,\"targetingTime\":0.99,\"firingTime\":1.25,\"targetingLaserId\":\"targetinglaser2\",\"targetingLaserFireOffset\":[8,0],\"payloadWeaponId\":\"gorgon_payload\",\"targetingLaserRange\":600,\"targetingLaserArc\":10,\"bombPumped\":false,\"snapFacingToTargetIfCloseEnough\":true,\"fadeOutEngineWhenFiring\":false,\"destroyMissleWhenDoneFiring\":true,\"destroyedExplosionColor\":[150,255,150,255]}: ordinary projectile/guided-missile trajectory used; special behavior omitted.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "gorgon_payload": {
@@ -8096,7 +8098,8 @@
       "reasons": [
         "Projectile on-fire hook com.fs.starfarer.api.impl.combat.dem.DEMEffect omitted; no native spawn-time callback.",
         "Unimplemented projectile behavior {\"behavior\":\"CUSTOM\",\"minDelayBeforeTriggering\":0,\"triggerDistance\":[500,550],\"preferredMinFireDistance\":[500,550],\"turnRateBoost\":100,\"targetingTime\":0.99,\"firingTime\":1.25,\"targetingLaserId\":\"targetinglaser2\",\"targetingLaserFireOffset\":[8,0],\"payloadWeaponId\":\"gorgon_payload\",\"targetingLaserRange\":600,\"targetingLaserArc\":10,\"bombPumped\":false,\"snapFacingToTargetIfCloseEnough\":true,\"fadeOutEngineWhenFiring\":false,\"destroyMissleWhenDoneFiring\":true,\"destroyedExplosionColor\":[150,255,150,255]}: ordinary projectile/guided-missile trajectory used; special behavior omitted.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "gravitonbeam": {
@@ -8115,47 +8118,51 @@
     "hammer": {
       "level": "approximate",
       "reasons": [
-        "Native projectile flameoutTime=3 uses the generic Web flight/collision lifecycle.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "hammer_single": {
       "level": "approximate",
       "reasons": [
-        "Native projectile flameoutTime=3 uses the generic Web flight/collision lifecycle.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "hammerrack": {
       "level": "approximate",
       "reasons": [
-        "Native projectile flameoutTime=3 uses the generic Web flight/collision lifecycle.",
         "Native weapon animation SMOKE uses static base mount sprites.",
-        "Per-barrel native firing angles are not applied; mount aim direction used."
+        "Per-barrel native firing angles are not applied; mount aim direction used.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "harpoon": {
       "level": "approximate",
       "reasons": [
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "harpoon_single": {
       "level": "approximate",
       "reasons": [
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "harpoonpod": {
       "level": "approximate",
       "reasons": [
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "heatseeker": {
       "level": "approximate",
       "reasons": [
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "heavy_adjudicator": {
@@ -8237,7 +8244,8 @@
       "level": "approximate",
       "reasons": [
         "Nested or missile MIRV child mirv_warhead is not implemented: carrier remains a single base missile; splitting/payload omitted.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "hveldriver": {
@@ -8251,7 +8259,8 @@
       "reasons": [
         "MIRV child on-fire hook com.fs.starfarer.api.impl.combat.dem.DEMEffect omitted.",
         "Nested or missile MIRV child hydra_warhead is not implemented: carrier remains a single base missile; splitting/payload omitted.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "hydra_payload": {
@@ -8329,19 +8338,16 @@
     "jackhammer": {
       "level": "approximate",
       "reasons": [
-        "Native projectile flameoutTime=3 uses the generic Web flight/collision lifecycle.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "kinetic_fragments": {
       "level": "approximate",
       "reasons": [
         "Unimplemented everyFrameEffect com.fs.starfarer.api.impl.combat.threat.KineticFragmentMissileEffect: special hook omitted; base damage/flux/trajectory retained.",
-        "Native projectile dudProbabilityOnFlameout=0 uses the generic Web flight/collision lifecycle.",
-        "Native projectile fizzleOnReachingWeaponRange=true uses the generic Web flight/collision lifecycle.",
-        "Native projectile flameoutTime=0.5 uses the generic Web flight/collision lifecycle.",
-        "Native projectile reduceDamageWhileFading=true uses the generic Web flight/collision lifecycle.",
-        "Native weapon animation GLOW uses static base mount sprites."
+        "Native weapon animation GLOW uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "kineticblaster": {
@@ -8423,7 +8429,8 @@
       "level": "approximate",
       "reasons": [
         "Native weapon animation SMOKE uses static base mount sprites.",
-        "Per-barrel native firing angles are not applied; mount aim direction used."
+        "Per-barrel native firing angles are not applied; mount aim direction used.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "lrpdlaser": {
@@ -8441,15 +8448,15 @@
     "minelayer1": {
       "level": "approximate",
       "reasons": [
-        "Native projectile flameoutTime=0.1 uses the generic Web flight/collision lifecycle.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "minelayer2": {
       "level": "approximate",
       "reasons": [
-        "Native projectile flameoutTime=0.1 uses the generic Web flight/collision lifecycle.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "miningblaster": {
@@ -8500,9 +8507,8 @@
     "nb_bomblauncher": {
       "level": "approximate",
       "reasons": [
-        "Native projectile fizzleOnReachingWeaponRange=true uses the generic Web flight/collision lifecycle.",
-        "Native projectile flameoutTime=0.05 uses the generic Web flight/collision lifecycle.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "neoferric_quadcoil": {
@@ -8516,9 +8522,7 @@
       "level": "approximate",
       "reasons": [
         "Projectile on-fire hook com.fs.starfarer.api.impl.combat.threat.NeutronTorpedoOnFireEffect omitted; no native spawn-time callback.",
-        "Native projectile dudProbabilityOnFlameout=0 uses the generic Web flight/collision lifecycle.",
-        "Native projectile flameoutTime=2 uses the generic Web flight/collision lifecycle.",
-        "Native projectile reduceDamageWhileFading=true uses the generic Web flight/collision lifecycle."
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "novalaser": {
@@ -8530,9 +8534,8 @@
     "od_bomblauncher": {
       "level": "approximate",
       "reasons": [
-        "Native projectile fizzleOnReachingWeaponRange=true uses the generic Web flight/collision lifecycle.",
-        "Native projectile flameoutTime=0.05 uses the generic Web flight/collision lifecycle.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "pdburst": {
@@ -8562,15 +8565,15 @@
     "phasecl": {
       "level": "approximate",
       "reasons": [
-        "Native projectile flameoutTime=0.1 uses the generic Web flight/collision lifecycle.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "phasecl_bomber": {
       "level": "approximate",
       "reasons": [
-        "Native projectile flameoutTime=0.1 uses the generic Web flight/collision lifecycle.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "pilum": {
@@ -8578,7 +8581,8 @@
       "reasons": [
         "Unimplemented onHitEffect com.fs.starfarer.api.impl.combat.PilumOnHitEffect: special hook omitted; base damage/flux/trajectory retained.",
         "Nested or missile MIRV child pilum_second_stage is not implemented: carrier remains a single base missile; splitting/payload omitted.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "pilum_large": {
@@ -8587,14 +8591,15 @@
         "Unimplemented onHitEffect com.fs.starfarer.api.impl.combat.PilumOnHitEffect: special hook omitted; base damage/flux/trajectory retained.",
         "Nested or missile MIRV child pilum_second_stage is not implemented: carrier remains a single base missile; splitting/payload omitted.",
         "Native ammo reload batches (6) use continuous Web ammo regeneration.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "plasma": {
       "level": "approximate",
       "reasons": [
-        "Native spawn type PLASMA uses a ballistic energy projectile; special appearance/motion not reproduced.",
-        "Native reverse-length muzzle flash is not rendered; muzzle particle flash omitted."
+        "Native reverse-length muzzle flash is not rendered; muzzle particle flash omitted.",
+        "Native PLASMA lifetime is restored; rotating-ray appearance and charge/collision geometry remain approximate."
       ]
     },
     "pseudoparticle_jet": {
@@ -8642,30 +8647,24 @@
       "reasons": [
         "Unimplemented everyFrameEffect com.fs.starfarer.api.impl.combat.RealityDisruptorEffect: special hook omitted; base damage/flux/trajectory retained.",
         "Unimplemented onHitEffect com.fs.starfarer.api.impl.combat.RealityDisruptorEffect: special hook omitted; base damage/flux/trajectory retained.",
-        "Native projectile dudProbabilityOnFlameout=0 uses the generic Web flight/collision lifecycle.",
-        "Native projectile fizzleOnReachingWeaponRange=true uses the generic Web flight/collision lifecycle.",
-        "Native projectile flameoutTime=0.5 uses the generic Web flight/collision lifecycle.",
-        "Native projectile noCollisionWhileFading=true uses the generic Web flight/collision lifecycle.",
         "Native projectile collision class NONE is approximated by the Web projectile collision model.",
         "Native weapon animation GLOW uses static base mount sprites.",
-        "Native weapon unaffectedByProjectileSpeedBonuses=true is not represented by the base Web weapon adapter."
+        "Native weapon unaffectedByProjectileSpeedBonuses=true is not represented by the base Web weapon adapter.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "reaper": {
       "level": "approximate",
       "reasons": [
-        "Native projectile flameoutTime=3 uses the generic Web flight/collision lifecycle.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "resonatormrm": {
       "level": "approximate",
       "reasons": [
-        "Native projectile dudProbabilityOnFlameout=0 uses the generic Web flight/collision lifecycle.",
-        "Native projectile fizzleOnReachingWeaponRange=true uses the generic Web flight/collision lifecycle.",
-        "Native projectile flameoutTime=0.5 uses the generic Web flight/collision lifecycle.",
-        "Native projectile reduceDamageWhileFading=true uses the generic Web flight/collision lifecycle.",
-        "Native ammo reload batches (4) use continuous Web ammo regeneration."
+        "Native ammo reload batches (4) use continuous Web ammo regeneration.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "rift_lightning": {
@@ -8728,51 +8727,50 @@
         "Unimplemented onHitEffect com.fs.starfarer.api.impl.combat.RiftTorpedoEffect: special hook omitted; base damage/flux/trajectory retained.",
         "Projectile on-fire hook com.fs.starfarer.api.impl.combat.RiftTorpedoEffect omitted; no native spawn-time callback.",
         "Native projectile applyOnHitEffectWhenPassThrough=false uses the generic Web flight/collision lifecycle.",
-        "Native projectile dudProbabilityOnFlameout=0 uses the generic Web flight/collision lifecycle.",
-        "Native projectile fizzleOnReachingWeaponRange=true uses the generic Web flight/collision lifecycle.",
-        "Native projectile flameoutTime=0.2 uses the generic Web flight/collision lifecycle.",
-        "Native projectile noCollisionWhileFading=true uses the generic Web flight/collision lifecycle."
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "sabot": {
       "level": "approximate",
       "reasons": [
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "sabot_fighter": {
       "level": "approximate",
       "reasons": [
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "sabot_single": {
       "level": "approximate",
       "reasons": [
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "sabotpod": {
       "level": "approximate",
       "reasons": [
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "salamanderpod": {
       "level": "approximate",
       "reasons": [
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "seeker_fragment": {
       "level": "approximate",
       "reasons": [
         "Unimplemented everyFrameEffect com.fs.starfarer.api.impl.combat.threat.SeekerFragmentMissileEffect: special hook omitted; base damage/flux/trajectory retained.",
-        "Native projectile dudProbabilityOnFlameout=0 uses the generic Web flight/collision lifecycle.",
-        "Native projectile fizzleOnReachingWeaponRange=true uses the generic Web flight/collision lifecycle.",
-        "Native projectile flameoutTime=0.5 uses the generic Web flight/collision lifecycle.",
-        "Native projectile reduceDamageWhileFading=true uses the generic Web flight/collision lifecycle.",
-        "Native weapon animation GLOW uses static base mount sprites."
+        "Native weapon animation GLOW uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "sensordish": {
@@ -8801,27 +8799,30 @@
       "level": "approximate",
       "reasons": [
         "Projectile on-fire hook com.fs.starfarer.api.impl.combat.SquallOnFireEffect omitted; no native spawn-time callback.",
-        "Native projectile flameoutTime=1 uses the generic Web flight/collision lifecycle.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "swarm_launcher": {
       "level": "approximate",
       "reasons": [
         "Unimplemented everyFrameEffect com.fs.starfarer.api.impl.combat.threat.SwarmLauncherEffect: special hook omitted; base damage/flux/trajectory retained.",
-        "Native weapon animation GLOW uses static base mount sprites."
+        "Native weapon animation GLOW uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "swarmer": {
       "level": "approximate",
       "reasons": [
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "swarmer_fighter": {
       "level": "approximate",
       "reasons": [
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "tachyonlance": {
@@ -8857,10 +8858,8 @@
     "terminator_missile": {
       "level": "approximate",
       "reasons": [
-        "Native projectile dudProbabilityOnFlameout=0 uses the generic Web flight/collision lifecycle.",
-        "Native projectile fizzleOnReachingWeaponRange=true uses the generic Web flight/collision lifecycle.",
-        "Native projectile flameoutTime=0.5 uses the generic Web flight/collision lifecycle.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "tpc": {
@@ -8872,16 +8871,16 @@
     "typhoon": {
       "level": "approximate",
       "reasons": [
-        "Native projectile flameoutTime=3 uses the generic Web flight/collision lifecycle.",
-        "Native weapon animation SMOKE uses static base mount sprites."
+        "Native weapon animation SMOKE uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "unstable_fragment": {
       "level": "approximate",
       "reasons": [
         "Unimplemented everyFrameEffect com.fs.starfarer.api.impl.combat.threat.UnstableFragmentMissileEffect: special hook omitted; base damage/flux/trajectory retained.",
-        "Native projectile flameoutTime=0.1 uses the generic Web flight/collision lifecycle.",
-        "Native weapon animation GLOW uses static base mount sprites."
+        "Native weapon animation GLOW uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "voidblaster": {
@@ -8899,7 +8898,7 @@
       "reasons": [
         "Unimplemented everyFrameEffect com.fs.starfarer.api.impl.combat.threat.VoltaicCannonEffect: special hook omitted; base damage/flux/trajectory retained.",
         "Unimplemented onHitEffect com.fs.starfarer.api.impl.combat.threat.VoltaicCannonEffect: special hook omitted; base damage/flux/trajectory retained.",
-        "Native spawn type PLASMA uses a ballistic energy projectile; special appearance/motion not reproduced."
+        "Native PLASMA lifetime is restored; rotating-ray appearance and charge/collision geometry remain approximate."
       ]
     },
     "voltaic_discharge": {
@@ -8915,7 +8914,8 @@
       "level": "approximate",
       "reasons": [
         "Unimplemented everyFrameEffect com.fs.starfarer.api.impl.combat.dweller.VortexLauncherEffect: special hook omitted; base damage/flux/trajectory retained.",
-        "Native weapon animation GLOW uses static base mount sprites."
+        "Native weapon animation GLOW uses static base mount sprites.",
+        "Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate."
       ]
     },
     "vpdriver": {

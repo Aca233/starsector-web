@@ -1,3 +1,4 @@
+// Explicit synchronous reference fixture; real-worker coverage lives in check-steam-snapshot-prepare.mjs.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { randomBytes } from 'node:crypto';
@@ -8,7 +9,7 @@ import protocol from '../src/network/protocol.json' with { type: 'json' };
 const hostId = '76561198000000001', guestId = '76561198000000002', lobby = '109775240000000001', connection = 'a'.repeat(32);
 function fixture() {
   const packets = [], logs = [];
-  const gateway = new SteamGateway({ build: 'test', log: line => logs.push(JSON.parse(line.slice('[steam-transport] '.length))),
+  const gateway = new SteamGateway({ snapshotPreparation: false, build: 'test', log: line => logs.push(JSON.parse(line.slice('[steam-transport] '.length))),
     client: { networking: { sendP2PPacket: (_remote, type, data) => { assert.equal(type, 2); packets.push(data); return true; },
       isP2PPacketAvailable: () => 0 }, } });
   gateway.owner = hostId;
@@ -81,7 +82,7 @@ function simulate(t, { window = STEAM_SNAPSHOT_WINDOW, rtt = 200, bandwidth = 12
   let now = 10000;
   t.mock.method(Date, 'now', () => now);
   const { gateway: host, peer } = fixture(), delivered = [], queues = { host: [], guest: [] }, tails = { host: 0, guest: 0 };
-  const guest = new SteamGateway({ build: 'test' });
+  const guest = new SteamGateway({ snapshotPreparation: false, build: 'test' });
   guest.owner = guestId; guest.guestConnection = connection;
   guest.selected = { ...host.selected };
   guest.renderer = { readyState: 1, bufferedAmount: 0,

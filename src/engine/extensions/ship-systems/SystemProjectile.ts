@@ -1,3 +1,4 @@
+import { initializeSourceMissile } from '../../simulation/systems/weapon/SourceMissileLifecycle';
 import { contentRegistry } from '../../content/ContentRegistry';
 import { systemWeaponSpec } from './SystemWeaponCatalog';
 import { effectiveHullModWeaponSpec } from '../HullMods';
@@ -30,6 +31,7 @@ export function spawnSystemProjectile(ship: Ship, weaponId: string, position: Ve
     glowRadius: w.glowRadius, coreWidthMult: w.coreWidthMult, projSpriteUrl: w.projSpriteUrl, projLength: w.projLength, projWidth: w.projWidth,
     isRocket: w.isRocket || w.spawnType === 'MISSILE', isGuided: w.isGuided,
     eccmChance: w.eccmChanceBonus, guidanceBonus: w.missileGuidanceBonus,
+    missileLifecycleSpec: w.missileLifecycleSpec,
     flightTimeRemaining: w.flightTime, maxFlightTime: w.flightTime, armingTimeRemaining: w.armingTime,
     engineAcceleration: w.engineAcceleration, missileDeceleration: w.missileDeceleration,
     maxSpeed: w.maxSpeed ?? w.projSpeed, maxTurnRate: w.maxTurnRate, maxTurnAcceleration: w.maxTurnAcceleration,
@@ -42,6 +44,7 @@ export function spawnSystemProjectile(ship: Ship, weaponId: string, position: Ve
   };
   initializeSourceProjectile(p, combatProjectileSpeed(ship, w), ship.vel);
   Object.assign(p, overrides);
+  initializeSourceMissile(p, world.combatRandom);
   world.projectiles.push(bindProjectileSource(p, ship));
   return p;
 }

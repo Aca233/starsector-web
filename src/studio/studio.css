@@ -2172,17 +2172,23 @@ select:focus-visible {
 .source-mod-scroll > .source-mod-row {
   position: relative;
   min-height: calc(36 * var(--u));
-  background: #0b252d99;
+  background: transparent;
   cursor: pointer;
 }
-.source-mod-scroll > .source-mod-row:nth-child(even) {
-  background: #0a202888;
+/* Native ModPicker row: showBG = !enabled. Blue is an unavailable marker,
+   not a stripe on every uninstalled mod. Keep unavailable rows inspectable. */
+.source-mod-scroll > .source-mod-row[data-unavailable="true"] {
+  background: #0b252d99;
+  cursor: default;
+}
+.source-mod-row[data-unavailable="true"] .source-mod-select {
+  cursor: default;
 }
 .source-mod-scroll > .source-mod-row.is-installed {
   background: #0009;
 }
-.source-mod-scroll > .source-mod-row:hover {
-  background: #153e4ab3;
+.source-mod-scroll > .source-mod-row:not([data-unavailable="true"]):is(:hover, :focus-within) {
+  background: #ffffff0a;
 }
 .source-mod-scroll > .source-mod-row > div {
   min-width: 0;

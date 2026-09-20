@@ -1,3 +1,4 @@
+// Explicit synchronous reference fixture; real-worker coverage lives in check-steam-snapshot-prepare.mjs.
 // Deterministic shared host-uplink simulator around production SteamGateway.
 // Link serialization is shared by ALL host destinations; guest uplinks remain
 // independent. Service rate changes affect already queued bytes, not just new
@@ -14,15 +15,15 @@ export async function bundleGateway(entry=path.join(root,'server/steam/gateway.m
  return result.outputFiles[0].text;
 }
 const quantile=(values,q)=>{if(!values.length)return null;const sorted=[...values].sort((a,b)=>a-b);return sorted[Math.min(sorted.length-1,Math.floor(sorted.length*q))];};
-export function simulateSharedLink(bundle,{guests=3,durationMs=40000,rttMs=300,upBytesPerSecond=128000,afterBytesPerSecond=upBytesPerSecond,changeAtMs=Infinity,stallAtMs=Infinity,stallMs=0,initialWindow=null,guestRtts=null,rotation=true,jitterMs=0,trace=false,dropFastAcks=false,reverseReliableStallAtMs=Infinity,reverseReliableStallMs=0}={}) {
+export function simulateSharedLink(bundle,{guests=3,durationMs=40000,rttMs=300,upBytesPerSecond=128000,afterBytesPerSecond=upBytesPerSecond,changeAtMs=Infinity,stallAtMs=Infinity,stallMs=0,initialWindow=null,guestRtts=null,rotation=true,jitterMs=0,trace=false,dropFastAcks=false,reverseReliableStallAtMs=Infinity,reverseReliableStallMs=0,frameFactory=null}={}) {
  const start=1000,clock={now:start},NativeDate=Date;
- const context=vm.createContext({module:{exports:{}},require,console,Buffer,URL,setTimeout,clearTimeout,setInterval,clearInterval,Date:class extends NativeDate{static now(){return clock.now;}},performance:{now:()=>clock.now}});
+ const context=vm.createContext({module:{exports:{}},require,console,Buffer,URL,TextEncoder,TextDecoder,setTimeout,clearTimeout,setInterval,clearInterval,Date:class extends NativeDate{static now(){return clock.now;}},performance:{now:()=>clock.now}});
  new vm.Script(bundle).runInContext(context);const {SteamGateway}=context.module.exports;
  const ids=Array.from({length:guests+1},(_,i)=>String(76561198000000001n+BigInt(i))),inboxes=ids.map(()=>[]),links=ids.map(()=>({queue:[],bytes:0,peak:0,sent:0,byOp:{}})),propagation=[],closes=[],peers=[],logs=[];
  let budgetViolations=0,maxTotalFlightBytes=0,maxQueueAge=0,seq=0,nextState=start+500,nextInput=start+500,nextPing=start+1000,rotor=0;
  const samples=[], lastDelivery=new Map(); let nextTrace=start;
  const totals=ids.map(()=>({states:[],pongs:[],inputs:0,peakFrames:0,peakBytes:0,decodeFailures:0}));
- const gateways=ids.map((id,index)=>new SteamGateway({build:'shared-uplink-test',log:line=>{const value=JSON.parse(line.slice('[steam-transport] '.length));if(['peer-close','invalid-packet'].includes(value.event))logs.push({at:clock.now-start,index,...value});},client:{networking:{
+ const gateways=ids.map((id,index)=>new SteamGateway({ snapshotPreparation: false,build:'shared-uplink-test',log:line=>{const value=JSON.parse(line.slice('[steam-transport] '.length));if(['peer-close','invalid-packet'].includes(value.event))logs.push({at:clock.now-start,index,...value});},client:{networking:{
   sendP2PPacket(remote,type,data){if(type!==2&&(type!==1||data[5]!==6||data.length>1200))throw Error('Only small ACKs may use the best-effort fast path');const target=ids.indexOf(String(remote));if(target<0)throw Error('Unknown test peer');
    const packet={data:Buffer.from(data),steamId:id,target,type,remaining:data.length,enqueued:clock.now};const link=links[index];link.queue.push(packet);link.bytes+=data.length;link.peak=Math.max(link.peak,link.bytes);link.sent+=data.length;link.byOp[data[5]]=(link.byOp[data[5]]??0)+data.length;return true;},
   isP2PPacketAvailable(){return inboxes[index][0]?.data.length??0;},readP2PPacket(){return inboxes[index].shift();}
@@ -54,7 +55,7 @@ export function simulateSharedLink(bundle,{guests=3,durationMs=40000,rttMs=300,u
  };
  for(;clock.now<start+durationMs;clock.now+=8){
   if(clock.now>=nextState){nextState+=1000/60;seq++;
-   const text=JSON.stringify({type:'state',matchId:'shared-battle',seq,frame:{tick:seq,marker:'exact-'+seq,producedAt:clock.now,ballast,ships:moving.map((item,i)=>({...item,pos:[Math.sin((seq+i)*.013)*10000,Math.cos((seq-i)*.019)*10000],angle:(seq*.13+i)%6.28}))}});
+   const text=JSON.stringify({type:'state',matchId:'shared-battle',seq,frame:{tick:seq,marker:'exact-'+seq,producedAt:clock.now,...(frameFactory?frameFactory(seq):{ballast,ships:moving.map((item,i)=>({...item,pos:[Math.sin((seq+i)*.013)*10000,Math.cos((seq-i)*.019)*10000],angle:(seq*.13+i)%6.28}))})}});
    const targets=rotation?Array.from({length:guests},(_,i)=>peers[1+(i+rotor)%guests]):peers.slice(1);rotor=(rotor+1)%guests;
    for(const peer of targets)if(peer?.snapshotWritable){
     const before=peers.reduce((sum,p)=>sum+(p?.inflightBytes??0),0);peer.send(text);

@@ -1,3 +1,4 @@
+// Explicit synchronous reference fixture; real-worker coverage lives in check-steam-snapshot-prepare.mjs.
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { test } from 'node:test';
@@ -25,7 +26,7 @@ function clock(t, initial = 100) {
 function transport(t, local = host) {
   const frames = [], packets = [], incoming = [], codec = new SteamPacketCodec();
   let failure = null;
-  const g = new SteamGateway({ build: 'test', client: { networking: {
+  const g = new SteamGateway({ snapshotPreparation: false, build: 'test', client: { networking: {
     isP2PPacketAvailable: () => incoming[0]?.data.length ?? 0,
     readP2PPacket: () => incoming.shift(),
     sendP2PPacket(remote, type, packet) {

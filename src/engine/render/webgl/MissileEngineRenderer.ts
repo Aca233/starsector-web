@@ -30,7 +30,7 @@ export function renderMissileEngines(items: readonly MissileEngineRenderItem[], 
       const sx = 0.5 + 0.5 * (i + 1) / 6;
       ribbon.drawEnginePlume(plume, nozzle.x + Math.cos(angle) * shift, nozzle.y + Math.sin(angle) * shift,
         angle, shape.length * sx, shape.width * (6 - i) / 6, shape.throat * sx, phase + i / 6, 1,
-        color, Math.floor(i * 5 * shape.color[3] / 255) / 255, shape.throatAlpha);
+        color, Math.floor(i * 5 * shape.color[3] / 255) / 255 * shape.flameoutAlpha, shape.throatAlpha);
     }
   }
   ribbon.end();

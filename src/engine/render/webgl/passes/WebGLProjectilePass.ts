@@ -174,14 +174,16 @@ export class WebGLProjectilePass {
 
         const rocketTex = textures.getTexture(p.projSpriteUrl || '/game-assets/graphics/missiles/missile_harpoon.png');
         batcher.setBlendMode('NORMAL');
-        batcher.drawSprite(rocketTex, pPos.x, pPos.y, wid, len, pAngle + Math.PI / 2, 0, 0, 1.0, 1.0, 1.0, (1 - (p.fadeProgress ?? 0)) * (p.spriteAlphaOverride ?? 1));
+        batcher.drawSprite(rocketTex, pPos.x, pPos.y, wid, len, pAngle + Math.PI / 2, 0, 0, 1.0, 1.0, 1.0, (1 - ((p.prevFadeProgress ?? p.fadeProgress ?? 0) * (1 - alpha) + (p.fadeProgress ?? 0) * alpha)) * (p.spriteAlphaOverride ?? 1));
       }
       // 4.5 其余标准投射物
       else {
         const [r, g, b] = p.color || [255, 200, 100];
+        const brightness = p.spawnType === 'PLASMA'
+          ? 1 - ((p.prevFadeProgress ?? p.fadeProgress ?? 0) * (1 - alpha) + (p.fadeProgress ?? 0) * alpha) : 1;
         batcher.setBlendMode('ADDITIVE');
-        batcher.drawSprite(hitGlowTex, pPos.x, pPos.y, p.radius * 4 * visual.glowScale, p.radius * 2 * visual.glowScale, pAngle, 0, 0, r / 255, g / 255, b / 255, 0.9);
-        batcher.drawSprite(hitGlowTex, pPos.x, pPos.y, p.radius * 2 * visual.coreScale, p.radius * visual.coreScale, pAngle, 0, 0, 1.0, 1.0, 1.0, 0.95);
+        batcher.drawSprite(hitGlowTex, pPos.x, pPos.y, p.radius * 4 * visual.glowScale, p.radius * 2 * visual.glowScale, pAngle, 0, 0, r / 255, g / 255, b / 255, 0.9 * brightness);
+        batcher.drawSprite(hitGlowTex, pPos.x, pPos.y, p.radius * 2 * visual.coreScale, p.radius * visual.coreScale, pAngle, 0, 0, 1.0, 1.0, 1.0, 0.95 * brightness);
       }
     }
 

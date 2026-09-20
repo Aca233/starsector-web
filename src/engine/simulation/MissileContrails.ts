@@ -4,7 +4,7 @@ import type { ContrailEngine } from './ContrailEngine';
 
 /** Visual-only: reads missile state; never advances flight, guidance, RNG or damage. */
 export function appendMissileContrail(contrails: ContrailEngine, p: Projectile, pos = p.pos, stripId: number | string = p.id): void {
-  if (!contrails.isEnabled || !p.isRocket || p.isFlare) return;
+  if (!contrails.isEnabled || !p.isRocket || p.isFlare || p.missileFizzleTime !== undefined) return;
   const heading = p.facingRad !== undefined ? p.facingRad : p.vel.heading();
   const nozzleOffset = p.missileEngineVisualSpec?.nozzleOffset ?? -(p.projLength || 25) * 0.5;
   const trail = p.missileTrailSpec;

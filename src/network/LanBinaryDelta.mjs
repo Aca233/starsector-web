@@ -1,3 +1,4 @@
+import { createMotionReference } from './SnapshotMotionReference.mjs';
 /** Lossless byte delta for negotiated, reliable LAN WebSockets only.
  * The full SWB1 remains the decoded contract; nothing is quantized or omitted.
  * At most two marked anchors are retained by a receiver, never every snapshot.
@@ -5,7 +6,10 @@
 export const LAN_DELTA_MAX_BYTES = 2 * 1024 * 1024;
 export const LAN_DELTA_HEADER = 36;
 const MAGIC = 0x534c4431; // SLD1, distinct from existing SWB1/SWF2.
-const DELTA = 1, ANCHOR = 2;
+// motionReference:1 is a separately negotiated extension. Bits 8..13 carry
+// 1..60 reference steps ONLY with DELTA|MOTION_REFERENCE. The base CRC still
+// names the ORIGINAL retained anchor; the target CRC verifies corrected bytes.
+const DELTA = 1, ANCHOR = 2, MOTION_REFERENCE = 4;
 const table = Uint32Array.from({ length: 256 }, (_, n) => {
   for (let k = 0; k < 8; k++) n = n & 1 ? 0xedb88320 ^ (n >>> 1) : n >>> 1;
   return n >>> 0;
@@ -71,17 +75,21 @@ export function createLanBytePatch(before, after) {
   if (!literal(target.length)) return null;
   return out.slice(0, pos);
 }
-export function encodeLanPacket({ bytes, seq, crc }, base, patch, anchor = false) {
+export function encodeLanPacket({ bytes, seq, crc }, base, patch, anchor = false, motionSteps = 0) {
   bytes = lanBytes(bytes);
   if (!Number.isSafeInteger(seq) || seq < 0 || !bytes.length || bytes.length > LAN_DELTA_MAX_BYTES || (patch && !base)) invalid();
+  if (!Number.isInteger(motionSteps) || motionSteps < 0 || motionSteps > 60 || motionSteps && !patch) invalid();
   const payload = patch ?? bytes, out = new Uint8Array(LAN_DELTA_HEADER + payload.length), view = new DataView(out.buffer);
-  view.setUint32(0, MAGIC); view.setUint32(4, (patch ? DELTA : 0) | (anchor ? ANCHOR : 0));
+  view.setUint32(0, MAGIC); view.setUint32(4, (patch ? DELTA : 0) | (anchor ? ANCHOR : 0) | (motionSteps ? MOTION_REFERENCE | motionSteps << 8 : 0));
   view.setFloat64(8, patch ? base.seq : 0); view.setFloat64(16, seq); view.setUint32(24, bytes.length);
   view.setUint32(28, patch ? base.crc : 0); view.setUint32(32, crc); out.set(payload, LAN_DELTA_HEADER);
   return out;
 }
 export class LanDeltaReceiver {
   #anchors = new Map();
+  #motionReference = false;
+  constructor({ motionReference = false } = {}) { this.#motionReference = motionReference === true; }
+  setMotionReference(enabled) { this.reset(); this.#motionReference = enabled === true; }
   reset() { this.#anchors.clear(); }
   get retainedBytes() { let bytes = 0; for (const anchor of this.#anchors.values()) bytes += anchor.bytes.length; return bytes; }
   decode(value) {
@@ -90,11 +98,15 @@ export class LanDeltaReceiver {
     try {
       if (packet.length <= LAN_DELTA_HEADER || packet.length > LAN_DELTA_MAX_BYTES + LAN_DELTA_HEADER) invalid();
       const view = new DataView(packet.buffer, packet.byteOffset, packet.byteLength), flags = view.getUint32(4), baseSeq = view.getFloat64(8), seq = view.getFloat64(16), size = view.getUint32(24), baseCrc = view.getUint32(28), crc = view.getUint32(32);
-      if (![0, DELTA, ANCHOR, DELTA | ANCHOR].includes(flags) || !Number.isSafeInteger(seq) || seq < 0 || !Number.isSafeInteger(baseSeq) || baseSeq < 0 || !size || size > LAN_DELTA_MAX_BYTES) invalid();
+      const motionSteps = flags >>> 8, motion = !!(flags & MOTION_REFERENCE);
+      if (flags & ~0x3f07 || (motion ? !this.#motionReference || !(flags & DELTA) || motionSteps < 1 || motionSteps > 60 : motionSteps !== 0)) invalid();
+      if (!Number.isSafeInteger(seq) || seq < 0 || !Number.isSafeInteger(baseSeq) || baseSeq < 0 || !size || size > LAN_DELTA_MAX_BYTES) invalid();
       let bytes;
       if (flags & DELTA) {
         const base = this.#anchors.get(baseSeq);
         if (!base || base.crc !== baseCrc || baseSeq >= seq) invalid();
+        const source = motion ? createMotionReference(base.bytes, motionSteps) : base.bytes;
+        if (!source) invalid();
         bytes = new Uint8Array(size); let read = LAN_DELTA_HEADER, written = 0, operations = 0;
         const vint = () => {
           let n = 0;
@@ -110,8 +122,8 @@ export class LanDeltaReceiver {
           const tag = vint(), length = Math.floor(tag / 2);
           if (!length || length > size - written) invalid();
           if (tag & 1) {
-            const offset = vint(); if (offset > base.bytes.length - length) invalid();
-            bytes.set(base.bytes.subarray(offset, offset + length), written);
+            const offset = vint(); if (offset > source.length - length) invalid();
+            bytes.set(source.subarray(offset, offset + length), written);
           } else {
             if (length > packet.length - read) invalid(); bytes.set(packet.subarray(read, read + length), written); read += length;
           }

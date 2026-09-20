@@ -8,7 +8,6 @@ import { RefitExplanationText } from './RefitHoverTerms';
 import { RefitHint, RefitInfoHover } from './RefitHint';
 import { RefitStatHover } from "./RefitHoverTerms";
 import { MotionPresence } from '../ui/core/MotionPresence';
-import { currentImportReasons } from '../engine/data/SourceCapabilities';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { NativeButton, NativeFrame } from "../ui/NativeChrome";
 export { NativeButton, NativeFrame } from "../ui/NativeChrome";
@@ -135,12 +134,6 @@ function RefitEditor(props: Props & {moduleContext: ModuleEditorContext}) {
   const [groupHighlight, setGroupHighlight] = useState<number | null>(null);
   const [showMounts, setShowMounts] = useState(false);
   const [feedback, setFeedback] = useState("");
-  const importStatus = nativeRefit.shipStatus[draft.hullId];
-  const equippedCaveats = [...new Set(Object.values(draft.weapons).filter((id): id is string => !!id).flatMap(id =>
-    (nativeRefit.weaponStatus[id]?.reasons ?? []).map(reason => weaponName(id) + "：" + reason)
-  ))];
-  const caveats = [...currentImportReasons(importStatus?.reasons ?? []), ...equippedCaveats];
-
   const mainRef = useRef<HTMLDivElement>(null);
   const evaluation = useMemo(() => evaluate(draft, template), [draft, template]);
   const { spec, op } = evaluation;
@@ -163,6 +156,13 @@ function RefitEditor(props: Props & {moduleContext: ModuleEditorContext}) {
     next.sMods = (next.sMods ?? []).filter(id => next.hullMods.includes(id) || spec.builtInHullMods?.includes(id));
     if (patch.hullMods) next.wings = designWingSlots(next);
     onChange(next);
+  };
+  // One budget ceiling for direct entry, native spinners and custom +/- buttons.
+  const fluxCeiling = (key: 'capacitors' | 'vents') =>
+    Math.min(fluxLimit(draft.hullId), draft[key] + Math.max(0, Math.floor(op.remaining)));
+  const setFlux = (key: 'capacitors' | 'vents', value: number) => {
+    const next = Math.max(0, Math.min(fluxCeiling(key), Math.floor(value || 0)));
+    if (next !== draft[key]) change({ [key]: next });
   };
   const selectModule = (next: string[]) => {
     weaponDetails.hide();
@@ -428,7 +428,6 @@ function RefitEditor(props: Props & {moduleContext: ModuleEditorContext}) {
           </div>
           <aside className="refit-stats" aria-label="舰船装配参数">
             <SystemLoadoutEditor draft={draft} spec={spec} disabled={props.roomLayout?.locked} onChange={onChange}/>
-            {caveats.length > 0 && <RefitInfoHover enabled={panel === null} className="refit-import-warning" title={`基础模拟 · ${caveats.length} 项适配说明`}><p>以下原作机制尚未完整重现；导入不等于战斗完全一致。</p><ul>{caveats.map((reason, i) => <li key={i}>{reason}</li>)}</ul></RefitInfoHover>}
             {systems.filter(s => s.definition.id !== 'NONE').map(({ definition: tacticalSystem, label, key }) => <RefitInfoHover key={label} enabled={panel === null} className="refit-system-readiness" available={!tacticalSystem.unavailable}
               title={`${label}：${tacticalSystem.name.replace(/^未适配[:：]\s*/, "")} · ${tacticalSystem.unavailable ? "未接入" : "可用"}`}>
               <p>{tacticalSystem.unavailable ? "此系统尚未实现战斗效果，不能激活。不会把空计时显示成已生效。" : "已接入战斗逻辑，试战中按 " + key + " 激活；受冷却、充能和舰船状态限制。"}</p>
@@ -513,7 +512,7 @@ function RefitEditor(props: Props & {moduleContext: ModuleEditorContext}) {
                   className="native-step"
                   aria-label={"减少" + item.label}
                   disabled={draft[item.key] === 0}
-                  onClick={() => change({ [item.key]: draft[item.key] - 1 })}
+                  onClick={() => setFlux(item.key, draft[item.key] - 1)}
                 >
                   −
                 </button>
@@ -522,25 +521,15 @@ function RefitEditor(props: Props & {moduleContext: ModuleEditorContext}) {
                   aria-label={item.label}
                   type="number"
                   min={0}
-                  max={fluxLimit(draft.hullId)}
+                  max={fluxCeiling(item.key)}
                   value={draft[item.key]}
-                  onChange={(e) =>
-                    change({
-                      [item.key]: Math.max(
-                        0,
-                        Math.min(
-                          fluxLimit(draft.hullId),
-                          Math.floor(e.target.valueAsNumber || 0),
-                        ),
-                      ),
-                    })
-                  }
+                  onChange={(e) => setFlux(item.key, e.target.valueAsNumber)}
                 />
                 <button
                   className="native-step"
                   aria-label={"增加" + item.label}
-                  disabled={draft[item.key] >= fluxLimit(draft.hullId)}
-                  onClick={() => change({ [item.key]: draft[item.key] + 1 })}
+                  disabled={draft[item.key] >= fluxCeiling(item.key)}
+                  onClick={() => setFlux(item.key, draft[item.key] + 1)}
                 >
                   +
                 </button>

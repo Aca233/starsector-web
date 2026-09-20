@@ -1,3 +1,4 @@
+import { initializeSourceMissile } from './weapon/SourceMissileLifecycle';
 import { effectiveHullModWeaponSpec } from '../../extensions/HullMods';
 import { AutofireController, type FireControlWorld } from '../../ai/AutofireController';
 import { signedAngle } from '../../math/Angles';
@@ -1026,6 +1027,7 @@ export class ShipWeaponControlSystem {
         facingRad: fireAngleRad,
         flightTimeRemaining: mount.spec.flightTime === undefined ? undefined : mount.spec.flightTime * (1 - ship.ecmRangePenalty / 100),
         maxFlightTime: mount.spec.flightTime === undefined ? undefined : mount.spec.flightTime * (1 - ship.ecmRangePenalty / 100),
+        missileLifecycleSpec: mount.spec.missileLifecycleSpec,
         armingTimeRemaining: mount.spec.armingTime,
         turnVelocityRad: 0,
         engineAcceleration: mount.spec.engineAcceleration,
@@ -1045,6 +1047,7 @@ export class ShipWeaponControlSystem {
         maxHitpoints: mount.spec.missileHp || (mount.spec.isRocket || mount.spec.spawnType === 'MISSILE' ? 100 : undefined)
       };
       initializeSourceProjectile(projectile, combatProjectileSpeed(ship, mount.spec), ship.vel);
+      initializeSourceMissile(projectile, this.random);
       spawnProjectile(bindProjectileSource(projectile, ship));
     }
     return true;

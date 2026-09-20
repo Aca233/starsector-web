@@ -1,4 +1,5 @@
 import { RefitHint } from './RefitHint';
+import { hullModDescription, nativeHullSizes, readableDescriptionStats, shipDescriptionId, weaponCustomDescription } from './NativeCatalogDescriptions';
 import { currentImportReasons } from '../engine/data/SourceCapabilities';
 import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
@@ -209,7 +210,8 @@ function sourceDescriptions(entry: Entry): RecordData[] {
     ships: ["SHIP", "HULL"], weapons: ["WEAPON"], wings: ["WING", "FIGHTER_WING"], hullmods: ["HULLMOD", "HULL_MOD"],
     systems: ["SHIP_SYSTEM", "SHIPSYSTEM", "SYSTEM"], variants: ["VARIANT"], projectiles: ["PROJECTILE"],
   };
-  return (index.descriptions.get(entry.id) ?? []).filter(row => !text(row.type) || types[entry.kind].includes(text(row.type).toUpperCase()));
+  const descriptionId = entry.kind === 'ships' ? shipDescriptionId(entry.id, entry.spec, entry.raw.baseHullId) : entry.id;
+  return (index.descriptions.get(descriptionId) ?? []).filter(row => !text(row.type) || types[entry.kind].includes(text(row.type).toUpperCase()));
 }
 function spritesFor(entry: Entry, seen = new Set<string>()): { label: string; path: string }[] {
   if (seen.has(entry.key)) return []; seen.add(entry.key);
@@ -341,6 +343,7 @@ function Details(props: DetailsProps) {
 }
 function LoadedDetails({ entry, navigate, onRefit, onVariant }: DetailsProps) {
   const [view, setView] = useState("overview"), [specOpen, setSpecOpen] = useState(false);
+  const [descriptionSize, setDescriptionSize] = useState<string>("FRIGATE");
   const descriptions = useMemo(() => sourceDescriptions(entry), [entry]);
   const variantHull = entry.kind === "variants" ? index.byId.ships.get(text(entry.spec.hullId)) : undefined;
   const loadableVariant = !!variantHull && !!runtime.ships && has(runtime.ships, variantHull.id) && !!variantHull.hullSize && variantHull.hullSize.toUpperCase() !== "FIGHTER";
@@ -353,8 +356,16 @@ function LoadedDetails({ entry, navigate, onRefit, onVariant }: DetailsProps) {
     systems: ["cooldown", "max uses", "regen", "charge up", "active", "down", "flux/second", "flux/use"], variants: [], projectiles: [],
   };
   const metrics = preferred[entry.kind].filter(key => has(entry.stats, key) && entry.stats[key] !== "").slice(0, 8);
-  const explanation = [first(entry.stats.short, entry.stats.desc), ...descriptions.flatMap(row => ["text1", "text2", "text3", "text4", "text5"].map(key => text(row[key])))].filter(Boolean);
-  const tabs = [{ id: "overview", name: "原始数据" }, { id: "links", name: `关联 ${relationCount}` }, { id: "raw", name: "JSON / 定义" }];
+  const readableStats = useMemo(() => readableDescriptionStats(entry.kind, entry.stats, descriptionSize), [entry, descriptionSize]);
+  const modDescription = entry.kind === 'hullmods' ? hullModDescription(entry.stats, 'desc', descriptionSize) : null;
+  const sModDescription = entry.kind === 'hullmods' ? hullModDescription(entry.stats, 'sModDesc', descriptionSize) : null;
+  const weaponDescriptions = entry.kind === 'weapons' ? [weaponCustomDescription(entry.stats, 'customPrimary'), weaponCustomDescription(entry.stats, 'customAncillary')] : [];
+  const explanation = [entry.kind === 'ships' ? text(entry.spec.descriptionPrefix) : '',
+    modDescription?.text || first(entry.stats.desc, entry.stats.short),
+    ...descriptions.flatMap(row => ['text1', 'text2', 'text3', 'text4', 'text5'].map(key => text(row[key]))),
+    ...weaponDescriptions.map(result => result.text)].filter(Boolean);
+  const unresolvedDescription = [modDescription, sModDescription, ...weaponDescriptions].some(result => result && !result.complete);
+  const tabs = [{ id: "overview", name: "说明 / 参数" }, { id: "links", name: `关联 ${relationCount}` }, { id: "raw", name: "JSON / 定义" }];
   return <>
     <header className="nc-detail-heading"><div><span className="nc-eyebrow">{categoryName(entry.kind)} / SOURCE RECORD</span><h2>{entry.name}</h2><code>{entry.id}</code><p>{entry.subtitle || "未提供分类信息"}</p></div>
       <div className="nc-detail-actions"><Badge status={entry.status} />{canRefit(entry) ? <button type="button" className="nc-primary" onClick={() => onRefit(entry.id)}>进入改装 <span aria-hidden="true">→</span></button>
@@ -369,10 +380,16 @@ function LoadedDetails({ entry, navigate, onRefit, onVariant }: DetailsProps) {
         {metrics.length ? <dl className="nc-metrics">{metrics.map(key => <div key={key}><dt>{fieldNames[key] ?? key}</dt><dd>{display(entry.stats[key])}</dd></div>)}</dl>
           : <p className="nc-empty-inline">此类定义没有统一的战斗参数摘要，请查阅下方全部字段或 JSON。</p>}
         <div className="nc-provenance"><strong>来源</strong><code>{entry.sourcePath || (entry.kind === "wings" || entry.kind === "hullmods" ? "原始 CSV 记录（导入器未提供行路径）" : "源记录未提供路径")}</code>
-          <span>显示源数据单位，未换算、未补值。空值与 0 分别保留。</span></div>
+          <span>参数保持源数据单位，空值与 0 分别保留；说明变量按原版参数解析。</span></div>
       </div></div>
-      {explanation.length > 0 && <section className="nc-description"><div className="nc-section-heading"><h3>原始说明</h3><span>保留占位符</span></div>{Array.from(new Set(explanation)).map((paragraph, i) => <p key={i}>{paragraph}</p>)}</section>}
-      <PropertyTable value={entry.stats} title={entry.kind === "wings" || entry.kind === "hullmods" ? "完整 CSV 记录" : "原始 CSV 参数"} />
+      {(explanation.length > 0 || sModDescription?.text) && <section className="nc-description"><div className="nc-section-heading"><h3>原版说明</h3><span>{entry.kind === 'hullmods' ? '原版基础值 · 不含指挥官加成' : '原版资料'}</span></div>
+        {entry.kind === 'hullmods' && <label>参考舰级 <select aria-label="说明参考舰级" value={descriptionSize} onChange={event => setDescriptionSize(event.target.value)}>{nativeHullSizes.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>}
+        {Array.from(new Set(explanation)).flatMap(paragraph => paragraph.split(/\r?\n\r?\n/)).map((paragraph, i) => <p key={i}>{paragraph}</p>)}
+        {sModDescription?.text && <><h4>S-mod 固化说明</h4><p>{sModDescription.text}</p></>}
+        {unresolvedDescription && <p className="nc-muted">部分原版参数尚未核实；未用推测数值替代，可在 JSON / 定义中查看源模板。</p>}
+        <p className="nc-muted">原版说明不代表当前 Web 已实现全部效果；支持范围见上方适配状态。原始模板保留在 JSON / 定义中。</p>
+      </section>}
+      <PropertyTable value={readableStats} title={entry.kind === "wings" || entry.kind === "hullmods" ? "CSV 参数 / 已解析说明" : "CSV 参数"} />
       {Object.keys(entry.spec).length > 0 && <details className="nc-spec-disclosure" onToggle={event => setSpecOpen(event.currentTarget.open)}><summary>展开解析后的定义字段 <span>{Object.keys(entry.spec).length} 字段</span></summary>{specOpen && <PropertyTable value={entry.spec} title="解析后的源定义" />}</details>}
       <button className="nc-wide-action" type="button" onClick={() => setView("links")}>查看引用与反向关联（{relationCount}） <span aria-hidden="true">→</span></button>
     </div>}

@@ -8,8 +8,11 @@ import { SteamReceiptDiagnostics, SteamPollDiagnostics } from './receipt-diagnos
 import { SnapshotHostBudget } from './snapshot-host-budget.mjs';
 import { SteamSessionMetrics, loadSteamSessionReader } from './session-metrics.mjs';
 import { SteamSnapshotEncoder, SteamSnapshotSender, SteamSnapshotReceiver } from './snapshot-delta.mjs';
+import { SteamBinarySnapshotEncoder, SteamBinarySnapshotSender, SteamBinarySnapshotReceiver } from './binary-snapshot.mjs';
 import { SteamReliableQueue } from './reliable-queue.mjs';
 import { SteamConsumptionWindow, SteamRendererReceipts } from './state-consumption.mjs';
+import { SnapshotPrepareBroker } from './snapshot-prepare-broker.mjs';
+import { SnapshotByteWindow } from './snapshot-byte-window.mjs';
 import { SnapshotSendWindow, INITIAL_SNAPSHOT_WINDOW, MAX_SNAPSHOT_WINDOW } from './snapshot-window.mjs';
 const require = createRequire(import.meta.url);
 export const STEAM_GAME_KEY = 'starsector-web-browser-v1';
@@ -39,28 +42,30 @@ export const STEAM_INITIAL_SNAPSHOT_WINDOW = INITIAL_SNAPSHOT_WINDOW;
 export const STEAM_SNAPSHOT_BYTES = 64 * 1024;
 export const STEAM_INPUT_ACK_DELAY_MS = 32;
 class SteamPeer extends EventEmitter {
-  constructor(gateway, remote, connection, supportsConsumption = false, cumulativeInputAck = false) {
+  constructor(gateway, remote, connection, supportsConsumption = false, cumulativeInputAck = false, binarySnapshots = false) {
     super(); this.gateway = gateway; this.remote = remote; this.connection = connection; this.readyState = 1;
-    this.cumulativeInputAck = cumulativeInputAck; this.inputAck = null;
-    this.inflight = new Map(); this.inflightBytes = 0; this.snapshotSender = new SteamSnapshotSender(); this.snapshotWindow = new SnapshotSendWindow();
+    this.cumulativeInputAck = cumulativeInputAck; this.inputAck = null; this.byteWindow = binarySnapshots ? new SnapshotByteWindow() : null;
+    this.inflight = new Map(); this.inflightBytes = 0; this.binarySnapshots = binarySnapshots; this.snapshotSender = binarySnapshots ? new SteamBinarySnapshotSender() : new SteamSnapshotSender(); this.snapshotWindow = new SnapshotSendWindow();
     this.sentStates = 0; this.skippedStates = 0; this.ackedStates = 0; this.ackMs = null;
     this.lastSnapshot = null; this.lastSnapshotSkip = null;
+    this.preparation = { attempts: 0, discarded: 0, totalMs: 0, discardedMs: 0, maxMs: 0 };
     this.supportsConsumption = supportsConsumption; this.requestedConsumption = false; this.helloSeen = false; this.consumption = null;
   }
   get bufferedAmount() { return this.inflightBytes; }
+  get snapshotByteLimit() { return this.byteWindow?.limit ?? STEAM_SNAPSHOT_BYTES; }
   // One extra consumption slot covers the local WS/renderer hop. Only the
   // existing network ACK controller may grow this bounded window.
   get consumptionLimit() { return Math.min(MAX_SNAPSHOT_WINDOW, this.snapshotWindow.limit + 1); }
   get snapshotBlockReason() {
     if (this.readyState !== 1) return 'disconnected';
     if (this.inflight.size >= this.snapshotWindow.limit) return 'frame-window';
-    if (this.inflightBytes >= STEAM_SNAPSHOT_BYTES) return 'wire-byte-window';
+    if (this.inflightBytes >= this.snapshotByteLimit || this.inflight.size === 1 && this.inflightBytes > STEAM_SNAPSHOT_BYTES) return 'wire-byte-window';
     if (this.consumption && !this.consumption.writable(this.consumptionLimit)) return 'renderer-consumption';
     return null;
   }
-  get snapshotWritable() { return this.snapshotBlockReason === null; }
+  get snapshotWritable() { const reason = this.snapshotBlockReason; if (reason === 'wire-byte-window' && !(this.inflight.size === 1 && this.inflightBytes > STEAM_SNAPSHOT_BYTES)) this.byteWindow?.blocked(Date.now()); return reason === null; }
   diagnostics(now = Date.now()) {
-    return { blockedBy: this.snapshotBlockReason, lastSnapshot: this.lastSnapshot, lastSnapshotSkip: this.lastSnapshotSkip, consumption: { enabled: !!this.consumption, inflight: this.consumption?.pending.size ?? 0, bytes: this.consumption?.bytes ?? 0, rawBytes: this.consumption?.rawBytes ?? 0, consumed: this.consumption?.consumed ?? 0, oldestMs: this.consumption?.oldestMs(now) ?? 0 }, nativeSession: this.gateway.sessionMetrics.get(this.remote, now), delta: this.snapshotSender.diagnostics(), window: this.snapshotWindow.limit, probing: this.snapshotWindow.probe, baseAckMs: this.snapshotWindow.baseRtt === null ? null : Math.round(this.snapshotWindow.baseRtt), sentStates: this.sentStates, skippedStates: this.skippedStates, ackedStates: this.ackedStates, queueAckMs: this.snapshotWindow.queueRtt === null ? null : Math.round(this.snapshotWindow.queueRtt),
+    return { byteLimit: this.snapshotByteLimit, preparation: Object.fromEntries(Object.entries(this.preparation).map(([key, value]) => [key, Math.round(value * 1000) / 1000])), blockedBy: this.snapshotBlockReason, lastSnapshot: this.lastSnapshot, lastSnapshotSkip: this.lastSnapshotSkip, consumption: { enabled: !!this.consumption, inflight: this.consumption?.pending.size ?? 0, bytes: this.consumption?.bytes ?? 0, rawBytes: this.consumption?.rawBytes ?? 0, consumed: this.consumption?.consumed ?? 0, oldestMs: this.consumption?.oldestMs(now) ?? 0 }, nativeSession: this.gateway.sessionMetrics.get(this.remote, now), delta: this.gateway.snapshotPreparer?.peerDiagnostics(this) ?? this.snapshotSender.diagnostics(), window: this.snapshotWindow.limit, probing: this.snapshotWindow.probe, baseAckMs: this.snapshotWindow.baseRtt === null ? null : Math.round(this.snapshotWindow.baseRtt), sentStates: this.sentStates, skippedStates: this.skippedStates, ackedStates: this.ackedStates, queueAckMs: this.snapshotWindow.queueRtt === null ? null : Math.round(this.snapshotWindow.queueRtt),
       ackMs: this.ackMs === null ? null : Math.round(this.ackMs), inflight: this.inflight.size,
       inflightBytes: this.inflightBytes, oldestAckMs: this.inflight.size ? now - this.inflight.values().next().value.since : 0 };
   }
@@ -69,43 +74,60 @@ class SteamPeer extends EventEmitter {
     if (!frame) return; // Duplicate, stale or forged ACKs must not grant credit.
     const now = Date.now(), sample = now - frame.since, sharedBytes = this.gateway.snapshotBudget.totalBytes();
     this.snapshotWindow.acknowledge(sample, now, this.inflight.size);
+    if (frame.binary) this.byteWindow?.acknowledge(sample, this.snapshotWindow.baseRtt, now, this.inflightBytes, frame.bytes);
+    if (this.consumption) this.consumption.maxBytes = this.snapshotByteLimit;
     this.inflight.delete(id); this.inflightBytes -= frame.bytes; this.ackedStates++;
     this.gateway.snapshotBudget.acknowledge(this.snapshotWindow.queueRtt ?? sample, this.snapshotWindow.baseRtt, now, sharedBytes);
     this.ackMs = this.ackMs === null ? sample : this.ackMs * .8 + sample * .2;
   }
-  send(encoded) {
+  discardPreparation(ms) { this.preparation.discarded++; this.preparation.discardedMs += ms; }
+  // Called only by the validated local relay, never by remote dispatch.
+  sendSnapshot(snapshot) { return this.send(null, snapshot); }
+  resetSnapshots() { this.snapshotSender.reset(); this.gateway.snapshotPreparer?.reset(this); }
+  sendPrepared(candidate) { return this.send(null, null, candidate); }
+  send(encoded, snapshot = null, candidate = null) {
     if (this.readyState !== 1) return;
     try {
-      const state = encoded.startsWith('{"type":"state",');
+      const state = candidate !== null || snapshot !== null || encoded.startsWith('{"type":"state",');
+      if (state && !candidate && this.gateway.snapshotPreparer) {
+        if (!this.snapshotWritable) { this.lastSnapshotSkip = this.snapshotBlockReason; this.gateway.snapshotBudget.remove(this); this.skippedStates++; return false; }
+        return this.gateway.snapshotPreparer.offer(this, snapshot ?? encoded);
+      }
+      // Controls remain immediate, but invalidate every older unsent proposal.
+      if (!state && /^\{"type":"(?:welcome|match|launch|ended|roomClosed)"[,}]/.test(encoded)) this.resetSnapshots();
+      if (snapshot && !this.binarySnapshots) encoded = JSON.stringify(snapshot.state);
       if (!state && this.requestedConsumption && encoded.startsWith('{"type":"welcome",')) {
         // Only an accepted relay hello can negotiate renderer consumption. The
         // relay's LAN window stays disabled for authenticated Steam peers.
-        this.consumption ??= new SteamConsumptionWindow({ maxFrames: MAX_SNAPSHOT_WINDOW, maxBytes: STEAM_SNAPSHOT_BYTES, maxRawBytes: protocol.maxSnapshotBytes * 2 });
+        this.consumption ??= new SteamConsumptionWindow({ maxFrames: MAX_SNAPSHOT_WINDOW, maxBytes: this.snapshotByteLimit, maxRawBytes: protocol.maxSnapshotBytes * 2 });
         encoded = JSON.stringify({ ...JSON.parse(encoded), stateCredits: 1 });
       }
       if (state && !this.snapshotWritable) { this.lastSnapshotSkip = this.snapshotBlockReason; this.gateway.snapshotBudget.remove(this); this.skippedStates++; return; }
       const prepareAt = state ? performance.now() : 0;
-      const choice = state ? this.snapshotSender.prepare(encoded, this.gateway.snapshotEncoder, this.gateway.codec) : null;
-      const payload = choice?.prepared ?? this.gateway.codec.prepare('data', encoded);
-      const rawBytes = state ? Buffer.byteLength(encoded) : 0;
-      if (state && this.consumption && !this.consumption.allows(payload.payload.length, rawBytes, this.consumptionLimit)) { this.lastSnapshotSkip = 'renderer-consumption'; this.gateway.snapshotBudget.remove(this); this.skippedStates++; return; }
+      const choice = state && !candidate ? this.snapshotSender.prepare(snapshot && this.binarySnapshots ? snapshot : encoded, this.binarySnapshots ? this.gateway.binarySnapshotEncoder : this.gateway.snapshotEncoder, this.gateway.codec) : null;
+      const payload = candidate?.prepared ?? choice?.prepared ?? this.gateway.codec.prepare('data', encoded);
+      const rawBytes = state ? candidate?.stateBytes ?? choice?.rawBytes ?? Buffer.byteLength(encoded) : 0;
+      const preparationMs = state ? performance.now() - prepareAt : 0;
+      if (state) { this.preparation.attempts++; this.preparation.totalMs += preparationMs; this.preparation.maxMs = Math.max(this.preparation.maxMs, preparationMs); }
+      if (state && this.consumption && !this.consumption.allows(payload.payload.length, rawBytes, this.consumptionLimit)) { this.discardPreparation(preparationMs); this.lastSnapshotSkip = 'renderer-consumption'; this.gateway.snapshotBudget.remove(this); this.skippedStates++; return; }
       // A frame larger than the byte window may travel alone (original size limit
       // still applies), but must not be stacked behind other snapshots.
-      if (state && this.inflight.size && this.inflightBytes + payload.payload.length > STEAM_SNAPSHOT_BYTES) { this.lastSnapshotSkip = 'wire-byte-window'; this.gateway.snapshotBudget.remove(this); this.skippedStates++; return; }
-      if (state && !this.gateway.snapshotBudget.allows(this, payload.payload.length)) { this.lastSnapshotSkip = 'shared-uplink-window'; this.skippedStates++; return; }
+      if (state && this.inflight.size && (payload.payload.length > STEAM_SNAPSHOT_BYTES || this.inflightBytes + payload.payload.length > (payload.binary ? this.snapshotByteLimit : STEAM_SNAPSHOT_BYTES))) { if (payload.binary && payload.payload.length <= STEAM_SNAPSHOT_BYTES) this.byteWindow?.blocked(Date.now()); this.discardPreparation(preparationMs); this.lastSnapshotSkip = 'wire-byte-window'; this.gateway.snapshotBudget.remove(this); this.skippedStates++; return; }
+      if (state && !this.gateway.snapshotBudget.allows(this, payload.payload.length)) { this.discardPreparation(preparationMs); this.lastSnapshotSkip = 'shared-uplink-window'; this.skippedStates++; return; }
       const prepared = this.gateway.codec.frame(this.connection, 'data', payload);
       this.gateway.transmitEncoded(this.remote, prepared);
       if (choice) this.snapshotSender.commit(choice);
       if (state) {
-        this.inflight.set(prepared.id, { bytes: prepared.bytes, since: Date.now() });
+        this.inflight.set(prepared.id, { bytes: prepared.bytes, since: Date.now(), binary: !!payload.binary });
         this.inflightBytes += prepared.bytes; this.sentStates++;
         this.lastSnapshotSkip = null;
         this.lastSnapshot = { rawBytes, wireBytes: prepared.packets.reduce((sum, packet) => sum + packet.length, 0), fragments: prepared.packets.length,
           prepareMs: Math.round((performance.now() - prepareAt) * 1000) / 1000,
-          format: choice?.delta ? 'delta' : choice?.target ? 'full' : 'legacy-full' };
+          format: candidate?.format ?? (payload.binary ? choice.delta ? 'binary-delta' : 'binary-full' : choice?.delta ? 'delta' : choice?.target ? 'full' : 'legacy-full') };
         this.consumption?.track(prepared.id, prepared.bytes, rawBytes);
       }
-    } catch { this.close(1013, 'Steam 发送失败，正在重新连接'); }
+      return true;
+    } catch { this.close(1013, 'Steam 发送失败，正在重新连接'); return false; }
   }
   acknowledgeInput(id, deferred = false, now = Date.now()) {
     if (!this.cumulativeInputAck) { this.gateway.transmit(this.remote, this.connection, 'ack', { id }); return; }
@@ -126,6 +148,7 @@ class SteamPeer extends EventEmitter {
     if (this.readyState !== 1) return;
     this.gateway.report('peer-close', { code, reason, ...this.diagnostics() });
     this.gateway.snapshotBudget.remove(this); this.gateway.sessionMetrics.forget(this.remote);
+    this.gateway.snapshotPreparer?.retire(this);
     this.readyState = 3; this.inputAck = null; this.inflight.clear(); this.inflightBytes = 0; this.snapshotSender.reset(); this.consumption?.clear();
     try { this.gateway.transmit(this.remote, this.connection, 'close', { code, reason }); } catch { /* already disconnected */ }
     this.emit('close');
@@ -135,17 +158,21 @@ class SteamPeer extends EventEmitter {
 }
 /** Native Steam stays in this localhost helper, never in the browser process. */
 export class SteamGateway {
-  constructor({ appId = 480, build, client = null, overlay = null, log = () => {}, sessionReader = null, socketRoomFactory = null }) {
+  constructor({ appId = 480, build, client = null, overlay = null, log = () => {}, sessionReader = null, socketRoomFactory = null, snapshotPreparation = true, snapshotWorkerFactory = undefined }) {
     if (socketRoomFactory !== null && typeof socketRoomFactory !== 'function') throw Error('Invalid socket room factory');
     this.socketRoomFactory = socketRoomFactory; this.socketRoom = null;
+    // Explicit synchronous reference mode is for deterministic clock models and
+    // ABBA measurements only. Injecting an SDK client never disables workers.
+    this.snapshotPreparation = snapshotPreparation; this.snapshotWorkerFactory = snapshotWorkerFactory;
+    this.snapshotPreparer = this.createSnapshotPreparer();
     this.sessionMetrics = new SteamSessionMetrics({ read: sessionReader, reason: client ? 'injected-client' : 'not-initialized' });
     this.receiptTrace = new SteamReceiptDiagnostics(); this.pollTrace = new SteamPollDiagnostics();
     this.fastAckTokens = 1200; this.fastAckAt = performance.now();
     this.log = log; this.receivedStates = 0; this.lastStateAt = 0; this.lastTransportLog = 0; this.lastRoomStatus = null;
     this.overlay = overlay; this.appId = appId; this.build = build; this.client = client; this.initialized = false; this.networkLost = false; this.error = '';
-    this.selected = null; this.pendingInvite = null; this.renderer = null; this.guestConnection = null; this.guestOutbound = null;
-    this.rendererReceipts = null; this.rendererRequestedCredits = false;
-    this.peers = new Map(); this.snapshotBudget = new SnapshotHostBudget(() => this.peers.values()); this.codec = new SteamPacketCodec(); this.snapshotEncoder = new SteamSnapshotEncoder(); this.snapshotReceiver = null; this.callbacks = []; this.busy = false; this.generation = 0;
+    this.selected = null; this.pendingInvite = null; this.renderer = null; this.guestConnection = null; this.guestBinaryState = null; this.guestBinaryStateRequested = false; this.guestOutbound = null;
+    this.rendererReceipts = null; this.rendererRequestedCredits = false; this.rendererRequestedBinary = false; this.rendererBinary = false;
+    this.peers = new Map(); this.snapshotBudget = new SnapshotHostBudget(() => this.peers.values()); this.codec = new SteamPacketCodec({ binaryStates: true }); this.binarySnapshotEncoder = new SteamBinarySnapshotEncoder(); this.snapshotEncoder = new SteamSnapshotEncoder(); this.snapshotReceiver = null; this.callbacks = []; this.busy = false; this.generation = 0;
     this.owner = ''; this.name = ''; this.lastAudit = 0; this.relay = null; this.faults = new Map();
     this.wss = new WebSocketServer({ noServer: true, maxPayload: protocol.maxSnapshotBytes, perMessageDeflate: false });
     this.extension = {
@@ -154,6 +181,16 @@ export class SteamGateway {
       upgrade: (req, socket, head) => this.wss.handleUpgrade(req, socket, head, ws => this.connectBrowser(ws, new URL(req.url, 'http://localhost'))),
       roomChanged: room => this.roomChanged(room),
     };
+  }
+  createSnapshotPreparer() {
+    return this.snapshotPreparation ? new SnapshotPrepareBroker({
+      workerFactory: this.snapshotWorkerFactory,
+      deliver: (peer, candidate) => peer.sendPrepared(candidate),
+      onFault: peers => {
+        this.report('snapshot-worker-failed');
+        for (const peer of peers) peer.close(1013, 'Steam 状态编码线程失败，请重新连接');
+      },
+    }) : null;
   }
   initialize() {
     if (this.initialized) return this.status();
@@ -193,7 +230,7 @@ export class SteamGateway {
     if (this.socketRoom) return { mode: STEAM_SOCKET_TRANSPORT, experimental: true, role: this.selected?.owner === this.owner ? 'host' : 'guest', ...this.socketRoom.diagnostics() };
     return { mode: LEGACY_TRANSPORT, role: !this.selected ? null : this.selected.owner === this.owner ? 'host' : 'guest',
       nativeSessions: this.sessionMetrics.status(), nativeHostSession: this.selected && this.selected.owner !== this.owner ? this.sessionMetrics.get(this.selected.owner, now) : null,
-      sharedSnapshots: this.snapshotBudget.diagnostics(now), outbound: this.guestOutbound?.diagnostics(now) ?? null, incomingSnapshots: this.snapshotReceiver?.diagnostics() ?? null,
+      snapshotWorker: this.snapshotPreparer?.diagnostics() ?? null, sharedSnapshots: this.snapshotBudget.diagnostics(now), outbound: this.guestOutbound?.diagnostics(now) ?? null, incomingSnapshots: this.snapshotReceiver?.diagnostics() ?? null,
       receipts: this.receiptTrace.snapshot(now), polling: this.pollTrace.snapshot(now),
       receivedStates: this.receivedStates, lastStateAgeMs: this.lastStateAt ? now - this.lastStateAt : null,
       peers: [...this.peers.values()].map(peer => peer.diagnostics(now)) };
@@ -304,19 +341,20 @@ export class SteamGateway {
     if (!this.initialized || !selected || url.searchParams.get('lobby') !== selected.id) { ws.close(1008, 'Select a Steam lobby first'); return; }
     if (this.renderer?.readyState === 1) { ws.close(4001, 'Use the already connected browser tab'); return; }
     this.renderer = ws;
-    ws.on('close', (code, reason) => { if (this.renderer !== ws) return; this.report('browser-close', { code, reason: String(reason ?? '').slice(0, 120), ...this.transportStatus() }); this.renderer = null; const connection = this.guestConnection; this.guestConnection = null; this.snapshotReceiver = null; this.rendererReceipts?.clear(); this.rendererReceipts = null; this.rendererRequestedCredits = false; this.guestOutbound?.clear(); this.guestOutbound = null; if (connection) { try { this.transmit(selected.owner, connection, 'close', { code: 1001, reason: 'Browser disconnected' }); } catch {} } });
+    ws.on('close', (code, reason) => { if (this.renderer !== ws) return; this.report('browser-close', { code, reason: String(reason ?? '').slice(0, 120), ...this.transportStatus() }); this.renderer = null; const connection = this.guestConnection; this.guestConnection = null; this.snapshotReceiver = null; this.rendererReceipts?.clear(); this.rendererReceipts = null; this.rendererRequestedCredits = false; this.rendererRequestedBinary = false; this.rendererBinary = false; this.guestOutbound?.clear(); this.guestOutbound = null; if (connection) { try { this.transmit(selected.owner, connection, 'close', { code: 1001, reason: 'Browser disconnected' }); } catch {} } });
     if (selected.owner === this.owner) {
-      this.relay.acceptTransport(ws, { identity: this.owner, scope: selected.id, canHost: true, appId: this.appId });
+      this.relay.acceptTransport(ws, { identity: this.owner, scope: selected.id, canHost: true, appId: this.appId, binaryHost: true });
       return;
     }
     if (this.socketRoom) { this.socketRoom.attachBrowser(ws); return; }
     const connection = this.guestConnection = randomBytes(16).toString('hex');
     this.receiptTrace = new SteamReceiptDiagnostics();
     this.snapshotReceiver = new SteamSnapshotReceiver();
-    this.rendererReceipts = null; this.rendererRequestedCredits = false;
+    this.guestBinaryState = null; this.guestBinaryStateRequested = true;
+    this.rendererReceipts = null; this.rendererRequestedCredits = false; this.rendererRequestedBinary = false; this.rendererBinary = false;
     const outbound = this.guestOutbound = new SteamReliableQueue(text => this.transmit(selected.owner, connection, 'data', text));
     // Reliable open/data ordering preserves the existing hello/welcome handshake.
-    try { this.transmit(selected.owner, connection, 'open', { lobby: selected.id, build: this.build, protocol: protocol.version, stateConsumption: 1, cumulativeInputAck: 1 }); }
+    try { this.transmit(selected.owner, connection, 'open', { lobby: selected.id, build: this.build, protocol: protocol.version, stateConsumption: 1, cumulativeInputAck: 1, binaryState: 1 }); }
     catch { ws.close(1013, 'Steam connection failed'); return; }
     ws.on('message', (raw, binary) => {
       if (this.renderer !== ws || this.guestConnection !== connection) return;
@@ -327,7 +365,7 @@ export class SteamGateway {
         // the remote gateway accepts it in welcome. Old hosts keep old ACKs.
         if (raw.length <= 4096) {
           let control; try { control = JSON.parse(text); } catch { /* relay validates malformed control */ }
-          if (control?.type === 'hello') this.rendererRequestedCredits = control.stateCredits === 1;
+          if (control?.type === 'hello') { this.rendererRequestedCredits = control.stateCredits === 1; this.rendererRequestedBinary = control.binaryReceive === 1; }
           if (raw.length <= 256 && control?.type === 'state-consumed' && this.rendererReceipts) {
             const id = this.rendererReceipts.consume(control);
             if (id !== null) { this.transmit(selected.owner, connection, 'ack', { id, consumed: true }); return; }
@@ -344,17 +382,21 @@ export class SteamGateway {
     const selected = this.selected;
     if (!selected || this.socketRoom || selected.transport === STEAM_SOCKET_TRANSPORT || !this.allowed(remote)) return;
     const { connection, op, data, id } = message;
+    // Framing can decode bytes only for a confirmed host->guest state stream.
+    // A guest cannot submit binary inputs/control or enable itself by sending data.
     if (selected.owner === this.owner) {
       let peer = this.peers.get(remote);
       if (op === 'open') {
         if (data?.lobby !== selected.id || data?.build !== this.build || data?.protocol !== protocol.version) { this.transmit(remote, connection, 'close', { code: 1008, reason: 'Steam room version mismatch' }); return; }
         if (peer?.connection === connection) return;
         peer?.close(1001, 'Connection replaced');
-        peer = new SteamPeer(this, remote, connection, data.stateConsumption === 1, data.cumulativeInputAck === 1); this.peers.set(remote, peer);
+        if (this.snapshotPreparer?.closed && !this.peers.size) this.snapshotPreparer = this.createSnapshotPreparer();
+        peer = new SteamPeer(this, remote, connection, data.stateConsumption === 1, data.cumulativeInputAck === 1, data.binaryState === 1); this.peers.set(remote, peer);
         this.relay.acceptTransport(peer, { identity: remote, scope: selected.id, canHost: false, appId: this.appId });
-        this.transmit(remote, connection, 'opened', {}); return;
+        this.transmit(remote, connection, 'opened', peer.binarySnapshots ? { binaryState: 1 } : {}); return;
       }
       if (!peer || peer.connection !== connection) return;
+      if (message.binary) throw Error('Unnegotiated Steam binary state');
       if (op === 'data') {
         if (data?.type === 'hello' && !peer.helloSeen) {
           peer.helloSeen = true;
@@ -370,12 +412,20 @@ export class SteamGateway {
         if (data?.consumed === true) { peer.consumption?.acknowledge(data.id); return; }
         const current = peer.inflight.has(data?.id);
         peer.acknowledge(data?.id);
-        if (current && data?.needsFull === true) peer.snapshotSender.reset();
+        if (current && data?.needsFull === true) peer.resetSnapshots();
       }
       else if (op === 'close') peer.close(1001, 'Remote browser closed');
     } else {
       const ws = this.renderer;
       if (!ws || ws.readyState !== 1 || connection !== this.guestConnection) return;
+      if (message.binary && (op !== 'data' || this.guestBinaryState !== true)) throw Error('Unnegotiated Steam binary state');
+      if (op === 'opened') {
+        if (this.guestBinaryStateRequested && this.guestBinaryState === null) {
+          this.guestBinaryState = data?.binaryState === 1;
+          if (this.guestBinaryState) this.snapshotReceiver = new SteamBinarySnapshotReceiver();
+        }
+        return;
+      }
       if (op === 'data') {
         this.snapshotReceiver ??= new SteamSnapshotReceiver();
         const incoming = this.snapshotReceiver.receive(data);
@@ -386,7 +436,15 @@ export class SteamGateway {
           if (this.rendererReceipts) this.transmit(remote, connection, 'ack', { id, consumed: true });
           return;
         }
-        const delivered = incoming.data;
+        let delivered = incoming.data;
+        if (delivered?.type === 'welcome') {
+          // Local receive capability is independent of host upload and LAN
+          // deltas. Require expanded-byte consumption credit as well; a smaller
+          // local payload must not silently expand an old renderer's queue.
+          this.rendererBinary = this.rendererRequestedBinary && this.guestBinaryState === true && this.rendererRequestedCredits && delivered.stateCredits === 1;
+          if (this.rendererBinary) delivered = { ...delivered, binaryReceive: 1 };
+          else if (Object.hasOwn(delivered, 'binaryReceive')) { delivered = { ...delivered }; delete delivered.binaryReceive; }
+        }
         if (delivered?.type === 'welcome' && delivered.stateCredits === 1 && this.rendererRequestedCredits && !this.rendererReceipts) {
           this.rendererReceipts = new SteamRendererReceipts({ maxFrames: MAX_SNAPSHOT_WINDOW, maxBytes: protocol.maxSnapshotBytes * 2 });
         }
@@ -396,12 +454,17 @@ export class SteamGateway {
         // Only the receiver's validated canonical result can bypass stringify;
         // ordinary legacy data still follows the original serialization path.
         const text = incoming.canonicalText ?? JSON.stringify(delivered);
-        if (delivered?.type === 'state' && this.rendererReceipts && !this.rendererReceipts.track(delivered, id, Buffer.byteLength(text))) {
+        // Credit still charges canonical expanded JSON, not the smaller local
+        // binary. This must not grow renderer backlog or move its consumption ACK.
+        const canonicalBytes = Buffer.byteLength(text);
+        const payload = this.rendererBinary && delivered?.type === 'state' && incoming.binaryState ? incoming.binaryState : text;
+        if (delivered?.type === 'state' && this.rendererReceipts && !this.rendererReceipts.track(delivered, id, canonicalBytes)) {
           ws.close(1013, 'Steam renderer receipt budget exceeded'); return;
         }
-        const trace = delivered?.type === 'state' ? this.receiptTrace : null, write = trace?.beginWrite();
+        const trace = delivered?.type === 'state' ? this.receiptTrace : null;
+        const write = trace?.beginWrite(Date.now(), { binary: typeof payload !== 'string', bytes: Buffer.byteLength(payload), canonicalBytes });
         try {
-          ws.send(text, error => {
+          ws.send(payload, error => {
             trace?.endWrite(write, error);
             if (!error && delivered?.type === 'state' && this.selected === selected && this.renderer === ws && this.guestConnection === connection) {
               try { this.transmit(remote, connection, 'ack', { id }); } catch { /* trace records SDK refusal; transport behavior is unchanged */ }
@@ -483,10 +546,12 @@ export class SteamGateway {
     this.renderer?.close(1000, 'Left Steam lobby'); this.renderer = null; this.guestConnection = null;
     this.guestOutbound?.clear(); this.guestOutbound = null;
     this.report('leave', this.transportStatus());
-    this.rendererReceipts?.clear(); this.rendererReceipts = null; this.rendererRequestedCredits = false;
-    this.selected = null; this.codec.clear(); this.sessionMetrics.clear(); this.snapshotBudget.clear(); this.snapshotEncoder.clear(); this.snapshotReceiver = null; this.faults.clear(); this.lastRoomStatus = null;
+    const preparationStopped = this.snapshotPreparer?.close(); this.snapshotPreparer = this.createSnapshotPreparer();
+    this.rendererReceipts?.clear(); this.rendererReceipts = null; this.rendererRequestedCredits = false; this.rendererRequestedBinary = false; this.rendererBinary = false;
+    this.selected = null; this.codec.clear(); this.sessionMetrics.clear(); this.snapshotBudget.clear(); this.snapshotEncoder.clear(); this.binarySnapshotEncoder.clear(); this.snapshotReceiver = null; this.faults.clear(); this.lastRoomStatus = null;
     this.receivedStates = 0; this.lastStateAt = 0; this.receiptTrace = new SteamReceiptDiagnostics(); this.pollTrace = new SteamPollDiagnostics();
     try { selected?.lobby.leave(); } catch { /* disconnected from Steam */ }
+    await preparationStopped;
     return this.status();
   }
   http(req, res) {

@@ -1,3 +1,4 @@
+import { remainingProjectileLifetime } from '../simulation/systems/weapon/SourceMissileLifecycle';
 import type { Projectile } from '../simulation/Weapon';
 import type { Ship } from '../simulation/Ship';
 import type { Vector2 } from '../math/Vector2';
@@ -27,11 +28,7 @@ export class ProjectileThreatIndex {
       }
       // Full remaining straight trajectory, independent of the assessed ship's
       // horizon. Unbounded/exceptional lifetimes cannot safely enter the tree.
-      let lifetime = Infinity;
-      if (p.flightTimeRemaining !== undefined) lifetime = p.flightTimeRemaining;
-      else if (p.rangeRemaining !== undefined) lifetime = Math.max(0, p.rangeRemaining)
-        / Math.max(1, p.sourceMoveSpeed ?? p.vel.length())
-        + Math.max(0, (p.fadeTime ?? 0) * (1 - (p.fadeProgress ?? 0)));
+      const lifetime = remainingProjectileLifetime(p);
       const x = p.pos.x, y = p.pos.y, endX = x + p.vel.x * lifetime, endY = y + p.vel.y * lifetime;
       const radius = Math.abs(p.radius) + Math.abs(p.proximityFuse?.range ?? 0);
       const pad = 1e-6 * Math.max(1, Math.abs(x), Math.abs(y), Math.abs(endX), Math.abs(endY), radius);

@@ -1,3 +1,4 @@
+import { remainingProjectileLifetime } from '../simulation/systems/weapon/SourceMissileLifecycle';
 import { sameTeam, combatTeam } from "../simulation/CombatTeams";
 import { Vector2 } from '../math/Vector2';
 import { signedAngle } from '../math/Angles';
@@ -53,10 +54,8 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
   const projectiles = world.projectileThreatIndex?.query(world.projectiles, ship, center, radius, horizon) ?? world.projectiles;
   for (const p of projectiles) {
     const owner = combatTeam(p) ?? world.ships.find(s => s.id === p.sourceShipId)?.teamId;
-    if (owner === undefined || owner === ship.teamId || p.isFlare || p.didDamage || !(p.damage > 0)) continue;
-    let lifetime = horizon;
-    if (p.flightTimeRemaining !== undefined) lifetime = Math.min(lifetime,p.flightTimeRemaining);
-    else if (p.rangeRemaining !== undefined) lifetime = Math.min(lifetime,Math.max(0,p.rangeRemaining)/Math.max(1,p.sourceMoveSpeed ?? p.vel.length())+Math.max(0,(p.fadeTime??0)*(1-(p.fadeProgress??0))));
+    if (owner === undefined || owner === ship.teamId || p.isFlare || p.isDisarmed || p.collisionDisabled || p.didDamage || !(p.damage > 0)) continue;
+    const lifetime = Math.min(horizon, remainingProjectileLifetime(p));
     if (!(lifetime > 0)) continue;
     const endX = p.pos.x+(p.vel.x-ship.vel.x)*lifetime;
     const endY = p.pos.y+(p.vel.y-ship.vel.y)*lifetime;

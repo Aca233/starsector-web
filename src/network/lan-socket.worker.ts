@@ -19,13 +19,14 @@ let ended = false;
 let connectStarted = false;
 let nativeBuffered = 0;
 const deltaReceiver = new LanDeltaReceiver();
+let offeredMotionReference = false;
 let offeredDelta = false, enabledDelta = false, hidden = false;
 // Canonical protocol controls always put type first. Inspect only these bounded
 // small messages, not every 60Hz input or any multi-megabyte state/design.
 function outgoingDeltaControl(data: unknown): void {
   if (typeof data !== "string" || data.length > 4096 || !/^\{"type":"(?:hello|visibility|leave)"/.test(data)) return;
   const m = JSON.parse(data);
-  if (m.type === "hello") { offeredDelta = m.binaryDelta === 1 && m.stateCredits === 1; enabledDelta = false; deltaReceiver.reset(); }
+  if (m.type === "hello") { offeredDelta = m.binaryDelta === 1 && m.stateCredits === 1; enabledDelta = false; offeredMotionReference = offeredDelta && m.motionReference === 1; deltaReceiver.setMotionReference(false); }
   if (m.type === "visibility") { hidden = m.hidden === true; deltaReceiver.reset(); }
   if (m.type === "leave") deltaReceiver.reset();
 }
@@ -93,7 +94,7 @@ function connect(url: string): void {
       if (typeof data === "string") {
         if (data.length <= 16384 && data.startsWith('{"type":"welcome"')) {
           const m = JSON.parse(data); enabledDelta = offeredDelta && m.stateCredits === 1 && m.binaryDelta === 1;
-          deltaReceiver.reset();
+          deltaReceiver.setMotionReference(enabledDelta && offeredMotionReference && m.motionReference === 1);
         } else if (data.startsWith('{"type":"match"') || data.startsWith('{"type":"state"')) deltaReceiver.reset();
       } else if (enabledDelta && !hidden) {
         // Restore in the existing I/O worker, before transferring to the render

@@ -1,3 +1,4 @@
+// Explicit synchronous reference fixture; real-worker coverage lives in check-steam-snapshot-prepare.mjs.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import path from 'node:path';
@@ -41,7 +42,7 @@ test('query faults, malformed counter values and exception contents are containe
  const unavailable=new SteamSessionMetrics();unavailable.sample([id],1000);assert.equal(unavailable.get(id).available,false);assert.equal(unavailable.cache.size,0);
 });
 function fixture(reader){
- const packets=[],logs=[],gateway=new SteamGateway({build:'native-diagnostics-test',sessionReader:reader,log:line=>logs.push(line),client:{networking:{sendP2PPacket:(_peer,type,packet)=>{packets.push({type,packet});return true;},isP2PPacketAvailable:()=>0}}});
+ const packets=[],logs=[],gateway=new SteamGateway({ snapshotPreparation: false,build:'native-diagnostics-test',sessionReader:reader,log:line=>logs.push(line),client:{networking:{sendP2PPacket:(_peer,type,packet)=>{packets.push({type,packet});return true;},isP2PPacketAvailable:()=>0}}});
  gateway.owner=host;gateway.selected={id:'10977524000000001',owner:host,lobby:{getMembers:()=>[host,id],getOwner:()=>host}};gateway.relay={acceptTransport(){}};
  gateway.dispatch(id,{connection:nonce,op:'open',data:{lobby:gateway.selected.id,build:gateway.build,protocol:protocol.version}});
  return {gateway,peer:gateway.peers.get(id),packets,logs};

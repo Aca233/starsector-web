@@ -96,8 +96,8 @@ test('actual producer queue/delta diagnostic fields survive the allowlist with z
     incomingSnapshots: receiver.diagnostics(), peers: [{ delta: sender.diagnostics() }] },
     lan: { mode: 'lan-websocket', receivers: [{ delta: lan.stats() }] } }));
   assert.deepEqual(row.steam.outbound, queue.diagnostics());
-  assert.deepEqual(row.steam.incomingSnapshots, receiver.diagnostics());
-  assert.deepEqual(row.steam.peers[0].delta, sender.diagnostics());
+  assert.deepEqual(row.steam.incomingSnapshots, { ...receiver.diagnostics(), binaryFullStates: null, binaryDeltaStates: null, motionDeltas: null });
+  assert.deepEqual(row.steam.peers[0].delta, { ...sender.diagnostics(), binaryFullStates: null, binaryDeltaStates: null, motionDeltas: null, budgetFallbacks: null });
   assert.deepEqual(row.lan.receivers[0].delta, lan.stats());
 });
 
@@ -107,19 +107,21 @@ test('production numeric/enumerated latency fields are retained; arbitrary ident
     longTaskMaxMs: 75, sampleIntervalMs: 2000, sampleDelayMs: 1000, jsHeapAvailable: false },
     hud: { input: { ...secret, sentSequence: 11, acknowledgedSequence: 8, trackedPending: 3, oldestTrackedPendingMs: 77, pendingActions: 0 },
       authority: { ageMs: 0, simulationMs: 8, captureMs: 2, encodeMs: 1, lastStepMs: 9, maxStepMs: 15, realtimeRatio: .9, combatRate: .8 } },
-    lan: { receivers: [{ credits: { peakCount: 3, peakBytes: 12000, sent: 40, acked: 38, rejected: 2 }, flow: { lastSeq: 99 } }] },
-    steam: { sharedSnapshots: { estimatedQueueBytes: 100 }, peers: [{ ...secret, queueAckMs: 110, probing: 'drain',
+    lan: { receivers: [{ credits: { idleCapacity: 5, capacity: 3, deliveryHz: 6.125, peakCount: 3, peakBytes: 12000, sent: 40, acked: 38, rejected: 2 }, delta: { motionDeltas: 31 }, flow: { lastSeq: 99 } }] },
+    steam: { sharedSnapshots: { estimatedQueueBytes: 100 }, peers: [{ ...secret, byteLimit: 98304, preparation: { ...secret, attempts: 60, discarded: 40, totalMs: 500, discardedMs: 350, maxMs: 15 }, queueAckMs: 110, probing: 'drain',
       lastSnapshot: { ...secret, format: 'delta', rawBytes: 300000, wireBytes: 10000 }, delta: { savedBytes: 99, baselineBytes: 123 } }] } }));
   assert.equal(row.hud.authority.simulationMs, 8); assert.equal(row.hud.authority.encodeMs, 1);
   assert.equal(row.hud.authority.realtimeRatio, .9); assert.equal(row.hud.authority.combatRate, .8);
   assert.equal(row.hud.input.trackedPending, 3); assert.equal(row.hud.input.pendingActions, 0);
   assert.equal(row.hud.input.acknowledgedSequence, 8); assert.equal(row.hud.input.oldestTrackedPendingMs, 77);
   assert.equal(row.steam.peers[0].lastSnapshot.format, 'delta'); assert.equal(row.steam.peers[0].queueAckMs, 110);
+  assert.equal(row.steam.peers[0].byteLimit, 98304); assert.deepEqual(row.steam.peers[0].preparation, { attempts: 60, discarded: 40, totalMs: 500, discardedMs: 350, maxMs: 15 });
   assert.equal(row.steam.peers[0].probing, 'drain'); assert.equal(row.steam.sharedSnapshots.estimatedQueueBytes, 100);
-  assert.equal(row.lan.receivers[0].credits.acked, 38); assert.equal(row.lan.receivers[0].flow.lastSeq, 99);
+  assert.equal(row.lan.receivers[0].credits.idleCapacity, 5); assert.equal(row.lan.receivers[0].credits.capacity, 3); assert.equal(row.lan.receivers[0].credits.deliveryHz, 6.125);
+  assert.equal(row.lan.receivers[0].delta.motionDeltas, 31); assert.equal(row.lan.receivers[0].credits.acked, 38); assert.equal(row.lan.receivers[0].flow.lastSeq, 99);
   assert.equal(row.runtime.sampleDelayMs, 1000); assert.equal(row.runtime.longTaskTotalMs, 125);
   assert.ok(!JSON.stringify(row).includes('SECRET'));
-  for (const format of ['full', 'delta', 'legacy-full', 'SECRET']) {
+  for (const format of ['full', 'delta', 'legacy-full', 'binary-full', 'binary-delta', 'SECRET']) {
     const r = normalizeNetworkRecord(sample({ steam: { peers: [{ probing: 'SECRET', lastSnapshot: { format } }] } }));
     assert.equal(r.steam.peers[0].lastSnapshot.format, format === 'SECRET' ? null : format);
     assert.equal(r.steam.peers[0].probing, null);
@@ -181,4 +183,24 @@ test('battle integration keeps the 1Hz timer, cleans observer, and distinguishes
   assert.match(source, /桌面端从本次启动到退出保存同一日志/);
   assert.match(source, /普通浏览器仅保留最近约 10 分钟/);
   assert.doesNotMatch(runtimeSource, /setInterval\(|setTimeout\(|performance\.getEntries|buffered: true/);
+});
+
+
+test('local bridge byte/format diagnostics survive without exposing payload or identities',()=>{
+ const receipts={rendererBinaryWrites:12,rendererJsonWrites:2,rendererPayloadBytes:20000,rendererCanonicalBytes:47000,payload:'private state',identity:'private identity'};
+ const result=normalizeNetworkRecord(sample({transport:'steam',steam:{receipts}}));
+ for(const key of ['rendererBinaryWrites','rendererJsonWrites','rendererPayloadBytes','rendererCanonicalBytes'])assert.equal(result.steam.receipts[key],receipts[key]);
+ assert.equal(result.steam.receipts.payload,undefined);assert.equal(result.steam.receipts.identity,undefined);
+});
+
+
+test('worker diagnostics preserve bounded timing/counts but no world or identity', () => {
+  const snapshotWorker = { offered: 60, replaced: 2, prepared: 57, accepted: 55, stale: 1, faults: 0,
+    workMs: 430, maxWorkMs: 12, queueMs: 30, maxQueueMs: 4, maxRetained: 2, active: true, pending: false,
+    ready: true, failed: false, state: { private: 'world' }, remote: 'identity' };
+  const result = normalizeNetworkRecord(sample({ transport: 'steam', steam: { snapshotWorker } }));
+  for (const [key, value] of Object.entries(snapshotWorker)) {
+    if (['state', 'remote'].includes(key)) assert.equal(result.steam.snapshotWorker[key], undefined);
+    else assert.equal(result.steam.snapshotWorker[key], value);
+  }
 });

@@ -1,3 +1,4 @@
+// Explicit synchronous reference fixture; real-worker coverage lives in check-steam-snapshot-prepare.mjs.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import vm from 'node:vm';
@@ -14,7 +15,7 @@ const Component=module.exports.SteamNetworkDiagnostics;
 const render=transport=>renderToStaticMarkup(createElement(Component,{transport}));
 function fixture(){
  const packets=[];const host='76561198000000001',guest='76561198000000002',lobby='109775240000000001',connection='a'.repeat(32);
- const gateway=new SteamGateway({build:'test',client:{networking:{sendP2PPacket:(_remote,type,data)=>{assert.equal(type,2);packets.push(data);return true;},isP2PPacketAvailable:()=>0}}});
+ const gateway=new SteamGateway({ snapshotPreparation: false,build:'test',client:{networking:{sendP2PPacket:(_remote,type,data)=>{assert.equal(type,2);packets.push(data);return true;},isP2PPacketAvailable:()=>0}}});
  gateway.owner=host;gateway.selected={id:lobby,owner:host,lobby:{getOwner:()=>host,getMembers:()=>[host,guest]}};gateway.relay={acceptTransport(){}};
  gateway.dispatch(guest,{connection,op:'open',data:{lobby,build:'test',protocol:protocol.version}});packets.length=0;
  return {gateway,peer:gateway.peers.get(guest),packets};

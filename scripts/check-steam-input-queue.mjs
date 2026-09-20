@@ -1,3 +1,4 @@
+// Explicit synchronous reference fixture; real-worker coverage lives in check-steam-snapshot-prepare.mjs.
 // Production gateway/codec regressions in virtual time. No Steam SDK, sockets, services or workers.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,13 +15,18 @@ const config=JSON.parse(fs.readFileSync(path.join(root,'src/network/protocol.jso
 const require=createRequire(import.meta.url);
 let assertions=0;
 const check=(condition,label)=>{ assertions++; assert.ok(condition,label); };
+// Inspect the committed base across negotiated binary and legacy senders;
+// no preparation/cache entry may satisfy these original commit assertions.
+const senderBase=peer=>peer.snapshotSender.sender ? peer.snapshotSender.sender.base ?? peer.snapshotSender.legacy.base : peer.snapshotSender.base;
+const baseSeq=peer=>{const base=senderBase(peer);return base?.seq ?? base?.value.seq;};
+const sentStates=peer=>{const d=peer.snapshotSender.diagnostics();return d.fullStates+d.deltaStates;};
 async function subject(source){
   const result=await build({entryPoints:[entry],bundle:true,write:false,platform:'node',format:'cjs',packages:'external',define:{'import.meta.url':JSON.stringify(pathToFileURL(entry).href)},plugins:[{name:'frozen-gateway',setup(b){b.onLoad({filter:/gateway\.mjs$/},args=>path.resolve(args.path)===entry?{contents:source,loader:'js',resolveDir:path.dirname(entry)}:null);}}]});
   return result.outputFiles[0].text;
 }
 function fixture(code,{rtt=300,outage=null}={}){
   const clock={now:100}, nativeDate=Date;
-  const context=vm.createContext({require,module:{exports:{}},console,Buffer,URL,setTimeout,clearTimeout,setInterval,clearInterval,
+  const context=vm.createContext({require,module:{exports:{}},console,Buffer,URL,TextEncoder,TextDecoder,setTimeout,clearTimeout,setInterval,clearInterval,
     performance:{now:()=>clock.now},Date:class extends nativeDate{static now(){return clock.now;}}});
   new vm.Script(code).runInContext(context);
   const {SteamGateway}=context.module.exports;
@@ -32,7 +38,7 @@ function fixture(code,{rtt=300,outage=null}={}){
       pending.push({i:1-i,remote:ids[i],data:Buffer.from(packet),due});traffic[i].push({at:clock.now,packet:Buffer.from(packet)});return true;},
     isP2PPacketAvailable(){return inbox[i][0]?.data.length??0;},readP2PPacket(){const p=inbox[i].shift();return {steamId:p.remote,data:p.data};}
   }}));
-  const gateways=clients.map(client=>new SteamGateway({build:'fixture',client}));
+  const gateways=clients.map(client=>new SteamGateway({ snapshotPreparation: false,build:'fixture',client}));
   for(let i=0;i<2;i++){const g=gateways[i];g.initialized=true;g.owner=ids[i];g.selected={id:'10977524000000001',owner:ids[0],code:'ABCDEF',lobby:{getMembers:()=>ids,getOwner:()=>ids[0]}};}
   gateways[0].relay={acceptTransport(peer){accepted=peer;let window=clock.now,count=0;
     peer.on('close',()=>closes.push({at:clock.now,side:'host'}));
@@ -90,7 +96,7 @@ const report={scope:'Real SteamGateway and codec with virtual reliable link and 
     f.gateways[1].snapshotReceiver.base=null;
     f.peer.send(state(2));f.step(1800);
     check(f.states.length===1,'missing-base delta never forwarded to browser');check(f.gateways[1].lastStateAt===live&&f.gateways[1].receivedStates===count,'dropped delta cannot renew liveness');
-    check(f.peer.inflight.size===0&&f.peer.inflightBytes===0,'needsFull releases exact in-flight credit');check(f.peer.snapshotSender.base===null,'matching needsFull resets sender');
+    check(f.peer.inflight.size===0&&f.peer.inflightBytes===0,'needsFull releases exact in-flight credit');check(senderBase(f.peer)===null,'matching needsFull resets sender');
     f.peer.send(state(3));f.step(2200);check(f.states.length===2&&f.states.at(-1).data.seq===3,'next full reconstructs fresh state');
     check(!f.closes.length,'baseline loss recovers without disconnect');return f.peer.diagnostics();
   });
@@ -99,19 +105,19 @@ const report={scope:'Real SteamGateway and codec with virtual reliable link and 
     const ballast=Array.from({length:12000},(_,i)=>String.fromCharCode(33+(i*i+i*17)%89)).join('');
     const state=seq=>JSON.stringify({type:'state',matchId:'battle',seq,frame:{tick:seq,ballast}});
     for(let seq=1;seq<=20;seq++)f.peer.send(state(seq));
-    check(f.peer.snapshotSender.base.value.seq===4,'window-skipped state never becomes baseline');
-    const base=f.peer.snapshotSender.base,ids=[...f.peer.inflight.keys()],remote=f.gateways[1].owner,connection=f.peer.connection;
+    check(baseSeq(f.peer)===4,'window-skipped state never becomes baseline');
+    const base=senderBase(f.peer),ids=[...f.peer.inflight.keys()],remote=f.gateways[1].owner,connection=f.peer.connection;
     const ack=(nonce,id)=>f.gateways[0].dispatch(remote,{connection:nonce,op:'ack',data:{id,needsFull:true}});
-    ack('f'.repeat(32),ids[0]);ack(connection,999999);check(f.peer.snapshotSender.base===base,'wrong nonce and unknown needsFull cannot reset');
+    ack('f'.repeat(32),ids[0]);ack(connection,999999);check(senderBase(f.peer)===base,'wrong nonce and unknown needsFull cannot reset');
     f.gateways[0].dispatch(remote,{connection,op:'ack',data:{id:ids[0]}});
-    ack(connection,ids[0]);check(f.peer.snapshotSender.base===base,'duplicate needsFull cannot reset');
-    f.peer.send(state(21));check(f.peer.snapshotSender.base.value.seq===21,'next accepted state commits');
+    ack(connection,ids[0]);check(senderBase(f.peer)===base,'duplicate needsFull cannot reset');
+    f.peer.send(state(21));check(baseSeq(f.peer)===21,'next accepted state commits');
     f.step(1200);check(f.states.map(x=>x.data.seq).join(',')==='1,2,3,4,21','receiver reconstructs skipped sequence exactly');
     f.gateways[0].dispatch(remote,{connection,op:'ack',data:{id:ids[1]}});
-    const sent=f.peer.snapshotSender.fullStates+f.peer.snapshotSender.deltaStates;
+    const sent=sentStates(f.peer);
     f.gateways[0].client.networking.sendP2PPacket=()=>false;f.peer.send(state(22));
-    check(f.peer.snapshotSender.fullStates+f.peer.snapshotSender.deltaStates===sent,'native failure never commits baseline or stats');
-    check(f.peer.snapshotSender.base===null&&f.peer.inflight.size===0,'native failure closes and clears state');
+    check(sentStates(f.peer)===sent,'native failure never commits baseline or stats');
+    check(senderBase(f.peer)===null&&f.peer.inflight.size===0,'native failure closes and clears state');
     check(f.closes.some(x=>x.side==='host'),'native failure closes retryable stream');return f.peer.diagnostics();
   });
   run('partial-native-fragment-failure-cannot-commit-state',()=>{
@@ -121,17 +127,17 @@ const report={scope:'Real SteamGateway and codec with virtual reliable link and 
     f.gateways[0].client.networking.sendP2PPacket=(remote,type,packet)=>packet[5]===2&&++fragments===2?false:native(remote,type,packet);
     f.peer.send(JSON.stringify({type:'state',matchId:'battle',seq:1,frame:{tick:1,ballast}}));
     check(fragments===2,'multi-fragment transmission fails at second fragment');check(f.peer.sentStates===0,'partially transmitted state not counted as sent');
-    check(f.peer.snapshotSender.fullStates===0&&f.peer.snapshotSender.base===null,'partial native failure cannot commit baseline');
+    check(f.peer.snapshotSender.diagnostics().fullStates===0&&senderBase(f.peer)===null,'partial native failure cannot commit baseline');
     f.step(1500);check(f.states.length===0,'incomplete state never reaches browser');return {fragments,closes:f.closes};
   });
   run('byte-budget-rejection-keeps-last-successful-delta-baseline',()=>{
     const f=fixture(code);f.step(1000);f.holdAcks();let seed=223;
     const noise=()=>Array.from({length:60000},()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return String.fromCharCode(32+seed%90);}).join('');
     const original=noise(),state=(seq,ballast)=>JSON.stringify({type:'state',matchId:'battle',seq,frame:{tick:seq,ballast}});
-    f.peer.send(state(1,original));const base=f.peer.snapshotSender.base;
+    f.peer.send(state(1,original));const base=senderBase(f.peer);
     check(f.peer.inflightBytes>32768&&f.peer.inflightBytes<65536,'first full state occupies most byte budget');
     f.peer.send(state(2,noise()));check(f.peer.inflight.size===1&&f.peer.skippedStates===1,'full replacement is refused by bytes, not frame count');
-    check(f.peer.snapshotSender.base===base,'byte-refused preparation cannot advance baseline');
+    check(senderBase(f.peer)===base,'byte-refused preparation cannot advance baseline');
     f.peer.send(state(3,original));check(f.peer.inflight.size===2,'small delta against last sent frame fits remaining bytes');
     f.step(1200);check(f.states.map(x=>x.data.seq).join(',')==='1,3','skipped byte-budget frame is not required to decode next state');
     check(!f.closes.length,'byte-constrained delta remains connected');return f.peer.diagnostics();

@@ -1,11 +1,11 @@
 import { MotionPresence } from '../ui/core/MotionPresence';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { NativeButton } from '../ui/NativeChrome';
 import { Modal } from '../ui/core/UI';
-import { data, hulls, createDesign, evaluate, type Design } from '../studio/DesignModel';
+import { data, hulls, createDesign, evaluate, readLibrary, storageKey, type Design } from '../studio/DesignModel';
 import { nativeVariantsForHull } from '../studio/NativeVariantCatalog';
-import { LoadoutFlyout, type LoadoutFlyoutOption } from '../ui/LoadoutFlyout';
-import { importNativeVariant } from '../studio/NativeVariantImport';
+import { LoadoutFlyout } from '../ui/LoadoutFlyout';
+import { aiFitsForHull } from './LanAiFits';
 import { matchesRefitSearch, refitSearchRank, hullMatchesCategory, hullSearchAliases, hullAssemblyLabel } from '../studio/RefitSearch';
 import { lanHullUnavailable, validateLanDesign } from './LanDesign';
 import { roomTeams, teamName, teamColor, type LanConnection, type Room } from './protocol';
@@ -28,21 +28,6 @@ import './lan-ai-fleet.css';
 
 const hullName = (hull: string) => data.ships[hull]?.name ?? hull;
 type Selection = NonNullable<AiEditTarget['returnSelection']>;
-interface AiFitOption { display: LoadoutFlyoutOption; selection: Selection | null }
-function aiFitsForHull(hullId: string): AiFitOption[] {
-  const native = nativeVariantsForHull(hullId);
-  return (native.length ? native : [null]).map(choice => {
-    const id = choice?.id ?? 'default-' + hullId, name = choice?.name ?? '舰体默认装配';
-    try {
-      const imported = choice ? importNativeVariant(choice.raw) : { design: createDesign(hullId), warnings: ['没有独立原版预设，使用舰体默认装配。'] };
-      const { op } = evaluate(imported.design);
-      let error = ''; try { validateLanDesign(imported.design); } catch (cause) { error = cause instanceof Error ? cause.message : '配装需要修正'; }
-      return { selection: { design: imported.design, source: choice ? '原版预设配装' : '舰体默认装配', nativeId: id, warnings: imported.warnings },
-        display: { id, name, detail: Object.values(imported.design.weapons).filter(Boolean).length + ' 门武器 · 电容 ' + imported.design.capacitors + ' · 耗散 ' + imported.design.vents,
-          cost: op.used + ' OP', error } };
-    } catch (cause) { return { selection: null, display: { id, name, detail: '', cost: '', error: cause instanceof Error ? cause.message : '配装不可用' } }; }
-  });
-}
 type FleetChange = (edit: Omit<AiFleetEdit, 'assignment' | 'team'> & {team?:number}, message: string, keepPicker?:boolean) => Promise<boolean>;
 
 /** Editing a number is a draft. Blur never changes the room. */
@@ -109,7 +94,27 @@ export function LanAiFleet({ room, isHost, editable, connection, currentDesign, 
   openRequest?: {sequence:number;team:number}; openInitially?: boolean; initialTeam?: number; initialQuery?: string; initialHullClass?: string; initialFaction?: string; initialBatch?: string; initialSelection?: Selection | null;
 }) {
   const codex = useInspectionCodex();
+  const [savedLibrary, setSavedLibrary] = useState(readLibrary);
+  const refreshLibrary = useCallback(() => {
+    const next = readLibrary();
+    setSavedLibrary(current => current.observedRaw === next.observedRaw && current.error === next.error ? current : next);
+  }, []);
+  const savedCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const design of savedLibrary.library.designs) counts.set(design.hullId, (counts.get(design.hullId) ?? 0) + 1);
+    return counts;
+  }, [savedLibrary]);
   const [open, setOpen] = useState(!!openRequest||openInitially), [team, setTeam] = useState(openRequest?.team??initialTeam);
+  useEffect(() => {
+    if (!open) return;
+    // Synchronize external storage when an openRequest reopens this mounted modal.
+    // oxlint-disable-next-line react/set-state-in-effect
+    refreshLibrary();
+    const onStorage = (event: StorageEvent) => { if (event.key === storageKey || event.key === null) refreshLibrary(); };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', refreshLibrary);
+    return () => { window.removeEventListener('storage', onStorage); window.removeEventListener('focus', refreshLibrary); };
+  }, [open, refreshLibrary]);
   const [lastOpenRequest,setLastOpenRequest]=useState(openRequest);
   if(lastOpenRequest!==openRequest){setLastOpenRequest(openRequest);if(openRequest){setTeam(openRequest.team);setOpen(true);}}
   const catalogElement=useRef<HTMLDivElement>(null), rosterElement=useRef<HTMLDivElement>(null);
@@ -136,10 +141,10 @@ export function LanAiFleet({ room, isHost, editable, connection, currentDesign, 
   const { hide: closePicker, keep: cancelPickerClose, leave: leavePicker } = pickerHover;
   const picker = pickerHover.active ? { hullId: pickerHover.active.id, element: pickerHover.active.anchor as HTMLButtonElement } : null;
   const openPicker = (hullId: string, element: HTMLButtonElement, immediate: boolean) => {
-    if (!pending && !codex.isOpen) pickerHover.show(hullId, element, immediate);
+    if (!pending && !codex.isOpen) { refreshLibrary(); pickerHover.show(hullId, element, immediate); }
   };
   const pickerHull = pickerHover.active?.id;
-  const pickerOptions = useMemo(() => pickerHull ? aiFitsForHull(pickerHull) : [], [pickerHull]);
+  const pickerOptions = useMemo(() => pickerHull ? aiFitsForHull(pickerHull, savedLibrary.library.designs) : [], [pickerHull, savedLibrary]);
   const busy = useRef(false), abort = useRef(new AbortController());
   useEffect(() => { const controller = new AbortController(); abort.current = controller; return () => controller.abort(); }, []);
   const solo = room.options.assignment === 'solo', activeTeam = solo ? 0 : Math.max(0, Math.min(team, room.options.aiHulls.length - 1));
@@ -217,6 +222,7 @@ export function LanAiFleet({ room, isHost, editable, connection, currentDesign, 
             <h3>1 · 选择舰船 / 方案</h3>
             <div className="lan-ai-source-tools"><NativeButton disabled={pending} onClick={() => selectDesign(currentDesign, '我的当前设计副本')}>复制我的当前设计</NativeButton>
               <LanDesignPicker disabled={pending} onSelect={design => selectDesign(design, '已存 / 导入方案')} returnLabel="返回 AI 编成"/></div>
+            {savedLibrary.error && <p className="lan-error" role="alert">{savedLibrary.error}</p>}
             <div className="refit-roster-filters lan-ai-catalog-filters" aria-label="AI 舰船筛选">
               <div className="refit-search-field">
                 <input ref={searchElement} type="search" autoComplete="off" aria-label="搜索 AI 舰船" value={query}
@@ -254,7 +260,7 @@ export function LanAiFleet({ room, isHost, editable, connection, currentDesign, 
                   onMouseEnter={event => openPicker(spec.id, event.currentTarget, false)} onMouseLeave={leavePicker}
                   onFocus={event => { if(event.currentTarget.matches(':focus-visible'))openPicker(spec.id, event.currentTarget, true); }} onBlur={leavePicker}
                   onClick={event => openPicker(spec.id, event.currentTarget, true)}>
-                  <LanHullThumbnail hull={spec.id} name={hullName(spec.id)}/><span>{hullName(spec.id)}</span><small>{hullAssemblyLabel(spec) && hullAssemblyLabel(spec)+' · '}{fits.length || 1} 项配装</small>
+                  <LanHullThumbnail hull={spec.id} name={hullName(spec.id)}/><span>{hullName(spec.id)}</span><small>{hullAssemblyLabel(spec) && hullAssemblyLabel(spec)+' · '}{(fits.length || 1) + (savedCounts.get(spec.id) ?? 0)} 项配装{savedCounts.has(spec.id) && ' · 已存 ' + savedCounts.get(spec.id)}</small>
                 </button>;
               })}
             </div>

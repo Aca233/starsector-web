@@ -2,15 +2,26 @@
 // ACK-owned bytes only: no unsent state payloads or alternate delivery queues.
 export const INITIAL_HOST_SNAPSHOT_BYTES = 64 * 1024;
 const REQUEST_TTL_MS = 250;
-const localWritable = peer => peer.readyState === 1 && peer.inflight.size < peer.snapshotWindow.limit && peer.inflightBytes < INITIAL_HOST_SNAPSHOT_BYTES;
+const localWritable = peer => peer.readyState === 1 && peer.inflight.size < peer.snapshotWindow.limit && peer.inflightBytes < (peer.snapshotByteLimit ?? INITIAL_HOST_SNAPSHOT_BYTES);
 export class SnapshotHostBudget {
   constructor(peers) { this.peers = peers; this.clear(); }
-  clear() { this.limitBytes = INITIAL_HOST_SNAPSHOT_BYTES; this.waiting = new Map(); this.samples = []; this.roundAt = null; this.blockedAt = -Infinity; this.lastQueueBytes = 0; }
+  clear() { this.singleBinaryPeer = false; this.limitBytes = INITIAL_HOST_SNAPSHOT_BYTES; this.waiting = new Map(); this.samples = []; this.roundAt = null; this.blockedAt = -Infinity; this.lastQueueBytes = 0; }
   totalBytes() { let total = 0; for (const peer of this.peers()) total += peer.inflightBytes; return total; }
   prune(now) {
     for (const [peer, request] of this.waiting) if (now - request.at > REQUEST_TTL_MS || !localWritable(peer)) this.waiting.delete(peer);
-    let count = 0; for (const peer of this.peers()) if (peer.readyState === 1) count++;
-    this.limitBytes = Math.min(this.limitBytes, INITIAL_HOST_SNAPSHOT_BYTES * Math.max(1, count));
+    const ready = [...this.peers()].filter(peer => peer.readyState === 1);
+    // With one negotiated peer, its measured byte controller IS the host budget.
+    // The old per-peer 64KiB clamp would otherwise defeat that controller.
+    // Multiple peers still obey the original shared aggregate controller/cap.
+    const singleBinaryPeer = ready.length === 1 && ready[0].binarySnapshots === true;
+    if (singleBinaryPeer !== this.singleBinaryPeer) {
+      // An inactive estimator must not resume with samples from the previous
+      // room composition. ACK-owned flight and FIFO intents remain untouched.
+      this.samples.length = 0; this.roundAt = null; this.blockedAt = -Infinity; this.lastQueueBytes = null;
+    }
+    this.singleBinaryPeer = singleBinaryPeer;
+    if (this.singleBinaryPeer) { this.limitBytes = ready[0].snapshotByteLimit; this.lastQueueBytes = ready[0].byteWindow?.queueBytes ?? null; }
+    else this.limitBytes = Math.min(this.limitBytes, INITIAL_HOST_SNAPSHOT_BYTES * Math.max(1, ready.length));
   }
   remove(peer) { this.waiting.delete(peer); }
   allows(peer, bytes, now = Date.now()) {
@@ -30,6 +41,7 @@ export class SnapshotHostBudget {
   acknowledge(sample, baseRtt, now, bytesBeforeAck) {
     if (!Number.isFinite(sample) || sample <= 0 || !Number.isFinite(baseRtt) || baseRtt <= 0) return;
     this.prune(now);
+    if (this.singleBinaryPeer) return;
     const queued = bytesBeforeAck * Math.max(0, 1 - baseRtt / sample);
     this.samples.push(queued); if (this.samples.length > 256) this.samples.shift();
     this.roundAt ??= now;
@@ -46,6 +58,6 @@ export class SnapshotHostBudget {
   }
   diagnostics(now = Date.now()) {
     this.prune(now);
-    return { limitBytes: this.limitBytes, inflightBytes: this.totalBytes(), waitingPeers: this.waiting.size, estimatedQueueBytes: Math.round(this.lastQueueBytes) };
+    return { limitBytes: this.limitBytes, inflightBytes: this.totalBytes(), waitingPeers: this.waiting.size, estimatedQueueBytes: this.lastQueueBytes === null ? null : Math.round(this.lastQueueBytes) };
   }
 }

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, Menu, dialog, screen, session, shell } from 'electron';
 import { DesktopNetworkLog, attachDesktopNetworkLog } from './network-log.mjs';
 import { networkSessionPath, resumeNetworkSessionPath, attachNetworkSessionDownloads, desktopProcessMetrics } from './network-session.mjs';
+import { N2nDiagnostics } from './n2n-diagnostics.mjs';
 import { DesktopBackend } from './backend.mjs';
 import { DesktopSteamOverlay, loadDesktopSteam, steamRestartArgs } from './steam-overlay.mjs';
 import { desktopUpdater } from './updates.mjs';
@@ -26,6 +27,7 @@ const resumedLogFile = resumeNetworkSessionPath(app.getPath('userData'), process
 const networkLogFile = resumedLogFile ?? networkSessionPath(app.getPath('userData'));
 const networkLog = new DesktopNetworkLog(networkLogFile);
 let stopNetworkSampler = () => {};
+let stopTunnelSampler = () => {};
 let exportingNetworkLog = false;
 const settingsFile = path.join(app.getPath('userData'), 'desktop-settings.json');
 let settings = {};
@@ -63,6 +65,7 @@ async function confirm(message, detail, action = '继续') {
 }
 async function closeNetworkLog(reason) {
   stopNetworkSampler();
+  stopTunnelSampler();
   let timer;
   try {
     // A failed/stalled disk must not prevent quitting indefinitely.
@@ -313,6 +316,16 @@ else {
   networkLog.start({ sessionId: path.basename(networkLogFile, '.jsonl'), appVersion: app.getVersion(), electronVersion: process.versions.electron,
     chromeVersion: process.versions.chrome, nodeVersion: process.versions.node, platform: process.platform, arch: process.arch,
     logicalCores: os.cpus().length, totalMemoryBytes: os.totalmem(), mode, resumed: Boolean(resumedLogFile) });
+  // Local management reads never share the renderer/network hot path. There is
+  // no OS query while playing Steam or offline; LAN discovery is once/minute.
+  const tunnel = new N2nDiagnostics();
+  const tunnelTimer = setInterval(() => {
+    if (mode !== 'lan' || quitting) return;
+    const sampledMode = mode;
+    void tunnel.sample().then(report => { if (report && !quitting) networkLog.event('n2n-sample', { mode: sampledMode, ...report }); });
+  }, 10000);
+  tunnelTimer.unref();
+  stopTunnelSampler = () => { clearInterval(tunnelTimer); tunnel.close(); };
   if (mode === 'steam') steamOverlay.prepare();
   app.on('will-quit', () => steamOverlay.close());
   app.on('second-instance', () => { if (win && !win.isDestroyed()) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); } });

@@ -1,4 +1,5 @@
 import { deflateRawSync, inflateRawSync } from 'node:zlib';
+import { STEAM_BINARY_MAX_BYTES } from './binary-snapshot.mjs';
 import protocol from '../../src/network/protocol.json' with { type: 'json' };
 const HEADER = 40, CHUNK = 32 * 1024;
 const MAX_MESSAGE = protocol.maxSnapshotBytes + 4096;
@@ -6,7 +7,7 @@ const OPS = ['open', 'opened', 'data', 'close', 'ping', 'pong', 'ack'];
 export const validConnection = value => typeof value === 'string' && /^[a-f0-9]{32}$/.test(value);
 /** Framed Steam P2P messages. No unbounded allocations or unbounded inflation. */
 export class SteamPacketCodec {
-  constructor() { this.sequence = 0; this.pending = new Map(); this.bytes = 0; this.cache = null; }
+  constructor({ binaryStates = false } = {}) { this.binaryStates = binaryStates === true; this.sequence = 0; this.pending = new Map(); this.bytes = 0; this.cache = null; }
   encode(connection, op, value) {
     if (!validConnection(connection) || !OPS.includes(op)) throw Error('无效 Steam 传输标识');
     return this.frame(connection, op, this.prepare(op, value));
@@ -30,13 +31,19 @@ export class SteamPacketCodec {
     }
     return prepared;
   }
+  prepareBinaryState(input) {
+    if (!this.binaryStates || !Buffer.isBuffer(input) || !input.length || input.length > STEAM_BINARY_MAX_BYTES) throw Error('Invalid Steam binary state budget');
+    const compressed = deflateRawSync(input, { level: 1 });
+    const zipped = compressed.length < input.length;
+    return { payload: zipped ? compressed : Buffer.from(input), rawBytes: input.length, zipped, binary: true };
+  }
   frame(connection, op, prepared) {
-    if (!validConnection(connection) || !OPS.includes(op)) throw Error('无效 Steam 传输标识');
+    if (!validConnection(connection) || !OPS.includes(op) || prepared.binary && (!this.binaryStates || op !== 'data')) throw Error('无效 Steam 传输标识');
     const { payload, rawBytes, zipped } = prepared, id = this.sequence = (this.sequence + 1) >>> 0;
     const count = Math.max(1, Math.ceil(payload.length / CHUNK)), packets = [];
     for (let index = 0; index < count; index++) {
       const part = payload.subarray(index * CHUNK, (index + 1) * CHUNK), packet = Buffer.alloc(HEADER + part.length);
-      packet.write('SWSP', 0, 'ascii'); packet[4] = 1; packet[5] = OPS.indexOf(op); packet[6] = Number(zipped);
+      packet.write('SWSP', 0, 'ascii'); packet[4] = 1; packet[5] = OPS.indexOf(op); packet[6] = Number(zipped) | (prepared.binary ? 2 : 0);
       packet.writeUInt32LE(id, 8); packet.writeUInt16LE(index, 12); packet.writeUInt16LE(count, 14);
       packet.writeUInt32LE(payload.length, 16); packet.writeUInt32LE(rawBytes, 20);
       Buffer.from(connection, 'hex').copy(packet, 24); part.copy(packet, HEADER); packets.push(packet);
@@ -49,10 +56,10 @@ export class SteamPacketCodec {
   clear() { this.pending.clear(); this.bytes = 0; this.cache = null; }
   receive(peer, packet, now = Date.now()) {
     this.sweep(now);
-    if (!Buffer.isBuffer(packet) || packet.length < HEADER || packet.length > HEADER + CHUNK || packet.toString('ascii', 0, 4) !== 'SWSP' || packet[4] !== 1 || packet[5] >= OPS.length || packet[6] > 1 || packet[7] !== 0) return null;
+    if (!Buffer.isBuffer(packet) || packet.length < HEADER || packet.length > HEADER + CHUNK || packet.toString('ascii', 0, 4) !== 'SWSP' || packet[4] !== 1 || packet[5] >= OPS.length || (packet[6] > 3 || (packet[6] & 2) && (!this.binaryStates || OPS[packet[5]] !== 'data')) || packet[7] !== 0) return null;
     const id = packet.readUInt32LE(8), index = packet.readUInt16LE(12), count = packet.readUInt16LE(14);
     const encoded = packet.readUInt32LE(16), raw = packet.readUInt32LE(20), connection = packet.subarray(24, 40).toString('hex');
-    if (encoded < 1 || encoded > MAX_MESSAGE || raw < 1 || raw > MAX_MESSAGE || count !== Math.ceil(encoded / CHUNK) || index >= count || packet.length - HEADER !== Math.min(CHUNK, encoded - index * CHUNK) || (!packet[6] && encoded !== raw)) throw Error('无效 Steam 分片');
+    if (encoded < 1 || encoded > MAX_MESSAGE || raw < 1 || raw > MAX_MESSAGE || count !== Math.ceil(encoded / CHUNK) || index >= count || packet.length - HEADER !== Math.min(CHUNK, encoded - index * CHUNK) || (!(packet[6] & 1) && encoded !== raw) || ((packet[6] & 2) && (raw > STEAM_BINARY_MAX_BYTES || encoded > STEAM_BINARY_MAX_BYTES))) throw Error('无效 Steam 分片');
     const key = peer + ':' + connection + ':' + id;
     let item = this.pending.get(key);
     if (!item) {
@@ -69,8 +76,9 @@ export class SteamPacketCodec {
     if (item.parts.size !== count) return null;
     this.remove(key);
     const assembled = Buffer.concat(Array.from({ length: count }, (_, i) => item.parts.get(i)), encoded);
-    const decoded = item.zipped ? inflateRawSync(assembled, { maxOutputLength: raw }) : assembled;
+    const decoded = item.zipped & 1 ? inflateRawSync(assembled, { maxOutputLength: raw }) : assembled;
     if (decoded.length !== raw) throw Error('Steam 消息长度不匹配');
-    return { connection, id, op: item.op, data: JSON.parse(decoded.toString('utf8')) };
+    return item.zipped & 2 ? { connection, id, op: item.op, binary: true, data: decoded }
+      : { connection, id, op: item.op, data: JSON.parse(decoded.toString('utf8')) };
   }
 }

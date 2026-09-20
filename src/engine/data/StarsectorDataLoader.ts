@@ -1,3 +1,4 @@
+import { missileLifecycleSpecFromSource } from './MissileLifecycleSpec';
 import { requireWeaponEffect } from '../extensions/weapon-effects/Registry';
 import { registerUnavailableSourceSystem, systemFromSource } from '../extensions/ship-systems/Registry';
 import type { ShipSpec, WeaponMountSlotConfig, EngineSlotConfig } from '../modding/ModManager';
@@ -266,11 +267,12 @@ export class StarsectorDataLoader {
     if (material.textureType && !['ROUGH','SMOOTH'].includes(material.textureType)) {
       omit(material, 'textureType', 'Native texture type ' + material.textureType + ' uses the default Web material.');
     }
-    if (proj.spawnType && !['BALLISTIC','BALLISTIC_AS_BEAM','MISSILE','BEAM'].includes(proj.spawnType)) {
+    if (proj.spawnType && !['BALLISTIC','BALLISTIC_AS_BEAM','PLASMA','MISSILE','BEAM'].includes(proj.spawnType)) {
       if (!options.reportApproximation) throw new Error(weaponId + ': unsupported spawnType ' + proj.spawnType);
       options.reportApproximation('Native spawn type ' + proj.spawnType + ' uses a ballistic energy projectile; special appearance/motion not reproduced.');
       proj.spawnType = 'BALLISTIC';
     }
+    if (proj.spawnType === 'PLASMA') options.reportApproximation?.('Native PLASMA lifetime is restored; rotating-ray appearance and charge/collision geometry remain approximate.');
     if (wpnJson.visualRecoil < 0) {
       if (!options.reportApproximation) throw new Error(weaponId + ': negative visual recoil');
       options.reportApproximation('Negative native visual recoil is not rendered; recoil animation disabled.');
@@ -288,11 +290,12 @@ export class StarsectorDataLoader {
     const url = (path: unknown) => typeof path === 'string' && path ? assetResolver.url(path) : undefined;
     const missile = proj.specClass === 'missile';
     if (options.reportApproximation) {
-      for (const key of ['applyOnHitEffectWhenPassThrough','collisionClassAfterFlameout','dudProbabilityOnFlameout','fizzleOnReachingWeaponRange','flameoutTime','noCollisionWhileFading','reduceDamageWhileFading','maxFlightTime']) {
+      for (const key of ['applyOnHitEffectWhenPassThrough']) {
         if (proj[key] !== undefined) options.reportApproximation('Native projectile '+key+'='+JSON.stringify(proj[key])+' uses the generic Web flight/collision lifecycle.');
       }
       if (['NONE','RAY','RAY_FIGHTER'].includes(proj.collisionClass)) options.reportApproximation('Native projectile collision class '+proj.collisionClass+' is approximated by the Web projectile collision model.');
     }
+    if (missile) options.reportApproximation?.('Native missile flameout timing is restored; MISSILE_FF/team collision filtering and engine spool visuals remain approximate.');
     const engine = proj.engineSlots?.[0];
     const style = engine?.styleSpec;
     if (proj.behaviorSpec && !['MIRV','PROXIMITY_FUSE'].includes(proj.behaviorSpec.behavior)) {
@@ -442,7 +445,8 @@ export class StarsectorDataLoader {
       isRocket: missile,
       isGuided: missile && (proj.engineSpec?.turnRate ?? 0) > 0,
       launchSpeed: missile ? number('launch speed') : undefined,
-      flightTime: missile ? number('flight time') : undefined,
+      flightTime: missile ? number('flight time', 1) : undefined,
+      missileLifecycleSpec: missile ? missileLifecycleSpecFromSource(proj) : undefined,
       armingTime: proj.armingTime,
       engineAcceleration: proj.engineSpec?.acc,
       missileDeceleration: proj.engineSpec?.dec,

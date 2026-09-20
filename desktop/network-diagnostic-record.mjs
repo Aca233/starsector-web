@@ -23,24 +23,25 @@ const hudSchema = { ...numbers('tick sim bytes rtt jitter acknowledgementMs age 
   decodeQueue: numbers('queued queuedBytes peakQueued peakBytes decoded backpressure waitMs maxWaitMs') };
 const lanSchema = { mode: choice('lan-websocket'), role: choice('host', 'guest'), relaySeq: numeric,
   authority: numbers('received lastBytes receiveMs'), receivers: list({ seat: numeric, compression: bool, bufferedBytes: numeric,
-    credits: numbers('inflight capacity bytes peakCount peakBytes sent acked rejected'), network: numbers('latestRttMs baselineRttMs busySamples'),
-    flow: numbers('sent skippedSocket skippedCredit lastBytes lastSeq'), delta: numbers('full delta originalBytes encodedBytes budgetFallbacks anchors baseSeq pendingSeq retainedBytes') }) };
+    credits: numbers('inflight capacity idleCapacity deliveryHz bytes peakCount peakBytes sent acked rejected'), network: numbers('latestRttMs baselineRttMs busySamples'),
+    flow: numbers('sent skippedSocket skippedCredit lastBytes lastSeq'), delta: numbers('full delta originalBytes encodedBytes budgetFallbacks motionDeltas anchors baseSeq pendingSeq retainedBytes') }) };
 const nativeSchema = { ...numbers('queuedBytes queuedPackets errorCode sampleAgeMs'), available: bool, active: bool, connecting: bool, usingRelay: bool,
   reason: choice('not-initialized', 'injected-client', 'unsupported-platform', 'binding-unavailable', 'invalid-peer', 'interface-unavailable', 'no-session', 'not-sampled', 'query-unavailable', 'query-failed') };
-const receiptSchema = numbers('rendererPending rendererWritten rendererWriteErrors maxRendererWriteMs networkAttempts networkAccepted networkErrors consumptionAttempts consumptionAccepted consumptionErrors fastAttempts fastAccepted fastRejected networkAgeMs consumptionAgeMs');
+const receiptSchema = numbers('rendererBinaryWrites rendererJsonWrites rendererPayloadBytes rendererCanonicalBytes rendererPending rendererWritten rendererWriteErrors maxRendererWriteMs networkAttempts networkAccepted networkErrors consumptionAttempts consumptionAccepted consumptionErrors fastAttempts fastAccepted fastRejected networkAgeMs consumptionAgeMs');
 const pollSchema = numbers('calls packetsRead discardedPackets oversizedHeads invalidPackets errors budgetHits maxGapMs maxDurationMs lastAgeMs');
 export const NETWORK_FAILURE_STAGES = ['snapshot-decode', 'snapshot-apply', 'server-rejected', 'graphics-context', 'worker-start', 'worker-runtime', 'snapshot-size', 'report-size', 'resource-load', 'initialization', 'frame-loop', 'unknown'];
 const blockReason = choice('disconnected', 'frame-window', 'wire-byte-window', 'renderer-consumption', 'shared-uplink-window');
 const steamSchema = { mode: choice('legacy-p2p', 'sockets'), role: choice('host', 'guest'), ...numbers('receivedStates lastStateAgeMs'),
   receipts: receiptSchema, polling: pollSchema,
+  snapshotWorker: { ...numbers('offered replaced prepared accepted stale faults workMs maxWorkMs queueMs maxQueueMs maxRetained'), active: bool, pending: bool, ready: bool, failed: bool },
   sharedSnapshots: numbers('inflightBytes limitBytes waitingPeers estimatedQueueBytes'),
   outbound: numbers('inflight queued oldestAckMs inflightBytes queuedBytes coalesced'), nativeHostSession: nativeSchema,
-  incomingSnapshots: numbers('fullStates deltaStates misses baselineBytes'),
-  peers: list({ ...numbers('inflight window inflightBytes oldestAckMs ackMs baseAckMs sentStates skippedStates ackedStates queueAckMs'), probing: choice('drain', 'measure'),
+  incomingSnapshots: numbers('fullStates deltaStates misses baselineBytes binaryFullStates binaryDeltaStates motionDeltas'),
+  peers: list({ preparation: numbers('attempts discarded totalMs discardedMs maxMs'), ...numbers('byteLimit inflight window inflightBytes oldestAckMs ackMs baseAckMs sentStates skippedStates ackedStates queueAckMs'), probing: choice('drain', 'measure'),
     consumption: { enabled: bool, ...numbers('inflight bytes rawBytes consumed oldestMs') },
     blockedBy: blockReason, lastSnapshotSkip: blockReason,
-    lastSnapshot: { ...numbers('rawBytes wireBytes fragments prepareMs'), format: choice('full', 'delta', 'legacy-full') },
-    delta: numbers('fullStates deltaStates legacyStates savedBytes baselineBytes'), nativeSession: nativeSchema }) };
+    lastSnapshot: { ...numbers('rawBytes wireBytes fragments prepareMs'), format: choice('full', 'delta', 'legacy-full', 'binary-full', 'binary-delta') },
+    delta: numbers('fullStates deltaStates legacyStates savedBytes baselineBytes binaryFullStates binaryDeltaStates motionDeltas budgetFallbacks'), nativeSession: nativeSchema }) };
 export const NETWORK_EVENTS = ['sample', 'battle-start', 'battle-stop', 'battle-failed', 'welcome', 'reconnecting', 'disconnected', 'page-visibility', 'error', 'ended', 'left', 'roomClosed'];
 export function normalizeNetworkRecord(input) {
   const v = fields(input);

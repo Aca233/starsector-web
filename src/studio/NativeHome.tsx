@@ -9,7 +9,7 @@ import { NativeButton } from '../ui/NativeChrome';
 import { runtimeAssetUrl } from '../engine/runtime/RuntimePaths';
 import { hullCount, weaponCount } from 'virtual:studio-summary';
 
-export function NativeHome({ onEnter, onSkills, onLan, onSteam, entryError, staticHosted }: { onEnter: () => void; onSkills: () => void; onLan?: () => void; onSteam?: () => void; entryError?: string; staticHosted?: boolean }) {
+export function NativeHome({ onEnter, onSkills, onLan, onSteam, entryError, staticHosted, lanLabel }: { onEnter: () => void; onSkills: () => void; onLan?: () => void; onSteam?: () => void; entryError?: string; staticHosted?: boolean; lanLabel?: string }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => { document.title = "远行星号 · 舰船设计"; }, []);
   useEffect(() => {
@@ -37,7 +37,7 @@ export function NativeHome({ onEnter, onSkills, onLan, onSteam, entryError, stat
           舰船设计
         </NativeButton>
         <NativeButton shortcut="C" onClick={onSkills} data-skills-entry>角色技能</NativeButton>
-        {onLan && <NativeButton onClick={onLan}>局域网联机</NativeButton>}
+        {onLan && <NativeButton onClick={onLan}>{lanLabel ?? "局域网联机"}</NativeButton>}
         {onSteam && <NativeButton onClick={onSteam}>Steam 联机</NativeButton>}
         <NativeButton onClick={() => setSettingsOpen(true)}>游戏设置</NativeButton>
         {staticHosted && <p className="native-static-note">GitHub Pages 单机试玩<br />局域网 / Steam 联机请使用 <a href="https://github.com/Aca233/starsector-web/releases/latest" target="_blank" rel="noopener noreferrer">桌面版</a></p>}

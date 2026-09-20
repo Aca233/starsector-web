@@ -1,14 +1,15 @@
+import { motionFrame, motionBytes } from './lib/motion-reference-fixture.mjs';
 import assert from 'node:assert/strict';import{test}from'node:test';import vm from'node:vm';import{build}from'esbuild';
 import{LanDeltaSender,lanDeltaTarget}from'../server/LanDeltaTransport.mjs';import{encodeBinaryState,encodeProjectedBinaryFrame}from'../src/network/BinarySnapshot.mjs';
 const code=(await build({entryPoints:['src/network/protocol.ts'],bundle:true,platform:'browser',format:'cjs',write:false,define:{__LAN_BUILD_ID__:'"test"'}})).outputFiles[0].text;
-function fixture(transport='lan',cap=true){
+function fixture(transport='lan',cap=true,motion=false){
  const sockets=[],timers=new Map();let now=1,id=0;const document=new EventTarget();document.visibilityState='visible';
  class Socket{static OPEN=1;readyState=1;bufferedAmount=0;sent=[];constructor(){sockets.push(this);}send(m){this.sent.push(m);}close(){this.readyState=3;}}
  const sandbox={module:{exports:{}},exports:{},WebSocket:Socket,EventTarget,TextEncoder,TextDecoder,ArrayBuffer,Uint8Array,URL,DOMException,document,crypto:{getRandomValues:a=>a.fill(7)},sessionStorage:{getItem:()=>null,setItem(){},removeItem(){}},performance:{now:()=>now},setTimeout:fn=>{timers.set(++id,fn);return id;},clearTimeout:i=>timers.delete(i),setInterval:()=>++id,clearInterval(){}};
  sandbox.exports=sandbox.module.exports;vm.runInNewContext(code,sandbox);
  const c=new sandbox.module.exports.LanConnection(transport),seen=[];c.subscribe(m=>seen.push(m));c.connect('ws://127.0.0.1/lan/ws','test');const ws=sockets[0];ws.onopen();
  const receive=data=>{now++;ws.onmessage({data:typeof data==='string'||data instanceof ArrayBuffer?data:JSON.stringify(data)});};
- receive({type:'welcome',resumeToken:'a'.repeat(64),stateCredits:1,...(cap?{binaryDelta:1}:{})});
+ receive({type:'welcome',resumeToken:'a'.repeat(64),stateCredits:1,...(cap?{binaryDelta:1}:{}),...(motion?{motionReference:1}:{})});
  return{c,ws,seen,receive,document,timers};
 }
 const target=seq=>lanDeltaTarget(encodeBinaryState('match',seq,encodeProjectedBinaryFrame({tick:seq,ships:[],ballast:'component-'.repeat(1500),value:seq})),seq);
@@ -32,4 +33,21 @@ test('visibility and new-match epochs accept fresh anchors, never consume hidden
 test('LAN legacy server and Steam keep the existing full-frame route',()=>{
  for(const [transport,cap]of[['lan',false],['steam',true]]){const f=fixture(transport,cap);if(transport==='steam')assert.equal(JSON.parse(f.ws.sent[0]).binaryDelta,undefined);
  const t=target(1);f.receive(t.bytes.buffer);assert.equal(f.seen.at(-1).frame.tick,1);assert.equal(f.c.snapshotBytes,t.bytes.length);f.c.close();}
+});
+
+test('main-thread fallback confirms motion capability before decoding and consuming full corrected bytes',()=>{
+ const f=fixture('lan',true,true),s=new LanDeltaSender({ordered:true,motionReference:true});assert.equal(JSON.parse(f.ws.sent[0]).motionReference,1);
+ for(let seq=1;seq<=3;seq++){const frame=motionFrame();frame.tick+=seq*12;frame.world.projectiles.values[0][1].$vector[0]=seq*42.125;
+  const t=lanDeltaTarget(motionBytes(frame,seq),seq),c=s.prepare(t);s.commit(c);f.receive(c.packet.buffer);
+  assert.deepEqual(JSON.parse(JSON.stringify(f.seen.at(-1).frame)),frame);assert.equal(f.c.snapshotBytes,t.bytes.length);assert.equal(JSON.parse(f.ws.sent.at(-1)).seq,seq);}
+ f.c.close();
+});
+
+test('Steam host binary upload is welcome-negotiated, not inferred from transport or LAN delta fields',()=>{
+ for(const cap of [false,true]){
+  const f=fixture('steam');assert.equal(JSON.parse(f.ws.sent[0]).binarySnapshots,1);assert.equal(JSON.parse(f.ws.sent[0]).binaryReceive,1);assert.equal(f.c.canSendBinarySnapshots,false);
+  f.receive({type:'welcome',resumeToken:'a'.repeat(64),...(cap?{binarySnapshots:1}:{})});assert.equal(f.c.canSendBinarySnapshots,cap);
+  const bytes=encodeProjectedBinaryFrame({tick:1});const sent=f.c.sendSnapshot('match',1,{binary:bytes.buffer,bytes:bytes.length});assert.equal(sent,cap?'sent':'disconnected');
+  if(cap)assert.ok(ArrayBuffer.isView(f.ws.sent.at(-1)));f.c.close();
+ }
 });

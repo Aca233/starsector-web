@@ -49,6 +49,8 @@ export interface RoomOptions {
   initialDeploymentLimit?: number | null;
 }
 export interface Match {
+  /** Omitted for the existing browser-hosted LAN/Steam mode. */
+  authority?: "server";
   options: RoomOptions;
   id: string;
   seed: number;
@@ -57,6 +59,7 @@ export interface Match {
   hostId: string;
 }
 export interface Room {
+  authority?: "server";
   code: string;
   capacity: number;
   hostId: string;
@@ -115,6 +118,8 @@ export class LanConnection {
   ready = false;
   private stateCredits = false;
   private binaryDelta = false;
+  private steamBinarySnapshots = false;
+  get canSendBinarySnapshots(): boolean { return this.transport === "lan" || this.steamBinarySnapshots; }
   private readonly deltaReceiver = new LanDeltaReceiver();
   /** Read-only LAN relay metrics from the existing pong; absent for Steam/old servers. */
   lanTransport: unknown = null;
@@ -242,6 +247,8 @@ export class LanConnection {
     this.authoritySample = null;
     this.stateCredits = false;
     this.binaryDelta = false;
+    this.steamBinarySnapshots = false;
+    this.deltaReceiver.setMotionReference(false);
     this.deltaReceiver.reset();
     clearTimeout(this.handshakeTimer);
     clearInterval(this.heartbeatTimer);
@@ -267,7 +274,7 @@ export class LanConnection {
         this.send({
           type: "hello",
           stateCredits: 1,
-          ...(this.transport === "lan" ? { binaryDelta: 1 } : {}),
+          ...(this.transport === "lan" ? { binaryDelta: 1, motionReference: 1 } : { binarySnapshots: 1, binaryReceive: 1 }),
           protocol: LAN_PROTOCOL,
           build: LAN_BUILD,
           name: this.name,
@@ -308,6 +315,8 @@ export class LanConnection {
         // Opt in only when the relay confirms; legacy LAN/Steam relays omit it.
         this.stateCredits = m.stateCredits === 1;
         this.binaryDelta = this.transport === "lan" && this.stateCredits && m.binaryDelta === 1;
+        this.steamBinarySnapshots = this.transport === "steam" && m.binarySnapshots === 1;
+        this.deltaReceiver.setMotionReference(this.binaryDelta && m.motionReference === 1);
         clearTimeout(this.handshakeTimer);
         this.ready = true;
         this.lastMessageAt = performance.now();
@@ -423,7 +432,7 @@ export class LanConnection {
     if (!this.realtimeGate.canSendSnapshot(this.socket.bufferedAmount, performance.now())) return "skipped";
     try {
       if (frame.binary instanceof ArrayBuffer) {
-        if (this.transport !== "lan" || frame.bytes !== frame.binary.byteLength) return "disconnected";
+        if (!this.canSendBinarySnapshots || frame.bytes !== frame.binary.byteLength) return "disconnected";
         if (frame.bytes >= LAN_MAX_SNAPSHOT_BYTES) return "oversized";
         this.socket.send(encodeBinaryState(matchId, seq, frame.binary));
         this.realtimeGate.snapshotSent(performance.now());

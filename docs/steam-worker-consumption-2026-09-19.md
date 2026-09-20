@@ -1,5 +1,8 @@
 # Steam 网络 Worker 与前台消费回执（2026-09-19）
 
+> **2026-09-20：用户已弃用本文的独立 0.2.6 测试包，不再作为推荐版本。当前正式 `v0.2.5`（`ef043ec`）已包含 LAN/Steam 网络 Worker 和 Steam 前台消费回执；不要与此前 `0.2.5-network-test.zip` 的冻结测试包混淆。原文件和验证记录保留，不回滚正式版代码。
+
+
 ## 此次改动
 
 - LAN、Steam 的 `LanConnection` 都复用私有 `createLanSocket` 适配器；不替换全局 WebSocket。COOP/COEP、SAB 或 Worker 初始化不可用时仍走原生 WebSocket；已开始连接后的故障只按原协议重连，不透明重放。

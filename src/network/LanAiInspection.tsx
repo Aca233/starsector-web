@@ -3,7 +3,7 @@ import { createDesign, data, evaluate, type Design } from '../studio/DesignModel
 import { RefitInspection, type InspectionTarget } from '../studio/RefitInspection';
 import { LoadoutSection } from '../studio/VariantInspection';
 import { RefitHint } from '../studio/RefitHint';
-import { costs } from '../engine/data/generated/simulation-roster.json';
+import costs from '../engine/data/generated/deployment-costs.json';
 import type { OpenWeaponCodex } from '../studio/useInspectionCodex';
 import { LanHullThumbnail } from './LanHullThumbnail';
 import { NativeBitmapText } from '../ui/NativeBitmapText';

@@ -3,6 +3,20 @@ import type { ProjectileImpactFamily } from '../visual/ImpactVisuals';
 import { Vector2 } from '../math/Vector2';
 import { DamageType } from './ArmorGrid';
 
+export type ProjectileSpawnType = 'BALLISTIC' | 'BALLISTIC_AS_BEAM' | 'PLASMA' | 'MISSILE' | 'BEAM';
+
+/** WeaponSpecLoader defaults plus authored missile flameout overrides. */
+export interface MissileLifecycleSpec {
+  flameoutTime: number;
+  noEngineGlowTime: number;
+  fadeTime: number;
+  dudProbabilityOnFlameout: number;
+  collisionClassAfterFlameout: 'NONE' | 'MISSILE_NO_FF' | 'MISSILE_FF';
+  fizzleOnReachingWeaponRange: boolean;
+  noCollisionWhileFading: boolean;
+  reduceDamageWhileFading: boolean;
+}
+
 export type WeaponMountType = 'TURRET' | 'HARDPOINT' | 'HIDDEN';
 export type WeaponSlotSize = 'SMALL' | 'MEDIUM' | 'LARGE';
 
@@ -182,15 +196,15 @@ export interface WeaponSpec {
   hardpointOffsets?: number[];
 
   // 弹道/光束渲染材质与参数 (严格对齐 .proj 和 .wpn)
-  spawnType?: 'BALLISTIC' | 'BALLISTIC_AS_BEAM' | 'MISSILE' | 'BEAM';
+  spawnType?: ProjectileSpawnType;
   /** Native missile .proj flag, defaults true. Does not turn ballistic shots into missiles. */
   renderTargetIndicator?: boolean;
   // 仅渲染语义；用于来源视觉类型与当前 gameplay 碰撞/实体语义暂时不一致的迁移场景。
   // 不得用于决定碰撞类别、伤害结算或实体生命周期。
-  visualSpawnType?: 'BALLISTIC' | 'BALLISTIC_AS_BEAM' | 'MISSILE' | 'BEAM';
+  visualSpawnType?: ProjectileSpawnType;
   textureType?: 'ROUGH' | 'SMOOTH';
   textureScrollSpeed?: number;
-  fadeTime?: number; // 原版投射物视觉消退字段（秒）；不得延长实体碰撞寿命
+  fadeTime?: number; // Native range-fade seconds; source-managed shots retain reduced-damage contacts
   pixelsPerTexel?: number; // 原版纹理采样比例字段，必须为正数
   fringeColor?: [number, number, number, number];
   coreColor?: [number, number, number, number];
@@ -237,7 +251,8 @@ export interface WeaponSpec {
   isRocket?: boolean;
   isGuided?: boolean;
   launchSpeed?: number; // missile launch velocity before engine acceleration
-  flightTime?: number; // authoritative missile lifetime in seconds
+  flightTime?: number; // powered flight duration; flameout is a separate lifecycle phase
+  missileLifecycleSpec?: MissileLifecycleSpec;
   armingTime?: number;
   engineAcceleration?: number;
   missileDeceleration?: number;
@@ -372,9 +387,9 @@ export interface Projectile {
   elapsedTime: number;
   color: [number, number, number];
 
-  spawnType?: 'BALLISTIC' | 'BALLISTIC_AS_BEAM' | 'MISSILE' | 'BEAM';
+  spawnType?: ProjectileSpawnType;
   renderTargetIndicator?: boolean;
-  visualSpawnType?: 'BALLISTIC' | 'BALLISTIC_AS_BEAM' | 'MISSILE' | 'BEAM';
+  visualSpawnType?: ProjectileSpawnType;
   textureType?: 'ROUGH' | 'SMOOTH';
   textureScrollSpeed?: number;
   fadeTime?: number;
@@ -406,6 +421,12 @@ export interface Projectile {
   facingRad?: number;
   turnVelocityRad?: number;
   flightTimeRemaining?: number;
+  missileLifecycleSpec?: MissileLifecycleSpec;
+  /** Undefined while powered; elapsed seconds since fuel/range flameout otherwise. */
+  missileFizzleTime?: number;
+  armedWhileFizzling?: boolean;
+  /** Serialized independently of spawnLocation, which cosmetic snapshots omit. */
+  missileRangeOrigin?: Vector2;
   maxFlightTime?: number;
   armingTimeRemaining?: number;
   engineAcceleration?: number;

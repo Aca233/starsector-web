@@ -1,3 +1,4 @@
+// Explicit synchronous reference fixture; real-worker coverage lives in check-steam-snapshot-prepare.mjs.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import http from 'node:http';
@@ -73,7 +74,7 @@ async function fixture(t, { factory = true, guestFactory = factory } = {}) {
     const client = { localplayer: { getSteamId: () => BigInt(id), getName: () => id === HOST ? '房主' : '玩家' },
       matchmaking: { createLobby: async () => lobby(), joinLobby: async () => lobby() }, callback: { register: (kind, cb) => { callbacks.set(id + ':' + kind, cb); return { disconnect() {} }; } },
       networking: new Proxy({}, { get: () => () => { legacyCalls++; throw Error('Unexpected legacy API'); } }) };
-    const g = new SteamGateway({ build: BUILD, client, socketRoomFactory: modern ? options => new SteamSocketRoom({ ...options, lifecycle: f.endpoint(id), now: () => now }) : null });
+    const g = new SteamGateway({ snapshotPreparation: false, build: BUILD, client, socketRoomFactory: modern ? options => new SteamSocketRoom({ ...options, lifecycle: f.endpoint(id), now: () => now }) : null });
     assert.equal(g.initialize().available, true); clearInterval(g.timer); return g;
   }
   const host = gateway(HOST, factory), guest = gateway(GUEST, guestFactory);

@@ -6,6 +6,7 @@ export function aiDesignSignature(input) {
 }
 function combatConfiguration(d) {
   return {hullId:d.hullId, sourceVariantId:d.sourceVariantId ?? null,
+    systemTypes:d.systemTypes ?? null,rightClickSystemType:d.rightClickSystemType ?? null,
     modules:Object.entries(d.modules ?? {}).sort(([a],[b])=>a.localeCompare(b)).map(([slot, child])=>[slot,combatConfiguration(child)]),
     weapons:Object.entries(d.weapons).filter(([,id])=>id!==null).sort(([a],[b])=>a < b ? -1 : a > b ? 1 : 0),
     hullMods:[...d.hullMods].sort(),sMods:[...d.sMods].sort(),

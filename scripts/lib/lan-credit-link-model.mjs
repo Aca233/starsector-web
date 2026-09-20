@@ -3,7 +3,8 @@
 // by TCP but not yet delivered. Rate changes apply to queued bytes, not to a
 // precomputed arrival timestamp. This models one receiver, not Wi-Fi loss.
 export function modelLanCredits(Credits, {duration=45000,rtt=20,bytes=44324,rate=100000,fastRate=10000000,changeAt=4000,restoreAt=35000,consumeMs=5}={}) {
-  const credits=new Credits(); let now=0,nextFrame=0,nextPing=1000,seq=0,probePending=false,queuedBytes=0;
+  let now=0,nextFrame=0,nextPing=1000,seq=0,probePending=false,queuedBytes=0;
+  const credits=new Credits({now:()=>now});
   let delivered=0,skipSocket=0,skipCredit=0,maxWindow=0,maxFlight=0,maxQueue=0;
   const tx=[],samples=[],ages=[],events=[];
   const schedule=(at,fn)=>{events.push({at,fn});events.sort((a,b)=>a.at-b.at);};
