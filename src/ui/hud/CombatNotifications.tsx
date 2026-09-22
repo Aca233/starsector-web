@@ -1,4 +1,4 @@
-import type { CombatEngine } from '../../engine/simulation/CombatEngine';
+import type { CombatHudView as CombatEngine } from '../../engine/runtime/CombatHudView';
 import { notificationOpacity } from '../../engine/simulation/CombatNotifications';
 import './combat-notifications.css';
 

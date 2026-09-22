@@ -73,7 +73,7 @@ class SteamPeer extends EventEmitter {
     const frame = this.inflight.get(id);
     if (!frame) return; // Duplicate, stale or forged ACKs must not grant credit.
     const now = Date.now(), sample = now - frame.since, sharedBytes = this.gateway.snapshotBudget.totalBytes();
-    this.snapshotWindow.acknowledge(sample, now, this.inflight.size);
+    this.snapshotWindow.acknowledge(sample, now, this.inflight.size, this.gateway.peers.size <= 1);
     if (frame.binary) this.byteWindow?.acknowledge(sample, this.snapshotWindow.baseRtt, now, this.inflightBytes, frame.bytes);
     if (this.consumption) this.consumption.maxBytes = this.snapshotByteLimit;
     this.inflight.delete(id); this.inflightBytes -= frame.bytes; this.ackedStates++;
@@ -81,6 +81,9 @@ class SteamPeer extends EventEmitter {
     this.ackMs = this.ackMs === null ? sample : this.ackMs * .8 + sample * .2;
   }
   discardPreparation(ms) { this.preparation.discarded++; this.preparation.discardedMs += ms; }
+  // Production preparation consumes original bytes in its Worker. A synchronous
+  // reference/legacy fallback needs the complete graph and must opt out.
+  get relayBinaryOnly() { return !!this.gateway.snapshotPreparer && !this.gateway.snapshotPreparer.closed; }
   // Called only by the validated local relay, never by remote dispatch.
   sendSnapshot(snapshot) { return this.send(null, snapshot); }
   resetSnapshots() { this.snapshotSender.reset(); this.gateway.snapshotPreparer?.reset(this); }
@@ -88,6 +91,7 @@ class SteamPeer extends EventEmitter {
   send(encoded, snapshot = null, candidate = null) {
     if (this.readyState !== 1) return;
     try {
+      if (snapshot?.metadataOnly && !this.relayBinaryOnly) throw Error("Relay metadata requires binary preparation Worker");
       const state = candidate !== null || snapshot !== null || encoded.startsWith('{"type":"state",');
       if (state && !candidate && this.gateway.snapshotPreparer) {
         if (!this.snapshotWritable) { this.lastSnapshotSkip = this.snapshotBlockReason; this.gateway.snapshotBudget.remove(this); this.skippedStates++; return false; }
@@ -109,6 +113,13 @@ class SteamPeer extends EventEmitter {
       const rawBytes = state ? candidate?.stateBytes ?? choice?.rawBytes ?? Buffer.byteLength(encoded) : 0;
       const preparationMs = state ? performance.now() - prepareAt : 0;
       if (state) { this.preparation.attempts++; this.preparation.totalMs += preparationMs; this.preparation.maxMs = Math.max(this.preparation.maxMs, preparationMs); }
+      // Exhausted patch CPU is not a reason to inject a much larger full world
+      // into a congested shared FIFO. Keep the old committed base and retry a
+      // NEW authority state on the next fair broadcast, in both worker/direct paths.
+      if (state && (candidate?.budgetFallback || choice?.choice?.budgetFallback)) {
+        this.discardPreparation(preparationMs); this.lastSnapshotSkip = 'codec-work-budget';
+        this.gateway.snapshotBudget.remove(this); this.skippedStates++; return false;
+      }
       if (state && this.consumption && !this.consumption.allows(payload.payload.length, rawBytes, this.consumptionLimit)) { this.discardPreparation(preparationMs); this.lastSnapshotSkip = 'renderer-consumption'; this.gateway.snapshotBudget.remove(this); this.skippedStates++; return; }
       // A frame larger than the byte window may travel alone (original size limit
       // still applies), but must not be stacked behind other snapshots.

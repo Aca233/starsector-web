@@ -32,6 +32,7 @@ export function snapshotPipelineMetrics(peer, now = performance.now()) {
   const age = stored && stored.match === room.match.id ? Math.max(0, now - stored.at) + stored.localAge : null;
   const source = age !== null ? { performance: age <= 5000 ? stored.sample : null, knownAgeMs: age, stale: age > 5000 } : null;
   return { version: 1, role: host ? 'host' : 'guest', authority: source,
+    relayDecode: room.relayDecode ? { ...room.relayDecode } : null,
     ingress: authority ? flow(authority, now).sample(now) : null,
     receivers: (host ? room.peers.filter(p => p !== peer && !p.disconnected).slice(0, 9) : [peer])
       .map(p => ({ seat: p.seat, consumptionCredits: !!p.stateCredits, stages: flow(p, now).sample(now) })) };

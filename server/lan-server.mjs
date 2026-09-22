@@ -1,3 +1,9 @@
+import { AutoMotionAdmission } from './AutoMotionAdmission.mjs';
+import { LanCriticalCombat } from "./LanCriticalCombat.mjs";
+import {motionWireTarget} from './MotionWire.mjs';
+import { LanProjectileVisuals } from './LanProjectileVisuals.mjs';
+import { SNAPSHOT_CHUNK_LIMITS } from './SnapshotChunkCodec.mjs';
+import { LanBulkScheduler } from './LanBulkScheduler.mjs';
 import { acceptAuthorityPerformance, countSnapshotStage, snapshotPipelineMetrics } from "./SnapshotPipelineMetrics.mjs";
 import { LanDeltaSender, lanDeltaTarget } from "./LanDeltaTransport.mjs";
 import { LanStateCredits } from "./LanStateCredits.mjs";
@@ -6,7 +12,7 @@ import { teamName, checkFleetBudget, editAiFleet } from "../src/network/room-fle
 import { MAX_BATTLE_REPORT_BYTES, validateBattleReport } from "../src/network/battle-report.mjs";
 import { summarizeCombatFrame, reusableStateText } from "./lan-state.mjs";
 import { prepareAuthoritySnapshot } from "./authority-snapshot.mjs";
-import { decodeBinaryState } from "../src/network/BinarySnapshot.mjs";
+import { decodeBinaryState, decodeBinaryStateForRelay } from "../src/network/BinarySnapshot.mjs";
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -14,6 +20,9 @@ import { fileURLToPath } from "node:url";
 import { networkInterfaces, hostname } from "node:os";
 import { randomBytes, randomUUID, createHash } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
+import { MotionDeliveryWindow } from "./MotionDeliveryWindow.mjs";
+import { motionFromText } from "../src/network/MotionFrame.mjs";
+import { LanControlLanes, LAN_CONTROL_PATH } from "./LanControlLane.mjs";
 import { LanBroadcastCompression } from "./LanBroadcastCompression.mjs";
 import { isLanAddress, lanPerMessageDeflate } from "./lan-websocket.mjs";
 import { DEFAULT_BATTLE_SIZE, MAX_BATTLE_SIZE, validBattleSize, battleTeamCount, battleTeamLimit } from "../src/shared/battle-size.mjs";
@@ -180,6 +189,7 @@ export async function createLanServer({
   const websocketServers = [false, lanPerMessageDeflate()].map(perMessageDeflate =>
     new WebSocketServer({ noServer: true, maxPayload: protocol.maxSnapshotBytes, perMessageDeflate }));
   const broadcastCompression = new LanBroadcastCompression();
+  const controlLanes = new LanControlLanes();
   const connected = (p) =>
     !p.disconnected && p.ws.readyState === WebSocket.OPEN;
   const sendEncoded = (p, encoded, snapshot = null) => {
@@ -192,7 +202,31 @@ export async function createLanServer({
     else p.ws.send(encoded);
     return true;
   };
-  const send = (p, message) => sendEncoded(p, JSON.stringify(message));
+  const send = (p, message) => controlLanes.send(p, message) || sendEncoded(p, JSON.stringify(message));
+  const flushCombat = r => {
+    if (!r?.combatStates || r.status !== 'running') return;
+    const recipients = r.peers.filter(p => p.combatState && p.loaded && p.sync && connected(p) && !p.background && controlLanes.motionActive(p) && (!p.combatReceiptOwner || p.combatReceiptOwner === r.combatStates || !p.combatReceiptOwner.hasDebt(p)))
+      .map(peer => ({peer, syncId: peer.sync.id, idleRttMs: peer.motionWindow?.networkRttMs}));
+    r.combatStates.flush(recipients, {writable: p => controlLanes.motionWritable(p), send: (p, data) => { const sent = controlLanes.sendCombat(p, data); if (sent) p.combatReceiptOwner = r.combatStates; return sent; }});
+  };
+  const flushVisuals = r => {
+    if (!r?.visuals || r.status !== 'running') return;
+    const recipients = r.peers.filter(p => p.visualState && p.loaded && p.sync && connected(p) && !p.background && controlLanes.motionActive(p) && (!p.visualReceiptOwner || p.visualReceiptOwner === r.visuals || !p.visualReceiptOwner.hasDebt(p))).map(peer => ({peer,syncId:peer.sync.id}));
+    const retryAfter = r.visuals.flush(recipients, {
+      writable: p => controlLanes.motionWritable(p),
+      encode: (p,message) => controlLanes.encodeVisual(p,message),
+      send: (p,kind,message,encoded) => {
+        p.visualReceiptOwner = r.visuals;
+        return controlLanes.sendVisual(p,message,encoded);
+      }
+    });
+    // Token refill / local write drain must not require a future publication.
+    // This wakes admission only; outstanding application credit is untouched.
+    if (retryAfter !== null && !r.visualFlushTimer) {
+      r.visualFlushTimer = setTimeout(() => { r.visualFlushTimer = null; flushVisuals(r); }, retryAfter);
+      r.visualFlushTimer.unref();
+    }
+  };
   const probeLanPeer = p => {
     if (!p.stateCredits || p.transport || p.nativeProbe || !connected(p)) return;
     const data = randomBytes(12), token = p.stateCredits.beginNetworkProbe();
@@ -202,9 +236,11 @@ export async function createLanServer({
     p.nativeProbe = { data, at: performance.now(), token };
     p.ws.ping(data);
   };
-  const broadcast = (r, message, except, encoded) => {
+  const needsFullRelayFrame = r => r?.peers.some(p => typeof p.ws.sendSnapshot === "function" && p.ws.relayBinaryOnly !== true);
+  const broadcast = (r, message, except, encoded, visualEncoded = null, metadataOnly = false) => {
     // Encode lazily, once per broadcast; validated host states can reuse their text.
-    let deltaTarget, relaySnapshot;
+    let deltaTarget, visualDeltaTarget, relaySnapshot;
+    const criticalActive = message.type === "state" && r.peers.some(q => q.motionWindow?.active && controlLanes.motionActive(q));
     // Rotate actual ready recipients, not the excluded host slot. Shared Steam
     // byte credit and bounded LAN patch work must not favor the first seat on
     // every broadcast. Lifecycle/control delivery retains its existing order.
@@ -220,11 +256,17 @@ export async function createLanServer({
       if (p === except || !connected(p)) continue;
       // Snapshots are replaceable. Do not queue stale views behind a slow receiver.
       if (message.type === "state") {
+        if (p.visualState && p.loaded && !p.background && controlLanes.motionActive(p) && r.visuals?.needsBaseline(p,p.sync?.id)) { setImmediate(()=>flushVisuals(r)); continue; }
+        if (p.bulkChunks && r.bulkScheduler?.busy(p)) { p.chunkDeferred = (p.chunkDeferred ?? 0) + 1; continue; }
         // Resource readiness is distinct from controls-ready: syncing peers still
         // need the next full frame. Loading/hidden peers cannot present it yet;
         // returning visible peers request a fresh baseline through resync.
         if (!p.assetsLoaded || p.background) continue;
-        // Forward every host tick to a ready peer. A busy socket still skips
+        // Negotiated multirate replica: critical pose has its own consumed stream.
+        // Keep full-detail synchronization fast for new/legacy/stalled replicas.
+        const detailInterval = !p.autoMotion && p.loaded && controlLanes.motionActive(p) ? p.motionWindow?.detailIntervalMs ?? 0 : 0;
+        if (detailInterval && (performance.now() - (p.lastDetailAt ?? -Infinity) < detailInterval || (p.stateCredits?.stats().inflight ?? 0) >= 1)) { p.detailSkipped = (p.detailSkipped ?? 0) + 1; continue; }
+        // Forward every eligible host tick to a ready peer. A busy socket still skips
         // replaceable state instead of accumulating stale megabyte snapshots.
         // Steam uses ACK-based bounded pipeline credit; ordinary WebSockets keep
         // their existing zero-buffer policy. This does not change simulation Hz.
@@ -235,38 +277,105 @@ export async function createLanServer({
         }
       }
       encoded ??= JSON.stringify(message);
+      const useVisual = message.type === 'state' && !!visualEncoded && p.visualState && p.loaded && controlLanes.motionActive(p) && r.visuals?.canReplaceBulk(p,p.sync?.id,r.lastTick,p.sync?.tick);
+      const selected = useVisual ? visualEncoded : encoded;
       // TCP receipt does not prove that the guest renderer consumed the frame.
       // This gates only replaceable, not-yet-sent states; never input/control.
       // No stale payload is retained or retried after a terminal message.
       if (message.type === "state" && p.stateCredits &&
-          !p.stateCredits.reserve(message.seq, Buffer.byteLength(encoded))) {
+          !p.stateCredits.canReserve(message.seq, Buffer.byteLength(selected))) {
+        p.stateCredits.reserve(message.seq, Buffer.byteLength(selected)); // record rejection only
         if (p.lanFlow) p.lanFlow.skippedCredit++;
         countSnapshotStage(p, "skippedCredit");
         continue;
       }
-      let delivery = encoded, choice = null;
+      let delivery = selected, choice = null;
       if (message.type === "state" && p.lanDelta) {
-        if (ArrayBuffer.isView(encoded)) deltaTarget ??= lanDeltaTarget(encoded, message.seq);
-        if (deltaTarget) { choice = p.lanDelta.prepare(deltaTarget); delivery = choice.packet; }
+        if (ArrayBuffer.isView(selected)) {
+          if (useVisual) visualDeltaTarget ??= lanDeltaTarget(selected,message.seq);
+          else deltaTarget ??= lanDeltaTarget(selected,message.seq);
+        }
+        const target = useVisual ? visualDeltaTarget : deltaTarget;
+        if (target) { choice = p.lanDelta.prepare(target); delivery = choice.packet; }
         else p.lanDelta.reset(); // JSON/small/oversized fallback establishes no delta base.
+      }
+      // CPU-budget exhaustion is a deferred send, not permission to flood a
+      // full world. No receipt credit or compression base advances for it.
+      if (choice?.budgetFallback) { p.codecDeferred = (p.codecDeferred ?? 0) + 1; continue; }
+      let chunks = null;
+      if (message.type === 'state' && p.bulkChunks && (!p.loaded || criticalActive) && ArrayBuffer.isView(delivery) && delivery.byteLength <= SNAPSHOT_CHUNK_LIMITS.raw) {
+        chunks = r.bulkScheduler ??= new LanBulkScheduler({ adaptive: true, maxFlightBytes: 65536, initialFlightBytes: 16384, maxPeerFlightBytes: 16384 });
+        if (p.bulkReceiptOwner && p.bulkReceiptOwner !== chunks && p.bulkReceiptOwner.hasDebt(p) || !chunks.canEnqueue(p, delivery)) { p.chunkDeferred = (p.chunkDeferred ?? 0) + 1; continue; }
+      }
+      if (message.type === 'state' && p.stateCredits && !p.stateCredits.reserve(message.seq, Buffer.byteLength(selected))) continue;
+      if (chunks) {
+        // Keep one bounded receipt owner across leave/join on this primary WS.
+        // Old room chunks still arrive before its terminal message in TCP order.
+        p.bulkReceiptOwner = chunks;
+        const socket = p.ws;
+        if (!chunks.enqueue(p, delivery, {
+          send(packet, done) { if (p.ws !== socket || !connected(p)) return false; socket.send(packet, { binary: true, compress: false }, done); return true; },
+          started() { if (choice) p.lanDelta.commit(choice); p.lastDetailAt = performance.now(); if(useVisual)p.visualBulkSent=(p.visualBulkSent??0)+1; countSnapshotStage(p, 'queued'); if (p.lanFlow) { p.lanFlow.sent++; p.lanFlow.lastBytes = Buffer.byteLength(selected); p.lanFlow.lastSeq = message.seq; } },
+          failed() { if (p.ws === socket) socket.close(1013, 'Bulk stream failed'); },
+        })) socket.close(1013, 'Bulk admission failed');
+        continue;
       }
       // Steam's native peer can reuse the already-decoded/validated local-host
       // SWB1, avoiding JSON -> parse -> binary on every broadcast. Old negotiated
       // peers are converted to their original text format inside SteamPeer.
       let snapshot = null;
       if (message.type === "state" && ArrayBuffer.isView(encoded) && typeof p.ws.sendSnapshot === "function") {
-        relaySnapshot ??= { state: message, bytes: encoded };
+        relaySnapshot ??= { state: message, bytes: encoded, ...(metadataOnly ? { metadataOnly: true } : {}) };
         snapshot = relaySnapshot;
       }
       if (message.type === "state" && !p.transport) broadcastCompression.share(delivery);
       const sent = sendEncoded(p, delivery, snapshot);
       if (sent && choice) p.lanDelta.commit(choice);
-      if (sent && message.type === "state") countSnapshotStage(p, "queued");
+      if (sent && message.type === "state") { p.autoMotion?.sent(message.seq, r.lastTick); p.lastDetailAt = performance.now(); if(useVisual)p.visualBulkSent=(p.visualBulkSent??0)+1; countSnapshotStage(p, "queued"); }
       if (sent && message.type === "state" && p.lanFlow) {
         p.lanFlow.sent++;
-        p.lanFlow.lastBytes = Buffer.byteLength(encoded);
+        p.lanFlow.lastBytes = Buffer.byteLength(selected);
         p.lanFlow.lastSeq = message.seq;
       }
+    }
+  };
+  const admitMotionUpload = (p, m) => {
+    if (!p.motionState || authorityFactory || p.room?.hostId !== p.id || m.matchId !== p.room.match?.id) throw Error("Unauthorized critical authority");
+    const now = Date.now();
+    if (!p.motionUploadAt || now - p.motionUploadAt >= 1000) { p.motionUploadAt = now; p.motionUploadCount = 0; }
+    if (++p.motionUploadCount > 80) { p.ws.close(1008, "Critical publication rate limit"); return; }
+    broadcastMotion(p.room, m.data);
+  };
+  const broadcastMotion = (r, data, authorityTick = null) => {
+    if (r.status !== "running" || !r.frame) return;
+    // Hidden/unloaded rooms may intentionally hold the bulk capture credit for
+    // minutes. Optional motion must not validate against that stale baseline or
+    // abort an otherwise healthy authority with no critical-state consumers.
+    const recipients = r.peers.filter(p => (authorityFactory || p.id !== r.hostId) && p.motionWindow && connected(p) && p.loaded && !p.background && p.sync && controlLanes.motionActive(p));
+    if (!recipients.length) return;
+    const frame = motionFromText(data);
+    if (frame.tick <= (r.lastMotionTick ?? -1)) return;
+    const eligible = recipients.filter(p => !p.autoMotion || p.autoMotion.allow(frame.tick));
+    if (!eligible.length) return;
+    // Only the dedicated worker IPC callback supplies this tick. Its motion
+    // mailbox keeps advancing when a full capture is deliberately held. Client
+    // hosts retain the strict full-world window; wire messages cannot opt out.
+    if (authorityTick !== null) {
+      if (!Number.isSafeInteger(authorityTick) || frame.tick !== authorityTick) throw Error("Critical worker tick mismatch");
+    } else if (frame.tick > r.lastTick + 120 || frame.tick < r.lastTick - 120) throw Error("Critical motion tick outside authority window");
+    const known = new Set(r.frame.ships.map(s => s.id));
+    // A newly deployed entity can precede its heavy baseline while the latter
+    // is backpressured. Never partially apply it; wait for the complete roster.
+    if (frame.ships.some(s => !known.has(s[0]))) return;
+    r.lastMotionTick = frame.tick;
+    let wireTarget;
+    for (const p of eligible) {
+      p.motionWindow.offer(frame.tick);
+      if (!controlLanes.motionWritable(p)||!p.motionWindow.mayPrepare(frame.tick)) continue;
+      const message = { type: "motion", matchId: r.match.id, syncId: p.sync.id, data };
+      if(p.motionWire)wireTarget??=motionWireTarget(data);
+      const prepared=controlLanes.prepareMotion(p,message,wireTarget);
+      if(prepared&&p.motionWindow.reserve(frame.tick,Buffer.byteLength(prepared.data)))controlLanes.sendMotion(p,message,prepared);
     }
   };
   const view = (r) => ({
@@ -316,18 +425,60 @@ export async function createLanServer({
   // Server-only capture credit: an unobserved battle still simulates at 60 Hz.
   // Keep a scalar tick, never a queued payload or a client-side authority owner.
   const hasSnapshotAudience = r => r.peers.some(p => connected(p) && p.assetsLoaded && !p.background);
+  const updateAuthorityMotionDemand = r => {
+    if (!authorityFactory || !r.authority) return;
+    const enabled = r.status === "running" && r.peers.some(p => p.motionState && connected(p) && p.assetsLoaded && !p.background && controlLanes.motionActive(p));
+    const visualEnabled = enabled && r.peers.some(p => p.visualState && p.loaded && connected(p) && !p.background && controlLanes.motionActive(p));
+    if (r.authorityVisualEnabled !== visualEnabled) { r.authorityVisualEnabled = visualEnabled; r.authority.postMessage({type:'visual-mode',enabled:visualEnabled}); }
+    const combatEnabled = enabled && r.peers.some(p => p.combatState && p.loaded && connected(p) && !p.background && controlLanes.motionActive(p));
+    if (r.authorityCombatEnabled !== combatEnabled) { r.authorityCombatEnabled = combatEnabled; r.authority.postMessage({ type: "combat-mode", enabled: combatEnabled }); }
+    if (r.authorityMotionEnabled === enabled) return;
+    r.authorityMotionEnabled = enabled; r.authority.postMessage({ type: "motion-mode", enabled });
+  };
+  // Demand-driven full capture. Simulation, input handling and the independent
+  // motion/visual mailboxes never wait here. No serialized snapshot is queued:
+  // retain only its exact IPC credit until at least one relay can use a new one.
+  const hasReadySnapshotAudience = r => r.peers.some(p => {
+    if (!connected(p) || !p.assetsLoaded || p.background) return false;
+    if (p.bulkChunks && r.bulkScheduler?.busy(p)) return false;
+    if (p.ws.snapshotWritable === false || p.ws.snapshotWritable === undefined && p.ws.bufferedAmount > 0) return false;
+    const inflight = p.stateCredits?.stats().inflight ?? 0;
+    if (p.stateCredits && inflight >= p.stateCredits.capacity) return false;
+    const detailInterval = !p.autoMotion && p.loaded && controlLanes.motionActive(p) ? p.motionWindow?.detailIntervalMs ?? 0 : 0;
+    if (detailInterval && (inflight >= 1 || performance.now() - (p.lastDetailAt ?? -Infinity) < detailInterval)) return false;
+    return !(p.visualState && p.loaded && controlLanes.motionActive(p) && r.visuals?.needsBaseline(p, p.sync?.id));
+  });
   const resumeAuthoritySnapshots = r => {
-    if (!authorityFactory || r.status !== "running" || r.authoritySnapshotTick == null || !hasSnapshotAudience(r)) return;
+    if (!r) return;
+    updateAuthorityMotionDemand(r);
+    if (!authorityFactory || r.status !== "running" || r.authoritySnapshotTick == null) return;
+    if (!hasSnapshotAudience(r)) { r.authorityCaptureReason = "audience"; r.authorityDiscardSounds = true; clearTimeout(r.authorityCaptureTimer); r.authorityCaptureTimer = null; return; }
+    if (!hasReadySnapshotAudience(r)) {
+      r.authorityCaptureReason = "relay";
+      // ACKs wake immediately. One bounded fallback timer covers plain socket
+      // drain (including legacy Steam) and a due detail interval, NOT new credit.
+      if (!r.authorityCaptureTimer) {
+        r.authorityCaptureTimer = setTimeout(() => { r.authorityCaptureTimer = null; resumeAuthoritySnapshots(r); }, 16);
+        r.authorityCaptureTimer.unref();
+      }
+      return;
+    }
+    clearTimeout(r.authorityCaptureTimer); r.authorityCaptureTimer = null;
     const tick = r.authoritySnapshotTick;
     r.authoritySnapshotTick = null;
-    // Grant ONE normal snapshot timeout from resumed demand, not on each ping,
-    // visibility message or resync. The next frame must really arrive.
+    r.authorityCaptureReason = null;
+    r.authorityCaptureGranted = (r.authorityCaptureGranted ?? 0) + 1;
     r.authorityDemandSince = Date.now();
-    r.authority?.postMessage({type:"snapshot-consumed", tick, discardSounds:true});
+    const discardSounds = r.authorityDiscardSounds === true;
+    r.authorityDiscardSounds = false;
+    r.authority?.postMessage({type:"snapshot-consumed", tick, ...(discardSounds ? {discardSounds:true} : {})});
   };
   const consumeAuthoritySnapshot = (r, tick) => {
-    if (r.status === "running" && !hasSnapshotAudience(r)) r.authoritySnapshotTick = tick;
-    else r.authority?.postMessage({type:"snapshot-consumed", tick});
+    if (r.status !== "running") { r.authority?.postMessage({type:"snapshot-consumed", tick}); return; }
+    r.authoritySnapshotTick = tick;
+    r.authorityCaptureHeldAt = performance.now();
+    resumeAuthoritySnapshots(r);
+    if (r.authoritySnapshotTick !== null) r.authorityCaptureWithheld = (r.authorityCaptureWithheld ?? 0) + 1;
   };
   const toAuthority = (r, message) => authorityFactory ? r.authority?.postMessage(message) : send(r.peers[0], message);
   const presence = (r, p, online) =>
@@ -341,7 +492,10 @@ export async function createLanServer({
   // Loading resources is not permission to send controls. A fresh full frame must
   // be applied and acknowledged with this connection's epoch first.
   const beginSync = (r, p) => {
-    p.stateCredits?.reset();
+    r.combatStates?.reset(p); r.visuals?.reset(p);
+    r.bulkScheduler?.cancel(p);
+    p.lastDetailAt = null; p.detailSkipped = 0; p.codecDeferred = 0;
+    p.autoMotion?.resetEpoch(p.room?.match?.id ?? null); p.motionWindow?.reset(); p.stateCredits?.reset();
     p.lanDelta?.reset();
     p.loaded = false;
     p.sync = { id: randomUUID(), tick: Math.max(0, r.lastTick + 1), since: Date.now() };
@@ -349,7 +503,7 @@ export async function createLanServer({
     send(p, { type: "launch", matchId: r.match.id, syncId: p.sync.id, minTick: p.sync.tick });
     resumeAuthoritySnapshots(r);
   };
-  const stopAuthority = r => { const handle = r.authority; r.authority = null; r.authorityReady = false; r.authoritySnapshotTick = null; return handle?.terminate(); };
+  const stopAuthority = r => { clearTimeout(r.visualFlushTimer); r.visualFlushTimer = null; clearTimeout(r.authorityCaptureTimer); r.authorityCaptureTimer = null; r.authorityDiscardSounds = false; r.combatStates?.close(); r.combatStates = null; r.visuals?.close(); r.visuals = null; r.bulkScheduler?.close(); r.bulkScheduler = null; const handle = r.authority; r.authority = null; r.authorityReady = false; r.authoritySnapshotTick = null; return handle?.terminate(); };
   const abort = (r, reason) => {
     if (!["loading", "running"].includes(r.status)) return;
     r.status = "ended";
@@ -360,7 +514,9 @@ export async function createLanServer({
     publish(r);
   };
   const leave = (p, reason = "玩家在加载期间离开，请重新准备。") => {
-    p.stateCredits?.reset();
+    p.room?.combatStates?.reset(p); p.room?.visuals?.reset(p);
+    p.room?.bulkScheduler?.cancel(p);
+    p.autoMotion?.resetEpoch(p.room?.match?.id ?? null); p.motionWindow?.reset(); p.stateCredits?.reset();
     p.lanDelta?.reset();
     const r = p.room;
     if (!r) return;
@@ -384,7 +540,7 @@ export async function createLanServer({
         other.room = null;
         other.ready = false;
       }
-      rooms.delete(r.code);
+      r.bulkScheduler?.close(); rooms.delete(r.code);
     } else {
       presence(r, p, false);
       if (r.status === "loading") abort(r, reason);
@@ -443,14 +599,31 @@ export async function createLanServer({
     if (rooms.get(r.code) !== r || r.match?.id !== matchId || !["loading","running"].includes(r.status)) return;
     try {
       if (message.type === "ready") { r.authorityReady = true; launchReady(r); }
-      else if (message.type === "snapshot") {
+      else if (message.type === 'projectile-visual') {
+        try {
+          if (r.status !== 'running') return;
+          r.visuals ??= new LanProjectileVisuals(matchId);
+          r.visuals.publish(message.publication); r.visualUnavailable = null;
+          setImmediate(() => flushVisuals(r));
+        } finally { r.authority?.postMessage({type:'visual-consumed',tick:message.tick}); }
+      } else if (message.type === 'visual-unavailable') {
+        r.visualUnavailable = message.reason;
+      } else if (message.type === "combat-state") {
+        try {
+          r.combatStates ??= new LanCriticalCombat(matchId);
+          r.combatStates.publish(new Uint8Array(message.data), message.tick);
+          flushCombat(r);
+        } finally { r.authority?.postMessage({ type: "combat-consumed", tick: message.tick }); }
+      } else if (message.type === "motion") {
+        try { broadcastMotion(r, message.data, message.tick); } finally { r.authority?.postMessage({ type: "motion-consumed", tick: message.tick }); }
+      } else if (message.type === "snapshot") {
         try {
           if (r.status !== "running") return;
           const seq = r.lastSeq + 1;
-          const needsFrame = r.peers.some(p => typeof p.ws.sendSnapshot === "function");
-          const {bytes, frame, summary} = prepareAuthoritySnapshot(message, matchId, seq, expectedShips(r), r.lastTick, needsFrame);
+          const needsFrame = needsFullRelayFrame(r);
+          const {bytes, frame, summary, visualBytes} = prepareAuthoritySnapshot(message, matchId, seq, expectedShips(r), r.lastTick, needsFrame);
           r.lastTick = summary.tick; r.lastSeq = seq; r.lastState = Date.now(); r.frame = summary;
-          broadcast(r, {type:"state", matchId, seq, frame}, undefined, bytes);
+          broadcast(r, {type:"state", matchId, seq, frame}, undefined, bytes, visualBytes, !frame);
         } finally { consumeAuthoritySnapshot(r, message.tick); }
       } else if (message.type === "performance") {
         if (Number.isSafeInteger(message.tick) && message.tick > (r.authorityProgressTick ?? -1)) {
@@ -482,13 +655,14 @@ export async function createLanServer({
       const origin = new URL(req.headers.origin ?? "");
       if (
         !validHost(req) ||
-        (req.url !== "/lan/ws" && !extension?.isUpgrade?.(req.url)) ||
+        (req.url !== "/lan/ws" && new URL(req.url, origin).pathname !== LAN_CONTROL_PATH && !extension?.isUpgrade?.(req.url)) ||
         !["http:", "https:"].includes(origin.protocol) ||
         origin.host !== req.headers.host ||
         (exposed && req.headers.host === exposed.host && origin.origin !== exposed.origin) ||
         peers.size >= 64
       )
         throw Error("upgrade");
+      if (new URL(req.url, origin).pathname === LAN_CONTROL_PATH) { controlLanes.upgrade(req, socket, head); return; }
       if (extension?.isUpgrade?.(req.url)) { extension.upgrade(req, socket, head); return; }
       const wss = websocketServers[(exposed && req.headers.host === exposed.host) || isLanAddress(socket.remoteAddress) ? 1 : 0];
       wss.handleUpgrade(req, socket, head, (ws) =>
@@ -548,8 +722,9 @@ export async function createLanServer({
     ws.on("close", () => {
       if (p.ws !== ws) return;
       peers.delete(p);
+      controlLanes.revoke(p); p.combatReceiptOwner?.abandon(p); p.combatReceiptOwner = null; p.visualReceiptOwner?.abandon(p); p.visualReceiptOwner = null; p.bulkReceiptOwner?.abandon(p); p.bulkReceiptOwner = null;
       if (!p.hello) return;
-      p.stateCredits?.reset();
+      p.autoMotion?.resetEpoch(p.room?.match?.id ?? null); p.motionWindow?.reset(); p.stateCredits?.reset();
       p.lanDelta?.reset();
       p.nativeProbe = null;
       p.disconnected = Date.now();
@@ -573,17 +748,36 @@ export async function createLanServer({
           p.window = now;
           p.count = 0;
         }
+        // A new bounded publication family, not 60 additional gameplay commands.
+        // Only the negotiated authority may use its own 80/s, 16KiB budget.
+        if (!binary && raw.length <= 16384 && p.motionState && !authorityFactory && p.room?.hostId === p.id && raw.toString().startsWith('{"type":"motion",')) {
+          const m = JSON.parse(raw.toString()); admitMotionUpload(p, m); return;
+        }
         // Consumption receipts are transport flow control, not player requests.
         // Only exact outstanding LAN credits may bypass the request budget; their
         // count/bytes are already bounded by our sends. Invalid/duplicate receipts
         // and malformed JSON still take the original 160-message request path.
         // Otherwise a healthy backlog drain can consume the input/control budget.
+        if (!binary && raw.length <= 160 && p.bulkChunks && p.bulkReceiptOwner) {
+          try { const receipt = JSON.parse(raw.toString()); if (receipt?.type === 'bulk-ack' && p.bulkReceiptOwner.acknowledge(p, receipt)) { flushCombat(p.room); flushVisuals(p.room); resumeAuthoritySnapshots(p.room); return; } } catch { /* Invalid receipts use ordinary validation/rate budget. */ }
+        }
+        if (!binary && raw.length <= 384 && p.combatReceiptOwner) {
+          try { const m = JSON.parse(raw.toString()); if (p.combatReceiptOwner.acknowledge(p, m)) { flushCombat(p.room); return; } } catch { /* Invalid receipts use ordinary validation/rate budget. */ }
+        }
+        if (!binary && raw.length <= 256 && p.motionWindow && p.loaded && p.room?.status === "running") {
+          try { const m = JSON.parse(raw.toString());
+            if (m.type === "motion-consumed" && m.matchId === p.room.match.id && m.syncId === p.sync?.id && p.motionWindow.ack(m.tick)) { p.room.bulkScheduler?.observeCritical(p, p.motionWindow.lastAckMs, p.motionWindow.networkRttMs); flushCombat(p.room); flushVisuals(p.room); resumeAuthoritySnapshots(p.room); return; }
+          } catch { /* Invalid receipts still spend the shared request budget. */ }
+        }
+        if (!binary && raw.length <= 320 && p.visualReceiptOwner) {
+          try { const m = JSON.parse(raw.toString()); if (p.visualReceiptOwner.acknowledge(p,m)) { flushCombat(p.room); flushVisuals(p.room); resumeAuthoritySnapshots(p.room); return; } } catch { /* Invalid receipts spend the normal request budget. */ }
+        }
         let receipt;
         if (!binary && p.stateCredits && raw.length <= 256 &&
             p.room && (authorityFactory || p.room.hostId !== p.id)) {
           try { receipt = JSON.parse(raw.toString()); } catch { /* counted below */ }
           if (receipt?.type === "state-consumed" && receipt.matchId === p.room.match?.id &&
-              p.stateCredits.ack(receipt.seq)) { p.lanDelta?.ack(receipt.seq); countSnapshotStage(p, "consumed"); return; }
+              p.stateCredits.ack(receipt.seq)) { p.autoMotion?.consumed(receipt.seq); p.lanDelta?.ack(receipt.seq); countSnapshotStage(p, "consumed"); resumeAuthoritySnapshots(p.room); return; }
         }
         if (++p.count > 160) {
           ws.close(1008, "Rate limit");
@@ -591,7 +785,8 @@ export async function createLanServer({
         }
         const decodeStarted = performance.now();
         const text = binary ? null : raw.toString();
-        const m = receipt ?? (binary ? decodeBinaryState(raw) : JSON.parse(text));
+        const relayMetadata = binary && !needsFullRelayFrame(p.room);
+        const m = receipt ?? (binary ? (relayMetadata ? decodeBinaryStateForRelay(raw) : decodeBinaryState(raw)) : JSON.parse(text));
         if (!m || typeof m.type !== "string") throw Error("无效消息");
         if (["configure","ai","ready","start"].includes(m.type) && typeof m.requestId === "string" && /^[a-zA-Z0-9-]{1,64}$/.test(m.requestId)) requestId = m.requestId;
         if (m.type !== "state" && raw.length > (["configure","ai"].includes(m.type) ? MAX_DESIGN_BYTES * 4 + 4096 : m.type === "options" ? protocol.maxOptionsBytes + 4096 : m.type === "finish" ? MAX_BATTLE_REPORT_BYTES + 4096 : 16384)) {
@@ -649,6 +844,7 @@ export async function createLanServer({
               !authorityFactory && previous.room?.hostId === previous.id &&
               previous.instance !== m.instance;
             p = previous;
+            controlLanes.revoke(p); p.combatReceiptOwner?.abandon(p); p.combatReceiptOwner = null; p.visualReceiptOwner?.abandon(p); p.visualReceiptOwner = null; p.bulkReceiptOwner?.abandon(p); p.bulkReceiptOwner = null;
             p.ws = ws;
             p.disconnected = 0;
             // Retain visibility until the resumed page reports it. A previously
@@ -682,12 +878,30 @@ export async function createLanServer({
           // Explicit LAN-only capability. Steam has its own transport ACK windows.
           p.stateCredits = !p.transport && m.stateCredits === 1 ? new LanStateCredits({maxBytes:protocol.maxSnapshotBytes*2}) : null;
           p.lanFlow = p.stateCredits ? createLanFlowMetrics() : null;
-          // Remote LAN only: loopback never gains codec CPU work, Steam stays on
-          // its own transport. Both sides must explicitly negotiate the feature.
-          p.lanDelta = p.stateCredits && m.binaryDelta === 1 && ws.extensions?.includes("permessage-deflate") ? new LanDeltaSender({ ordered: true, motionReference: m.motionReference === 1 }) : null;
+          // Ordinary loopback avoids codec work. Negotiated experimental helper chunks
+          // compress independently of WS extensions, including loopback tests. Steam
+          // retains its own transport; both helper capabilities must be offered.
+          p.lanDelta = p.stateCredits && m.binaryDelta === 1 && (ws.extensions?.includes("permessage-deflate") || m.bulkChunks === 1 && m.motionState === 1 && m.controlLane === 1) ? new LanDeltaSender({ ordered: true, motionReference: m.motionReference === 1 }) : null;
           p.nativeProbe = null;
+          p.motionState = !p.transport && !!p.stateCredits && m.motionState === 1;
+          p.autoMotion = p.motionState && m.motionAuto === 1 ? (p.autoMotion ?? new AutoMotionAdmission()) : null;
+          p.autoMotion?.resetEpoch(p.room?.match?.id ?? null);
+          p.motionWire = p.motionState && m.motionWire === 1 && m.controlLane === 1;
+          p.combatState = !p.autoMotion && !!authorityFactory && p.motionWire && m.combatState === 1;
+          p.visualState = !p.autoMotion && !!authorityFactory && p.motionState && m.visualState === 1 && m.controlLane === 1;
+          p.visualWire = p.visualState && m.visualWire === 1;
+          p.motionWindow = p.motionState ? new MotionDeliveryWindow() : null;
+          p.bulkChunks = !p.autoMotion && p.motionState && !!p.lanDelta && m.controlLane === 1 && m.bulkChunks === 1;
+          const controlLane = !p.transport && m.controlLane === 1 ? controlLanes.issue(p, ws) : null;
           send(p, {
             type: "welcome",
+            ...(controlLane ? { controlLane } : {}),
+            ...(p.motionState ? { motionState: 1 } : {}),
+            ...(p.combatState ? { combatState: 1 } : {}),
+            ...(p.motionWire ? {motionWire:1} : {}),
+            ...(p.visualState ? { visualState: 1 } : {}),
+            ...(p.visualWire ? {visualWire:1} : {}),
+            ...(p.bulkChunks ? { bulkChunks: 1 } : {}),
             ...(p.binaryHost ? {binarySnapshots:1} : {}),
             ...(p.stateCredits ? {stateCredits:1} : {}),
             ...(p.lanDelta ? {binaryDelta:1} : {}),
@@ -731,7 +945,7 @@ export async function createLanServer({
             const r = p.room;
             r.recoveryUntil = Math.min(now + protocol.hostStateTimeoutMs, r.lastState + protocol.backgroundGraceMs);
           }
-          if (p.background !== m.hidden) { p.stateCredits?.reset(); p.lanDelta?.reset(); }
+          if (p.background !== m.hidden) { p.room?.combatStates?.reset(p); p.room?.visuals?.reset(p); p.room?.bulkScheduler?.cancel(p); p.autoMotion?.resetEpoch(p.room?.match?.id ?? null); p.motionWindow?.reset(); p.stateCredits?.reset(); p.lanDelta?.reset(); }
           p.background = m.hidden;
           if (p.room) resumeAuthoritySnapshots(p.room);
           return;
@@ -743,11 +957,14 @@ export async function createLanServer({
           send(p, { type: "pong", sent: m.sent, ...(lanTransport ? { lanTransport } : {}), ...(snapshotPipeline ? { snapshotPipeline } : {}) });
           return;
         }
+        if (m.type === "bulk-ack" && p.bulkChunks) return; // Stale/duplicate chunk receipts spend ordinary rate budget, grant nothing.
+        if (m.type === "visual-consumed") return;
+        if (m.type === "motion-consumed" || m.type === "combat-consumed") return; // Non-outstanding/old receipts grant nothing.
         if (m.type === "state-consumed") {
           // Exact sent-sequence validation is inside the window. A stale socket,
           // old match, host ACK or forged/future sequence cannot create credit.
           if (p.stateCredits && p.room && (authorityFactory || p.room.hostId !== p.id) &&
-              m.matchId === p.room.match?.id && p.stateCredits.ack(m.seq)) { p.lanDelta?.ack(m.seq); countSnapshotStage(p, "consumed"); }
+              m.matchId === p.room.match?.id && p.stateCredits.ack(m.seq)) { p.autoMotion?.consumed(m.seq); p.lanDelta?.ack(m.seq); countSnapshotStage(p, "consumed"); }
           return;
         }
         if (m.type === "leave") {
@@ -994,15 +1211,18 @@ export async function createLanServer({
             snapshotHz: protocol.snapshotHz, // Fixed target; bounded sockets may still skip congested state.
             options: copyOptions(r.options),
           };
+          r.combatStates?.close(); r.combatStates = null; r.visuals?.close(); r.visuals = null;
+          r.bulkScheduler?.close(); r.bulkScheduler = null;
           r.status = "loading";
           r.reason = "";
           r.since = now;
           r.lastState = now;
           r.authoritySnapshotTick = null;
           r.authorityProgressTick = -1;
+          r.authorityCaptureGranted = r.authorityCaptureWithheld = 0; r.authorityCaptureReason = null;
           r.authorityProgressAt = r.authorityDemandSince = now;
           r.lastSeq = -1;
-          r.lastTick = -1;
+          r.lastTick = -1; r.lastMotionTick = -1; r.relayDecode = null;
           r.frame = null;
           r.result = null;
           for (const member of r.peers) {
@@ -1015,7 +1235,7 @@ export async function createLanServer({
           broadcast(r, { type: "match", match: r.match });
           if (authorityFactory) {
             const matchId = r.match.id;
-            try { r.authority = authorityFactory(r.match, message => receiveAuthority(r, matchId, message)); }
+            try { r.authorityMotionEnabled = false; r.authorityVisualEnabled = false; r.authorityCombatEnabled = false; r.authority = authorityFactory(r.match, message => receiveAuthority(r, matchId, message)); }
             catch (error) { abort(r, "服务器无法开始战斗：" + error.message); }
           }
           return;
@@ -1025,7 +1245,7 @@ export async function createLanServer({
           if(m.type==='deployment-result'||m.type==='finish')return;
           throw Error("已过期的对局消息");
         }
-        if (authorityFactory && ["state", "finish", "deployment-result", "host-recovered"].includes(m.type))
+        if (authorityFactory && ["state", "motion", "combat-state", "finish", "deployment-result", "host-recovered"].includes(m.type))
           throw Error("此房间由服务器计算，客户端不能提交权威状态或结果。");
         if (m.type === "end") {
           isHost(p, r);
@@ -1060,6 +1280,8 @@ export async function createLanServer({
           if (!Number.isSafeInteger(m.tick) || m.tick < p.sync.tick || m.tick > r.lastTick || r.lastTick - m.tick > 120 || now - r.lastState > 1500) return;
           if (!p.loaded) {
             p.loaded = true;
+            updateAuthorityMotionDemand(r);
+            flushCombat(r); flushVisuals(r);
             presence(r, p, true);
             publish(r);
           }
@@ -1165,6 +1387,10 @@ export async function createLanServer({
           });
           return;
         }
+        if (m.type === "motion") {
+          isHost(p, r); if (!p.motionState) throw Error("Critical motion not negotiated");
+          admitMotionUpload(p, m); return;
+        }
         if (m.type === "state") {
           isHost(p, r);
           if (r.status !== "running") return;
@@ -1176,6 +1402,8 @@ export async function createLanServer({
             p.lanFlow.lastReceivedBytes = raw.length;
             p.lanFlow.lastReceiveMs = performance.now() - decodeStarted;
           }
+          const decode = r.relayDecode ??= { metadataFrames: 0, fullFrames: 0, lastMs: 0 };
+          decode[relayMetadata ? 'metadataFrames' : 'fullFrames']++; decode.lastMs = performance.now() - decodeStarted;
           countSnapshotStage(p, "received");
           r.lastSeq = m.seq;
           r.lastTick = f.tick;
@@ -1188,6 +1416,7 @@ export async function createLanServer({
             { type: "state", matchId: r.match.id, seq: m.seq, frame: f },
             p,
             binary ? raw : reusableStateText(m, text),
+            null, relayMetadata,
           );
           return;
         }
@@ -1197,6 +1426,8 @@ export async function createLanServer({
           const teams = new Set([...r.match.players.map(member=>member.team), ...r.match.options.aiHulls.flatMap((hulls,team)=>hulls.length?[team]:[])]);
           if (m.winner !== "draw" && (!validTeam(m.winner) || !teams.has(m.winner))) throw Error("无效结果");
           const report = validateBattleReport(m.report, r.match, r.frame);
+          r.combatStates?.close(); r.combatStates = null; r.visuals?.close(); r.visuals = null;
+          r.bulkScheduler?.close(); r.bulkScheduler = null;
           r.status = "ended";
           const winnerName = r.match.options.assignment === "solo" ? r.match.players.find(member=>member.team===m.winner)?.name : null;
           r.reason = m.winner === "draw" ? "所有阵营均被消灭，平局" : (winnerName ?? teamName(m.winner)) + "获胜";
@@ -1263,6 +1494,7 @@ export async function createLanServer({
     });
   } catch (error) {
     clearInterval(timer);
+    await controlLanes.close();
     for (const wss of websocketServers) wss.close();
     throw error;
   }
@@ -1276,12 +1508,13 @@ export async function createLanServer({
       void stopAuthority(room);
       broadcast(room, {type:"roomClosed", message:"服务器关闭了房间。"});
       for (const member of room.peers) member.room = null;
-      rooms.delete(code);
+      room.bulkScheduler?.close(); rooms.delete(code);
     },
     addresses: addresses(),
     close: async () => {
       clearInterval(timer);
       await Promise.all([...rooms.values()].map(stopAuthority));
+      await controlLanes.close();
       for (const p of peers) p.ws.terminate();
       await Promise.all(websocketServers.map(wss => new Promise(resolve => wss.close(resolve))));
       await new Promise((resolve) => server.close(resolve));

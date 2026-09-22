@@ -108,3 +108,13 @@ test('nonfinite numeric dependencies never write nonfinite bytes, and repeated c
   const raw = bytes(f), first = createMotionReference(raw, 60); assert.ok(first); assert.doesNotThrow(() => decodeBinaryState(first));
   assert.deepEqual(createMotionReference(raw, 60), first);
 });
+test('dynamic recipe collections stay opaque without disabling ordinary projectile/FX references', () => {
+  const source=frame();
+  const envelope={$dynamicParticles:[1,[[1,2,123,0,0,1,255,120,20,0,0]],[[0,0,17,[1,2,3,4]]]]};
+  source.world.fxSystem.values[0]=envelope;source.world.fxSystem.values[1]=structuredClone(envelope);
+  const raw=bytes(source),reference=createMotionReference(raw,12);assert.ok(reference);
+  const output=decodeBinaryState(reference).frame;
+  assert.deepEqual(output.world.fxSystem.values[0],envelope);assert.deepEqual(output.world.fxSystem.values[1],envelope);
+  assert.notDeepEqual(output.world.projectiles,source.world.projectiles);assert.deepEqual(decodeBinaryState(raw).frame,source);
+  source.world.fxSystem.values[0].extra=true;expectFallback(source);
+});

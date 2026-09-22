@@ -12,6 +12,8 @@ export interface CommandFXCallbacks {
 export class FleetCommandSystem {
   public commandPoints = 5;
   private recoveryElapsed = 0;
+  private orderSequence = 0;
+  public allocateOrderId(): string { return 'tactical-' + (++this.orderSequence); }
   public selectedUnitId: string | null = null;
   public orders: Map<string, TacticalOrder> = new Map();
   public radioMessages: RadioMessage[] = [];
@@ -22,6 +24,7 @@ export class FleetCommandSystem {
   public clear() {
     this.commandPoints = 5;
     this.recoveryElapsed = 0;
+    this.orderSequence = 0;
     this.selectedUnitId = null;
     this.orders.clear();
     this.radioMessages = [];

@@ -1,7 +1,7 @@
 import {
   Cell, LAN_SOCKET_CLOSE_MS, LAN_SOCKET_INIT_MS, LAN_SOCKET_QUEUE_BYTES,
   LAN_SOCKET_QUEUE_MESSAGES, LAN_SOCKET_SHARED_BYTES, closeArguments,
-  payloadBytes, releaseIncoming, reserve,
+  payloadBytes, releaseIncoming, reserve, closeTransport,
 } from "./LanSocketShared";
 import type { FromLanWorker, LanPayload, ToLanWorker } from "./LanSocketShared";
 
@@ -9,6 +9,8 @@ import type { FromLanWorker, LanPayload, ToLanWorker } from "./LanSocketShared";
  * Worker mode supports arraybuffer reception only. send() accepts a queue
  * entry, not a delivery ACK; later native-send failures emit error then close. */
 export interface LanSocket extends EventTarget {
+  attachAuthority?(port: MessagePort, matchId: string, seq: number): boolean;
+  detachAuthority?(): void;
   readonly url: string;
   readonly readyState: number;
   readonly bufferedAmount: number;
@@ -53,6 +55,12 @@ class WorkerLanSocket extends EventTarget implements LanSocket {
     }
   }
 
+  attachAuthority(port: MessagePort, matchId: string, seq: number): boolean {
+    if (this.native || !this.worker || this.readyState !== 1) return false;
+    try { this.post({ type: "authority", port, matchId, seq }, [port]); return true; }
+    catch { return false; }
+  }
+  detachAuthority(): void { if (this.worker && !this.finished) this.post({ type: "authority-detach" }); }
   get readyState(): number { return this.native?.readyState ?? this.state; }
   get bufferedAmount(): number {
     return this.native?.bufferedAmount ?? (this.cells ? Atomics.load(this.cells, Cell.outbound) : 0);
@@ -213,7 +221,7 @@ class WorkerLanSocket extends EventTarget implements LanSocket {
   close(code?: number, reason?: string): void {
     const args = closeArguments(code, reason);
     if (this.finished || this.readyState >= 2) return;
-    if (this.native) { this.native.close(args.code, args.reason); return; }
+    if (this.native) { closeTransport(this.native, args.code, args.reason); return; }
     const connecting = this.state === 0;
     this.state = 2;
     if (this.cells) Atomics.store(this.cells, Cell.closing, 1);

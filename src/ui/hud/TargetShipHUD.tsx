@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { Ship } from '../../engine/simulation/Ship';
+import type { HudShip as Ship } from '../../engine/runtime/CombatHudView';
 import { i18n } from '../../engine/i18n/LocalizationManager';
 import { isInspectableShip } from '../../engine/runtime/CombatTargeting';
 import type { FloatingShipHUDProps } from './FloatingShipHUD';
@@ -11,7 +11,7 @@ import { contactAnchor, clampContact } from './ContactLayout';
 import './target-ship-hud.css';
 
 const damageLabels = { KINETIC: '动能', HIGH_EXPLOSIVE: '高爆', ENERGY: '能量', FRAGMENTATION: '破片' };
-interface Props extends Pick<FloatingShipHUDProps, 'ship' | 'cameraPosRef' | 'zoomRef' | 'canvasRef' | 'alphaRef'> { observer: Ship }
+interface Props extends Pick<FloatingShipHUDProps, 'cameraPosRef' | 'zoomRef' | 'canvasRef' | 'alphaRef'> { ship: Ship; observer: Ship }
 
 /** Locked-contact inspection is deliberately read-only, never an enemy WeaponGroupConsole. */
 export function TargetShipHUD({ ship, observer, cameraPosRef, zoomRef, canvasRef, alphaRef }: Props) {

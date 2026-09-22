@@ -22,7 +22,7 @@ const result=await build({entryPoints:['server/authority-worker.mjs'],outfile:wo
  });}
 }]});
 assert.ok(!Object.keys(result.metafile.inputs).some(p=>/(^|\/)campaign(\/|\.)/.test(p)));
-assert.match(await fs.readFile('src/network/host.worker.ts','utf8'),/const frame = captureAuthorityCombat\(/);
+assert.match(await fs.readFile('src/network/host.worker.ts','utf8'),/captured = captureAuthorityCombat\(/);
 const match={id:'shared-transport-match',hostId:'a',seed:1511506142,snapshotHz:60,players:[{id:'a',seat:0,team:0,hull:'onslaught'},{id:'b',seat:1,team:1,hull:'onslaught'}],options:{assignment:'teams',battleSize:3200,aiHulls:[Array(7).fill('hammerhead'),Array(7).fill('hammerhead')]}};
 const normalize=value=>JSON.parse(JSON.stringify(value));
 const initialState=frame=>{const result={...frame};for(const k of ['simulationMs','captureMs','encodeMs','realtimeRatio','combatRate'])delete result[k];return normalize(result);};
@@ -44,7 +44,7 @@ async function collect(mode){
     assert.ok(m.tick>last);last=m.tick;count++;
     assert.equal(m.binary instanceof ArrayBuffer,mode.binary);assert.equal(typeof m.json==='string',!mode.binary);
     assert.equal(!!m.summary,mode.summary);
-    if(!frames.length||(frames.length===1&&m.tick>=120)||(frames.length===2&&m.tick>=300)){
+    if(!frames.length||(frames.length===1&&m.tick>=120)||(frames.length===2&&m.tick>=780)){
      const frame=m.binary?decodeBinaryFrame(m.binary):JSON.parse(m.json);
      assert.equal(frame.tick,m.tick);assert.equal(m.bytes,m.binary?m.binary.byteLength:Buffer.byteLength(m.json));
      if(frame.acknowledged[1]>=7)acknowledged=true;
@@ -78,6 +78,8 @@ function steamRoundtrip(packets){
  assert.deepEqual(kernel.stats().map(s=>s.lastSeq),[seq,seq]);return formats;
 }
 const modes=[{name:'lan-web-relay-and-steam-binary',binary:true,summary:false},{name:'steam-legacy-json',binary:false,summary:false},{name:'dedicated-node-adapter',binary:true,summary:true}];
+const recipeRows=value=>!value||typeof value!=='object'?0:Object.hasOwn(value,'$dynamicParticles')?value.$dynamicParticles[2].filter(Array.isArray).length:Object.values(value).reduce((n,v)=>n+recipeRows(v),0);
+const residualRows=value=>!value||typeof value!=='object'?0:Object.hasOwn(value,'$dynamicParticles')?value.$dynamicParticles[2].filter(r=>Array.isArray(r)&&r[3]?.length===5).length:Object.values(value).reduce((n,v)=>n+residualRows(v),0);
 const checks=[];let baseline;
 for(const mode of modes){
  const {frames,count}=await collect(mode);const initial=initialState(frames[0].frame);
@@ -87,7 +89,9 @@ for(const mode of modes){
   if(m.binary){const wire=decodeBinaryState(encodeBinaryState(match.id,i+1,m.binary));assert.deepEqual(normalize(wire.frame),normalize(frame));}
   if(mode.summary){const prepared=prepareAuthoritySnapshot(m,match.id,i+1,16,m.tick-1);assert.deepEqual(prepared.summary,summarizeCombatFrame(frame,16,m.tick-1));assert.deepEqual(normalize(decodeBinaryState(prepared.bytes).frame),normalize(frame));}
  }
- checks.push({mode:mode.name,snapshots:count,ticks:frames.map(v=>v.frame.tick),steamPeerFormats:steamRoundtrip(frames)});
+ const dynamicParticleRows=frames.reduce((n,v)=>n+recipeRows(v.frame),0);assert.ok(dynamicParticleRows>0,'production worker must exercise dynamic recipes in '+mode.name);
+ const particleResidualRows=frames.reduce((n,v)=>n+residualRows(v.frame),0);assert.ok(particleResidualRows>0,'production worker must exercise exact residuals in '+mode.name);
+ checks.push({mode:mode.name,dynamicParticleRows,particleResidualRows,snapshots:count,ticks:frames.map(v=>v.frame.tick),steamPeerFormats:steamRoundtrip(frames)});
 }
 const report={passed:true,checks,scope:'Real shared authority Worker and real Steam preparation/framing/receivers; local in-memory delivery, NOT native Steam or public-Internet latency/Hz. No campaign bundle or running service changed.'};
 await fs.writeFile(path.join(base,'results.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));

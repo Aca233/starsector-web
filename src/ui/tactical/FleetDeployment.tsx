@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { CombatEngine } from '../../engine/simulation/CombatEngine';
+import { deploymentViewReason, deploymentViewUsed, type DeploymentViewSource } from '../../engine/runtime/DeploymentView';
+import { useDeploymentView, useDeploymentSelection } from './useDeploymentView';
 import { runtimeAssetUrl } from '../../engine/runtime/RuntimePaths';
 import { matchesRefitSearch, hullMatchesCategory, hullSearchAliases } from '../../studio/RefitSearch';
 import { RefitHint } from '../../studio/RefitHint';
@@ -16,34 +17,32 @@ import './simulation-deployment.css';
 import './fleet-deployment.css';
 
 const PAGE_SIZE = 80;
-export function FleetDeployment({ engine, team, onClose, onDeployed, onDeploy }: {
-  engine: CombatEngine; team: number; onClose: () => void; onDeployed: () => void; onDeploy?: (ids: string[]) => Promise<void>;
+export function FleetDeployment({ source, team, onClose, onDeployed, onDeploy }: {
+  source: DeploymentViewSource; team: number; onClose: () => void; onDeployed: () => void; onDeploy: (ids: string[]) => Promise<void>;
 }) {
-  const [selected, setSelected] = useState<string[]>([]), [error, setError] = useState(''), [busy, setBusy] = useState(false);
+  const { view } = useDeploymentView(source);
+  const [selected, setSelected] = useDeploymentSelection<string[]>(source, view.generation + ':' + team, []);
+  const [error, setError] = useState('');
+  const [busyOwner, setBusyOwner] = useState<{ source: DeploymentViewSource; generation: number; team: number } | null>(null);
+  const busy = busyOwner?.source === source && busyOwner.generation === view.generation && busyOwner.team === team;
   const [query, setQuery] = useState(''), [size, setSize] = useState(''), [scope, setScope] = useState('reserve'), [page, setPage] = useState(0);
   const [hoverId, setHoverId] = useState<string | null>(null);
-  const pending = useRef(false), mounted = useRef(true);
+  const pending = useRef(false), mounted = useRef(true), generation = useRef(0);
   const codex = useInspectionCodex();
   const clearHover = useCallback(() => setHoverId(null), []);
   const { picker, closePicker, dismissPicker, hullButtonProps, onRosterScroll, cancelClose, leavePicker, dwell } = useDeploymentPicker(codex.isOpen, clearHover, !busy);
-  const [, refresh] = useState(0);
   useEffect(() => {
-    mounted.current = true;
-    const timer = window.setInterval(() => {
-      refresh(n => n + 1);
-      const available = new Set(engine.deployment.snapshot().rows.filter(row => row.teamId === team && row.status === 'reserve').map(row => row.id));
-      setSelected(current => { const next = current.filter(id => available.has(id)); return next.length === current.length ? current : next; });
-    }, 200);
-    return () => { mounted.current = false; window.clearInterval(timer); };
-  }, [engine, team]);
-  const roster = fleetDeploymentRoster(engine, team), entries = roster.flatMap(hull => hull.entries);
+    mounted.current = true; generation.current++; pending.current = false;
+    return () => { mounted.current = false; };
+  }, [source, team, view.generation]);
+  const roster = fleetDeploymentRoster(view, team), entries = roster.flatMap(hull => hull.entries);
   const picks = entries.filter(entry => selected.includes(entry.id) && entry.status === 'reserve');
   const ids = picks.map(entry => entry.id), cost = picks.reduce((sum, entry) => sum + entry.cost, 0);
-  const used = engine.deployment.used(team), limit = engine.deployment.limit, over = used + cost > limit;
-  const reason = engine.deployment.reason(ids, team);
+  const used = deploymentViewUsed(view, team), limit = view.fleetLimit, over = used + cost > limit;
+  const reason = deploymentViewReason(view, ids, team);
   const hulls = roster.map(hull => ({ ...hull, entries: hull.entries.filter(entry =>
-    (scope === 'all' || entry.status === scope) && hullMatchesCategory(entry.ship.spec, size) &&
-    matchesRefitSearch(query, hull.name, entry.name, hull.id, entry.ship.spec.sourceVariantId ?? '', hullSearchAliases(entry.ship.spec)))
+    (scope === 'all' || entry.status === scope) && hullMatchesCategory(entry.spec, size) &&
+    matchesRefitSearch(query, hull.name, entry.name, hull.id, entry.spec.sourceVariantId ?? '', hullSearchAliases(entry.spec)))
   })).filter(hull => hull.entries.length);
   const pages = Math.max(1, Math.ceil(hulls.length / PAGE_SIZE)), shownPage = Math.min(page, pages - 1);
   // Resolve the open picker against fresh state, not the snapshot from the moment it was opened.
@@ -58,14 +57,16 @@ export function FleetDeployment({ engine, team, onClose, onDeployed, onDeploy }:
   };
   const deploy = async () => {
     if (pending.current) return;
-    const currentReason = engine.deployment.reason(ids, team);
+    const currentReason = deploymentViewReason(source.read(), ids, team);
     if (currentReason) { setError(currentReason); return; }
-    pending.current = true; setBusy(true); setError('');
+    const token = generation.current, viewGeneration = view.generation;
+    const current = () => mounted.current && generation.current === token && source.read().generation === viewGeneration;
+    pending.current = true; setBusyOwner({ source, generation: viewGeneration, team }); setError('');
     try {
-      if (onDeploy) await onDeploy(ids); else engine.deployment.deploy(ids, team);
-      if (mounted.current) onDeployed();
-    } catch (cause) { if (mounted.current) setError(cause instanceof Error ? cause.message : String(cause)); }
-    finally { pending.current = false; if (mounted.current) setBusy(false); }
+      await onDeploy(ids);
+      if (current()) onDeployed();
+    } catch (cause) { if (current()) setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { if (generation.current === token) pending.current = false; if (current()) setBusyOwner(null); }
   };
   return <><Modal title="舰队增援" className="simulation-deployment fleet-deployment" initialFocus="panel" surface="glass"
     onClose={() => { if (!pending.current && !dismissPicker()) onClose(); }}
@@ -76,7 +77,7 @@ export function FleetDeployment({ engine, team, onClose, onDeployed, onDeploy }:
     </>}>
     <div className="sim-deployment-tabs fleet-deployment-team"><NativeBitmapText font="button" color="currentColor">本队舰队</NativeBitmapText><span>战前编成 · 真实后备舰</span></div>
     <div className="sim-deployment-intro"><h2 data-side="ally"><NativeBitmapText font="action" color="currentColor">选择本队增援舰船</NativeBitmapText></h2>
-      {hover ? <div className="sim-deployment-detail"><strong>{hover.name}</strong><span>{hover.cost} DP · {fleetStatusLabels[hover.status]} · {fleetShipCondition(hover.ship)}</span><small>保留本场实际武器、插件及联队配装</small></div>
+      {hover ? <div className="sim-deployment-detail"><strong>{hover.name}</strong><span>{hover.cost} DP · {fleetStatusLabels[hover.status]} · {fleetShipCondition(hover)}</span><small>保留本场实际武器、插件及联队配装</small></div>
         : <p className="sim-deployment-hint">停留后移入逐艘选择，移出自动收起；点击舰体可立即进入。确认部署后才入场。</p>}
     </div>
     <div className="sim-deployment-filters"><input aria-label="筛选本队舰船" placeholder="舰名 / 舰体ID / 装配" value={query} disabled={busy} onChange={event => { setQuery(event.target.value); filtered(); }} />
@@ -84,7 +85,7 @@ export function FleetDeployment({ engine, team, onClose, onDeployed, onDeploy }:
       <select aria-label="舰船状态" value={scope} disabled={busy} onChange={event => { setScope(event.target.value); filtered(); }}><option value="reserve">待命舰船</option><option value="all">全部本队舰船</option>{Object.entries(fleetStatusLabels).filter(([status]) => status !== 'reserve').map(([status, label]) => <option key={status} value={status}>{label}</option>)}</select>
     </div>
     <div className="sim-deployment-roster" aria-label="本队舰船名单" onScroll={onRosterScroll}>{hulls.slice(shownPage * PAGE_SIZE, (shownPage + 1) * PAGE_SIZE).map(hull => {
-      const spec = hull.entries[0].ship.spec, count = hull.entries.filter(entry => ids.includes(entry.id)).length;
+      const spec = hull.entries[0].spec, count = hull.entries.filter(entry => ids.includes(entry.id)).length;
       const costs = [...new Set(hull.entries.map(entry => entry.cost))], price = costs.length === 1 ? String(costs[0]) : Math.min(...costs) + '–' + Math.max(...costs);
       return <button type="button" key={hull.id} className="sim-deployment-ship" disabled={busy} aria-label={hull.name + ' · ' + hull.entries.length + ' 艘' + (count ? ' · 已选 ' + count : '')}
         aria-pressed={count > 0} data-unavailable={hull.entries.every(entry => entry.status !== 'reserve')}
@@ -94,11 +95,11 @@ export function FleetDeployment({ engine, team, onClose, onDeployed, onDeploy }:
       </button>;
     })}{!hulls.length && <p className="sim-empty">{entries.some(entry => entry.status === 'reserve') ? '没有符合筛选条件的舰船。' : '本队没有待命后备舰。可切换状态查看已部署或已撤离的舰船。'}</p>}</div>
     {picker && activeHull && <DwellScope hover={dwell} native><LoadoutFlyout dwell={dwell} transient element={picker.element} pinned={false} name={activeHull.name} selected={ids} disabled={busy}
-      options={activeHull.entries.map(entry => ({ id: entry.id, name: entry.name, cost: entry.cost + ' DP', detail: fleetStatusLabels[entry.status] + ' · ' + fleetShipCondition(entry.ship), error: entry.status === 'reserve' ? undefined : fleetStatusLabels[entry.status] + '，不可再次部署' }))}
+      options={activeHull.entries.map(entry => ({ id: entry.id, name: entry.name, cost: entry.cost + ' DP', detail: fleetStatusLabels[entry.status] + ' · ' + fleetShipCondition(entry), error: entry.status === 'reserve' ? undefined : fleetStatusLabels[entry.status] + '，不可再次部署' }))}
       onChoose={toggle} onInspect={setHoverId} onEnter={cancelClose} onLeave={leavePicker} onClose={() => dismissPicker()}
       renderOption={(option, button) => {
         const entry = activeHull.entries.find(item => item.id === option.id)!;
-        return <FleetShipInspection ship={entry.ship} name={entry.name} cost={entry.cost} status={fleetStatusLabels[entry.status]} enabled={!codex.isOpen}
+        return <FleetShipInspection ship={entry} name={entry.name} cost={entry.cost} status={fleetStatusLabels[entry.status]} enabled={!codex.isOpen}
           onOpenCodex={codex.open}>{button}</FleetShipInspection>;
       }} /></DwellScope>}
     <div className="sim-deployment-pages"><span>{hulls.length} 种舰体 · {hulls.reduce((sum, hull) => sum + hull.entries.length, 0)} 艘 · 本队待命 {entries.filter(entry => entry.status === 'reserve').length} 艘</span>

@@ -1,3 +1,4 @@
+import type { FireControlQueryBatch } from './FireControlQueryBatch';
 import { segmentCircleEntry } from '../math/Geometry';
 import { combatTeam } from '../simulation/CombatTeams';
 import type { Ship } from '../simulation/Ship';
@@ -28,12 +29,13 @@ export class InFlightFireBudget {
       && !p.isHullExplosion && p.targetProjectileId === undefined && !p.mirv && p.spawnType !== 'BALLISTIC_AS_BEAM'
       && (p.hitpoints === undefined || p.hitpoints > 0) && (p.flightTimeRemaining === undefined || p.flightTimeRemaining > 0);
   }
-  estimate(ship: Ship, target: Ship, beforeSeconds: number): number {
+  estimate(ship: Ship, target: Ship, beforeSeconds: number, queries?: FireControlQueryBatch): number {
     const shots = this.byTarget.get(target.id);
     const horizon = Math.min(3, beforeSeconds);
     if (!shots || !Number.isFinite(horizon) || horizon <= 0 || target.isDead || target.isCollisionless
       || target.teamId === ship.teamId || !target.isVisibleTo(ship.teamId) || target.shield.type === 'PHASE'
       || !target.hasNativeThreatPhaseHooks || target.shield.isActive) return 0;
+    const batch = queries?.forInFlightBudget(ship, this.ships);
     let damage = 0;
     for (const p of shots) {
       if (!this.eligible(p) || p.targetShipId !== target.id || p.damagedTargetIds?.includes(target.id)
@@ -47,8 +49,10 @@ export class InFlightFireBudget {
       const eta = entry * lifetime;
       if ((p.armingTimeRemaining ?? 0) > eta) continue;
       // Another hull/rock may intercept first. Work in each blocker's moving frame.
-      const blocked = this.ships.some(other => other !== target && other.id !== p.sourceShipId
-        && !other.isCollisionless && other.isVisibleTo(ship.teamId)
+      const indexed = batch?.queryFlightBlockers(p.pos, p.vel, eta);
+      const blockers = indexed ?? this.ships;
+      const blocked = blockers.some(other => other !== target && other.id !== p.sourceShipId
+        && (indexed || !other.isCollisionless && other.isVisibleTo(ship.teamId))
         && shipSegmentEntry(other, p.pos, p.pos.clone().addScaled(p.vel.clone().sub(other.vel), eta)) !== null)
         || this.asteroids.some(a => a.hp > 0 && segmentCircleEntry(p.pos,
           p.pos.clone().addScaled(p.vel.clone().sub(a.vel), eta), a.pos, a.radius + p.radius) !== null);
@@ -75,8 +79,8 @@ export class InFlightFireBudget {
     return damage;
   }
   /** Only diverts toward a legal clear alternative; a sole target is never withheld. */
-  penalty(ship: Ship, target: Ship, beforeSeconds: number): number {
-    const coverage = this.estimate(ship, target, beforeSeconds) / Math.max(1, target.hullHp);
+  penalty(ship: Ship, target: Ship, beforeSeconds: number, queries?: FireControlQueryBatch): number {
+    const coverage = (queries ? this.estimate(ship, target, beforeSeconds, queries) : this.estimate(ship, target, beforeSeconds)) / Math.max(1, target.hullHp);
     return 2.5 * Math.max(0, Math.min(1, (coverage - .6) / .8));
   }
 }

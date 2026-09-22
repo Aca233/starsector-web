@@ -1,5 +1,5 @@
-import type { Ship } from '../../simulation/Ship';
-import type { ShipSystem } from '../../simulation/ShipSystem';
+import type { ShipRenderState as Ship } from '../../render/ShipRenderState';
+import type { RenderSystem as ShipSystem } from '../../render/ShipRenderState';
 import type { SystemVisuals, SystemVisualColor, SystemWeaponType } from '../../extensions/ship-systems/Types';
 import type { Vector2 } from '../../math/Vector2';
 import type { WebGLPassContext } from './WebGLPassContext';

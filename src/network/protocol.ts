@@ -1,3 +1,5 @@
+import { networkFeaturePolicy, networkHelloFeatures, networkFeatureStatus } from './NetworkFeaturePolicy.mjs';
+import { VisualPacketAssembler, visualReceipt } from './ProjectileVisualPacket.mjs';
 import { publicAuthorityPerformance } from "./SnapshotFlow.mjs";
 import type { PublicAuthorityPerformance } from "./SnapshotFlow.mjs";
 import { LanDeltaReceiver, isLanDelta } from "./LanBinaryDelta.mjs";
@@ -109,6 +111,12 @@ export const blankInput = (): PlayerInput => ({
 export type Listener = (message: any) => void;
 const STORAGE_KEY = "starsector.lan.session.v5";
 /** Session token is tab-local. A new page can resume a guest, never reconstruct a host Worker. */
+const NETWORK_FEATURE_POLICY = networkFeaturePolicy(import.meta.env);
+// Full multirate remains opt-in. Default additive motion never slows full worlds.
+export const LAN_LAYERED_SYNC_ENABLED = NETWORK_FEATURE_POLICY.mode === 'experimental';
+export const LAN_MOTION_SYNC_ENABLED = NETWORK_FEATURE_POLICY.motion;
+export const LAN_CRITICAL_COMBAT_ENABLED = NETWORK_FEATURE_POLICY.combat;
+
 export class LanConnection {
   socket: LanSocket | null = null;
   private readonly realtimeGate = new RealtimeSendGate();
@@ -117,6 +125,10 @@ export class LanConnection {
   }
   ready = false;
   private stateCredits = false;
+  combatState = false;
+  motionState = false;
+  visualState = false;
+  private readonly visualPackets = new VisualPacketAssembler();
   private binaryDelta = false;
   private steamBinarySnapshots = false;
   get canSendBinarySnapshots(): boolean { return this.transport === "lan" || this.steamBinarySnapshots; }
@@ -129,6 +141,7 @@ export class LanConnection {
   private pipelineEpoch = 0;
   private pipelineProbeEpoch = -1;
   private resetPipeline(): void {
+    this.visualPackets.reset();
     this.snapshotPipeline = null;
     this.snapshotPipelineAt = null;
     this.snapshotPipelineRoundTripMs = 0;
@@ -165,7 +178,9 @@ export class LanConnection {
     crypto.getRandomValues(new Uint8Array(16)),
     (n) => n.toString(16).padStart(2, "0"),
   ).join("");
+  networkFeatures: ReturnType<typeof networkFeatureStatus>;
   constructor(public readonly transport: "lan" | "steam" = "lan") {
+    this.networkFeatures = networkFeatureStatus(transport, NETWORK_FEATURE_POLICY);
     try {
       const saved = JSON.parse(sessionStorage.getItem(this.storageKey) ?? "null");
       if (
@@ -246,6 +261,8 @@ export class LanConnection {
     this.resetPipeline();
     this.authoritySample = null;
     this.stateCredits = false;
+    this.networkFeatures = networkFeatureStatus(this.transport, NETWORK_FEATURE_POLICY);
+    this.motionState = false; this.visualState = false; this.combatState = false;
     this.binaryDelta = false;
     this.steamBinarySnapshots = false;
     this.deltaReceiver.setMotionReference(false);
@@ -274,7 +291,7 @@ export class LanConnection {
         this.send({
           type: "hello",
           stateCredits: 1,
-          ...(this.transport === "lan" ? { binaryDelta: 1, motionReference: 1 } : { binarySnapshots: 1, binaryReceive: 1 }),
+          ...networkHelloFeatures(this.transport, NETWORK_FEATURE_POLICY),
           protocol: LAN_PROTOCOL,
           build: LAN_BUILD,
           name: this.name,
@@ -296,6 +313,7 @@ export class LanConnection {
         m = binary ? decodeBinaryState(packet) : JSON.parse(packet);
         if (!binary && (m.type === "state" || m.type === "match")) this.deltaReceiver.reset();
         if (m.type === "state") {
+          if (m.frame?.projectileVisuals === 1 && !this.visualState) throw Error("Unnegotiated projectile projection");
           this.snapshotBytes = event.data instanceof ArrayBuffer ? packet.byteLength : event.data.length;
           this.snapshotParseMs = performance.now() - started;
         }
@@ -314,6 +332,10 @@ export class LanConnection {
       if (m.type === "welcome") {
         // Opt in only when the relay confirms; legacy LAN/Steam relays omit it.
         this.stateCredits = m.stateCredits === 1;
+        this.combatState = LAN_CRITICAL_COMBAT_ENABLED && this.transport === "lan" && m.combatState === 1;
+        this.visualState = LAN_LAYERED_SYNC_ENABLED && this.transport === "lan" && m.visualState === 1;
+        this.motionState = LAN_MOTION_SYNC_ENABLED && this.transport === "lan" && m.motionState === 1;
+        this.networkFeatures = networkFeatureStatus(this.transport, NETWORK_FEATURE_POLICY, m);
         this.binaryDelta = this.transport === "lan" && this.stateCredits && m.binaryDelta === 1;
         this.steamBinarySnapshots = this.transport === "steam" && m.binarySnapshots === 1;
         this.deltaReceiver.setMotionReference(this.binaryDelta && m.motionReference === 1);
@@ -376,6 +398,17 @@ export class LanConnection {
       }
       if (m.type === "error" && ["RESUME_EXPIRED", "VERSION"].includes(m.code))
         this.forget();
+      if (m.type === 'projectile-visual') {
+        if (!this.visualState) return;
+        try { m.visualBytes = this.visualPackets.take(m); } catch { this.visualPackets.reset(); this.send(visualReceipt(m,'discarded')); return; }
+        if (!m.visualBytes) { this.send(visualReceipt(m,'fragment')); return; }
+        // Synchronous subscribers set visualHandled only after successful CRC,
+        // epoch and projection validation/retention. No listener => discard,
+        // which frees bounded flight but never grants baseline-ready credit.
+        this.emit(m);
+        this.send(visualReceipt(m,m.visualHandled === true ? 'consumed' : 'discarded'));
+        return;
+      }
       this.emit(m);
       // Application consumption credit, never a GPU/display ACK or RTT sample.
       // Release only after the synchronous subscribers have retained the frame
@@ -456,11 +489,13 @@ export class LanConnection {
     // (one input + one snapshot); reject further input before serialization.
     // Action/sequence state advances only after a successful local admission.
     if ((message as { type?: string } | null)?.type === "input" && !this.canSendInput()) return false;
+    if ((message as { type?: string } | null)?.type === "motion" && !this.realtimeGate.canSendMotion(this.socket.bufferedAmount, performance.now())) return false;
     try {
       if (wireBytes(message) > LAN_MAX_SNAPSHOT_BYTES) return false;
       this.socket.send(JSON.stringify(message));
       const m = message as { type?: string; input?: PlayerInput };
       if (m.type === "input") this.realtimeGate.inputSent(performance.now());
+      if (m.type === "motion") this.realtimeGate.motionSent(performance.now());
       if (m.type === "input" && m.input) {
         this.inputSequence = Math.max(this.inputSequence, m.input.seq);
         for (const a of m.input.actions)

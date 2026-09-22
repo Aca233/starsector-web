@@ -1,3 +1,4 @@
+import { nativePhaseReader } from './NativePhaseReaders';
 import type { Ship } from '../simulation/Ship';
 import nativeFacts from './native-hull-facts.json';
 import { sound } from '../audio/SoundManager';
@@ -17,7 +18,7 @@ export function installPhaseAnchor(ship: Ship): void {
     ship.hullHp = 1; ship.pendingCombatCRLoss += crLoss; ship.retreating = true;
     state.emergency = true;
     if (!ship.isPhased) sound.play('phase_activate',1);
-    ship.externalPhaseEffects.set(state,()=>Math.min(.25,state.alpha));
+    ship.externalPhaseEffects.set(state,nativePhaseReader(()=>Math.min(.25,state.alpha)));
     ship.runtimeModifiers.set('phase_anchor_emergency',{hullDamageMultiplier:0});
     for (const system of ship.allSystems) system.deactivate();
     return true;

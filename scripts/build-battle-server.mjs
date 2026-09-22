@@ -1,13 +1,14 @@
 import { build } from 'esbuild';
+import {componentWriteEsbuildPlugin} from './component-write-transform.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = path.resolve(root, process.argv.slice(2).find(arg => !arg.startsWith('--')) ?? 'artifacts/server-authority-20260920/runtime');
 await fs.mkdir(out, {recursive:true});
-const common = {bundle:true, platform:'node', format:'esm', target:'node22',
+const common = {plugins:process.env.VITE_LAN_COMPONENTS==='true'?[componentWriteEsbuildPlugin()]:[],bundle:true, platform:'node', format:'esm', target:'node22',
   external:['bufferutil','utf-8-validate'],
-  define:{__LAN_BUILD_ID__:'"dedicated-node"','import.meta.env':'{"BASE_URL":"/","DEV":false,"VITE_LAN_AI_WORKERS":"false"}'},
+  define:{__LAN_BUILD_ID__:'"dedicated-node"','import.meta.env':JSON.stringify({BASE_URL:'/',DEV:false,VITE_LAN_AI_WORKERS:'false',VITE_LAN_COMPONENTS:process.env.VITE_LAN_COMPONENTS??'false',VITE_LAN_PARTICLE_RECIPES:process.env.VITE_LAN_PARTICLE_RECIPES??'true',VITE_LAN_WEAPON_STATE:process.env.VITE_LAN_WEAPON_STATE??'false'})},
   banner:{js:'import { createRequire as __nodeRequire } from "node:module"; const require = __nodeRequire(import.meta.url);'}, logLevel:'info', metafile:true};
 const result = await build({...common, absWorkingDir:root, entryPoints:['server/authority-worker.mjs'], outfile:path.join(out,'authority-worker.mjs')});
 if(Object.keys(result.metafile.inputs).some(name=>/(^|\/)campaign(\/|\.)/.test(name)))throw Error('Campaign leaked into authority bundle');

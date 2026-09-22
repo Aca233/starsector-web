@@ -39,12 +39,16 @@ export class ModManager {
     return ModManager.instance ??= new ModManager();
   }
 
-  public registerShip(spec: ShipSpec, options: { allowExistingId?: boolean; requireBundledAssets?: boolean } = {}) {
+  public validateShipDefinition(spec: ShipSpec, options: { allowExistingId?: boolean; requireBundledAssets?: boolean } = {}) {
     validateStrings(spec.i18n);
     validateShipSpec(spec, options);
     for (const wing of spec.fighterWings ?? []) {
       if (contentRegistry.getShip(wing.specId)?.hullSize !== 'FIGHTER') throw new Error(`Invalid wing craft: ${wing.specId}`);
     }
+  }
+
+  public registerShip(spec: ShipSpec, options: { allowExistingId?: boolean; requireBundledAssets?: boolean } = {}) {
+    this.validateShipDefinition(spec, options);
     contentRegistry.registerShip(spec, options.allowExistingId);
     this.registerStrings(spec.i18n);
   }

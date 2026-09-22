@@ -84,6 +84,15 @@ export class Shield {
     return this.hitLevels;
   }
 
+  /** Snapshot the lazy visual geometry without initializing authoritative hit state.
+   * Existing storage is borrowed until the synchronous projection has copied it. */
+  public presentationHitSegmentLevels(): Float32Array {
+    if (this.hitRadius === this.radius && this.hitArcDeg === this.maxArcDeg) return this.hitLevels;
+    const arcLength = 2 * Math.PI * Math.max(0, this.radius) * this.maxArcDeg / 360;
+    const count = Math.max(2, Math.floor(arcLength / 20) + 1, Math.floor(this.maxArcDeg / 5) + 1);
+    return new Float32Array(count).fill(100);
+  }
+
   /** Five degrees of visual fringe at each full-deployment arc endpoint. */
   public get renderArcRad(): number {
     return (this.maxArcDeg + 10) * this.deploymentLevel * Math.PI / 180;

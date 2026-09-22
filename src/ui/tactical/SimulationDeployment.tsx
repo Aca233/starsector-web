@@ -1,3 +1,5 @@
+import type { DeploymentCommand } from '../../engine/runtime/DeploymentControl';
+import type { CommandResult } from '../../engine/runtime/CombatCommands';
 import { useDeploymentPicker } from './useDeploymentPicker';
 import { RefitHint } from '../../studio/RefitHint';
 import { RefitInspection } from '../../studio/RefitInspection';
@@ -5,32 +7,39 @@ import { RefitHoverTerm } from '../../studio/RefitHoverTerms';
 import { useInspectionCodex } from '../../studio/useInspectionCodex';
 import { matchesRefitSearch, hullMatchesCategory, hullSearchAliases } from '../../studio/RefitSearch';
 import { BATTLE_SIZE_PRESETS, BATTLE_SIZE_STEP, MIN_BATTLE_SIZE, MAX_BATTLE_SIZE } from '../../shared/battle-size.mjs';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { CombatEngine } from '../../engine/simulation/CombatEngine';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { DeploymentViewSource } from '../../engine/runtime/DeploymentView';
+import { useDeploymentView, useDeploymentSelection } from './useDeploymentView';
 import { runtimeAssetUrl } from '../../engine/runtime/RuntimePaths';
 import { Modal } from '../core/UI';
 import { NativeButton } from '../NativeChrome';
 import { NativeBitmapText } from '../NativeBitmapText';
-import { simulationRoster, groupSimulationHulls, prepareSimulationOption, simulationOptionErrors, registerSimulationOption, type SimulationOption } from './SimulationRoster';
+import { simulationRoster, groupSimulationHulls, prepareSimulationOption, simulationOptionErrors, type SimulationOption } from './SimulationRoster';
 import { SimulationLoadoutPicker } from './SimulationLoadoutPicker';
 import './simulation-deployment.css';
 
 type Side='ally'|'enemy';
 const PAGE_SIZE=80;
-export function SimulationDeployment({ engine, onClose, onDeployed }: {
-  engine: CombatEngine; onClose: () => void; onDeployed: () => void;
+export function SimulationDeployment({ source, onClose, onDeployed, onDeploymentCommand }: {
+  source: DeploymentViewSource; onDeploymentCommand: (command: DeploymentCommand) => Promise<CommandResult>; onClose: () => void; onDeployed: () => void;
 }) {
+  const { view, refresh } = useDeploymentView(source);
   const codex = useInspectionCodex();
+  const pending = useRef(false), mounted = useRef(true), generation = useRef(0);
+  const [busyOwner, setBusyOwner] = useState<{ source: DeploymentViewSource; generation: number } | null>(null);
+  const busy = busyOwner?.source === source && busyOwner.generation === view.generation;
   const roster = useMemo(() => simulationRoster(), []);
   const [side,setSide]=useState<Side>('enemy');
-  const [selected,setSelected]=useState<Record<Side,string[]>>({ally:[],enemy:[]});
+  const [selected,setSelected]=useDeploymentSelection<Record<Side,string[]>>(source, view.generation, {ally:[],enemy:[]});
   const [hover,setHover]=useState<SimulationOption|null>(null);
   const clearHover = useCallback(() => setHover(null), []);
-  const { picker, closePicker, dismissPicker, hullButtonProps, onRosterScroll, cancelClose, leavePicker, dwell } = useDeploymentPicker(codex.isOpen, clearHover);
+  const { picker, closePicker, dismissPicker, hullButtonProps, onRosterScroll, cancelClose, leavePicker, dwell } = useDeploymentPicker(codex.isOpen, clearHover, !busy);
   const [query,setQuery]=useState(''),[size,setSize]=useState(''),[scope,setScope]=useState('all');
   const [page,setPage]=useState(0),[error,setError]=useState('');
-  const [,refresh]=useState(0);
-  useEffect(()=>{const timer=window.setInterval(()=>refresh(n=>n+1),200);return()=>window.clearInterval(timer);},[]);
+  useEffect(() => {
+    mounted.current = true; generation.current++; pending.current = false;
+    return () => { mounted.current = false; };
+  }, [source, view.generation]);
   const options=useMemo(()=>roster.filter(option=>hullMatchesCategory(option.spec,size)&&(scope!=='preset'||option.preset)
     &&matchesRefitSearch(query,option.name,option.variantName,option.hullId,option.id,hullSearchAliases(option.spec))),[roster,size,scope,query]);
   const hulls=useMemo(()=>groupSimulationHulls(options),[options]);
@@ -38,38 +47,46 @@ export function SimulationDeployment({ engine, onClose, onDeployed }: {
   const pages=Math.max(1,Math.ceil(hulls.length/PAGE_SIZE)),shownPage=Math.min(page,pages-1);
   const picks={ally:roster.filter(option=>selected.ally.includes(option.id)),enemy:roster.filter(option=>selected.enemy.includes(option.id))};
   const costs={ally:picks.ally.reduce((sum,o)=>sum+o.cost,0),enemy:picks.enemy.reduce((sum,o)=>sum+o.cost,0)};
-  const used={ally:engine.simulationDeployedPoints(true),enemy:engine.simulationDeployedPoints(false)},limit=engine.simulationPointLimit;
+  const used={ally:view.allyUsed,enemy:view.enemyUsed},limit=view.simulationLimit;
   const over={ally:used.ally+costs.ally>limit,enemy:used.enemy+costs.enemy>limit};
   const total=picks.ally.length+picks.enemy.length;
-  const changeSide=(next:Side)=>{setSide(next);closePicker();setError('');};
+  const changeSide=(next:Side)=>{if(pending.current)return;setSide(next);closePicker();setError('');};
   const inspect=(option:SimulationOption)=>setHover(prepareSimulationOption(option));
   const toggle=(option:SimulationOption)=>{
+    if (pending.current) return;
     const resolved=prepareSimulationOption(option);setHover(resolved);
     if(resolved.errors.length){setError(resolved.errors.join('；'));return;}
     setSelected(current=>({...current,[side]:current[side].includes(option.id)?current[side].filter(id=>id!==option.id):[...current[side],option.id]}));setError('');
   };
-  const deploy=()=>{
-    if(!total||over.ally||over.enemy)return;
+  const commit = async (command: DeploymentCommand, deployed = false) => {
+    if (pending.current) return;
+    const token = generation.current, viewGeneration = view.generation;
+    const current = () => mounted.current && generation.current === token && source.read().generation === viewGeneration;
+    pending.current = true; setBusyOwner({ source, generation: viewGeneration }); setError('');
     try {
-      // Both tab selections are one transaction. Filtering/switching tabs never discards the other side.
-      const entries=([ 'ally','enemy' ] as const).flatMap(team=>picks[team].map(option=>({specId:registerSimulationOption(option),cost:option.cost,isPlayer:team==='ally'})));
-      engine.deploySimulationFleet(entries);
-      onDeployed();
-    } catch(cause){setError(cause instanceof Error?cause.message:String(cause));}
+      const result = await onDeploymentCommand(command);
+      if (!current()) return;
+      if (!result.accepted) { setError(result.reason ?? '部署未获确认。'); return; }
+      refresh();
+      if (deployed) onDeployed();
+    } catch (cause) { if (current()) setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { if (generation.current === token) pending.current = false; if (current()) setBusyOwner(null); }
   };
-  const changePointLimit=(value:number)=>{
-    if(engine.setSimulationPointLimit(value)){refresh(n=>n+1);setError('');}
-    else setError('不能低于场上舰船已经占用的部署点。');
+  const deploy = () => {
+    if (!total || over.ally || over.enemy) return;
+    // Catalogue identities only: authority compiles BOTH sides and determines their DP.
+    void commit({ kind: 'simulation-wave', ally: picks.ally.map(option => option.id), enemy: picks.enemy.map(option => option.id) }, true);
   };
+  const changePointLimit = (limit: number) => { void commit({ kind: 'simulation-limit', limit }); };
   const filtered=()=>{setPage(0);closePicker();};
   const summary=total?'友军 '+picks.ally.length+' 艘 +'+costs.ally+' DP · 敌军 '+picks.enemy.length+' 艘 +'+costs.enemy+' DP':'可切换友军/敌军分别选择，最后一次部署全部选择。';
-  return <><Modal title="模拟战斗舰船部署" className="simulation-deployment" onClose={()=>{if(!dismissPicker())onClose();}} initialFocus="panel" surface="glass"
-    onShortcut={key=>{if(key==='q')changeSide('ally');else if(key==='w')changeSide('enemy');}}
-    footer={<><RefitHint text={engine.battleResult?'战斗已经结束，不能继续部署。':!total?'先点击配装行选择舰船；悬停只查看，不会自动选择。':over.ally||over.enemy?'所选舰船超出部署上限。减少对应阵营的选择或提高上限后，才能一次部署双方。':'确认后将友军和敌军的已选方案一起部署。悬停不会入场。'}><NativeButton disabled={!total||over.ally||over.enemy||!!engine.battleResult} onClick={deploy}>{picks.ally.length&&picks.enemy.length?'部署双方':picks.ally.length?'部署友军':'部署敌军'}</NativeButton></RefitHint>
-      <NativeButton disabled={!total} onClick={()=>{setSelected({ally:[],enemy:[]});setError('');}}>清空选择</NativeButton><NativeButton onClick={onClose}>取消</NativeButton></>}>
+  return <><Modal title="模拟战斗舰船部署" className="simulation-deployment" onClose={()=>{if(!pending.current&&!dismissPicker())onClose();}} initialFocus="panel" surface="glass"
+    onShortcut={key=>{if(pending.current)return;if(key==='q')changeSide('ally');else if(key==='w')changeSide('enemy');}}
+    footer={<><RefitHint text={view.battleEnded?'战斗已经结束，不能继续部署。':!total?'先点击配装行选择舰船；悬停只查看，不会自动选择。':over.ally||over.enemy?'所选舰船超出部署上限。减少对应阵营的选择或提高上限后，才能一次部署双方。':'确认后将友军和敌军的已选方案一起部署。悬停不会入场。'}><NativeButton disabled={busy||!total||over.ally||over.enemy||(view.battleEnded || !view.available || !view.simulation)} onClick={deploy}>{picks.ally.length&&picks.enemy.length?'部署双方':picks.ally.length?'部署友军':'部署敌军'}</NativeButton></RefitHint>
+      <NativeButton disabled={busy||!total} onClick={()=>{setSelected({ally:[],enemy:[]});setError('');}}>清空选择</NativeButton><NativeButton disabled={busy} onClick={onClose}>取消</NativeButton></>}>
     <div className="sim-deployment-tabs" role="tablist" aria-label="部署阵营">
-      <NativeButton role="tab" aria-selected={side==='ally'} shortcut="Q" onClick={()=>changeSide('ally')}>友军{selected.ally.length?' ('+selected.ally.length+')':''}</NativeButton>
-      <NativeButton role="tab" aria-selected={side==='enemy'} shortcut="W" onClick={()=>changeSide('enemy')}>敌军{selected.enemy.length?' ('+selected.enemy.length+')':''}</NativeButton>
+      <NativeButton disabled={busy} role="tab" aria-selected={side==='ally'} shortcut="Q" onClick={()=>changeSide('ally')}>友军{selected.ally.length?' ('+selected.ally.length+')':''}</NativeButton>
+      <NativeButton disabled={busy} role="tab" aria-selected={side==='enemy'} shortcut="W" onClick={()=>changeSide('enemy')}>敌军{selected.enemy.length?' ('+selected.enemy.length+')':''}</NativeButton>
     </div>
     <div className="sim-deployment-intro">
       <h2 data-side={side}><NativeBitmapText font="action" color="currentColor">{side==='enemy'?'选择敌方参战舰船':'选择友方参战舰船'}</NativeBitmapText></h2>
@@ -101,8 +118,8 @@ export function SimulationDeployment({ engine, onClose, onDeployed }: {
     <div className="sim-deployment-limit">
       <RefitHint text="友军与敌军分别使用这份部署额度，不是双方共享；友军已部署值包含旗舰。只影响本次模拟，不能调到低于已部署占用的数值。"><label htmlFor="sim-point-limit"><NativeBitmapText font="caption" color="currentColor">每方部署上限</NativeBitmapText></label></RefitHint>
       <input aria-label="调整每方部署上限" type="range" min={MIN_BATTLE_SIZE/2} max={Math.max(MAX_BATTLE_SIZE/2,limit)} step={BATTLE_SIZE_STEP/2}
-        value={limit} disabled={!!engine.battleResult} onChange={event=>changePointLimit(Number(event.target.value))}/>
-      <select id="sim-point-limit" aria-label="每方部署上限" value={limit} disabled={!!engine.battleResult} onChange={event=>changePointLimit(Number(event.target.value))}>
+        value={limit} disabled={busy||(view.battleEnded || !view.available || !view.simulation)} onChange={event=>changePointLimit(Number(event.target.value))}/>
+      <select id="sim-point-limit" aria-label="每方部署上限" value={limit} disabled={busy||(view.battleEnded || !view.available || !view.simulation)} onChange={event=>changePointLimit(Number(event.target.value))}>
         {[...new Set([...BATTLE_SIZE_PRESETS.map(value=>value/2),limit])].sort((a,b)=>a-b).map(value=><option key={value} value={value}>{value} DP</option>)}
       </select>
     </div>
@@ -114,6 +131,6 @@ export function SimulationDeployment({ engine, onClose, onDeployed }: {
       <p className="refit-inspection-note">这是待确认的选择；悬停不部署。任一方超限时，双方都不会入场。</p>
     </>}><div className="sim-deployment-meter" data-over={over[team]} role="status" aria-label={team==='ally'?'友军部署点数':'敌军部署点数'}>
       <i style={{width:Math.min(100,(used[team]+costs[team])/limit*100)+'%'}}/><span>{team==='ally'?'友军':'敌军'} {used[team]} + {costs[team]} / {limit}</span></div></RefitInspection>)}</div>
-    <div className="sim-deployment-feedback" role="status">{error||(over.ally||over.enemy?([over.ally?'友军':'',over.enemy?'敌军':''].filter(Boolean).join('、')+'超出部署上限，双方均未部署。'):summary)}</div>
+    <div className="sim-deployment-feedback" role="status">{busy ? '等待部署确认；不会重复提交。' : error||(over.ally||over.enemy?([over.ally?'友军':'',over.enemy?'敌军':''].filter(Boolean).join('、')+'超出部署上限，双方均未部署。'):summary)}</div>
   </Modal>{codex.content}</>;
 }

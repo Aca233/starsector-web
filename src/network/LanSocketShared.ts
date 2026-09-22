@@ -21,6 +21,8 @@ export type LanPayload = string | ArrayBuffer | Blob;
 export type ToLanWorker =
   | { type: "init"; shared: SharedArrayBuffer }
   | { type: "connect"; url: string }
+  | { type: "authority"; port: MessagePort; matchId: string; seq: number }
+  | { type: "authority-detach" }
   | { type: "send"; data: LanPayload; size: number }
   | { type: "close"; code?: number; reason: string };
 export type FromLanWorker =
@@ -69,4 +71,11 @@ export function closeArguments(code?: number, reason = ""): { code?: number; rea
   const bytes = encoder.encode(`${reason}`);
   if (bytes.byteLength > 123) throw new DOMException("Close reason exceeds 123 UTF-8 bytes", "SyntaxError");
   return { code: normalized, reason: new TextDecoder().decode(bytes) };
+}
+
+/** Keep a no-code close a genuinely argument-less native call. With a reason,
+ * use the standard normal-closure code, never WebIDL's undefined-to-zero. */
+export function closeTransport(socket: Pick<WebSocket, "close">, code?: number, reason = ""): void {
+  if (code === undefined && !reason) socket.close();
+  else socket.close(code ?? 1000, reason);
 }

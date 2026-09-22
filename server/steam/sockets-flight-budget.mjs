@@ -2,11 +2,20 @@
 // instead of) native pending-byte admission. Only authenticated remote receipts
 // for packets actually admitted to the SDK can grant credit. No timer fabricates
 // ACKs. Limits include packets already outside the SDK in an external FIFO.
-export const SOCKET_FLIGHT_LIMITS = Object.freeze({ initial: 49152, min: 24576, max: 131072, peer: 49152, packets: 2048 });
+// Whole-frame fairness fixes weak-link starvation but reduces fast-link bulk
+// throughput: keep this experimental (see the Phase10 report), not a release
+// replacement for component-based real-time replication.
+// The old 128KiB ceiling limited a healthy 300ms RTT room to ~0.4MB/s
+// despite an 8Mbps native link. Keep startup credit and the congestion floor,
+// but permit bounded receipt-driven growth to 200KiB. This is in-flight data,
+// NOT an SDK queue allowance; existing RTT inflation still shrinks the window.
+export const SOCKET_FLIGHT_LIMITS = Object.freeze({ initial: 49152, min: 24576, max: 204800, peer: 49152, packets: 2048 });
+const serializedFrame = job => job?.frame?.kind === 'anchor' || job?.frame?.kind === 'snapshot' && job.frame.count > 1;
 const key = p => p.epoch + ':' + p.id + ':' + p.index;
 export class SteamSocketFlightBudget {
   constructor({ inputOnly = false } = {}) {
     this.inputOnly = inputOnly;
+    this.frameAdmission = null;
     this.waiters = new Map(); this.records = new Map(); this.bytes = 0; this.count = 0; this.limit = inputOnly ? 8256 : SOCKET_FLIGHT_LIMITS.initial;
     this.adjustedAt = -Infinity; this.serial = 0;
     this.stats = { peakBytes: 0, acknowledged: 0, ignoredReceipts: 0, increased: 0, reduced: 0, orphanBytes: 0, lostPackets: 0, lostBytes: 0 };
@@ -17,11 +26,32 @@ export class SteamSocketFlightBudget {
     return r;
   }
   allows(session, bytes, job = null) {
+    // Interleaving many large states spends scarce credit on fragments that
+    // all expire before any world completes. Finish admission of ONE multi-
+    // fragment state before starting another. Reliable anchors use this gate
+    // too, so their eight-second clocks do not all start while awaiting peers.
+    // Controls and one-packet snapshots retain spare-credit opportunities.
+    // Ownership neither grants bytes nor forgives already-issued debt.
+    const active = this.frameAdmission;
+    if (active && (active.session.state === 'closed' || active.session.stateJob !== active.job && !active.session.controls.includes(active.job))) this.frameAdmission = null;
     // Do not let a stream of tiny lossy fragments perpetually consume the
     // credit needed to finish another peer's already-started reliable fragment.
     for (const [peer, waiting] of this.waiters) if (peer.state === 'closed' || waiting.job && !peer.stateJob && !peer.latest && !peer.controls.some(job => job.frame.kind !== 'control')) this.waiters.delete(peer);
     this.waiters.set(session, { bytes, job });
-    const first = [...this.waiters].find(([peer, request]) => {
+    if (!this.inputOnly && this.frameAdmission && serializedFrame(job) && job !== this.frameAdmission.job) return false;
+    const requests = [...this.waiters];
+    // A completed owner goes to the tail on its next request. Merely leaving
+    // spare byte credit must not let the pacer's rotation start a second large
+    // frame ahead of guests that have waited throughout the previous one.
+    if (!this.inputOnly && !this.frameAdmission && serializedFrame(job)) {
+      const head = requests.find(([peer, request]) => {
+        const candidate = this.record(peer);
+        return serializedFrame(request.job) && !candidate.retired && candidate.bytes + request.bytes <= SOCKET_FLIGHT_LIMITS.peer;
+      });
+      if (head && head[0] !== session) return false;
+    }
+    if(this.frameAdmission)requests.sort(([a],[b])=>Number(b===this.frameAdmission.session)-Number(a===this.frameAdmission.session));
+    const first = requests.find(([peer, request]) => {
       const candidate = this.record(peer); return !candidate.retired && candidate.bytes + request.bytes <= SOCKET_FLIGHT_LIMITS.peer;
     });
     // Earmark the head waiter's next packet, not the whole room. The native
@@ -38,6 +68,9 @@ export class SteamSocketFlightBudget {
     const r = this.record(session), k = key(packet);
     if (r.packets.has(k)) throw Error('Duplicate admitted state packet');
     this.waiters.delete(session);
+    if(!this.inputOnly && serializedFrame(job)) {
+      this.frameAdmission = packet.index + 1 < job.frame.count ? { session, job } : null;
+    }
     r.packets.set(k, { ...packet, at: now, serial: ++this.serial }); r.bytes += packet.bytes;
     this.bytes += packet.bytes; this.count++; this.stats.peakBytes = Math.max(this.stats.peakBytes, this.bytes);
   }
@@ -46,6 +79,10 @@ export class SteamSocketFlightBudget {
     for (const [epoch, id, index] of packets) {
       const k = key({ epoch, id, index }), p = r?.packets.get(k);
       if (!p || now <= p.at) { this.stats.ignoredReceipts++; continue; }
+      // Utilization belongs to the flight the receipt actually acknowledges.
+      // At the 24KiB floor only two 8256-byte packets fit; testing AFTER
+      // subtracting one leaves <50% forever and traps a recovered link there.
+      const wasUtilized = this.bytes >= this.limit * .5;
       r.packets.delete(k); r.bytes -= p.bytes; this.bytes -= p.bytes; this.count--; this.stats.acknowledged++; r.lastReceiptAt = now;
       // Missing UNRELIABLE packets are reconciled only after a fresh native
       // lane-empty observation AND a newer snapshot, admitted after that
@@ -65,7 +102,7 @@ export class SteamSocketFlightBudget {
       if (now - this.adjustedAt < Math.max(100, Math.min(500, r.baseRtt))) continue;
       const delay = r.rtt - r.baseRtt;
       if (delay > Math.max(100, r.baseRtt * .5)) { this.limit = Math.max(SOCKET_FLIGHT_LIMITS.min, Math.floor(this.limit * .7)); this.stats.reduced++; this.adjustedAt = now; }
-      else if (delay < 50 && this.bytes >= this.limit * .5) { this.limit = Math.min(SOCKET_FLIGHT_LIMITS.max, this.limit + 8256); this.stats.increased++; this.adjustedAt = now; }
+      else if (delay < 50 && (this.bytes >= this.limit * .5 || wasUtilized && this.bytes > 0 && this.limit < 3 * p.bytes)) { this.limit = Math.min(SOCKET_FLIGHT_LIMITS.max, this.limit + 8256); this.stats.increased++; this.adjustedAt = now; }
     }
   }
   observeNative(session, status, now) {
@@ -82,6 +119,7 @@ export class SteamSocketFlightBudget {
   }
   cancelWait(session) { this.waiters.delete(session); }
   retire(session) {
+    if(this.frameAdmission?.session === session)this.frameAdmission=null;
     this.waiters.delete(session);
     const r = this.records.get(session); if (!r || r.retired) return;
     // Closing a native handle cannot retract packets already in the router.
@@ -89,6 +127,6 @@ export class SteamSocketFlightBudget {
     r.retired = true; this.stats.orphanBytes += r.bytes;
     if (!r.bytes) this.records.delete(session);
   }
-  clear() { this.waiters.clear(); this.records.clear(); this.bytes = 0; this.count = 0; }
+  clear() { this.frameAdmission=null; this.waiters.clear(); this.records.clear(); this.bytes = 0; this.count = 0; }
   diagnostics() { return { bytes: this.bytes, packets: this.count, limit: this.limit, waiters: this.waiters.size, peers: this.records.size, ...this.stats }; }
 }

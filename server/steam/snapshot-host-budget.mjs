@@ -1,6 +1,12 @@
 // A shared host uplink cannot afford each guest independently filling 64 KiB.
 // ACK-owned bytes only: no unsent state payloads or alternate delivery queues.
 export const INITIAL_HOST_SNAPSHOT_BYTES = 64 * 1024;
+// Normal multi-peer flight has ONE room ceiling, not 64KiB per guest. At the
+// supported 256Kbps collapse probe this leaves space/time for receipt and control
+// traffic inside the existing 8s guard. This is not a guarantee for arbitrary
+// rates or the existing one-oversized-baseline exception. A lone negotiated
+// binary peer retains its separately tested BDP controller.
+export const MAX_SHARED_HOST_SNAPSHOT_BYTES = 224 * 1024;
 const REQUEST_TTL_MS = 250;
 const localWritable = peer => peer.readyState === 1 && peer.inflight.size < peer.snapshotWindow.limit && peer.inflightBytes < (peer.snapshotByteLimit ?? INITIAL_HOST_SNAPSHOT_BYTES);
 export class SnapshotHostBudget {
@@ -21,7 +27,7 @@ export class SnapshotHostBudget {
     }
     this.singleBinaryPeer = singleBinaryPeer;
     if (this.singleBinaryPeer) { this.limitBytes = ready[0].snapshotByteLimit; this.lastQueueBytes = ready[0].byteWindow?.queueBytes ?? null; }
-    else this.limitBytes = Math.min(this.limitBytes, INITIAL_HOST_SNAPSHOT_BYTES * Math.max(1, ready.length));
+    else this.limitBytes = Math.min(this.limitBytes, Math.min(MAX_SHARED_HOST_SNAPSHOT_BYTES, INITIAL_HOST_SNAPSHOT_BYTES * Math.max(1, ready.length)));
   }
   remove(peer) { this.waiting.delete(peer); }
   allows(peer, bytes, now = Date.now()) {

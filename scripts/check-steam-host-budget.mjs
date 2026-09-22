@@ -58,3 +58,12 @@ test('surplus credit bypasses an older waiter without spending its reserved fram
  assert.equal(budget.allows(a,30000,8),false,'cannot spend the oldest waiter reservation');
  assert.equal(budget.allows(b,20000,8),true);
 });
+
+test('nine peers never multiply shared normal flight beyond the room ceiling',()=>{
+ const all=Array.from({length:9},peer),budget=new SnapshotHostBudget(()=>all);
+ track(all[0],65536*9);
+ for(let now=0;now<30000;now+=100){budget.allows(all[1],1000,now);budget.acknowledge(300,300,now,budget.limitBytes);}
+ assert.equal(budget.limitBytes,224*1024);
+ assert.equal(budget.allows(all[1],1000,30001),false,'shrinking/admission never forgives already-issued debt');
+ assert.equal(budget.totalBytes(),65536*9);
+});

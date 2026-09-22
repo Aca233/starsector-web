@@ -52,3 +52,11 @@ test('ample bandwidth preserves near-60 delivery with 20/120/300ms idle native R
     assert.equal(r.skipSocket,0);assert.ok(r.ageMax===null);
   }
 });
+
+test('LAN preflight does not consume sequence, bytes, ACK membership or counters',()=>{
+ const c=new LanStateCredits(),before=c.stats();
+ for(let i=0;i<10;i++)assert.ok(c.canReserve(1,1000));
+ assert.deepEqual(c.stats(),before);assert.equal(c.ack(1),false);assert.ok(c.reserve(1,1000));
+ assert.equal(c.canReserve(1,1000),false);assert.ok(c.reserve(2,1000));assert.equal(c.canReserve(3,1000),false);
+ assert.ok(c.ack(2));assert.ok(c.reserve(3,1000));
+});

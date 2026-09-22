@@ -67,7 +67,8 @@ export const CombatView: React.FC<{
         initialShipId,
         isVisualLab || isDesignTrial,
       );
-      if (isDesignTrial) next.combat.engine.beginSimulationDeployment(deploymentCost, battleTeamLimit(readBattleSize()));
+      if (isDesignTrial) next.combat.beginSimulationDeployment(deploymentCost, battleTeamLimit(readBattleSize()));
+      if (!isVisualLab && new URLSearchParams(window.location.search).get("combat") !== "inline") next.combat.enableWorker();
       return next;
     },
   );
@@ -77,7 +78,7 @@ export const CombatView: React.FC<{
   );
   const stableSessionRef = useRef(session);
 
-  const cameraPosRef = useRef<Vector2>(game.combat.engine.playerShip.pos.clone());
+  const cameraPosRef = useRef<Vector2>(game.combat.read.playerShip.pos.clone());
   const zoomRef = useRef<number>(0.65);
   const keysPressed = useRef<{ [key: string]: boolean }>({});
   const mouseScreenPos = useRef<Vector2>(
@@ -109,7 +110,7 @@ export const CombatView: React.FC<{
   });
   const [presentationState, setPresentationState] =
     useState<CombatPresentationState>(() => session.getPresentationState());
-  const [battleResult, setBattleResult] = useState(session.engine.battleResult);
+  const [battleResult, setBattleResult] = useState(session.read.battleResult);
   const isAutopilotRef = useRef(false);
   const [, setTickState] = useState(0);
 
@@ -117,10 +118,15 @@ export const CombatView: React.FC<{
     !!battleResult && !isResultsModalDismissed && !isGamePanelOpen;
 
   React.useEffect(() => {
-    const unsubscribe = game.subscribe(() => setTickState((tick) => tick + 1));
+    const unsubscribe = game.subscribe(() => {
+      setTickState((tick) => tick + 1);
+      if (['available','blocked'].includes(game.combatCheckpointStatus.state) && !isVisualLab && !isDesignTrial) {
+        setIsPaused(true); setIsGamePanelOpen(true);
+      }
+    });
     game.activate();
     return unsubscribe;
-  }, [game]);
+  }, [game, isVisualLab, isDesignTrial]);
 
   React.useEffect(() => {
     isAutopilotRef.current = isAutopilot;
@@ -138,7 +144,7 @@ export const CombatView: React.FC<{
       presentationState.status !== "ready";
     if (inputBlockedRef.current) {
       keysPressed.current = {}; isMouseDown.current = false; mouseAimActiveRef.current = false;
-      session.engine.playerShip.clearInput();
+      session.dispatchControl({ kind: 'clear-input' });
       session.cameraController.suspendPointer();
     }
   }, [
@@ -156,6 +162,7 @@ export const CombatView: React.FC<{
   // Deployment blocks cockpit input without pausing the simulation. Other dialogs
   // share one pause owner and must preserve the player's explicit Space-pause.
   const pauseRequested =
+    (!isVisualLab && !isDesignTrial && game.combatCheckpointStatus.state === 'loading') ||
     isPaused ||
     isPauseMenuOpen ||
     isSettingsOpen ||
@@ -170,7 +177,7 @@ export const CombatView: React.FC<{
     for (const key of Object.keys(keysPressed.current))
       keysPressed.current[key] = false;
     isMouseDown.current = false;
-    session.engine.playerShip.clearInput();
+    session.dispatchControl({ kind: 'clear-input' });
     return () => {
       if (wasRunning) session.start();
     };
@@ -202,8 +209,8 @@ export const CombatView: React.FC<{
 
   React.useEffect(() => {
     const timer = window.setInterval(() => {
-      const next = session.engine.isBattleResultReady
-        ? session.engine.battleResult
+      const next = session.read.isBattleResultReady
+        ? session.read.battleResult
         : null;
       setBattleResult((current) => (current === next ? current : next));
     }, 150);
@@ -221,11 +228,13 @@ export const CombatView: React.FC<{
         error,
       );
     });
-    if (isVisualLab) session.pause();
+    // The mount effect must not override the pause owner while IndexedDB is pending.
+    if (isVisualLab || game.combatCheckpointStatus.state === 'loading') session.pause();
     else session.start();
     (window as any).__gameSession = game;
     (window as any).__combatSession = session;
-    (window as any).__combatEngine = session.engine;
+    (window as any).__combatReadView = session.read;
+    if (isVisualLab || new URLSearchParams(window.location.search).get("combat") === "inline") (window as any).__combatEngine = session.engine;
     (window as any).__combatRenderer = session.renderer;
     (window as any).__combatPerformanceReport = () =>
       session.getPerformanceReport();
@@ -246,6 +255,7 @@ export const CombatView: React.FC<{
       delete (window as any).__gameSession;
       delete (window as any).__combatSession;
       delete (window as any).__combatEngine;
+      delete (window as any).__combatReadView;
       delete (window as any).__combatRenderer;
       delete (window as any).__combatPerformanceReport;
     };
@@ -271,7 +281,7 @@ export const CombatView: React.FC<{
         keysPressed.current[key] = false;
       isMouseDown.current = false;
       mouseAimActiveRef.current = false;
-      cameraPosRef.current.copy(session.engine.playerShip.pos);
+      cameraPosRef.current.copy(session.read.playerShip.pos);
       setTickState((tick) => tick + 1);
     } catch (error) {
       setGameActionError(
@@ -280,11 +290,26 @@ export const CombatView: React.FC<{
     }
   };
 
+  const handleCheckpointAction = async (kind: 'save' | 'resume') => {
+    setIsPaused(true); session.pause(); stopTransientAudio();
+    keysPressed.current = {}; isMouseDown.current = false; mouseAimActiveRef.current = false;
+    setGameActionError(null);
+    try {
+      if (kind === 'save') await game.saveCombatCheckpoint();
+      else {
+        await game.resumeCombatCheckpoint();
+        setBattleResult(session.read.battleResult);
+        setIsAutopilot(session.read.playerShip.fireControlMode === 'AI');
+        cameraPosRef.current.copy(session.read.playerShip.pos);
+      }
+    } catch (error) { setGameActionError(error instanceof Error ? error.message : String(error)); }
+  };
+
   const handleReset = () => {
     if (isDesignTrial) {
       handleGameAction(() => {
         session.restart(prototypeId);
-        session.engine.beginSimulationDeployment(deploymentCost, battleTeamLimit(readBattleSize()));
+        session.beginSimulationDeployment(deploymentCost, battleTeamLimit(readBattleSize()));
         session.refreshPresentationAssets();
       });
       setIsAutopilot(false);
@@ -373,7 +398,7 @@ export const CombatView: React.FC<{
       )}
       <MotionPresence>{isPauseMenuOpen && (
         <CombatPauseMenu
-          spec={session.engine.playerShip.spec}
+          spec={session.read.playerShip.spec}
           shipName={designName}
           endLabel={game.mode === "fleet" ? "结束战斗" : "结束模拟"}
           onSettings={() => setIsSettingsOpen(true)}
@@ -385,10 +410,10 @@ export const CombatView: React.FC<{
       )}</MotionPresence>
       {isSettingsOpen && (
         <CombatSettingsMenu
-          spec={session.engine.playerShip.spec}
+          spec={session.read.playerShip.spec}
           defaultMouseSteering={defaultMouseSteering}
           onDefaultMouseSteeringChange={setDefaultMouseSteering}
-          hasFighters={session.engine.fighterSystem.playerWings.length > 0}
+          hasFighters={session.read.playerWings.length > 0}
           canRestart={
             game.mode !== "fleet" || !!game.getSnapshot().pendingCombat
           }
@@ -414,29 +439,36 @@ export const CombatView: React.FC<{
       )}
       <CombatAvailabilityOverlay
         state={presentationState}
+        onRecoverAuthority={session.canRecoverAuthority ? () => {
+          setIsPaused(true);
+          keysPressed.current = {}; isMouseDown.current = false; mouseAimActiveRef.current = false;
+          void session.recoverAuthority();
+        } : undefined}
         onReturnDesign={isDesignTrial ? onExit : undefined}
         onRefresh={() => window.location.reload()}
       />
 
-      {isDeploymentOpen && presentationState.status === "ready" && isDesignTrial && <SimulationDeployment engine={session.engine}
+      {isDeploymentOpen && presentationState.status === "ready" && isDesignTrial && <SimulationDeployment source={session.deploymentView} onDeploymentCommand={command => session.dispatchDeployment(command)}
         onClose={() => setIsDeploymentOpen(false)}
         onDeployed={() => {
-          if (session.engine.isTacticalMap) session.engine.toggleTacticalMap();
+          if (session.read.isTacticalMap) session.dispatchControl({ kind: 'toggle-map' });
           setIsDeploymentOpen(false);
           session.refreshPresentationAssets();
         }} />}
 
-      {isDeploymentOpen && !isDesignTrial && session.engine.deployment.enabled && <FleetDeployment engine={session.engine} team={session.engine.playerShip.teamId}
-        onClose={()=>setIsDeploymentOpen(false)} onDeployed={()=>{if(session.engine.isTacticalMap)session.engine.toggleTacticalMap();setIsDeploymentOpen(false);}} />}
+      {isDeploymentOpen && !isDesignTrial && session.read.deploymentEnabled && <FleetDeployment source={session.deploymentView} team={session.read.playerShip.teamId}
+        onDeploy={async ids => { const result = await session.dispatchDeployment({ kind: 'fleet', ids }); if (!result.accepted) throw new Error(result.reason ?? '部署未获确认。'); }}
+        onClose={()=>setIsDeploymentOpen(false)} onDeployed={()=>{if(session.read.isTacticalMap)session.dispatchControl({ kind: 'toggle-map' });setIsDeploymentOpen(false);session.refreshPresentationAssets();}} />}
 
-      <TacticalHUD
+      <TacticalHUD mapSource={session.tacticalMapView}
         paused={pauseRequested}
         onPausedChange={setIsPaused}
         autopilot={isAutopilot}
         onAutopilotChange={combatInput.setAutopilot}
         onShipCommand={combatInput.command}
+        onControl={command => session.dispatchControl(command)}
         controlNotice={combatInput.controlNotice}
-        engine={session.engine}
+        engine={session.read}
         hudVisuals={session.hudVisuals}
         scheduler={session.scheduler}
         defaultMouseSteering={defaultMouseSteering}
@@ -453,7 +485,7 @@ export const CombatView: React.FC<{
         zoomRef={zoomRef}
         canvasRef={canvasRef}
         onHelpChange={setIsHelpOpen}
-        onOpenDeployment={isDesignTrial || session.engine.deployment.enabled ? () => setIsDeploymentOpen(true) : undefined}
+        onOpenDeployment={isDesignTrial || session.read.deploymentEnabled ? () => setIsDeploymentOpen(true) : undefined}
         inputBlocked={
           isDeploymentOpen ||
           isModModalOpen ||
@@ -491,6 +523,7 @@ export const CombatView: React.FC<{
         )}
       {isGamePanelOpen && (
         <GameStatePanel
+          onCheckpointAction={handleCheckpointAction}
           game={game}
           onClose={() => setIsGamePanelOpen(false)}
           onAction={handleGameAction}
@@ -517,7 +550,7 @@ export const CombatView: React.FC<{
           onCameraLockChange={(enabled) => {
             session.setCameraLocked(enabled);
             if (enabled)
-              cameraPosRef.current.copy(session.engine.playerShip.pos);
+              cameraPosRef.current.copy(session.read.playerShip.pos);
           }}
           onDamageChange={(enabled) => session.setDamageEnabled(enabled)}
           onMotionChange={(enabled) => session.setMotionEnabled(enabled)}
@@ -530,7 +563,7 @@ export const CombatView: React.FC<{
 
       {isResultModalOpen && (
         <CombatResultsModal
-          battleResult={session.engine.battleResult!}
+          battleResult={session.read.battleResult!}
           gameMode={game.mode}
           onOpenGameState={() => {
             setIsResultsModalDismissed(true);
@@ -552,7 +585,7 @@ export const CombatView: React.FC<{
 
       {isModModalOpen && (
         <ModManagerModal
-          currentShipId={session.engine.playerShip.spec.id}
+          currentShipId={session.read.playerShip.spec.id}
           isOpen={isModModalOpen}
           allowSandboxSwitch={
             game.getSnapshot().pendingCombat?.kind !== "fleet"

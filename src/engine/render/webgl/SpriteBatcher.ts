@@ -1,3 +1,4 @@
+import { spriteInClip } from './SpriteVisibility';
 import { Vector2 } from '../../math/Vector2';
 import { WebGLShaderUtil } from './WebGLShaderUtil';
 
@@ -92,11 +93,14 @@ export class SpriteBatcher {
   private currentBlendMode: 'NORMAL' | 'ADDITIVE' = 'NORMAL';
   public currentViewProj: Float32Array = new Float32Array(9);
   public drawCalls = 0;
+  public culledSprites = 0;
+  /** Actual sampler capacity, exposed for diagnostics (not an inferred feature flag). */
+  public get textureCapacity(): 1 | 4 { return this.textureSlots; }
 
   constructor(gl: WebGL2RenderingContext, private readonly textureSlots: 1 | 4 = 1) {
     this.gl = gl;
-    // Four-sampler mode is confined to the FX pass; other passes retain the
-    // original single-texture shader and ordering. Slot uses existing padding.
+    // Four-sampler mode keeps submission/primitive order and flush boundaries
+    // for blend/pass changes; it only shares texture binds. Slot uses padding.
     const vertexSource = textureSlots === 1 ? VERTEX_SHADER_SOURCE : VERTEX_SHADER_SOURCE
       .replace('out vec2 v_uv;', 'layout(location = 7) in float a_textureSlot;\nflat out int v_textureSlot;\nout vec2 v_uv;')
       .replace('  v_color = a_color;', '  v_color = a_color;\n  v_textureSlot = int(a_textureSlot);');
@@ -217,6 +221,7 @@ export class SpriteBatcher {
     this.batchTextures.length = 0;
     this.currentTextureSlot = 0;
     this.drawCalls = 0;
+    this.culledSprites = 0;
   }
 
   public resumeProgram() {
@@ -264,6 +269,8 @@ export class SpriteBatcher {
     u1 = 1.0,
     v1 = 1.0
   ) {
+    if (import.meta.env.VITE_CULL_SPRITES !== "false" && Number.isFinite(rotation)
+      && !spriteInClip(this.currentViewProj,worldX,worldY,scaleX,scaleY,pivotX,pivotY)) { this.culledSprites++; return; }
     if (this.textureSlots === 1) {
       if (this.currentTexture !== texture || this.spriteCount >= SpriteBatcher.MAX_SPRITES) {
         this.flush();

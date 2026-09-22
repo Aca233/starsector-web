@@ -26,6 +26,7 @@ jobs:
       contents: write
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      VITE_LAN_COMPONENTS: 'false'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,7 +49,9 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - name: Check network diagnostics and heartbeat
-        run: node --test scripts/check-network-diagnostics.mjs scripts/check-network-session-log.mjs scripts/check-network-session-integration.mjs scripts/check-network-n2n.mjs scripts/check-network-runtime-diagnostics.mjs scripts/check-snapshot-pipeline.mjs scripts/check-background-heartbeat.mjs scripts/check-network-publication.mjs scripts/check-lan-binary-delta.mjs scripts/check-lan-delta-relay.mjs scripts/check-lan-delta-client.mjs scripts/check-lan-delta-worker.mjs scripts/check-lan-ordered-websocket.mjs scripts/check-snapshot-broadcast-order.mjs scripts/check-snapshot-delivery-window.mjs scripts/check-snapshot-motion-reference.mjs scripts/check-lan-motion-reference.mjs scripts/check-lan-congestion.mjs scripts/check-lan-diagnostics.mjs scripts/check-lan-broadcast-compression.mjs scripts/check-lan-delta-continuity.mjs
+        run: npm run network:check
+      - name: Check shared native capture and viewer projection
+        run: node scripts/check-native-capture.mjs
       # Keep failing gates visible and retain a draft for explicit release review.
       # Only passing gates may automatically replace the stable update release.
       - name: Check Steam transport release gates
@@ -58,6 +61,8 @@ jobs:
           New-Item -ItemType Directory -Force artifacts | Out-Null
           npm run steam:check
       - run: npm run package:windows -- --version $env:RELEASE_VERSION
+      - name: Verify built release excludes career mode
+        run: node scripts/check-release-scope.mjs
       - run: npm run package:steam -- --skip-build --version $env:RELEASE_VERSION
       - run: npm run release:manifest -- --version $env:RELEASE_VERSION
       - run: npm run package:electron -- --skip-build --version $env:RELEASE_VERSION

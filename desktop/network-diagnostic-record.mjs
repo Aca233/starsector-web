@@ -12,18 +12,24 @@ function project(value, schema) {
   return Object.fromEntries(Object.entries(schema).map(([key, rule]) => [key, typeof rule === 'function' ? rule(value[key]) : project(value[key], rule)]));
 }
 const flow = names => ({ windowMs: numeric, rates: numbers(names) });
-const performanceSchema = { ...numbers('tick simulationMs captureMs encodeMs callbackGapMs backlogMs lastStepMs maxStepMs ageMs realtimeRatio combatRate'), flow: flow('simulated produced blocked') };
+const performanceSchema = { capturePlans: {enabled:bool,...numbers('hits compiled fallbacks shapes')}, serializer: { reason:choice('opt-in','legacy-codec','no-worker','no-shared-memory','startup-error','inactive','starting','active','worker-error','job-id-exhausted','unsupported-tape','post-failed','startup-timeout','job-timeout','invalid-mailbox','worker-fallback','cancelled','closed'), enabled:bool, ready:bool, busy:bool, ...numbers('submitted completed cancelled fallbacks prepareMs workerMs tapeBytes transferBytes ageMs') }, captureReuse: { ...numbers('produced reused encodedFragments'), retained: bool }, ...numbers('tick simulationMs captureMs encodeMs callbackGapMs backlogMs lastStepMs maxStepMs ageMs realtimeRatio combatRate'), flow: flow('simulated produced blocked'), io: { enabled: bool, sharedCredit: bool, ...numbers('sent skipped inputs inflight displaySounds sharedCompletions'), flow: flow('uploaded uploadSkipped') } };
 const pipelineSchema = { version: numeric, role: choice('host', 'guest'),
+  relayDecode: numbers('metadataFrames fullFrames lastMs'),
   authority: { knownAgeMs: numeric, stale: bool, performance: performanceSchema }, ingress: flow('received'),
   receivers: list({ seat: numeric, consumptionCredits: bool, stages: flow('received queued skippedSocket skippedCredit consumed') }) };
 const runtimeSchema = { ...numbers('sampleIntervalMs sampleDelayMs longTaskCount longTaskTotalMs longTaskMaxMs jsHeapUsedBytes jsHeapTotalBytes jsHeapLimitBytes'), longTaskSupported: bool, jsHeapAvailable: bool };
-const hudSchema = { ...numbers('tick sim bytes rtt jitter acknowledgementMs age hz appliedHz capture encode parse apply render gpu fps frameMs realtimeRatio combatRate playbackDelay ships projectiles explosions'),
+const hudSchema = { ...numbers('motionHz motionAgeMs motionTick tick sim bytes rtt jitter acknowledgementMs age hz appliedHz capture encode parse apply render renderDrawCalls spriteDrawCalls spriteTextureSlots gpu fps frameMs realtimeRatio combatRate playbackDelay ships projectiles explosions'),
+  renderCulling: { spritesEnabled: bool, hullOverlaysEnabled: bool, ...numbers('shipSpritesRejected hullOverlaysRejected') },
   localFlow: flow('uploaded uploadSkipped'), authority: performanceSchema,
-  input: numbers('sentSequence acknowledgedSequence trackedPending oldestTrackedPendingMs pendingActions'),
+  input: { projectileFlight: { active: bool, ...numbers('tick entities renderedFrames extrapolationMs') }, turretPrediction: { active: bool, reason: choice('reset','active','inactive','stale','command','unavailable'), ...numbers('renderedFrames reconciliations hardSnaps mounts pendingInputs') }, motionPrediction: { active: bool, reason: choice('reset', 'active', 'inactive', 'collision', 'unavailable', 'stale'), ...numbers('renderedFrames suspendedFrames reconciliations hardSnaps correctionDistance correctionAngleDeg replayMs pendingInputs') }, localParticles: numbers('groups particles generated advances step'), firePrediction: numbers('predicted repeated observedCycles recoveredCycles matched resolvedWithoutProjectile expired cancelled suppressed pending lastResponseMs'), ...numbers('sentSequence acknowledgedSequence trackedPending oldestTrackedPendingMs pendingActions'), projectileVisuals: numbers('tick received entities'), criticalCombat: numbers('tick ageMs hz') },
   decodeQueue: numbers('queued queuedBytes peakQueued peakBytes decoded backpressure waitMs maxWaitMs') };
 const lanSchema = { mode: choice('lan-websocket'), role: choice('host', 'guest'), relaySeq: numeric,
+  captureDemand: { held: bool, reason: choice('audience','relay'), ...numbers('heldTick heldMs granted withheld') },
+  criticalCombat: numbers('publications sent consumed discarded abandonedBytes skipped oversize peakFlightBytes wireBytes flightBytes peers retainedBytes baseBytes wireFull wireDelta tick'),
+  projectileVisuals: numbers('publications sent consumed discarded fragment skippedWritable skippedBudget oversizeBaseline peakFlightBytes flightBytes peers retainedPublicationBytes'),
+  bulk: { adaptive: bool, ...numbers('queued completed packets wireBytes receipts ignoredReceipts peakFlightBytes peakRetainedBytes cancelled retiredBytes failures increased reduced abandonedBytes abandonedChunks disconnectedPeers jobs ownedJobs flightBytes retainedBytes limit peerLimit ceiling') },
   compressionFanout: numbers('requests jobs shared savedInputBytes retries fallback activeJobs activeBytes'),
-  authority: numbers('received lastBytes receiveMs'), receivers: list({ seat: numeric, compression: bool, bufferedBytes: numeric,
+  authority: numbers('received lastBytes receiveMs'), receivers: list({ seat: numeric, motionAdmission: { mode: choice('auto'), status: choice('awaiting-world', 'eligible', 'fallback'), fallbackReason: choice('whole-state-late', 'whole-state-stalled'), ...numbers('worldSenderAgeMs pending maxAgeMs') }, visualBulkSent: numeric, bulkChunks: bool, chunkDeferred: numeric, detailSkipped: numeric, codecDeferred: numeric, combat: numbers('inflight bytes acknowledgementMs tick'), motion: { active: bool, fresh: bool, ...numbers("sent consumed skipped inflight bytes capacity idleRttMs deliveryHz acknowledgementMs detailIntervalMs") }, controlLane: { active: bool, ...numbers("received sent fallbacks bufferedBytes"), motionWire: numbers("full delta rawBytes packetBytes fallbacks retainedBytes") }, compression: bool, bufferedBytes: numeric,
     credits: numbers('inflight capacity idleCapacity deliveryHz bytes peakCount peakBytes sent acked rejected'), network: numbers('latestRttMs baselineRttMs busySamples'),
     flow: numbers('sent skippedSocket skippedCredit lastBytes lastSeq'), delta: numbers('full delta originalBytes encodedBytes budgetFallbacks motionDeltas anchors baseSeq pendingSeq retainedBytes') }) };
 const nativeSchema = { ...numbers('queuedBytes queuedPackets errorCode sampleAgeMs'), available: bool, active: bool, connecting: bool, usingRelay: bool,
@@ -31,7 +37,7 @@ const nativeSchema = { ...numbers('queuedBytes queuedPackets errorCode sampleAge
 const receiptSchema = numbers('rendererBinaryWrites rendererJsonWrites rendererPayloadBytes rendererCanonicalBytes rendererPending rendererWritten rendererWriteErrors maxRendererWriteMs networkAttempts networkAccepted networkErrors consumptionAttempts consumptionAccepted consumptionErrors fastAttempts fastAccepted fastRejected networkAgeMs consumptionAgeMs');
 const pollSchema = numbers('calls packetsRead discardedPackets oversizedHeads invalidPackets errors budgetHits maxGapMs maxDurationMs lastAgeMs');
 export const NETWORK_FAILURE_STAGES = ['snapshot-decode', 'snapshot-apply', 'server-rejected', 'graphics-context', 'worker-start', 'worker-runtime', 'snapshot-size', 'report-size', 'resource-load', 'initialization', 'frame-loop', 'unknown'];
-const blockReason = choice('disconnected', 'frame-window', 'wire-byte-window', 'renderer-consumption', 'shared-uplink-window');
+const blockReason = choice('disconnected', 'frame-window', 'wire-byte-window', 'renderer-consumption', 'shared-uplink-window', 'codec-work-budget');
 const steamSchema = { mode: choice('legacy-p2p', 'sockets'), role: choice('host', 'guest'), ...numbers('receivedStates lastStateAgeMs'),
   receipts: receiptSchema, polling: pollSchema,
   snapshotWorker: { ...numbers('offered replaced prepared accepted stale faults workMs maxWorkMs queueMs maxQueueMs maxRetained'), active: bool, pending: bool, ready: bool, failed: bool },
@@ -52,6 +58,7 @@ export function normalizeNetworkRecord(input) {
   const record = { version: 1, event: v.event, build, transport: v.transport,
     ...project(v, { wallTimeMs: numeric, monotonicMs: numeric, battle: numeric, seat: numeric, role: choice('host', 'guest'),
       failureStage: choice(...NETWORK_FAILURE_STAGES), hidden: bool, connected: bool, socketBufferedBytes: numeric, sampleGapMs: numeric, hudAgeMs: numeric, pipelineAgeMs: numeric, steamAgeMs: numeric,
+      features: { policy: choice('auto', 'off', 'experimental'), negotiated: bool, motionRequested: bool, motion: bool, visuals: bool, combat: bool, motionWire: bool, bulkChunks: bool, binaryDelta: bool, binarySnapshots: bool, reason: choice('steam-motion-not-implemented', 'disabled-by-build', 'awaiting-welcome', 'server-did-not-negotiate', 'no-helper-lane', 'check-receiver-activity') },
       runtime: runtimeSchema, hud: hudSchema, pipeline: pipelineSchema, lan: lanSchema, steam: steamSchema }) };
   // Stale values are explicitly unavailable, not a fresh repetition or measured zero.
   record.hudFresh = record.hudAgeMs !== null && record.hudAgeMs <= 2500;

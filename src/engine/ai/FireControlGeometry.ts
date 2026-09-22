@@ -148,3 +148,13 @@ export function shipSegmentEntry(ship: Ship, start: Vector2, end: Vector2): numb
   }
   return Number.isFinite(first) ? first : null;
 }
+
+/** All current hull and shield geometry fits this orientation-independent box.
+ * Broadphase only: do not replace shipSegmentEntry with this approximation. */
+export function shipFireControlExtent(ship: Ship): number {
+  const points = ship.spec.bounds;
+  const hull = points && points.length >= 3 ? hullBounds(points).extent : Math.abs(ship.spec.collisionRadius);
+  const shield = ship.shield.isActive && ship.shield.currentArcDeg > 0 && ship.shield.type !== 'NONE' && ship.shield.type !== 'PHASE'
+    ? Math.abs(ship.shield.radius) + Math.abs(ship.spec.shieldCenterX || 0) + Math.abs(ship.spec.shieldCenterY || 0) : 0;
+  return Math.max(hull, shield);
+}

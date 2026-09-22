@@ -1,6 +1,6 @@
 import { WebGLShaderUtil } from './WebGLShaderUtil';
 import type { Vector2 } from '../../math/Vector2';
-import type { Ship } from '../../simulation/Ship';
+import type { ShipRenderState as Ship } from '../../render/ShipRenderState';
 import { SHIELD_VISUAL_PROFILES, getShipVisualProfile } from '../../visual/VisualProfiles';
 
 const SHIELD_VS = `#version 300 es

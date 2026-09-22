@@ -1,3 +1,5 @@
+import { particleEventSink } from '../../visual/ParticleEventSink';
+import { beginParticleRecipe, rememberParticleRecipe, advanceParticleRecipe } from "../../visual/DynamicParticleRecipe";
 import { appendMuzzleFlash, appendLauncherSmoke } from '../../visual/MuzzleParticles';
 import { createNativeEmpArc, advanceNativeEmpArc } from '../../visual/EmpArcVisuals';
 import { DEBRIS_TEXTURES } from '../../assets/CombatFXAssets';
@@ -97,6 +99,7 @@ export class CombatFXSystem {
   constructor(private readonly random = new SimulationRandom()) {}
 
   public clear() {
+    particleEventSink(this)?.clear();
     this.particles = [];
     this.contrails = [];
     this.explosions = [];
@@ -127,6 +130,7 @@ export class CombatFXSystem {
   }
 
   public updateParticles(dt: number) {
+    particleEventSink(this)?.advance(dt);
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       p.life -= dt;
@@ -153,10 +157,12 @@ export class CombatFXSystem {
         p.alpha = Math.max(0, p.life / p.maxLife);
       }
 
+      advanceParticleRecipe(p, dt);
       if (p.life <= 0) {
         fastRemoveAt(this.particles, i);
       }
     }
+    particleEventSink(this)?.afterAdvance();
   }
 
   public updateContrails(dt: number) {
@@ -309,6 +315,7 @@ export class CombatFXSystem {
       d.pos.addScaled(d.vel, dt);
       d.vel.scale(Math.max(0, 1 - dt * 0.4)); // 太空摩擦阻力
       d.rotation += d.angularVel * dt;
+      advanceParticleRecipe(d, dt);
       if (d.life <= 0) {
         fastRemoveAt(this.debris, i);
       }
@@ -352,13 +359,14 @@ export class CombatFXSystem {
 
   private reserveParticleSlots(requested: number, priority: ParticlePriority = 'NORMAL'): number {
     if (requested <= 0) return 0;
-    const available = Math.max(0, PARTICLE_HARD_CAP - this.particles.length);
+    const occupied = this.particles.length + (particleEventSink(this)?.activeParticles ?? 0);
+    const available = Math.max(0, PARTICLE_HARD_CAP - occupied);
     if (available <= 0) return 0;
 
     // Soft degradation keeps large fleet fights readable and bounded without abruptly
     // disabling high-value hit flashes. No camera dependency is required, so simulation
     // determinism is preserved across render rates.
-    const load = this.particles.length / PARTICLE_HARD_CAP;
+    const load = occupied / PARTICLE_HARD_CAP;
     let density = load < 0.55 ? 1 : load < 0.75 ? 0.78 : load < 0.9 ? 0.5 : 0.25;
     if (priority === 'HIGH') density = Math.min(1, density * 1.2);
     if (priority === 'LOW') density *= 0.7;
@@ -372,11 +380,18 @@ export class CombatFXSystem {
     if (ship.damageDecals.suppressed) return;
     const pos = ship.pos.clone().add(localImpact.clone().rotate(ship.facingRad));
     // Do not apply the modern burst's minimum count or load-based soft density to source particles.
-    this.particles.push(...createArmorDamageParticles(pos, armorDamage, this.random));
+    if (particleEventSink(this)?.emit(0, pos, armorDamage, [0, 0, 0], this.random)) return;
+    const recipe = beginParticleRecipe(0, this.random, pos, armorDamage);
+    const particles = createArmorDamageParticles(pos, armorDamage, this.random);
+    rememberParticleRecipe(particles, recipe);
+    this.particles.push(...particles);
   }
 
   public spawnSparks(pos: Vector2, count = 15, color: [number, number, number] = [255, 200, 100]) {
     const actualCount = this.reserveParticleSlots(count, 'NORMAL');
+    if (particleEventSink(this)?.emit(2, pos, actualCount, color, this.random)) return;
+    const recipe = beginParticleRecipe(2, this.random, pos, actualCount, color);
+    const first = this.particles.length;
     for (let i = 0; i < actualCount; i++) {
       const angle = this.random.next() * Math.PI * 2;
       const speed = 70 + this.random.next() * 230;
@@ -401,10 +416,13 @@ export class CombatFXSystem {
         stretch: 1.4 + this.random.next() * 1.8
       });
     }
+    if (recipe) rememberParticleRecipe(this.particles.slice(first), recipe);
   }
 
   public spawnExplosion(pos: Vector2, count = 60) {
     const actualCount = this.reserveParticleSlots(count, 'HIGH');
+    const recipe = beginParticleRecipe(3, this.random, pos, actualCount);
+    const first = this.particles.length;
     for (let i = 0; i < actualCount; i++) {
       const ratio = actualCount > 1 ? i / (actualCount - 1) : 0;
       const angle = this.random.next() * Math.PI * 2;
@@ -446,6 +464,7 @@ export class CombatFXSystem {
         });
       }
     }
+    if (recipe) rememberParticleRecipe(this.particles.slice(first), recipe);
   }
 
   public spawnProjectileHitGlows(projectile: Projectile, pos: Vector2, target: Ship, result: HitGlowDamageResult) {
@@ -647,6 +666,8 @@ export class CombatFXSystem {
     baseSpeed = 90,
     sizeCategory: 'small' | 'medium' | 'large' = 'small'
   ) {
+    const recipe = beginParticleRecipe(1, this.random, pos, count, color, baseSpeed, ["small", "medium", "large"].indexOf(sizeCategory));
+    const recipeMembers: DebrisParticle[] | null = recipe ? [] : null;
     const texList = DEBRIS_TEXTURES[sizeCategory] || DEBRIS_TEXTURES.small;
     const baseSize = sizeCategory === 'large' ? 16 : sizeCategory === 'medium' ? 12 : 8;
     const maxLife = sizeCategory === 'large' ? 3.0 : sizeCategory === 'medium' ? 2.2 : 1.4;
@@ -662,7 +683,7 @@ export class CombatFXSystem {
         : color;
 
       const life = maxLife * (0.7 + this.random.next() * 0.4);
-      this.debris.push({
+      const particle: DebrisParticle = {
         pos: pos.clone(),
         vel: Vector2.fromAngle(angle, speed),
         rotation: this.random.next() * Math.PI * 2,
@@ -674,8 +695,11 @@ export class CombatFXSystem {
         points: [],
         spriteUrl: shardTex,
         isGlowing
-      });
+      };
+      this.debris.push(particle);
+      recipeMembers?.push(particle);
     }
+    if (recipeMembers) rememberParticleRecipe(recipeMembers, recipe);
   }
 
   public spawnShieldRipple(pos: Vector2, maxRadius = 55, color: [number, number, number] = [100, 210, 255]) {

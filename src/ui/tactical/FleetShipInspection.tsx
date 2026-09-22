@@ -1,6 +1,6 @@
 import { fleetInspectionDesign, fleetShipCondition } from './FleetDeploymentRoster';
 import { useMemo } from 'react';
-import type { Ship } from '../../engine/simulation/Ship';
+import type { DeploymentMemberView } from '../../engine/runtime/DeploymentView';
 import type { ShipSpec } from '../../engine/content/ShipSpec';
 import { data, nativeRefit, weaponName } from '../../studio/DesignModel';
 import { LoadoutSection } from '../../studio/VariantInspection';
@@ -10,13 +10,13 @@ import { ModInformation } from '../../studio/HullModInformation';
 import { WingInformation } from '../../studio/WingInformation';
 
 export function FleetShipInspection({ ship, name, cost, status, children, enabled, onOpenCodex }: {
-  ship: Ship; name: string; cost: number; status: string; children: InspectionTarget; enabled: boolean;
+  ship: DeploymentMemberView; name: string; cost: number; status: string; children: InspectionTarget; enabled: boolean;
   onOpenCodex: OpenWeaponCodex;
 }) {
   return <RefitInspection title={name} className="refit-loadout-inspection simulation-option-inspection" enabled={enabled}
     content={<FleetShipInformation ship={ship} cost={cost} status={status} onOpenCodex={onOpenCodex} />}>{children}</RefitInspection>;
 }
-function FleetShipInformation({ ship, cost, status, onOpenCodex }: { ship: Ship; cost: number; status: string; onOpenCodex: OpenWeaponCodex }) {
+function FleetShipInformation({ ship, cost, status, onOpenCodex }: { ship: DeploymentMemberView; cost: number; status: string; onOpenCodex: OpenWeaponCodex }) {
   const result = useMemo(() => {
     try { return { draft: fleetInspectionDesign(ship.spec), error: '' }; }
     catch (error) { return { draft: null, error: error instanceof Error ? error.message : String(error) }; }

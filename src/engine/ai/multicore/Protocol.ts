@@ -1,3 +1,5 @@
+import { remainingProjectileLifetime } from '../../simulation/systems/weapon/SourceMissileLifecycle';
+import type { Projectile } from '../../simulation/Weapon';
 import { scalarWireCodec, type ScalarWireCodec } from './ScalarWire';
 import { Vector2 } from '../../math/Vector2';
 import { weaponDps, weaponRange } from '../ShipCombatProfile';
@@ -36,7 +38,7 @@ export const motionKeys = ['maxSpeed', 'acceleration', 'deceleration', 'maxTurnR
 // Target observation/range policy consumes these scalars on read-only owner views too.
 const shipFields = ['hullHp', 'maxHullHp', 'hasVastBulk', 'isRetreated', 'isDocked', 'isCollisionless', 'flux.fluxPercent', 'pos.x', 'pos.y', 'vel.x', 'vel.y', 'facingRad', 'isDead', 'isPlayer', 'teamId', 'visibilityMask', 'visibilityOverflow', 'visibleToPlayer', 'visibleToEnemy', 'isPhased', 'shield.type', 'shield.isActive', 'shield.radius', 'shield.currentArcDeg', 'shield.phaseChargeDownDuration', 'flux.isOverloaded', 'flux.overloadTimer', 'flux.isVenting', 'system.blocksWeapons', 'system.chargeDownDuration'];
 const mountFields = ['currentAngleRad', 'ammo', 'isDisabled', 'firingState', 'firingStateTimer', 'burstRemaining', 'burstTimer', 'cooldownTimer', 'barrelIndex', 'fireControlTargetShipId', 'fireControl.reason', 'fireControl.targetKind'];
-const projectileFields = ['sourceShipId', 'isPlayer', 'isFlare', 'didDamage', 'damage', 'damageType', 'flightTimeRemaining', 'rangeRemaining', 'sourceMoveSpeed', 'fadeTime', 'fadeProgress', 'pos.x', 'pos.y', 'vel.x', 'vel.y', 'radius', 'proximityFuse.range', 'isGuided', 'targetShipId', 'facingRad', 'maxTurnRate', 'maxSpeed', 'teamId'] as const;
+const projectileFields = ['sourceShipId', 'isPlayer', 'isFlare', 'didDamage', 'damage', 'damageType', 'flightTimeRemaining', 'rangeRemaining', 'sourceMoveSpeed', 'fadeTime', 'fadeProgress', 'pos.x', 'pos.y', 'vel.x', 'vel.y', 'radius', 'proximityFuse.range', 'isGuided', 'targetShipId', 'facingRad', 'maxTurnRate', 'maxSpeed', 'teamId', 'isDisarmed', 'collisionDisabled'] as const;
 export const shipPaths = shipFields.map(s => s.split('.'));
 export const mountPaths = mountFields.map(s => s.split('.'));
 export const projectilePaths = projectileFields.map(s => s.split('.'));
@@ -118,7 +120,9 @@ export class NumericReader {
 /** Explicit version of projectilePaths, in exactly the same wire order. Avoid
  * a polymorphic string-path lookup for every field of every live projectile.
  * NumericStore/Reader still preserve undefined, null, strings and special numbers. */
-export const projectileWireWidth: (typeof projectileFields)['length'] = 23;
+// One derived lifetime follows the 25 source fields. Only read-only owners use it;
+// physics still owns all missile lifecycle state on the authority.
+export const projectileWireWidth = projectileFields.length + 1;
 function encodeProjectile(store: NumericStore, p: Fields, offset: number): void {
     store.set(offset + 0, p.sourceShipId);
     store.set(offset + 1, p.isPlayer);
@@ -143,6 +147,9 @@ function encodeProjectile(store: NumericStore, p: Fields, offset: number): void 
     store.set(offset + 20, p.maxTurnRate);
     store.set(offset + 21, p.maxSpeed);
     store.set(offset + 22, p.teamId);
+    store.set(offset + 23, p.isDisarmed);
+    store.set(offset + 24, p.collisionDisabled);
+    store.set(offset + 25, remainingProjectileLifetime(p as Projectile));
 }
 function matchesProjectile(store: NumericStore, p: Fields, offset: number): boolean {
     return store.equals(offset + 0, p.sourceShipId)
@@ -167,7 +174,10 @@ function matchesProjectile(store: NumericStore, p: Fields, offset: number): bool
         && store.equals(offset + 19, p.facingRad)
         && store.equals(offset + 20, p.maxTurnRate)
         && store.equals(offset + 21, p.maxSpeed)
-        && store.equals(offset + 22, p.teamId);
+        && store.equals(offset + 22, p.teamId)
+        && store.equals(offset + 23, p.isDisarmed)
+        && store.equals(offset + 24, p.collisionDisabled)
+        && store.equals(offset + 25, remainingProjectileLifetime(p as Projectile));
 }
 export function readProjectile(reader: NumericReader, p: Fields, offset: number): void {
     p.sourceShipId = reader.get(offset + 0);
@@ -193,6 +203,9 @@ export function readProjectile(reader: NumericReader, p: Fields, offset: number)
     p.maxTurnRate = reader.get(offset + 20);
     p.maxSpeed = reader.get(offset + 21);
     p.teamId = reader.get(offset + 22);
+    p.isDisarmed = reader.get(offset + 23);
+    p.collisionDisabled = reader.get(offset + 24);
+    p.threatLifetime = reader.get(offset + 25);
 }
 
 export class Publisher {

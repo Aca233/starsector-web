@@ -1,7 +1,8 @@
+import { AuthorityIoBridge } from './AuthorityIoBridge.mjs';
 import { LanDeltaReceiver } from "./LanBinaryDelta.mjs";
 import {
   Cell, LAN_SOCKET_QUEUE_BYTES, LAN_SOCKET_QUEUE_MESSAGES, LAN_SOCKET_SHARED_BYTES,
-  payloadBytes, releaseIncoming, reserve,
+  payloadBytes, releaseIncoming, reserve, closeTransport,
 } from "./LanSocketShared";
 import type { FromLanWorker, ToLanWorker } from "./LanSocketShared";
 
@@ -18,6 +19,13 @@ let socket: WebSocket | undefined;
 let ended = false;
 let connectStarted = false;
 let nativeBuffered = 0;
+const authority = new AuthorityIoBridge({
+  buffered: () => { accountNative(); return cells ? Atomics.load(cells, Cell.outbound) : Infinity; },
+  send: data => {
+    if (ended || !cells || Atomics.load(cells, Cell.closing) || socket?.readyState !== 1) throw Error("Authority socket closed");
+    socket.send(data); accountNative(); if (nativeBuffered > 0 && poll === undefined) poll = setTimeout(sample, 4);
+  },
+});
 const deltaReceiver = new LanDeltaReceiver();
 let offeredMotionReference = false;
 let offeredDelta = false, enabledDelta = false, hidden = false;
@@ -58,6 +66,7 @@ function sample(): void {
 function fail(reason: string): void {
   if (ended) return;
   ended = true;
+  authority.close(reason);
   clearTimeout(poll);
   if (cells) Atomics.store(cells, Cell.transportState, 3);
   // Browser close() forbids 1006/1009/1011/1013; internal wire codes are private.
@@ -103,6 +112,7 @@ function connect(url: string): void {
         data = bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength ? bytes.buffer : bytes.slice().buffer;
       }
     } catch { fail("Invalid LAN delta baseline"); return; }
+    if (authority.observe(data)) return;
     const size = payloadBytes(data);
     if (!reserve(cells!, Cell.inboundMessages, 1, LAN_SOCKET_QUEUE_MESSAGES)) {
       fail("I/O receive queue full"); return;
@@ -122,6 +132,7 @@ function connect(url: string): void {
   socket.onclose = event => {
     if (ended) return;
     ended = true;
+    authority.close("Authority socket closed");
     clearTimeout(poll);
     accountNative();
     Atomics.store(cells!, Cell.transportState, 3);
@@ -166,11 +177,16 @@ scope.onmessage = event => {
         else if (nativeBuffered > 0 && poll === undefined) poll = setTimeout(sample, 4);
         break;
       }
+      case "authority":
+        if (!cells || ended || socket?.readyState !== 1) { message.port.close(); break; }
+        authority.attach(message.port, message.matchId, message.seq); break;
+      case "authority-detach": authority.close(); break;
       case "close":
+        authority.close();
         if (cells) Atomics.store(cells, Cell.transportState, 2);
         // Ordered after every earlier send, including when close follows send
         // in the same main-thread task. Do not drop those sends using closing.
-        if (socket) socket.close(message.code, message.reason);
+        if (socket) closeTransport(socket, message.code, message.reason);
         else fail("I/O closed before connect");
         break;
     }

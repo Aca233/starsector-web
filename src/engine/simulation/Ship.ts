@@ -1,3 +1,4 @@
+import { isImmutableMetadata } from '../extensions/Immutable';
 import { defenseSystemId, tacticalSystemIds } from '../extensions/ship-systems/Loadout';
 import { moduleOffset } from '../content/ModuleGeometry';
 import type { ShipModuleSpec } from '../content/ShipSpec';
@@ -37,6 +38,7 @@ import {
 } from './CombatReadiness';
 
 // Identity, not a caller-writable "pure" flag; no new serialized combat state.
+const nativeArmorReaders = new WeakMap<Ship, { damage: ArmorGrid['damageTakenModifiers']; effective: ArmorGrid['dynamicEffectiveArmorMultiplier']; cell: ArmorGrid['onCellDamage']; overload: FluxTracker['onOverloadStarted'] }>();
 const nativeShieldReaders = new WeakMap<Ship, () => number>();
 const nativeShieldDamageFor = Shield.prototype.damageTakenMultiplierFor;
 
@@ -421,6 +423,7 @@ export class Ship {
     // ship_data.csv: phase cost / phase upkeep 是基础幅能容量的比例 (厄运 0.05/0.05)。
     this.shield.externalDamageTakenMultiplier = () => this.externalDamageTakenMultiplier;
     nativeShieldReaders.set(this, this.shield.externalDamageTakenMultiplier);
+    nativeArmorReaders.set(this, { damage: this.armor.damageTakenModifiers, effective: this.armor.dynamicEffectiveArmorMultiplier, cell: this.armor.onCellDamage, overload: this.flux.onOverloadStarted });
     this.shield.phaseMinSpeedFluxThresholdMultiplier = 1 + refit.phaseMinSpeedFluxThresholdPercent / 100;
     this.shield.unfoldRateMultiplier = 1 + refit.shieldUnfoldRatePercent / 100;
     this.shield.turnRateMultiplier = 1 + refit.shieldTurnRatePercent / 100;
@@ -984,3 +987,41 @@ export const nativeGetShieldCenter = Ship.prototype.getShieldCenter;
 
 /** Identity gate for scan-local motion reads; custom readers keep per-obstacle calls. */
 export const nativeGetMotionStats = Ship.prototype.getMotionStats;
+
+/** The weapon aim loop may share availability reads only for the native read surface.
+ * Capture at module initialization, not on the first query (which may already be modded). */
+const fireControlReaderTypes = [Ship, Shield, FluxTracker, ShipSystem, ArmorGrid, RuntimeCombatModifiers, ShipWeaponControlSystem].map(type => {
+  const prototype = type.prototype;
+  const readers = Object.entries(Object.getOwnPropertyDescriptors(prototype))
+    .filter(([key, d]) => key !== 'constructor' && (d.get || d.set || typeof d.value === 'function'));
+  return { prototype, readers, keys: new Set(readers.map(([key]) => key)) };
+});
+export function nativeFireControlPrototypes(): boolean {
+  return fireControlReaderTypes.every(({ prototype, readers }) => readers.every(([key, d]) => {
+    const now = Object.getOwnPropertyDescriptor(prototype, key);
+    return now?.get === d.get && now?.set === d.set && now?.value === d.value;
+  }));
+}
+export function hasNativeFireControlReaders(ship: Ship): boolean {
+  if (Object.getPrototypeOf(ship) !== Ship.prototype) return false;
+  // Do not invoke a custom component getter merely to decide to fall back.
+  for (const key of Object.getOwnPropertyNames(ship)) {
+    if (fireControlReaderTypes[0].keys.has(key) || !('value' in Object.getOwnPropertyDescriptor(ship, key)!)) return false;
+  }
+  const objects = [ship, ship.shield, ship.flux, ship.system, ship.armor, ship.runtimeModifiers, ship.weaponControl];
+  for (let i = 1; i < objects.length; i++) {
+    const object = objects[i], { prototype, keys } = fireControlReaderTypes[i];
+    if (Object.getPrototypeOf(object) !== prototype) return false;
+    for (const key of Object.getOwnPropertyNames(object)) {
+      if (keys.has(key) || !('value' in Object.getOwnPropertyDescriptor(object, key)!)) return false;
+    }
+  }
+  if (!isImmutableMetadata(ship.spec) || ship.system.auxiliary !== ship.defenseSystem || ship.defenseSystem.auxiliary || ship.systems.length > 1 || Object.getPrototypeOf(ship.defenseSystem) !== ShipSystem.prototype) return false;
+  for (const key of Object.getOwnPropertyNames(ship.defenseSystem)) if (fireControlReaderTypes[3].keys.has(key)) return false;
+  const armor = nativeArmorReaders.get(ship);
+  return ship.hasNativeThreatPhaseHooks && ship.system.hasNativeStats && ship.defenseSystem.hasNativeStats
+    && ship.armor.damageTakenModifiers === armor?.damage && ship.armor.dynamicEffectiveArmorMultiplier === armor?.effective
+    && ship.armor.onCellDamage === armor?.cell && ship.flux.onOverloadStarted === armor?.overload
+    && ship.runtimeModifiers.empty && !ship.parentShip && !ship.sourceCarrier
+    && ship.hullDamageInterceptors.size === 0 && ShipWeaponControlSystem.hasNativeQueryLoop(ship.weaponControl);
+}

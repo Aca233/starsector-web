@@ -1,4 +1,4 @@
-import type { Ship } from '../simulation/Ship';
+type Ship = { readonly systems: readonly unknown[] };
 export interface SystemBindings { slots: (string | null)[]; wheelSelect: boolean; selectedKey: string | null }
 const storageKey = 'starsector-web:system-bindings:v1';
 export const defaultSystemBindings = (): SystemBindings => ({ slots: ['KeyF', 'KeyG', 'KeyH'], wheelSelect: false, selectedKey: 'KeyJ' });

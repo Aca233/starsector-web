@@ -1,3 +1,21 @@
+import { copyReplayCheckpoint, type CombatReplayCheckpoint } from './local/CombatReplayCheckpoint';
+import { LOCAL_COMBAT_PROTOCOL } from './local/LocalCombatProtocol';
+import { localCombatContentSignature } from './local/LocalCombatContent';
+import { combatHudView, liveCombatHudView, type CombatHudView } from './CombatHudView';
+import { LocalWorkerHost, type LocalCombatFrame } from './local/LocalWorkerHost';
+import type { LocalCombatConfig } from './local/LocalCombatKernel';
+import type { CombatRequest, CombatOutcome } from '../game/GameState';
+import { CombatHandoff } from '../game/CombatHandoff';
+import { sound } from '../audio/SoundManager';
+import { TacticalMapViewProjector, type TacticalMapSource } from './TacticalMapView';
+import { DeploymentViewProjector, type DeploymentViewSource } from './DeploymentView';
+import { copyDeploymentCommand, prepareDeployment, applyPreparedDeployment, type DeploymentCommand } from './DeploymentControl';
+import { contentRegistry } from '../content/ContentRegistry';
+import { applyCombatControlCommand, applyCombatControlSample, copyControlSample, type CombatControlCommand, type CombatControlSample } from './CombatControl';
+import { combatRenderView } from '../render/CombatRenderView';
+import { CombatAuthority } from './CombatAuthority';
+import { CombatTickHost } from './CombatTickHost';
+import { CombatStepProfiler, type CombatStepSpan, type StepProfileOptions } from '../diagnostics/CombatStepProfiler';
 import { CombatMulticore } from '../ai/multicore/CombatMulticore';
 import type { AIPhaseBatch } from '../ai/multicore/Types';
 import { DEFAULT_PLAYER_HULL, DEFAULT_ENEMY_HULL } from '../data/SandboxDefaults';
@@ -21,6 +39,7 @@ export type CombatSessionState = 'created' | 'prepared' | 'running' | 'paused' |
 
 export type CombatPresentationStatus = 'idle' | 'loading' | 'ready' | 'context-lost' | 'restoring' | 'failed' | 'disposed';
 export type CombatPresentationErrorCode =
+  | 'authority-failed'
   | 'webgl2-unsupported'
   | 'renderer-init-failed'
   | 'resource-prepare-failed'
@@ -42,7 +61,178 @@ let nextSessionId = 1;
 
 /** Owns the mutable lifetime of one combat run. React only keeps this object. */
 export class CombatSession {
-  public engine: CombatEngine;
+  private readonly authority: CombatAuthority;
+  private workerEnabled = false;
+  private workerHost?: LocalWorkerHost;
+  private workerStep?: Promise<void | false>;
+  private stagedRestore?: LocalWorkerHost;
+  private restorePending = false;
+  private encounter?: CombatRequest;
+  private simulationPointLimit?: number;
+  private loadingEncounter = false;
+  private workerConfigSeed = 0x51f15e;
+  private controlGeneration = 0;
+  private acceptedWorkerSequence = 0;
+  private telemetrySequence = 0;
+  private pilotIntent?: boolean;
+  private pilotRequest = 0;
+  private inputSerial = 0;
+  private readonly pendingReleases = new Map<string, {serial:number; promise:Promise<import('./CombatCommands').CommandResult>}>();
+  /** Stable presentation facade, never the authoritative engine. */
+  public readonly read: CombatHudView = liveCombatHudView(() => this.workerHost?.latest?.presentation.hud.read ?? combatHudView(this.authority.engine));
+  private get renderView() { return this.workerHost?.latest?.presentation.view ?? combatRenderView(this.authority.engine); }
+  public get controlEpoch(): number { return this.controlGeneration; }
+  public enableWorker(): void {
+    if (this.authority.tick !== 0) throw new Error('Worker migration requires a new encounter, not a display checkpoint');
+    this.workerEnabled = true;
+  }
+  private closeWorker(): void { this.stagedRestore?.dispose(); this.stagedRestore = undefined; this.restorePending = false; this.controlGeneration++; this.pilotIntent = undefined; this.pilotRequest++; this.inputSerial++; this.pendingReleases.clear(); this.acceptedWorkerSequence = 0; this.telemetrySequence = 0; this.workerHost?.dispose(); this.workerHost = undefined; this.workerStep = undefined; }
+  public loadEncounter(request: CombatRequest, handoff = new CombatHandoff(request)): void {
+    this.encounter = structuredClone(handoff.request); this.simulationPointLimit = undefined;
+    this.loadingEncounter = true;
+    try { handoff.deploy(this); } finally { this.loadingEncounter = false; }
+    this.refreshPresentationAssets();
+  }
+  public beginSimulationDeployment(points: number, limit: number): void {
+    this.closeWorker(); this.encounter = undefined; this.simulationPointLimit = limit;
+    this.authority.engine.beginSimulationDeployment(points, limit);
+  }
+  public collectOutcome(handoff: CombatHandoff): CombatOutcome {
+    if (!this.workerEnabled) return handoff.collect(this);
+    const outcome = this.workerHost?.latest?.outcome;
+    if (!outcome || outcome.encounterId !== handoff.request.id) throw new Error('权威战果尚未就绪，不能从显示帧结算。');
+    return structuredClone(outcome);
+  }
+  private async ensureWorker(): Promise<void> {
+    if (!this.workerEnabled) return;
+    if (!this.workerHost) {
+      const engine = this.authority.engine;
+      const config: LocalCombatConfig = {playerHull: engine.playerShip.spec.id, enemyHull: engine.enemyShip.spec.id,
+        seed: this.workerConfigSeed, encounter: this.encounter, simulationPointLimit: this.simulationPointLimit,
+        presentation:'render', content:{ships:contentRegistry.getAllShips(), weapons:contentRegistry.getAllWeapons()}};
+      const created = new LocalWorkerHost(config);
+      this.workerHost = created;
+      created.subscribeFailure(error => this.failAuthority(created, error));
+    }
+    const host = this.workerHost;
+    const frame = await host.ready;
+    if (this.workerHost === host && this.state !== 'disposed') this.acceptWorkerFrame(host, frame);
+  }
+  private acceptWorkerFrame(host: LocalWorkerHost, frame: LocalCombatFrame): void {
+    if (this.workerHost !== host || this.state === 'disposed' || frame.sequence <= this.acceptedWorkerSequence) return;
+    this.acceptedWorkerSequence = frame.sequence;
+    for (const event of frame.audio) {
+      if (event.position) sound.playAtPos(event.key, new Vector2(...event.position), this.read.playerShip.pos, event.volume, event.rate);
+      else sound.play(event.key, event.volume, event.rate);
+    }
+    const report = frame.presentation.hud.battleResult;
+    if (report && frame.presentation.hud.isBattleResultReady && report !== this.completedBattle) {
+      this.completedBattle = report;
+      for (const listener of this.battleListeners) listener();
+    }
+  }
+  private failAuthority(host: LocalWorkerHost, error: unknown): void {
+    if (this.workerHost !== host || this.state === 'disposed') return;
+    this.state = 'paused'; this.visualClock.setPaused(true); this.scheduler.resync();
+    this.failPresentation(this.presentationGeneration, 'authority-failed', error);
+  }
+  /** Manual, acknowledged-boundary recovery only; never replay an uncertain last tick. */
+  public get canRecoverAuthority(): boolean {
+    return this.state !== 'disposed' && this.presentationState.errorCode === 'authority-failed'
+      && this.workerHost?.status === 'failed' && !this.workerHost.recoveryUnavailableReason && !!this.canvas;
+  }
+  public get supportsCheckpoints(): boolean { return this.workerEnabled && !!this.encounter && !this.restorePending; }
+  public async captureCheckpoint(): Promise<CombatReplayCheckpoint> {
+    const host = this.workerHost, epoch = this.controlGeneration;
+    if (!this.supportsCheckpoints || !host || host.status !== 'ready') throw new Error('当前战斗不能保存中场点。');
+    this.pause(); await this.barrier();
+    if (this.workerHost !== host || this.controlGeneration !== epoch || this.restorePending || host.latest?.outcome)
+      throw new Error('战斗已更换、结束或正在恢复，未保存中场点。');
+    return host.checkpoint();
+  }
+  public async recoverAuthority(): Promise<import('./CombatCommands').CommandResult> {
+    if (!this.canRecoverAuthority) return {accepted:false, reason:'当前战斗没有可恢复的已确认日志。'};
+    try { return await this.restoreCheckpoint(this.workerHost!.checkpoint()); }
+    catch (error) { return {accepted:false, reason:String(error)}; }
+  }
+  /** Used by same-page recovery and a validated, same-encounter durable checkpoint.
+   * A candidate replays off to the side; it cannot replace the live host before validation. */
+  public async restoreCheckpoint(source: CombatReplayCheckpoint, canAdopt: () => boolean = () => true): Promise<import('./CombatCommands').CommandResult> {
+    if (!this.workerEnabled || this.restorePending || !this.canvas || this.state === 'disposed')
+      return {accepted:false, reason:'战斗尚未就绪或已在恢复。'};
+    let checkpoint: CombatReplayCheckpoint;
+    try {
+      checkpoint = copyReplayCheckpoint(source, LOCAL_COMBAT_PROTOCOL);
+      if (checkpoint.config.expectedContent !== localCombatContentSignature()
+        || checkpoint.config.seed !== this.workerConfigSeed || checkpoint.config.simulationPointLimit !== this.simulationPointLimit
+        || JSON.stringify(checkpoint.config.encounter) !== JSON.stringify(this.encounter))
+        throw new Error('中场点的内容或遭遇与当前战斗不符。');
+    } catch (error) { return {accepted:false, reason:String(error)}; }
+    const previous = this.workerHost, canvas = this.canvas, generation = this.controlGeneration;
+    const previousPresentation = this.presentationState;
+    const alreadyCompleted = !!this.completedBattle;
+    this.restorePending = true;
+    this.state = 'paused'; this.visualClock.setPaused(true); this.scheduler.resync();
+    let candidate: LocalWorkerHost | undefined;
+    try {
+      if (previous?.status === 'ready') await this.barrier();
+      if (generation !== this.controlGeneration) throw new Error('恢复期间战斗已更换。');
+      candidate = new LocalWorkerHost(checkpoint.config, 90_000, checkpoint);
+      this.stagedRestore = candidate;
+      this.setPresentationState({status:'restoring', errorCode:'authority-failed', errorMessage:null});
+      const frame = await candidate.ready;
+      if (generation !== this.controlGeneration || this.stagedRestore !== candidate) throw new Error('恢复期间战斗已更换。');
+      if (!canAdopt()) throw new Error('存档已变化，拒绝提交恢复结果。');
+      this.stagedRestore = undefined;
+      this.closeWorker();
+      const adoptedGeneration = this.controlGeneration, host = candidate;
+      this.workerHost = host;
+      host.subscribeFailure(error => this.failAuthority(host, error));
+      if (alreadyCompleted) this.completedBattle = frame.presentation.hud.battleResult;
+      this.acceptWorkerFrame(host, frame);
+      this.acceptWorkerFrame(host, await host.commands([{kind:'clear-input'}, {kind:'stop-firing'}]));
+      if (this.workerHost !== host || this.controlGeneration !== adoptedGeneration) throw new Error('恢复期间战斗已更换。');
+      await this.prepare(canvas);
+      if (this.workerHost !== host || this.controlGeneration !== adoptedGeneration) throw new Error('恢复期间战斗已更换。');
+      this.pause();
+      return {accepted:true};
+    } catch (error) {
+      if (candidate && this.workerHost !== candidate) candidate.dispose();
+      if (generation === this.controlGeneration) {
+        this.stagedRestore = undefined; this.restorePending = false;
+        // The rejected candidate never became authority; retain the original paused world.
+        this.setPresentationState(previous?.status === 'failed'
+          ? {status:'failed',errorCode:'authority-failed',errorMessage:String(error)} : previousPresentation);
+      }
+      return {accepted:false, reason:String(error)};
+    }
+  }
+
+  /** Pause barrier includes already accepted commands/tick but never starts another. */
+  public async barrier(): Promise<void> {
+    const host = this.workerHost;
+    if (!host) { this.finishPendingTick(); return; }
+    try { this.acceptWorkerFrame(host, await host.barrier()); }
+    catch (error) { this.failAuthority(host, error); throw error; }
+  }
+
+  private deploymentPending = false;
+  private readonly tacticalMapProjector = new TacticalMapViewProjector();
+  public readonly tacticalMapView: TacticalMapSource = { read: () => this.workerHost?.latest ? this.workerHost.tacticalMapView.read() : this.tacticalMapProjector.capture(this.authority.engine, this.authority.epoch, this.state !== 'disposed') };
+  private readonly deploymentProjector = new DeploymentViewProjector();
+  public readonly deploymentView: DeploymentViewSource = { read: () => this.workerHost?.latest ? this.workerHost.deploymentView.read() : this.deploymentProjector.capture(this.authority.engine, this.authority.epoch, this.state !== 'disposed') };
+  private readonly tickHost = new CombatTickHost();
+  /** Legacy edit adapter. Presentation never receives this authority object. */
+  public get engine(): CombatEngine { if (this.workerHost) throw new Error('Worker authority has no main-thread CombatEngine; use session.read'); return this.authority.engine; }
+  public set engine(engine: CombatEngine) {
+    if (this.workerEnabled) throw new Error('Worker authority cannot be replaced with a presentation engine');
+    this.discardPendingTick(); this.authority.beginEpoch(engine);
+  }
+  public getAuthorityStatus() {
+    if (this.workerEnabled) return {epoch:this.workerHost?.epoch ?? this.controlGeneration, tick:this.workerHost?.latest?.tick ?? 0, pending:!!this.workerStep, backend:'worker-render'};
+    return { epoch: this.authority.epoch, tick: this.authority.tick, pending: this.tickHost.hasPendingTick,
+      backend: this.multicore.status.mode === 'serial' ? 'inline' : 'inline-with-ai-workers' };
+  }
   public readonly scheduler = new FixedTimestepScheduler(60);
   public renderer: ICombatRenderer | null = null;
   public playerAI: CapitalShipAI;
@@ -61,26 +251,35 @@ export class CombatSession {
   };
 
   private readonly multicore = new CombatMulticore();
-  private pendingTick: { promise: Promise<void | false>; finish: (batch?: AIPhaseBatch) => void; discard: () => void } | null = null;
+  private stepProfiler?: CombatStepProfiler;
+  /** Opt-in diagnostics only. Toggling never flushes or changes a pending game tick. */
+  public setStepProfiling(options: StepProfileOptions | null): void {
+    const next = options ? new CombatStepProfiler(options) : undefined;
+    this.stepProfiler?.reset();
+    this.stepProfiler = next;
+  }
+  public getStepProfile() { return this.stepProfiler?.getReport() ?? null; }
+  public resetStepProfile(): void { this.stepProfiler?.reset(); }
   private completedSimulationSteps = 0;
   private totalSimulationMs = 0;
   private lastSimulationMs = 0;
   public getMulticoreStatus() {
+    if (this.workerHost?.latest) return {...this.workerHost.latest.ai, completedSteps:this.completedSimulationSteps, lastStepMs:this.lastSimulationMs, meanStepMs:this.completedSimulationSteps ? this.totalSimulationMs / this.completedSimulationSteps : 0};
     return { ...this.multicore.status, completedSteps: this.completedSimulationSteps,
       lastStepMs: this.lastSimulationMs,
       meanStepMs: this.completedSimulationSteps ? this.totalSimulationMs / this.completedSimulationSteps : 0 };
   }
   public setMulticoreEnabled(enabled: boolean): void {
+    if (this.workerHost) throw new Error('AI configuration requires a new worker encounter');
     this.finishPendingTick(); this.multicore.enabled = enabled;
     if (!enabled) this.multicore.reset();
   }
   /** Resolve a previously sampled input once before a pause or direct roster edit. */
   private finishPendingTick(): void {
-    const pending = this.pendingTick;
-    if (pending) { this.multicore.reset(); pending.finish(); }
+    if (this.tickHost.hasPendingTick) { this.multicore.reset(); this.tickHost.flush(); }
   }
   private discardPendingTick(): void {
-    this.multicore.reset(); this.pendingTick?.discard();
+    this.multicore.reset(); this.tickHost.discard();
   }
 
   private canvas: HTMLCanvasElement | null = null;
@@ -101,8 +300,10 @@ export class CombatSession {
   /** Install a new authoritative encounter; caller applies its roster before asset preparation. */
   public beginEncounter(playerShipId: string | ShipSpec, enemyShipId: string | ShipSpec, seed: number): void {
     if (this.state === 'disposed') throw new Error('Cannot reuse a disposed CombatSession');
+    this.closeWorker();
     this.discardPendingTick();
     this.setSeed(seed);
+    this.authority.beginEpoch();
     this.engine.switchPlayerShip(playerShipId, enemyShipId);
     this.playerAI = new CapitalShipAI(this.engine.playerShip, this.engine.enemyShip);
     this.completedBattle = null;
@@ -120,9 +321,10 @@ export class CombatSession {
     seed = 0x51f15e,
     private readonly rendererFactory: CombatRendererFactory = (canvas, gl, lifecycle) => new WebGLCombatRenderer(canvas, gl, lifecycle)
   ) {
+    this.workerConfigSeed = seed;
     this.sessionId = `combat-${nextSessionId++}`;
     this.visualRandom = new VisualRandom(seed);
-    this.engine = new CombatEngine(playerShipId, enemyShipId, seed);
+    this.authority = new CombatAuthority(new CombatEngine(playerShipId, enemyShipId, seed));
     this.playerAI = new CapitalShipAI(this.engine.playerShip, this.engine.enemyShip);
   }
 
@@ -234,10 +436,13 @@ export class CombatSession {
       if (!this.isCurrentPresentationPreparation(renderer, generation, preparationRevision)) return;
       await contentManifestManager.ensureLoaded();
       if (!this.isCurrentPresentationPreparation(renderer, generation, preparationRevision)) return;
-      await renderer.prepareAssets(this.engine);
+      await this.ensureWorker();
+      if (!this.isCurrentPresentationPreparation(renderer, generation, preparationRevision)) return;
+      await renderer.prepareAssets(this.renderView);
     } catch (error) {
       if (!this.isCurrentPresentationPreparation(renderer, generation, preparationRevision)) return;
-      this.failPresentation(generation, failureCode, error);
+      if (this.workerHost?.status === 'failed') this.failAuthority(this.workerHost, error);
+      else this.failPresentation(generation, failureCode, error);
       throw error;
     }
 
@@ -277,7 +482,7 @@ export class CombatSession {
   }
 
   public start(): void {
-    if (this.state === 'disposed') return;
+    if (this.state === 'disposed' || this.restorePending) return;
     this.visualClock.setPaused(false);
     this.state = 'running';
   }
@@ -287,7 +492,7 @@ export class CombatSession {
   }
 
   public refreshPresentationAssets(): void {
-    if (!this.renderer || this.state === 'disposed' || ['context-lost', 'restoring'].includes(this.presentationState.status)) return;
+    if (this.loadingEncounter || !this.renderer || this.state === 'disposed' || ['context-lost', 'restoring'].includes(this.presentationState.status)) return;
     this.assetsReady = false;
     this.setPresentationState({ status: 'loading', errorCode: null, errorMessage: null });
     const preparation = this.preparePresentationResources(
@@ -315,55 +520,11 @@ export class CombatSession {
     this.finishPendingTick();
     this.visualClock.setPaused(true);
     this.state = 'paused';
+    if (this.workerHost) void this.barrier().catch(() => {});
   }
 
-  private advanceSimulation(dt: number, aiBatch?: AIPhaseBatch): void {
-    const damageEnabled = this.visualOptions.damage;
-    const protectedShips = damageEnabled
-      ? null
-      : this.engine.ships.map((ship) => ({
-          ship,
-          hullHp: ship.hullHp,
-          hullDamageSuppressed: ship.hullDamageSuppressed,
-          isDead: ship.isDead,
-          armor: ship.armor.cells.slice(),
-          softFlux: ship.flux.softFlux,
-          hardFlux: ship.flux.hardFlux,
-          overloaded: ship.flux.isOverloaded,
-          overloadTimer: ship.flux.overloadTimer
-        }));
-    const protectedStats = damageEnabled ? null : {
-      player: { ...this.engine.statsTracker.playerStats },
-      enemy: { ...this.engine.statsTracker.enemyStats },
-      battleResult: this.engine.battleResult
-    };
-
-    // Suppress damage callbacks while the lab temporarily applies/restores armor.
-    // Existing heat still advances; ignored hits create neither decals nor visual RNG draws.
-    if (protectedShips) for (const { ship } of protectedShips) { ship.damageDecals.suppressed = true; ship.hullDamageSuppressed = true; }
-    try {
-      this.engine.fixedUpdate(dt, { suppressDestructionSideEffects: !damageEnabled, aiBatch });
-    } finally {
-      if (protectedShips) for (const { ship, hullDamageSuppressed } of protectedShips) { ship.damageDecals.suppressed = false; ship.hullDamageSuppressed = hullDamageSuppressed; }
-    }
-
-    if (protectedShips) {
-      for (const snapshot of protectedShips) {
-        snapshot.ship.hullHp = snapshot.hullHp;
-        snapshot.ship.isDead = snapshot.isDead;
-        snapshot.ship.armor.cells.set(snapshot.armor);
-        snapshot.ship.armor.dirtyVersion++;
-        snapshot.ship.flux.softFlux = snapshot.softFlux;
-        snapshot.ship.flux.hardFlux = snapshot.hardFlux;
-        snapshot.ship.flux.isOverloaded = snapshot.overloaded;
-        snapshot.ship.flux.overloadTimer = snapshot.overloadTimer;
-      }
-    }
-    if (protectedStats) {
-      this.engine.statsTracker.playerStats = protectedStats.player;
-      this.engine.statsTracker.enemyStats = protectedStats.enemy;
-      this.engine.battleResult = protectedStats.battleResult;
-    }
+  private advanceSimulation(dt: number, aiBatch?: AIPhaseBatch, trace?: CombatStepSpan): void {
+    this.authority.advance(dt, this.visualOptions.damage, aiBatch, trace);
     // Emit once at the authoritative tick boundary, not from a React polling interval.
     const report = this.engine.battleResult;
     if (report && this.engine.isBattleResultReady && report !== this.completedBattle) {
@@ -373,6 +534,7 @@ export class CombatSession {
   }
 
   public step(dt = this.scheduler.fixedDeltaTime): void {
+    if (this.workerEnabled) throw new Error('Inline editor operation is unavailable for worker authority');
     if (this.state === 'disposed') return;
     this.finishPendingTick();
     this.advanceSimulation(dt);
@@ -380,41 +542,137 @@ export class CombatSession {
     this.updateVisualOnly(dt);
   }
 
+  /** Compile catalogue data outside the tick, then recheck the world at commit. */
+  public async dispatchDeployment(command: DeploymentCommand): Promise<import('./CombatCommands').CommandResult> {
+    if (this.restorePending) return {accepted:false,reason:'战斗正在恢复。'};
+    if (this.workerHost) {
+      const host = this.workerHost;
+      try { const frame = await host.commands([{kind:'deployment',command}]);
+        if (this.workerHost !== host) return {accepted:false,reason:'战斗已更换。'};
+        this.acceptWorkerFrame(host,frame); return frame.results[0];
+      } catch (error) { this.failAuthority(host,error); return {accepted:false,reason:String(error)}; }
+    }
+    if (this.workerEnabled) return {accepted:false,reason:'战斗权威正在启动。'};
+    if (this.state === 'disposed' || this.deploymentPending) return { accepted: false, reason: '部署请求正在处理或战斗已关闭。' };
+    const epoch = this.authority.epoch, engine = this.engine, revision = contentRegistry.revision;
+    this.deploymentPending = true;
+    try {
+      const prepared = await prepareDeployment(copyDeploymentCommand(command));
+      if ((this.state as CombatSessionState) === 'disposed' || this.authority.epoch !== epoch || this.engine !== engine || contentRegistry.revision !== revision)
+        return { accepted: false, reason: '准备部署时战斗或内容已改变，请重新选择。' };
+      this.finishPendingTick();
+      if ((this.state as CombatSessionState) === 'disposed' || this.authority.epoch !== epoch || this.engine !== engine || contentRegistry.revision !== revision)
+        return { accepted: false, reason: '战斗或内容已改变，未部署舰船。' };
+      // The display refreshes resources after consuming the ACK, so a loading
+      // transition cannot unmount its pending deployment dialog before onDeployed.
+      return applyPreparedDeployment(engine, prepared);
+    } catch (error) { return { accepted: false, reason: error instanceof Error ? error.message : String(error) }; }
+    finally { this.deploymentPending = false; }
+  }
+
+  /** UI edge writes enter through a serial boundary, never into an outstanding prediction. */
+  public dispatchControl(command: CombatControlCommand): import('./CombatCommands').CommandResult | Promise<import('./CombatCommands').CommandResult> {
+    if (this.restorePending) return {accepted:false,reason:'战斗正在恢复。'};
+    if (this.workerHost) {
+      const host = this.workerHost, release = command.kind === 'clear-input' || command.kind === 'stop-firing';
+      if (release) {
+        const previous = this.pendingReleases.get(command.kind);
+        if (previous?.serial === this.inputSerial) return previous.promise;
+        if (host.status === 'ready' && host.latest && !host.pendingTransactions) {
+          const ship = this.read.playerShip;
+          if (!ship.isFiringMain && (command.kind === 'stop-firing' || (ship.throttle === 0 && !ship.brakeInput && ship.strafeInput === 0 && ship.turnInput === 0))) return {accepted:true};
+        }
+      } else this.inputSerial++;
+      const pilot = command.kind === 'pilot', previousPilot = this.pilotIntent, request = pilot ? ++this.pilotRequest : this.pilotRequest;
+      if (command.kind === 'pilot') this.pilotIntent = command.autopilot;
+      const promise = host.commands([command]).then(frame => {
+        if (this.workerHost !== host) return {accepted:false,reason:'战斗已更换。'};
+        if (pilot && request === this.pilotRequest && !frame.results[0].accepted) this.pilotIntent = previousPilot;
+        this.acceptWorkerFrame(host,frame); return frame.results[0];
+      }, error => {
+        if (pilot && this.workerHost === host && request === this.pilotRequest) this.pilotIntent = previousPilot;
+        this.failAuthority(host,error); return {accepted:false,reason:String(error)};
+      }).finally(() => { if (this.pendingReleases.get(command.kind)?.promise === promise) this.pendingReleases.delete(command.kind); });
+      if (release) this.pendingReleases.set(command.kind,{serial:this.inputSerial,promise});
+      return promise;
+    }
+    if (this.workerEnabled) return {accepted:false,reason:'战斗权威正在启动。'};
+    if (this.state === 'disposed') return { accepted: false, reason: 'Combat session disposed' };
+    // Idempotent pointer/focus releases need not cancel an expensive prediction pool.
+    const ship = this.engine.playerShip;
+    if (command.kind === 'stop-firing' && !ship.isFiringMain) return { accepted: true };
+    if (command.kind === 'clear-input' && !ship.isFiringMain && ship.throttle === 0 && !ship.brakeInput && ship.strafeInput === 0 && ship.turnInput === 0) return { accepted: true };
+    const epoch = this.authority.epoch;
+    this.finishPendingTick();
+    if (this.authority.epoch !== epoch || (this.state as CombatSessionState) === 'disposed') return { accepted: false, reason: 'Combat encounter changed or disposed' };
+    return applyCombatControlCommand(this.engine, command);
+  }
+
+  public fixedUpdateControlled(dt: number, sample: CombatControlSample): void | false | Promise<void | false> {
+    if (this.workerEnabled) {
+      if (dt !== this.scheduler.fixedDeltaTime) throw new Error('Worker combat requires the fixed 60 Hz timestep');
+      if (this.state !== 'running' || !this.isPresentationReady() || !this.workerHost) return false;
+      if (this.workerStep) return this.workerStep;
+      const host = this.workerHost; this.inputSerial++;
+      const operation = host.step(copyControlSample({...sample,autopilot:this.pilotIntent ?? sample.autopilot})).then(frame => {
+        if (this.workerHost !== host || this.state === 'disposed') return false as const;
+        this.acceptWorkerFrame(host, frame);
+        this.lastSimulationMs = frame.simulationMs; this.totalSimulationMs += frame.simulationMs; this.completedSimulationSteps++;
+        this.performance.recordTiming('simulationMs', frame.simulationMs);
+        this.visualClock.seek(this.visualClock.time + dt); this.updateVisualOnly(dt);
+      }, error => { this.failAuthority(host,error); return false as const; }).finally(() => { if (this.workerStep === operation) this.workerStep = undefined; });
+      this.workerStep = operation; return operation;
+    }
+    if (this.tickHost.pendingPromise) return this.tickHost.pendingPromise;
+    const accepted = copyControlSample(sample);
+    return this.fixedUpdateScheduled(dt, () => applyCombatControlSample(this.engine, this.playerAI, dt, accepted));
+  }
+
   /** Same full tick as fixedUpdate, with an optional pre-tick ownership prediction. */
   public fixedUpdateScheduled(dt: number, beforeTick: () => void = () => {}): void | false | Promise<void | false> {
+    if (this.workerEnabled) throw new Error('Inline editor operation is unavailable for worker authority');
     if (this.state !== 'running') return false;
-    if (this.pendingTick) return this.pendingTick.promise;
-    const start = performance.now(), engine = this.engine;
-    beforeTick();
-    const prediction = this.visualOptions.damage ? this.multicore.prepare(this.engine, this.playerAI, dt) : null;
+    if (this.tickHost.pendingPromise) return this.tickHost.pendingPromise;
+    const start = performance.now();
+    const trace = this.stepProfiler?.begin(dt);
     const complete = (batch?: AIPhaseBatch) => {
-      try { this.advanceSimulation(dt, batch); }
-      finally { batch?.finish(); }
+      trace?.mark('sessionSetup');
+      try {
+        try { this.advanceSimulation(dt, batch, trace); }
+        finally { trace?.mark('finalize'); batch?.finish(); }
+      } catch (error) { trace?.finish('error'); throw error; }
       // Includes player controls/AI, eligibility, packing, wait, validation, merge and fallback.
       this.lastSimulationMs = performance.now() - start;
       this.totalSimulationMs += this.lastSimulationMs; this.completedSimulationSteps++;
       this.performance.recordTiming('simulationMs', this.lastSimulationMs);
+      if (trace) {
+        const status = this.multicore.status;
+        trace.finish('completed', {
+          reason: !this.visualOptions.damage ? 'damage-disabled' : !this.multicore.enabled ? 'disabled' : status.reason,
+          commits: batch ? status.metrics?.commits : 0, fallbacks: batch ? status.metrics?.fallbacks : 0
+        });
+      }
+      this.multicore.record(this.lastSimulationMs, !!batch);
       this.visualClock.advance(dt); this.updateVisualOnly(dt);
     };
-    if (!prediction) { complete(); return; }
-    let resolve!: (result: void | false) => void, reject!: (error: unknown) => void;
-    const promise = new Promise<void | false>((ok, fail) => { resolve = ok; reject = fail; });
-    let done = false;
-    const finish = (batch?: AIPhaseBatch) => {
-      if (done) { batch?.finish(); return; }
-      done = true; this.pendingTick = null;
-      if (this.engine !== engine) { batch?.finish(); resolve(false); return; }
-      try { complete(batch); resolve(); }
-      catch (error) { this.pause(); reject(error); }
-    };
-    this.pendingTick = { promise, finish, discard: () => {
-      if (!done) { done = true; this.pendingTick = null; resolve(false); }
-    } };
-    void prediction.then(finish, () => finish());
-    return promise;
+    return this.tickHost.run({
+      prepare: () => {
+        try {
+          beforeTick();
+          trace?.mark('dispatch');
+          const prediction = this.visualOptions.damage ? this.multicore.prepare(this.engine, this.playerAI, dt) : null;
+          if (trace && prediction) { trace.predictionRequested = true; trace.mark('wait'); }
+          return prediction;
+        } catch (error) { trace?.finish('error'); throw error; }
+      },
+      commit: complete,
+      discard: () => trace?.finish('discarded'),
+      failed: () => this.pause(),
+    });
   }
 
   public fixedUpdate(dt: number): void {
+    if (this.workerEnabled) throw new Error('Inline editor operation is unavailable for worker authority');
     if (this.state === 'paused' || this.state === 'disposed') return;
     this.finishPendingTick();
     const simStart = performance.now();
@@ -428,8 +686,8 @@ export class CombatSession {
   public updateVisualOnly(dt: number): void {
     if (this.state === 'disposed') return;
     const visualStart = performance.now();
-    this.hudVisuals.update(this.engine.playerShip, Math.max(0, dt));
-    this.renderer?.updateVisual(this.engine, Math.max(0, dt), {
+    this.hudVisuals.update(this.read.playerShip, Math.max(0, dt));
+    this.renderer?.updateVisual(this.renderView, Math.max(0, dt), {
       visualTime: this.visualClock.time,
       random: this.visualRandom,
       layers: this.visualOptions.layers,
@@ -449,10 +707,23 @@ export class CombatSession {
     };
     this.performance.recordTiming('renderPreparationMs', performance.now() - prepStart);
     const submitStart = performance.now();
-    const rendered = this.renderer.render(this.engine, alpha, cameraPos, zoom, { ...frame });
+    const rendered = this.renderer.render(this.renderView, alpha, cameraPos, zoom, { ...frame });
     if (!rendered) return;
     this.performance.recordTiming('drawSubmitMs', performance.now() - submitStart);
     const resourceStats = this.renderer.getResourceStats();
+    if (this.workerHost?.latest) {
+      const latest = this.workerHost.latest, collision = latest.telemetry.collision, fresh = this.telemetrySequence !== latest.sequence;
+      this.telemetrySequence = latest.sequence;
+      this.performance.finalizeFrame({gpuTimeMs:resourceStats.gpuTimeMs,gpuTimerAvailable:resourceStats.gpuTimerAvailable,
+        projectileCount:this.renderView.projectiles.length, particleCount:this.renderView.particles.length, trailStripCount:latest.telemetry.trails.stripCount,
+        trailPointCount:latest.telemetry.trails.pointCount,textureCount:resourceStats.residentTextures,pendingTextureUploads:resourceStats.pendingUploads,textureUploads:resourceStats.uploads,
+        textureInvalidations:resourceStats.invalidations,resourceRecreations:resourceStats.resourceRecreations,drawCalls:resourceStats.drawCalls,memoryBytes:null,
+        collisionKernelMs:fresh ? collision.kernelMs : 0, collisionTypeScriptBatches:fresh ? collision.typescriptBatches : 0,
+        collisionWasmBatches:fresh ? collision.wasmBatches : 0,collisionWasmFallbacks:fresh ? collision.wasmFallbacks : 0,
+        collisionProjectiles:fresh ? collision.projectileCount : 0,collisionCandidatePairs:fresh ? collision.candidatePairs : 0,
+        collisionMaxCandidatesPerProjectile:fresh ? collision.maxCandidatesPerProjectile : 0,collisionBackendState:collision.backendState});
+      return;
+    }
     const collisionTelemetry = this.engine.weaponSystem.collisionHandler.runtimeCollisionKernel.consumeTelemetry();
     const memory = (performance as Performance & { memory?: { usedJSHeapSize?: number } }).memory;
     const particleCount = this.engine.particles.length
@@ -499,9 +770,11 @@ export class CombatSession {
     return this.performance.getReport();
   }
 
-  public restart(shipId = this.engine.playerShip.spec.id): void {
+  public restart(shipId = this.read.playerShip.spec.id): void {
     if (this.state === 'disposed') return;
+    this.closeWorker(); this.encounter = undefined; this.completedBattle = null;
     this.discardPendingTick();
+    this.authority.beginEpoch();
     this.engine.resetBattle(shipId);
     this.playerAI = new CapitalShipAI(this.engine.playerShip, this.engine.enemyShip);
     this.scheduler.reset();
@@ -522,7 +795,9 @@ export class CombatSession {
 
   public switchPlayerShip(shipId: string): void {
     if (this.state === 'disposed') return;
+    this.closeWorker(); this.encounter = undefined; this.simulationPointLimit = undefined; this.completedBattle = null;
     this.discardPendingTick();
+    this.authority.beginEpoch();
     this.engine.switchPlayerShip(shipId);
     this.playerAI = new CapitalShipAI(this.engine.playerShip, this.engine.enemyShip);
     this.scheduler.reset();
@@ -536,6 +811,7 @@ export class CombatSession {
 
   public setSeed(seed: number): void {
     this.finishPendingTick();
+    this.workerConfigSeed = seed;
     this.visualRandom.reseed(seed);
     this.engine.setSeed(seed);
   }
@@ -546,6 +822,7 @@ export class CombatSession {
   }
 
   public setDamageEnabled(enabled: boolean): void {
+    if (this.workerEnabled) throw new Error('Inline editor operation is unavailable for worker authority');
     this.finishPendingTick();
     this.visualOptions.damage = enabled;
   }
@@ -563,7 +840,9 @@ export class CombatSession {
 
   public dispose(): void {
     if (this.state === 'disposed') return;
+    this.closeWorker();
     this.discardPendingTick();
+    this.tickHost.dispose();
     this.presentationGeneration++;
     this.preparationRevision++;
     this.assetsReady = false;

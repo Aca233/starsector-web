@@ -15,6 +15,11 @@ export class SimulationRandom {
     this.idCounter = 0;
   }
 
+  /** Exact replay witness, including the untruncated cursor and identity allocator. */
+  public checkpointWitness(): readonly [number, number, number] {
+    return [this.initialSeed, this.state, this.idCounter];
+  }
+
   public next(): number {
     let t = (this.state += 0x6d2b79f5) >>> 0;
     t = Math.imul(t ^ (t >>> 15), t | 1);

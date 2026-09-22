@@ -1,6 +1,7 @@
+import type { TacticalMapSource } from '../engine/runtime/TacticalMapView';
 import React, { useState, useEffect } from "react";
 import type { CombatHudVisuals } from "../engine/visual/CombatHudVisuals";
-import { CombatEngine } from "../engine/simulation/CombatEngine";
+import type { CombatHudView as CombatEngine } from '../engine/runtime/CombatHudView';
 import { FixedTimestepScheduler } from "../engine/simulation/FixedTimestepScheduler";
 import { Vector2 } from "../engine/math/Vector2";
 import { ShipPaperDoll } from "./hud/ShipPaperDoll";
@@ -10,6 +11,8 @@ import { CombatContacts } from "./hud/CombatContacts";
 import { CombatRadar } from "./hud/CombatRadar";
 import { getHudDensity } from "./hud/HudLayout";
 import { TacticalMap } from "./tactical/TacticalMap";
+import type { CombatControlCommand } from '../engine/runtime/CombatControl';
+import type { CommandResult } from '../engine/runtime/CombatCommands';
 import type { ShipCommand } from '../engine/runtime/CombatCommands';
 import { CombatNotifications } from './hud/CombatNotifications';
 import { TacticalHelpPanel } from "./TacticalHelpPanel";
@@ -24,10 +27,12 @@ export {
 
 export interface TacticalHUDProps {
   engine: CombatEngine;
+  mapSource: TacticalMapSource;
   paused: boolean;
   onPausedChange: (paused: boolean) => void;
   autopilot: boolean;
   onAutopilotChange: (enabled: boolean) => void;
+  onControl: (command: CombatControlCommand) => CommandResult | Promise<CommandResult>;
   onShipCommand?: (command: ShipCommand) => void;
   controlNotice?: { ship: CombatEngine['playerShip'] };
   defaultMouseSteering?: boolean;
@@ -48,11 +53,13 @@ export interface TacticalHUDProps {
 
 export const TacticalHUD: React.FC<TacticalHUDProps> = ({
   engine,
+  mapSource,
   paused,
   onPausedChange,
   autopilot,
   onAutopilotChange,
   onShipCommand,
+  onControl,
   controlNotice,
   defaultMouseSteering,
   onDefaultMouseSteeringChange,
@@ -141,7 +148,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
       {engine.playerShip.isDead && !engine.battleResult && !engine.isTacticalMap && (
         <div className="combat-observer-hint">旗舰已损失 · WASD / 方向键观察战场 · Tab 战术地图</div>
       )}
-      {engine.isTacticalMap && <TacticalMap engine={engine} paused={paused} onPausedChange={onPausedChange}
+      {engine.isTacticalMap && <TacticalMap onControl={onControl} source={mapSource} paused={paused} onPausedChange={onPausedChange}
         autopilot={autopilot} onAutopilotChange={onAutopilotChange} inputBlocked={inputBlocked || showHelpDrawer}
         cameraPosRef={cameraPosRef} zoomRef={zoomRef} canvasRef={canvasRef} onOpenDeployment={onOpenDeployment} />}
 

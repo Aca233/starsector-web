@@ -14,6 +14,9 @@ import type { WeaponThreatEnvelope } from '../WeaponThreatEnvelope';
 import type { Projectile, Beam, WeaponMount } from '../../simulation/Weapon';
 import type { Asteroid } from '../../simulation/CombatTypes';
 sound.setMuted(true);
+// The publisher computes this with the authority's complete missile lifecycle.
+// Never infer a different lifetime from the deliberately minimal projectile view.
+const projectileLifetime = (p: Projectile): number => (p as Projectile & { threatLifetime: number }).threatLifetime;
 const writable = new Set(['ship', 'flux', 'shield', 'system', 'defenseSystem', 'aimTargetWorld', 'ai', 'defense']);
 export class Owner {
     private readonly ownSync: { node: Fields; offset: number; codec: ScalarWireCodec }[] = [];
@@ -135,8 +138,8 @@ export class Owner {
         const syncMs = performance.now() - start, begin = performance.now(), rows: Row[] = [];
         const ships = [...this.views], wanted = new Set(frame.jobs);
         let navigationDeps: Set<number>;
-        const projectileThreatIndex = this.projectiles.length >= 128 ? new ProjectileThreatIndex(this.projectiles) : undefined;
-        const world: TacticalWorld = { fleetPlan: new Map(frame.fleetPlan), ships: ships as Ship[], projectiles: this.projectiles, beams: this.beams, asteroids: this.asteroids, projectileThreatIndex, weaponThreatEnvelope: { get: (s: Ship) => this.views[this.indexById.get(s.id)].envelope } as WeaponThreatEnvelope,
+        const projectileThreatIndex = this.projectiles.length >= 128 ? new ProjectileThreatIndex(this.projectiles, projectileLifetime) : undefined;
+        const world: TacticalWorld = { fleetPlan: new Map(frame.fleetPlan), ships: ships as Ship[], projectiles: this.projectiles, beams: this.beams, asteroids: this.asteroids, projectileThreatIndex, projectileLifetime, weaponThreatEnvelope: { get: (s: Ship) => this.views[this.indexById.get(s.id)].envelope } as WeaponThreatEnvelope,
             noteNavigationObstacle: (ship, other, horizon) => { const own = Math.max(ship.spec.collisionRadius, ship.shield.isActive ? ship.shield.radius : 0), radius = Math.max(other.spec.collisionRadius, other.shield.radius); const reach = own + radius + 8 + (ship.getMotionStats().maxSpeed + ship.vel.length() + other.vel.length()) * horizon; const distance = ship.pos.distanceTo(other.pos), pad = 1e-6 * Math.max(1, Math.abs(ship.pos.x), Math.abs(ship.pos.y), Math.abs(other.pos.x), Math.abs(other.pos.y), Math.abs(reach)); if (!Number.isFinite(distance + reach) || distance <= reach + pad)
                 navigationDeps.add(this.indexById.get(other.id)); } };
         try {
@@ -154,31 +157,53 @@ export class Owner {
                 for (let p = 0; p < own.nodes.length; p++)
                     if (writable.has(model.schema[p].kind))
                         before.push([p, model.schema[p].keys.map(k => own.nodes[p][1][k])]);
-                ai.update(frame.dt, null, world);
-                const changes: Row["changes"] = [];
-                let needsAuthority = false;
-                for (const [part, values] of before) {
-                    const schema = model.schema[part], node = own.nodes[part][1], fields: Record<string, Scalar> = {};
-                    let changed = false;
-                    for (let k = 0; k < schema.keys.length; k++) {
-                        const key = schema.keys[k], v = node[key];
-                        if (!Object.is(v, values[k])) {
-                            if (!primitive(v)) {
-                                needsAuthority = true;
-                                continue;
+                const references = {
+                    target: ai.targetShip, currentTarget: ship.currentTargetShip, tactical: ship.tacticalAI,
+                    systems: [ship.system, ship.defenseSystem].map(system => ({
+                        system, input: system.activationInput, target: system.activationTarget,
+                        teleport: system.teleportVisual,
+                    })),
+                };
+                try {
+                    ai.update(frame.dt, null, world);
+                    const changes: Row["changes"] = [];
+                    let needsAuthority = false;
+                    for (const [part, values] of before) {
+                        const schema = model.schema[part], node = own.nodes[part][1], fields: Record<string, Scalar> = {};
+                        let changed = false;
+                        for (let k = 0; k < schema.keys.length; k++) {
+                            const key = schema.keys[k], v = node[key];
+                            if (!Object.is(v, values[k])) {
+                                if (!primitive(v)) {
+                                    needsAuthority = true;
+                                    continue;
+                                }
+                                fields[key] = v;
+                                changed = true;
+                                if (['system', 'defenseSystem', 'flux'].includes(schema.kind) || schema.kind === 'ship' && !controls.includes(key))
+                                    needsAuthority = true;
                             }
-                            fields[key] = v;
-                            changed = true;
-                            if (['system', 'defenseSystem', 'flux'].includes(schema.kind) || schema.kind === 'ship' && !controls.includes(key))
-                                needsAuthority = true;
                         }
+                        if (changed)
+                            changes.push([part, fields]);
                     }
-                    if (changed)
-                        changes.push([part, fields]);
+                    rows.push({ index: i, changes, tactical: ship.tacticalAI, target: this.indexById.get(ai.targetShip.id), currentTarget: ship.currentTargetShip ? this.indexById.get(ship.currentTargetShip.id) : -1, navigationDeps: [...navigationDeps], needsAuthority });
+                } finally {
+                    // A proposal is never authoritative private state. Roll back both scalar
+                    // AI/defense timers and object-valued activation edges, even on exceptions.
+                    // The next publication supplies the actual committed state in either case.
+                    for (const [part, values] of before) {
+                        const keys = model.schema[part].keys, node = own.nodes[part][1];
+                        for (let k = 0; k < keys.length; k++) node[keys[k]] = values[k];
+                    }
+                    ai.targetShip = references.target; ship.currentTargetShip = references.currentTarget;
+                    ship.tacticalAI = references.tactical;
+                    for (const old of references.systems) {
+                        old.system.activationInput = old.input; old.system.activationTarget = old.target;
+                        old.system.teleportVisual = old.teleport;
+                    }
+                    ships[i] = this.views[i];
                 }
-                rows.push({ index: i, changes, tactical: ship.tacticalAI, target: this.indexById.get(ai.targetShip.id), currentTarget: ship.currentTargetShip ? this.indexById.get(ship.currentTargetShip.id) : -1, navigationDeps: [...navigationDeps], needsAuthority });
-                // Leave owned AI state resident. All other ships in world remain read-only views.
-                ships[i] = this.views[i];
             }
         }
         finally {

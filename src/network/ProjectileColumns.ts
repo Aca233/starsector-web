@@ -22,7 +22,7 @@ function sharedWeight(value: Wire, remaining = MAX_PROJECTILE_SHARED_NODES, dept
   return weight;
 }
 
-function fieldsWeight(values: Wire[]): number {
+export function fieldsWeight(values: Wire[]): number {
   let total = 0;
   for (const value of values) {
     total += sharedWeight(value, MAX_PROJECTILE_SHARED_NODES - total);
@@ -31,7 +31,7 @@ function fieldsWeight(values: Wire[]): number {
   return total;
 }
 
-function equalPacked(a: Wire, b: Wire, depth = 0): boolean {
+export function equalPacked(a: Wire, b: Wire, depth = 0): boolean {
   if (Object.is(a, b)) return true;
   if (!a || !b || typeof a !== 'object' || typeof b !== 'object' || depth > 8) return false;
   if (Array.isArray(a)) {

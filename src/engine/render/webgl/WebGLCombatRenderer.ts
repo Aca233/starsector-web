@@ -2,7 +2,7 @@ import { getGraphicsSettings, RenderFrameLimiter } from '../../runtime/GraphicsS
 import { RenderResolutionTarget } from './RenderResolutionTarget';
 import { beginRenderFrame, endRenderFrame, visualRandom, visualNowMs } from '../RenderDeterminism';
 import type { RenderFrameContext } from '../RenderFrameContext';
-import { CombatEngine } from '../../simulation/CombatEngine';
+import type { CombatRenderView } from '../CombatRenderView';
 import { Vector2 } from '../../math/Vector2';
 import { SpriteBatcher } from './SpriteBatcher';
 import { RibbonBatcher } from './RibbonBatcher';
@@ -19,6 +19,10 @@ import { renderShipPhase } from './ShipPhaseRenderer';
 import { ESSENTIAL_TEXTURE_URLS } from '../TextureCache';
 import { collectCombatTextureUrls } from '../../assets/CombatAssetClosure';
 import type { ICombatRenderer, RendererResourceStats } from '../ICombatRenderer';
+
+// Same ordered sprite stream, fewer texture-driven flushes. Both creation and
+// context restoration must use the same policy; false is an emergency fallback.
+const MAIN_SPRITE_TEXTURE_SLOTS = import.meta.env?.VITE_MULTI_TEXTURE_SHIPS === 'false' ? 1 : 4;
 
 export interface WebGLRendererLifecycle {
   onContextLost?: () => void;
@@ -93,7 +97,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
     let shieldShader: WebGLShieldShader | null = null;
     try {
       textures = new WebGLTextureManager(gl);
-      batcher = new SpriteBatcher(gl);
+      batcher = new SpriteBatcher(gl, MAIN_SPRITE_TEXTURE_SLOTS);
       effectBatcher = new SpriteBatcher(gl, 4);
       ribbonBatcher = new RibbonBatcher(gl);
       shieldShader = new WebGLShieldShader(gl);
@@ -145,7 +149,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
       if (!nextGl) throw new Error('WebGL2 context could not be restored');
 
       nextTextures = new WebGLTextureManager(nextGl);
-      nextBatcher = new SpriteBatcher(nextGl);
+      nextBatcher = new SpriteBatcher(nextGl, MAIN_SPRITE_TEXTURE_SLOTS);
       nextEffectBatcher = new SpriteBatcher(nextGl, 4);
       nextRibbonBatcher = new RibbonBatcher(nextGl);
       nextShieldShader = new WebGLShieldShader(nextGl);
@@ -190,18 +194,18 @@ export class WebGLCombatRenderer implements ICombatRenderer {
     }
   }
 
-  public prepareAssets(engine?: CombatEngine): Promise<void> {
+  public prepareAssets(engine?: CombatRenderView): Promise<void> {
     if (engine) this.requiredTextures = collectCombatTextureUrls(engine);
     return this.textures.preload(this.requiredTextures);
   }
 
-  public updateVisual(engine: CombatEngine, dt: number, frame: RenderFrameContext): void {
+  public updateVisual(engine: CombatRenderView, dt: number, frame: RenderFrameContext): void {
     if (this.contextLost) return;
     this.shipPass.updateVisual(engine, dt, frame.random);
     this.updateTacticalArc(engine, dt);
   }
 
-  private updateTacticalArc(engine: CombatEngine, dt: number): void {
+  private updateTacticalArc(engine: CombatRenderView, dt: number): void {
     const pShip = engine.playerShip;
     const targetGroup = pShip?.weaponGroups?.[pShip.selectedGroupIndex] ?? null;
     const targetHasWeapons = !!(targetGroup?.weaponSlotIds?.length);
@@ -247,7 +251,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
     this.arcAnimProgress = 1.0;
   }
 
-  public render(engine: CombatEngine, alpha: number, cameraPos: Vector2, zoom: number, frame: RenderFrameContext) {
+  public render(engine: CombatRenderView, alpha: number, cameraPos: Vector2, zoom: number, frame: RenderFrameContext) {
     if (this.contextLost || this.disposed) return false;
     const graphics = getGraphicsSettings();
     if (graphics !== this.graphicsSettings) { this.graphicsSettings = graphics; this.frameLimiter.reset(); }
@@ -335,7 +339,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
     // 4.5 通道 5: 折跃水雷、极坐标护盾 Shader、护盾涟漪、EMP 闪电与火球爆炸碎片
     if (frame.layers.has('shield') || frame.layers.has('explosion')) {
       // Preserve pass/primitive/blend order while avoiding a flush for each
-      // alternating explosion texture. Do not enable multi-texture work globally.
+      // alternating explosion texture. Keep FX state separate from the main pass.
       this.batcher.flush();
       this.effectBatcher.begin(actualCam, zoom, width, height);
       this.fxPass.render(engine, { ...ctx, batcher: this.effectBatcher }, nowSec, enemyPos, enemyFacing, playerPos, playerFacing, {

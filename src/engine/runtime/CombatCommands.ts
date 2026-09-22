@@ -20,7 +20,7 @@ export function flightKey(code: string): string | undefined {
   return (flightKeys as readonly string[]).includes(canonical) ? canonical : undefined;
 }
 /** Only declared chords are consumed; Ctrl+F/Ctrl+R/Alt+arrows stay browser commands. */
-export function shipCommandForKey(key: CombatKey, ship?: Ship): ShipCommand | undefined {
+export function shipCommandForKey(key: CombatKey, ship?: { readonly systems: readonly unknown[] }): ShipCommand | undefined {
   if (key.altKey || key.metaKey) return undefined;
   const digit = /^(?:Digit|Numpad)([1-7])$/.exec(key.code);
   if (digit) {

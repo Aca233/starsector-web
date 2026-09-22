@@ -26,6 +26,10 @@ for(const motion of [false,true])test('production relay negotiates remote LAN on
   const first=state();assert.ok(isLanDelta(guest.packets.at(-1)));assert.deepEqual(guest.rows.at(-1),first);assert.equal(peer().lanDelta.stats().baseSeq,seq);
   const creditsBefore = peer().stateCredits.stats();
   ack(seq+100);assert.deepEqual(peer().stateCredits.stats(),creditsBefore);assert.equal(peer().lanDelta.stats().baseSeq,seq);ack(seq);assert.equal(peer().lanDelta.stats().baseSeq,seq);
+  const ordinaryPrepare=peer().lanDelta.prepare.bind(peer().lanDelta), creditBeforeDefer=peer().stateCredits.stats(), baseBeforeDefer=peer().lanDelta.stats().baseSeq, packetsBeforeDefer=guest.packets.length;
+  peer().lanDelta.prepare=target=>({...ordinaryPrepare(target),budgetFallback:true});state();
+  assert.deepEqual(peer().stateCredits.stats(),creditBeforeDefer);assert.equal(peer().lanDelta.stats().baseSeq,baseBeforeDefer);assert.equal(guest.packets.length,packetsBeforeDefer);assert.equal(peer().codecDeferred,1);
+  peer().lanDelta.prepare=ordinaryPrepare;
   const next=state();assert.ok(guest.packets.at(-1).length<1000);assert.deepEqual(guest.rows.at(-1),next);const pending=peer().lanDelta.stats().baseSeq;if(motion)assert.ok(peer().lanDelta.stats().motionDeltas>0);
   guest.bufferedAmount=1;state();guest.bufferedAmount=0;assert.equal(peer().lanDelta.stats().baseSeq,pending);ack(pending);
   assert.deepEqual(guest.rows.at(-1),next);const afterSkip=state();assert.deepEqual(guest.rows.at(-1),afterSkip);

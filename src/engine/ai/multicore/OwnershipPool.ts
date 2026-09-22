@@ -44,7 +44,7 @@ export class OwnershipPool {
     constructor(private readonly engine: CombatEngine, private readonly allAis: CapitalShipAI[], readonly count = 4, private readonly options: OwnershipPoolOptions = {}) {
         if (options.lan) this.lanGate = new LanOwnershipGate(engine, allAis);
         if (options.lan ? !Number.isInteger(count) || count < 1 || count > 4 || !this.lanGate!.supports()
-            : count !== 4 || !supportsOwnership(engine, allAis))
+            : (count !== 2 && count !== 4) || !supportsOwnership(engine, allAis))
             throw new Error('Unsupported ownership scene');
         this.publisher = new Publisher(engine.ships, allAis);
         const groups = Array.from({ length: count }, () => [] as number[]);

@@ -1,3 +1,4 @@
+import { projectileVisualLayer } from '../engine/render/ProjectileVisualLayer';
 import { Vector2 } from '../engine/math/Vector2';
 import type { CombatEngine } from '../engine/simulation/CombatEngine';
 import { appendMissileContrail } from '../engine/simulation/MissileContrails';
@@ -15,6 +16,9 @@ export class LocalContrails {
   }
 
   update(engine: CombatEngine, visualTime: number, alpha: number, reset = false): void {
+    const layer = projectileVisualLayer(engine);
+    if (layer?.stale) { this.reset(engine); return; }
+    if (layer) { visualTime = layer.time; alpha = 1; reset = false; }
     if (!Number.isFinite(visualTime) || !Number.isFinite(alpha)) { this.reset(engine); return; }
     const elapsed = this.time === null ? 0 : visualTime - this.time;
     if (reset || elapsed < 0 || elapsed > .5) this.reset(engine);
@@ -28,7 +32,7 @@ export class LocalContrails {
     engine.contrailEngine.update(dt);
     for (const state of this.tracked.values()) state.seen = false;
     const blend = Math.max(0, Math.min(1, alpha));
-    for (const p of engine.projectiles) {
+    for (const p of (layer?.projectiles ?? engine.projectiles)) {
       if (!p.isRocket || p.isFlare || p.isMine || p.collisionDisabled || p.isDisarmed || p.flareFizzling || p.didDamage
         || (p.hitpoints !== undefined && p.hitpoints <= 0) || (p.flightTimeRemaining !== undefined && p.flightTimeRemaining <= 0)) continue;
       const position = Vector2.lerp(p.prevPos, p.pos, blend);

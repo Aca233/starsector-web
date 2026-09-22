@@ -201,3 +201,14 @@ test('two-minute low-bandwidth soak does not slowly learn a stale multi-second q
   assert.ok(result.finalWindow <= 6, JSON.stringify(result));
   console.log(JSON.stringify({ scenario: '120s virtual soak, 8Mbps -> 128Kbps', result }));
 });
+
+test('shared-room ACK queue cannot become a new RTT baseline or single-frame probe',()=>{
+ const w=new SnapshotSendWindow();w.acknowledge(300,0,4,false);
+ for(let now=400;now<=80000;now+=400){w.acknowledge(1000,now,4,false);assert.equal(w.probe,null);assert.ok(w.limit>=2);assert.equal(w.baseRtt,300);}
+ w.acknowledge(280,80400,2,false);assert.equal(w.baseRtt,280,'genuine lower observations remain usable');
+});
+test('a second room peer cancels an outstanding upward RTT probe without losing credit control',()=>{
+ const w=new SnapshotSendWindow();w.acknowledge(50,10000,4);w.acknowledge(300,41001,4);assert.equal(w.probe,'drain');
+ w.acknowledge(350,41500,1,false);assert.equal(w.probe,null);assert.equal(w.baseRtt,50);assert.ok(w.limit>=2);
+ const limit=w.limit;w.acknowledge(NaN,42000,1,false);assert.equal(w.limit,limit);assert.equal(w.baseRtt,50);
+});

@@ -1,3 +1,5 @@
+import {MotionDeliveryWindow} from '../server/MotionDeliveryWindow.mjs';
+import {encodeMotionFrame,motionToText} from '../src/network/MotionFrame.mjs';
 import assert from 'node:assert/strict';
 import {decodeBinaryState,encodeProjectedBinaryFrame} from '../src/network/BinarySnapshot.mjs';
 import {summarizeCombatFrame} from '../server/lan-state.mjs';
@@ -20,7 +22,7 @@ class Socket extends EventEmitter {
   terminate(){this.close();}
   receive(data){this.emit('message',Buffer.from(JSON.stringify(data)),false);}
 }
-async function setup(t){
+async function setup(t, stateCredits=false, autoMotion=false){
   const dist=await fs.mkdtemp(path.join(os.tmpdir(),'authority-lifecycle-'));
   await fs.writeFile(path.join(dist,'lan-build.json'),JSON.stringify({build:'lifecycle'}));
   let worker;
@@ -29,7 +31,7 @@ async function setup(t){
     queueMicrotask(()=>receive({type:'ready'}));return worker;
   }});
   t.after(async()=>{await app.close();await fs.unlink(path.join(dist,'lan-build.json'));await fs.rmdir(dist);});
-  const peer=name=>{const s=new Socket();app.acceptTransport(s);s.receive({type:'hello',name,instance:crypto.randomUUID(),build:'lifecycle',protocol:protocol.version});return s;};
+  const peer=name=>{const s=new Socket();app.acceptTransport(s);s.receive({type:'hello',name,instance:crypto.randomUUID(),build:'lifecycle',protocol:protocol.version,...(stateCredits?{stateCredits:1}:{}),...(autoMotion?{motionState:1,motionAuto:1}:{})});return s;};
   const a=peer('creator'),b=peer('guest');a.receive({type:'create'});const room=[...app.rooms.values()][0];
   b.receive({type:'join',code:room.code});b.receive({type:'ready',ready:true});a.receive({type:'start'});
   await delay(0);for(const s of [a,b])s.receive({type:'loaded',matchId:room.match.id});
@@ -112,4 +114,63 @@ test('decoded-state adapter keeps full state when dedicated summaries exist',asy
   worker.emit(binarySnapshot(frame(1)));
   assert.equal(relay.state.frame.world.time,1/60);assert.equal(relay.state.frame.ships.length,2);
   assert.equal(decodeBinaryState(relay.bytes).frame.tick,1);
+});
+
+test('independent critical Worker credit is released even when hidden bulk baseline is old',async t=>{
+ const {a,b,room,worker,snapshot,credits}=await setup(t);snapshot(1);
+ a.receive({type:'visibility',hidden:true});b.receive({type:'visibility',hidden:true});snapshot(2);
+ const before=credits().length;
+ worker.emit({type:'motion',tick:900,data:motionToText(encodeMotionFrame({tick:900,time:15,acknowledged:{0:1},ships:[['ship-0',0,0,0,0,0,0,0,0]]}))});
+ assert.equal(room.status,'running');assert.equal(worker.terminated,0);assert.equal(credits().length,before);
+ assert.equal(worker.messages.filter(m=>m.type==='motion-consumed').at(-1).tick,900);
+});
+
+test('full capture is withheld behind all consumer windows and exact consumption wakes only once',async t=>{
+ const {a,b,room,snapshot,credits,worker}=await setup(t,true);
+ snapshot(1);snapshot(2);assert.equal(credits().length,1);assert.equal(room.authoritySnapshotTick,2);
+ const before=room.authorityDemandSince,firstSeq=a.rows.find(m=>m.type==='state').seq;
+ a.receive({type:'state-consumed',matchId:room.match.id,seq:999});
+ a.receive({type:'state-consumed',matchId:'other',seq:1});
+ await delay(70);assert.equal(credits().length,1);assert.equal(room.authorityDemandSince,before);
+ // Independent authority progress remains live while intentional backpressure
+ // holds captures; it must not produce replacement transport/worker credits.
+ worker.emit({type:'performance',tick:300});assert.equal(credits().length,1);
+ a.receive({type:'state-consumed',matchId:room.match.id,seq:firstSeq});
+ assert.deepEqual(credits().map(m=>m.tick),[1,2]);assert.equal(room.authoritySnapshotTick,null);
+ a.receive({type:'state-consumed',matchId:room.match.id,seq:firstSeq});assert.equal(credits().length,2);
+ snapshot(301);assert.equal(credits().length,2);assert.equal(room.authoritySnapshotTick,301);
+ b.receive({type:'state-consumed',matchId:room.match.id,seq:firstSeq+1});assert.equal(credits().at(-1).tick,301);
+ assert.equal(worker.terminated,0);
+});
+test('plain socket drain wakes a held full capture without traffic; closing cancels the wake timer',async t=>{
+ const {a,b,app,room,snapshot,credits}=await setup(t);
+ a.bufferedAmount=b.bufferedAmount=100;snapshot(1);assert.equal(credits().length,0);
+ assert.ok(room.authorityCaptureTimer);
+ a.bufferedAmount=0;await until(()=>credits().length===1);assert.equal(credits()[0].tick,1);
+ a.bufferedAmount=100;snapshot(2);assert.ok(room.authorityCaptureTimer);
+ app.closeRoom(room.code);a.bufferedAmount=b.bufferedAmount=0;await delay(50);
+ assert.equal(credits().length,1);assert.equal(room.authorityCaptureTimer,null);
+});
+test('dedicated motion continues beyond a held full baseline; mismatched IPC tick still aborts',async t=>{
+ const {a,b,room,worker,snapshot}=await setup(t);snapshot(1);
+ for(const p of room.peers){p.loaded=true;p.motionState=true;p.motionWindow=new MotionDeliveryWindow();p.controlLane={primary:p.ws,socket:new Socket()};}
+ a.bufferedAmount=b.bufferedAmount=100;snapshot(2);
+ const f={tick:900,time:15,ships:room.frame.ships.map(s=>[s.id,0,0,0,0,0,0,0,0])};
+ worker.emit({type:'motion',tick:900,data:motionToText(encodeMotionFrame(f))});
+ assert.equal(room.status,'running');assert.equal(room.lastTick,2);assert.equal(room.lastMotionTick,900);
+ assert.ok(room.peers.every(p=>p.controlLane.socket.rows.some(m=>m.type==='motion')));
+ worker.emit({type:'motion',tick:902,data:motionToText(encodeMotionFrame({...f,tick:901}))});
+ assert.equal(room.status,'ended');assert.equal(worker.terminated,1);
+});
+
+test('binary authority summary without frame still registers auto-motion whole-state receipt tick',async t=>{
+  const {a,b,room,worker,frame}=await setup(t,true,true);
+  worker.emit(binarySnapshot(frame(42)));
+  assert.equal(room.status,'running');assert.equal(worker.terminated,0);
+  for(const [index,socket] of [a,b].entries()){
+    const state=socket.rows.find(m=>m.type==='state');assert.equal(state.frame.tick,42);
+    const guard=room.peers[index].autoMotion;assert.equal(guard.pending.get(state.seq).tick,42);
+    socket.receive({type:'state-consumed',matchId:room.match.id,seq:state.seq});
+    assert.equal(guard.stats().status,'eligible');assert.equal(guard.allow(43),true);
+  }
 });

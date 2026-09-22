@@ -1,70 +1,35 @@
-import { OwnershipPool, UnsupportedOwnershipScene } from './OwnershipPool';
-import { supportsOwnership } from './Eligibility';
+import { CombatWorkerBudget } from './CombatWorkerBudget';
+import { AuditedCombatMulticore } from './AuditedCombatMulticore';
 import type { CombatEngine } from '../../simulation/CombatEngine';
 import type { CapitalShipAI } from '../CapitalShipAI';
 import type { AIPhaseBatch } from './Types';
-/** Session-local optional acceleration. No changes to LAN's synchronous authority API. */
+
+/** Single-player adapter: player controls/AI have already executed before prepare.
+ * Only the engine's later native AI phase is predicted, exactly as on a LAN host.
+ * Generic support is behavior-audited; the proven native fast tier is retained.
+ * Unknown behavior still crosses a serial barrier.
+ */
 export class CombatMulticore {
-    private pool: OwnershipPool | null = null;
-    private ready = false;
-    private failed = false;
-    private reason = 'not-started';
+    private readonly owners = new AuditedCombatMulticore({
+        minShips: 50, minJobs: 4, minHardwareConcurrency: 8,
+        frameTimeoutMs: 250, readyReason: 'audited-native-local',
+    });
+    // Retrying a measured losing mixed codec every ten seconds creates its own
+    // repeating hitch. Local battles use a longer hysteresis; LAN keeps its policy.
+    private readonly budget = new CombatWorkerBudget(60000);
     enabled = true;
-    get status() { return { mode: this.ready && !this.pool?.isDisposed ? '4-workers' : 'serial', reason: this.pool?.isDisposed ? 'unsupported-scene' : this.reason, metrics: this.pool?.metrics ?? null }; }
+    get status() {
+        const status = this.owners.status;
+        return { ...status, budget: this.budget.status,
+            reason: !status.workers && status.reason === 'not-started' ? this.budget.status.reason : status.reason };
+    }
     prepare(engine: CombatEngine, playerAI: CapitalShipAI, dt: number): Promise<AIPhaseBatch> | null {
-        if (!this.enabled || this.failed)
-            return null;
-        if (typeof Worker === 'undefined' || typeof SharedArrayBuffer === 'undefined'
-            || globalThis.crossOriginIsolated !== true || (globalThis.navigator?.hardwareConcurrency ?? 0) < 8) {
-            this.reason = 'browser-or-isolation';
-            return null;
-        }
-        const ais = [playerAI, ...engine.getNativeAIs()];
-        if (!this.pool && !supportsOwnership(engine, ais)) {
-            this.reason = 'unsupported-scene';
-            return null;
-        }
-        if (!this.pool) {
-            try {
-                const pool = this.pool = new OwnershipPool(engine, ais);
-                this.reason = 'starting';
-                // Initialization does not stall combat; snapshots are first published AFTER ready.
-                void pool.ready.then(() => {
-                    if (this.pool === pool) {
-                        this.ready = true;
-                        this.reason = 'native-onslaught';
-                    }
-                }, error => {
-                    if (this.pool === pool)
-                        this.fail(error);
-                });
-            }
-            catch (error) {
-                this.fail(error);
-            }
-            return null;
-        }
-        if (!this.ready)
-            return null;
-        const pool = this.pool;
-        return pool.prepare(dt).catch(error => {
-            if (this.pool === pool) {
-                if (error instanceof UnsupportedOwnershipScene) { this.reset(); this.reason = 'unsupported-scene'; }
-                else this.fail(error);
-            }
-            throw error;
-        });
+        if (!this.enabled) return null;
+        return this.owners.prepare(engine, dt, { ais: [playerAI, ...engine.getNativeAIs()],
+            allowAudited: this.budget.allow(engine.capitalShips.length, performance.now()) });
     }
-    private fail(error: unknown): void {
-        this.reset();
-        this.failed = true;
-        this.reason = error instanceof Error ? error.message : String(error);
+    record(ms: number, usedOwners: boolean): void {
+        if (this.owners.status.tier !== 'legacy-native' && this.budget.record(ms, usedOwners, performance.now())) this.owners.reset();
     }
-    reset(): void {
-        this.pool?.dispose();
-        this.pool = null;
-        this.ready = false;
-        this.failed = false;
-        this.reason = 'not-started';
-    }
+    reset(): void { this.owners.reset(); this.budget.reset(); }
 }

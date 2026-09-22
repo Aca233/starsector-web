@@ -1,5 +1,5 @@
 import { shipSystemDefinitions } from '../extensions/ship-systems/Registry';
-import type { ShipSystem } from '../simulation/ShipSystem';
+import type { HudSystem as ShipSystem } from '../runtime/CombatHudView';
 import { sound } from './SoundManager';
 const previous = new WeakMap<ShipSystem, boolean>();
 export function stopSystemAudio(): void {

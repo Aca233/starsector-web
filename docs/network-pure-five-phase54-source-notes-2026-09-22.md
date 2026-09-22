@@ -1,0 +1,7 @@
+# Phase54 source notes — user-requested pure five-player diagnostic
+
+2026-09-22. User explicitly asks to test only five people, rather than five players plus seventeen AI ships. Extend the existing compiled multiplayer fixture with `players-only`: five independent browser processes, one Onslaught per seat, aiHulls=[[],[]], no reserves; normal room options validation and actual UI loadout/ready/start. Preserve the 22-ship fixture as a separately named load case. No gameplay changes, no Hz/precision/timeout/performance-gate relaxation.
+
+Use the currently accepted playable dist, not a new build. Its sources now differ from the working tree (17 imported-source paths at preflight). Archive the exact compiled files, historical manifest linkage and previously recorded served-module hashes; explicitly report source drift. An archived-artifact run proves the bytes it serves, NOT equivalence to current source. Strict current-source/frozen-source verification remains the default for other runs.
+
+Pure-five scenario includes actual browser-local movement/held-fire input, accepted-input evidence and live ship/projectile telemetry; this is scripted load, not five real humans. Measurement excludes later renderer stall/reload probes. No profiler for the requested simple run. Same-machine loopback LAN cannot establish remote Steam/n2n RTT. No visible windows, OS input, campaign changes, installation, commit/push/release.

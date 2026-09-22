@@ -38,6 +38,7 @@ try {
     window.__vite_plugin_react_preamble_installed__ = true;
     const React = (await import('/node_modules/.vite/deps/react.js')).default;
     const { createRoot } = (await import('/node_modules/.vite/deps/react-dom_client.js')).default;
+    const { engineDeploymentView } = await import('/src/engine/runtime/DeploymentView.ts');
     const { SimulationDeployment } = await import('/src/ui/tactical/SimulationDeployment.tsx');
     const root = createRoot(document.getElementById('fixture'));
     const engine = {
@@ -46,7 +47,7 @@ try {
       deploySimulationShips: (entries, ally) => { window.__deployment = { entries, ally }; },
     };
     window.__fixtureRoot = root;
-    root.render(React.createElement(SimulationDeployment, { engine, onClose() {}, onDeployed() {} }));
+    root.render(React.createElement(SimulationDeployment, { source: engineDeploymentView(engine), onDeploymentCommand: async () => ({ accepted: false }), onClose() {}, onDeployed() {} }));
   });
   const deploy = page.getByRole('button', { name: '部署', exact: true });
   const ships25 = page.locator('.sim-deployment-ship[aria-disabled="false"][aria-label$=" · 25 部署点"]');

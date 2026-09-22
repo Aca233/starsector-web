@@ -1,6 +1,6 @@
 import { sameTeam, combatTeamColor } from "../../engine/simulation/CombatTeams";
 import React, { useRef, useEffect } from 'react';
-import { CombatEngine } from '../../engine/simulation/CombatEngine';
+import type { CombatHudView as CombatEngine } from '../../engine/runtime/CombatHudView';
 import { Vector2 } from '../../engine/math/Vector2';
 import { runtimeAssetUrl } from '../../engine/runtime/RuntimePaths';
 
@@ -111,7 +111,7 @@ export const CombatRadar: React.FC<CombatRadarProps> = ({ engine }) => {
       }
 
       // 5. 旗舰用较大的箭头区分，颜色仍属于实际队伍，不能固定为绿色。
-      if (!player.isDead && !player.isRetreated && !player.isDocked && !engine.deployment.isReserve(player.id)) {
+      if (!player.isDead && !player.isRetreated && !player.isDocked && !engine.reserveIds.includes(player.id)) {
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(player.facingRad);

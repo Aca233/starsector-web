@@ -96,16 +96,13 @@ export class LanStateCredits {
 
   // Only successful reservations advance the sequence high-water mark.
   // A failed attempt retains no entry and can be retried after credits return.
+  canReserve(seq, bytes) {
+    return Number.isSafeInteger(seq) && seq >= 0 && seq > this.#lastSeq &&
+      Number.isSafeInteger(bytes) && bytes > 0 && bytes <= this.#maxBytes &&
+      this.#inflight.size < this.capacity && bytes <= this.#maxBytes - this.#bytes;
+  }
   reserve(seq, bytes) {
-    if (
-      !Number.isSafeInteger(seq) || seq < 0 || seq <= this.#lastSeq ||
-      !Number.isSafeInteger(bytes) || bytes <= 0 || bytes > this.#maxBytes ||
-      this.#inflight.size >= this.capacity ||
-      bytes > this.#maxBytes - this.#bytes
-    ) {
-      this.#rejected++;
-      return false;
-    }
+    if (!this.canReserve(seq, bytes)) { this.#rejected++; return false; }
     this.#inflight.set(seq, bytes);
     this.#lastSeq = seq;
     this.#bytes += bytes;

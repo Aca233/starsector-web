@@ -1,8 +1,8 @@
 /** Reduce replaceable snapshot flight only after measured queue inflation.
  * A delivery ACK is NOT an idle RTT measurement, and can NEVER raise the caller's
  * idle-RTT ceiling. No retransmissions, payload retention, timers or IO here.
- * Two extra frames cover serialization plus the receiver's scheduling turn; a
- * hard two-frame window was measured to starve otherwise usable 4 Mbps links.
+ * The usual two extra frames cover serialization and receiver scheduling. Only
+ * sub-half-frame BDP routes use two total slots; never cap every link at two.
  */
 export class SnapshotDeliveryWindow {
   #now;
@@ -43,7 +43,12 @@ export class SnapshotDeliveryWindow {
     if (!this.#congested && !inflated) return ceiling;
     const hz = this.deliveryHz;
     if (hz === null) return ceiling;
-    const limit = Math.max(2, Math.min(ceiling, Math.ceil(idleRttMs * hz / 1000) + 2));
+    // When a route's BDP is below half a frame, three whole large states
+    // mostly buy queue age, not throughput. Two keep serialization overlapped
+    // with the ACK flight. Preserve the extra scheduler slot for >= half-frame
+    // BDP (including the measured 4Mbps case), not a global two-frame cap.
+    const pipeline = idleRttMs * hz / 1000;
+    const limit = Math.max(2, Math.min(ceiling, pipeline < .5 ? 2 : Math.ceil(pipeline) + 2));
     // A drained queue is the intended outcome, not evidence that bandwidth has
     // returned. Reopening the full window on a single clean pong causes a
     // repeated multi-second burst/drain cycle on healthy high-RTT slow routes.

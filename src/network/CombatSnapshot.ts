@@ -1,3 +1,15 @@
+import {HostCombatComponentEvents,CombatComponentEventReceiver} from './CombatComponentEvents';
+import type {CombatComponentEvent,CombatComponentEventBatch} from './CombatComponentEvents';
+import {ArmorGrid} from '../engine/simulation/ArmorGrid';
+import {ComponentCapture,ComponentReceiver,sealShipComponents,sealComponentTree,resolveComponent} from './ComponentReplication';
+import type {MutationJournal} from './MutationJournal';
+import { ownedArmorGrid, captureArmorCells, restoreArmorCells } from './ArmorReplication';
+import { PackedSnapshotNumbers } from './PackedSnapshotNumbers.mjs';
+import { nativeRecordRestorer } from './NativeRecordRestore.generated';
+import type { NativeRecordRestore } from './NativeRecordRestore.generated';
+import { validateParticleEvents } from './particle-events.mjs';
+import { particleRecipeRow, particleRecipeBudget, DynamicParticleDecoder, PARTICLE_RECIPE_LIMITS } from "../engine/visual/DynamicParticleRecipe";
+import type { ParticleRecipeBudget, ParticleRecipe } from "../engine/visual/DynamicParticleRecipe";
 import { compactProjectileColumns, projectileColumnPlan } from "./ProjectileColumns";
 import { CombatFXSystem } from "../engine/simulation/systems/CombatFXSystem";
 import { explosionPuffRecipe, explosionPuffCount } from "../engine/visual/ExplosionPuffRecipe";
@@ -41,11 +53,25 @@ type Wire = any;
 const captureArrayMap = Array.prototype.map;
 /** Each snapshot carries its own field dictionary: reconnect never needs a baseline. */
 class SnapshotLayouts {
+  journal?: MutationJournal;
   readonly puffBudget = puffRecipeBudget();
+  readonly particleBudget = particleRecipeBudget();
   // Frame-owned, immutable wire marker; decoded viewer objects are never shared.
   readonly absent = Object.freeze({ $undefined: 1 });
-  constructor(readonly compactPuffs = false, readonly compactProjectiles = false, readonly nativeCapture = false) {}
+  constructor(readonly compactPuffs = false, readonly compactProjectiles = false, readonly nativeCapture = false, readonly compactParticles = false, readonly packedNumbers = false, dictionary?:SnapshotLayouts, readonly persistent=false) {
+    if(dictionary){this.keys=dictionary.keys;this.byFirst=dictionary.byFirst;this.planned=dictionary.planned;}
+  }
   readonly keys: string[][] = [];
+  private planned = new Map<NativeCaptureShape, number>();
+  recordPlanned(shape: NativeCaptureShape, values: Wire[]): Wire | null {
+    if (shape.keys.length < 6) return null;
+    const id = this.planned.get(shape);
+    if (id !== undefined) return { $record: id, values };
+    // A captured frame owns its dictionary; never expose mutable cached keys.
+    const record = this.record(shape.keys.slice(), values);
+    if (record) this.planned.set(shape, record.$record);
+    return record;
+  }
   private byFirst = new Map<string, Map<number, number[]>>();
   record(keys: string[], values: Wire[]): Wire | null {
     if (keys.length < 6 || keys.length > 2048) return null;
@@ -63,27 +89,28 @@ class SnapshotLayouts {
     if (!byLength) this.byFirst.set(keys[0], byLength = new Map());
     if (!candidates) byLength.set(keys.length, candidates = []);
     const id = this.keys.length;
+    if(this.persistent)Object.freeze(keys);
     this.keys.push(keys); candidates.push(id);
     return { $record: id, values };
   }
 }
-interface DecodeLayouts { keys: string[][]; puffDecoder: ExplosionPuffDecoder; puffBudget: PuffRecipeBudget }
-function snapshotLayouts(value: unknown, puffDecoder: ExplosionPuffDecoder): DecodeLayouts {
+interface DecodeLayouts { componentDefinitions?:Record<string,any>; components?: ComponentReceiver; nativeRecords?: Map<string[], NativeRecordRestore>; nativeDecode?: (value: Wire, previous: any, depth: number) => any; nativeProjection?: boolean; keys: string[][]; puffDecoder: ExplosionPuffDecoder; puffBudget: PuffRecipeBudget; particleDecoder: DynamicParticleDecoder; particleBudget: ParticleRecipeBudget }
+function snapshotLayouts(value: unknown, puffDecoder: ExplosionPuffDecoder, particleDecoder: DynamicParticleDecoder): DecodeLayouts {
   if (value === undefined) value = [];
   if (!Array.isArray(value) || value.length > 1024) throw Error('Invalid snapshot layouts');
   for (const keys of value) {
     if (!Array.isArray(keys) || keys.length > 2048 || keys.some(key => typeof key !== 'string' || key.length > 256 || SKIP.has(key)) || new Set(keys).size !== keys.length)
       throw Error('Invalid snapshot layout keys');
   }
-  return { keys: value, puffDecoder, puffBudget: puffRecipeBudget() };
+  return { keys: value, puffDecoder, puffBudget: puffRecipeBudget(), particleDecoder, particleBudget: particleRecipeBudget() };
 }
 // Projection is path-scoped: an unrelated "cells"/"armor"/"healthTracker" is never filtered.
-enum CaptureProjection { None, Ship, World, Damage, WeaponControl, EngineControl, Weapons, Engines, Projectiles, Weapon, Engine, Projectile, FX, Explosions, Explosion, ExplosionPuffs }
+enum CaptureProjection { None, Ship, World, Damage, WeaponControl, EngineControl, Weapons, Engines, Projectiles, Weapon, Engine, Projectile, FX, Explosions, Explosion, DynamicParticles, ExplosionPuffs }
 const capturePrototypes: object[] = [
   Object.prototype, Ship.prototype, Object.prototype, ShipDamageState.prototype,
   ShipWeaponControlSystem.prototype, EngineController.prototype, Array.prototype,
   Array.prototype, Array.prototype, Object.prototype, Object.prototype, Object.prototype,
-  CombatFXSystem.prototype, Array.prototype, Object.prototype, Array.prototype,
+  CombatFXSystem.prototype, Array.prototype, Object.prototype, Array.prototype, Array.prototype,
 ];
 // Path/prototype checks limit omissions. Generic capture still traverses omitted
 // fields; only an explicit native-graph caller may skip them before packing.
@@ -103,6 +130,7 @@ function captureChildProjection(projection: CaptureProjection, key: string): Cap
       if (key === 'fxSystem') return CaptureProjection.FX;
       break;
     case CaptureProjection.FX:
+      if (key === 'particles' || key === 'debris') return CaptureProjection.DynamicParticles;
       if (key === 'explosions') return CaptureProjection.Explosions;
       break;
     case CaptureProjection.Explosion:
@@ -119,17 +147,77 @@ function captureChildProjection(projection: CaptureProjection, key: string): Cap
 }
 function omitCapturedField(projection: CaptureProjection, key: string): boolean {
   switch (projection) {
+    case CaptureProjection.Ship: return key === 'prevPos' || key === 'prevFacingRad';
     case CaptureProjection.Damage: return key === 'armor' || key === 'cells' || key === 'armorRevision';
     case CaptureProjection.Weapon:
     case CaptureProjection.Engine: return key === 'healthTracker';
     case CaptureProjection.Projectile:
-      return key === 'spawnLocation' || key === 'sourceDamageMultiplier'
+      return key === 'prevPos' || key === 'prevBallisticTail' || key === 'prevFadeProgress'
+        || key === 'spawnLocation' || key === 'sourceDamageMultiplier'
         || key === 'passThroughMissiles' || key === 'passThroughFighters'
         || key === 'passThroughFightersOnlyWhenDestroyed' || key === 'mirv' || key === 'proximityFuse';
     default: return false;
   }
 }
+/** Field traversal plans, never value/snapshot caches. Weak identity ownership
+ * cannot retain an engine. A bounded shape interner amortizes layout lookup for
+ * the same native projectile/controller type across objects and frames. */
+interface NativeCaptureShape { raw: string[]; projection: CaptureProjection; keys: string[]; children: CaptureProjection[]; indices: number[] }
+const nativeCaptureShapes = new WeakMap<object, NativeCaptureShape>();
+const internedCaptureShapes = new Map<string, NativeCaptureShape>();
+const capturePlansEnabled = import.meta.env.VITE_LAN_CAPTURE_PLANS !== 'false';
+const nativeCapturePlanCounts = { hits: 0, compiled: 0, fallbacks: 0 };
+/** Cumulative Worker-local plan work, not received Hz or saved network bytes. */
+export function capturePlanDiagnostics() {
+  return {enabled: capturePlansEnabled, ...nativeCapturePlanCounts, shapes: internedCaptureShapes.size};
+}
+function nativeCaptureShape(value: object, raw: string[], projection: CaptureProjection): NativeCaptureShape | null {
+  const prior = nativeCaptureShapes.get(value);
+  if (prior && prior.projection === projection && prior.raw.length === raw.length) {
+    let same = true;
+    for (let i = 0; i < raw.length; i++) if (raw[i] !== prior.raw[i]) { same = false; break; }
+    if (same) { nativeCapturePlanCounts.hits++; return prior; }
+  }
+  // Unusual/custom wide shapes use the established path, not an unbounded cache.
+  if (raw.length > 256 || raw.some(key => key.length > 128)) { nativeCapturePlanCounts.fallbacks++; return null; }
+  const signature = projection + ':' + JSON.stringify(raw);
+  let shape = internedCaptureShapes.get(signature);
+  if (!shape) {
+    nativeCapturePlanCounts.compiled++;
+    const keys = raw.filter(key => !SKIP.has(key) && !omitCapturedField(projection, key));
+    shape = {raw, projection, keys, children: keys.map(key => captureChildProjection(projection, key)), indices: keys.map(key => raw.indexOf(key))};
+    if (internedCaptureShapes.size >= 1024) internedCaptureShapes.delete(internedCaptureShapes.keys().next().value!);
+    internedCaptureShapes.set(signature, shape);
+  }
+  nativeCaptureShapes.set(value, shape);
+  return shape;
+}
 function pack(value: any, seen: object[], refs: Map<string, Ship>, layouts: SnapshotLayouts, plain = false, projection = CaptureProjection.None): Wire {
+  if(value instanceof Ship&&!plain){layouts.journal?.reference(value);refs.set(value.id,value);return {$ship:value.id};}
+  if(layouts.journal&&value&&typeof value==='object'&&seen.includes(value))layouts.journal.cycle();
+  if(layouts.journal&&value&&typeof value==='object'&&!seen.includes(value)&&!(value instanceof Ship&&plain))
+    return layouts.journal.memo(value,projection+':'+plain+':'+layouts.packedNumbers+':'+layouts.compactProjectiles,refs,(previous,changed)=>packIncremental(value,seen,refs,layouts,plain,projection,previous,changed));
+  return packFresh(value,seen,refs,layouts,plain,projection);
+}
+/** A dirty native record updates only changed scalar slots. Re-enter object
+ * children to retain dependency/ref discovery; their own journals skip clean work. */
+function packIncremental(value:any,seen:object[],refs:Map<string,Ship>,layouts:SnapshotLayouts,plain:boolean,projection:CaptureProjection,previous:Wire,changed:ReadonlySet<string>|null):Wire{
+ if(!previous||!changed||plain||Array.isArray(value)||value instanceof ArmorGrid||value instanceof Map||value instanceof Set
+   ||ArrayBuffer.isView(value)||value instanceof Vector2)return packFresh(value,seen,refs,layouts,plain,projection);
+ const record=Object.hasOwn(previous,'$record');
+ if(!record&&Object.keys(previous).some(key=>key.startsWith('$')))return packFresh(value,seen,refs,layouts,plain,projection);
+ const keys:string[]=record?layouts.keys[previous.$record]:Object.keys(previous);
+ const values:Wire[]=record?previous.values.slice():keys.map(key=>previous[key]);
+ seen.push(value);
+ try{for(let i=0;i<keys.length;i++){
+  const key=keys[i],prior=values[i];if(!changed.has(key)&&(prior===null||typeof prior!=='object'))continue;
+  const field=value[key];if(typeof field==='function'){seen.pop();return packFresh(value,seen,refs,layouts,plain,projection);}
+  values[i]=field===null||typeof field==='string'||typeof field==='boolean'||typeof field==='number'&&Number.isFinite(field)?field:pack(field,seen,refs,layouts,false,captureChildProjection(projection,key));
+ }}finally{if(seen.at(-1)===value)seen.pop();}
+ const result=record?{$record:previous.$record,values}:Object.fromEntries(keys.map((key,i)=>[key,values[i]]));
+ layouts.journal!.record(value,result,keys);return result;
+}
+function packFresh(value: any, seen: object[], refs: Map<string, Ship>, layouts: SnapshotLayouts, plain = false, projection = CaptureProjection.None): Wire {
   if (value === undefined) return layouts.compactProjectiles ? layouts.absent : { $undefined: 1 };
   if (typeof value === "number" && !Number.isFinite(value)) return { $number: String(value) };
   if (value === null || typeof value !== "object") return typeof value === "function" ? { $undefined: 1 } : value;
@@ -140,11 +228,34 @@ function pack(value: any, seen: object[], refs: Map<string, Ship>, layouts: Snap
   if (!nativeArray) {
     if (value instanceof Ship && !plain) { refs.set(value.id, value); return { $ship: value.id }; }
     if (value instanceof Vector2) return { $vector: [value.x, value.y] };
-    if (ArrayBuffer.isView(value)) return { $typed: value.constructor.name, values: Array.from(value as any) };
+    if (ArrayBuffer.isView(value)) return { $typed: value.constructor.name,
+      values: layouts.nativeCapture && layouts.packedNumbers
+        ? PackedSnapshotNumbers.capture(value) ?? Array.from(value as any) : Array.from(value as any) };
   }
   if (projection === CaptureProjection.ExplosionPuffs && layouts.compactPuffs && Array.isArray(value)) {
     const recipe = explosionPuffRecipe(value);
     if (recipe && reservePuffRecipe(layouts.puffBudget, explosionPuffCount(recipe[1]))) return { $explosionPuffs: recipe };
+  }
+  if (seen.includes(value)) return { $undefined: 1 };
+  if (projection === CaptureProjection.DynamicParticles && layouts.compactParticles && Array.isArray(value)
+      && Object.getPrototypeOf(value) === Array.prototype && !Object.hasOwn(value, 'map') && value.map === captureArrayMap
+      && value.length <= PARTICLE_RECIPE_LIMITS.rows && Reflect.ownKeys(value).length === value.length + 1) {
+    const recipes: ParticleRecipe[] = [], ids = new Map<ParticleRecipe, number>(), items: Wire[] = []; let encoded = 0;
+    for (let i = 0; i < value.length; i++) {
+      const d = Object.getOwnPropertyDescriptor(value, String(i));
+      if (!d || !Object.hasOwn(d, 'value')) { encoded = 0; break; }
+      const row = d.value && typeof d.value === 'object' ? particleRecipeRow(d.value, layouts.particleBudget) : null;
+      if (row && layouts.particleBudget.rows < PARTICLE_RECIPE_LIMITS.rows && (ids.has(row.recipe) || layouts.particleBudget.groups < PARTICLE_RECIPE_LIMITS.groups)) {
+        let id = ids.get(row.recipe);
+        if (id === undefined) { id = recipes.length; recipes.push(row.recipe.slice() as ParticleRecipe); ids.set(row.recipe,id); layouts.particleBudget.groups++; }
+        items.push([id,row.index,row.steps,row.motion]); encoded++; layouts.particleBudget.rows++;
+      } else items.push(null);
+    }
+    if (encoded) {
+      seen.push(value);
+      try { for (let i = 0; i < items.length; i++) if (items[i] === null) items[i] = { raw: pack(value[i], seen, refs, layouts) }; } finally { seen.pop(); }
+      return { $dynamicParticles: [2,recipes,items] };
+    }
   }
   // Only ancestors can form a cycle. A short path stack avoids Set add/delete
   // churn for every record, while repeated non-cyclic references still expand.
@@ -192,10 +303,54 @@ function pack(value: any, seen: object[], refs: Map<string, Ship>, layouts: Snap
     } else result = rows;
   }
   else {
-    const keys = Object.keys(value);
+    let keys = Object.keys(value);
     if (projection) projection = nativeCaptureProjection(value, projection);
     let values: Wire[];
-    if (layouts.nativeCapture) {
+    const shape = layouts.nativeCapture && capturePlansEnabled ? nativeCaptureShape(value, keys, projection) : null;
+    let planned = false;
+    const armorCells = layouts.nativeCapture && layouts.packedNumbers && ownedArmorGrid(value)
+      ? captureArmorCells(value) : null;
+    if (armorCells) {
+      // Known owned component: do not read/escape or repack the cell buffer.
+      // Preserve all other fields, ordering, extension values and reference discovery.
+      values = []; let count = 0;
+      for (const key of keys) {
+        if (SKIP.has(key) || omitCapturedField(projection, key)) continue;
+        if (key === 'cells') { keys[count++] = key; values.push(armorCells); continue; }
+        const field = value[key];
+        if (typeof field === 'function') continue;
+        keys[count++] = key;
+        values.push(field === null || typeof field === 'string' || typeof field === 'boolean'
+          || (typeof field === 'number' && Number.isFinite(field)) ? field
+          : pack(field, seen, refs, layouts, false, captureChildProjection(projection, key)));
+      }
+      keys.length = count;
+    } else if (shape) {
+      // Explicit native graph only: own enumerable data fields, no accessors/Proxies.
+      // Read once in the just-validated raw key order. Indexed projection avoids
+      // megamorphic property lookup per field; indices are invalidated on ANY
+      // shape/order change above. Never cache field values in a traversal plan.
+      const fields = Object.values(value);
+      keys = shape.keys;
+      values = fields;
+      let written = 0;
+      let filtered: string[] | null = null;
+      for (let i = 0; i < keys.length; i++) {
+        const field = fields[shape.indices[i]];
+        // Function/value transitions remain live, and must not corrupt the plan.
+        if (typeof field === 'function') { filtered ??= keys.slice(0, i); continue; }
+        if (filtered) filtered.push(keys[i]);
+        // Retained raw indices increase monotonically; writing behind the read
+        // cursor cannot replace a field we have yet to visit. This array belongs
+        // to THIS capture, never the authority or any other frame.
+        values[written++] = field === null || typeof field === 'string' || typeof field === 'boolean'
+          || (typeof field === 'number' && Number.isFinite(field))
+          ? field : pack(field, seen, refs, layouts, false, shape.children[i]);
+      }
+      values.length = written;
+      if (filtered) keys = filtered;
+      else planned = true;
+    } else if (layouts.nativeCapture) {
       // Explicitly trusted, locally constructed authority graph: no getters or
       // Proxies. Read retained fields once, and never allocate simulation-only
       // subtrees merely to discard them. Do not infer this contract from a proto.
@@ -226,7 +381,7 @@ function pack(value: any, seen: object[], refs: Map<string, Ship>, layouts: Snap
           || (typeof field === 'number' && Number.isFinite(field))
           ? field : pack(field, seen, refs, layouts, false, captureChildProjection(projection, keys[i]));
       }
-      if (projection === CaptureProjection.Damage || projection === CaptureProjection.Weapon
+      if (projection === CaptureProjection.Ship || projection === CaptureProjection.Damage || projection === CaptureProjection.Weapon
         || projection === CaptureProjection.Engine || projection === CaptureProjection.Projectile) {
         let kept = 0;
         for (let i = 0; i < keys.length; i++) if (!omitCapturedField(projection, keys[i])) {
@@ -235,8 +390,9 @@ function pack(value: any, seen: object[], refs: Map<string, Ship>, layouts: Snap
         keys.length = values.length = kept;
       }
     }
-    result = plain ? null : layouts.record(keys, values);
+    result = plain ? null : planned ? layouts.recordPlanned(shape!, values) : layouts.record(keys, values);
     if (!result) { result = {}; for (let i = 0; i < keys.length; i++) result[keys[i]] = values[i]; }
+    if(layouts.journal&&!plain)layouts.journal.record(value,result,keys);
   }
   seen.pop();
   return result;
@@ -255,9 +411,14 @@ const typed: Record<string, any> = {
 /** Copy scalar record fields directly; only tagged/structured values need recursive decoding.
  * Keep the same depth budget even for primitives at the final level. */
 function unpackRecord(values: Wire[], keys: string[], output: any, ships: Map<string, Ship>, layouts: DecodeLayouts, depth: number) {
+  const armor = layouts.nativeProjection && ownedArmorGrid(output);
+  const native = armor ? undefined : layouts.nativeRecords?.get(keys);
+  if (native) { native(values, output, depth, layouts.nativeDecode!); return; }
   for (let i = 0; i < keys.length; i++) {
-    const key = keys[i], value = values[i], previous = output[key];
+    const key = keys[i], value = values[i];
     if (depth > 64) throw Error("Snapshot nesting exceeds limit");
+    if (armor && key === "cells" && restoreArmorCells(output, value)) continue;
+    const previous = output[key];
     output[key] = value === null || typeof value !== 'object' ? value : unpack(value, previous, ships, layouts, depth);
   }
 }
@@ -270,6 +431,10 @@ function unpack(
 ): any {
   if (depth > 64) throw Error("Snapshot nesting exceeds limit");
   if (value === null || typeof value !== "object") return value;
+  if(Object.hasOwn(value,'$component')) {
+    const restore=(data:any)=>unpack(data,target,ships,layouts,depth+1);
+    return layouts.components?layouts.components.restore(value,target,restore):restore(resolveComponent(value,layouts.componentDefinitions??{}));
+  }
   if (Object.hasOwn(value, '$record')) {
     const keys = Number.isInteger(value.$record) && value.$record >= 0 ? layouts.keys[value.$record] : undefined;
     if (!keys || !Array.isArray(value.values) || value.values.length !== keys.length) throw Error('Invalid snapshot record');
@@ -301,6 +466,14 @@ function unpack(
         ? -Infinity
         : NaN;
   if (value.$typed) {
+    if (value.values instanceof PackedSnapshotNumbers) {
+      if (!Object.hasOwn(typed, value.$typed) || value.$typed !== value.values.type)
+        throw Error("Invalid typed array");
+      const block = value.values;
+      const output = target instanceof typed[value.$typed] && target.length === block.length
+        ? target : new typed[value.$typed](block.length);
+      block.copyNumbersTo(output); return output;
+    }
     if (!Object.hasOwn(typed, value.$typed) || !Array.isArray(value.values))
       throw Error("Invalid typed array");
     if (target instanceof typed[value.$typed] && target.length === value.values.length) {
@@ -355,6 +528,27 @@ function unpack(
     output.length = rows.length;
     return output;
   }
+  if (Object.hasOwn(value, '$dynamicParticles')) {
+    const data = value.$dynamicParticles;
+    if (Object.keys(value).length !== 1 || !Array.isArray(data) || data.length !== 3 || (data[0] !== 1 && data[0] !== 2) || !Array.isArray(data[1]) || !Array.isArray(data[2])
+        || data[1].length > PARTICLE_RECIPE_LIMITS.groups || data[2].length > PARTICLE_RECIPE_LIMITS.rows || depth + 3 > 64) throw Error('Invalid dynamic particle envelope');
+    const output = Array.isArray(target) ? target : [], recipes = data[1], rows = data[2];
+    if (layouts.particleBudget.groups + recipes.length > PARTICLE_RECIPE_LIMITS.groups) throw Error('Dynamic particle group budget exceeded');
+    layouts.particleBudget.groups += recipes.length;
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];let expanded: Wire;
+      if (Array.isArray(row)) {
+        if (row.length !== 4 || !Number.isSafeInteger(row[0]) || row[0] < 0 || row[0] >= recipes.length) throw Error('Invalid dynamic particle reference');
+        if (!Array.isArray(row[3]) || (data[0] === 1 ? row[3].length !== 4 : row[3].length !== 4 && row[3].length !== 5)) throw Error('Missing authoritative particle motion');
+        expanded = layouts.particleDecoder.expand(recipes[row[0]], row[1], row[2], layouts.particleBudget, row[3]);
+      } else {
+        if (!row || typeof row !== 'object' || Object.keys(row).length !== 1 || !Object.hasOwn(row,'raw')) throw Error('Invalid ordinary particle reference');
+        expanded = row.raw;
+      }
+      output[i] = unpack(expanded, output[i], ships, layouts, depth + 3);
+    }
+    output.length = rows.length; return output;
+  }
   // Like batched records, recipes are cold relative to vector decoding.
   if (Object.hasOwn(value, '$explosionPuffs')) {
     if (Object.keys(value).length !== 1) throw Error('Invalid explosion puff envelope');
@@ -374,6 +568,22 @@ function unpack(
     target && typeof target === "object" && !Array.isArray(target)
       ? target
       : {};
+  // Network DTOs have no getters/Proxies. Avoid a temporary [key,value]
+  // allocation per field; still restore EVERY retained field against the live
+  // target. Arbitrary callers keep Object.entries and its eager read ordering.
+  if (layouts.nativeProjection) {
+    const armor = ownedArmorGrid(output);
+    for (const k of Object.keys(value)) {
+      if (SKIP.has(k)) continue;
+      const v = value[k];
+      if (depth >= 64) throw Error("Snapshot nesting exceeds limit");
+      if (armor && k === "cells" && restoreArmorCells(output, v)) continue;
+      const previous = output[k];
+      if((v===null||typeof v!=='object')&&Object.is(v,previous))continue;
+      output[k] = v === null || typeof v !== 'object' ? v : unpack(v, previous, ships, layouts, depth + 1);
+    }
+    return output;
+  }
   for (const [k, v] of Object.entries(value)) {
     if (SKIP.has(k)) continue;
     const previous = output[k];
@@ -412,18 +622,24 @@ export interface CombatSound {
 export interface CombatSnapshot {
   /** Self-contained cosmetic spawn window; not a resumable physics checkpoint. */
   muzzleEvents?: import('./muzzle-events.mjs').MuzzleEventBatch;
+  particleEvents?: import('./particle-events.mjs').ParticleEventBatch;
   sounds?: CombatSound[];
   deployment?: import("../engine/simulation/CombatDeployment").DeploymentState;
   tick: number;
   acknowledged: Record<Seat, number>;
-  ships: Array<{ id: string; state: Wire }>;
-  crafts: Array<{ id: string; kind: "fighter" | "bomber" | "drone" | "detached"; spec: number; state: Wire }>;
-  craftSpecs: ShipSpec[];
+  componentMode?: 1;
+  combatEvents?:CombatComponentEventBatch;
+  componentDefinitions?:Record<string,Wire>;
+  ships: Array<{ id: string; generation?:number; state: Wire }>;
+  crafts: Array<{ id: string; generation?:number; kind: "fighter" | "bomber" | "drone" | "detached"; spec: number; state: Wire }>;
+  craftSpecs: Wire[];
   /** Lossless, self-contained field dictionary for nested presentation records. */
   layouts?: string[][];
   world: Wire;
   simulationMs: number;
   snapshotHz?: number;
+  /** Negotiated separate visual authority; world.projectiles must be empty. */
+  projectileVisuals?: 1;
   captureMs?: number;
   encodeMs?: number;
   /** Authority clock progress over wall time, including serialization/recovery. */
@@ -443,6 +659,22 @@ const WORLD_KEYS = [
   "nebulaSystem",
   "mineSystem",
 ] as const;
+const componentCaptures=new WeakMap<CombatEngine,ComponentCapture>();
+const componentDictionaries=new WeakMap<CombatEngine,SnapshotLayouts>();
+const componentReceivers=new WeakMap<CombatEngine,ComponentReceiver>();
+let componentEventEpoch=0;
+const hostComponentEvents=new WeakMap<CombatEngine,{host:HostCombatComponentEvents;tick:number;batch?:CombatComponentEventBatch}>();
+const receivedComponentEvents=new WeakMap<CombatEngine,CombatComponentEventReceiver>();
+const componentNotices=new WeakMap<CombatEngine,readonly CombatComponentEvent[]>();
+const NO_COMPONENT_EVENTS:readonly CombatComponentEvent[]=Object.freeze([]);
+/** Notifications from the most recently restored endpoint; never damage commands. */
+export function combatComponentNotices(engine:CombatEngine):readonly CombatComponentEvent[]{return componentNotices.get(engine)??NO_COMPONENT_EVENTS;}
+const displayGenerations=new WeakMap<CombatEngine,Map<string,number>>();
+const validatedComponentSpecs=new WeakSet<object>();
+const componentOmit=(_source:object,key:string)=>SKIP.has(key);
+const componentReference=(source:object)=>source instanceof Ship;
+const WORLD_COMPONENTS=new Set<string>(["environment","asteroidSystem","nebulaSystem","mineSystem"]);
+export function componentCaptureDiagnostics(engine:CombatEngine){return componentCaptures.get(engine)?.journal.stats;}
 export function captureCombat(
   engine: CombatEngine,
   tick: number,
@@ -454,24 +686,35 @@ export function captureCombat(
   // Opt in only for a locally constructed, non-Proxy native engine graph.
   // Not a property inferred from prototypes or untrusted wire data.
   nativeCapture = false,
+  compactParticles = false,
+  packedNumbers = false,
+  componentMode = false,
 ): CombatSnapshot {
+  let components:ComponentCapture|undefined;
+  if(componentMode&&nativeCapture){components=componentCaptures.get(engine);if(!components){components=new ComponentCapture(componentOmit,componentReference);componentCaptures.set(engine,components);}components.begin();}
   const world: Record<string, unknown> = {};
   // Ribbons are client cosmetics in LAN. Keep the default projection available
   // for diagnostics/legacy capture; omission preserves the viewer's local engine.
-  for (const k of WORLD_KEYS) if (k !== 'contrailEngine' || !localContrails) world[k] = engine[k];
+  for (const k of WORLD_KEYS) if ((k !== 'contrailEngine' || !localContrails)&&!(components&&WORLD_COMPONENTS.has(k))) world[k] = engine[k];
   const capitals = new Set(engine.allCapitalShips);
   const refs = new Map(engine.ships.map(ship => [ship.id, ship]));
-  const layouts = new SnapshotLayouts(compactPuffs, compactProjectiles, nativeCapture);
+  const layouts = new SnapshotLayouts(compactPuffs, compactProjectiles, nativeCapture, compactParticles, packedNumbers,components?componentDictionaries.get(engine):undefined,!!components);
+  if(components)componentDictionaries.set(engine,layouts);
   // Root ship/world fields remain named for server validation and playback clocks.
   // Enumerate ship roots directly; nested Ship values still become references.
-  const project = (value: unknown, projection = CaptureProjection.Ship) => pack(value, [], refs, layouts, true, projection);
+  const project = (value: unknown, projection = CaptureProjection.Ship) => {
+    layouts.journal=projection===CaptureProjection.Ship?components?.journal:undefined;
+    const data=pack(value, [], refs, layouts, true, projection);
+    return layouts.journal?sealShipComponents(data,components):data;
+  };
   // A reserve cannot change in simulation. Its frozen match loadout is already present on viewers;
   // avoid resending every inactive weapon/controller/component at snapshot frequency.
-  const ships = engine.allCapitalShips.map(ship => ({id:ship.id,state:project(engine.deployment.isReserve(ship.id)
+  const ships = engine.allCapitalShips.map(ship => ({id:ship.id,...(components?{generation:components.generation(ship)}:{}),state:project(engine.deployment.isReserve(ship.id)
     ? {id:ship.id,teamId:ship.teamId,isPlayer:ship.isPlayer,hullHp:ship.hullHp,currentCR:ship.currentCR,isDead:ship.isDead,isRetreated:ship.isRetreated}
     : ship)}));
   const projectedWorld = project(world, CaptureProjection.World);
-  const craftSpecs: ShipSpec[] = [], specs = new Map<string,number>();
+  if(components)for(const k of WORLD_KEYS)if(WORLD_COMPONENTS.has(k)){layouts.journal=components.journal;const value=pack(engine[k],[],refs,layouts);projectedWorld[k]=value&&typeof value==='object'?sealComponentTree(value,components):value;}
+  const craftSpecs: Wire[] = [], specs = new Map<string,number>();
   const specObjects = new Map<ShipSpec, number>();
   const fighterSet = new Set(engine.fighters), bomberSet = new Set(engine.bombers), droneSet = new Set(engine.droneSystem.drones);
   const crafts: CombatSnapshot['crafts'] = [];
@@ -480,20 +723,43 @@ export function captureCombat(
     if (capitals.has(ship)) continue;
     let spec = specObjects.get(ship.spec);
     if (spec === undefined) {
-      const signature = JSON.stringify(ship.spec);
+      const definition=components?.definition(ship.spec);
+      const signature = definition?.signature ?? JSON.stringify(ship.spec);
       spec = specs.get(signature);
-      if (spec === undefined) {spec=craftSpecs.length;specs.set(signature,spec);craftSpecs.push(ship.spec);}
+      if (spec === undefined) {spec=craftSpecs.length;specs.set(signature,spec);craftSpecs.push(definition?.capsule ?? ship.spec);}
       specObjects.set(ship.spec, spec);
     }
     const kind = fighterSet.has(ship) ? 'fighter' : bomberSet.has(ship) ? 'bomber' : droneSet.has(ship) ? 'drone' : 'detached';
-    crafts.push({id:ship.id,kind,spec,state:project(ship)});
+    crafts.push({id:ship.id,...(components?{generation:components.generation(ship)}:{}),kind,spec,state:project(ship)});
   }
-  return {tick,acknowledged,simulationMs,ships,crafts,craftSpecs,layouts:layouts.keys,world:projectedWorld, ...(engine.deployment.enabled ? {deployment:engine.deployment.snapshot()} : {})};
+  components?.finish();
+  const frame:CombatSnapshot={...(components?{componentMode:1 as const,componentDefinitions:components.definitionFrame()}:{}),tick,acknowledged,simulationMs,ships,crafts,craftSpecs,layouts:components?layouts.keys.slice():layouts.keys,world:projectedWorld, ...(engine.deployment.enabled ? {deployment:engine.deployment.snapshot()} : {})};
+  if(components){
+    let events=hostComponentEvents.get(engine);
+    if(!events||tick<events.tick){events={host:new HostCombatComponentEvents('authority-'+(++componentEventEpoch)),tick:-1};hostComponentEvents.set(engine,events);}
+    // Re-publication of an unchanged simulation tick must not duplicate notices.
+    if(tick>events.tick){try{events.batch=events.host.capture(frame);}catch{events.batch=undefined;}events.tick=tick;}
+    if(events.batch)frame.combatEvents=events.batch;
+  }
+  return frame;
+}
+/** Dedicated entity capture for a locally constructed authority. Shares the
+ * existing projection/omission contract without traversing ships or world FX.
+ * Native/custom callers must obey the same nativeCapture restriction as above. */
+export function captureProjectileProjection(engine: CombatEngine) {
+  const layouts = new SnapshotLayouts(false, true, true);
+  const refs = new Map(engine.ships.map(ship => [ship.id, ship]));
+  const projectiles = pack(engine.projectiles, [], refs, layouts, false, CaptureProjection.Projectiles);
+  return { world: { projectiles }, layouts: layouts.keys };
 }
 const puffDecoders = new WeakMap<CombatEngine, ExplosionPuffDecoder>();
+const particleDecoders = new WeakMap<CombatEngine, DynamicParticleDecoder>();
 const displayCrafts = new WeakMap<CombatEngine, Map<string, Ship>>();
 const validatedSpecs = new WeakMap<CombatEngine, Set<string>>();
 const displayTicks = new WeakMap<CombatEngine, number>();
+const projectileWorldTicks = new WeakMap<CombatEngine, number>();
+/** Compact world ticks do not supersede the independent projectile stream. */
+export const projectileSnapshotTick = (engine: CombatEngine): number => projectileWorldTicks.get(engine) ?? -1;
 // Only native roster accessors may share membership within this synchronous apply.
 // A custom targeting method is still called normally; never cache its result.
 const restoreFindHostile = CombatEngine.prototype.findHostile;
@@ -512,6 +778,11 @@ export interface CombatSnapshotBatchOptions {
    * cannot detect transparent Proxies, so callers unable to guarantee their absence
    * must leave this off. Wire frames still receive the normal full validation. */
   nativeTargeting?: boolean;
+  /** Locally owned non-Proxy engine + ordinary decoded DTO frames only. No
+   * custom accessors on either graph. Generic/mod callers must leave false. */
+  nativeProjection?: boolean;
+  /** Separate lifecycle/HP notifications after each successful full endpoint. */
+  afterComponentEvents?: (events:readonly CombatComponentEvent[])=>void;
 }
 
 /**
@@ -540,7 +811,8 @@ export function applyCombatSnapshots(
   options?: CombatSnapshotBatchOptions,
 ): void {
   for (const frame of frames) {
-    restoreCombatSnapshot(engine, frame, resetInterpolation, options?.nativeTargeting === true);
+    restoreCombatSnapshot(engine, frame, resetInterpolation, options?.nativeTargeting === true, options?.nativeProjection === true);
+    options?.afterComponentEvents?.(combatComponentNotices(engine));
     afterApply?.(frame);
   }
 }
@@ -559,6 +831,7 @@ function restoreCombatSnapshot(
   frame: CombatSnapshot,
   resetInterpolation: boolean,
   nativeTargeting: boolean,
+  nativeProjection = false,
 ) {
   if (
     !frame ||
@@ -568,11 +841,33 @@ function restoreCombatSnapshot(
     new Set(frame.ships.map((row) => row.id)).size !== frame.ships.length
   )
     throw Error("Invalid combat snapshot");
+  if(frame.componentMode!==undefined&&frame.componentMode!==1)throw Error('Invalid component protocol');
+  if(frame.componentMode===1&&[...frame.ships,...(frame.crafts??[])].some(row=>!Number.isSafeInteger(row.generation)||row.generation!<=0))throw Error('Invalid entity generation');
+  if (frame.particleEvents !== undefined) validateParticleEvents(frame.particleEvents);
+  if (frame.projectileVisuals !== undefined && (frame.projectileVisuals !== 1 || !Array.isArray(frame.world?.projectiles) || frame.world.projectiles.length)) throw Error('Invalid separate projectile snapshot');
   if (!Array.isArray(frame.crafts) || !Array.isArray(frame.craftSpecs))
     throw Error('Invalid dynamic craft snapshot');
   let puffDecoder = puffDecoders.get(engine);
   if (!puffDecoder) { puffDecoder = new ExplosionPuffDecoder(); puffDecoders.set(engine, puffDecoder); }
-  const layouts = snapshotLayouts(frame.layouts, puffDecoder);
+  let particleDecoder = particleDecoders.get(engine);
+  if (!particleDecoder) { particleDecoder = new DynamicParticleDecoder(); particleDecoders.set(engine,particleDecoder); }
+  const layouts = snapshotLayouts(frame.layouts, puffDecoder, particleDecoder);
+  layouts.nativeProjection = nativeProjection;
+  layouts.componentDefinitions=frame.componentDefinitions;
+  let componentReceiver:ComponentReceiver|undefined;
+  if(frame.componentMode===1){componentReceiver=componentReceivers.get(engine);if(!componentReceiver){componentReceiver=new ComponentReceiver(componentOmit,componentReference);componentReceivers.set(engine,componentReceiver);}
+    componentReceiver.begin(JSON.stringify([[...frame.ships,...frame.crafts].map(r=>[r.id,r.generation]),layouts.keys]),resetInterpolation,layouts.keys,frame.componentDefinitions??{});
+    if(nativeProjection)layouts.components=componentReceiver;
+  }
+  const frameSpecs=frame.craftSpecs.map((spec,index)=>frame.componentMode===1?componentReceiver!.definition(index,spec):spec);
+  if (nativeProjection) {
+    layouts.nativeRecords = new Map();
+    for (const keys of layouts.keys) {
+      const native = nativeRecordRestorer(keys);
+      if (native) layouts.nativeRecords.set(keys, native);
+    }
+    layouts.nativeDecode = (value, previous, depth) => unpack(value, previous, ships, layouts, depth);
+  }
   const previousTick = displayTicks.get(engine);
   const continuous = !resetInterpolation && previousTick !== undefined && frame.tick > previousTick && frame.tick - previousTick <= 60;
   // Arrays are unpacked/reused by index, but projectiles are identified by ID.
@@ -585,7 +880,9 @@ function restoreCombatSnapshot(
   const capitalSet = capitals ? new Set(capitals) : undefined;
   const previous = displayCrafts.get(engine) ?? new Map([...engine.combatShips.filter(s=>s.isAttachedModule),...engine.fighters,...engine.bombers,...engine.droneSystem.drones].map(s=>[s.id,s]));
   const cache = validatedSpecs.get(engine) ?? new Set<string>();
-  for (const spec of frame.craftSpecs) {
+  for (const spec of frameSpecs) {
+    if(frame.componentMode===1&&validatedComponentSpecs.has(spec))continue;
+    if(frame.componentMode===1){validateShipSpec(spec,{allowExistingId:true,requireBundledAssets:true});validatedComponentSpecs.add(spec);continue;}
     const signature=JSON.stringify(spec);
     if (!cache.has(signature)) {
       validateShipSpec(spec,{allowExistingId:true,requireBundledAssets:true});
@@ -594,13 +891,17 @@ function restoreCombatSnapshot(
     }
   }
   validatedSpecs.set(engine,cache);
+  const generations=displayGenerations.get(engine)??new Map<string,number>();
+  const nextGenerations=new Map<string,number>();
   const next = new Map<string,Ship>();
   for (const row of frame.crafts) {
-    if (typeof row.id !== 'string' || row.id.length > 256 || ships.has(row.id) || !['fighter','bomber','drone','detached'].includes(row.kind) || !Number.isInteger(row.spec) || !frame.craftSpecs[row.spec]) throw Error('Invalid craft identity');
-    const spec=frame.craftSpecs[row.spec];
+    if (typeof row.id !== 'string' || row.id.length > 256 || ships.has(row.id) || !['fighter','bomber','drone','detached'].includes(row.kind) || !Number.isInteger(row.spec) || !frameSpecs[row.spec]) throw Error('Invalid craft identity');
+    const spec=frameSpecs[row.spec];
     const carrierId=row.state?.sourceCarrier?.$ship;
     const carrier=carrierId ? ships.get(carrierId) : undefined;
-    const ship=previous.get(row.id) ?? new Ship(row.id,spec,!!row.state?.isPlayer,new Vector2(),0,undefined,undefined,carrier);
+    const sameLifetime=frame.componentMode!==1||!generations.has(row.id)||generations.get(row.id)===row.generation;
+    const ship=(sameLifetime?previous.get(row.id):undefined) ?? new Ship(row.id,frame.componentMode===1?structuredClone(spec):spec,!!row.state?.isPlayer,new Vector2(),0,undefined,undefined,carrier);
+    if(frame.componentMode===1)nextGenerations.set(row.id,row.generation!);
     ships.set(row.id,ship);next.set(row.id,ship);
   }
   const fighters:Ship[]=[], bombers:Ship[]=[], drones:Ship[]=[];
@@ -614,6 +915,7 @@ function restoreCombatSnapshot(
   engine.bombers.splice(0,engine.bombers.length,...bombers);
   engine.droneSystem.drones.splice(0,engine.droneSystem.drones.length,...drones);
   displayCrafts.set(engine,next);
+  displayGenerations.set(engine,nextGenerations);
   for (const row of [...frame.ships,...frame.crafts]) {
     const ship = ships.get(row.id);
     if (!ship) throw Error("Unknown ship");
@@ -639,6 +941,7 @@ function restoreCombatSnapshot(
     p.prevFadeProgress = prior?.fade ?? p.fadeProgress;
   }
   displayTicks.set(engine, frame.tick);
+  if (resetInterpolation || frame.projectileVisuals !== 1) projectileWorldTicks.set(engine, frame.projectileVisuals === 1 ? -1 : frame.tick);
   if (engine.deployment.enabled) { if (!frame.deployment) throw Error("Missing deployment snapshot"); engine.deployment.applySnapshot(frame.deployment); }
   for (const root of capitals ?? engine.allCapitalShips) for (const parent of root.assemblyShips) {
     parent.childModules.forEach((child, index) => { child.parentShip = parent; child.moduleMount = parent.spec.modules?.[index] ?? null; });
@@ -659,4 +962,13 @@ function restoreCombatSnapshot(
         : Reflect.apply(findHostile, engine, [ship]) ?? null;
     }
   }
+  componentReceiver?.finish();
+  let notices=NO_COMPONENT_EVENTS;
+  if(frame.componentMode===1&&frame.combatEvents){
+    let receiver=receivedComponentEvents.get(engine);
+    if(!receiver||resetInterpolation){receiver=new CombatComponentEventReceiver();receivedComponentEvents.set(engine,receiver);}
+    // Optional notices can never veto or repeat an authoritative full restore.
+    try{notices=receiver.observeSnapshot(frame.combatEvents.epoch,frame,frame.combatEvents);}catch{receivedComponentEvents.delete(engine);}
+  }else receivedComponentEvents.delete(engine);
+  componentNotices.set(engine,notices);
 }

@@ -1,7 +1,7 @@
-import { localMuzzleLayer } from '../../LocalMuzzleLayer';
+import { projectileDisplayPose } from '../../ProjectileFlightLayer';
 import { renderMissileEngines, type MissileEngineRenderItem } from '../MissileEngineRenderer';
 import { contrailMayBeVisible } from '../ContrailVisibility';
-import { CombatEngine } from '../../../simulation/CombatEngine';
+import type { CombatRenderView } from '../../CombatRenderView';
 import { WebGLPassContext } from '../WebGLPassContext';
 import { Vector2 } from '../../../math/Vector2';
 import { getWeaponVisualProfile } from '../../../visual/VisualProfiles';
@@ -24,15 +24,15 @@ export class WebGLProjectilePass {
   /**
    * 绘制底图层导弹连续烟雾尾迹带 (位于舰体下方 LAYER_BELOW_SHIPS)
    */
-  public renderContrails(engine: CombatEngine, ctx: WebGLPassContext) {
+  public renderContrails(engine: CombatRenderView, ctx: WebGLPassContext) {
     const { batcher, ribbonBatcher, textures } = ctx;
 
     // 1. 绘制导弹连续烟雾尾迹带 (1:1 ContrailEngine.java 三角形缎带光栅化)
-    if (engine.contrailEngine) {
+    if (engine.trailStrips) {
       batcher.flush();
       const contrailTex = textures.getTexture('/game-assets/graphics/fx/contrail64b.png', true);
       ribbonBatcher.begin(batcher.currentViewProj);
-      for (const strip of engine.contrailEngine.getStrips()) {
+      for (const strip of engine.trailStrips) {
         if (strip.points.length < 2 || !contrailMayBeVisible(strip.points, ctx.viewport, ctx.zoom)) continue;
         ribbonBatcher.drawStrip(contrailTex, strip.points, strip.color, strip.blendMode);
       }
@@ -44,7 +44,7 @@ export class WebGLProjectilePass {
   /**
    * 绘制高能持续光束与死光射线 (位于舰体上方 LAYER_ABOVE_SHIPS_AND_ASTEROIDS - 1:1 BeamWeaponRay.java)
    */
-  public renderBeams(engine: CombatEngine, ctx: WebGLPassContext) {
+  public renderBeams(engine: CombatRenderView, ctx: WebGLPassContext) {
     const { batcher, ribbonBatcher, textures, hitGlowTex } = ctx;
     if (engine.beams.length === 0) return;
     const roughFringe = textures.getTexture('/game-assets/graphics/fx/beam_rough2_fringe.png', true);
@@ -77,11 +77,11 @@ export class WebGLProjectilePass {
   /**
    * 绘制上图层投射物与枪口粒子 (位于舰体上方)
    */
-  public renderProjectilesAndMuzzle(engine: CombatEngine, ctx: WebGLPassContext) {
+  public renderProjectilesAndMuzzle(engine: CombatRenderView, ctx: WebGLPassContext) {
     const { batcher, ribbonBatcher, textures, hitGlowTex, alpha } = ctx;
 
     // 3. 绘制枪口开火粒子与火光 (1:1 _class.java:29-54 & SmoothParticle.java)
-    const localMuzzles = localMuzzleLayer(engine.fxSystem);
+    const localMuzzles = engine.localMuzzles;
     if (engine.muzzleParticles.length || localMuzzles.length) {
       const muzzlePartTex = textures.getTexture('/game-assets/graphics/fx/particlealpha32sq.png');
       for (const mode of ['NORMAL', 'ADDITIVE'] as const) {
@@ -119,7 +119,10 @@ export class WebGLProjectilePass {
 
     const movingRayProjectiles: Array<{ projectile: (typeof engine.projectiles)[number]; pos: Vector2 }> = [];
 
-    for (const p of engine.projectiles) {
+    const prediction = engine.projectilePrediction;
+    // Ghosts and corrected display copies never enter the combat projectile array.
+    for (const list of [engine.projectileVisuals?.projectiles ?? engine.projectiles, prediction?.projectiles ?? []]) for (const original of list) {
+      const p = projectileDisplayPose(original, engine.projectileFlight, prediction?.corrections);
       if (p.isMine) continue; // Native mine sprite/glow are drawn once in the FX pass.
       const pPos = Vector2.lerp(p.prevPos, p.pos, alpha);
       const pAngle = p.facingRad !== undefined ? p.facingRad : p.vel.heading();
@@ -225,7 +228,7 @@ export class WebGLProjectilePass {
     // 5. Source-faithful BALLISTIC_AS_BEAM mesh pass (MovingRay.java -> renderers/N.java).
     // TPC keeps its authored 100x35 data; tapering, transparent half-width ends and a twice-drawn
     // white core are what make the original projectile read as a sharp red energy needle.
-    if (movingRayProjectiles.length > 0 || engine.fxSystem.movingRayFades.length > 0) {
+    if (movingRayProjectiles.length > 0 || engine.movingRayFades.length > 0) {
       batcher.flush();
       ribbonBatcher.begin(batcher.currentViewProj);
       ribbonBatcher.setAlphaDensityScale(1.0);
@@ -269,7 +272,7 @@ export class WebGLProjectilePass {
 
       // Solid impacts keep the head at contact while the tail catches up. MovingRay.render()
       // also multiplies brightness by currentLength/maxPulseLength as the segment collapses.
-      for (const fade of engine.fxSystem.movingRayFades) {
+      for (const fade of engine.movingRayFades) {
         const len = fade.headPos.distanceTo(fade.tailPos);
         if (len <= 0.1) continue;
         const lifeBrightness = Math.max(0, Math.min(1, fade.life / fade.maxLife));

@@ -1,4 +1,4 @@
-import type { Ship } from '../../simulation/Ship';
+import type { ShipRenderState as Ship } from '../../render/ShipRenderState';
 import type { Vector2 } from '../../math/Vector2';
 import type { WebGLPassContext } from './WebGLPassContext';
 import { visualRandom } from '../RenderDeterminism';

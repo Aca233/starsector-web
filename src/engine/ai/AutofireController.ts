@@ -1,3 +1,4 @@
+import type { FireControlQueryBatch, FireControlQueryRoster } from './FireControlQueryBatch';
 import { isImmutableMetadata } from '../extensions/Immutable';
 import type { InFlightFireBudget } from './InFlightFireBudget';
 import { fireTargetUtility } from './FireTargetUtility';
@@ -18,6 +19,9 @@ import { interceptTimeComponents, shipSegmentEntry, weaponMuzzle } from './FireC
 /** One world view per combat step; no renderer/UI or single-opponent dependency. */
 export interface FireControlWorld {
   fireBudget?: InFlightFireBudget;
+  /** Valid only inside a single ship's synchronous, pre-emission aim loop. */
+  queryBatch?: FireControlQueryBatch;
+  queryRoster?: FireControlQueryRoster;
   ships: readonly Ship[];
   missiles: readonly Projectile[];
   asteroids: readonly Asteroid[];
@@ -75,7 +79,9 @@ function canTarget(ship: Ship, mount: WeaponMount, target: FireControlTarget, wo
       && !(p.isFlare && (hint(mount, 'IGNORES_FLARES') || ship.hullStats.pdIgnoresFlares > 0));
   }
   const other = target.entity;
-  if ((!knownPresent && !world.ships.includes(other)) || other.hasVastBulk || other.isDead || !other.isVisibleTo(ship.teamId) || other.isCollisionless || sameTeam(other, ship)) return false;
+  const batch = world.queryBatch?.forShip(ship, world.ships);
+  if (batch ? !batch.canTarget(other)
+    : ((!knownPresent && !world.ships.includes(other)) || other.hasVastBulk || other.isDead || !other.isVisibleTo(ship.teamId) || other.isCollisionless || sameTeam(other, ship))) return false;
   // Native private.java: PD_ONLY permits fighters only when ANTI_FTR is present.
   if (hint(mount, 'PD_ONLY') && !(hint(mount, 'ANTI_FTR') && fighter(other))) return false;
   if (fighter(other)) {
@@ -167,9 +173,12 @@ export function shotObstruction(ship: Ship, mount: WeaponMount, solution: AimSol
   origin: Vector2, angle: number, contact: Contact): 'FRIENDLY_BLOCKED' | 'OBSTACLE_BLOCKED' | null {
   const travel = Vector2.fromAngle(angle, contact.distance);
   const start = new Vector2(), end = new Vector2();
-  for (const other of world.ships) {
-    if (other === ship || other.isDead || other.isPhased || !sameTeam(other, ship)) continue;
-    if (other.assemblyRoot === ship.assemblyRoot && !other.spec.sourceHullTraits?.includes('do_not_fire_through')) continue;
+  const batch = world.queryBatch?.forShip(ship, world.ships);
+  for (const other of batch?.queryBlockers(origin, travel, solution.delay, contact.time) ?? world.ships) {
+    if (!batch) {
+      if (other === ship || other.isDead || other.isPhased || !sameTeam(other, ship)) continue;
+      if (other.assemblyRoot === ship.assemblyRoot && !other.spec.sourceHullTraits?.includes('do_not_fire_through')) continue;
+    }
     if (fighter(other) && mount.spec.passThroughFighters && !mount.spec.passThroughFightersOnlyWhenDestroyed) continue;
     const vx = ship.vel.x - other.vel.x, vy = ship.vel.y - other.vel.y;
     start.set(origin.x + vx * solution.delay, origin.y + vy * solution.delay);
@@ -244,7 +253,7 @@ export class AutofireController {
       if (point) return point;
     }
     let nearest: Vector2 | null = null, distance = Infinity;
-    for (const other of world.ships) {
+    for (const other of world.queryBatch?.forShip(ship, world.ships)?.targets() ?? world.ships) {
       // Allies can never be a tracking target. Reject them before doing the
       // per-mount distance/intercept work; preserve enemy order and tie breaks.
       if (sameTeam(other, ship)) continue;
@@ -298,7 +307,7 @@ export class AutofireController {
       }
       // Like preAim, reject allies before allocating/scanning a target. The
       // remaining hostile candidates keep their original order and validation.
-      for (const other of world.ships) if (!sameTeam(other, ship)) add({ kind: 'SHIP', entity: other });
+      for (const other of world.queryBatch?.forShip(ship, world.ships)?.targets() ?? world.ships) if (!sameTeam(other, ship)) add({ kind: 'SHIP', entity: other });
       const origin = weaponMuzzle(ship, mount);
       const autonomous = ship.fireControlMode === 'AI';
       const policyAction = shipPolicyAction(ship);
@@ -314,7 +323,8 @@ export class AutofireController {
         const traverse = Math.abs(signedAngle(s.point.clone().sub(origin).heading() - mount.currentAngleRad));
         const arrival = s.delay + (mount.spec.isBeam ? 0 : origin.distanceTo(s.point) / Math.max(1, s.speed));
         const committed = autonomous && !isPointDefense(mount) && s.target.kind === 'SHIP'
-          ? world.fireBudget?.penalty(ship, s.target.entity, arrival) ?? 0 : 0;
+          ? (world.queryBatch ? world.fireBudget?.penalty(ship, s.target.entity, arrival, world.queryBatch)
+            : world.fireBudget?.penalty(ship, s.target.entity, arrival)) ?? 0 : 0;
         const utility = autonomous && s.target.kind === 'SHIP'
           ? fireTargetUtility(ship, mount, s.target.entity, coveredByShield(s.target.entity, origin), retained,
             traverse, arrival, policyAction) - committed : 0;

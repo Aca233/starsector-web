@@ -1,4 +1,4 @@
-// Explicit synchronous reference fixture; real-worker coverage lives in check-steam-snapshot-prepare.mjs.
+// Production relay with both synchronous reference and default real preparation Worker.
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {EventEmitter} from 'node:events';
@@ -23,16 +23,16 @@ class Browser extends EventEmitter {
   message(value){this.emit('message',Buffer.from(JSON.stringify(value)),false);}
   binary(value){this.emit('message',Buffer.from(value),true);}
 }
-async function fixture(t,{hostOffer=true,oldGuest=false}={}) {
+async function fixture(t,{hostOffer=true,oldGuest=false,production=false}={}) {
   const dist=mkdtempSync(join(tmpdir(),'steam-binary-host-'));writeFileSync(join(dist,'lan-build.json'),JSON.stringify({build:'test'}));
   const mock=t.mock.method(http,'createServer',()=>new MemoryServer());let relay;
   try {relay=await createLanServer({dist,host:'127.0.0.1',port:32110});}finally{mock.mock.restore();}
   let refused=false;
   const messages=[],codec=new SteamPacketCodec({binaryStates:true});
-  const gateway=new SteamGateway({ snapshotPreparation: false,build:'test',client:{networking:{sendP2PPacket(_id,_type,packet){if(refused && packet[5]===2)return false;const m=codec.receive(hostId,packet);if(m)messages.push(m);return true;}}}});
+  const gateway=new SteamGateway({ ...(production?{}:{snapshotPreparation:false}),build:'test',client:{networking:{sendP2PPacket(_id,_type,packet){if(refused && packet[5]===2)return false;const m=codec.receive(hostId,packet);if(m)messages.push(m);return true;}}}});
   gateway.owner=hostId;gateway.initialized=true;gateway.relay=relay;
   gateway.selected={id:lobby,owner:hostId,lobby:{getMembers:()=>[hostId,guestId],getOwner:()=>hostId}};
-  t.after(async()=>{gateway.wss.close();await relay.close();unlinkSync(join(dist,'lan-build.json'));rmdirSync(dist);});
+  t.after(async()=>{await gateway.snapshotPreparer?.close();gateway.wss.close();await relay.close();unlinkSync(join(dist,'lan-build.json'));rmdirSync(dist);});
   const host=new Browser();gateway.connectBrowser(host,new URL('http://localhost/steam/ws?lobby='+lobby));
   const hello={type:'hello',name:'test',instance:'test',build:'test',protocol:protocol.version,stateCredits:1,binarySnapshots:1};
   host.message({...hello,binarySnapshots:hostOffer?1:0});
@@ -87,3 +87,65 @@ test('validated binary target is shared without reparse/re-encode; full raw fall
   f.refuse();f.host.binary(f.bytes(f.state(3)));assert.equal(f.peer.readyState,3);
   assert.equal(f.peer.snapshotSender.diagnostics().fullStates,committed);assert.equal(f.peer.snapshotSender.sender.base,null);
  });
+
+test('patch-work exhaustion defers direct/worker proposals without native bytes, receipts or base commit',async t=>{
+ const f=await fixture(t);f.host.binary(f.bytes(f.state(1)));f.receive();
+ const sent=f.peer.sentStates,base=f.peer.snapshotSender.sender.base,credits=f.peer.consumption.pending.size;
+ const original=f.peer.snapshotSender.prepare.bind(f.peer.snapshotSender);
+ f.peer.snapshotSender.prepare=(...args)=>{const c=original(...args);return{...c,choice:{...c.choice,budgetFallback:true}};};
+ f.host.binary(f.bytes(f.state(2)));assert.equal(f.peer.lastSnapshotSkip,'codec-work-budget');assert.equal(f.peer.sentStates,sent);assert.equal(f.peer.snapshotSender.sender.base,base);assert.equal(f.peer.inflight.size,0);assert.equal(f.peer.consumption.pending.size,credits);
+ f.peer.snapshotSender.prepare=original;
+ const proposal=original(JSON.stringify(f.state(3)),f.gateway.binarySnapshotEncoder,f.gateway.codec);
+ assert.equal(f.peer.send(null,null,{prepared:proposal.prepared,stateBytes:proposal.rawBytes,budgetFallback:true}),false);
+ assert.equal(f.peer.sentStates,sent);assert.equal(f.peer.snapshotSender.sender.base,base);assert.equal(f.peer.inflight.size,0);
+ f.host.binary(f.bytes(f.state(4)));assert.deepEqual(f.receive().data,f.state(4));assert.equal(f.peer.sentStates,sent+1);
+});
+
+for(const oldGuest of [false,true])test('production relay -> default real preparation Worker -> exact '+(oldGuest?'legacy':'binary')+' world uses metadata-only decode',async t=>{
+  const f=await fixture(t,{oldGuest,production:true});
+  assert.equal(f.peer.relayBinaryOnly,true);
+  const until=async predicate=>{const deadline=Date.now()+5000;while(!predicate()){assert.ok(Date.now()<deadline,'real preparation Worker timeout');await new Promise(r=>setTimeout(r,5));}};
+  for(const seq of [1,3,7]){
+    const value=f.state(seq);f.host.binary(f.bytes(value));
+    await until(()=>!f.gateway.snapshotPreparer.active&&!f.gateway.snapshotPreparer.latest&&!f.gateway.snapshotPreparer.scheduled);
+    assert.equal(f.peer.readyState,1);assert.deepEqual(f.receive().data,value);
+  }
+  assert.equal(f.room.relayDecode.metadataFrames,3);assert.equal(f.room.relayDecode.fullFrames,0);
+  assert.equal(f.peer.sentStates,3);assert.equal(f.peer.consumption.consumed,3);
+  assert.ok(f.gateway.snapshotPreparer.diagnostics().accepted>=3);
+  // Receipt/worker credits are still genuine; optimization does not clear debt.
+  assert.equal(f.peer.consumption.pending.size,0);
+});
+test('synchronous Steam fallback receives full graph and refuses a metadata-only descriptor',async t=>{
+  const f=await fixture(t,{oldGuest:true});const value=f.state(1);f.host.binary(f.bytes(value));
+  assert.deepEqual(f.receive().data,value);assert.equal(f.room.relayDecode.fullFrames,1);assert.equal(f.room.relayDecode.metadataFrames,0);
+  assert.equal(f.peer.relayBinaryOnly,false);
+  f.peer.sendSnapshot({state:{...value,frame:{tick:2}},bytes:f.bytes(value),metadataOnly:true});
+  assert.equal(f.peer.readyState,3);assert.equal(f.peer.sentStates,1);
+});
+
+for (const oldGuest of [false, true]) test('direct authority I/O uses real Steam preparation Worker and '+(oldGuest?'legacy':'binary')+' guest without host renderer forwarding', async t => {
+  const {AuthorityIoBridge} = await import('../src/network/AuthorityIoBridge.mjs');
+  const f=await fixture(t,{production:true,oldGuest}),received=[];
+  const port={onmessage:null,start(){},postMessage:m=>received.push(m),close(){}};
+  const bridge=new AuthorityIoBridge({buffered:()=>0,send:data=>typeof data==='string'?f.host.message(JSON.parse(data)):f.host.binary(data)});
+  t.after(()=>bridge.close());bridge.attach(port,f.room.match.id,1);
+  const original=f.host.send.bind(f.host);f.host.send=text=>{if(!bridge.observe(text))original(text);};
+  bridge.observe(JSON.stringify({type:'launch',matchId:f.room.match.id}));
+  const until=async fn=>{for(let i=0;i<500;i++){if(fn())return;await new Promise(r=>setTimeout(r,5));}throw Error('Steam direct Worker timeout');};
+  for(let tick=1;tick<=3;tick++) {
+    const before=f.peer.sentStates, frame=f.state(tick), binary=encodeProjectedBinaryFrame(frame.frame).buffer;
+    port.onmessage({data:{type:'snapshot',tick,binary,bytes:binary.byteLength}});
+    await until(()=>f.peer.sentStates>before);assert.deepEqual(f.receive().data,frame);
+    if(tick===1){
+      for(const [i,send] of [[0,m=>f.host.message(m)],[1,m=>f.guest(m)]])send({type:'sync-ready',matchId:f.room.match.id,syncId:f.room.peers[i].sync.id,tick});
+      assert.ok(f.room.peers.every(p=>p.loaded));
+      f.guest({type:'input',matchId:f.room.match.id,syncId:f.room.peers[1].sync.id,input:{seq:1,keys:0,aim:[10,20],firing:false,pointerActive:true,actions:[]}});
+      assert.ok(received.some(m=>m.type==='input'&&m.seat===1&&m.input.seq===1));
+    }
+  }
+  assert.equal(received.filter(m=>m.type==='io-snapshot'&&m.delivery==='sent').length,3);
+  assert.equal(f.peer.lastSnapshot.format,oldGuest?'delta':'binary-delta');
+  assert.equal(f.peer.consumption.pending.size,0);
+  assert.ok(f.gateway.snapshotPreparer.diagnostics().accepted>=3);
+});

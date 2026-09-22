@@ -1,3 +1,4 @@
+import { selectThreatFacing } from './ShieldThreatSector';
 import { remainingProjectileLifetime } from '../simulation/systems/weapon/SourceMissileLifecycle';
 import { sameTeam, combatTeam } from "../simulation/CombatTeams";
 import { Vector2 } from '../math/Vector2';
@@ -52,10 +53,11 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
       direction:Math.atan2(origin.y-center.y,origin.x-center.x)});
   };
   const projectiles = world.projectileThreatIndex?.query(world.projectiles, ship, center, radius, horizon) ?? world.projectiles;
+  const lifetimeOf = world.projectileLifetime ?? remainingProjectileLifetime;
   for (const p of projectiles) {
     const owner = combatTeam(p) ?? world.ships.find(s => s.id === p.sourceShipId)?.teamId;
     if (owner === undefined || owner === ship.teamId || p.isFlare || p.isDisarmed || p.collisionDisabled || p.didDamage || !(p.damage > 0)) continue;
-    const lifetime = Math.min(horizon, remainingProjectileLifetime(p));
+    const lifetime = Math.min(horizon, lifetimeOf(p));
     if (!(lifetime > 0)) continue;
     const endX = p.pos.x+(p.vel.x-ship.vel.x)*lifetime;
     const endY = p.pos.y+(p.vel.y-ship.vel.y)*lifetime;
@@ -80,7 +82,8 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
     add('PROJECTILE',p.sourceShipId,eta,p.damage,p.damageType,p.pos);
   }
   const activeBeams = new Set<string>();
-  for (const b of world.beams) {
+  const beams = world.beamThreatIndex?.query(world.beams, world.ships, ship, center, radius) ?? world.beams;
+  for (const b of beams) {
     const source = world.ships.find(s=>s.id===b.sourceShipId);
     if (!source || sameTeam(source, ship) || source.isDead || b.damageActive===false || b.duration<=0) continue;
     if (segmentCircleEntry(b.startPos,b.endPos,center,radius) === null) continue;
@@ -193,21 +196,23 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
   // Pick the shield sector covering the largest weighted threat, not the fleet's attack target.
   let facing: number|null = null, best = -1;
   const halfArc = ship.shield.maxArcDeg*Math.PI/360;
-  const weights = imminent.map(t => t.shieldFlux / (1 + t.eta));
-  for (const candidate of imminent) {
-    let weight = 0;
-    // Preserve accumulation order and ties without an array per candidate sector.
-    for (let i = 0; i < imminent.length; i++) {
-      const difference = imminent[i].direction - candidate.direction;
-      const absolute = Math.abs(difference), separation = absolute <= Math.PI ? absolute : Math.PI * 2 - absolute;
-      // Directions come from atan2. Away from the boundary, a wrapped difference
-      // gives the same predicate without three transcendental calls per pair.
-      // Keep original evaluation at rounding-sensitive seams and exceptional inputs.
-      const covered = absolute <= Math.PI * 2 && Math.abs(separation - halfArc) > 1e-12
-        ? separation <= halfArc : Math.abs(signedAngle(difference)) <= halfArc;
-      if (covered) weight += weights[i];
+  if (imminent.length >= 128) {
+    facing = selectThreatFacing(imminent, halfArc);
+  } else {
+    // Keep the established small-set loop in the caller's hot path. The sorted
+    // sector kernel only pays for itself with dense incoming threat sets.
+    const weights = imminent.map(t => t.shieldFlux / (1 + t.eta));
+    for (const candidate of imminent) {
+      let weight = 0;
+      for (let i = 0; i < imminent.length; i++) {
+        const difference = imminent[i].direction - candidate.direction;
+        const absolute = Math.abs(difference), separation = absolute <= Math.PI ? absolute : Math.PI * 2 - absolute;
+        const covered = absolute <= Math.PI * 2 && Math.abs(separation - halfArc) > 1e-12
+          ? separation <= halfArc : Math.abs(signedAngle(difference)) <= halfArc;
+        if (covered) weight += weights[i];
+      }
+      if (weight>best) { best=weight;facing=candidate.direction; }
     }
-    if (weight>best) { best=weight;facing=candidate.direction; }
   }
   let imminentDamage = 0, imminentShieldFlux = 0, actualDamage = 0, earliest = Infinity;
   for (const t of threats) {

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Ship } from '../../engine/simulation/Ship';
+import type { HudShip as Ship } from '../../engine/runtime/CombatHudView';
 import { getCachedImage } from './hudUtils';
 import { drawShipDamageDecals, shipLocalToSpritePixel } from '../../engine/render/ShipDamageVisuals';
 
@@ -70,7 +70,7 @@ export const ShipPaperDoll: React.FC<ShipPaperDollProps> = ({ ship, isEnemy = fa
 
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
-          const val = armor.getCell(c, r);
+          const val = armor.cells[r * armor.cols + c];
           const ratio = Math.min(1.0, Math.max(0, val / armor.maxCellArmor));
 
           let fillColor: string;
@@ -86,7 +86,7 @@ export const ShipPaperDoll: React.FC<ShipPaperDollProps> = ({ ship, isEnemy = fa
             fillColor = 'rgba(15, 20, 25, 0.9)';
           }
 
-          const localCenter = armor.getCellCenterLocal(c, r);
+          const localCenter = {x: armor.minX + (c + .5) * armor.cellWidth, y: armor.minY + (r + .5) * armor.cellHeight};
           const spriteCenter = shipLocalToSpritePixel(ship.spec, localCenter);
           const cx = spriteCenter.x * scaleX;
           const cy = spriteCenter.y * scaleY;

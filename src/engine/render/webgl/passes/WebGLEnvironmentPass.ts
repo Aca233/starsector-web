@@ -1,4 +1,4 @@
-import { CombatEngine } from '../../../simulation/CombatEngine';
+import type { CombatRenderView } from '../../CombatRenderView';
 import { NEBULA_SPRITE_SIZE } from '../../../simulation/systems/NebulaSystem';
 import { Vector2 } from '../../../math/Vector2';
 import { VisualRandom } from '../../../runtime/VisualRandom';
@@ -35,13 +35,13 @@ export class WebGLEnvironmentPass {
     }
   }
 
-  public renderBackground(ctx: WebGLPassContext, actualCam: Vector2, environment: CombatEngine['environment']): void {
+  public renderBackground(ctx: WebGLPassContext, actualCam: Vector2, environment: CombatRenderView['environment']): void {
     const { batcher, textures, whiteTex, viewport, canvas, zoom } = ctx;
 
     batcher.setBlendMode('NORMAL');
     if (environment.backgroundUrl) {
       const info = textures.getTextureInfo(environment.backgroundUrl);
-      // CombatEngine.replaceBackground only enlarges images to cover the screen;
+      // CombatRenderView.replaceBackground only enlarges images to cover the screen;
       // CombatState.renderBG uses a separate, unzoomed projection. Convert those
       // pixel dimensions into world coordinates here so camera/zoom cancel out.
       const cover = Math.max(1, canvas.width / Math.max(1, info.width), canvas.height / Math.max(1, info.height));
@@ -65,7 +65,7 @@ export class WebGLEnvironmentPass {
     }
   }
 
-  public renderNebulae(engine: CombatEngine, ctx: WebGLPassContext): void {
+  public renderNebulae(engine: CombatRenderView, ctx: WebGLPassContext): void {
     const { batcher, textures } = ctx;
     // terrain/A.renderBelow: white modulation, SRC_ALPHA/ONE_MINUS_SRC_ALPHA.
     // Cloud.render: one unrotated 4x4 atlas tile, 312.5 world units at smallClouds.
@@ -81,7 +81,7 @@ export class WebGLEnvironmentPass {
     }
   }
 
-  public renderAsteroids(engine: CombatEngine, ctx: WebGLPassContext): void {
+  public renderAsteroids(engine: CombatRenderView, ctx: WebGLPassContext): void {
     const { batcher, textures } = ctx;
     batcher.setBlendMode('NORMAL');
     for (const asteroid of engine.asteroids) {

@@ -50,7 +50,7 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
   const [connection] = useState(() => new LanConnection(transport));
   useEffect(() => connection.subscribe(message => {
     if (['welcome', 'reconnecting', 'disconnected', 'page-visibility', 'error', 'ended', 'left', 'roomClosed'].includes(message.type)) {
-      recordNetworkDiagnostic({ event: message.type, transport, connected: connection.ready,
+      recordNetworkDiagnostic({ event: message.type, transport, connected: connection.ready, features: connection.networkFeatures,
         hidden: document.visibilityState === 'hidden' });
     }
   }), [connection, transport]);

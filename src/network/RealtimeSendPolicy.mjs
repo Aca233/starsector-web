@@ -20,26 +20,28 @@ export function submitRealtimeInput({ canSend, takeBudget, createInput, send, ac
   accepted(input);
   return true;
 }
-// One fresh input and snapshot may share a batch, in either callback order.
-// Otherwise a consistently first producer could starve the other forever.
-// The one-shot companion allowance expires after one simulation interval. A
-// trailing send consumes it without granting another: no alternating FIFO.
+// One fresh input, critical pose and full snapshot may share a bounded batch.
+// Each kind is admitted at most once, in any order, within one simulation tick.
+// Consuming a companion NEVER grants another allowance or extends its deadline.
 export class RealtimeSendGate {
-  #tailKind = null;
-  #tailUntil = -Infinity;
+  #remaining = null;
+  #until = -Infinity;
   #canSend(kind, bufferedAmount, now) {
     if (realtimeWritable(bufferedAmount)) { this.reset(); return true; }
-    return Number.isFinite(bufferedAmount) && bufferedAmount > 0 &&
-      this.#tailKind === kind && Number.isFinite(now) && now <= this.#tailUntil;
+    return Number.isFinite(bufferedAmount) && bufferedAmount > 0 && Number.isFinite(now) &&
+      now <= this.#until && this.#remaining?.has(kind) === true;
   }
   #sent(kind, now) {
-    if (this.#tailKind === kind || !Number.isFinite(now)) { this.reset(); return; }
-    this.#tailKind = kind === 'input' ? 'snapshot' : 'input';
-    this.#tailUntil = now + 1000 / 60;
+    if (!Number.isFinite(now)) { this.reset(); return; }
+    if (this.#remaining !== null) { this.#remaining.delete(kind); return; }
+    this.#remaining = new Set(['input', 'motion', 'snapshot']); this.#remaining.delete(kind);
+    this.#until = now + 1000 / 60;
   }
+  canSendMotion(bufferedAmount, now) { return this.#canSend('motion', bufferedAmount, now); }
+  motionSent(now) { this.#sent('motion', now); }
   canSendSnapshot(bufferedAmount, now) { return this.#canSend('snapshot', bufferedAmount, now); }
   snapshotSent(now) { this.#sent('snapshot', now); }
   canSendInput(bufferedAmount, now) { return this.#canSend('input', bufferedAmount, now); }
   inputSent(now) { this.#sent('input', now); }
-  reset() { this.#tailKind = null; this.#tailUntil = -Infinity; }
+  reset() { this.#remaining = null; this.#until = -Infinity; }
 }

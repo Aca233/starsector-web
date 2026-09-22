@@ -1,0 +1,5 @@
+import {build} from 'esbuild';import fs from 'node:fs';import path from 'node:path';import crypto from 'node:crypto';import {pathToFileURL} from 'node:url';import {scannerCodecPlugin} from './lib/scanner-codec-test.mjs';
+const out=path.resolve(process.env.SCANNER_OUT??'artifacts/network-stream-20260921/phase30/scanner-benchmark');fs.mkdirSync(out,{recursive:true});const outfile=path.join(out,'benchmark.mjs');
+const r=await build({entryPoints:['scripts/benchmark-snapshot-scanner.mts'],outfile,bundle:true,platform:'node',format:'esm',packages:'external',plugins:[scannerCodecPlugin],metafile:true,define:{__LAN_BUILD_ID__:'"native-projectile-benchmark"','import.meta.env':'{"BASE_URL":"/","DEV":false,"VITE_LAN_AI_WORKERS":"false"}'},logLevel:'warning'});
+if(Object.keys(r.metafile.inputs).some(p=>/(^|\/)campaign(\/|\.)/.test(p)))throw Error('Campaign import');fs.writeFileSync(path.join(out,'source.json'),JSON.stringify({sha256:crypto.createHash('sha256').update(fs.readFileSync(outfile)).digest('hex'),inputs:r.metafile.inputs},null,2));
+await import(pathToFileURL(outfile).href);

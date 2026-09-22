@@ -1,7 +1,7 @@
 import { getGraphicsSettings } from '../../../runtime/GraphicsSettings';
 import { nativeMineSpec } from '../../../extensions/NativeMines';
 import { visualRandom, visualObjectRandom } from '../../RenderDeterminism';
-import { CombatEngine } from '../../../simulation/CombatEngine';
+import type { CombatRenderView } from '../../CombatRenderView';
 import { WebGLPassContext } from '../WebGLPassContext';
 import { Vector2 } from '../../../math/Vector2';
 import { getExplosionVisualProfile } from '../../../visual/VisualProfiles';
@@ -20,7 +20,7 @@ import { hitParticleDuration } from '../../../visual/ExplosionVisuals';
  */
 export class WebGLFXPass {
   public render(
-    engine: CombatEngine,
+    engine: CombatRenderView,
     ctx: WebGLPassContext,
     nowSec: number,
     _enemyPos: Vector2,
@@ -150,13 +150,14 @@ export class WebGLFXPass {
     }
 
     // 6. 通用现代粒子层：按材质分组以减少纹理/Blend 切换，并让火花、辉光、烟尘拥有不同的形状语义。
-    if (detail && renderExplosionLayer && engine.particles && engine.particles.length > 0) {
+    const localParticles = engine.localParticles;
+    if (detail && renderExplosionLayer && (engine.particles.length > 0 || localParticles.length > 0)) {
       const sparkTex = textures.getTexture('/game-assets/graphics/fx/particlealpha32sq.png');
       const smokeTex = textures.getTexture('/game-assets/graphics/fx/contrail64b.png');
 
       // 6.1 柔光能量团：单独成批，避免和高速火花来回切 hit_glow 纹理。
       batcher.setBlendMode('ADDITIVE');
-      for (const part of engine.particles) {
+      for (const particles of [engine.particles, localParticles]) for (const part of particles) {
         if (part.material !== 'GLOW' || part.alpha <= 0.001) continue;
         const [r, g, b] = part.color;
         const size = part.size * 2.15;
@@ -165,7 +166,7 @@ export class WebGLFXPass {
 
       // 6.2 火花/旧粒子：高速粒子沿速度方向拉伸，并叠一条更细的白热芯。
       // 这比增加粒子数量更能提升细节，同时仍保持一个纹理批次。
-      for (const part of engine.particles) {
+      for (const particles of [engine.particles, localParticles]) for (const part of particles) {
         if (part.material === 'GLOW' || part.material === 'SMOKE' || part.alpha <= 0.001) continue;
         const [r, g, b] = part.color;
         if (part.material === 'SPARK') {
@@ -185,7 +186,7 @@ export class WebGLFXPass {
 
       // 6.3 烟尘使用 source-over；生命周期曲线已经在 CombatFXSystem 中完成，渲染层只负责批量采样。
       batcher.setBlendMode('NORMAL');
-      for (const part of engine.particles) {
+      for (const particles of [engine.particles, localParticles]) for (const part of particles) {
         if (part.material !== 'SMOKE' || part.alpha <= 0.001) continue;
         const [r, g, b] = part.color;
         batcher.drawSprite(smokeTex, part.pos.x, part.pos.y, part.size, part.size, part.rotation ?? 0, 0, 0, r / 255, g / 255, b / 255, part.alpha);

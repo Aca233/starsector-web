@@ -105,3 +105,79 @@ test('array fast decoding keeps preflight bounds, unsupported-tag, depth and saf
   const malformed = framed([0x93, 1, 0xa1, 0xff, 2]);
   assert.deepEqual(decodeBinaryFrame(malformed), reference(malformed));
 });
+
+// SWF3 is a deliberate protocol extension, not permission for arbitrary blobs.
+import { PackedSnapshotNumbers } from '../src/network/PackedSnapshotNumbers.mjs';
+import { encodeBinaryFrame, encodeBinaryState, decodeBinaryStateForRelay, ProjectionEncodingCache } from '../src/network/BinarySnapshot.mjs';
+import { SnapshotTapeWriter, readSnapshotTape } from '../src/network/SnapshotTape.mjs';
+const jsonShape = value => JSON.parse(JSON.stringify(value));
+const numericFrame = numbers => ({tick:1,ships:[{id:'s',state:{teamId:0,armor:{$typed:numbers.type,values:numbers}}}],crafts:[],craftSpecs:[],world:{}});
+test('packed native numbers preserve all widths, subviews, JSON/tape fallback and byte ownership', () => {
+  for (const Type of [Float32Array,Float64Array,Uint8Array,Uint8ClampedArray,Uint16Array,Uint32Array,Int8Array,Int16Array,Int32Array]) {
+    for (const length of [0,1,17,17000]) {
+      const native = new Type(length + 2);
+      for (let i=0;i<native.length;i++) native[i]=i%2 ? -(i+1)/7 : (i+1)*13.25;
+      const values=PackedSnapshotNumbers.capture(native.subarray(1,length+1)), frame=numericFrame(values), expected=jsonShape(frame);
+      const bytes=encodeProjectedBinaryFrame(frame,true); assert.equal(bytes[3],51);
+      assert.deepEqual(bytes,encodeProjectedBinaryFrame(frame,false));
+      assert.equal(encodeBinaryFrame(frame),null,'generic entry retains JSON fallback');
+      const decoded=decodeBinaryFrame(bytes);
+      assert.deepEqual(jsonShape(decoded),expected);
+      assert.deepEqual(jsonShape(readSnapshotTape(new SnapshotTapeWriter().encode(frame))),expected);
+      native.fill(0); bytes.fill(0); assert.deepEqual(jsonShape(frame),expected); assert.deepEqual(jsonShape(decoded),expected);
+      assert.equal(encodeProjectedBinaryFrame(new Type(2)),null,'unmarked raw views remain unsupported');
+    }
+  }
+  for(const Type of [Float32Array,Float64Array]){
+    assert.equal(PackedSnapshotNumbers.capture(new Type([NaN])),null);
+    assert.equal(PackedSnapshotNumbers.capture(new Type([Infinity])),null);
+    assert.equal(Object.is(PackedSnapshotNumbers.capture(new Type([-0])).numbers[0],-0),false);
+  }
+});
+test('packed fragments retain their wire revision on reuse and relay skips only validated blocks',()=>{
+  const frame=numericFrame(PackedSnapshotNumbers.capture(new Float32Array([.25,1024.5])));
+  const cache=new ProjectionEncodingCache(frame), first=encodeProjectedBinaryFrame(frame,true,cache);
+  const second=encodeProjectedBinaryFrame({...frame,sounds:[]},true,cache); assert.ok(cache.hits>0); assert.equal(second[3],51);
+  assert.deepEqual(jsonShape(decodeBinaryFrame(second)),jsonShape({...frame,sounds:[]}));
+  const relay=decodeBinaryStateForRelay(encodeBinaryState('packed',1,first));
+  assert.deepEqual(relay.frame.ships,[{id:'s',state:{teamId:0}}]);
+  const downgraded=first.slice();downgraded[3]=50;assert.throws(()=>decodeBinaryFrame(downgraded),/Unsupported/);
+});
+test('all decode paths reject malformed numeric blocks, including skipped relay fields',()=>{
+  const payload=PackedSnapshotNumbers.capture(new Float64Array([1.25])).bytes;
+  const wrap=block=>Buffer.concat([Buffer.from('SWF3'),new Encoder().encode({world:{ignored:block}})]);
+  const invalid=[];
+  const type=payload.slice();type[0]=255;invalid.push(type);
+  const reserved=payload.slice();reserved[1]=1;invalid.push(reserved);
+  const nan=payload.slice();new DataView(nan.buffer).setFloat64(8,NaN,true);invalid.push(nan);
+  invalid.push(payload.slice(0,-1),payload.slice(0,7),new Uint8Array());
+  for(const data of invalid){const bytes=wrap(data);assert.throws(()=>decodeBinaryFrame(bytes));assert.throws(()=>decodeBinaryStateForRelay(encodeBinaryState('bad',1,bytes)));}
+  for(const bytes of [Buffer.from([83,87,70,51,0xc6,255,255,255,255]),wrap(payload).subarray(0,-1)]){
+    assert.throws(()=>decodeBinaryFrame(bytes));assert.throws(()=>decodeBinaryStateForRelay(encodeBinaryState('bad',1,bytes)));
+  }
+  // Short invalid UTF8 takes the pinned decoder's fallback, still restoring blocks.
+  const malformed=Buffer.concat([Buffer.from('SWF3'),Buffer.from([0x82,0xa1,0xff,0xc0]),new Encoder().encode('values'),new Encoder().encode(payload)]);
+  assert.ok(decodeBinaryFrame(malformed).values instanceof PackedSnapshotNumbers);
+});
+
+import {readPackedNumbers,packedNumberCacheStats} from '../src/network/PackedSnapshotNumbers.mjs';
+test('component numeric cache is immutable, bounded and validates hash collisions',()=>{
+ const values=new Float32Array(64).fill(.25),raw=PackedSnapshotNumbers.capture(values).bytes;
+ const first=readPackedNumbers(raw),second=readPackedNumbers(raw.slice());assert.equal(second,first);
+ const original=first.toJSON();first.numbers.fill(0);first.bytes.fill(0);raw.fill(0);
+ assert.deepEqual(first.toJSON(),original,'inspectors never expose retained storage');
+ const copied=new Float32Array(64),wireCopy=new Uint8Array(first.byteLength);
+ copied.set=wireCopy.set=()=>assert.fail('overridden copy target must not receive private storage');
+ first.copyNumbersTo(copied);first.copyBytesTo(wireCopy,0);
+ assert.deepEqual(Array.from(copied),original);assert.deepEqual(Array.from(wireCopy),Array.from(first.bytes));
+ assert.throws(()=>first.copyNumbersTo({set:()=>assert.fail('untrusted target')}),TypeError);
+ assert.throws(()=>first.copyBytesTo({set:()=>assert.fail('untrusted target')},0),TypeError);
+ const valid=first.bytes,bad=valid.slice();new DataView(bad.buffer).setFloat32(16,NaN,true);
+ assert.throws(()=>readPackedNumbers(bad),/Invalid/,'same sparse hash is not trusted');
+ assert.equal(readPackedNumbers(valid),first,'failed validation cannot poison a valid cache entry');
+ const frame=numericFrame(first),a=decodeBinaryFrame(encodeProjectedBinaryFrame(frame,true)),b=decodeBinaryFrame(encodeProjectedBinaryFrame(frame,true));
+ assert.equal(a.ships[0].state.armor.values,b.ships[0].state.armor.values);
+ for(let i=0;i<180;i++)readPackedNumbers(PackedSnapshotNumbers.capture(new Uint8Array(40000+i).fill(i)).bytes);
+ const stats=packedNumberCacheStats();assert.ok(stats.entries<=128&&stats.bytes<=4*1024*1024);assert.ok(stats.hits>0);
+ assert.deepEqual(first.toJSON(),original,'eviction does not alter live frames');
+});

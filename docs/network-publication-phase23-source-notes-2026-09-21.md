@@ -1,0 +1,14 @@
+# Phase23 source notes — local publication completion and small-state scheduling
+
+Scope: shared LAN/Steam host Worker scheduling and its private authenticated I/O bridge. No gameplay, UI, simulation rate, remote ACK, receiver credit, wire format, campaign or OS/n2n changes.
+
+Evidence → change → validation:
+- Phase22 measured physics ~60/s but complete publications 35–39/s; local I/O return receipt processing ~12ms while actual I/O service ~0.44ms. The `directInFlight` mailbox is held by authority event-loop receipt handling, not by remote consumption. Add an optional per-port atomic completion journal. Poll only exact completed tick; retain ordinary MessagePort receipts as wakeups/fallback. No increased publication window, queues, speculative ACKs or stronger delivery claim.
+- `host.worker.ts:step` currently emits motion/critical state after synchronous complete capture/encode and after catch-up. Publish small-state at completed fixed-step boundaries before expensive complete capture, honoring its existing held credit. Physics remains 1/60 with six-step catch-up bound; never read a half-mutated engine.
+- `CombatSnapshot.ts` already omits static specs and simulation-only fields; `LanDeltaTransport` already uses lossless byte references. Do not introduce a second speculative low-frequency protocol or drop fields. Any additional codec optimization must preserve byte-exact reconstruction and be measured separately.
+
+Native boundary: Starsector has no corresponding LAN/Steam synchronization protocol in the local decompiled API. This is transport scheduling only. Existing authoritative simulation, visuals, sounds and inputs are unchanged; original desktop operation is neither needed nor authorized. See Phase22 source notes/report and the frozen browser evidence for measured baseline.
+
+Validation required: exact snapshot bytes/sounds; shared journal validity, stale port, teardown, delayed/duplicate messages, terminal barriers, sequence high-water, no-SAB fallback; priority order and unchanged physics; headless actual five-player paired runs with rendering, plus stall/reconnect. Source-only results are not an installed release or real n2n/Steam multi-machine certification.
+
+Additional selected slice: eliminate repeat encoding of immutable presentation subtrees when display/network consume the SAME retained capture. `capturedFrame` already provides exact-tick/engine invalidation; the codec can retain bounded encoded root fragments under that same lifetime. Metadata/sounds are always freshly encoded. Output must remain byte-for-byte SWF2, not a new inter-frame baseline, reduced visual fidelity, or a claimed WAN bandwidth saving. Tests must transfer the first output and prove the retained fragments are still valid, and prove next-tick/changed-body invalidation. Expensive complete capture/first encode remain on authority; this is not full off-thread serialization.

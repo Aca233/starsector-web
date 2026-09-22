@@ -4,7 +4,7 @@ type RecordValue = Record<string, unknown>;
 const record = (value: unknown): RecordValue => value !== null && typeof value === "object" && !Array.isArray(value) ? value as RecordValue : {};
 const num = (value: unknown, digits = 0) => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value.toFixed(digits) : "未知";
 const kb = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0 ? (value / 1024).toFixed(1) + " KiB" : "未知";
-const reasons: Record<string, string> = { "disconnected": "已断开", "frame-window": "等待网络 ACK（帧数）", "wire-byte-window": "等待网络 ACK（字节）", "renderer-consumption": "等待客机接纳状态", "shared-uplink-window": "共享上行额度不足" };
+const reasons: Record<string, string> = { "disconnected": "已断开", "frame-window": "等待网络 ACK（帧数）", "wire-byte-window": "等待网络 ACK（字节）", "renderer-consumption": "等待客机接纳状态", "shared-uplink-window": "共享上行额度不足", "codec-work-budget": "差分计算预算用尽，等待最新状态" };
 const reason = (value: unknown) => value == null ? "无" : typeof value === "string" && Object.hasOwn(reasons, value) ? reasons[value] : "未知";
 function NativeQueue({ value }: { value: unknown }) {
   const s = record(value);

@@ -1,19 +1,21 @@
+import type { CombatControlCommand } from '../../engine/runtime/CombatControl';
+import type { CommandResult } from '../../engine/runtime/CombatCommands';
 import { sameTeam } from "../../engine/simulation/CombatTeams";
 import { useEffect, useRef, useState, type MutableRefObject, type RefObject } from 'react';
-import type { CombatEngine } from '../../engine/simulation/CombatEngine';
+import type { TacticalMapSource, TacticalMapView, MapContact, MapPoint } from '../../engine/runtime/TacticalMapView';
 import type { TacticalOrder } from '../../engine/simulation/CombatTypes';
 import { Vector2 } from '../../engine/math/Vector2';
 import { i18n } from '../../engine/i18n/LocalizationManager';
 import { runtimeAssetUrl } from '../../engine/runtime/RuntimePaths';
 import { TacticalCommandDock, type TacticalAction, type TacticalActionGroup } from './TacticalCommandDock';
 import { TacticalShipStatus } from './TacticalShipStatus';
-import { tacticalContactVisible, tacticalObservers } from './TacticalVisibility';
 import { NativeBitmapText } from '../NativeBitmapText';
 import { fitTacticalView, mapWorld, pickMapShip, TacticalMapPainter, zoomTacticalView } from './TacticalMapPainter';
 import './tactical-map.css';
 
 export interface TacticalMapProps {
-  engine: CombatEngine;
+  source: TacticalMapSource;
+  onControl: (command: CombatControlCommand) => CommandResult | Promise<CommandResult>;
   paused: boolean;
   onPausedChange: (paused: boolean) => void;
   autopilot: boolean;
@@ -29,73 +31,96 @@ export interface TacticalMapProps {
   canvasRef?: RefObject<HTMLCanvasElement | null>;
 }
 const asset = (name: string) => runtimeAssetUrl('graphics/warroom/' + name + '.png');
-const nameOf = (ship: CombatEngine['playerShip']) => i18n.t(ship.spec.nameKey);
+const nameOf = (ship: MapContact) => i18n.t(ship.spec.nameKey);
 
+const vector = (p: MapPoint) => new Vector2(p.x, p.y);
 export function TacticalMap(props: TacticalMapProps) {
-  const { engine, paused, onPausedChange, autopilot, onAutopilotChange, inputBlocked } = props;
+  const [, refresh] = useState(0);
+  useEffect(() => { const timer = window.setInterval(() => refresh(value => value + 1), 100); return () => window.clearInterval(timer); }, [props.source]);
+  const snapshot = props.source.read();
+  return snapshot.map && snapshot.available ? <TacticalMapContent key={snapshot.generation} {...props} map={snapshot.map} generation={snapshot.generation} refreshRead={() => refresh(value => value + 1)} /> : null;
+}
+function TacticalMapContent(props: TacticalMapProps & { map: TacticalMapView; generation: number; refreshRead: () => void }) {
+  const { source, map, generation, paused, onPausedChange, autopilot, onAutopilotChange, inputBlocked } = props;
   const rootRef = useRef<HTMLElement>(null);
   const mapRef = useRef<HTMLCanvasElement>(null);
   const live = useRef(props);
   useEffect(() => { live.current = props; });
-  const view = useRef(fitTacticalView(engine));
+  const view = useRef(fitTacticalView(map));
+  const displayed = useRef(map);
   const hover = useRef<string | null>(null);
   const drag = useRef<{ id: number; x: number; y: number; center: Vector2; moved: boolean } | null>(null);
-  const sequence = useRef(0);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [message, setMessage] = useState('');
   const [inspectedId, setInspectedId] = useState<string | null>(null);
   const inspectedRef = useRef<string | null>(null);
   const [showInfo, setShowInfo] = useState(false);
   useEffect(() => { inspectedRef.current = inspectedId; }, [inspectedId]);
   useEffect(() => { if (!message) return; const timer = window.setTimeout(() => setMessage(''), 4500); return () => window.clearTimeout(timer); }, [message]);
-  const [, refresh] = useState(0);
-  const [span, setSpan] = useState(() => fitTacticalView(engine).span);
-  const invalidate = () => { setSpan(view.current.span); refresh(tick => tick + 1); };
-  const observers = tacticalObservers(engine);
-  const living = engine.capitalShips.filter(ship => tacticalContactVisible(ship, observers, engine.playerShip.teamId, engine.openBattlefield));
-  const friendly = living.filter(ship => sameTeam(ship,engine.playerShip));
-  const inspected = living.find(ship => ship.id === (inspectedId ?? engine.selectedUnitId));
-  const selected = engine.selectedUnitId;
+  const [span, setSpan] = useState(() => fitTacticalView(map).span);
+  const invalidate = () => { setSpan(view.current.span); props.refreshRead(); };
+  const living = map.capitalShips;
+  const friendly = living.filter(ship => sameTeam(ship,map.playerShip));
+  const inspected = living.find(ship => ship.id === (inspectedId ?? map.selectedUnitId));
+  const selected = map.selectedUnitId;
   const hasSelection = selected === 'fleet' ? friendly.length > 0 : friendly.some(ship => ship.id === selected);
 
-  const retreat = async(full=false)=>{
-    const ids=friendly.filter(s=>!s.retreating&&(full||selected==='fleet'||s.id===selected)).map(s=>s.id);
-    try{if(props.onRetreat)await props.onRetreat(ids,full);else engine.deployment.requestRetreat(ids,engine.playerShip.teamId,full);setMessage('撤退指令已确认；舰船驶离本方边缘后释放部署点。');}catch(e){setMessage(e instanceof Error?e.message:String(e));}
-  };
-  const fullAssault = engine.orders.get('fleet')?.type === 'ASSAULT';
-  const close = () => { engine.toggleTacticalMap(); props.onClosed?.(); props.canvasRef?.current?.focus({ preventScroll: true }); };
-  const selectFleet = () => { engine.selectUnit('fleet'); setInspectedId(null); invalidate(); };
-  const fit = () => { view.current = fitTacticalView(engine, mapRef.current?.clientWidth, mapRef.current?.clientHeight); invalidate(); };
-  const cancel = () => {
-    if(props.readOnlyCommands)return;
-    if (!hasSelection || !selected) return;
-    // A fleet order is owned by the fleet. Do not pretend a per-ship cancellation removes it.
-    if (!engine.orders.has(selected) && engine.orders.has('fleet')) {
-      setMessage('该舰正在执行全舰指令；按 A 选择全舰后取消。'); return;
+  // The view submits intent only. A rejected/delayed acknowledgement cannot be
+  // presented as success or mutate a display replica. Inline acknowledgements stay synchronous.
+  const dispatch = (command: CombatControlCommand, accepted?: () => void) => {
+    if (inputBlocked) return;
+    if (props.readOnlyCommands && (command.kind !== 'tactical' || !['select', 'close'].includes(command.command.action))) {
+      setMessage('联机地图仅提供观察、增援和撤退；战术指令尚未接入主机。'); return;
     }
-    engine.cancelOrder(selected); setMessage('已取消指令，不消耗或返还指挥点。'); invalidate();
+    const current = () => mounted.current && live.current.source === source && source.read().generation === generation;
+    const complete = (result: CommandResult) => {
+      if (!current()) return;
+      if (result.accepted) accepted?.(); else setMessage(result.reason ?? '指令未获确认。');
+      invalidate();
+    };
+    const failed = (error: unknown) => { if (current()) setMessage(error instanceof Error ? error.message : String(error)); };
+    try {
+      const result = props.onControl(command);
+      if (result instanceof Promise) void result.then(complete, failed); else complete(result);
+    } catch (error) { failed(error); }
+  };
+  const retreat = async (full = false) => {
+    const ids = friendly.filter(s => !s.retreating && (full || selected === 'fleet' || s.id === selected)).map(s => s.id);
+    const confirmed = () => setMessage('撤退指令已确认；舰船驶离本方边缘后释放部署点。');
+    if (!props.onRetreat) { dispatch({ kind: 'tactical', command: { action: 'retreat', unitIds: ids, full } }, confirmed); return; }
+    try { await props.onRetreat(ids, full); if (mounted.current && live.current.source === source && source.read().generation === generation) confirmed(); }
+    catch (error) { if (mounted.current && live.current.source === source && source.read().generation === generation) setMessage(error instanceof Error ? error.message : String(error)); }
+  };
+  const fullAssault = map.orders.fleet?.type === 'ASSAULT';
+  const close = () => dispatch({ kind: 'tactical', command: { action: 'close' } }, () => { props.onClosed?.(); props.canvasRef?.current?.focus({ preventScroll: true }); });
+  const selectFleet = () => dispatch({ kind: 'tactical', command: { action: 'select', unitId: 'fleet' } }, () => setInspectedId(null));
+  const fit = () => { view.current = fitTacticalView(map, mapRef.current?.clientWidth, mapRef.current?.clientHeight); invalidate(); };
+  const cancel = () => {
+    if (props.readOnlyCommands || !hasSelection || !selected) return;
+    dispatch({ kind: 'tactical', command: { action: 'cancel', unitId: selected } }, () => setMessage('已取消指令，不消耗或返还指挥点。'));
   };
   const issue = (order: Omit<TacticalOrder, 'id' | 'issuedTime'>, fleet = false) => {
-    if(props.readOnlyCommands){setMessage('联机地图仅提供观察、增援和撤退；战术指令尚未接入主机。');return;}
-    const unitId = fleet ? 'fleet' : engine.selectedUnitId;
+    const unitId = fleet ? 'fleet' : map.selectedUnitId;
     if ((!fleet && !hasSelection) || !unitId || !friendly.length) { setMessage('请先左键选择友舰，或按 A 选择全舰。'); return; }
-    if (order.targetShipId && order.type !== 'ESCORT' && !living.some(ship => ship.id === order.targetShipId && !sameTeam(ship,engine.playerShip))) { setMessage('目标已离开己方视野。'); return; }
-    const accepted = engine.issueOrder(unitId, { ...order, id: 'map-order-' + (++sequence.current) + '-' + engine.combatTime, issuedTime: engine.combatTime });
-    if (!accepted) { setMessage(engine.commandPoints <= 0 ? '指挥点不足。每 120 秒战斗时间恢复 1 点。' : '该舰或目标已离开战场。'); invalidate(); return; }
-    const includesFlagship = unitId === 'fleet' || unitId === engine.playerShip.id;
-    if (includesFlagship) onAutopilotChange(true);
-    setMessage((order.type === 'WAYPOINT' ? '移动指令已下达' : order.type === 'ASSAULT' ? '已取消原指令，自主进攻' : order.type === 'DEFEND' ? '原地防守指令已下达' : order.type === 'AVOID' ? '回避指令已下达' : '集火指令已下达')
-      + (includesFlagship ? ' · 旗舰自动驾驶，U 可手动接管。' : '。'));
-    invalidate();
+    if (order.targetShipId && order.type !== 'ESCORT' && !living.some(ship => ship.id === order.targetShipId && !sameTeam(ship, map.playerShip))) { setMessage('目标已离开己方视野。'); return; }
+    dispatch({ kind: 'tactical', command: { action: 'order', unitId, order: {
+      type: order.type, targetShipId: order.targetShipId, position: order.targetPos ? [order.targetPos.x, order.targetPos.y] : undefined,
+    } } }, () => {
+      const includesFlagship = unitId === 'fleet' || unitId === map.playerShip.id;
+      if (includesFlagship) onAutopilotChange(true);
+      setMessage((order.type === 'WAYPOINT' ? '移动指令已下达' : order.type === 'ASSAULT' ? '已取消原指令，自主进攻' : order.type === 'DEFEND' ? '原地防守指令已下达' : order.type === 'AVOID' ? '回避指令已下达' : '集火指令已下达')
+        + (includesFlagship ? ' · 旗舰自动驾驶，U 可手动接管。' : '。'));
+    });
   };
 
-
-  const escortCandidates = (rank: number) => friendly.filter(ship => ship.id !== inspected?.id && !engine.orders.has(ship.id)
+  const escortCandidates = (rank: number) => friendly.filter(ship => ship.id !== inspected?.id && !map.orders[ship.id]
     && (rank === 3 || ['FRIGATE', ...(rank === 2 ? ['DESTROYER'] : [])].includes(ship.spec.hullSize ?? '')))
-    .sort((a,b) => a.pos.distanceTo(inspected?.pos ?? engine.playerShip.pos) - b.pos.distanceTo(inspected?.pos ?? engine.playerShip.pos)).slice(0, rank === 3 ? 2 : 1);
-  const commandDisabled = engine.commandPoints <= 0 ? '指挥点不足；每 120 秒战斗时间恢复 1 点。' : !friendly.length ? '没有可以接令的友舰。' : undefined;
+    .sort((a,b) => vector(a.pos).distanceTo(vector(inspected?.pos ?? map.playerShip.pos)) - vector(b.pos).distanceTo(vector(inspected?.pos ?? map.playerShip.pos))).slice(0, rank === 3 ? 2 : 1);
+  const commandDisabled = map.commandPoints <= 0 ? '指挥点不足；每 120 秒战斗时间恢复 1 点。' : !friendly.length ? '没有可以接令的友舰。' : undefined;
   const action = (id: string, icon: string, label: string, key: string, description: string, unavailable?: string, active?: boolean): TacticalAction => ({id,icon,label,key,description,unavailable,active});
-  const direct = (inspected && sameTeam(inspected,engine.playerShip)) || selected === 'fleet';
-  const groups: TacticalActionGroup[] = inspected && !sameTeam(inspected,engine.playerShip) ? [
+  const direct = (inspected && sameTeam(inspected,map.playerShip)) || selected === 'fleet';
+  const groups: TacticalActionGroup[] = inspected && !sameTeam(inspected,map.playerShip) ? [
     {label:'其它',actions:[action('target','icon_set_target','设为旗舰目标','R','只设置旗舰的火控目标，不分配机动任务。'),action('info','icon_more_info','舰船信息','F2','查看选中舰船及战术地图操作说明。')]},
     {label:'任务指派',actions:[action('ignore','icon_ignore','撤销对该舰的任务','','撤销所有以该敌舰为目标的已下达指令。'),
       action('avoid','icon_avoid','回避','V','接令舰持续与该敌舰拉开距离，仍保留自卫火控。',commandDisabled),
@@ -112,31 +137,33 @@ export function TacticalMap(props: TacticalMapProps) {
       action('transfer','icon_transfer_command','转移指挥','','当前指挥旗舰不可在局内更换。','尚未实现局内旗舰切换。'),
       action('center','icon_video_feed','定位所选舰船','F','把地图视角移到所选舰船。'),action('info','icon_more_info','舰船信息','F2','查看舰船及地图操作说明。')]},
     {label:'直接命令',actions:[action('search','icon_search_and_destroy','自主进攻','S','解除该舰原有任务，恢复自主选择敌舰进攻。',commandDisabled),
-      action('retreat','icon_retreat','撤退','T','驶向本方边缘，离场后释放部署点。',engine.deployment.enabled?undefined:'本场没有后备舰队撤退规则。'),
+      action('retreat','icon_retreat','撤退','T','驶向本方边缘，离场后释放部署点。',map.deploymentEnabled?undefined:'本场没有后备舰队撤退规则。'),
       action('directRetreat','icon_retreat_direct','紧急撤退','E','命令该舰立即撤离战场。','当前试航没有紧急撤离策略与撤离结算。'),
       action('cancel','icon_rescind_order','取消指令','','撤销选中舰船的直接指令；全舰命令需先按 A 选择全舰。也可按 Delete。')]},
   ] : [];
   const runAction = (item: TacticalAction) => {
     if (inputBlocked) return;
     if (item.unavailable) { setMessage(item.unavailable); return; }
-    const enemy = inspected && !sameTeam(inspected,engine.playerShip) ? inspected : undefined;
-    if (enemy && !tacticalContactVisible(enemy,tacticalObservers(engine),engine.playerShip.teamId,engine.openBattlefield)) { setMessage('目标已离开己方视野。'); return; }
-    if (item.id === 'target' && enemy) { engine.setPlayerTarget(enemy.id); setMessage('旗舰目标：'+nameOf(enemy)); }
+    const enemy = inspected && !sameTeam(inspected,map.playerShip) ? inspected : undefined;
+    if (enemy && !source.read().map?.capitalShips.some(ship => ship.id === enemy.id)) { setMessage('目标已离开己方视野。'); return; }
+    if (item.id === 'target' && enemy) dispatch({ kind: 'tactical', command: { action: 'target', targetId: enemy.id } }, () => setMessage('旗舰目标：' + nameOf(enemy)));
     else if (item.id === 'engage' && enemy) issue({type:'ENGAGE',targetShipId:enemy.id},!hasSelection);
     else if (item.id === 'avoid' && enemy) issue({type:'AVOID',targetShipId:enemy.id},!hasSelection);
-    else if (item.id === 'ignore' && enemy) { for(const [id,order] of engine.orders)if(order.targetShipId===enemy.id)engine.cancelOrder(id); setMessage('已撤销针对此舰的任务。'); }
-    else if (item.id === 'defend') issue({type:'DEFEND',targetPos:(inspected??engine.playerShip).pos.clone()});
+    else if (item.id === 'ignore' && enemy) dispatch({ kind: 'tactical', command: { action: 'cancel-target', targetId: enemy.id } }, () => setMessage('已撤销针对此舰的任务。'));
+    else if (item.id === 'defend') issue({type:'DEFEND',targetPos:vector((inspected??map.playerShip).pos)});
     else if (item.id === 'search') issue({type:'ASSAULT'});
     else if (item.id === 'cancel') cancel();
     else if (item.id === 'retreat') void retreat();
-    else if (item.id === 'dismiss') { setInspectedId(null); engine.selectUnit(null); setShowInfo(false); }
+    else if (item.id === 'dismiss') dispatch({ kind: 'tactical', command: { action: 'select', unitId: null } }, () => { setInspectedId(null); setShowInfo(false); });
     else if (item.id === 'autopilot') onAutopilotChange(!autopilot);
-    else if (item.id === 'center') view.current.center=(inspected??engine.playerShip).pos.clone();
+    else if (item.id === 'center') view.current.center=vector((inspected??map.playerShip).pos);
     else if (item.id === 'info') setShowInfo(value=>!value);
     else if (item.id.startsWith('escort') && inspected) {
       const ships=escortCandidates(Number(item.id.slice(-1)));
-      const order:TacticalOrder={id:'escort-'+(++sequence.current)+'-'+engine.combatTime,type:'ESCORT',targetShipId:inspected.id,issuedTime:engine.combatTime};
-      if(engine.issueEscortGroup(ships.map(ship=>ship.id),order)){if(ships.includes(engine.playerShip))onAutopilotChange(true);setMessage('已派出 '+ships.length+' 艘友舰护航。');}else setMessage('护航指令未生效，请检查指挥点或舰船状态。');
+      dispatch({ kind: 'tactical', command: { action: 'escort', unitIds: ships.map(ship => ship.id), targetId: inspected.id } }, () => {
+        if (ships.some(ship => ship.id === map.playerShip.id)) onAutopilotChange(true);
+        setMessage('已派出 ' + ships.length + ' 艘友舰护航。');
+      });
     }
     invalidate();
   };
@@ -163,7 +190,7 @@ export function TacticalMap(props: TacticalMapProps) {
       canvas.width = Math.max(1, Math.round(size * dpr)); canvas.height = Math.max(1,Math.round(height*dpr));
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       if (!fitted && size > 0 && height > 0) {
-        view.current = fitTacticalView(engine, size, height); fitted = true; invalidate();
+        view.current = fitTacticalView(live.current.map, size, height); fitted = true; setSpan(view.current.span); live.current.refreshRead();
       }
     };
     const observer = new ResizeObserver(resize); observer.observe(canvas); resize();
@@ -171,8 +198,11 @@ export function TacticalMap(props: TacticalMapProps) {
       if (now - last >= 1000 / 30 && size > 0) {
         last = now;
         const current = live.current;
-        painter.draw(ctx, size, view.current, engine, {
-          pos: current.cameraPosRef?.current ?? engine.playerShip.pos,
+        const frameView = current.source.read().map;
+        if (!frameView) { frame = requestAnimationFrame(draw); return; }
+        displayed.current = frameView;
+        painter.draw(ctx, size, view.current, frameView, {
+          pos: current.cameraPosRef?.current ?? frameView.playerShip.pos,
           zoom: current.zoomRef?.current ?? 1,
           width: current.canvasRef?.current?.clientWidth ?? window.innerWidth,
           height: current.canvasRef?.current?.clientHeight ?? window.innerHeight,
@@ -182,11 +212,11 @@ export function TacticalMap(props: TacticalMapProps) {
     };
     frame = requestAnimationFrame(draw);
     const wheel = (event: WheelEvent) => {
-      if (!engine.isTacticalMap || live.current.inputBlocked || event.ctrlKey || event.altKey || event.metaKey) return;
+      if (!source.read().map || live.current.inputBlocked || event.ctrlKey || event.altKey || event.metaKey) return;
       event.preventDefault(); event.stopPropagation();
       const rect = canvas.getBoundingClientRect();
       zoomTacticalView(view.current, new Vector2(event.clientX - rect.left, event.clientY - rect.top), size, Math.exp(Math.max(-.3, Math.min(.3, event.deltaY * .0015))), height);
-      invalidate();
+      setSpan(view.current.span); live.current.refreshRead();
     };
     const clearPointer = () => {
       const pointer = drag.current; drag.current = null; hover.current = null;
@@ -200,11 +230,11 @@ export function TacticalMap(props: TacticalMapProps) {
       cancelAnimationFrame(frame); observer.disconnect(); canvas.removeEventListener('wheel', wheel);
       window.removeEventListener('blur', clearPointer); document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [engine]);
+  }, [source, generation]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (!engine.isTacticalMap || event.defaultPrevented || event.isComposing || inputBlocked || event.ctrlKey || event.metaKey || event.altKey || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      if (!source.read().map || event.defaultPrevented || event.isComposing || inputBlocked || event.ctrlKey || event.metaKey || event.altKey || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
       const target = event.target instanceof HTMLElement ? event.target : null;
       if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
       // Escape still belongs to the game's pause menu. All flight keys are otherwise isolated.
@@ -219,9 +249,9 @@ export function TacticalMap(props: TacticalMapProps) {
       else if (event.code === 'Space') onPausedChange(!paused);
       else if (event.code === 'KeyA') selectFleet();
       else if (event.code === 'Home') fit();
-      else if (event.code === 'KeyC') { view.current.center = engine.playerShip.pos.clone(); invalidate(); }
+      else if (event.code === 'KeyC') { view.current.center = vector(map.playerShip.pos); invalidate(); }
       else if (event.code === 'KeyU' && !props.readOnlyCommands) { onAutopilotChange(!autopilot); setMessage(autopilot ? '旗舰切回手动；关闭地图后操纵。' : '旗舰自动驾驶已开启。'); }
-      else if (event.code === 'KeyZ' && !props.readOnlyCommands) { engine.toggleFighterRecall(); invalidate(); }
+      else if (event.code === 'KeyZ' && !props.readOnlyCommands) { dispatch({ kind: 'ship', command: { kind: 'recall' } }); }
       else if (event.code === 'KeyG') { if (props.onOpenDeployment) props.onOpenDeployment(); else setMessage('本场舰船均已部署，没有待命增援。'); }
       else if (event.code === 'Delete' || event.code === 'Backspace') cancel();
       else if (event.code === 'Equal' || event.code === 'Minus') {
@@ -253,8 +283,8 @@ export function TacticalMap(props: TacticalMapProps) {
             event.currentTarget.setPointerCapture(event.pointerId);
           } else if (event.button === 2) {
             const point = pointAt(event.clientX, event.clientY), size = event.currentTarget.clientWidth;
-            const target = pickMapShip(engine, point, view.current, size, event.currentTarget.clientHeight);
-            if ((target && sameTeam(target,engine.playerShip))) { setMessage('右键敌舰下达集火；右键空白处设置航路点。'); return; }
+            const target = pickMapShip(displayed.current, point, view.current, size, event.currentTarget.clientHeight);
+            if ((target && sameTeam(target,map.playerShip))) { setMessage('右键敌舰下达集火；右键空白处设置航路点。'); return; }
             issue(target ? { type: 'ENGAGE', targetShipId: target.id } : { type: 'WAYPOINT', targetPos: mapWorld(point, view.current, size, event.currentTarget.clientHeight) });
           }
         }}
@@ -265,14 +295,14 @@ export function TacticalMap(props: TacticalMapProps) {
             const dx = event.clientX - current.x, dy = event.clientY - current.y;
             current.moved ||= Math.hypot(dx, dy) > 4;
             if (current.moved) view.current.center = new Vector2(current.center.x - dx * view.current.span / event.currentTarget.clientWidth, current.center.y - dy * view.current.span / event.currentTarget.clientWidth);
-          } else hover.current = pickMapShip(engine, pointAt(event.clientX, event.clientY), view.current, event.currentTarget.clientWidth, event.currentTarget.clientHeight)?.id ?? null;
+          } else hover.current = pickMapShip(displayed.current, pointAt(event.clientX, event.clientY), view.current, event.currentTarget.clientWidth, event.currentTarget.clientHeight)?.id ?? null;
         }}
         onPointerUp={event => {
           const current = drag.current; drag.current = null;
           if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
           if (!current || current.id !== event.pointerId || current.moved || inputBlocked) return;
-          const ship = pickMapShip(engine, pointAt(event.clientX, event.clientY), view.current, event.currentTarget.clientWidth, event.currentTarget.clientHeight);
-          if((ship && sameTeam(ship,engine.playerShip)))engine.selectUnit(ship.id);else if(!ship)engine.selectUnit(null);
+          const ship = pickMapShip(displayed.current, pointAt(event.clientX, event.clientY), view.current, event.currentTarget.clientWidth, event.currentTarget.clientHeight);
+          if ((ship && sameTeam(ship, map.playerShip)) || !ship) dispatch({ kind: 'tactical', command: { action: 'select', unitId: ship?.id ?? null } });
           setInspectedId(ship?.id ?? null); setShowInfo(false); invalidate();
         }}
         onPointerCancel={() => { drag.current = null; }} onLostPointerCapture={() => { drag.current = null; }}
@@ -285,23 +315,23 @@ export function TacticalMap(props: TacticalMapProps) {
     </div>
     <aside className="tactical-map-commands" aria-label="舰队指挥">
       <div className="tactical-map-command-head">
-        <button className="tactical-map-reinforce" disabled={!props.onOpenDeployment || inputBlocked || !!engine.battleResult} onClick={props.onOpenDeployment} title={props.onOpenDeployment ? "打开舰船部署 / 增援 [G]" : "本场舰船均已部署，没有待命增援"}><NativeBitmapText font="button" color="currentColor">增援</NativeBitmapText> <em>[G]</em></button>
+        <button className="tactical-map-reinforce" disabled={!props.onOpenDeployment || inputBlocked || map.battleEnded} onClick={props.onOpenDeployment} title={props.onOpenDeployment ? "打开舰船部署 / 增援 [G]" : "本场舰船均已部署，没有待命增援"}><NativeBitmapText font="button" color="currentColor">增援</NativeBitmapText> <em>[G]</em></button>
         <div className="tactical-map-counters">
-          <Counter label="已部署" icon="icon_fleetpoints" value={String(engine.isSimulation ? engine.simulationDeployedPoints(true) : engine.deployment.enabled ? engine.deployment.used(engine.playerShip.teamId) : friendly.length).padStart(2, '0')} title={engine.isSimulation || engine.deployment.enabled ? "当前在场盟军使用的部署点" : "在场友方主舰数量（不含舰载机），不是部署点预算"} />
-          <Counter label="指挥点" icon="icon_commandpoints" value={String(engine.commandPoints).padStart(2, '0')} title="每条指令消耗 1 点；每 120 秒战斗时间恢复 1 点" tone="yellow" />
+          <Counter label="已部署" icon="icon_fleetpoints" value={String(map.deployedCount).padStart(2, '0')} title={map.isSimulation || map.deploymentEnabled ? "当前在场盟军使用的部署点" : "在场友方主舰数量（不含舰载机），不是部署点预算"} />
+          <Counter label="指挥点" icon="icon_commandpoints" value={String(map.commandPoints).padStart(2, '0')} title="每条指令消耗 1 点；每 120 秒战斗时间恢复 1 点" tone="yellow" />
           <Counter label="安全撤离" icon="clean_disengage" value="—" title="没有免战安全脱离判定；已接入后备舰队的战斗可下令驶离边缘撤退" />
         </div>
       </div>
-      <MapAction icon="icon_search+destroy" pressed={fullAssault} disabled={props.readOnlyCommands || buttonsDisabled || (!fullAssault && engine.commandPoints <= 0)}
+      <MapAction icon="icon_search+destroy" pressed={fullAssault} disabled={props.readOnlyCommands || buttonsDisabled || (!fullAssault && map.commandPoints <= 0)}
         title="取消友舰原有航点和集火任务，交由 AI 自主选择敌舰进攻；消耗 1 指挥点"
-        onClick={() => { if (fullAssault) { engine.cancelOrder('fleet'); setMessage('已解除全面进攻；各舰恢复自主交战。'); invalidate(); } else issue({ type: 'ASSAULT' }, true); }}>全面进攻!</MapAction>
-      {props.readOnlyCommands && <MapAction icon="icon_retreat" disabled={!engine.deployment.enabled || !hasSelection || inputBlocked || !!engine.battleResult} title="让选中的本队 AI 或自己驾驶的舰船驶离边缘；不能替其他真人撤退" onClick={()=>void retreat()}>选中舰撤退</MapAction>}
-      <MapAction icon="icon_full_retreat" disabled={!engine.deployment.enabled || inputBlocked || !!engine.battleResult} title="全部在场友舰撤离，未出场后备舰保留，不再自动增援" onClick={()=>void retreat(true)}>全面撤退!</MapAction>
-      <p className="tactical-map-unavailable">{engine.isSimulation ? "G 打开模拟部署" : engine.deployment.enabled ? "G 呼叫后备舰 · 撤离后释放部署点" : "本场无预备舰"}</p>
+        onClick={() => { if (fullAssault) { dispatch({ kind: 'tactical', command: { action: 'cancel', unitId: 'fleet' } }, () => setMessage('已解除全面进攻；各舰恢复自主交战。')); } else issue({ type: 'ASSAULT' }, true); }}>全面进攻!</MapAction>
+      {props.readOnlyCommands && <MapAction icon="icon_retreat" disabled={!map.deploymentEnabled || !hasSelection || inputBlocked || map.battleEnded} title="让选中的本队 AI 或自己驾驶的舰船驶离边缘；不能替其他真人撤退" onClick={()=>void retreat()}>选中舰撤退</MapAction>}
+      <MapAction icon="icon_full_retreat" disabled={!map.deploymentEnabled || inputBlocked || map.battleEnded} title="全部在场友舰撤离，未出场后备舰保留，不再自动增援" onClick={()=>void retreat(true)}>全面撤退!</MapAction>
+      <p className="tactical-map-unavailable">{map.isSimulation ? "G 打开模拟部署" : map.deploymentEnabled ? "G 呼叫后备舰 · 撤离后释放部署点" : "本场无预备舰"}</p>
     </aside>
-    <TacticalShipStatus ship={engine.playerShip} />
+    <TacticalShipStatus ship={map.playerShip} readShip={() => displayed.current.playerShip} />
     {!props.readOnlyCommands&&groups.length>0&&<TacticalCommandDock groups={groups} onAction={runAction} />}
-    {showInfo&&<aside className="tactical-map-info" aria-label="战术信息"><strong>{inspected?nameOf(inspected):'全舰指令'}</strong><p>{inspected?'结构 '+Math.ceil(inspected.hullHp)+' / '+inspected.maxHullHp+' · 幅能 '+Math.round(inspected.flux.fluxPercent*100)+'%':''}</p><p>左键选择接触；右键空白处移动，右键敌舰集火。A 选择全舰，Del 取消指令。</p><p>拖动或方向键平移；滚轮 / ± 缩放。Home 全览，Tab 返回战斗。</p><p>{engine.openBattlefield ? "多队联机为公开战场：显示所有已部署且存活的舰船；队色与大厅一致。后备、入库和已撤退舰不显示。" : "灰蓝色为未探明区域，黑色为己方地图视野；基础传感器半径为 3000，受舰船和系统视野加成影响。"}</p><button onClick={()=>setShowInfo(false)}>关闭 [F2]</button></aside>}
+    {showInfo&&<aside className="tactical-map-info" aria-label="战术信息"><strong>{inspected?nameOf(inspected):'全舰指令'}</strong><p>{inspected?'结构 '+Math.ceil(inspected.hullHp)+' / '+inspected.maxHullHp+' · 幅能 '+Math.round(inspected.flux.fluxPercent*100)+'%':''}</p><p>左键选择接触；右键空白处移动，右键敌舰集火。A 选择全舰，Del 取消指令。</p><p>拖动或方向键平移；滚轮 / ± 缩放。Home 全览，Tab 返回战斗。</p><p>{map.openBattlefield ? "多队联机为公开战场：显示所有已部署且存活的舰船；队色与大厅一致。后备、入库和已撤退舰不显示。" : "灰蓝色为未探明区域，黑色为己方地图视野；基础传感器半径为 3000，受舰船和系统视野加成影响。"}</p><button onClick={()=>setShowInfo(false)}>关闭 [F2]</button></aside>}
     <footer className="tactical-map-help"><div role="status">{message}</div></footer>
   </section>;
 }

@@ -152,3 +152,19 @@ for (const transport of ['lan', 'steam']) test(transport + ': input-first schedu
   assert.equal(f.sent.filter(raw => JSON.parse(raw).type === 'state').length, 600);
   assert.equal(f.sent.filter(raw => JSON.parse(raw).type === 'input').length, 600);
 });
+
+for(const transport of ['lan','steam'])test(`${transport}: actual LanBattle firing prediction hook runs only after accepted sends with focus and original actions`,()=>{
+  const f=fixture(transport);f.producer.set({firing:true});f.socket.bufferedAmount=1;f.producer.action(1);f.producer.tick();
+  assert.equal(f.producer.fireRecords.length,0);assert.equal(f.producer.seq,0);
+  f.socket.bufferedAmount=0;const send=f.socket.send;f.socket.send=()=>{throw Error('send failed');};f.producer.tick();assert.equal(f.producer.fireRecords.length,0);
+  f.at(20);f.socket.send=send;f.producer.tick();assert.equal(f.producer.fireRecords.length,1);
+  const r=f.producer.fireRecords[0];assert.equal(r.input.seq,1);assert.equal(r.input.firing,true);assert.equal(r.input.actions.length,1);assert.equal(r.enabled,true);
+  assert.equal(f.producer.actions.length,0);
+  f.at(40);f.producer.set({focused:false});f.producer.tick();assert.equal(f.producer.fireRecords[1].enabled,false);assert.equal(f.producer.fireRecords[1].input.firing,false);
+});
+
+for(const transport of ['lan','steam'])test(`${transport}: actual local turret hook never records a failed or backpressured send`,()=>{
+ const f=fixture(transport);f.socket.bufferedAmount=1;f.producer.tick();assert.equal(f.producer.turretRecords.length,0);
+ f.socket.bufferedAmount=0;f.at(20);f.producer.tick();assert.equal(f.producer.turretRecords.length,1);assert.equal(f.producer.turretRecords[0].input.seq,1);
+ assert.equal(f.producer.turretRecords[0].input,f.producer.fireRecords[0].input);
+});

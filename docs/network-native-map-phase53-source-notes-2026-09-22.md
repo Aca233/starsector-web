@@ -1,0 +1,5 @@
+# Phase53 source notes — trusted projection map writer
+
+2026-09-22. Phase52 is rejected/restored; do not revive its reference tape. This bounded experiment targets the CURRENT synchronous SWF2 encoder instead: native captured maps are currently enumerated once to count defined fields, then read again to encode. Candidate reserves an upper-bound map header, validates/reads/writes each field once and adjusts the header if undefined keys were omitted. No network format or game behavior change. Generic/accessor callers keep their existing API and two-read semantics; never replace that path globally.
+
+Correctness requirements: exact numeric widths/order/depth; every key remains validated including undefined-valued forbidden keys; 15/16 and65535/65536 header boundaries; recursive buffer growth; owned output; projection-cache and sound lane semantics. Compare complete capture+encode cost as well as isolated encoder cost on existing same-world 22-ship states, both orders. Accept only encoder P50<=.90 and combined P50<=.95/P95<=1.10 in all windows. No activation/rebuild if this early gate fails; no campaign or gameplay changes.
