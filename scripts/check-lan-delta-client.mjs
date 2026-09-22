@@ -1,12 +1,13 @@
 import { motionFrame, motionBytes } from './lib/motion-reference-fixture.mjs';
 import assert from 'node:assert/strict';import{test}from'node:test';import vm from'node:vm';import{build}from'esbuild';
 import{LanDeltaSender,lanDeltaTarget}from'../server/LanDeltaTransport.mjs';import{encodeBinaryState,encodeProjectedBinaryFrame}from'../src/network/BinarySnapshot.mjs';
-const code=(await build({entryPoints:['src/network/protocol.ts'],bundle:true,platform:'browser',format:'cjs',write:false,define:{__LAN_BUILD_ID__:'"test"'}})).outputFiles[0].text;
+const compile=async env=>(await build({entryPoints:['src/network/protocol.ts'],bundle:true,platform:'browser',format:'cjs',write:false,define:{__LAN_BUILD_ID__:'"test"','import.meta.env':JSON.stringify(env)}})).outputFiles[0].text;
+const code=await compile({}),motionCode=await compile({VITE_LAN_MOTION_REFERENCE:'true'});
 function fixture(transport='lan',cap=true,motion=false){
  const sockets=[],timers=new Map();let now=1,id=0;const document=new EventTarget();document.visibilityState='visible';
  class Socket{static OPEN=1;readyState=1;bufferedAmount=0;sent=[];constructor(){sockets.push(this);}send(m){this.sent.push(m);}close(){this.readyState=3;}}
  const sandbox={module:{exports:{}},exports:{},WebSocket:Socket,EventTarget,TextEncoder,TextDecoder,ArrayBuffer,Uint8Array,URL,DOMException,document,crypto:{getRandomValues:a=>a.fill(7)},sessionStorage:{getItem:()=>null,setItem(){},removeItem(){}},performance:{now:()=>now},setTimeout:fn=>{timers.set(++id,fn);return id;},clearTimeout:i=>timers.delete(i),setInterval:()=>++id,clearInterval(){}};
- sandbox.exports=sandbox.module.exports;vm.runInNewContext(code,sandbox);
+ sandbox.exports=sandbox.module.exports;vm.runInNewContext(motion?motionCode:code,sandbox);
  const c=new sandbox.module.exports.LanConnection(transport),seen=[];c.subscribe(m=>seen.push(m));c.connect('ws://127.0.0.1/lan/ws','test');const ws=sockets[0];ws.onopen();
  const receive=data=>{now++;ws.onmessage({data:typeof data==='string'||data instanceof ArrayBuffer?data:JSON.stringify(data)});};
  receive({type:'welcome',resumeToken:'a'.repeat(64),stateCredits:1,...(cap?{binaryDelta:1}:{}),...(motion?{motionReference:1}:{})});
@@ -15,7 +16,7 @@ function fixture(transport='lan',cap=true,motion=false){
 const target=seq=>lanDeltaTarget(encodeBinaryState('match',seq,encodeProjectedBinaryFrame({tick:seq,ships:[],ballast:'component-'.repeat(1500),value:seq})),seq);
 const deliver=(f,s,seq)=>{const t=target(seq),choice=s.prepare(t);s.commit(choice);f.receive(choice.packet.buffer);return t;};
 test('actual LanConnection negotiates, restores before subscribers/ACK, and reports COMPLETE snapshot bytes',()=>{
- const f=fixture(),s=new LanDeltaSender();assert.equal(JSON.parse(f.ws.sent[0]).binaryDelta,1);
+ const f=fixture(),s=new LanDeltaSender();assert.equal(JSON.parse(f.ws.sent[0]).binaryDelta,1);assert.equal(JSON.parse(f.ws.sent[0]).motionReference,undefined);
  const t=deliver(f,s,1);assert.equal(f.c.snapshotBytes,t.bytes.length);assert.equal(f.seen.at(-1).frame.tick,1);
  assert.equal(JSON.parse(f.ws.sent.at(-1)).type,'state-consumed');s.ack(1);deliver(f,s,2);assert.equal(f.seen.at(-1).frame.tick,2);assert.equal(f.c.snapshotBytes,target(2).bytes.length);
  f.c.close();
