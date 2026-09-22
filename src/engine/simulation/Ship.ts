@@ -258,6 +258,15 @@ export class Ship {
       && hasOnlyNativeRangeModifiers(this.spec)
       && (!this.sourceCarrier || hasOnlyNativeRangeModifiers(this.sourceCarrier.spec));
   }
+  /** Unknown damage hooks retain the full advisory forecast. */
+  public get hasNativeFireBudgetPolicyInputs(): boolean {
+    const native = nativeArmorReaders.get(this);
+    return !!native && this.hasNativeThreatPhaseHooks && this.runtimeModifiers.empty
+      && this.system.hasNativeStats && this.defenseSystem.hasNativeStats
+      && this.armor.damageTakenModifiers === native.damage
+      && this.armor.dynamicEffectiveArmorMultiplier === native.effective;
+  }
+
   public get externalDamageTakenMultiplier(): number {
     let value = 1;
     for (const modifier of this.damageTakenModifiers.values()) value *= modifier();

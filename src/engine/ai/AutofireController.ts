@@ -16,6 +16,8 @@ import type { Projectile, WeaponMount, WeaponSpec } from '../simulation/Weapon';
 import type { Asteroid } from '../simulation/CombatTypes';
 import { interceptTimeComponents, shipSegmentEntry, weaponMuzzle } from './FireControlGeometry';
 
+const ADAPTIVE_FIRE_BUDGET = import.meta.env?.VITE_AI_FIRE_BUDGET_ADAPTIVE !== 'false';
+
 /** One world view per combat step; no renderer/UI or single-opponent dependency. */
 export interface FireControlWorld {
   fireBudget?: InFlightFireBudget;
@@ -318,11 +320,21 @@ export class AutofireController {
         if (s.target.entity === ship.currentTargetShip) return 1;
         return 2;
       };
+      // Every autonomous hull candidate has priority 1; missiles/decoys never
+      // share that tier. A hull-only score cannot reorder zero/one hull choices.
+      let competingHulls = 0;
+      if (ADAPTIVE_FIRE_BUDGET && autonomous) {
+        for (const candidate of candidates) if (candidate.target.kind === 'SHIP' && ++competingHulls === 2) break;
+      }
+      const omitBudget = ADAPTIVE_FIRE_BUDGET && autonomous && competingHulls < 2
+        && world.fireBudget?.canOmitUncontestedPenalty === true;
       const rank = (s: AimSolution) => {
         const retained = sameTarget(state.target, s.target);
         const traverse = Math.abs(signedAngle(s.point.clone().sub(origin).heading() - mount.currentAngleRad));
         const arrival = s.delay + (mount.spec.isBeam ? 0 : origin.distanceTo(s.point) / Math.max(1, s.speed));
-        const committed = autonomous && !isPointDefense(mount) && s.target.kind === 'SHIP'
+        const scoreBudget = !omitBudget && autonomous && !isPointDefense(mount) && s.target.kind === 'SHIP'
+          && (!ADAPTIVE_FIRE_BUDGET || !world.fireBudget || typeof world.fireBudget.needsDetailedPenalty !== 'function' || world.fireBudget.needsDetailedPenalty(ship, s.target.entity));
+        const committed = scoreBudget && s.target.kind === 'SHIP'
           ? (world.queryBatch ? world.fireBudget?.penalty(ship, s.target.entity, arrival, world.queryBatch)
             : world.fireBudget?.penalty(ship, s.target.entity, arrival)) ?? 0 : 0;
         const utility = autonomous && s.target.kind === 'SHIP'

@@ -50,7 +50,9 @@ function expanded(frame:any){
  const {layouts:_layouts,...rest}=frame;return expand(rest);
 }
 const engine=createLanWorld(match()).engine,muzzle=configureHostCosmetics(engine);
-const capture=(tick:number,native:boolean)=>native ? captureAuthorityCombat(engine,tick,{0:tick,1:tick},0,muzzle) : captureHostCombat(engine,tick,{0:tick,1:tick},0,muzzle);
+// This legacy native-vs-generic parity check explicitly retains authority work fields.
+// The production pruned read-set is covered by check-native-capture-plans.
+const capture=(tick:number,native:boolean)=>native ? captureAuthorityCombat(engine,tick,{0:tick,1:tick},0,muzzle,false,false,false,false,false,false) : captureHostCombat(engine,tick,{0:tick,1:tick},0,muzzle);
 test('native capture retains complete visible projection, event windows and real receiver state through 32-ship combat',()=>{
  const a=createLanWorld(match()).engine,b=createLanWorld(match()).engine;
  let events=0,projectiles=0,damage=0;
@@ -535,7 +537,8 @@ function componentExpanded(frame:any):any {
 test('whole component replication follows writes, lanes, lifecycle, loss and native restore',()=>{
  const fixture=match(4,'drover'),host=createLanWorld(fixture).engine,baseline=createLanWorld(fixture).engine;
  const guest=createLanWorld(fixture).engine,oldGuest=createLanWorld(fixture).engine;
- const take=(e:any,tick:number,on:boolean)=>captureAuthorityCombat(e,tick,{0:tick},0,null,false,true,on);
+ // Compare the component experiment with the SAME full weapon read-set, not the new independent projection.
+ const take=(e:any,tick:number,on:boolean)=>captureAuthorityCombat(e,tick,{0:tick},0,null,false,true,on,false,false,false);
  const before=componentReplicationDiagnostics(),sender=new LanDeltaSender({ordered:true,motionReference:true}),receiver=new LanDeltaReceiver({motionReference:true});
  let last:any,oldLast:any,oldFighter:Ship|undefined,oldGeneration:number|undefined,totalWire=0,totalFull=0;
  for(let tick=0;tick<90;tick++){
@@ -597,7 +600,7 @@ test('whole component paired processing benchmark', {skip:process.env.COMPONENT_
   const senders=viewers.map(()=>new LanDeltaSender({ordered:true,motionReference:true})),receivers=viewers.map(()=>new LanDeltaReceiver({motionReference:true}));
   return(tick:number)=>{
    const times:any={};let t=performance.now();e.fixedUpdate(1/60);times.simulation=performance.now()-t;
-   t=performance.now();const frame=captureAuthorityCombat(e,tick,{0:tick},0,null,true,true,components);times.capture=performance.now()-t;
+   t=performance.now();const frame=captureAuthorityCombat(e,tick,{0:tick},0,null,true,true,components,false,false,false);times.capture=performance.now()-t;
    t=performance.now();const bytes=encodeBinaryState('component-bench',tick,encodeProjectedBinaryFrame(frame,true)!);times.encode=performance.now()-t;
    times.delta=0;times.decode=0;times.apply=0;let wire=0;
    for(let i=0;i<viewers.length;i++){

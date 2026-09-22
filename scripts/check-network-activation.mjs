@@ -64,6 +64,11 @@ async function fixture(t, players=3, env={}) {
 
 test('default build requests additive motion; no experimental visual/combat/chunks and no invented Steam support',()=>{
   const policy=networkFeaturePolicy();assert.equal(policy.mode,'auto');
+  assert.equal(policy.motionReference,false);
+  assert.equal(networkHelloFeatures('lan',policy).motionReference,undefined);
+  assert.equal(networkHelloFeatures('lan',networkFeaturePolicy({VITE_LAN_MOTION_REFERENCE:'true'})).motionReference,1);
+  assert.equal(networkHelloFeatures('lan',networkFeaturePolicy({VITE_LAN_MOTION_REFERENCE:'false'})).motionReference,undefined);
+  assert.equal(networkHelloFeatures('steam',networkFeaturePolicy({VITE_LAN_MOTION_REFERENCE:'true'})).motionReference,undefined);
   const lan=networkHelloFeatures('lan',policy);assert.equal(lan.motionState,1);assert.equal(lan.motionAuto,1);assert.equal(lan.visualState,undefined);assert.equal(lan.combatState,undefined);
   assert.equal(networkHelloFeatures('steam',policy).motionState,undefined);
   const steam=networkFeatureStatus('steam',policy,{motionState:1,visualState:1,binarySnapshots:1});assert.equal(steam.motion,false);assert.equal(steam.reason,'steam-motion-not-implemented');

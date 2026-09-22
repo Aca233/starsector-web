@@ -1,16 +1,20 @@
 /** Transport capability policy, not an assertion about measured Hz or delivery.
  * Default: add bounded LAN motion only; keep complete-world cadence unchanged.
  * The incomplete multirate/visual rewrite still requires an explicit build opt-in.
+ * Prediction-based compression is separate from the additive motion lane: it
+ * scans an entire anchor on BOTH endpoints before correction/decode. Default to
+ * exact ordinary byte deltas for lower CPU; bandwidth-constrained builds may
+ * opt back into the unchanged lossless reference codec.
  */
 export function networkFeaturePolicy(env = {}) {
   const mode = env.VITE_LAN_LAYERED_SYNC === 'false' ? 'off'
     : env.VITE_LAN_LAYERED_SYNC === 'true' ? 'experimental' : 'auto';
-  return Object.freeze({ mode, motion: mode !== 'off', visuals: mode === 'experimental',
+  return Object.freeze({ mode, motion: mode !== 'off', motionReference: env.VITE_LAN_MOTION_REFERENCE === 'true', visuals: mode === 'experimental',
     combat: mode === 'experimental' && env.VITE_LAN_CRITICAL_COMBAT === 'true' });
 }
 export function networkHelloFeatures(transport, policy) {
   if (transport === 'steam') return { binarySnapshots: 1, binaryReceive: 1 };
-  return { binaryDelta: 1, motionReference: 1,
+  return { binaryDelta: 1, ...(policy.motionReference ? { motionReference: 1 } : {}),
     ...(policy.motion ? { motionState: 1, ...(policy.mode === 'auto' ? { motionAuto: 1 } : {}) } : {}),
     ...(policy.visuals ? { visualState: 1 } : {}), ...(policy.combat ? { combatState: 1 } : {}) };
 }

@@ -51,6 +51,9 @@ function battery(ship: Ship, world: TacticalWorld, stationkeeping = false): Gun[
 }
 function intersects(start: Vector2, end: Vector2, center: Vector2, radius: number): boolean {
   const delta = end.clone().sub(start), length2 = delta.dot(delta);
+  return intersectsPrepared(start, delta, length2, center, radius);
+}
+function intersectsPrepared(start: Vector2, delta: Vector2, length2: number, center: Vector2, radius: number): boolean {
   if (length2 < 1) return false;
   const t = center.clone().sub(start).dot(delta) / length2;
   return t > 0 && t < 1 && start.clone().addScaled(delta, t).distanceTo(center) < radius;
@@ -106,7 +109,10 @@ export function chooseCombatVelocity(ship: Ship, target: Ship, desired: Vector2,
         const trackingError = Math.abs(signedAngle(direction.heading() - g.mount.currentAngleRad - (facing - ship.facingRad)));
         if (trackingError > turretReach + Math.asin(Math.min(1, target.spec.collisionRadius / Math.max(1, direction.length())))) continue;
       }
-      if (bodies.some(body => intersects(origin, targetPos, body.pos, body.radius))) blockedPower += g.power;
+      // One immutable segment for this gun/candidate, not a new vector and dot
+      // product for every blocker. Preserve narrow-phase math and early exit.
+      const length2 = direction.dot(direction);
+      if (bodies.some(body => intersectsPrepared(origin, direction, length2, body.pos, body.radius))) blockedPower += g.power;
       else clearPower += g.power;
     }
     const clearFire = clearPower / ownPower, blocked = blockedPower / ownPower;

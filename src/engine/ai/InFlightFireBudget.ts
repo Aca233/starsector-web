@@ -10,6 +10,32 @@ import { shipSegmentEntry } from './FireControlGeometry';
  * Index only launched projectiles with a known intended hull. Guidance/spread,
  * shields and damage can change after this estimate. Never reserve future DPS. */
 export class InFlightFireBudget {
+  /** Exact native advisory score: with fewer than two hull choices, it cannot
+   * affect ordering. Custom estimators/penalties still receive their calls. */
+  public get canOmitUncontestedPenalty(): boolean {
+    return this.estimate === nativeEstimate && this.penalty === nativePenalty;
+  }
+  /** Deliberately coarser advisory AI: reserve precise kill prediction for
+   * damaged hulls or substantial launched fire. Never gates actual firing. */
+  public needsDetailedPenalty(ship: Ship, target: Ship): boolean {
+    if (!this.canOmitUncontestedPenalty) return true;
+    if (target.shield.isActive || target.shield.type === 'PHASE') return false;
+    if (!target.hasNativeFireBudgetPolicyInputs
+      || !Number.isFinite(target.hullHp) || !Number.isFinite(target.maxHullHp)
+      || target.hullHp <= 0 || target.hullHp <= target.maxHullHp * .5) return true;
+    const shots = this.byTarget.get(target.id);
+    if (!shots) return false;
+    let rawDamage = 0;
+    for (const p of shots) {
+      // Count even blocked/late/disarmed shots: uncertainty can only make us
+      // run the full estimator, not reject a plausible high-pressure volley.
+      if (!Number.isFinite(p.damage)) return true;
+      if ((p.teamId ?? this.sources.get(p.sourceShipId)?.teamId ?? combatTeam(p)) !== ship.teamId) continue;
+      rawDamage += Math.max(0, p.damage);
+      if (rawDamage >= target.hullHp * .25) return true;
+    }
+    return false;
+  }
   private readonly byTarget = new Map<string, Projectile[]>();
   private readonly sources: Map<string, Ship>;
   constructor(private readonly ships: readonly Ship[], projectiles: readonly Projectile[],
@@ -84,3 +110,6 @@ export class InFlightFireBudget {
     return 2.5 * Math.max(0, Math.min(1, (coverage - .6) / .8));
   }
 }
+
+const nativeEstimate = InFlightFireBudget.prototype.estimate;
+const nativePenalty = InFlightFireBudget.prototype.penalty;

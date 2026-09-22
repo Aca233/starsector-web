@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import { WebSocket } from 'ws';
 import { Worker } from 'node:worker_threads';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
@@ -16,7 +17,24 @@ const runtime=path.resolve(value('--runtime','artifacts/server-authority-2026092
 const assets=path.resolve(value('--assets','public'));
 const ships=Number(value('--ships','16')), roomCount=Number(value('--rooms','2'));
 const expectSuspended=args.includes('--expect-suspended');
-const isolatedClients=args.includes('--isolated-clients');
+const applyReplica=args.includes('--apply-replica');
+const motionReference=!args.includes('--no-motion-reference');
+const autoMotion=args.includes('--auto-motion');
+if(autoMotion&&!applyReplica)throw Error('--auto-motion requires --apply-replica (isolated native peers)');
+const isolatedClients=applyReplica||args.includes('--isolated-clients');
+let replicaSource;
+if(applyReplica){
+  // Standalone --benchmarks runtimes include a prebuilt helper. Source checkouts
+  // compile it once before launching peers; no client CPU runs on the gateway.
+  try { replicaSource=await fs.readFile(new URL('./headless-battle-replica.mjs',import.meta.url),'utf8'); }
+  catch(error){
+    if(error.code!=='ENOENT')throw error;
+    const {build}=await import('esbuild');
+    const built=await build({entryPoints:[fileURLToPath(new URL('./lib/headless-battle-replica.mts',import.meta.url))],bundle:true,platform:'node',format:'esm',target:'node22',write:false,logLevel:'warning',metafile:true,define:{__LAN_BUILD_ID__:'"room-bench"','import.meta.env':JSON.stringify({BASE_URL:'/',DEV:false,VITE_LAN_AI_WORKERS:'false',VITE_LAN_COMPONENTS:'false',VITE_LAN_FIXED_DISPLAY:'false',VITE_LAN_RECORD_DELTAS:'false'})}});
+    if(Object.keys(built.metafile.inputs).some(file=>/(^|\/)campaign(\/|\.)/.test(file)))throw Error('Campaign leaked into benchmark replica');
+    replicaSource=built.outputFiles[0].text;
+  }
+}
 const activeSeconds=Number(value('--active-seconds','0'));
 if(!Number.isFinite(activeSeconds)||activeSeconds<0||activeSeconds>60)throw Error('Invalid active measurement length');
 const stats=values=>{const sorted=[...values].sort((a,b)=>a-b);return sorted.length?{count:sorted.length,mean:sorted.reduce((a,b)=>a+b,0)/sorted.length,p50:sorted[Math.floor(sorted.length/2)],p95:sorted[Math.min(sorted.length-1,Math.ceil(sorted.length*.95)-1)],max:sorted.at(-1)}:null;};
@@ -47,7 +65,7 @@ class Peer {
     this.ws=new WebSocket('ws://127.0.0.1:'+app.server.address().port+'/lan/ws',{headers:{Host:new URL(publicOrigin).host},origin:publicOrigin,perMessageDeflate:true});
     clients.push(this);
     this.ws.on('error',e=>errors.push(e));
-    this.ws.on('open',()=>this.send({type:'hello',name,instance:crypto.randomUUID(),build:'room-bench',protocol:protocol.version,stateCredits:1,binaryDelta:1,motionReference:1}));
+    this.ws.on('open',()=>this.send({type:'hello',name,instance:crypto.randomUUID(),build:'room-bench',protocol:protocol.version,stateCredits:1,binaryDelta:1,motionReference:motionReference?1:0}));
     this.ws.on('message',(data,binary)=>{try{
       const m=binary?decodeBinaryState(this.decoder.decode(data)):JSON.parse(data);
       if(m.type==='welcome'){this.welcome=m;this.decoder.setMotionReference(m.motionReference===1);}
@@ -71,11 +89,11 @@ class Peer {
 }
 class IsolatedPeer {
   constructor(name){
-    this.frames=0;this.inputLatencies=[];clients.push(this);
-    this.worker=new Worker(new URL('./benchmark-server-peer.mjs',import.meta.url),{workerData:{name,url:'ws://127.0.0.1:'+app.server.address().port+'/lan/ws',origin:publicOrigin},execArgv:[],resourceLimits:{maxOldGenerationSizeMb:256}});
+    this.frames=0;this.appliedFrames=0;this.inputLatencies=[];this.receiveLatencies=[];this.decodeTimes=[];this.applyTimes=[];clients.push(this);
+    this.worker=new Worker(new URL('./benchmark-server-peer.mjs',import.meta.url),{workerData:{name,url:'ws://127.0.0.1:'+app.server.address().port+'/lan/ws',origin:publicOrigin,assets,replicaSource,motionReference,autoMotion,authoritySeed:1511506142},execArgv:[],resourceLimits:{maxOldGenerationSizeMb:256}});
     this.ws={extensions:'',terminate:()=>this.worker.terminate()};
     this.worker.on('error',e=>errors.push(e));
-    this.worker.on('message',m=>{if(m.error){errors.push(Error(m.error));return;}if(m.extensions)this.ws.extensions=m.extensions;for(const key of ['frames','state','welcome','room','match','seat','launch','controls'])if(Object.hasOwn(m,key))this[key]=m[key];if(m.latency!==null&&Number.isFinite(m.latency)&&this.inputLatencies.length<4096)this.inputLatencies.push(m.latency);});
+    this.worker.on('message',m=>{if(m.error){errors.push(Error(m.error));return;}if(m.extensions)this.ws.extensions=m.extensions;for(const key of ['frames','appliedFrames','state','welcome','room','match','seat','launch','controls'])if(Object.hasOwn(m,key))this[key]=m[key];if(m.latency!==null&&Number.isFinite(m.latency)&&this.inputLatencies.length<4096)this.inputLatencies.push(m.latency);for(const [key,list] of [['receivedLatency',this.receiveLatencies],['decodeMs',this.decodeTimes],['applyMs',this.applyTimes]])if(m[key]!==null&&Number.isFinite(m[key])&&list.length<4096)list.push(m[key]);});
   }
   send(message){this.worker.postMessage({type:'send',message});}
   visibility(hidden){this.worker.postMessage({type:'visibility',hidden});}
@@ -83,16 +101,17 @@ class IsolatedPeer {
   stopInputs(){this.worker.postMessage({type:'probe-stop'});}
 }
 async function phase(name,ms){
-  loop.reset();for(const m of metrics)m.gatewayTimes=[];for(const p of clients)p.inputLatencies=[];
+  loop.reset();for(const m of metrics)m.gatewayTimes=[];for(const p of clients){p.inputLatencies=[];p.receiveLatencies=[];p.decodeTimes=[];p.applyTimes=[];}
   const peers=rooms.flatMap(r=>r.peers),peerBefore=peers.map(p=>({...p.lanFlow,wireBytes:p.ws._socket?.bytesWritten??0}));
-  const before=metrics.map(m=>({...m})),received=clients.map(p=>p.frames),cpu=process.cpuUsage(),start=performance.now();
+  const before=metrics.map(m=>({...m})),received=clients.map(p=>p.frames),applied=clients.map(p=>p.appliedFrames??0),cpu=process.cpuUsage(),start=performance.now();
   await sleep(ms);if(errors.length)throw errors[0];
   const elapsed=(performance.now()-start)/1000,usage=process.cpuUsage(cpu);
   const result={name,seconds:elapsed,cpuMs:(usage.user+usage.system)/1000,rssMiB:process.memoryUsage().rss/1048576,
     rooms:metrics.map((m,i)=>({produced:m.produced-before[i].produced,producedHz:(m.produced-before[i].produced)/elapsed,progressTicks:m.tick-before[i].tick,uncompressedMiB:(m.bytes-before[i].bytes)/1048576,recoveries:m.recoveries,telemetry:m.telemetry,gatewayMs:stats(m.gatewayTimes)})),
     eventLoopMs:{mean:loop.mean/1e6,p95:loop.percentile(95)/1e6,max:loop.max/1e6},inputAckMs:clients.map(p=>stats(p.inputLatencies)),
     transport:peers.map((p,i)=>({seat:p.seat,socketSkips:p.lanFlow.skippedSocket-peerBefore[i].skippedSocket,creditSkips:p.lanFlow.skippedCredit-peerBefore[i].skippedCredit,wireMbps:((p.ws._socket?.bytesWritten??0)-peerBefore[i].wireBytes)*8/elapsed/1e6,credits:p.stateCredits.stats(),delta:p.lanDelta?.stats()})),
-    receivedHz:clients.map((p,i)=>(p.frames-received[i])/elapsed)};
+    receivedHz:clients.map((p,i)=>(p.frames-received[i])/elapsed),
+    ...(applyReplica?{appliedHz:clients.map((p,i)=>(p.appliedFrames-applied[i])/elapsed),guestDecodeMs:clients.map(p=>stats(p.decodeTimes)),guestApplyMs:clients.map(p=>stats(p.applyTimes)),inputReceiveAckMs:clients.map(p=>stats(p.receiveLatencies))}:{})};
   phases.push(result);console.log(JSON.stringify(result));return result;
 }
 try{
@@ -108,7 +127,7 @@ try{
     await until(()=>room.options.aiHulls.flat().length===ships-2,'fleet');
     b.send({type:'ready',ready:true});await until(()=>room.peers[1].ready,'ready');
     a.send({type:'start'});await until(()=>a.controls&&b.controls&&a.frames>=20&&b.frames>=20,'start');
-    assert.equal(a.welcome.motionReference,1);
+    assert.equal(a.welcome.motionReference===1,motionReference);
   }
   loop.enable();await sleep(2000);
   if(activeSeconds){
@@ -134,8 +153,8 @@ try{
   await Promise.all(clients.map(p=>p.ws.terminate()));
   for(const room of rooms)app.closeRoom(room.code);
   await until(()=>factory.activeCount()===0,'cleanup');
-  const report={passed:true,node:process.version,arch:process.arch,shipsPerRoom:ships,rooms:roomCount,expectSuspended,activeSeconds,isolatedClients,
-    scope:'Latest-input ACKs measured at synthetic consumption, not GPU display latency. Real server workers + gateway + PMD/delta WebSocket clients on one machine (isolatedClients=true gives each client its own worker); CPU total still includes clients; no WAN, TLS, GPU or browser render cost. Short test, not a capacity guarantee.',phases};
+  const report={passed:true,node:process.version,arch:process.arch,shipsPerRoom:ships,rooms:roomCount,expectSuspended,activeSeconds,isolatedClients,applyReplica,motionReference,autoMotion,
+    scope:(applyReplica?'Latest-input ACKs measured after native replica apply; headless appliedHz excludes RAF/interpolation/prediction/GPU. ':'Latest-input ACKs measured at synthetic consumption, not GPU display latency. ')+ ' Real server workers + gateway + PMD/delta WebSocket clients on one machine (isolatedClients=true gives each client its own worker); CPU total still includes clients; no WAN, TLS, GPU or browser render cost. Short test, not a capacity guarantee.',phases};
   const out=path.resolve(value('--out','artifacts/server-authority-20260920/room-benchmark.json'));await fs.mkdir(path.dirname(out),{recursive:true});await fs.writeFile(out,JSON.stringify(report,null,2));
 }finally{
   clearInterval(inputTimer);loop.disable();

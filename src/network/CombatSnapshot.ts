@@ -1,3 +1,6 @@
+import { RecordDeltaCapture, RecordDeltaRestore } from './RecordDeltas';
+import { FixedDisplayCapture, FixedDisplayRestore, fixedDisplayField, fixedDisplayStride } from './display/FixedDisplayRecords';
+import type { DisplayRecordKind, FixedDisplayTable } from './display/FixedDisplayRecords';
 import {HostCombatComponentEvents,CombatComponentEventReceiver} from './CombatComponentEvents';
 import type {CombatComponentEvent,CombatComponentEventBatch} from './CombatComponentEvents';
 import {ArmorGrid} from '../engine/simulation/ArmorGrid';
@@ -54,6 +57,9 @@ const captureArrayMap = Array.prototype.map;
 /** Each snapshot carries its own field dictionary: reconnect never needs a baseline. */
 class SnapshotLayouts {
   journal?: MutationJournal;
+  display?: FixedDisplayCapture;
+  recordDeltas?: RecordDeltaCapture;
+  weaponPresentation = false;
   readonly puffBudget = puffRecipeBudget();
   readonly particleBudget = particleRecipeBudget();
   // Frame-owned, immutable wire marker; decoded viewer objects are never shared.
@@ -94,7 +100,7 @@ class SnapshotLayouts {
     return { $record: id, values };
   }
 }
-interface DecodeLayouts { componentDefinitions?:Record<string,any>; components?: ComponentReceiver; nativeRecords?: Map<string[], NativeRecordRestore>; nativeDecode?: (value: Wire, previous: any, depth: number) => any; nativeProjection?: boolean; keys: string[][]; puffDecoder: ExplosionPuffDecoder; puffBudget: PuffRecipeBudget; particleDecoder: DynamicParticleDecoder; particleBudget: ParticleRecipeBudget }
+interface DecodeLayouts { recordDeltas?: RecordDeltaRestore; display?: FixedDisplayRestore; componentDefinitions?:Record<string,any>; components?: ComponentReceiver; nativeRecords?: Map<string[], NativeRecordRestore>; nativeDecode?: (value: Wire, previous: any, depth: number) => any; nativeProjection?: boolean; keys: string[][]; puffDecoder: ExplosionPuffDecoder; puffBudget: PuffRecipeBudget; particleDecoder: DynamicParticleDecoder; particleBudget: ParticleRecipeBudget }
 function snapshotLayouts(value: unknown, puffDecoder: ExplosionPuffDecoder, particleDecoder: DynamicParticleDecoder): DecodeLayouts {
   if (value === undefined) value = [];
   if (!Array.isArray(value) || value.length > 1024) throw Error('Invalid snapshot layouts');
@@ -145,11 +151,14 @@ function captureChildProjection(projection: CaptureProjection, key: string): Cap
   }
   return CaptureProjection.None;
 }
-function omitCapturedField(projection: CaptureProjection, key: string): boolean {
+// The authority AI/weapon tick owns these fields. No renderer, HUD, prediction
+// or replica consumer reads them; presentation snapshots are NOT checkpoints.
+const weaponAuthorityFields = new Set(["fireControl", "fireControlTargetShipId", "fireControlTargetProjectileId", "cycleTargetShipId", "cycleTargetProjectileId", "burstFluxReserved", "lifecycleDt", "aimIdleSeconds"]);
+function omitCapturedField(projection: CaptureProjection, key: string, weaponPresentation = false): boolean {
   switch (projection) {
     case CaptureProjection.Ship: return key === 'prevPos' || key === 'prevFacingRad';
     case CaptureProjection.Damage: return key === 'armor' || key === 'cells' || key === 'armorRevision';
-    case CaptureProjection.Weapon:
+    case CaptureProjection.Weapon: return key === 'healthTracker' || weaponPresentation && weaponAuthorityFields.has(key);
     case CaptureProjection.Engine: return key === 'healthTracker';
     case CaptureProjection.Projectile:
       return key === 'prevPos' || key === 'prevBallisticTail' || key === 'prevFadeProgress'
@@ -162,8 +171,12 @@ function omitCapturedField(projection: CaptureProjection, key: string): boolean 
 /** Field traversal plans, never value/snapshot caches. Weak identity ownership
  * cannot retain an engine. A bounded shape interner amortizes layout lookup for
  * the same native projectile/controller type across objects and frames. */
-interface NativeCaptureShape { raw: string[]; projection: CaptureProjection; keys: string[]; children: CaptureProjection[]; indices: number[] }
+interface NativeCaptureShape { weaponPresentation: boolean; displayKind?: DisplayRecordKind; raw: string[]; projection: CaptureProjection; keys: string[]; children: CaptureProjection[]; indices: number[] }
 const nativeCaptureShapes = new WeakMap<object, NativeCaptureShape>();
+// Separate optional-layout caches: toggling a transport must not evict the
+// ordinary plan (including paired A/B captures of the same authority object).
+const nativeDisplayCaptureShapes = new WeakMap<object, NativeCaptureShape>();
+const nativeWeaponCaptureShapes = new WeakMap<object, NativeCaptureShape>();
 const internedCaptureShapes = new Map<string, NativeCaptureShape>();
 const capturePlansEnabled = import.meta.env.VITE_LAN_CAPTURE_PLANS !== 'false';
 const nativeCapturePlanCounts = { hits: 0, compiled: 0, fallbacks: 0 };
@@ -171,25 +184,27 @@ const nativeCapturePlanCounts = { hits: 0, compiled: 0, fallbacks: 0 };
 export function capturePlanDiagnostics() {
   return {enabled: capturePlansEnabled, ...nativeCapturePlanCounts, shapes: internedCaptureShapes.size};
 }
-function nativeCaptureShape(value: object, raw: string[], projection: CaptureProjection): NativeCaptureShape | null {
-  const prior = nativeCaptureShapes.get(value);
-  if (prior && prior.projection === projection && prior.raw.length === raw.length) {
+function nativeCaptureShape(value: object, raw: string[], projection: CaptureProjection, displayKind?: DisplayRecordKind, weaponPresentation = false): NativeCaptureShape | null {
+  weaponPresentation = weaponPresentation && projection === CaptureProjection.Weapon;
+  const cache = weaponPresentation ? nativeWeaponCaptureShapes : displayKind ? nativeDisplayCaptureShapes : nativeCaptureShapes;
+  const prior = cache.get(value);
+  if (prior && prior.projection === projection && prior.weaponPresentation === weaponPresentation && prior.displayKind === displayKind && prior.raw.length === raw.length) {
     let same = true;
     for (let i = 0; i < raw.length; i++) if (raw[i] !== prior.raw[i]) { same = false; break; }
     if (same) { nativeCapturePlanCounts.hits++; return prior; }
   }
   // Unusual/custom wide shapes use the established path, not an unbounded cache.
   if (raw.length > 256 || raw.some(key => key.length > 128)) { nativeCapturePlanCounts.fallbacks++; return null; }
-  const signature = projection + ':' + JSON.stringify(raw);
+  const signature = projection + ':' + (displayKind ?? 0) + ':' + Number(weaponPresentation) + ':' + JSON.stringify(raw);
   let shape = internedCaptureShapes.get(signature);
   if (!shape) {
     nativeCapturePlanCounts.compiled++;
-    const keys = raw.filter(key => !SKIP.has(key) && !omitCapturedField(projection, key));
-    shape = {raw, projection, keys, children: keys.map(key => captureChildProjection(projection, key)), indices: keys.map(key => raw.indexOf(key))};
+    const keys = raw.filter(key => !SKIP.has(key) && !omitCapturedField(projection, key, weaponPresentation) && (!displayKind || !fixedDisplayField(displayKind, key)));
+    shape = {raw, projection, displayKind, weaponPresentation, keys, children: keys.map(key => captureChildProjection(projection, key)), indices: keys.map(key => raw.indexOf(key))};
     if (internedCaptureShapes.size >= 1024) internedCaptureShapes.delete(internedCaptureShapes.keys().next().value!);
     internedCaptureShapes.set(signature, shape);
   }
-  nativeCaptureShapes.set(value, shape);
+  cache.set(value, shape);
   return shape;
 }
 function pack(value: any, seen: object[], refs: Map<string, Ship>, layouts: SnapshotLayouts, plain = false, projection = CaptureProjection.None): Wire {
@@ -292,6 +307,20 @@ function packFresh(value: any, seen: object[], refs: Map<string, Ship>, layouts:
     const columns = projection === CaptureProjection.Projectiles && nativeMembers && layouts.compactProjectiles
       ? compactProjectileColumns(rows, layouts.keys) : null;
     if (columns) { seen.pop(); return columns; }
+    if (layouts.recordDeltas && rows.length && (memberProjection === CaptureProjection.Weapon || memberProjection === CaptureProjection.Engine)
+      && rows.every(row => row?.$recordDelta)) {
+      for (let i = 0; i < rows.length; i++) rows[i] = rows[i].$recordDelta;
+      seen.pop(); return { $recordDeltas: rows };
+    }
+    const kind: DisplayRecordKind | undefined = rows[0]?.$d?.[0];
+    const displayId = rows[0]?.$d?.[2]?.$record, displayOffset = rows[0]?.$d?.[1];
+    if (kind && rows.every((row, i) => row?.$d?.[0] === kind && row?.$d?.[2] && Object.keys(row.$d[2]).length === 0 && row.$d[1] === displayOffset + i * fixedDisplayStride(kind))) {
+      seen.pop(); return { $ds: [kind, displayOffset, rows.length] };
+    }
+    if (kind && Number.isInteger(displayId) && rows.every((row, i) => row?.$d?.[0] === kind && row?.$d?.[2]?.$record === displayId && row.$d[1] === displayOffset + i * fixedDisplayStride(kind))) {
+      result = { $ds: [kind, displayOffset, { $records: displayId, values: rows.map(row => row.$d[2].values) }] };
+      seen.pop(); return result;
+    }
     const id = rows[0]?.$record;
     let shared = rows.length > 1 && Number.isInteger(id);
     if (shared) for (const row of rows) if (row?.$record !== id) { shared = false; break; }
@@ -306,7 +335,12 @@ function packFresh(value: any, seen: object[], refs: Map<string, Ship>, layouts:
     let keys = Object.keys(value);
     if (projection) projection = nativeCaptureProjection(value, projection);
     let values: Wire[];
-    const shape = layouts.nativeCapture && capturePlansEnabled ? nativeCaptureShape(value, keys, projection) : null;
+    const displayKind: DisplayRecordKind | undefined = layouts.display ? (projection === CaptureProjection.Weapon ? 1 : projection === CaptureProjection.Engine ? 2 : undefined) : undefined;
+    const displayShape = displayKind && capturePlansEnabled ? nativeCaptureShape(value, keys, projection, displayKind, layouts.weaponPresentation) : null;
+    const sampledFields = displayShape ? Object.values(value) : undefined;
+    const displayOffset = displayKind ? layouts.display!.capture(displayKind, value, displayShape?.raw, sampledFields) : null;
+    const fixedKind: DisplayRecordKind | undefined = displayOffset === null ? undefined : displayKind;
+    const shape = fixedKind && displayShape ? displayShape : layouts.nativeCapture && capturePlansEnabled ? nativeCaptureShape(value, keys, projection, fixedKind, layouts.weaponPresentation) : null;
     let planned = false;
     const armorCells = layouts.nativeCapture && layouts.packedNumbers && ownedArmorGrid(value)
       ? captureArmorCells(value) : null;
@@ -315,7 +349,7 @@ function packFresh(value: any, seen: object[], refs: Map<string, Ship>, layouts:
       // Preserve all other fields, ordering, extension values and reference discovery.
       values = []; let count = 0;
       for (const key of keys) {
-        if (SKIP.has(key) || omitCapturedField(projection, key)) continue;
+        if (SKIP.has(key) || omitCapturedField(projection, key, layouts.weaponPresentation) || (fixedKind && fixedDisplayField(fixedKind, key))) continue;
         if (key === 'cells') { keys[count++] = key; values.push(armorCells); continue; }
         const field = value[key];
         if (typeof field === 'function') continue;
@@ -330,7 +364,12 @@ function packFresh(value: any, seen: object[], refs: Map<string, Ship>, layouts:
       // Read once in the just-validated raw key order. Indexed projection avoids
       // megamorphic property lookup per field; indices are invalidated on ANY
       // shape/order change above. Never cache field values in a traversal plan.
-      const fields = Object.values(value);
+      const fields = sampledFields ?? Object.values(value);
+      if (!plain && layouts.recordDeltas && (projection === CaptureProjection.Weapon || projection === CaptureProjection.Engine)) {
+        const row = layouts.recordDeltas.recordNative(value, shape.keys, fields, shape.indices,
+          (field, slot) => pack(field, seen, refs, layouts, false, shape.children[slot]));
+        if (row) { seen.pop(); return row; }
+      }
       keys = shape.keys;
       values = fields;
       let written = 0;
@@ -357,7 +396,7 @@ function packFresh(value: any, seen: object[], refs: Map<string, Ship>, layouts:
       values = [];
       let count = 0;
       for (const key of keys) {
-        if (SKIP.has(key) || omitCapturedField(projection, key)) continue;
+        if (SKIP.has(key) || omitCapturedField(projection, key, layouts.weaponPresentation) || (fixedKind && fixedDisplayField(fixedKind, key))) continue;
         const field = value[key];
         if (typeof field === 'function') continue;
         keys[count++] = key;
@@ -390,8 +429,11 @@ function packFresh(value: any, seen: object[], refs: Map<string, Ship>, layouts:
         keys.length = values.length = kept;
       }
     }
-    result = plain ? null : planned ? layouts.recordPlanned(shape!, values) : layouts.record(keys, values);
+    result = !plain && layouts.recordDeltas && (projection === CaptureProjection.Weapon || projection === CaptureProjection.Engine)
+      ? layouts.recordDeltas.record(value, keys, values)
+      : plain ? null : planned ? layouts.recordPlanned(shape!, values) : layouts.record(keys, values);
     if (!result) { result = {}; for (let i = 0; i < keys.length; i++) result[keys[i]] = values[i]; }
+    if (fixedKind) result = { $d: [fixedKind, displayOffset, result] };
     if(layouts.journal&&!plain)layouts.journal.record(value,result,keys);
   }
   seen.pop();
@@ -564,6 +606,42 @@ function unpack(
     output.length = rows.length;
     return output;
   }
+  // Fixed leaves are rare; common records/vectors return before these marker checks.
+  if (Object.hasOwn(value, '$ds') || Object.hasOwn(value, '$d')) {
+    const batch = Object.hasOwn(value, '$ds'), tuple = batch ? value.$ds : value.$d;
+    if (!layouts.display || Object.keys(value).length !== 1 || !Array.isArray(tuple) || tuple.length !== 3) throw Error('Invalid fixed display tuple');
+    const [kind, offset, state] = tuple;
+    if (batch) {
+      const empty = typeof state === 'number';
+      if (empty ? !Number.isSafeInteger(state) || state < 0 || state > 32768 : !state || !Object.hasOwn(state, '$records') || !Array.isArray(state.values)) throw Error('Invalid fixed display records');
+      const count = empty ? state : state.values.length;
+      layouts.display.validateBatch(kind, offset, count);
+      const output = empty ? Array.isArray(target) ? target : [] : unpack(state, target, ships, layouts, depth + 1);
+      if (empty) { for (let i = 0; i < count; i++) if (!output[i] || typeof output[i] !== 'object' || Array.isArray(output[i])) output[i] = {}; output.length = count; }
+      layouts.display.bindBatchValidated(kind, offset, output);
+      return output;
+    }
+    layouts.display.validate(kind, offset);
+    if (!state || typeof state !== 'object' || Array.isArray(state) || Object.hasOwn(state, '$d') || Object.hasOwn(state, '$ds')) throw Error('Invalid fixed display state');
+    const output = unpack(state, target, ships, layouts, depth + 1);
+    layouts.display.bindValidated(kind, offset, output);
+    return output;
+  }
+  if (Object.hasOwn(value, '$recordDeltas')) {
+    const rows = value.$recordDeltas;
+    if (!layouts.recordDeltas || Object.keys(value).length !== 1 || !Array.isArray(rows) || rows.length > 32768) throw Error('Invalid record delta batch');
+    if (rows.length && depth + 2 > 64) throw Error('Snapshot nesting exceeds limit');
+    const output = Array.isArray(target) ? target : [];
+    const decode = (wire: Wire, previous: any) => unpack(wire, previous, ships, layouts, depth + 2);
+    for (let i = 0; i < rows.length; i++) output[i] = layouts.recordDeltas.apply(rows[i], output[i], decode, layouts.nativeProjection);
+    output.length = rows.length; return output;
+  }
+  if (Object.hasOwn(value, '$recordDelta')) {
+    if (!layouts.recordDeltas || Object.keys(value).length !== 1) throw Error('Missing or invalid record delta definitions');
+    if (depth + 1 > 64) throw Error('Snapshot nesting exceeds limit');
+    return layouts.recordDeltas.apply(value.$recordDelta, target,
+      (wire, previous) => unpack(wire, previous, ships, layouts, depth + 1), layouts.nativeProjection);
+  }
   const output =
     target && typeof target === "object" && !Array.isArray(target)
       ? target
@@ -620,6 +698,9 @@ export interface CombatSound {
   pos?: [number, number];
 }
 export interface CombatSnapshot {
+  fixedDisplay?: FixedDisplayTable;
+  /** Self-contained scalar templates; independent of mutation-journal mode. */
+  recordDefinitions?: unknown;
   /** Self-contained cosmetic spawn window; not a resumable physics checkpoint. */
   muzzleEvents?: import('./muzzle-events.mjs').MuzzleEventBatch;
   particleEvents?: import('./particle-events.mjs').ParticleEventBatch;
@@ -673,6 +754,7 @@ const displayGenerations=new WeakMap<CombatEngine,Map<string,number>>();
 const validatedComponentSpecs=new WeakSet<object>();
 const componentOmit=(_source:object,key:string)=>SKIP.has(key);
 const componentReference=(source:object)=>source instanceof Ship;
+const recordDeltaCaptures = new WeakMap<CombatEngine, RecordDeltaCapture>();
 const WORLD_COMPONENTS=new Set<string>(["environment","asteroidSystem","nebulaSystem","mineSystem"]);
 export function componentCaptureDiagnostics(engine:CombatEngine){return componentCaptures.get(engine)?.journal.stats;}
 export function captureCombat(
@@ -689,6 +771,10 @@ export function captureCombat(
   compactParticles = false,
   packedNumbers = false,
   componentMode = false,
+  fixedDisplay = false,
+  recordDeltas = false,
+  // Authority-only presentation omission; legacy/native diagnostic capture stays full.
+  weaponPresentation = false,
 ): CombatSnapshot {
   let components:ComponentCapture|undefined;
   if(componentMode&&nativeCapture){components=componentCaptures.get(engine);if(!components){components=new ComponentCapture(componentOmit,componentReference);componentCaptures.set(engine,components);}components.begin();}
@@ -699,7 +785,14 @@ export function captureCombat(
   const capitals = new Set(engine.allCapitalShips);
   const refs = new Map(engine.ships.map(ship => [ship.id, ship]));
   const layouts = new SnapshotLayouts(compactPuffs, compactProjectiles, nativeCapture, compactParticles, packedNumbers,components?componentDictionaries.get(engine):undefined,!!components);
+  layouts.weaponPresentation = nativeCapture && weaponPresentation && !components;
   if(components)componentDictionaries.set(engine,layouts);
+  if (fixedDisplay && nativeCapture && !components) layouts.display = new FixedDisplayCapture();
+  if (recordDeltas && nativeCapture && !components && !layouts.display) {
+    let capture = recordDeltaCaptures.get(engine);
+    if (!capture) { capture = new RecordDeltaCapture(); recordDeltaCaptures.set(engine, capture); }
+    capture.begin(); layouts.recordDeltas = capture;
+  }
   // Root ship/world fields remain named for server validation and playback clocks.
   // Enumerate ship roots directly; nested Ship values still become references.
   const project = (value: unknown, projection = CaptureProjection.Ship) => {
@@ -734,6 +827,8 @@ export function captureCombat(
   }
   components?.finish();
   const frame:CombatSnapshot={...(components?{componentMode:1 as const,componentDefinitions:components.definitionFrame()}:{}),tick,acknowledged,simulationMs,ships,crafts,craftSpecs,layouts:components?layouts.keys.slice():layouts.keys,world:projectedWorld, ...(engine.deployment.enabled ? {deployment:engine.deployment.snapshot()} : {})};
+  if (layouts.display) frame.fixedDisplay = layouts.display.finish();
+  if (layouts.recordDeltas) frame.recordDefinitions = layouts.recordDeltas.finish();
   if(components){
     let events=hostComponentEvents.get(engine);
     if(!events||tick<events.tick){events={host:new HostCombatComponentEvents('authority-'+(++componentEventEpoch)),tick:-1};hostComponentEvents.set(engine,events);}
@@ -853,6 +948,8 @@ function restoreCombatSnapshot(
   if (!particleDecoder) { particleDecoder = new DynamicParticleDecoder(); particleDecoders.set(engine,particleDecoder); }
   const layouts = snapshotLayouts(frame.layouts, puffDecoder, particleDecoder);
   layouts.nativeProjection = nativeProjection;
+  if (frame.fixedDisplay !== undefined) layouts.display = new FixedDisplayRestore(frame.fixedDisplay);
+  if (frame.recordDefinitions !== undefined) layouts.recordDeltas = new RecordDeltaRestore(frame.recordDefinitions);
   layouts.componentDefinitions=frame.componentDefinitions;
   let componentReceiver:ComponentReceiver|undefined;
   if(frame.componentMode===1){componentReceiver=componentReceivers.get(engine);if(!componentReceiver){componentReceiver=new ComponentReceiver(componentOmit,componentReference);componentReceivers.set(engine,componentReceiver);}
