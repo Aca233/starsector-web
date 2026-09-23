@@ -9,7 +9,7 @@ import { createMotionReference as oldReference, motionSnapshotTick as oldTick } 
 import { motionFrame, motionBytes } from './lib/motion-reference-fixture.mjs';
 import { FIXED_TAG_BYTES } from '../src/network/BinaryTagWidths.mjs';
 const result = (fn, value) => { try { return { value: fn(value) }; } catch (error) { return { error: error.constructor.name, message: error.message }; } };
-const framePair = bytes => assert.deepEqual(result(decodeBinaryFrame, bytes), result(oldFrame, bytes));
+const framePair = bytes => assert.deepEqual(result(decodeBinaryFrame, bytes), result(oldFrame, bytes), `packet=${Buffer.from(bytes).toString('hex')}`);
 const statePair = bytes => {
   assert.deepEqual(result(decodeBinaryState, bytes), result(oldState, bytes));
   assert.equal(motionSnapshotTick(bytes), oldTick(bytes));
@@ -74,7 +74,7 @@ test('slice-by-8 CRC matches old implementation and zlib, including offset/tail 
 
 import {directOnePass,encodeProjectedBinaryFrame} from 'onepass-candidate';
 import {assets,world} from './lib/native-projectile-fixture.mts';
-import {captureCombat} from '../src/network/CombatSnapshot';
+import {captureCombat} from '../src/network/AuthorityCombatSnapshot';
 await assets();
 test('ordinary native frames succeed directly without the compatibility fallback',()=>{
  const engine=world();for(const ship of engine.allCapitalShips){ship.pos.scale(.2);ship.prevPos.copy(ship.pos);ship.fireControlMode='AI';}

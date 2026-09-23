@@ -1,3 +1,4 @@
+import { combatWeaponRange, combatProjectileSpeed } from './WeaponRange';
 import { isImmutableMetadata } from '../extensions/Immutable';
 import { defenseSystemId, tacticalSystemIds } from '../extensions/ship-systems/Loadout';
 import { moduleOffset } from '../content/ModuleGeometry';
@@ -25,7 +26,7 @@ import { Shield } from './Shield';
 import { ShipSystem } from './ShipSystem';
 import { Projectile, Beam, WeaponMount, WeaponGroup, LauncherSmokeSpec, MuzzleFlashSpec } from './Weapon';
 import { ShipSpec } from '../modding/ModManager';
-import { sound } from '../audio/SoundManager';
+import { combatAudio as sound } from '../audio/CombatAudioEvents';
 import { ShipWeaponControlSystem } from './systems/ShipWeaponControlSystem';
 import { SimulationRandom } from './SimulationRandom';
 import {
@@ -972,6 +973,13 @@ export class Ship {
     this.damageDecals.advance(dt, this.hullHp / this.maxHullHp);
   }
 
+  public getRenderWeaponRange(mount: import('../render/ShipRenderState').RenderWeapon): number {
+    const source = this.weapons.find(candidate => candidate === mount);
+    if (!source) throw new Error('Unknown render mount');
+    return combatWeaponRange(this, source.spec);
+  }
+  public getWeaponDisplayRange(spec: import('./Weapon').WeaponSpec): number { return combatWeaponRange(this, spec); }
+  public getWeaponDisplaySpeed(spec: import('./Weapon').WeaponSpec): number { return combatProjectileSpeed(this, spec); }
   public getMotionStats() { return shipMotionStats(this); }
 
   private updateMotion(dt: number): { accelerating: boolean; spreading: boolean } {

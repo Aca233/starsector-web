@@ -12,8 +12,11 @@ await mkdir(work,{recursive:true});
 const fixture=resolve(work,'fixture.html');
 await writeFile(fixture,`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box}body{margin:0}</style><div id="root"></div><script type="module">
 import React from 'react';import {createRoot} from 'react-dom/client';import NativeCatalog from '/src/studio/NativeCatalog.tsx';
+import {SystemLoadoutEditor} from '/src/studio/SystemLoadoutEditor.tsx';import {createDesign,evaluate} from '/src/studio/DesignModel.ts';import {shipSystemDefinitions} from '/src/engine/extensions/ship-systems/Registry.ts';import '/src/index.css';import '/src/studio/studio.css';
+window.systemDescriptions=shipSystemDefinitions.all().filter(d=>d.id!=='NONE'&&!d.unavailable).map(d=>({id:d.id,name:d.name,description:d.description}));
+function SystemFixture(){const [draft,setDraft]=React.useState(()=>createDesign('onslaught','empty'));const [changes,setChanges]=React.useState(0);window.systemTestState={draft,changes};return React.createElement(SystemLoadoutEditor,{draft,spec:evaluate(draft).spec,onChange:next=>{setChanges(n=>n+1);setDraft(next);}});}
 function Fixture(){const [open,setOpen]=React.useState(true);return open?React.createElement(NativeCatalog,{onClose:()=>setOpen(false),onRefit:()=>{},onVariant:()=>{}}):React.createElement('p',null,'目录已关闭');}
-createRoot(document.getElementById('root')).render(React.createElement(Fixture));</script></html>`);
+createRoot(document.getElementById('root')).render(React.createElement(location.search.includes('systems')?SystemFixture:Fixture));</script></html>`);
 const outDir=resolve(work,'build');
 // No campaign entry, release packaging, user dist overwrite or development HMR/dependency scan.
 const result=await build({configFile:false,root,base:'./',plugins:[react(),catalogDataPlugin()],build:{outDir,emptyOutDir:false,copyPublicDir:false,rollupOptions:{input:fixture}},logLevel:'warn'});
@@ -73,6 +76,42 @@ try {
   await page.getByRole('tab',{name:'船体插件'}).focus();await page.keyboard.press('ArrowRight');
   assert.equal(await page.getByRole('tab',{name:'舰船系统'}).getAttribute('aria-selected'),'true');
   await page.keyboard.press('Escape');await page.locator('.native-catalog').waitFor({state:'detached'});
+  // Same regression fixture now covers the skill picker that previously displayed a
+  // shared implementation note in place of seventeen individual effect descriptions.
+  await page.setViewportSize({width:1440,height:900});
+  await page.goto(origin+entry+'?systems');
+  await page.getByRole('button',{name:/装配舰船技能/}).click();
+  await page.getByRole('button',{name:'全部',exact:true}).click();
+  const audit=await page.evaluate(()=>window.systemDescriptions);
+  const before=await page.evaluate(()=>JSON.stringify(window.systemTestState));
+  assert.equal(audit.length,57);
+  assert.ok(audit.every(d=>d.description?.trim()),'all selectable native systems need real descriptions');
+  assert.equal(new Set(audit.map(d=>d.description)).size,audit.length,'no shared generic descriptions');
+  for(const definition of audit){
+    await page.getByRole('textbox',{name:'搜索舰船技能'}).fill(definition.id);
+    await page.locator('[data-system-id="'+definition.id+'"]').click();
+    const shown=await page.locator('.system-detail-description').innerText();
+    assert.equal(shown,definition.description,definition.id);
+    assert.doesNotMatch(shown,/%s|参数待核实|沿用原版技能效果|原版脚本战斗效果、CSV|尚未提供/,definition.id);
+  }
+  const byId=Object.fromEntries(audit.map(d=>[d.id,d.description]));
+  assert.match(byId.FORTRESS_SHIELD,/90%.*2.5%/);
+  assert.match(byId.FASTMISSILERACKS,/不会制造或补充导弹/);
+  assert.match(byId.FORGEVATS,/基础备弹量/);assert.match(byId.FORGEVATS_STATION,/一次补满/);
+  assert.match(byId.MICROBURN_OMEGA,/主力舰为3次/);
+  assert.match(byId.MICROBURN,/仍可转向/);assert.match(byId.COMBAT_BURN,/关闭护盾/);
+  assert.match(byId.DRONE_SENSOR,/25%.*15%.*库存5架.*上限2架/);
+  assert.match(byId.FLARELAUNCHER,/10枚普通/);assert.match(byId.FLARELAUNCHER_ACTIVE,/3枚追踪/);
+  await page.getByRole('textbox',{name:'搜索舰船技能'}).fill('DAMPER_OMEGA');
+  await page.locator('[data-system-id="DAMPER_OMEGA"]').click();
+  assert.equal(await page.locator('.system-detail-more').getAttribute('open'),null);
+  await page.getByText('实现说明',{exact:true}).click();
+  assert.match(await page.locator('.system-detail-more').innerText(),/Web 战术 AI/);
+  await page.getByText('实现说明',{exact:true}).click();
+  await page.screenshot({path:resolve('artifacts/native-description-tests/system-description-desktop.png')});
+  await page.getByRole('button',{name:/取消/}).click();
+  await page.getByRole('dialog').waitFor({state:'detached'});
+  assert.equal(await page.evaluate(()=>JSON.stringify(window.systemTestState)),before,'viewing descriptions must not edit loadout');
   assert.deepEqual(errors,[]);
-  console.log(JSON.stringify({passed:['native hullmod normal/S-mod','four hull sizes','raw templates preserved','weapon CSV parameters + verified ion fallback','XIV prefix and base lore','390px layout','keyboard navigation and close'],errors},null,2));
+  console.log(JSON.stringify({passed:['native hullmod normal/S-mod','four hull sizes','raw templates preserved','weapon CSV parameters + verified ion fallback','XIV prefix and base lore','390px layout','keyboard navigation and close','57 distinct skill descriptions + source-specific values','implementation details separated','skill browsing/cancel preserves draft'],errors},null,2));
 } finally {await browser?.close();await new Promise((resolve,reject)=>server.httpServer.close(error=>error?reject(error):resolve()));}

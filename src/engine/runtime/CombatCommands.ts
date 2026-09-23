@@ -2,7 +2,7 @@ import { readSystemBindings, selectedSystemSlot } from './SystemBindings';
 import type { Ship } from '../simulation/Ship';
 import type { Vector2 } from '../math/Vector2';
 import { pickCombatContact } from './CombatTargeting';
-import { sound } from '../audio/SoundManager';
+import { combatAudio as sound } from '../audio/CombatAudioEvents';
 
 /** Shared by local input, HUD, LAN authority and the Worker experiment. */
 export type ShipCommand =

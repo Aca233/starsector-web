@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {assetManager} from '../src/engine/assets/AssetResolver';
 import {createLanWorld} from '../src/network/LanWorld';
-import {captureCombat,applyCombatSnapshot} from '../src/network/CombatSnapshot';
+import {captureCombat,applyCombatSnapshot} from '../src/network/AuthorityCombatSnapshot';
 import {LocalFirePrediction} from '../src/network/LocalFirePrediction';
 import {predictedProjectileLayer} from '../src/engine/render/PredictedProjectileLayer';
 import {setProjectileVisualLayer} from '../src/engine/render/ProjectileVisualLayer';

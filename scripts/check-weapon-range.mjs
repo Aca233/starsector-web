@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';import path from 'node:path';import {pathToFileURL} from 'node:url';import {build} from 'esbuild';
-const out=path.resolve('artifacts/dynamic-range-20260922');fs.mkdirSync(out,{recursive:true});
+const out=path.resolve(process.env.WEAPON_RANGE_OUT??'artifacts/dynamic-range-20260922');fs.mkdirSync(out,{recursive:true});
 const outfile=path.join(out,'range-contract.mjs');
 await build({stdin:{loader:'ts',resolveDir:process.cwd(),contents:
  `export {combatWeaponRange,effectiveWeaponRange} from './src/engine/simulation/WeaponRange';
@@ -41,4 +41,18 @@ mods.hullModDefinitions.register({id:'range_contract_live',name:'Live range cont
 const custom=immutableCopy({...template,builtInHullMods:[],hullMods:['range_contract_live']});
 for(const percent of [0,30,30,0]){bonus+=11;const before=calls;compare(custom,w,10,percent);assert.equal(calls-before,2,'candidate and reference must both call extension');}
 for(const value of [NaN,Infinity,-Infinity,-1,0]){w.range=value;compare(immutableCopy({...template,builtInHullMods:[],hullMods:['safetyoverrides']}),w,20,40);}
+// Classification caches may hold false, but never mutable specs or failed resolution.
+const nativeSpec=immutableCopy({...template,builtInHullMods:[],hullMods:['targetingunit']});
+for(let i=0;i<3;i++){assert.equal(mods.hasOnlyNativeRangeModifiers(nativeSpec),true);assert.equal(mods.hasOnlyNativeRangeModifiers(custom),false);}
+const changing={...template,builtInHullMods:[],hullMods:['targetingunit']};
+assert.equal(mods.hasOnlyNativeRangeModifiers(changing),true);changing.hullMods[0]='range_contract_live';
+assert.equal(mods.hasOnlyNativeRangeModifiers(changing),false);changing.hullMods[0]='targetingunit';
+assert.equal(mods.hasOnlyNativeRangeModifiers(changing),true);
+const late=immutableCopy({...template,builtInHullMods:[],hullMods:['range_contract_late']});
+assert.throws(()=>mods.hasOnlyNativeRangeModifiers(late),/unsupported/);
+mods.hullModDefinitions.register({id:'range_contract_late',name:'Late registry contract',status:'implemented'});
+assert.equal(mods.hasOnlyNativeRangeModifiers(late),false);
+const installed=mods.installedHullMods(nativeSpec);installed.length=0;
+assert.equal(mods.installedHullMods(nativeSpec).length,1);assert.equal(mods.hasOnlyNativeRangeModifiers(nativeSpec),true);
+checks+=13;
 fs.writeFileSync(path.join(out,'range-contract.json'),JSON.stringify({checks,customCalls:calls}));console.log(JSON.stringify({checks,customCalls:calls}));

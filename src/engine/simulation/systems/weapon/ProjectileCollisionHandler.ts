@@ -5,7 +5,7 @@ import { distanceToSegment, segmentHullHit } from '../../../visual/HulkGeometry'
 import { Vector2 } from '../../../math/Vector2';
 import { Ship } from '../../Ship';
 import { Projectile } from '../../Weapon';
-import { sound } from '../../../audio/SoundManager';
+import { combatAudio as sound } from '../../../audio/CombatAudioEvents';
 import { requireWeaponEffect, weaponEffects } from '../../../extensions/weapon-effects/Registry';
 import { applyComponentDamage } from './ComponentDamage';
 import { projectileOutgoingMultiplier, projectileSource, bindProjectileSource } from './OutgoingDamage';

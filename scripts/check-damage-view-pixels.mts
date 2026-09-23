@@ -13,7 +13,7 @@ import {normalizedProjection} from './lib/damage-view-oracle.mts';
  await assetManager.ensureManifestLoaded();await contentManifestManager.ensureLoaded();
  await Promise.all(['cracks','burns','holes'].flatMap(kind=>[0,1].flatMap(variant=>['base','glow'].map(layer=>textureCache.waitForImage(`/game-assets/graphics/damage/damage_${kind}48_${variant}_${layer}.png`)))));
  const world=()=>{const e=createLanWorld({id:'damage-pixels',seed:917,hostId:'p0',snapshotHz:60,players:[{id:'p0',seat:0,team:0,hull:'onslaught'},{id:'p1',seat:1,team:1,hull:'onslaught'}],options:{assignment:'teams',battleSize:3200,aiHulls:[Array(10).fill('hammerhead'),Array(10).fill('hammerhead')]}} as any).engine;configureHostCosmetics(e,true,true,true);return e;};
- const take=(e:any,t:number,fn:any=oldCapture)=>fn(e,t,{},0,true,true,true,true,true,true);
+ const take=(e:any,t:number,fn:any=oldCapture)=>fn(e,t,{},0,true,true,true,true,true,true,false,false,false,true,true);
  const canon=(e:any,t:number)=>JSON.stringify(normalizedProjection(take(e,t),true));
  const source=world();for(const ship of source.allCapitalShips){ship.pos.scale(.2);ship.prevPos.copy(ship.pos);ship.fireControlMode='AI';}
  const canvases=[document.createElement('canvas'),document.createElement('canvas')];for(const c of canvases){c.width=c.height=768;document.body.append(c);}

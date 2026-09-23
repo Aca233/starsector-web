@@ -56,7 +56,7 @@ export class ProjectileFlightPrediction {
   private readonly layer = new Map<Projectile, Projectile>();
   private tick = -1;
   private at = 0;
-  private engine: CombatEngine | null = null;
+  private engine: DisplaySource | null = null;
   private frames = 0;
   private ageMs = 0;
   private active = false;
@@ -64,7 +64,7 @@ export class ProjectileFlightPrediction {
     if (this.engine) setProjectileFlightLayer(this.engine);
     this.poses.length = 0; this.layer.clear(); this.tick = -1; this.active = false; this.ageMs = 0;
   }
-  receive(engine: CombatEngine, tick: number, now: number): void {
+  receive(engine: DisplaySource, tick: number, now: number): void {
     if (!Number.isSafeInteger(tick) || tick < 0 || !Number.isFinite(now)) return;
     if (this.engine !== engine) { this.reset(); this.engine = engine; }
     if (tick <= this.tick) return;
@@ -97,7 +97,7 @@ export class ProjectileFlightPrediction {
     }
     this.poses.length = count;
   }
-  render(engine: CombatEngine, now: number, enabled: boolean): void {
+  render(engine: DisplaySource, now: number, enabled: boolean): void {
     const age = now - this.at;
     this.active = enabled && engine === this.engine && this.tick >= 0 && Number.isFinite(now)
       && age >= 0 && age <= PROJECTILE_FLIGHT_LIMITS.staleMs && !projectileVisualLayer(engine) && this.poses.length > 0;
@@ -120,3 +120,6 @@ export class ProjectileFlightPrediction {
   }
   stats() { return { active: this.active, tick: this.tick, entities: this.poses.length, renderedFrames: this.frames, extrapolationMs: this.ageMs }; }
 }
+
+/** Minimal display capabilities; never an authority-world requirement. */
+type DisplaySource = Pick<CombatEngine, 'projectiles'>;

@@ -1,7 +1,17 @@
+import type { CombatDisplayReads } from './CombatDisplayReads';
 import type { CombatEngine } from '../simulation/CombatEngine';
 import type { ShipSpec } from '../content/ShipSpec';
 import type { DeploymentRow } from '../simulation/CombatDeployment';
 import { immutableCopy, isImmutableMetadata } from '../extensions/Immutable';
+
+/** World reads needed for deployment projection, not the published DeploymentViewSource.
+ * Only the replica's read API is required; deployment writes stay on the authority. */
+export type DeploymentSource = Readonly<Pick<CombatDisplayReads,
+  'playerShip' | 'allCapitalShips' | 'battleResult' | 'isSimulation'
+  | 'simulationPointLimit' | 'simulationDeployedPoints'
+>> & {
+  readonly deployment: Readonly<Pick<CombatEngine['deployment'], 'enabled' | 'snapshot'>>;
+};
 
 /** Data only: never give deployment UI an authority Ship or callable simulation service. */
 export interface DeploymentMemberView extends Readonly<DeploymentRow> {
@@ -55,12 +65,12 @@ class DefinitionSnapshots {
  * Unregistered mutable specs are sampled each capture, never frozen in their owner's world. */
 export class DeploymentViewProjector {
   private readonly definitions = new DefinitionSnapshots();
-  private engine?: CombatEngine;
-  private flagship?: CombatEngine['playerShip'];
+  private engine?: DeploymentSource;
+  private flagship?: DeploymentSource['playerShip'];
   private epoch = -1;
   private generation = 0;
   private previous?: DeploymentView;
-  capture(engine: CombatEngine, epoch = 0, available = true): DeploymentView {
+  capture(engine: DeploymentSource, epoch = 0, available = true): DeploymentView {
     if (this.engine !== engine || this.flagship !== engine.playerShip || this.epoch !== epoch) {
       this.engine = engine; this.flagship = engine.playerShip; this.epoch = epoch;
       this.generation++; this.previous = undefined;
@@ -102,7 +112,7 @@ export class DeploymentViewProjector {
 }
 
 /** Compatibility boundary for network display engines, not a UI-owned engine fallback. */
-export function engineDeploymentView(engine: CombatEngine): DeploymentViewSource {
+export function engineDeploymentView(engine: DeploymentSource): DeploymentViewSource {
   const projector = new DeploymentViewProjector();
   return { read: () => projector.capture(engine) };
 }

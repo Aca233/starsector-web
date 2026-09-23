@@ -1,7 +1,6 @@
+import type { CombatDisplayReads, CombatDisplayShip as Ship } from '../engine/runtime/CombatDisplayReads';
 import { Vector2 } from '../engine/math/Vector2';
 import { setShipPresentationPose } from '../engine/visual/ShipPresentation';
-import type { Ship } from '../engine/simulation/Ship';
-import type { CombatEngine } from '../engine/simulation/CombatEngine';
 import type { MotionFrame, MotionRow } from './MotionFrame.mjs';
 /** Two small authority endpoints, not complete-world replacements. All writes
  * go to render-only poses. No HP, weapon, collision, AI or world tick mutation. */
@@ -24,7 +23,7 @@ export class MotionReplica {
     for (const ship of this.shown) setShipPresentationPose(ship, null);
     this.shown.clear(); this.current = this.previous = null; this.receivedAt = null;
   }
-  render(engine: CombatEngine, now: number, worldTick: number) {
+  render(engine: DisplaySource, now: number, worldTick: number) {
     for (const ship of this.shown) setShipPresentationPose(ship, null);
     this.shown.clear();
     if (!this.fresh(now, worldTick)) return;
@@ -58,3 +57,6 @@ export function motionAuthority(ship: Ship, row: MotionRow): Ship {
   replica.facingRad = row[5]; replica.angularVelRad = row[6]; replica.teleportSequence = row[7];
   return replica;
 }
+
+/** Minimal display capabilities; never an authority-world requirement. */
+type DisplaySource = Pick<CombatDisplayReads, 'allCapitalShips'>;

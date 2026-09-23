@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';import {test} from 'node:test';
 import {captureCombat as oldCapture,applyCombatSnapshots as oldApply} from 'projectiles-reference';
-import {captureCombat,applyCombatSnapshots} from '../src/network/CombatSnapshot';
+import {captureCombat,applyCombatSnapshots} from '../src/network/AuthorityCombatSnapshot';
 import {nativeProjectileCaptureDiagnostics} from '../src/network/NativeProjectileCapture';
 import {compileProjectileFixed,restoreProjectileFixed} from '../src/network/ProjectileFixedRestore';
 import {encodeProjectedBinaryFrame,decodeBinaryFrame} from '../src/network/BinarySnapshot.mjs';

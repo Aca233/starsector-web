@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import crypto from 'node:crypto';import {deflateRawSync,inflateRawSync} from 'node:zlib';
-import {captureCombat,applyCombatSnapshots} from '../src/network/CombatSnapshot';
+import {captureCombat,applyCombatSnapshots} from '../src/network/AuthorityCombatSnapshot';
 import {captureCombat as entityCapture,applyCombatSnapshots as entityApply} from 'entity-candidate';
 import {ProjectileCapsuleReceiver} from '../src/network/ProjectileEntityCapsule';
 import {expandSnapshotProjectiles} from '../src/network/ProjectileProjection';

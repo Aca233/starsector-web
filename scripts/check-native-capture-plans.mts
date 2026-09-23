@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';import {test} from 'node:test';import fs from 'node:fs';import path from 'node:path';
 import {captureCombat as reference} from 'capture-plans-off';
-import {applyCombatSnapshots} from '../src/network/CombatSnapshot';
+import {applyCombatSnapshots} from '../src/network/AuthorityCombatSnapshot';
 import {nativeRecordRestorer} from '../src/network/NativeRecordRestore.generated';
-import {captureCombat,capturePlanDiagnostics} from '../src/network/CombatSnapshot';import {encodeProjectedBinaryFrame,decodeBinaryFrame} from '../src/network/BinarySnapshot.mjs';
+import {captureCombat,capturePlanDiagnostics} from '../src/network/AuthorityCombatSnapshot';import {encodeProjectedBinaryFrame,decodeBinaryFrame} from '../src/network/BinarySnapshot.mjs';
 import {createLanWorld} from '../src/network/LanWorld';import {assetManager} from '../src/engine/assets/AssetResolver';import {captureAuthorityCombat,configureHostCosmetics} from '../src/network/HostSnapshot';import {Vector2} from '../src/engine/math/Vector2';
 const baseTest = process.argv.includes('--weapon-only') ? (_name:string,_fn:()=>unknown)=>{} : test;
 const root=path.resolve('public');globalThis.fetch=async(input:any)=>{const file=path.resolve(root,String(input).replace(/^\//,''));if(!file.startsWith(root+path.sep))throw Error('outside assets');return new Response(fs.readFileSync(file));};await assetManager.ensureManifestLoaded();

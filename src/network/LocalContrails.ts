@@ -9,13 +9,13 @@ export class LocalContrails {
   private serial = 0;
   private tracked = new Map<number, { strip: string; position: Vector2; seen: boolean }>();
 
-  reset(engine: CombatEngine): void {
+  reset(engine: DisplaySource): void {
     engine.contrailEngine.clear();
     this.tracked.clear();
     this.time = null;
   }
 
-  update(engine: CombatEngine, visualTime: number, alpha: number, reset = false): void {
+  update(engine: DisplaySource, visualTime: number, alpha: number, reset = false): void {
     const layer = projectileVisualLayer(engine);
     if (layer?.stale) { this.reset(engine); return; }
     if (layer) { visualTime = layer.time; alpha = 1; reset = false; }
@@ -56,3 +56,6 @@ export class LocalContrails {
     }
   }
 }
+
+/** Minimal display capabilities; never an authority-world requirement. */
+type DisplaySource = Pick<CombatEngine, 'contrailEngine' | 'projectiles'>;

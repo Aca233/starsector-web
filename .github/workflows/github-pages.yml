@@ -30,6 +30,11 @@ jobs:
         uses: actions/configure-pages@v5
       - name: Exclude unfinished career mode
         run: node scripts/check-release-scope.mjs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install lossless image encoder
+        run: python -m pip install "Pillow==12.1.0"
       - run: npm ci
       - run: npm run lint
       - name: Build static browser edition

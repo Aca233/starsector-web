@@ -1,7 +1,7 @@
 import { copyReplayCheckpoint, sameReplayWitness } from './CombatReplayCheckpoint';
-import { sound } from '../../audio/SoundManager';
+import { captureCombatAudio } from '../../audio/CombatAudioEvents';
 import { LocalCombatKernel } from './LocalCombatKernel';
-import { CombatPresentationEncoder } from './CombatPresentation';
+import { CombatPresentationEncoder } from './CombatPresentationEncoder';
 import { LOCAL_COMBAT_PROTOCOL, type CombatAudioEvent, type LocalCombatRequest, type LocalCombatAck, type LocalCombatFailure } from './LocalCombatProtocol';
 
 let kernel: LocalCombatKernel | undefined, encoder: CombatPresentationEncoder | undefined;
@@ -13,9 +13,10 @@ const pushAudio = (event: CombatAudioEvent) => {
   if (audio.length >= 8192) throw new Error('Combat audio event budget exceeded');
   audio.push(event);
 };
-// This module is worker-only; the main-thread sound singleton is never patched.
-sound.play = (key, volume = .8, rate = 1) => pushAudio({ key, volume, rate });
-sound.playAtPos = (key, pos, _listener, volume = .8, rate = 1) => pushAudio({ key, volume, rate, position: [pos.x, pos.y] });
+captureCombatAudio(event => {
+  if (event.kind === 'play') pushAudio({key:event.key,volume:event.volume,rate:event.rate,
+    ...(event.position ? {position:[...event.position] as [number,number]} : {})});
+});
 self.onmessage = async (event: MessageEvent<LocalCombatRequest>) => {
   if (failed) return;
   const request = event.data;
@@ -32,7 +33,7 @@ self.onmessage = async (event: MessageEvent<LocalCombatRequest>) => {
       const checkpoint = copyReplayCheckpoint(request.checkpoint, LOCAL_COMBAT_PROTOCOL);
       epoch = request.epoch; replaying = true;
       kernel = new LocalCombatKernel(checkpoint.config);
-      encoder = new CombatPresentationEncoder(epoch, checkpoint.config.presentation ?? 'compatibility');
+      encoder = new CombatPresentationEncoder(epoch, checkpoint.config.presentation ?? 'render-strict');
       let completed = 0;
       const total = checkpoint.entries.reduce((sum, entry) => sum + (entry.kind === 'step' ? entry.count : 1), 0);
       const progress = () => self.postMessage({ protocol: LOCAL_COMBAT_PROTOCOL, epoch,
@@ -59,7 +60,7 @@ self.onmessage = async (event: MessageEvent<LocalCombatRequest>) => {
       replaying = false; audio.length = 0;
     } else if (request.kind === 'init') {
       if (kernel || sequence) throw new Error('Local combat worker already initialized');
-      epoch = request.epoch; kernel = new LocalCombatKernel(request.config); encoder = new CombatPresentationEncoder(epoch, request.config.presentation ?? 'compatibility');
+      epoch = request.epoch; kernel = new LocalCombatKernel(request.config); encoder = new CombatPresentationEncoder(epoch, request.config.presentation ?? 'render-strict');
     } else {
       if (!kernel || !encoder || request.epoch !== epoch) throw new Error('Stale local combat epoch');
       if (request.kind === 'step') { await kernel.stepScheduled(request.sample); if (failed) return; }

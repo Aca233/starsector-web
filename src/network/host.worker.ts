@@ -1,4 +1,4 @@
-import {capturePlanDiagnostics} from './CombatSnapshot';
+import {capturePlanDiagnostics} from './AuthorityCombatSnapshot';
 import {SnapshotEncoderBroker} from './SnapshotEncoderBroker';
 import {attachAuthorityCompletion, readAuthorityCompletion} from './AuthorityLocalCompletion.mjs';
 import type {AuthorityCompletion} from './AuthorityLocalCompletion.mjs';
@@ -26,9 +26,9 @@ import { Vector2 } from "../engine/math/Vector2";
 import { applyPlayerControls } from "../engine/runtime/PlayerControls";
 import { DEFAULT_MOUSE_STEERING } from "../engine/runtime/CombatControlSettings";
 import { dispatchShipCommand } from "../engine/runtime/CombatCommands";
-import { sound } from "../engine/audio/SoundManager";
+import { captureCombatAudio } from "../engine/audio/CombatAudioEvents";
 import type { CombatSound } from "./CombatSnapshot";
-import { captureAuthorityCombat, configureHostCosmetics } from "./HostSnapshot";
+import { captureLanDisplayCombat, configureHostCosmetics } from "./HostSnapshot";
 import { encodeProjectedBinaryFrame, ProjectionEncodingCache } from "./BinarySnapshot.mjs";
 import { blankInput, KEY_CODES } from "./protocol";
 import type { Match, PlayerInput, Seat, Action } from "./protocol";
@@ -59,7 +59,7 @@ const deploymentReplies = new Map<string, Record<string, unknown>>();
 let captureMs = 0, encodeMs = 0;
 // At most one completed tick, retained only for the other display/network lane.
 // Not a payload queue or a baseline: every recipient still gets a full frame.
-let capturedFrame: { engine: CombatEngine; tick: number; frame: ReturnType<typeof captureAuthorityCombat>; encoding: ProjectionEncodingCache | null } | null = null;
+let capturedFrame: { engine: CombatEngine; tick: number; frame: ReturnType<typeof captureLanDisplayCombat>; encoding: ProjectionEncodingCache | null } | null = null;
 let captures = 0, captureReuses = 0, encodedFragmentReuses = 0;
 let snapshotInFlight: number | null = null;
 let snapshotEncoderWorker: SnapshotEncoderBroker | null = null;
@@ -154,13 +154,10 @@ const queueSound = (
   if (sounds.length < 64) sounds.push(event);
   if (directIo && networkSounds.length < 64) networkSounds.push(event);
 };
-// Worker emits data-only one-shot events; each client plays them at its own listener position.
-sound.play = (key, volume = 0.8, rate = 1) => {
-  queueSound(key, volume, rate);
-};
-sound.playAtPos = (key, pos, _listener, volume = 0.8, rate = 1) => {
-  queueSound(key, volume, rate, [pos.x, pos.y]);
-};
+// Worker owns a bounded event collector, never a patched playback singleton.
+captureCombatAudio(event => {
+  if (event.kind === 'play') queueSound(event.key,event.volume,event.rate,event.position ? [...event.position] : undefined);
+});
 const send = (message: unknown, transfer: Transferable[] = []) =>
   (self as unknown as { postMessage(message: unknown, transfer: Transferable[]): void }).postMessage(message, transfer);
 const ioFlow = new FlowCounters(['uploaded', 'uploadSkipped']);
@@ -268,15 +265,15 @@ function snapshot(final = false) {
     // leave an old projection pinned. Only successful dispatch may retain it.
     const previous = capturedFrame;
     capturedFrame = null;
-    let captured: ReturnType<typeof captureAuthorityCombat>;
+    let captured: ReturnType<typeof captureLanDisplayCombat>;
     if (cacheable && previous?.engine === engine && previous.tick === tick) {
       captured = previous.frame;
       captureReuses++;
     } else {
       const started = performance.now();
-      captured = captureAuthorityCombat(engine, tick,
+      captured = captureLanDisplayCombat(engine, tick,
         Object.fromEntries([...controls].map(([seat, state]) => [seat, state.acknowledged])),
-        simulationMs, muzzleEvents, compactParticles, binarySnapshots, import.meta.env.VITE_LAN_COMPONENTS === 'true');
+        simulationMs, muzzleEvents, compactParticles, binarySnapshots);
       captures++;
       captureMs = captureMs * .7 + (performance.now() - started) * .3;
     }
@@ -323,7 +320,8 @@ function snapshot(final = false) {
     const priorFragmentHits = encodingCache?.hits ?? 0;
     const binary = display && binarySnapshots ? encodeProjectedBinaryFrame(frame, true, encodingCache) : null;
     const networkBinary = networkFrame && binarySnapshots ? sameSounds && binary ? binary.slice() : encodeProjectedBinaryFrame(networkFrame, true, encodingCache) : null;
-    const visualBinary = binary && visualEnabled && engine.projectiles.length > 0 ? encodeProjectedBinaryFrame(withoutBulkProjectiles(frame), true) : null;
+    // Only the dedicated IPC consumer currently accepts the stripped variant.
+    const visualBinary = binary && authoritySummaryShips !== null && visualEnabled && engine.projectiles.length > 0 ? encodeProjectedBinaryFrame(withoutBulkProjectiles(frame), true) : null;
     const json = !display || binary ? undefined : JSON.stringify(frame);
     const bytes = !display ? 0 : binary?.byteLength ?? snapshotEncoder.encode(json!).byteLength;
     encodedFragmentReuses += (encodingCache?.hits ?? 0) - priorFragmentHits;
@@ -591,8 +589,8 @@ function handleMessage(m: any) {
       serializerStartupFailed = false;
       binarySnapshots = m.binarySnapshots === true;
       ensureSnapshotEncoder();
-      visualPublisher = new AnchoredProjectilePublisher(m.match.id); visualEnabled = false; visualInFlight = null; lastVisualTick = -1; lastVisualAt = -Infinity; visualRetryAt = 0;
-      combatEnabled = false; combatInFlight = null; lastCombatTick = -1; nextCombatAt = 0;
+      visualPublisher = new AnchoredProjectilePublisher(m.match.id); visualEnabled = m.visualState === true; visualInFlight = null; lastVisualTick = -1; lastVisualAt = -Infinity; visualRetryAt = 0;
+      combatEnabled = m.combatState === true; combatInFlight = null; lastCombatTick = -1; nextCombatAt = 0;
       motionEnabled = m.motionState === true; lastMotionTick = -1; motionInFlight = null;
       foregroundPending = false;
       backgroundThrottled = false;

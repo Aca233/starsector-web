@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';import fs from 'node:fs';import path fro
 import {performance} from 'node:perf_hooks';
 import {LocalFirePrediction as Before} from 'fire-recovery-control';
 import {LocalFirePrediction as After} from '../src/network/LocalFirePrediction';
-import {assetManager} from '../src/engine/assets/AssetResolver';import {createLanWorld} from '../src/network/LanWorld';import {captureCombat} from '../src/network/CombatSnapshot';
+import {assetManager} from '../src/engine/assets/AssetResolver';import {createLanWorld} from '../src/network/LanWorld';import {captureCombat} from '../src/network/AuthorityCombatSnapshot';
 const root=path.resolve('public');globalThis.fetch=async(input:any)=>{const p=path.resolve(root,String(input).replace(/^\//,''));if(!p.startsWith(root+path.sep))throw Error('Outside assets');return new Response(fs.readFileSync(p));};await assetManager.ensureManifestLoaded();
 const match:any={id:'receive-cost',seed:917,hostId:'a',snapshotHz:60,players:[{id:'a',seat:0,team:0,hull:'onslaught'},{id:'b',seat:1,team:1,hull:'onslaught'}],options:{assignment:'teams',battleSize:3200,aiHulls:[Array(10).fill('hammerhead'),Array(10).fill('hammerhead')]}};
 const rows:any[]=[];const q=(xs:number[],p:number)=>xs.toSorted((a,b)=>a-b)[Math.floor((xs.length-1)*p)];

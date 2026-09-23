@@ -1,3 +1,4 @@
+import {PackedSnapshotNumbers} from '../../src/network/PackedSnapshotNumbers.mjs';
 /** Test oracle independent of the candidate capture/restore implementations. */
 const FULL_MARK_KEYS = ['cellIndex','localPos','opacity','intensity','heat','justHit','flash','flashElapsed','phase','pulsePeriod','size','rotationRad','kind','variant'];
 export const DAMAGE_INTERNAL_FIELDS = ['heat','justHit','flash','flashElapsed','phase','pulsePeriod'];
@@ -10,6 +11,7 @@ export function normalizedProjection(frame: any, renderMarks = false): any {
  };
  const visit = (value: any): any => {
   if (!value || typeof value !== 'object') return value;
+  if (value instanceof PackedSnapshotNumbers) return value.toJSON();
   if (Array.isArray(value)) return value.map(visit);
   if (Object.hasOwn(value,'$record')) return record(value.$record,value.values);
   if (Object.hasOwn(value,'$records')) return value.values.map((row:any[]) => record(value.$records,row));

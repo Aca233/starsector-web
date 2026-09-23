@@ -45,12 +45,12 @@ await fs.writeFile(path.join(dist,'lan-build.json'),JSON.stringify({build:'room-
 const metrics=[],clients=[],rooms=[],errors=[],phases=[];
 const factory=createAuthorityFactory({workerFile:path.join(runtime,'authority-worker.mjs'),assets,maxBattles:roomCount});
 const authorityFactory=(match,receive)=>{
-  const metricsRow={id:match.id,produced:0,bytes:0,tick:0,recoveries:0,telemetry:null,gatewayTimes:[]};metrics.push(metricsRow);
+  const metricsRow={id:match.id,produced:0,bytes:0,tick:0,recoveries:0,recoveryEvents:[],telemetry:null,gatewayTimes:[]};metrics.push(metricsRow);
   return factory({...match,seed:1511506142},m=>{
     if(m.type==='snapshot'){metricsRow.produced++;metricsRow.bytes+=m.bytes;metricsRow.tick=m.tick;}
     if(m.type==='performance'){metricsRow.tick=m.tick;metricsRow.telemetry=m;}
-    if(m.type==='recovered')metricsRow.recoveries++;
-    if(m.type==='error')errors.push(Error(m.message));
+    if(m.type==='recovered'){metricsRow.recoveries++;metricsRow.recoveryEvents.push({pauseMs:m.pauseMs,diagnostics:m.diagnostics});}
+    if(m.type==='error'){metricsRow.failure={message:m.message,diagnostics:m.diagnostics};errors.push(Error(m.message));}
     const at=performance.now();receive(m);
     if(m.type==='snapshot'&&metricsRow.gatewayTimes.length<4096)metricsRow.gatewayTimes.push(performance.now()-at);
   });
@@ -107,7 +107,7 @@ async function phase(name,ms){
   await sleep(ms);if(errors.length)throw errors[0];
   const elapsed=(performance.now()-start)/1000,usage=process.cpuUsage(cpu);
   const result={name,seconds:elapsed,cpuMs:(usage.user+usage.system)/1000,rssMiB:process.memoryUsage().rss/1048576,
-    rooms:metrics.map((m,i)=>({produced:m.produced-before[i].produced,producedHz:(m.produced-before[i].produced)/elapsed,progressTicks:m.tick-before[i].tick,uncompressedMiB:(m.bytes-before[i].bytes)/1048576,recoveries:m.recoveries,telemetry:m.telemetry,gatewayMs:stats(m.gatewayTimes)})),
+    rooms:metrics.map((m,i)=>({produced:m.produced-before[i].produced,producedHz:(m.produced-before[i].produced)/elapsed,progressTicks:m.tick-before[i].tick,uncompressedMiB:(m.bytes-before[i].bytes)/1048576,recoveries:m.recoveries,recoveryEvents:m.recoveryEvents,telemetry:m.telemetry,gatewayMs:stats(m.gatewayTimes)})),
     eventLoopMs:{mean:loop.mean/1e6,p95:loop.percentile(95)/1e6,max:loop.max/1e6},inputAckMs:clients.map(p=>stats(p.inputLatencies)),
     transport:peers.map((p,i)=>({seat:p.seat,socketSkips:p.lanFlow.skippedSocket-peerBefore[i].skippedSocket,creditSkips:p.lanFlow.skippedCredit-peerBefore[i].skippedCredit,wireMbps:((p.ws._socket?.bytesWritten??0)-peerBefore[i].wireBytes)*8/elapsed/1e6,credits:p.stateCredits.stats(),delta:p.lanDelta?.stats()})),
     receivedHz:clients.map((p,i)=>(p.frames-received[i])/elapsed),
@@ -156,6 +156,11 @@ try{
   const report={passed:true,node:process.version,arch:process.arch,shipsPerRoom:ships,rooms:roomCount,expectSuspended,activeSeconds,isolatedClients,applyReplica,motionReference,autoMotion,
     scope:(applyReplica?'Latest-input ACKs measured after native replica apply; headless appliedHz excludes RAF/interpolation/prediction/GPU. ':'Latest-input ACKs measured at synthetic consumption, not GPU display latency. ')+ ' Real server workers + gateway + PMD/delta WebSocket clients on one machine (isolatedClients=true gives each client its own worker); CPU total still includes clients; no WAN, TLS, GPU or browser render cost. Short test, not a capacity guarantee.',phases};
   const out=path.resolve(value('--out','artifacts/server-authority-20260920/room-benchmark.json'));await fs.mkdir(path.dirname(out),{recursive:true});await fs.writeFile(out,JSON.stringify(report,null,2));
+}catch(error){
+  const out=path.resolve(value('--out','artifacts/server-authority-20260920/room-benchmark.json'));
+  await fs.mkdir(path.dirname(out),{recursive:true});
+  await fs.writeFile(out,JSON.stringify({passed:false,error:String(error?.stack??error),node:process.version,shipsPerRoom:ships,rooms:roomCount,activeSeconds,isolatedClients,applyReplica,motionReference,autoMotion,metrics,phases},null,2));
+  throw error;
 }finally{
   clearInterval(inputTimer);loop.disable();
   await Promise.all(clients.map(p=>p.ws.terminate()));await app?.close();await factory.close();

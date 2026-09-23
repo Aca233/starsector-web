@@ -49,9 +49,8 @@ for(const [playerHull,enemyHull] of [['onslaught','onslaught'],['odyssey','parag
   stats.full+=p.length*8+p.visuals.length*8;stats.render+=q.length*8+q.visuals.length*8;
   assert.equal(v.view.ships.length,w.view.ships.length);checks++;
   const projected=w.view.playerShip instanceof ProjectedRenderShip;
-  if(!projected){assert.deepEqual(state(w),state(v),'Whole-frame compatibility fallback');checks++;}
+  assert(projected,'Display-only projection required');checks++;
   for(let i=0;i<w.view.ships.length;i++){
-   if(!projected){assert(w.view.ships[i] instanceof api.Ship);checks++;continue;}
    assert(w.view.ships[i] instanceof ProjectedRenderShip);assert.equal('applyHullDamage' in w.view.ships[i],false);
    assert.deepEqual(shipRead(w.view.ships[i]),shipRead(k.engine.ships[i]),`${playerHull}/${t}/${i}`);checks+=3;
   }
@@ -60,6 +59,61 @@ for(const [playerHull,enemyHull] of [['onslaught','onslaught'],['odyssey','parag
   if(stable && Object.getPrototypeOf(stable)===Object.getPrototypeOf(w.view.playerShip))assert.equal(stable,w.view.playerShip);stable=w.view.playerShip;checks++;
  }
  reports.push(stats);k.dispose();
+}
+// Strict presentation is an explicitly negotiated contract, never a native graph fallback.
+{
+ const same=(a,b)=>{assert.equal(a,b);checks++;};
+ const rejects=(fn,pattern)=>{assert.throws(fn,pattern);checks++;};
+ rejects(()=>new CombatPresentationDecoder(0,'render-strict'),/epoch/);
+ const k=new LocalCombatKernel({playerHull:'onslaught',enemyHull:'paragon',seed:994,multicore:false,presentation:'render-strict'});
+ const encoder=new CombatPresentationEncoder(901,'render-strict'),decoder=new CombatPresentationDecoder(901,'render-strict');
+ const baseline=encoder.capture(k.engine,0),first=decoder.apply(structuredClone(baseline)),ship=first.view.playerShip;
+ same(ship instanceof ProjectedRenderShip,true);same(first.view.enemyShip instanceof ProjectedRenderShip,true);
+ assert.deepEqual(shipRead(ship),shipRead(k.engine.playerShip));checks++;
+ const compatibility=new CombatPresentationDecoder(902).apply(new CombatPresentationEncoder(902).capture(k.engine,0));
+ assert.deepEqual(normalize(first.hud),normalize(compatibility.hud));checks++;
+ rejects(()=>decoder.apply(structuredClone(baseline)),/stale/);
+ k.step(sample(1));k.engine.playerShip.hullHp-=7;
+ const next=encoder.capture(k.engine,k.tick),before=state(first);
+ // All native simulation prototype IDs are forbidden, including unused shapes.
+ for(let type=1;type<=9;type++){
+  const bad=structuredClone(next);bad.shapes.push({type,keys:[]});
+  rejects(()=>decoder.apply(bad),/Simulation class/);
+  assert.deepEqual(state(first),before);checks++;
+ }
+ const executable=structuredClone(next),data=new Float64Array(executable.buffer,0,executable.length);
+ same(data[0],6);same(data[2],data[1]);same(data[3],0);
+ same(executable.shapes[data[4]].type,0);same(executable.shapes[data[4]].keys[0],'view');
+ data[5]=8;data[6]=executable.strings.push(k.engine.playerShip.system.type)-1;
+ rejects(()=>decoder.apply(executable),/Executable system definition/);
+ assert.deepEqual(state(first),before);checks++;
+ for(const bad of [{...next,revision:next.revision+1},{...next,epoch:903}]){
+  rejects(()=>decoder.apply(bad),/stale/);assert.deepEqual(state(first),before);checks++;
+ }
+ const second=decoder.apply(structuredClone(next));same(second.view.playerShip,ship);
+ same(ship.hullHp,k.engine.playerShip.hullHp);
+ assert.deepEqual(shipRead(ship),shipRead(k.engine.playerShip));checks++;
+ // A fresh full epoch is required after losing a revision; no history is reused.
+ const fresh=new CombatPresentationEncoder(903,'render-strict').capture(k.engine,k.tick);
+ const recovered=new CombatPresentationDecoder(903,'render-strict').apply(structuredClone(fresh));
+ assert.deepEqual(shipRead(recovered.view.playerShip),shipRead(ship));checks++;
+ same(recovered.view.playerShip===ship,false);
+ const plainRoots=structuredClone(fresh);let projectedShapes=0;
+ for(const shape of plainRoots.shapes)if(shape.type===11){shape.type=0;projectedShapes++;}
+ assert(projectedShapes>0);checks++;
+ rejects(()=>new CombatPresentationDecoder(903,'render-strict').apply(plainRoots),/Missing strict projected ship root/);
+ // Unsupported hooks must not be invoked, or change a strict epoch to compatibility.
+ const source=k.engine.playerShip,original=source.system.getWeaponRangePercent;let calls=0;
+ source.system.getWeaponRangePercent=()=>{calls++;return 42;};
+ const unsupported=new CombatPresentationEncoder(904,'render-strict');
+ rejects(()=>unsupported.capture(k.engine,k.tick),/authority-side presentation adapter/);same(calls,0);
+ source.system.getWeaponRangePercent=original;
+ rejects(()=>unsupported.capture(k.engine,k.tick),/encoder failed/);same(calls,0);
+ same(new CombatPresentationDecoder(905,'render-strict').apply(new CombatPresentationEncoder(905,'render-strict').capture(k.engine,k.tick)).view.playerShip instanceof ProjectedRenderShip,true);
+ // The former non-strict name is now a display-only alias, never a fallback.
+ source.externalPhaseEffects.set({},()=>.5);
+ rejects(()=>new CombatPresentationEncoder(906,'render').capture(k.engine,k.tick),/authority-side presentation adapter/);
+ k.dispose();reports.push({scenario:'render-strict',contract:'no-simulation-prototypes-or-executable-system-definitions'});
 }
 // Tactical map data is standalone, observing-team filtered, immutable and optional when closed.
 {
@@ -350,17 +404,16 @@ for(const [playerHull,enemyHull] of [['onslaught','onslaught'],['odyssey','parag
  const bad=encoder.capture(k.engine,0);const shape=bad.shapes.find(x=>x.keys.includes('kind'))??bad.shapes[0];shape.keys.push('constructor');assert.throws(()=>decoder.apply(bad));checks++;
  // Projection must neither invoke custom query hooks nor masquerade them as native.
  const projection=new api.RenderShipProjection(),original=source.system.getWeaponRangePercent;let calls=0;
- source.system.getWeaponRangePercent=()=>{calls++;return 42;};assert.equal(projection.project(source),source);assert.equal(calls,0);checks+=2;
+ source.system.getWeaponRangePercent=()=>{calls++;return 42;};assert.throws(()=>projection.project(source),/authority-side presentation adapter/);assert.equal(calls,0);checks+=2;
  source.system.getWeaponRangePercent=original;projection.begin();assert(projection.project(source) instanceof ProjectedRenderShip);checks++;
  for(const radius of [0,1,45,1234]){
   source.shield.radius=radius;const before=JSON.stringify(state(source.shield));const levels=source.shield.presentationHitSegmentLevels();assert.equal(JSON.stringify(state(source.shield)),before);assert.deepEqual(levels,source.shield.hitSegmentLevels);checks+=2;
  }
  source.externalPhaseEffects.set({},()=>{calls++;return .5;});projection.begin();const count=calls;
- assert.equal(projection.project(source),source);assert.equal(calls,count);checks+=2;
- const fallback=new CombatPresentationDecoder(2).apply(new CombatPresentationEncoder(2,'render').capture(k.engine,0));
- assert(fallback.view.playerShip instanceof api.Ship);assert(fallback.view.enemyShip instanceof api.Ship);checks+=2;
+ assert.throws(()=>projection.project(source),/authority-side presentation adapter/);assert.equal(calls,count);checks+=2;
+ assert.throws(()=>new CombatPresentationEncoder(2,'render').capture(k.engine,0),/authority-side presentation adapter/);checks++;
  const driftEncoder=new CombatPresentationEncoder(3,'render');source.externalPhaseEffects.clear();driftEncoder.capture(k.engine,0);
- source.externalPhaseEffects.set({},()=>.5);assert.throws(()=>driftEncoder.capture(k.engine,0),/new compatibility epoch/);checks++;
+ source.externalPhaseEffects.set({},()=>.5);assert.throws(()=>driftEncoder.capture(k.engine,0),/authority-side presentation adapter/);checks++;
  k.dispose();
 }
 {

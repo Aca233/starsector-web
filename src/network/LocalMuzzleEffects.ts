@@ -1,5 +1,4 @@
 import { Vector2 } from '../engine/math/Vector2';
-import type { CombatEngine } from '../engine/simulation/CombatEngine';
 import type { MuzzleParticle } from '../engine/simulation/CombatTypes';
 import { SimulationRandom } from '../engine/simulation/SimulationRandom';
 import { appendMuzzleFlash, appendLauncherSmoke } from '../engine/visual/MuzzleParticles';
@@ -35,11 +34,11 @@ export class LocalMuzzleEffects {
       this.dirty=true;
     }
   }
-  reset(engine:CombatEngine):void {
+  reset(engine: DisplaySource):void {
     setLocalMuzzleLayer(engine.fxSystem);this.groups.clear();this.particles.length=0;
     this.latest=undefined;this.highest=0;this.particleBudget=0;this.time=null;this.dirty=false;
   }
-  update(engine:CombatEngine,visualTime:number,reset=false):void {
+  update(engine: DisplaySource,visualTime:number,reset=false):void {
     if(!Number.isFinite(visualTime)){this.reset(engine);return;}
     if(reset || (this.time!==null&&(visualTime<this.time||visualTime-this.time>1))){
       const batch=this.latest;this.reset(engine);this.receive(batch);
@@ -67,3 +66,6 @@ export class LocalMuzzleEffects {
     setLocalMuzzleLayer(engine.fxSystem,this.particles);
   }
 }
+
+/** Minimal display capabilities; never an authority-world requirement. */
+type DisplaySource = { readonly fxSystem: object };

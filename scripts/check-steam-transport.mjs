@@ -7,7 +7,7 @@ import { SnapshotSendWindow, MAX_SNAPSHOT_WINDOW } from '../server/steam/snapsho
 import { SteamPacketCodec } from '../server/steam/packet-codec.mjs';
 import protocol from '../src/network/protocol.json' with { type: 'json' };
 const hostId = '76561198000000001', guestId = '76561198000000002', lobby = '109775240000000001', connection = 'a'.repeat(32);
-function fixture() {
+function fixture(open = {}) {
   const packets = [], logs = [];
   const gateway = new SteamGateway({ snapshotPreparation: false, build: 'test', log: line => logs.push(JSON.parse(line.slice('[steam-transport] '.length))),
     client: { networking: { sendP2PPacket: (_remote, type, data) => { assert.equal(type, 2); packets.push(data); return true; },
@@ -15,7 +15,7 @@ function fixture() {
   gateway.owner = hostId;
   gateway.selected = { id: lobby, owner: hostId, lobby: { getOwner: () => BigInt(hostId), getMembers: () => [BigInt(hostId), BigInt(guestId)] } };
   gateway.relay = { acceptTransport() {} };
-  gateway.dispatch(guestId, { connection, op: 'open', data: { lobby, build: 'test', protocol: protocol.version } });
+  gateway.dispatch(guestId, { connection, op: 'open', data: { lobby, build: 'test', protocol: protocol.version, ...open } });
   packets.length = 0;
   return { gateway, peer: gateway.peers.get(guestId), packets, logs };
 }
@@ -211,4 +211,177 @@ test('a second room peer cancels an outstanding upward RTT probe without losing 
  const w=new SnapshotSendWindow();w.acknowledge(50,10000,4);w.acknowledge(300,41001,4);assert.equal(w.probe,'drain');
  w.acknowledge(350,41500,1,false);assert.equal(w.probe,null);assert.equal(w.baseRtt,50);assert.ok(w.limit>=2);
  const limit=w.limit;w.acknowledge(NaN,42000,1,false);assert.equal(w.limit,limit);assert.equal(w.baseRtt,50);
+});
+
+test('Steam motion handles fragmentation, loss, reordering, duplicate/old scopes and malformed packets', async () => {
+  const { encodeSteamMotion, SteamMotionReceiver } = await import('../server/steam/motion-channel.mjs');
+  const { encodeMotionFrame, motionToText } = await import('../src/network/MotionFrame.mjs');
+  let now = 0;
+  const receiver = new SteamMotionReceiver(connection, { now: () => now });
+  const arm = (sync = 'sync') => {
+    receiver.reset('match', sync);
+    receiver.worldReceived(0, { matchId: 'match', frame: { tick: 0 } });
+    assert.ok(receiver.worldConsumed(0));
+  };
+  arm();
+  const message = tick => ({ type: 'motion', matchId: 'match', syncId: 'sync', data: motionToText(encodeMotionFrame({
+    tick, time: tick / 60, acknowledged: {},
+    ships: Array.from({ length: 100 }, (_, i) => ['ship' + i, ...Array.from({ length: 6 }, (_, j) => ((i + 1) * 12345.6789 * (j + 1)) % 100000), 0, 0]),
+  })) });
+  const a = encodeSteamMotion(connection, message(1)); assert.ok(a.packets.length > 1);
+  assert.equal(receiver.receive(a.packets[0]), null); now = 251;
+  const b = encodeSteamMotion(connection, message(2)); let result;
+  for (const p of [...b.packets].reverse()) result = receiver.receive(p) ?? result;
+  assert.deepEqual(result, message(2)); assert.equal(receiver.parts.size, 0);
+  for (const p of a.packets) assert.equal(receiver.receive(p), null, 'old lost pose cannot rewind');
+  for (const p of b.packets) assert.equal(receiver.receive(p), null, 'duplicate cannot reapply');
+  assert.equal(receiver.consume({ matchId: 'match', syncId: 'old', tick: 2 }), null);
+  assert.equal(receiver.consume({ matchId: 'match', syncId: 'sync', tick: 999 }), null);
+  assert.deepEqual(receiver.consume({ matchId: 'match', syncId: 'sync', tick: 2 }), { motion: 1, matchId: 'match', syncId: 'sync', tick: 2 });
+  arm('next'); for (const p of encodeSteamMotion(connection, message(3)).packets) assert.equal(receiver.receive(p), null, 'old sync rejected');
+  arm(); for (const p of encodeSteamMotion('b'.repeat(32), message(4)).packets) assert.equal(receiver.receive(p), null, 'wrong nonce rejected before allocation');
+  assert.equal(receiver.parts.size, 0);
+  const bad = Buffer.from(b.packets[0]); bad.writeUInt16LE(65535, 18); assert.equal(receiver.receive(bad), null);
+  const corrupt = b.packets.map(p => Buffer.from(p)); corrupt[0][36] ^= 1;
+  for (const p of corrupt) assert.equal(receiver.receive(p), null, 'inconsistent checksum cannot deliver');
+  arm();
+  for (let tick = 10; tick < 50; tick++) receiver.receive(encodeSteamMotion(connection, message(tick)).packets[0]);
+  assert.equal(receiver.parts.size, 2, 'loss never allocates an unbounded reassembly queue');
+});
+
+test('Steam motion requires real world consumption, bounds shared traffic and expires without faking ACKs', async () => {
+  const { SteamMotionBudget, SteamMotionSender } = await import('../server/steam/motion-channel.mjs');
+  const { encodeMotionFrame, motionToText } = await import('../src/network/MotionFrame.mjs');
+  let now = 0; const budget = new SteamMotionBudget({ now: () => now }), sent = [];
+  const sender = new SteamMotionSender(connection, budget, p => { sent.push(p); return true; }, { now: () => now });
+  const message = tick => ({ type: 'motion', matchId: 'match', syncId: 'sync', data: motionToText(encodeMotionFrame({ tick, time: tick / 60, acknowledged: {}, ships: [['ship', tick, 0, 0, 0, 0, 0, 0, 0]] })) });
+  sender.worldSent(1, { matchId: 'match', seq: 1, tick: 1 }); assert.equal(sender.send(message(2)), false);
+  assert.equal(sender.worldConsumed(999), false); assert.equal(sender.worldConsumed(1), true);
+  for (let tick = 2; tick <= 5; tick++) assert.ok(sender.send(message(tick)));
+  assert.equal(sender.send(message(6)), false); assert.equal(sender.stats().inflight, 4);
+  assert.equal(sender.consumed({ matchId: 'wrong', syncId: 'sync', tick: 5 }), false);
+  now = 251;
+  assert.equal(sender.consumed({ matchId: 'match', syncId: 'sync', tick: 5 }), false, 'late ACK cannot resurrect expired credit');
+  assert.equal(sender.stats().consumed, 0); assert.equal(sender.stats().expired, 4); assert.equal(sender.send(message(7)), false);
+  assert.ok(sender.stats().fallback); sender.reset(); assert.ok(sender.stats().fallback, 'same-match resync cannot erase sticky fallback');
+  sender.reset(null); sender.worldSent(2, { matchId: 'match', seq: 2, tick: 8 }); sender.worldConsumed(2, true);
+  assert.equal(sender.send(message(9)), false, 'discarded full state is not a usable baseline');
+  sender.worldSent(3, { matchId: 'match', seq: 3, tick: 9 }); sender.worldConsumed(3);
+  assert.ok(sender.send(message(10))); assert.ok(sender.consumed({ matchId: 'match', syncId: 'sync', tick: 10 }));
+  now += 751; assert.equal(sender.send(message(11)), false); assert.equal(sender.stats().world.fallbackReason, 'whole-state-stalled');
+  sender.reset(); assert.equal(sender.stats().world.fallbackReason, 'whole-state-stalled');
+  const fair = new SteamMotionBudget({ now: () => now, burst: 1200, bytesPerSecond: 1200 });
+  assert.ok(fair.take(1200, 'a')); assert.equal(fair.take(1000, 'b'), false); now += 200;
+  assert.equal(fair.take(100, 'a'), false, 'small later sender cannot starve older request');
+  for (let i = 0; i < 3; i++) { assert.equal(fair.take(1000, 'b'), false); now += 200; }
+  assert.equal(fair.take(1000, 'b'), false); // Still polled within the 250ms intent lifetime.
+  assert.equal(fair.take(100, 'a'), false); now += 100;
+  assert.ok(fair.take(1000, 'b')); assert.ok(sent.every(p => p.length <= 1200));
+});
+
+test('Steam motion visibility and resync require a new retained world and discard old receipt authority', async () => {
+  const { encodeSteamMotion, SteamMotionReceiver } = await import('../server/steam/motion-channel.mjs');
+  const { encodeMotionFrame, motionToText } = await import('../src/network/MotionFrame.mjs');
+  const receiver = new SteamMotionReceiver(connection); receiver.reset('match', 'sync');
+  const packet = (tick, syncId = 'sync') => encodeSteamMotion(connection, { type: 'motion', matchId: 'match', syncId,
+    data: motionToText(encodeMotionFrame({ tick, time: tick / 60, acknowledged: {}, ships: [] })) }).packets[0];
+  const world = tick => ({ matchId: 'match', frame: { tick } });
+  receiver.worldReceived(1, world(1)); assert.equal(receiver.receive(packet(2)), null, 'network arrival is not consumption');
+  assert.ok(receiver.worldConsumed(1)); assert.ok(receiver.receive(packet(2)));
+  receiver.worldReceived(2, world(3)); receiver.setHidden(true);
+  assert.equal(receiver.consume({ matchId: 'match', syncId: 'sync', tick: 2 }), null);
+  receiver.setHidden(false); assert.equal(receiver.worldConsumed(2), false); assert.equal(receiver.receive(packet(4)), null);
+  receiver.worldReceived(3, world(4)); assert.ok(receiver.worldConsumed(3));
+  assert.equal(receiver.receive(packet(2)), null, 'old datagram cannot rewind past fresh baseline'); assert.ok(receiver.receive(packet(5)));
+  receiver.reset('match', 'new-sync'); assert.equal(receiver.worldConsumed(3), false);
+  receiver.worldReceived(4, world(6)); receiver.worldConsumed(4);
+  assert.equal(receiver.receive(packet(7)), null); assert.ok(receiver.receive(packet(7, 'new-sync')));
+});
+
+test('Steam motion capability alone never advertises negotiated renderer support', () => {
+  const { gateway, peer } = fixture({ stateConsumption: 1, motion: 1 });
+  assert.equal(peer.diagnostics().motion, null);
+  gateway.dispatch(guestId, { connection, id: 100, op: 'data', data: { type: 'hello', stateCredits: 1 } });
+  peer.send(JSON.stringify({ type: 'welcome' }));
+  assert.equal(peer.diagnostics().motion, null); assert.equal(peer.sendMotion({}), false);
+  // Only a trusted relay welcome may finish both ends of the negotiation.
+  peer.send(JSON.stringify({ type: 'welcome', motionState: 1, motionTransport: 'steam-datagram-v1' }));
+  assert.equal(peer.diagnostics().motion.world.status, 'awaiting-world');
+  assert.equal(peer.motionEnabled, true); peer.close();
+});
+
+test('Steam motion superseded by a real newer full world is not mistaken for packet loss', async () => {
+  const { SteamMotionBudget, SteamMotionSender } = await import('../server/steam/motion-channel.mjs');
+  const { encodeMotionFrame, motionToText } = await import('../src/network/MotionFrame.mjs');
+  let now = 0;
+  const sender = new SteamMotionSender(connection, new SteamMotionBudget({ now: () => now }), () => true, { now: () => now });
+  const world = tick => { sender.worldSent(tick, { matchId: 'match', seq: tick, tick }); assert.ok(sender.worldConsumed(tick)); };
+  const pose = tick => ({ type: 'motion', matchId: 'match', syncId: 'sync', data: motionToText(encodeMotionFrame({ tick, time: tick / 60, acknowledged: {}, ships: [] })) });
+  world(1);
+  for (let tick = 2; tick <= 5; tick++) { assert.ok(sender.send(pose(tick))); world(tick); now += 100; }
+  sender.expire(); assert.equal(sender.stats().inflight, 0); assert.equal(sender.stats().bytes, 0);
+  assert.equal(sender.stats().consumed, 0); assert.equal(sender.stats().superseded, 4);
+  assert.equal(sender.stats().expired, 0); assert.equal(sender.stats().fallback, null);
+  assert.equal(sender.send(pose(5)), false); assert.ok(sender.send(pose(6)));
+});
+
+test('Steam components isolate receipt credit, fragmented loss, corruption and old connections', async () => {
+  const { SteamComponentBudget, SteamComponentSender, SteamComponentReceiver } = await import('../server/steam/component-channel.mjs');
+  const { encodeCombatState, COMBAT_NUMBERS } = await import('../src/network/CriticalCombatState.mjs');
+  let now = 0, reason = null;
+  const budget = new SteamComponentBudget({ now: () => now }), packets = [];
+  const sender = new SteamComponentSender(connection, budget, p => { packets.push(p); return true; }, r => { reason = r; }, { now: () => now });
+  const receiver = new SteamComponentReceiver(connection, { now: () => now });
+  const message = tick => ({ type: 'combat-state', matchId: 'match', syncId: 'sync', tick, data: Buffer.from(encodeCombatState({ tick, time: tick / 60,
+    ships: Array.from({ length: 100 }, (_, i) => ['ship-' + i, 0, 0, ...COMBAT_NUMBERS.map((_, j) => Math.sin(i * 97 + j * 61 + tick) * 12345)]) })).toString('base64') });
+  assert.ok(sender.send(message(1))); assert.ok(packets.length > 1); assert.ok(packets.every(p => p.length <= 1200));
+  let delivered; for (const p of [...packets].reverse()) delivered = receiver.receive(p, 'match', 'sync') ?? delivered;
+  assert.deepEqual(delivered, message(1)); assert.equal(sender.stats().consumed, 0, 'packet delivery is not application consumption');
+  const receipt = { type: 'combat-consumed', matchId: 'match', syncId: 'sync', tick: 1, status: 'consumed' };
+  assert.equal(receiver.consume({ ...receipt, syncId: 'old' }), null);
+  const ack = receiver.consume(receipt); assert.ok(ack); assert.equal(sender.consume(ack.component, null), null);
+  assert.deepEqual(sender.consume(ack.component, ack.receipt), receipt); assert.equal(budget.flight, 0);
+  for (const p of packets) assert.equal(receiver.receive(p, 'match', 'sync'), null);
+  const foreign = new SteamComponentReceiver('b'.repeat(32)); for (const p of packets) assert.equal(foreign.receive(p, 'match', 'sync'), null);
+  assert.equal(foreign.parts.size, 0);
+  packets.length = 0; assert.ok(sender.send(message(2)));
+  const corrupt = packets.map(p => Buffer.from(p)); corrupt[0][40] ^= 1;
+  for (const p of corrupt) assert.equal(receiver.receive(p, 'match', 'sync'), null);
+  now = 501; sender.poll(); await Promise.resolve();
+  assert.equal(reason, 'component-loss-or-consumer-stall'); assert.equal(sender.stats().consumed, 1);
+  assert.equal(budget.flight, 0); assert.equal(sender.send(message(3)), false, 'loss disables only optional epoch without fake ACK');
+  sender.reset(); assert.ok(sender.send(message(4))); sender.reset(); assert.equal(budget.flight, 0);
+  // Transport credit must obey the same fragment/final semantics as the relay.
+  assert.equal(receiver.consume(null), null);
+  for (const offset of [0, 6144]) {
+    packets.length = 0;
+    const visual = {type:'projectile-visual',matchId:'match',syncId:'sync',key:1,tick:5,kind:'baseline',offset,total:6145,data:Buffer.alloc(offset === 0 ? 6144 : 1).toString('base64')};
+    assert.ok(sender.send(visual));
+    for (const p of packets) receiver.receive(p, 'match', 'sync');
+    const r = {type:'visual-consumed',matchId:'match',syncId:'sync',key:1,tick:5,kind:'baseline',offset,total:6145,status:offset === 0 ? 'fragment' : 'consumed'};
+    const wrong = {...r,status:offset === 0 ? 'consumed' : 'fragment'};
+    assert.equal(receiver.consume(wrong), null);
+    assert.equal(sender.consume(sender.serial, wrong), null);
+    assert.ok(budget.flight > 0);
+    const exact = receiver.consume(r); assert.ok(exact);
+    assert.deepEqual(sender.consume(exact.component, exact.receipt), r);
+    assert.equal(budget.flight, 0);
+  }
+});
+
+test('authority component upload validates cached visual anchors and complete combat bytes', async () => {
+  const { AuthorityComponentPublisher, AuthorityComponentReceiver } = await import('../src/network/AuthorityComponents.mjs');
+  const { AnchoredProjectilePublisher } = await import('../src/network/AnchoredProjectileVisual.mjs');
+  const { encodeCombatState } = await import('../src/network/CriticalCombatState.mjs');
+  const source = new AuthorityComponentPublisher(), target = new AuthorityComponentReceiver('match'), visual = new AnchoredProjectilePublisher('match');
+  const first = source.prepare('match', { type: 'projectile-visual', publication: visual.publish({ tick: 1, time: 1 / 60, rows: [] }) });
+  assert.ok(first.message.baseline); first.commit(); assert.equal(target.receive(first.message).publication.tick, 1);
+  const next = source.prepare('match', { type: 'projectile-visual', publication: visual.publish({ tick: 2, time: 2 / 60, rows: [] }) });
+  assert.equal(next.message.baseline, undefined); assert.equal(target.receive(next.message).publication.tick, 2);
+  assert.throws(() => new AuthorityComponentReceiver('match').receive(next.message), /baseline/);
+  assert.throws(() => target.receive({ ...next.message, matchId: 'old' }), /scope/);
+  const combat = source.prepare('match', { type: 'combat-state', tick: 3, data: encodeCombatState({ tick: 3, time: .05, ships: [] }) });
+  assert.equal(target.receive(combat.message).frame.tick, 3);
+  assert.throws(() => target.receive({ ...combat.message, tick: 4 }), /tick/);
+  source.reset(); assert.ok(source.prepare('match', { type: 'projectile-visual', publication: visual.latest }).message.baseline);
 });

@@ -16,3 +16,10 @@ export class ProjectionEncodingCache { constructor(frame: CombatSnapshot); reado
 export interface TranscodedSnapshotTape {bytes:Uint8Array<ArrayBuffer>;sounds:CombatSnapshot['sounds'];soundStart:number;soundEnd:number}
 export function encodeProjectedSnapshotTape(tape:import('./SnapshotTape.mjs').SnapshotTape):TranscodedSnapshotTape|null;
 export function replaceProjectedTapeSounds(frame:TranscodedSnapshotTape,sounds:CombatSnapshot['sounds']):Uint8Array<ArrayBuffer>|null;
+
+/** One validated relay projection; lazy same-packet variant, null retains complete bytes.
+ * Keep input immutable; caller must validate summary and per-recipient consumed visual credit. */
+export function decodeBinaryStateWithProjectileVariantForRelay(buffer: ArrayBuffer | ArrayBufferView): {
+  state: ReturnType<typeof decodeBinaryStateForRelay>;
+  projectileVariant(): Uint8Array<ArrayBuffer> | null;
+};

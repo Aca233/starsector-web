@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { nativeRecordRestorer } from '../src/network/NativeRecordRestore.generated';
 import { LAN_WEAPON_NUMBERS } from '../src/network/display/FixedDisplayRecords';
 import { captureAuthorityCombat } from '../src/network/HostSnapshot';
-import { captureCombat, applyCombatSnapshots } from '../src/network/CombatSnapshot';
+import { captureCombat, applyCombatSnapshots } from '../src/network/AuthorityCombatSnapshot';
 import { encodeProjectedBinaryFrame, decodeBinaryFrame, encodeProjectedSnapshotTape, decodeBinaryState, encodeBinaryState } from '../src/network/BinarySnapshot.mjs';
 import { SnapshotTapeWriter } from '../src/network/SnapshotTape.mjs';
 import { summarizeCombatFrame } from '../src/network/CombatFrameSummary.mjs';

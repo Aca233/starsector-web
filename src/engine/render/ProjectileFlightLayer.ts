@@ -1,12 +1,11 @@
-import type { CombatEngine } from '../simulation/CombatEngine';
 import type { Projectile } from '../simulation/Weapon';
 
 /** Display-only ordinary-shot poses. Separate from unconfirmed local fire and
  * from the experimental stream (which replaces the authoritative draw list). */
 export type ProjectileFlightLayer = ReadonlyMap<Projectile, Projectile>;
-const layers = new WeakMap<CombatEngine, ProjectileFlightLayer>();
-export const projectileFlightLayer = (engine: CombatEngine): ProjectileFlightLayer | undefined => layers.get(engine);
-export function setProjectileFlightLayer(engine: CombatEngine, layer?: ProjectileFlightLayer): void {
+const layers = new WeakMap<object, ProjectileFlightLayer>();
+export const projectileFlightLayer = (engine: object): ProjectileFlightLayer | undefined => layers.get(engine);
+export function setProjectileFlightLayer(engine: object, layer?: ProjectileFlightLayer): void {
   if (layer) layers.set(engine, layer); else layers.delete(engine);
 }
 

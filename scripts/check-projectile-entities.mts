@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { assets, world } from './lib/native-projectile-fixture.mts';
-import { captureCombat, captureProjectileProjection, applyCombatSnapshots as controlApply } from '../src/network/CombatSnapshot';
+import { captureCombat, captureProjectileProjection, applyCombatSnapshots as controlApply } from '../src/network/AuthorityCombatSnapshot';
 import { captureCombat as candidate, applyCombatSnapshots as apply } from 'entity-candidate';
 import { NativeProjectileCapsules, ProjectileCapsuleReceiver, restoreEntityValue } from '../src/network/ProjectileEntityCapsule';
 import { expandSnapshotProjectiles } from '../src/network/ProjectileProjection';

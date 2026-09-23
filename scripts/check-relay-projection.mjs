@@ -5,9 +5,11 @@ import path from 'node:path';
 const baseline = process.env.RELAY_PROJECTION_BASELINE ? await import(pathToFileURL(path.resolve(process.env.RELAY_PROJECTION_BASELINE)).href) : null;
 const exactResult=(decode,bytes)=>{try{return {value:decode(bytes)};}catch(error){return {error:{name:error.name,message:error.message}};}};
 import {encode} from '@msgpack/msgpack';
-import {decodeBinaryState,decodeBinaryStateForRelay,encodeBinaryState,encodeProjectedBinaryFrame} from '../src/network/BinarySnapshot.mjs';
+import {decodeBinaryState,decodeBinaryStateForRelay,decodeBinaryStateWithProjectileVariantForRelay,encodeBinaryState,encodeProjectedBinaryFrame} from '../src/network/BinarySnapshot.mjs';
 import {summarizeCombatFrame} from '../src/network/CombatFrameSummary.mjs';
 import {KEY_DICTIONARY} from '../src/network/KeyDictionary.mjs';
+import {withoutBulkProjectiles} from '../src/network/ProjectileBulkVariant.mjs';
+import {PackedSnapshotNumbers} from '../src/network/PackedSnapshotNumbers.mjs';
 
 const wrap = payload => encodeBinaryState('relay-equivalence',7,payload);
 const frame = tick => ({tick, ships:[{id:'a',state:{teamId:0,x:1.75}},{id:'b',state:{teamId:1,x:-33}}],
@@ -20,7 +22,9 @@ function result(decode, bytes) {
 }
 function equivalent(bytes, expected) {
   const before=Buffer.from(bytes),full=result(decodeBinaryState,bytes),projected=result(decodeBinaryStateForRelay,bytes);
-  assert.deepEqual(projected,full);assert.deepEqual(Buffer.from(bytes),before);
+  assert.deepEqual(projected,full);
+  assert.deepEqual(result(b=>decodeBinaryStateWithProjectileVariantForRelay(b).state,bytes),full);
+  assert.deepEqual(Buffer.from(bytes),before);
   if(baseline)assert.deepEqual(exactResult(decodeBinaryStateForRelay,bytes),exactResult(baseline.decodeBinaryStateForRelay,bytes));
   if(expected!==undefined)assert.equal(full.ok,expected);
 }
@@ -119,4 +123,85 @@ test('bounded relay checks every skipped tag/truncation, near-depth boundary and
   for(const value of [Buffer.from([0xdd,0x7f,0xff,0xff,0xff]),Buffer.from([0xdf,0,1,0,1]),Buffer.from([0xda,0xff,0xff]),Buffer.from([0xdb,0xff,0xff,0xff,0xff])]){
     equivalent(branch(value),false);equivalent(branch(value,true),false);
   }
+});
+
+function paired(bytes, expected = true) {
+  const original = Buffer.from(new Uint8Array(bytes.buffer,bytes.byteOffset,bytes.byteLength));
+  const {state,projectileVariant} = decodeBinaryStateWithProjectileVariantForRelay(bytes);
+  assert.deepEqual(state,decodeBinaryStateForRelay(bytes));
+  const variant = projectileVariant();
+  assert.equal(!!variant,expected);
+  assert.equal(projectileVariant(),variant,'one lazy allocation per broadcast');
+  if (variant) {
+    assert.ok(variant.length < original.length);
+    const full = decodeBinaryState(bytes);
+    assert.deepEqual(decodeBinaryState(variant),{...full,frame:withoutBulkProjectiles(full.frame)});
+    assert.deepEqual(decodeBinaryStateForRelay(variant),state);
+  }
+  assert.deepEqual(Buffer.from(new Uint8Array(bytes.buffer,bytes.byteOffset,bytes.byteLength)),original);
+  return variant;
+}
+const swf2 = payload => wrap(Buffer.concat([Buffer.from('SWF2'),payload]));
+const largeProjectiles = () => Array.from({length:64},(_,i)=>({id:i,pos:{$vector:[i/3,-i]},trail:[1,2,3]}));
+
+test('single-upload variants preserve every non-projectile value in SWF2/SWF3 and offset views',()=>{
+  for (const packed of [false,true]) for (const columns of [false,true]) {
+    const f=frame(4);f.world.projectiles=columns?{$projectileColumns:{ids:Array.from({length:80},(_,i)=>i),positions:Array.from({length:160},(_,i)=>i/4)}}:largeProjectiles();
+    f.world.mines=[{id:4,x:2}];f.world.beams=[{id:5,hit:[2,5]}];f.world.fx=[['flash',13]];
+    f.sounds=[{id:'impact',time:1}];f.extra={nested:{world:{projectiles:['keep me']},projectileVisuals:9}};
+    const numbers=[1.125,2**40,3.5];
+    if(packed)f.extra.exact=PackedSnapshotNumbers.capture(new Float64Array(numbers));
+    const bytes=wrap(encodeProjectedBinaryFrame(f,true));
+    const size=new DataView(bytes.buffer).getUint32(4,true);
+    assert.equal(bytes[8+size+3],packed?51:50);
+    const padded=Buffer.concat([Buffer.alloc(9,0xfe),bytes,Buffer.alloc(5,0xfe)]);
+    for (const view of [bytes,padded.subarray(9,-5),new DataView(padded.buffer,padded.byteOffset+9,bytes.length)]) {
+      const variant=paired(view);
+      if(packed){
+        const value=decodeBinaryState(variant).frame.extra.exact;
+        assert.deepEqual(value.numbers,new Float64Array(numbers));
+        assert.deepEqual(value.bytes,f.extra.exact.bytes);
+      }
+    }
+  }
+});
+
+test('ambiguous, legacy, marked and non-saving packets retain the complete fallback',()=>{
+  const full=frame(1);full.world.projectiles=largeProjectiles();
+  paired(wrap(encode(full)),false); // No SWF prefix: supported decoding, no derivation.
+  for(const value of [[],[0],undefined]){
+    const f=frame(1);if(value===undefined)delete f.world.projectiles;else f.world.projectiles=value;
+    paired(wrap(encodeProjectedBinaryFrame(f)),false);
+  }
+  for(const marker of [0,1,null])paired(wrap(encodeProjectedBinaryFrame({...full,projectileVisuals:marker})),false);
+  const pairs=Object.entries(full).map(([k,v])=>[k,encode(v)]);
+  paired(swf2(rawMap([...pairs,['world',encode(full.world)]])),false);
+  paired(swf2(rawMap(pairs.map(([k,v])=>[k,k==='world'?rawMap([['projectiles',encode(largeProjectiles())],['projectiles',encode(largeProjectiles())]]):v]))),false);
+  // 'world' is intentionally not in the frozen dictionary; alternate MessagePack
+  // string headers still denote the same key and must count twice.
+  paired(swf2(rawMap([...pairs,[Buffer.concat([Buffer.from([0xd9,5]),Buffer.from('world')]),encode(full.world)]])),false);
+  paired(swf2(rawMap([...pairs,['projectileVisuals',encode(null)]])),false);
+  for(const world of [null,[],42])paired(wrap(encodeProjectedBinaryFrame({...full,world})),false);
+  // Library UTF8 fallback may accept this legacy value, but its partial spans
+  // are never trusted. Poison after that fallback still rejects the packet.
+  paired(swf2(rawMap([...pairs,['extra',Buffer.from([0xa1,0xff])]])),false);
+  assert.throws(()=>decodeBinaryStateWithProjectileVariantForRelay(swf2(rawMap([...pairs,['extra',rawMap([['utf8',Buffer.from([0xa1,0xff])],['constructor',encode(1)]])]]))));
+  assert.throws(()=>decodeBinaryStateWithProjectileVariantForRelay(swf2(rawMap([...pairs,['extra',Buffer.from([0xc1])]]))));
+});
+
+test('paired variants rewrite bounded root map headers without changing other entries or duplicate-key semantics',()=>{
+  for(const count of [15,16,65535,65536]){
+    const f=frame(1);f.world.projectiles=largeProjectiles();
+    const pairs=Object.entries(f).map(([k,v])=>[encode(k),encode(v)]);
+    while(pairs.length<count)pairs.push([encode('unused'+pairs.length),encode(pairs.length)]);
+    const head=Buffer.alloc(count<16?1:count<65536?3:5);
+    if(head.length===1)head[0]=0x80+count;
+    else {head[0]=head.length===3?0xde:0xdf;if(head.length===3)head.writeUInt16BE(count,1);else head.writeUInt32BE(count,1);}
+    const bytes=swf2(Buffer.concat([head,...pairs.flat()]));
+    paired(bytes,count<65536);
+  }
+  const f=frame(1);f.world.projectiles=largeProjectiles();
+  const pairs=Object.entries(f).map(([k,v])=>[k,encode(v)]);
+  const bytes=swf2(rawMap([...pairs,['tick',encode(9)]]));
+  assert.equal(decodeBinaryState(paired(bytes)).frame.tick,9);
 });

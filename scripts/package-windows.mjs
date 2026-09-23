@@ -1,5 +1,6 @@
 import { copySteamMetricsRuntime, verifySteamMetricsRuntime } from './package-steam-metrics-runtime.mjs';
 import fs from 'node:fs/promises';
+import { assertCleanWebBuild } from './web-build-integrity.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -35,6 +36,7 @@ if (!args.includes('--skip-build')) {
   command(process.execPath, [npm, 'run', 'build']);
 }
 const dist = path.join(project, 'dist');
+await assertCleanWebBuild(dist);
 const { build: buildId } = JSON.parse(await fs.readFile(path.join(dist, 'lan-build.json'), 'utf8'));
 await fs.access(path.join(dist, 'index.html'));
 const nodeExe = await fs.realpath(process.execPath);

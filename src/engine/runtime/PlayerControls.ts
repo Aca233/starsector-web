@@ -1,4 +1,4 @@
-import type { Ship } from '../simulation/Ship';
+import type { CombatDisplayShip as Ship } from './CombatDisplayReads';
 import { Vector2 } from '../math/Vector2';
 import { signedAngle } from '../math/Angles';
 import { DEFAULT_MOUSE_STEERING } from './CombatControlSettings';

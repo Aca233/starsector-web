@@ -6,14 +6,12 @@ import { ProjectileThreatIndex } from '../../ai/ProjectileThreatIndex.ts';
 import { Vector2 } from '../../math/Vector2.ts';
 import { SimulationRandom } from '../../simulation/SimulationRandom.ts';
 import { createWeaponHealthTracker, weaponHealthProfile } from '../../simulation/systems/weapon/WeaponComponentHealth';
-import { sound } from '../../audio/SoundManager.ts';
 import { parts, controls, primitive, NumericReader, shipPaths, mountPaths, projectileWireWidth, readProjectile, motionKeys, writePath } from './Protocol.ts';
 import type { Model, Frame, OwnerResult, Fields, Part, Row, Scalar } from './Types';
 import type { TacticalWorld } from '../TacticalWorld';
 import type { WeaponThreatEnvelope } from '../WeaponThreatEnvelope';
 import type { Projectile, Beam, WeaponMount } from '../../simulation/Weapon';
 import type { Asteroid } from '../../simulation/CombatTypes';
-sound.setMuted(true);
 // The publisher computes this with the authority's complete missile lifecycle.
 // Never infer a different lifetime from the deliberately minimal projectile view.
 const projectileLifetime = (p: Projectile): number => (p as Projectile & { threatLifetime: number }).threatLifetime;

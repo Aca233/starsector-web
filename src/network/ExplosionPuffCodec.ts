@@ -42,4 +42,22 @@ export class ExplosionPuffDecoder {
     Object.freeze(wire); this.entries.set(key, { wire, count }); this.retained += count;
     return wire;
   }
+  /** Native receiver: templates are validated/private; copy directly rather
+   * than redispatching six fields and two vector tags for every puff. */
+  restoreInto(value: unknown, budget: PuffRecipeBudget, target: unknown, depth: number): unknown[] {
+    const rows = this.expand(value, budget) as ReadonlyArray<readonly [number, number, number, number,
+      { readonly $vector: readonly number[] }, { readonly $vector: readonly number[] }]>;
+    if (depth > 64) throw Error('Snapshot nesting exceeds limit');
+    const output = Array.isArray(target) ? target : [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i], previous = output[i];
+      const record = previous && typeof previous === 'object' && !Array.isArray(previous) ? previous : {};
+      record.texture = row[0]; record.startSize = row[1]; record.endSize = row[2]; record.rotation = row[3];
+      const offset = row[4].$vector, velocity = row[5].$vector;
+      record.offset = record.offset instanceof Vector2 ? record.offset.set(offset[0], offset[1]) : new Vector2(offset[0], offset[1]);
+      record.velocity = record.velocity instanceof Vector2 ? record.velocity.set(velocity[0], velocity[1]) : new Vector2(velocity[0], velocity[1]);
+      output[i] = record;
+    }
+    output.length = rows.length; return output;
+  }
 }

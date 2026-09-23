@@ -24,7 +24,7 @@ export class ProjectileVisualReplica {
   private previousTime = 0;
   private receivedAt = 0;
   private interval = 50;
-  private engine: CombatEngine | null = null;
+  private engine: DisplaySource | null = null;
   private count = 0;
   constructor(private readonly epoch: string) { this.receiver = new AnchoredProjectileReceiver(epoch); }
   clear(): void {
@@ -50,7 +50,7 @@ export class ProjectileVisualReplica {
     this.tick = frame.tick; this.time = frame.time; this.receivedAt = now; this.poses = poses; this.projectiles = poses.map(p=>p.display); this.count++;
     return true;
   }
-  render(engine: CombatEngine, now: number, bulkTick: number): void {
+  render(engine: DisplaySource, now: number, bulkTick: number): void {
     this.engine = engine;
     if (this.tick < 0 || bulkTick > this.tick) { setProjectileVisualLayer(engine,null); return; }
     // Stale visuals never resurrect removed entities from an older bulk world.
@@ -78,3 +78,6 @@ export class ProjectileVisualReplica {
   }
   stats(): {tick:number;received:number;entities:number} { return {tick:this.tick,received:this.count,entities:this.poses.length}; }
 }
+
+/** Minimal display capabilities; never an authority-world requirement. */
+type DisplaySource = object;

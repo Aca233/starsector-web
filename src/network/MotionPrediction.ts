@@ -1,8 +1,8 @@
-import type { Ship } from '../engine/simulation/Ship';
+import type { CombatDisplayShip as Ship } from '../engine/runtime/CombatDisplayReads';
 import { Vector2 } from '../engine/math/Vector2';
 import { signedAngle } from '../engine/math/Angles';
 import { applyPlayerControls } from '../engine/runtime/PlayerControls';
-import { advanceShipMotion } from '../engine/simulation/systems/ShipMotion';
+import { advanceMotionWithStats } from '../engine/simulation/systems/ShipMotion';
 import { setShipPresentationPose } from '../engine/visual/ShipPresentation';
 import { blankInput, KEY_CODES } from './protocol';
 import type { PlayerInput } from './protocol';
@@ -23,7 +23,7 @@ function advance(replica: Ship, input: PlayerInput, seconds: number) {
   const keys: Record<string, boolean> = {};
   KEY_CODES.forEach((key, bit) => { keys[key] = !!(input.keys & (1 << bit)); });
   applyPlayerControls(replica, keys, new Vector2(...input.aim), false, undefined, input.pointerActive);
-  advanceShipMotion(replica, seconds * Math.min(4, replica.subjectiveTimeMultiplier));
+  advanceMotionWithStats(replica, seconds * Math.min(4, replica.subjectiveTimeMultiplier), replica.getMotionStats());
 }
 
 /** Bounded motion-only replay. No weapon, collision, flux, AI or combat fixedUpdate. */

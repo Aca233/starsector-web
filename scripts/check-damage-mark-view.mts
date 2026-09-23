@@ -1,13 +1,14 @@
-import {captureCombat as previousCapture} from 'damage-view-previous';
+import {hostParticleEvents} from '../src/network/HostParticleEvents';
+import {captureAuthorityCombat} from '../src/network/HostSnapshot';
 import assert from 'node:assert/strict';import {test} from 'node:test';
 import {captureCombat as oldCapture,applyCombatSnapshots as oldApply} from 'receiver-fields-control';
-import {captureCombat as newCapture,applyCombatSnapshots as newApply,damageViewDiagnostics} from 'receiver-fields-candidate';
+import {captureCombat as newCapture,applyCombatSnapshots as newApply} from 'receiver-fields-candidate';
 import {encodeProjectedBinaryFrame,decodeBinaryFrame} from '../src/network/BinarySnapshot.mjs';
 import {Vector2} from '../src/engine/math/Vector2';
 import {assets,world} from './lib/native-projectile-fixture.mts';
 import {normalizedProjection,DAMAGE_INTERNAL_FIELDS,renderMark} from './lib/damage-view-oracle.mts';
 await assets();
-const take=(e:any,t:number,fn:any=oldCapture,native=true,view=true)=>fn(e,t,{0:t,1:t},0,true,true,true,native,true,view);
+const take=(e:any,t:number,fn:any=oldCapture,native=true,view=true)=>fn(e,t,{0:t,1:t},0,true,true,true,native,true,true,false,false,false,true,view);
 const bytes=(f:any)=>encodeProjectedBinaryFrame(f,true)!;
 function mark(){return {cellIndex:80,localPos:new Vector2(2,3),opacity:.7,intensity:.234,heat:117,justHit:false,flash:11,flashElapsed:.23,phase:1.72,pulsePeriod:.57,size:42,rotationRad:.98,kind:'burns',variant:1};}
 function withMarks(marks:any){const e=world(2);(e.allCapitalShips[0].damageDecals as any).marks=marks;return e;}
@@ -27,19 +28,21 @@ test('unknown mark layouts, reordered fields, subclasses and custom arrays retai
  const changed:any=mark();delete changed.cellIndex;changed.cellIndex=80;
  class Marks extends Array<any>{}
  const mapped:any=[mark()];mapped.map=()=>[mark()];
- for(const marks of [[{...mark(),modValue:17}],[missing],[changed],[new CustomMark()],new Marks(mark()),mapped]){
+ const customConstructor:any=[mark()];customConstructor.constructor=Array;
+ for(const marks of [[{...mark(),modValue:17}],[missing],[changed],[new CustomMark()],new Marks(mark()),mapped,customConstructor]){
   const e=withMarks(marks);assert.deepEqual(bytes(take(e,1,newCapture)),bytes(take(e,1)));
  }
 });
-test('direct path preserves the first view wire for scalar extremes, nonstandard vectors and late-row fallback',()=>{
+test('render fields preserve scalar extremes, nonstandard vectors and mixed rows',()=>{
+ const expected=(e:any)=>{const p=normalizedProjection(take(e,1));for(const m of p.ships[0].state.damageDecals.marks)for(const k of DAMAGE_INTERNAL_FIELDS)delete m[k];return p;};
  class OtherVector extends Vector2 {}
  for(const field of ['cellIndex','opacity','intensity','size','rotationRad','kind','variant'])for(const value of [-0,NaN,Infinity,-Infinity,Number.MAX_VALUE,null,undefined,false,'changed',()=>0]){
   const changed:any=mark();changed[field]=value;const e=withMarks([mark(),changed]);
-  assert.deepEqual(bytes(take(e,1,newCapture)),bytes(take(e,1,previousCapture)));
+  assert.deepEqual(normalizedProjection(take(e,1,newCapture)),expected(e));
  }
  for(const position of [new OtherVector(1,2),new Vector2(Infinity,0),{x:2,y:3},null]){
   const changed:any=mark();changed.localPos=position;const e=withMarks([mark(),changed]);
-  assert.deepEqual(bytes(take(e,1,newCapture)),bytes(take(e,1,previousCapture)));
+  assert.deepEqual(normalizedProjection(take(e,1,newCapture)),expected(e));
  }
 });
 test('sparse native arrays and mixed default/custom records preserve order, holes and unknown fields',()=>{
@@ -78,7 +81,6 @@ test('22-ship 1200-tick combat: full independent P1 oracle, RNG/state ownership,
   if(tick)source.fixedUpdate(1/60);peak=Math.max(peak,source.projectiles.length);if(tick%10)continue;
   marks=Math.max(marks,source.allCapitalShips.reduce((n,s)=>n+s.scorchMarks.length,0));
   const rng=JSON.stringify([source.random,source.visualRandom]);const before=take(source,tick),after=take(source,tick,newCapture);
-  assert.deepEqual(bytes(after),bytes(take(source,tick,previousCapture)),'direct vs first view bytes at '+tick);
   assert.deepEqual(normalizedProjection(after),normalizedProjection(before,true),'all P1 fields at '+tick);
   assert.equal(JSON.stringify([source.random,source.visualRandom]),rng);assert.deepEqual(bytes(take(source,tick)),bytes(before),'capture did not alter full authority');
   const x=bytes(before),y=bytes(after);assert.ok(y.length<=x.length);saved+=x.length-y.length;
@@ -86,7 +88,17 @@ test('22-ship 1200-tick combat: full independent P1 oracle, RNG/state ownership,
   oldApply(a,[decodeBinaryFrame(x)],tick===0,undefined,{nativeTargeting:true,nativeProjection:true});
   newApply(b,[decodeBinaryFrame(y)],tick===0,undefined,{nativeTargeting:true,nativeProjection:true});
   assert.deepEqual(normalizedProjection(take(b,tick),true),normalizedProjection(take(a,tick),true),'entire reconstructed P1 at '+tick);
-  if(tick%300===0){const cold=world(),coldOld=world();newApply(cold,[decodeBinaryFrame(y)],true,undefined,{nativeTargeting:true,nativeProjection:true});oldApply(coldOld,[decodeBinaryFrame(x)],true,undefined,{nativeTargeting:true,nativeProjection:true});assert.deepEqual(normalizedProjection(take(cold,tick),true),normalizedProjection(take(coldOld,tick),true),'both cold receivers at '+tick);if(tick===300)assert.notDeepEqual(normalizedProjection(take(coldOld,tick),true),normalizedProjection(take(a,tick),true),'existing full legacy receiver also differs cold versus warm due retained beam fields');}
+  if(tick%300===0){const cold=world(),coldOld=world();newApply(cold,[decodeBinaryFrame(y)],true,undefined,{nativeTargeting:true,nativeProjection:true});oldApply(coldOld,[decodeBinaryFrame(x)],true,undefined,{nativeTargeting:true,nativeProjection:true});assert.deepEqual(normalizedProjection(take(cold,tick),true),normalizedProjection(take(coldOld,tick),true),'both cold receivers at '+tick);}
  }
- assert.ok(peak>30);assert.ok(marks>30);assert.ok(saved>100000);assert.ok(damageViewDiagnostics().directRows>10000);
+ assert.ok(peak>30);assert.ok(marks>30);assert.ok(saved>100000);
+});
+
+test('authority entrypoint enables the view, generic/rollback/component captures stay complete',()=>{
+ const e=withMarks([mark()]);
+ const actual=captureAuthorityCombat(e,1,{0:1,1:1},0,null,true,true);
+ assert.deepEqual(bytes(actual),bytes({...take(e,1,newCapture),particleEvents:hostParticleEvents(e.fxSystem)!.snapshot()}));
+ const rollback=captureAuthorityCombat(e,1,{0:1,1:1},0,null,true,true,false,false,false,true,false);
+ assert.deepEqual(bytes(rollback),bytes({...take(e,1,oldCapture),particleEvents:hostParticleEvents(e.fxSystem)!.snapshot()}));
+ const components=(fn:any,view:boolean)=>fn(e,1,{},0,true,true,true,true,true,true,true,false,false,true,view);
+ assert.deepEqual(bytes(components(newCapture,true)),bytes(components(newCapture,false)));
 });

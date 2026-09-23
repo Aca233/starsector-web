@@ -95,3 +95,7 @@ export class CombatLab {
 }
 
 export * from './FleetCombatLab';
+
+export { assessThreats } from '../../src/engine/ai/ThreatAssessment';
+export { WeaponThreatEnvelope } from '../../src/engine/ai/WeaponThreatEnvelope';
+export { ShipDefenseController } from '../../src/engine/ai/ShipDefenseController';

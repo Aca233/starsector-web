@@ -16,7 +16,7 @@ import { appendMissileContrail } from '../src/engine/simulation/MissileContrails
 import { WebGLProjectilePass } from '../src/engine/render/webgl/passes/WebGLProjectilePass';
 import { createLanWorld } from '../src/network/LanWorld';
 import { assetManager } from '../src/engine/assets/AssetResolver';
-import { captureCombat, applyCombatSnapshot } from '../src/network/CombatSnapshot';
+import { captureCombat, applyCombatSnapshot } from '../src/network/AuthorityCombatSnapshot';
 import { encodeBinaryState, decodeBinaryState, encodeProjectedBinaryFrame } from '../src/network/BinarySnapshot.mjs';
 import { ProjectileThreatIndex } from '../src/engine/ai/ProjectileThreatIndex';
 import { assessThreats } from '../src/engine/ai/ThreatAssessment';

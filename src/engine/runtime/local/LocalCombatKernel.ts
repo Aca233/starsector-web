@@ -1,3 +1,4 @@
+import type { CombatPresentationMode } from './CombatPresentation';
 import { copyDeploymentCommand, prepareDeployment, applyPreparedDeployment, type DeploymentCommand } from '../DeploymentControl';
 import { contentRegistry } from '../../content/ContentRegistry';
 import { deploymentCost } from '../../simulation/CombatDeployment';
@@ -20,7 +21,7 @@ export interface LocalCombatConfig {
   content?: {ships: ShipSpec[]; weapons: import('../../simulation/Weapon').WeaponSpec[]};
   multicore?: boolean;
   /** Display-only render graph, with the complete HUD read set alongside it. */
-  presentation?: 'compatibility' | 'render';
+  presentation?: CombatPresentationMode;
   encounter?: CombatRequest;
   /** Empty simulator, with the same per-side budget as the design-trial entry. */
   simulationPointLimit?: number;
@@ -53,7 +54,7 @@ export class LocalCombatKernel {
   get engine(): CombatEngine { return this.authority.engine; }
   get tick(): number { return this.authority.tick; }
   constructor(config: LocalCombatConfig) {
-    if (!config || (config.presentation !== undefined && config.presentation !== 'compatibility' && config.presentation !== 'render') || typeof config.playerHull !== 'string' || typeof config.enemyHull !== 'string'
+    if (!config || (config.presentation !== undefined && config.presentation !== 'render' && config.presentation !== 'render-strict') || typeof config.playerHull !== 'string' || typeof config.enemyHull !== 'string'
       || !Number.isSafeInteger(config.seed) || (config.multicore !== undefined && typeof config.multicore !== 'boolean') || (config.additionalShips?.length ?? 0) > 4096)
       throw new Error('Invalid local combat configuration');
     if (config.simulationPointLimit !== undefined && (!Number.isInteger(config.simulationPointLimit) || config.simulationPointLimit <= 0 || config.simulationPointLimit > 20000 || config.encounter || config.additionalShips?.length))

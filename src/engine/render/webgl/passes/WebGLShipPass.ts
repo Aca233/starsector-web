@@ -1,7 +1,7 @@
 import { presentationPulseOffset } from '../../ShipSystemPresentation';
 import { hullOverlayInViewport } from '../HullOverlayVisibility';
 import { activeSystemVisuals, renderSystemHull, weaponSystemGlows, systemTeleportCopies, systemTeleportBodyAlpha } from '../ShipSystemRenderer';
-import { renderPulseOffset, renderWeaponAngle } from '../../../runtime/local/RenderShipProjection';
+import { renderPulseOffset, renderWeaponAngle } from '../../ShipRenderQueries';
 import { visualRandom } from '../../RenderDeterminism';
 import type { CombatRenderView } from '../../CombatRenderView';
 import { WebGLPassContext } from '../WebGLPassContext';

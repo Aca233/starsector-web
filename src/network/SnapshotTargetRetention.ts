@@ -48,7 +48,7 @@ function nativeTargetFields(ship: Ship): boolean {
  * No dependency on full/sparse wire shapes: both endpoints have already been fully
  * unpacked (including craft lifecycle/deployment) before this fresh audit runs. */
 export function canRetainSnapshotTargets(
-  engine: CombatEngine,
+  engine: Pick<CombatEngine, 'findHostile'>,
   ships: ReadonlyMap<string, Ship>,
   roster: readonly Ship[],
   nativeFindHostile: CombatEngine['findHostile'],

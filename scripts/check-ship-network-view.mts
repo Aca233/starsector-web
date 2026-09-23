@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';import {test} from 'node:test';import fs from 'node:fs';
 import {ShipViewPublisher,ShipViewReceiver,readShipView,SHIP_VIEW_FIELDS,SHIP_VIEW_LIMITS} from '../src/network/experimental/ShipNetworkView';
 import {lanCrc32} from '../src/network/LanBinaryDelta.mjs';
-import {captureCombat,applyCombatSnapshot,pilotCaptureShips,pilotApplyShips} from '../src/network/CombatSnapshot';
+import {captureCombat,applyCombatSnapshot,pilotCaptureShips,pilotApplyShips} from '../src/network/AuthorityCombatSnapshot';
 import {initAssets,world,take,channel} from './lib/ship-network-view-pilot.mts';
 await initAssets();
 function fixture(){const host=world(),view=world(),rows=host.allCapitalShips.map(ship=>({ship,generation:1}));return{host,view,rows,p:new ShipViewPublisher(17),r:new ShipViewReceiver(17,new Map(view.allCapitalShips.map(s=>[s.id,s])))};}

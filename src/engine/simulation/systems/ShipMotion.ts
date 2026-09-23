@@ -48,11 +48,18 @@ export function advanceAngularVelocity(velocity: number, input: number, dt: numb
 export function advanceShipMotion(ship: Ship, dt: number): { accelerating: boolean; spreading: boolean } {
   if (!(dt > 0)) return { accelerating: false, spreading: false };
   if (ship.engineController.isFlamedOut) {
+    ship.pos.addScaled(ship.vel, dt); ship.facingRad += ship.angularVelRad * dt;
+    return { accelerating: false, spreading: false };
+  }
+  return advanceMotionWithStats(ship, dt, shipMotionStats(ship));
+}
+export function advanceMotionWithStats(ship: import('../../runtime/CombatDisplayReads').CombatDisplayShip, dt: number, stats: ReturnType<typeof shipMotionStats>): { accelerating: boolean; spreading: boolean } {
+  if (!(dt > 0)) return { accelerating: false, spreading: false };
+  if (ship.engineController.isFlamedOut) {
     ship.pos.addScaled(ship.vel, dt);
     ship.facingRad += ship.angularVelRad * dt;
     return { accelerating: false, spreading: false };
   }
-  const stats = shipMotionStats(ship);
   const burnDrive = ship.system.forcesForward;
   const turn = ship.system.locksTurning || ship.flux.isOverloaded ? 0 : ship.hullStats.forcedRightTurn > 0 ? 1 : ship.turnInput;
   const turning = Math.abs(turn) > .01;

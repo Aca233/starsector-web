@@ -9,7 +9,7 @@ import {Vector2} from '../src/engine/math/Vector2';
 import {shipPresentationPose, setShipPresentationPose} from '../src/engine/visual/ShipPresentation';
 import {assetManager} from '../src/engine/assets/AssetResolver';
 import {createLanWorld} from '../src/network/LanWorld';
-import {captureCombat} from '../src/network/CombatSnapshot';
+import {captureCombat} from '../src/network/AuthorityCombatSnapshot';
 import {applyPlayerControls} from '../src/engine/runtime/PlayerControls';
 import {advanceShipMotion} from '../src/engine/simulation/systems/ShipMotion';
 import {blankInput,KEY_CODES} from '../src/network/protocol';

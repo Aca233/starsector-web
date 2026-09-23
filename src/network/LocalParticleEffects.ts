@@ -1,4 +1,3 @@
-import type { CombatEngine } from '../engine/simulation/CombatEngine';
 import type { Particle } from '../engine/simulation/CombatTypes';
 import { generateParticleRecipe } from '../engine/visual/DynamicParticleRecipe';
 import type { ParticleRecipe } from '../engine/visual/DynamicParticleRecipe';
@@ -35,8 +34,8 @@ export class LocalParticleEffects {
       this.groups.clear();for(const row of this.latest.events)this.groups.set(row[0],{row,steps:0});
     }
   }
-  reset(engine:CombatEngine):void {setLocalParticleLayer(engine.fxSystem);this.latest=undefined;this.groups.clear();this.output.length=0;this.highest=0;}
-  update(engine:CombatEngine,visualTime:number,reset=false):void {
+  reset(engine: DisplaySource):void {setLocalParticleLayer(engine.fxSystem);this.latest=undefined;this.groups.clear();this.output.length=0;this.highest=0;}
+  update(engine: DisplaySource,visualTime:number,reset=false):void {
     this.output.length=0;
     if(!this.latest || !Number.isFinite(visualTime)){setLocalParticleLayer(engine.fxSystem);return;}
     if(reset){
@@ -58,3 +57,6 @@ export class LocalParticleEffects {
   }
   stats(){return {groups:this.groups.size,particles:this.output.length,generated:this.generated,advances:this.advances,step:this.latest?.step??null};}
 }
+
+/** Minimal display capabilities; never an authority-world requirement. */
+type DisplaySource = { readonly fxSystem: object };

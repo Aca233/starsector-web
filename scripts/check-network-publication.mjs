@@ -55,7 +55,7 @@ test('actual host snapshot function splits display/network mailboxes and retains
  const c={running:true,snapshotEncoderWorker:null,pendingEncoding:null,ProjectionEncodingCache,encodedFragmentReuses:0,pollIoCompletion(){},tick:1,lastSnapshotTick:-1,snapshotInFlight:null,directReady:true,directLaunched:true,directInFlight:null,directLastTick:-1,directSequence:0,directAttempt:0,directRetryAt:0,
   directIo:{postMessage:(m,transfer=[])=>published.push(structuredClone(m,{transfer}))},send:(m,transfer=[])=>shown.push(structuredClone(m,{transfer})),
   engine:{projectiles:[]},controls:new Map([[0,{acknowledged:3}]]),elapsedCost:0,samples:0,captureMs:0,encodeMs:0,muzzleEvents:null,compactParticles:true,
-  captureAuthorityCombat:(_engine,tick,acknowledged)=>({tick,acknowledged,ships:[],world:{combatTime:tick/60}}),performance:{now:()=>0},LAN_SNAPSHOT_HZ:60,
+  captureLanDisplayCombat:(_engine,tick,acknowledged)=>({tick,acknowledged,ships:[],world:{combatTime:tick/60}}),performance:{now:()=>0},LAN_SNAPSHOT_HZ:60,
   measureClock(){},realtimeRatio:1,combatRate:1,sounds:[],networkSounds:[],soundId:0,authoritySummaryShips:null,binarySnapshots:true,visualEnabled:false,
   capturedFrame:null,captures:0,captureReuses:0,snapshotEncoder:new TextEncoder(),encodeProjectedBinaryFrame,snapshotFlow:{count(){}},
  };

@@ -1,9 +1,14 @@
+import type { CombatDisplayReads } from './CombatDisplayReads';
 import type { CombatEngine } from '../simulation/CombatEngine';
 import type { TacticalOrder } from '../simulation/CombatTypes';
 import { sameTeam } from '../simulation/CombatTeams';
 import { Vector2 } from '../math/Vector2';
 import type { CommandResult } from './CombatCommands';
 
+/** Observer-local selection/map state only; no combat authority is required. */
+export type TacticalViewCommandSource = Readonly<Pick<CombatDisplayReads,
+  'isTacticalMap' | 'toggleTacticalMap' | 'capitalShips' | 'playerShip' | 'selectUnit'
+>>;
 /** Wire input, not a simulation order: no mutable Ship/Vector2 or display-clock timestamp. */
 export interface TacticalOrderInput {
   type: TacticalOrder['type'];
@@ -31,7 +36,7 @@ function validOrder(order: TacticalOrderInput): boolean {
     && (!['ENGAGE', 'AVOID', 'ESCORT'].includes(order.type) || id(order.targetShipId));
 }
 /** Explicit display-only subset for the LAN observer map. Never dispatches combat writes. */
-export function applyTacticalViewCommand(engine: CombatEngine, command: TacticalCommand): CommandResult {
+export function applyTacticalViewCommand(engine: TacticalViewCommandSource, command: TacticalCommand): CommandResult {
   if (!command || typeof command !== 'object') return reject('无效的地图命令。');
   if (command.action === 'close') {
     if (engine.isTacticalMap) engine.toggleTacticalMap();

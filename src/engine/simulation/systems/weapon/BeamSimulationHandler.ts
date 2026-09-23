@@ -9,7 +9,7 @@ import { intersectSegmentWithPolygon, segmentCircleEntry } from '../../../math/G
 import { Beam, type WeaponMount } from '../../Weapon';
 import { advanceBeamDamage } from './BeamDamageClock';
 import { Ship } from '../../Ship';
-import { sound } from '../../../audio/SoundManager';
+import { combatAudio as sound } from '../../../audio/CombatAudioEvents';
 import { WeaponSimContext } from './WeaponSimContext';
 import { advanceBeamContactPulse } from '../../../visual/ImpactVisuals';
 import { advanceBeamGlow, beamIntensity, recordBeamGlowDamage, shortenBeamGlow } from '../../../visual/BeamVisuals';

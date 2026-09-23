@@ -17,6 +17,7 @@ export type RenderWeaponSpec = Readonly<Pick<WeaponSpec, 'id' | 'spawnType' | 'i
 export type RenderEngineStatus = Readonly<Pick<Ship['engineStatuses'][number], 'prevThrust' | 'currentThrust' | 'prevSpread' | 'spread'>>;
 export type RenderWeapon = Readonly<Pick<WeaponMount, 'arcDeg' | 'baseAngleDeg' | 'currentAngleRad' | 'currentSpreadDeg' | 'glowAlpha' | 'isDisabled' | 'mountType' | 'recoil' | 'relativePos' | 'slotId'>> & { readonly spec: RenderWeaponSpec };
 export interface ShipRenderState extends Readonly<Pick<Ship, 'id' | 'spec' | 'pos' | 'prevPos' | 'vel' | 'facingRad' | 'prevFacingRad' | 'angularVelRad' | 'hullHp' | 'isDead' | 'isDocked' | 'isRetreated' | 'isAttachedModule' | 'teamId' | 'playerTargetId' | 'visibilityMask' | 'visibilityOverflow' | 'phaseGhosts' | 'phaseVisualAlpha' | 'engineBoostLevel' | 'prevEngineBoostLevel' | 'scorchMarks' | 'scorchMarkVersion' | 'selectedGroupIndex'>> {
+ getRenderWeaponRange?(mount: RenderWeapon): number;
  readonly shield: RenderShield;
  readonly flux: RenderFlux;
  readonly armor: Readonly<Pick<Ship['armor'], 'cellWidth'>>;

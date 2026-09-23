@@ -50,7 +50,7 @@ export class SnapshotPrepareState {
    if(!payload){payload=Uint8Array.from(choice.prepared.payload).buffer;copies.set(choice.prepared,payload);transfer.push(payload);}
    const {rawBytes,zipped,binary}=choice.prepared;
    const stateBytes=choice.rawBytes??Buffer.byteLength(input.text);
-   results.push({key:p.key,epoch:p.epoch,seq:input.state.seq,prepared:{payload,rawBytes,zipped,binary:!!binary},stateBytes,
+   results.push({key:p.key,epoch:p.epoch,seq:input.state.seq,matchId:input.state.matchId,tick:input.state.frame.tick,prepared:{payload,rawBytes,zipped,binary:!!binary},stateBytes,
     format:binary?(choice.delta?'binary-delta':'binary-full'):choice.delta?'delta':choice.target?'full':'legacy-full',
     budgetFallback:choice.choice?.budgetFallback??false});
    choices.set(p.key,{record:r,epoch:p.epoch,choice,seq:input.state.seq});

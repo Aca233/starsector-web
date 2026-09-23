@@ -1,4 +1,4 @@
-import type { CombatEngine } from '../engine/simulation/CombatEngine';
+import type { CombatDisplayReads } from '../engine/runtime/CombatDisplayReads';
 import type { WeaponMount } from '../engine/simulation/Weapon';
 import { signedAngle } from '../engine/math/Angles';
 import { advanceTurretAim } from '../engine/simulation/systems/weapon/WeaponAim';
@@ -42,7 +42,7 @@ export class LocalTurretPrediction {
     this.samples = this.samples.filter(s => now - s.at < 1000).slice(-60);
   }
   /** Full applied weapon baseline only; a motion ACK cannot acknowledge aiming. */
-  receive(engine: CombatEngine, tick: number, acknowledged: number, now: number) {
+  receive(engine: DisplaySource, tick: number, acknowledged: number, now: number) {
     if (!Number.isSafeInteger(tick) || tick < 0 || !Number.isFinite(now)) return;
     const ship = engine.playerShip;
     if (this.owner && (this.owner !== ship.id || this.group !== ship.selectedGroupIndex || this.teleport !== ship.teleportSequence)) this.reset();
@@ -56,7 +56,7 @@ export class LocalTurretPrediction {
     this.tick = tick; this.at = now; this.correct = true; this.baseline.clear();
     for (const mount of ship.weapons) this.baseline.set(mount.slotId, { spec: mount.spec.id, relative: signedAngle(mount.currentAngleRad - ship.facingRad) });
   }
-  render(engine: CombatEngine, live: PlayerInput, now: number, enabled: boolean) {
+  render(engine: DisplaySource, live: PlayerInput, now: number, enabled: boolean) {
     const ship = engine.playerShip;
     const reason = !Number.isFinite(now) || !live.aim.every(Number.isFinite) ? 'unavailable' : !enabled || !live.pointerActive ? 'inactive' : now < this.at || now - this.at > 250 ? 'stale'
       : this.barrier > this.acknowledged ? 'command'
@@ -111,3 +111,6 @@ export class LocalTurretPrediction {
     if (this.shown.size) this.counts.renderedFrames++;
   }
 }
+
+/** Minimal display capabilities; never an authority-world requirement. */
+type DisplaySource = Pick<CombatDisplayReads, 'playerShip'>;

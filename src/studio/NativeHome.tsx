@@ -8,6 +8,7 @@ import { LocalBattleSizeSettings } from '../ui/BattleSizeControl';
 import { NativeButton } from '../ui/NativeChrome';
 import { runtimeAssetUrl } from '../engine/runtime/RuntimePaths';
 import { hullCount, weaponCount } from 'virtual:studio-summary';
+import '../ui/native-home-fonts.css';
 
 export function NativeHome({ onEnter, onSkills, onLan, onSteam, entryError, staticHosted, lanLabel }: { onEnter: () => void; onSkills: () => void; onLan?: () => void; onSteam?: () => void; entryError?: string; staticHosted?: boolean; lanLabel?: string }) {
   const [settingsOpen, setSettingsOpen] = useState(false);

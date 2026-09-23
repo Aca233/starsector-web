@@ -1,3 +1,4 @@
+import { AuthorityComponentReceiver } from '../src/network/AuthorityComponents.mjs';
 import { AutoMotionAdmission } from './AutoMotionAdmission.mjs';
 import { LanCriticalCombat } from "./LanCriticalCombat.mjs";
 import {motionWireTarget} from './MotionWire.mjs';
@@ -12,7 +13,8 @@ import { teamName, checkFleetBudget, editAiFleet } from "../src/network/room-fle
 import { MAX_BATTLE_REPORT_BYTES, validateBattleReport } from "../src/network/battle-report.mjs";
 import { summarizeCombatFrame, reusableStateText } from "./lan-state.mjs";
 import { prepareAuthoritySnapshot } from "./authority-snapshot.mjs";
-import { decodeBinaryState, decodeBinaryStateForRelay } from "../src/network/BinarySnapshot.mjs";
+import { decodeBinaryState, decodeBinaryStateForRelay, decodeBinaryStateWithProjectileVariantForRelay } from "../src/network/BinarySnapshot.mjs";
+import { createStaticAssetResponse } from "./StaticAssetResponse.mjs";
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -113,7 +115,8 @@ export async function createLanServer({
         (n) =>
           "http://" + n.address + ":" + server.address().port + "/?view=lan",
       );
-  const server = http.createServer((req, res) => {
+  const staticAssetResponse = createStaticAssetResponse();
+  const server = http.createServer(async (req, res) => {
     if (!validHost(req)) {
       res.writeHead(403);
       res.end("Host not allowed");
@@ -159,8 +162,8 @@ export async function createLanServer({
         throw Error("path");
       const candidate = path.resolve(root, "." + name);
       if (!candidate.startsWith(root + path.sep)) throw Error("path");
-      const real = fs.realpathSync(candidate);
-      if (!real.startsWith(root + path.sep) || !fs.statSync(real).isFile())
+      const real = await fs.promises.realpath(candidate);
+      if (!real.startsWith(root + path.sep) || !(await fs.promises.stat(real)).isFile())
         throw Error("path");
       res.setHeader(
         "Content-Type",
@@ -172,13 +175,7 @@ export async function createLanServer({
           ? "public, max-age=31536000, immutable"
           : "no-cache",
       );
-      if (req.method === "HEAD") {
-        res.end();
-        return;
-      }
-      const stream = fs.createReadStream(real);
-      stream.on("error", () => res.destroy());
-      stream.pipe(res);
+      await staticAssetResponse(req, res, real);
     } catch {
       res.writeHead(404);
       res.end("Not found");
@@ -203,21 +200,24 @@ export async function createLanServer({
     return true;
   };
   const send = (p, message) => controlLanes.send(p, message) || sendEncoded(p, JSON.stringify(message));
+  const componentActive = p => p.steamLayers ? p.ws.componentsEnabled && p.ws.componentReady && !p.steamLayerFailed : controlLanes.motionActive(p);
+  const componentWritable = p => p.steamLayers ? !p.steamLayerFailed && p.ws.componentWritable : controlLanes.motionWritable(p);
+  const detailInterval = p => p.steamLayers ? (p.ws.layeredActive && !p.steamLayerFailed ? 200 : 0) : !p.autoMotion && controlLanes.motionActive(p) ? p.motionWindow?.detailIntervalMs ?? 0 : 0;
   const flushCombat = r => {
     if (!r?.combatStates || r.status !== 'running') return;
-    const recipients = r.peers.filter(p => p.combatState && p.loaded && p.sync && connected(p) && !p.background && controlLanes.motionActive(p) && (!p.combatReceiptOwner || p.combatReceiptOwner === r.combatStates || !p.combatReceiptOwner.hasDebt(p)))
+    const recipients = r.peers.filter(p => (authorityFactory || p.id !== r.hostId) && p.combatState && p.loaded && p.sync && connected(p) && !p.background && componentActive(p) && (!p.combatReceiptOwner || p.combatReceiptOwner === r.combatStates || !p.combatReceiptOwner.hasDebt(p)))
       .map(peer => ({peer, syncId: peer.sync.id, idleRttMs: peer.motionWindow?.networkRttMs}));
-    r.combatStates.flush(recipients, {writable: p => controlLanes.motionWritable(p), send: (p, data) => { const sent = controlLanes.sendCombat(p, data); if (sent) p.combatReceiptOwner = r.combatStates; return sent; }});
+    r.combatStates.flush(recipients, {ordered: p => !p.steamLayers, writable: componentWritable, send: (p, data) => { const sent = p.steamLayers ? p.ws.sendCombat(data) : controlLanes.sendCombat(p, data); if (sent) p.combatReceiptOwner = r.combatStates; return sent; }});
   };
   const flushVisuals = r => {
     if (!r?.visuals || r.status !== 'running') return;
-    const recipients = r.peers.filter(p => p.visualState && p.loaded && p.sync && connected(p) && !p.background && controlLanes.motionActive(p) && (!p.visualReceiptOwner || p.visualReceiptOwner === r.visuals || !p.visualReceiptOwner.hasDebt(p))).map(peer => ({peer,syncId:peer.sync.id}));
+    const recipients = r.peers.filter(p => (authorityFactory || p.id !== r.hostId) && p.visualState && p.loaded && p.sync && connected(p) && !p.background && componentActive(p) && (!p.visualReceiptOwner || p.visualReceiptOwner === r.visuals || !p.visualReceiptOwner.hasDebt(p))).map(peer => ({peer,syncId:peer.sync.id}));
     const retryAfter = r.visuals.flush(recipients, {
-      writable: p => controlLanes.motionWritable(p),
-      encode: (p,message) => controlLanes.encodeVisual(p,message),
+      writable: componentWritable,
+      encode: (p,message) => p.steamLayers ? JSON.stringify(message) : controlLanes.encodeVisual(p,message),
       send: (p,kind,message,encoded) => {
         p.visualReceiptOwner = r.visuals;
-        return controlLanes.sendVisual(p,message,encoded);
+        return p.steamLayers ? p.ws.sendComponent(message) : controlLanes.sendVisual(p,message,encoded);
       }
     });
     // Token refill / local write drain must not require a future publication.
@@ -239,7 +239,7 @@ export async function createLanServer({
   const needsFullRelayFrame = r => r?.peers.some(p => typeof p.ws.sendSnapshot === "function" && p.ws.relayBinaryOnly !== true);
   const broadcast = (r, message, except, encoded, visualEncoded = null, metadataOnly = false) => {
     // Encode lazily, once per broadcast; validated host states can reuse their text.
-    let deltaTarget, visualDeltaTarget, relaySnapshot;
+    let deltaTarget, visualDeltaTarget, relaySnapshot, visualRelaySnapshot;
     const criticalActive = message.type === "state" && r.peers.some(q => q.motionWindow?.active && controlLanes.motionActive(q));
     // Rotate actual ready recipients, not the excluded host slot. Shared Steam
     // byte credit and bounded LAN patch work must not favor the first seat on
@@ -256,7 +256,7 @@ export async function createLanServer({
       if (p === except || !connected(p)) continue;
       // Snapshots are replaceable. Do not queue stale views behind a slow receiver.
       if (message.type === "state") {
-        if (p.visualState && p.loaded && !p.background && controlLanes.motionActive(p) && r.visuals?.needsBaseline(p,p.sync?.id)) { setImmediate(()=>flushVisuals(r)); continue; }
+        if (p.visualState && p.loaded && !p.background && componentActive(p) && r.visuals?.needsBaseline(p,p.sync?.id)) { setImmediate(()=>flushVisuals(r)); continue; }
         if (p.bulkChunks && r.bulkScheduler?.busy(p)) { p.chunkDeferred = (p.chunkDeferred ?? 0) + 1; continue; }
         // Resource readiness is distinct from controls-ready: syncing peers still
         // need the next full frame. Loading/hidden peers cannot present it yet;
@@ -264,8 +264,8 @@ export async function createLanServer({
         if (!p.assetsLoaded || p.background) continue;
         // Negotiated multirate replica: critical pose has its own consumed stream.
         // Keep full-detail synchronization fast for new/legacy/stalled replicas.
-        const detailInterval = !p.autoMotion && p.loaded && controlLanes.motionActive(p) ? p.motionWindow?.detailIntervalMs ?? 0 : 0;
-        if (detailInterval && (performance.now() - (p.lastDetailAt ?? -Infinity) < detailInterval || (p.stateCredits?.stats().inflight ?? 0) >= 1)) { p.detailSkipped = (p.detailSkipped ?? 0) + 1; continue; }
+        const interval = p.loaded ? detailInterval(p) : 0;
+        if (interval && (performance.now() - (p.lastDetailAt ?? -Infinity) < interval || (p.stateCredits?.stats().inflight ?? 0) >= 1)) { p.detailSkipped = (p.detailSkipped ?? 0) + 1; continue; }
         // Forward every eligible host tick to a ready peer. A busy socket still skips
         // replaceable state instead of accumulating stale megabyte snapshots.
         // Steam uses ACK-based bounded pipeline credit; ordinary WebSockets keep
@@ -277,7 +277,12 @@ export async function createLanServer({
         }
       }
       encoded ??= JSON.stringify(message);
-      const useVisual = message.type === 'state' && !!visualEncoded && p.visualState && p.loaded && controlLanes.motionActive(p) && r.visuals?.canReplaceBulk(p,p.sync?.id,r.lastTick,p.sync?.tick);
+      let useVisual = message.type === 'state' && !!visualEncoded && p.visualState && p.loaded && componentActive(p) && (!p.transport || p.ws.relayBinaryOnly) && r.visuals?.canReplaceBulk(p,p.sync?.id,r.lastTick,p.sync?.tick);
+      // Ordinary hosts upload just one complete binary packet. Derive at most
+      // once, only for an actually eligible viewer; dedicated paired bytes use
+      // this same selector. Unsupported/ambiguous/no-saving packets stay full.
+      if (useVisual && typeof visualEncoded === 'function') visualEncoded = visualEncoded();
+      useVisual = useVisual && !!visualEncoded;
       const selected = useVisual ? visualEncoded : encoded;
       // TCP receipt does not prove that the guest renderer consumed the frame.
       // This gates only replaceable, not-yet-sent states; never input/control.
@@ -326,7 +331,8 @@ export async function createLanServer({
       let snapshot = null;
       if (message.type === "state" && ArrayBuffer.isView(encoded) && typeof p.ws.sendSnapshot === "function") {
         relaySnapshot ??= { state: message, bytes: encoded, ...(metadataOnly ? { metadataOnly: true } : {}) };
-        snapshot = relaySnapshot;
+        if (useVisual) visualRelaySnapshot ??= { state: message, bytes: selected, metadataOnly: true };
+        snapshot = useVisual ? visualRelaySnapshot : relaySnapshot;
       }
       if (message.type === "state" && !p.transport) broadcastCompression.share(delivery);
       const sent = sendEncoded(p, delivery, snapshot);
@@ -351,7 +357,7 @@ export async function createLanServer({
     // Hidden/unloaded rooms may intentionally hold the bulk capture credit for
     // minutes. Optional motion must not validate against that stale baseline or
     // abort an otherwise healthy authority with no critical-state consumers.
-    const recipients = r.peers.filter(p => (authorityFactory || p.id !== r.hostId) && p.motionWindow && connected(p) && p.loaded && !p.background && p.sync && controlLanes.motionActive(p));
+    const recipients = r.peers.filter(p => (authorityFactory || p.id !== r.hostId) && p.motionState && (p.motionWindow || p.steamMotion) && connected(p) && p.loaded && !p.background && p.sync && (p.steamMotion || controlLanes.motionActive(p)));
     if (!recipients.length) return;
     const frame = motionFromText(data);
     if (frame.tick <= (r.lastMotionTick ?? -1)) return;
@@ -370,6 +376,7 @@ export async function createLanServer({
     r.lastMotionTick = frame.tick;
     let wireTarget;
     for (const p of eligible) {
+      if (p.steamMotion) { p.ws.sendMotion?.({ type: 'motion', matchId: r.match.id, syncId: p.sync.id, data }); continue; }
       p.motionWindow.offer(frame.tick);
       if (!controlLanes.motionWritable(p)||!p.motionWindow.mayPrepare(frame.tick)) continue;
       const message = { type: "motion", matchId: r.match.id, syncId: p.sync.id, data };
@@ -427,10 +434,10 @@ export async function createLanServer({
   const hasSnapshotAudience = r => r.peers.some(p => connected(p) && p.assetsLoaded && !p.background);
   const updateAuthorityMotionDemand = r => {
     if (!authorityFactory || !r.authority) return;
-    const enabled = r.status === "running" && r.peers.some(p => p.motionState && connected(p) && p.assetsLoaded && !p.background && controlLanes.motionActive(p));
-    const visualEnabled = enabled && r.peers.some(p => p.visualState && p.loaded && connected(p) && !p.background && controlLanes.motionActive(p));
+    const enabled = r.status === "running" && r.peers.some(p => p.motionState && connected(p) && p.assetsLoaded && !p.background && (p.steamMotion || controlLanes.motionActive(p)));
+    const visualEnabled = enabled && r.peers.some(p => p.visualState && p.loaded && connected(p) && !p.background && componentActive(p));
     if (r.authorityVisualEnabled !== visualEnabled) { r.authorityVisualEnabled = visualEnabled; r.authority.postMessage({type:'visual-mode',enabled:visualEnabled}); }
-    const combatEnabled = enabled && r.peers.some(p => p.combatState && p.loaded && connected(p) && !p.background && controlLanes.motionActive(p));
+    const combatEnabled = enabled && r.peers.some(p => p.combatState && p.loaded && connected(p) && !p.background && componentActive(p));
     if (r.authorityCombatEnabled !== combatEnabled) { r.authorityCombatEnabled = combatEnabled; r.authority.postMessage({ type: "combat-mode", enabled: combatEnabled }); }
     if (r.authorityMotionEnabled === enabled) return;
     r.authorityMotionEnabled = enabled; r.authority.postMessage({ type: "motion-mode", enabled });
@@ -444,9 +451,9 @@ export async function createLanServer({
     if (p.ws.snapshotWritable === false || p.ws.snapshotWritable === undefined && p.ws.bufferedAmount > 0) return false;
     const inflight = p.stateCredits?.stats().inflight ?? 0;
     if (p.stateCredits && inflight >= p.stateCredits.capacity) return false;
-    const detailInterval = !p.autoMotion && p.loaded && controlLanes.motionActive(p) ? p.motionWindow?.detailIntervalMs ?? 0 : 0;
-    if (detailInterval && (inflight >= 1 || performance.now() - (p.lastDetailAt ?? -Infinity) < detailInterval)) return false;
-    return !(p.visualState && p.loaded && controlLanes.motionActive(p) && r.visuals?.needsBaseline(p, p.sync?.id));
+    const interval = p.loaded ? detailInterval(p) : 0;
+    if (interval && (inflight >= 1 || performance.now() - (p.lastDetailAt ?? -Infinity) < interval)) return false;
+    return !(p.visualState && p.loaded && componentActive(p) && r.visuals?.needsBaseline(p, p.sync?.id));
   });
   const resumeAuthoritySnapshots = r => {
     if (!r) return;
@@ -718,6 +725,21 @@ export async function createLanServer({
         p.nativeProbe = null;
       }
     });
+    const abandonComponents = () => {
+      p.combatReceiptOwner?.abandon(p); p.combatReceiptOwner = null;
+      p.visualReceiptOwner?.abandon(p); p.visualReceiptOwner = null;
+    };
+    ws.on('components-reset', () => {
+      if (p.ws !== ws || !p.steamLayers) return;
+      abandonComponents();
+      if (p.steamLayerFailed) send(p, { type: 'layered-ready', visualState: p.visualState ? 1 : 0, combatState: p.combatState ? 1 : 0 });
+      p.steamLayerFailed = false;
+    });
+    ws.on('components-failed', reason => {
+      if (p.ws !== ws || !p.steamLayers) return;
+      p.steamLayerFailed = true; abandonComponents();
+      send(p, { type: 'layered-unavailable', reason }); resumeAuthoritySnapshots(p.room);
+    });
     ws.on("error", () => {});
     ws.on("close", () => {
       if (p.ws !== ws) return;
@@ -753,6 +775,23 @@ export async function createLanServer({
         if (!binary && raw.length <= 16384 && p.motionState && !authorityFactory && p.room?.hostId === p.id && raw.toString().startsWith('{"type":"motion",')) {
           const m = JSON.parse(raw.toString()); admitMotionUpload(p, m); return;
         }
+        // Player-host publications share the dedicated authority validators,
+        // with a separate bounded upload family (never gameplay request credit).
+        if (!binary && raw.length <= 192 * 1024 && !authorityFactory && p.hello && p.room?.hostId === p.id && raw.toString().startsWith('{"type":"component-publication",')) {
+          const r = p.room, m = JSON.parse(raw.toString());
+          if (r.status !== 'running' || m.matchId !== r.match?.id || r.frame && (m.tick > r.lastTick + 120 || m.tick < r.lastTick - 120)) throw Error('Component authority window mismatch');
+          if (m.family === 'combat' ? !p.publishCombat : m.family !== 'visual' || !p.publishVisual) throw Error('Component upload not negotiated');
+          if (now - (p.componentUploadAt ?? 0) >= 1000) { p.componentUploadAt = now; p.componentUploads = 0; }
+          if ((p.componentUploads = (p.componentUploads ?? 0) + 1) > 60) throw Error('Component upload rate');
+          if (r.componentUpload?.matchId !== r.match.id) r.componentUpload = new AuthorityComponentReceiver(r.match.id);
+          const publication = r.componentUpload.receive(m);
+          if (publication.family === 'combat') {
+            const ids = r.frame ? new Set(r.frame.ships.map(ship => ship.id)) : null;
+            if (ids && publication.frame.ships.some(row => !ids.has(row[0]))) return;
+            r.combatStates ??= new LanCriticalCombat(r.match.id); r.combatStates.publish(publication.data, m.tick); flushCombat(r);
+          } else { r.visuals ??= new LanProjectileVisuals(r.match.id); r.visuals.publish(publication.publication); flushVisuals(r); }
+          return;
+        }
         // Consumption receipts are transport flow control, not player requests.
         // Only exact outstanding LAN credits may bypass the request budget; their
         // count/bytes are already bounded by our sends. Invalid/duplicate receipts
@@ -786,7 +825,8 @@ export async function createLanServer({
         const decodeStarted = performance.now();
         const text = binary ? null : raw.toString();
         const relayMetadata = binary && !needsFullRelayFrame(p.room);
-        const m = receipt ?? (binary ? (relayMetadata ? decodeBinaryStateForRelay(raw) : decodeBinaryState(raw)) : JSON.parse(text));
+        const paired = relayMetadata && p.publishVisual ? decodeBinaryStateWithProjectileVariantForRelay(raw) : null;
+        const m = receipt ?? paired?.state ?? (binary ? (relayMetadata ? decodeBinaryStateForRelay(raw) : decodeBinaryState(raw)) : JSON.parse(text));
         if (!m || typeof m.type !== "string") throw Error("无效消息");
         if (["configure","ai","ready","start"].includes(m.type) && typeof m.requestId === "string" && /^[a-zA-Z0-9-]{1,64}$/.test(m.requestId)) requestId = m.requestId;
         if (m.type !== "state" && raw.length > (["configure","ai"].includes(m.type) ? MAX_DESIGN_BYTES * 4 + 4096 : m.type === "options" ? protocol.maxOptionsBytes + 4096 : m.type === "finish" ? MAX_BATTLE_REPORT_BYTES + 4096 : 16384)) {
@@ -882,21 +922,29 @@ export async function createLanServer({
           // compress independently of WS extensions, including loopback tests. Steam
           // retains its own transport; both helper capabilities must be offered.
           p.lanDelta = p.stateCredits && m.binaryDelta === 1 && (ws.extensions?.includes("permessage-deflate") || m.bulkChunks === 1 && m.motionState === 1 && m.controlLane === 1) ? new LanDeltaSender({ ordered: true, motionReference: m.motionReference === 1 }) : null;
+          p.componentUpload = m.componentUpload === 1 && (!p.transport || p.transport.canHost === true);
+          p.publishVisual = p.componentUpload && m.visualState === 1; p.publishCombat = p.componentUpload && m.combatState === 1;
           p.nativeProbe = null;
-          p.motionState = !p.transport && !!p.stateCredits && m.motionState === 1;
-          p.autoMotion = p.motionState && m.motionAuto === 1 ? (p.autoMotion ?? new AutoMotionAdmission()) : null;
+          // Only gateway-authenticated capabilities enable Steam's actual datagram lane.
+          p.steamMotion = p.transport?.motion === true && m.stateCredits === 1 && (typeof ws.sendMotion === 'function' || !authorityFactory && p.transport.canHost === true);
+          p.motionState = ((!p.transport && !!p.stateCredits) || p.steamMotion) && m.motionState === 1;
+          p.autoMotion = !p.steamMotion && p.motionState && m.motionAuto === 1 ? (p.autoMotion ?? new AutoMotionAdmission()) : null;
           p.autoMotion?.resetEpoch(p.room?.match?.id ?? null);
-          p.motionWire = p.motionState && m.motionWire === 1 && m.controlLane === 1;
-          p.combatState = !p.autoMotion && !!authorityFactory && p.motionWire && m.combatState === 1;
-          p.visualState = !p.autoMotion && !!authorityFactory && p.motionState && m.visualState === 1 && m.controlLane === 1;
+          p.steamLayers = p.steamMotion && p.transport?.components === true && m.layeredState === 1 && (typeof ws.sendComponent === 'function' || !authorityFactory && p.transport.canHost === true);
+          p.steamLayerFailed = false;
+          p.motionWire = !p.transport && p.motionState && m.motionWire === 1 && m.controlLane === 1;
+          p.combatState = !p.autoMotion && (p.motionWire || p.steamLayers) && m.combatState === 1;
+          p.visualState = !p.autoMotion && p.motionState && m.visualState === 1 && (p.steamLayers || !p.transport && m.controlLane === 1);
           p.visualWire = p.visualState && m.visualWire === 1;
-          p.motionWindow = p.motionState ? new MotionDeliveryWindow() : null;
+          p.motionWindow = p.motionState && !p.steamMotion ? new MotionDeliveryWindow() : null;
           p.bulkChunks = !p.autoMotion && p.motionState && !!p.lanDelta && m.controlLane === 1 && m.bulkChunks === 1;
           const controlLane = !p.transport && m.controlLane === 1 ? controlLanes.issue(p, ws) : null;
           send(p, {
             type: "welcome",
             ...(controlLane ? { controlLane } : {}),
-            ...(p.motionState ? { motionState: 1 } : {}),
+            ...(p.motionState ? { motionState: 1, ...(p.steamMotion ? { motionTransport: 'steam-datagram-v1' } : {}) } : {}),
+            ...(p.componentUpload ? { componentUpload: 1 } : {}),
+            ...(p.steamLayers ? { layeredTransport: 'steam-components-v1' } : {}),
             ...(p.combatState ? { combatState: 1 } : {}),
             ...(p.motionWire ? {motionWire:1} : {}),
             ...(p.visualState ? { visualState: 1 } : {}),
@@ -1416,7 +1464,7 @@ export async function createLanServer({
             { type: "state", matchId: r.match.id, seq: m.seq, frame: f },
             p,
             binary ? raw : reusableStateText(m, text),
-            null, relayMetadata,
+            paired?.projectileVariant ?? null, relayMetadata,
           );
           return;
         }

@@ -3,9 +3,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { assetManager } from '../../src/engine/assets/AssetResolver';
-import { createLanWorld } from '../../src/network/LanWorld';
+import { createLanDisplayWorld } from '../../src/network/LanDisplayBootstrap';
 import { decodeBinaryState } from '../../src/network/BinarySnapshot.mjs';
-import { applyCombatSnapshots } from '../../src/network/CombatSnapshot';
+import { applyLanDisplaySnapshot } from '../../src/network/LanDisplaySnapshot';
 import type { Match } from '../../src/network/protocol';
 
 export async function createHeadlessReplica(assetRoot: string) {
@@ -16,15 +16,17 @@ export async function createHeadlessReplica(assetRoot: string) {
     return new Response(await fs.readFile(file));
   };
   await assetManager.ensureManifestLoaded();
-  let engine: ReturnType<typeof createLanWorld>['engine'] | undefined;
+  let engine: ReturnType<typeof createLanDisplayWorld>['world'] | undefined;
+  let roster: Match | undefined;
   let reset = true;
   return {
-    initialize(match: Match) { engine = createLanWorld(match).engine; reset = true; },
+    initialize(match: Match) { roster = match; engine = undefined; reset = true; },
     decode: decodeBinaryState,
     reset() { reset = true; },
     apply(frame: any) {
-      if (!engine) throw Error('Replica not initialized');
-      applyCombatSnapshots(engine, [frame], reset, undefined, { nativeTargeting: true, nativeProjection: true });
+      if (!roster) throw Error('Replica not initialized');
+      if (!engine) engine = createLanDisplayWorld(roster, 0, frame).world;
+      else applyLanDisplaySnapshot(engine, frame, reset);
       reset = false;
     },
   };

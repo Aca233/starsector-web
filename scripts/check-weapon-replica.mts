@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';import {test} from 'node:test';import fs
 import {assetManager} from '../src/engine/assets/AssetResolver';
 import {createLanWorld} from '../src/network/LanWorld';
 import {captureHostCombat} from '../src/network/HostSnapshot';
-import {applyCombatSnapshot} from '../src/network/CombatSnapshot';
+import {applyCombatSnapshot} from '../src/network/AuthorityCombatSnapshot';
 import {captureCriticalCombat,CriticalCombatReplica} from '../src/network/CriticalCombatReplica';
 import {captureWeaponPresentation,applyWeaponPresentation} from '../src/network/WeaponPresentationReplica';
 import {decodeCombatState} from '../src/network/CriticalCombatState.mjs';

@@ -1,4 +1,4 @@
-import type { Ship } from '../engine/simulation/Ship';
+import type { CombatDisplayShip as Ship } from '../engine/runtime/CombatDisplayReads';
 import type { WeaponMount } from '../engine/simulation/Weapon';
 import { WEAPON_FLAGS, WEAPON_NUMBERS, WEAPON_PHASES } from './WeaponPresentationState.mjs';
 import type { WeaponStateRow, WeaponStateShips } from './WeaponPresentationState.mjs';

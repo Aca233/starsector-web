@@ -3,6 +3,7 @@ import type { ShipSystemDefinition } from './Types';
 export const fortressShield: ShipSystemDefinition = {
   installReason: needsShield,
   id: 'FORTRESS_SHIELD', sourceIds: ['fortressshield'], name: '堡垒护盾',
+  description: '将武器系统的能量转给护盾，完全展开后护盾承伤降低90%，并免除普通护盾维持耗能。期间禁止开火，每秒产生相当于幅能容量2.5%的硬幅能，即使未受到攻击也会积累。',
   chargeUp: 1.5, active: Infinity, chargeDown: 1.5, cooldown: 0, toggle: true, hardFlux: true,
   controls: { blockWeapons: true }, visuals: { fortressShield: true },
   audio: { loop: 'fortress_shield_loop', loopVolume: .7 },

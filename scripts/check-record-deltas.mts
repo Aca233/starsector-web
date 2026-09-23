@@ -5,7 +5,7 @@ import { componentCapsule } from '../src/network/ComponentReplication';
 import { hasComponentMutationInstrumentation } from '../src/network/ComponentMutation.mjs';
 import { encodeProjectedBinaryFrame, decodeBinaryFrame } from '../src/network/BinarySnapshot.mjs';
 import { createLanWorld } from '../src/network/LanWorld';
-import { captureCombat, applyCombatSnapshots, componentCaptureDiagnostics } from '../src/network/CombatSnapshot';
+import { captureCombat, applyCombatSnapshots, componentCaptureDiagnostics } from '../src/network/AuthorityCombatSnapshot';
 import { captureAuthorityCombat, configureHostCosmetics } from '../src/network/HostSnapshot';
 import { assets } from './lib/native-projectile-fixture.mts';
 

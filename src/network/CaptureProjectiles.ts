@@ -1,4 +1,4 @@
-import {captureProjectileProjection} from './CombatSnapshot';
+import {captureProjectileProjection} from './AuthorityCombatSnapshot';
 import {expandSnapshotProjectiles} from './ProjectileProjection';
 import type {ProjectileStreamFrame,ProjectileRecord} from './ProjectileEventStream.mjs';
 import type {CombatEngine} from '../engine/simulation/CombatEngine';

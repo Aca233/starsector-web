@@ -10,7 +10,7 @@ import {LocalParticleEffects} from '../src/network/LocalParticleEffects';
 import {localParticleLayer} from '../src/engine/render/LocalParticleLayer';
 import {validateParticleEvents,PARTICLE_EVENT_LIMITS} from '../src/network/particle-events.mjs';
 import {captureAuthorityCombat,configureHostCosmetics} from '../src/network/HostSnapshot';
-import {captureCombat,applyCombatSnapshot} from '../src/network/CombatSnapshot';
+import {captureCombat,applyCombatSnapshot} from '../src/network/AuthorityCombatSnapshot';
 import {createLanWorld} from '../src/network/LanWorld';
 import {assetManager} from '../src/engine/assets/AssetResolver';
 import {encodeProjectedBinaryFrame,decodeBinaryFrame,encodeBinaryState,decodeBinaryState,decodeBinaryStateForRelay} from '../src/network/BinarySnapshot.mjs';

@@ -34,5 +34,5 @@ const WORLD_KEYS = [`);
 }
 export const entityCodecPlugin={name:'entity-candidate',setup(build){
   build.onResolve({filter:/^entity-candidate$/},()=>({path:'candidate',namespace:'entity-candidate'}));
-  build.onLoad({filter:/.*/,namespace:'entity-candidate'},()=>({contents:entityCandidate(fs.readFileSync('src/network/CombatSnapshot.ts','utf8')),loader:'ts',resolveDir:path.resolve('src/network')}));
+  build.onLoad({filter:/.*/,namespace:'entity-candidate'},()=>({contents:entityCandidate(fs.readFileSync('src/network/AuthorityCombatSnapshot.ts','utf8')),loader:'ts',resolveDir:path.resolve('src/network')}));
 }};

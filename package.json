@@ -1,7 +1,7 @@
 {
   "name": "starsector-web",
   "private": true,
-  "version": "0.2.10",
+  "version": "0.2.11",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,6 +13,9 @@
     "benchmark:collision": "node scripts/benchmark-collision.mjs",
     "import:content": "node scripts/import-game-content.mjs",
     "preview": "vite preview",
+    "size:report": "node scripts/report-web-size.mjs",
+    "images:webp": "node scripts/prepare-webp-assets.mjs",
+    "size:check": "node --test scripts/check-web-build-integrity.mjs scripts/check-static-asset-response.mjs scripts/check-webp-assets.mjs",
     "import:catalog": "node scripts/import-native-catalog.mjs",
     "import:refit-factions": "node scripts/import-refit-factions.mjs",
     "import:all": "npm run import:content && npm run import:catalog && npm run import:refit-factions",

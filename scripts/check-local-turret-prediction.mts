@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {assetManager} from '../src/engine/assets/AssetResolver';
 import {createLanWorld} from '../src/network/LanWorld';
-import {captureCombat} from '../src/network/CombatSnapshot';
+import {captureCombat} from '../src/network/AuthorityCombatSnapshot';
 import {renderWeaponAngle,ProjectedRenderWeapon} from '../src/engine/runtime/local/RenderShipProjection';
 import {LocalTurretPrediction} from '../src/network/LocalTurretPrediction';
 import {weaponPresentationAngle} from '../src/engine/visual/WeaponPresentation';

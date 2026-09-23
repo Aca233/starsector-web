@@ -1,5 +1,5 @@
 import { lockedCombatTarget } from '../../../runtime/CombatTargeting';
-import { renderWeaponRange } from '../../../runtime/local/RenderShipProjection';
+import { renderWeaponRange } from '../../ShipRenderQueries';
 import type { CombatRenderView } from '../../CombatRenderView';
 import { WebGLPassContext } from '../WebGLPassContext';
 import { Vector2 } from '../../../math/Vector2';

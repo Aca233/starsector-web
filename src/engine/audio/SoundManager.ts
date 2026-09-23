@@ -1,3 +1,4 @@
+import { setCombatAudioPlayback } from './CombatAudioEvents';
 /**
  * 远行星号原生音频引擎 (Web Audio API 原版音效直接流式解码)
  * 从应用内置 /game-assets/sounds/ 资源包加载 .ogg 音效，
@@ -300,3 +301,11 @@ export class SoundManager {
 }
 
 export const sound = SoundManager.getInstance();
+
+setCombatAudioPlayback(event => {
+  if (event.kind === 'muffled') sound.setMuffled(event.value);
+  else if (event.kind === 'loop') { if (event.active) sound.startLoop(event.key,event.volume); else sound.stopLoop(event.key); }
+  else if (event.position && event.listener) sound.playAtPos(event.key,{x:event.position[0],y:event.position[1]},
+    {x:event.listener[0],y:event.listener[1]},event.volume,event.rate,event.maxDistance);
+  else sound.play(event.key,event.volume,event.rate);
+});

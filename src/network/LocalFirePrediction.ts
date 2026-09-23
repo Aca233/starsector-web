@@ -1,10 +1,8 @@
+import type { CombatDisplayReads, CombatDisplayShip as Ship } from '../engine/runtime/CombatDisplayReads';
 import { weaponPresentationAngle } from '../engine/visual/WeaponPresentation';
 import { Vector2 } from '../engine/math/Vector2';
 import { signedAngle } from '../engine/math/Angles';
-import type { CombatEngine } from '../engine/simulation/CombatEngine';
-import type { Ship } from '../engine/simulation/Ship';
 import type { Projectile, WeaponMount } from '../engine/simulation/Weapon';
-import { combatProjectileSpeed, combatWeaponRange } from '../engine/simulation/WeaponRange';
 import { advanceTurretAim, manualFireSlots } from '../engine/simulation/systems/weapon/WeaponAim';
 import { initializeSourceProjectile, advanceSourceProjectile, hasSourceProjectileLifecycle } from '../engine/simulation/systems/weapon/SourceProjectileLifecycle';
 import { projectileVisualLayer } from '../engine/render/ProjectileVisualLayer';
@@ -50,7 +48,7 @@ export class LocalFirePrediction {
   private recoveryIntent: { sequence: number; owner: string; at: number } | null = null;
   private recoveryBaseline: RecoveryBaseline | null = null;
   stats() { return { ...this.counts, pending: this.pending.size, lastResponseMs: this.lastResponseMs }; }
-  reset(engine: CombatEngine): void {
+  reset(engine: DisplaySource): void {
     // A focus/sync reset may erase a ghost, not proof that its input was consumed.
     for (const shot of this.pending.values()) this.commandBarrier = Math.max(this.commandBarrier, shot.sequence);
     this.counts.cancelled += this.pending.size;
@@ -60,7 +58,7 @@ export class LocalFirePrediction {
   }
   /** Call only AFTER the corresponding complete world was applied, never from a
    * motion-only ACK or socket receipt (those do not confirm weapon execution). */
-  receive(engine: CombatEngine, tick: number, acknowledged: number, now: number, confirmedLeadMs = 0): void {
+  receive(engine: DisplaySource, tick: number, acknowledged: number, now: number, confirmedLeadMs = 0): void {
     if (!Number.isSafeInteger(tick) || tick < 0 || !Number.isFinite(now)) return;
     if (this.owner && this.owner !== engine.playerShip.id) this.reset(engine);
     if (tick <= this.tick) return;
@@ -105,7 +103,7 @@ export class LocalFirePrediction {
         this.handoffs.set(q.id, { offset, at: now, source: q.sourceShipId, slot, spec: q.specId });
     }
   }
-  private recoveryMounts(engine: CombatEngine, acknowledged: number, now: number): WeaponMount[] | null {
+  private recoveryMounts(engine: DisplaySource, acknowledged: number, now: number): WeaponMount[] | null {
     const intent = this.recoveryIntent, ship = engine.playerShip;
     // An older RAF timestamp can precede a just-accepted input. Skip this
     // observation without treating that legitimate ordering as a new intent.
@@ -123,7 +121,7 @@ export class LocalFirePrediction {
       || mounts.some(m => !supported(m))) { this.recoveryBaseline = null; return null; }
     return mounts;
   }
-  private observeRecovery(engine: CombatEngine, mounts: WeaponMount[], owned: Projectile[], ids: ReadonlySet<number>, tick: number, acknowledged: number, now: number, cadenceAt: number): void {
+  private observeRecovery(engine: DisplaySource, mounts: WeaponMount[], owned: Projectile[], ids: ReadonlySet<number>, tick: number, acknowledged: number, now: number, cadenceAt: number): void {
     if (owned.length > FIRE_PREDICTION_LIMITS.baselineIds || ids.size !== owned.length
       || owned.some(p => !Number.isFinite(p.id) || p.id < 0)) { this.recoveryBaseline = null; return; }
     const ship = engine.playerShip, previous = this.recoveryBaseline;
@@ -156,7 +154,7 @@ export class LocalFirePrediction {
   }
   /** Only accepted local inputs are recorded; unsent/backpressured commands must
    * never paint phantom fire. A matched round grants at most one bounded repeat. */
-  record(engine: CombatEngine, input: PlayerInput, now: number, enabled: boolean): void {
+  record(engine: DisplaySource, input: PlayerInput, now: number, enabled: boolean): void {
     if (!Number.isSafeInteger(input.seq) || input.seq <= this.sequence || !Number.isFinite(now)) return;
     this.sequence = input.seq; this.acceptedAt = now;
     const pressed = input.firing && input.pointerActive;
@@ -222,7 +220,7 @@ export class LocalFirePrediction {
     if (!produced) this.counts.suppressed++;
   }
   private create(ship: Ship, mount: WeaponMount, aim: [number, number]): Projectile | null {
-    const spec = mount.spec, speed = combatProjectileSpeed(ship, spec), range = combatWeaponRange(ship, spec);
+    const spec = mount.spec, speed = ship.getWeaponDisplaySpeed(spec), range = ship.getWeaponDisplayRange(spec);
     if (![speed, range, ...aim, mount.currentAngleRad].every(Number.isFinite) || speed <= 0 || range <= 0) return null;
     const facing = ship.interpolatedFacing(1), position = ship.interpolatedPos(1).clone();
     const mountPos = mount.relativePos.clone().rotate(facing).add(position), base = facing + mount.baseAngleDeg * Math.PI / 180;
@@ -246,7 +244,7 @@ export class LocalFirePrediction {
       projSpriteUrl: spec.projSpriteUrl, projLength: spec.projLength, projWidth: spec.projWidth };
     initializeSourceProjectile(p, speed, ship.vel); return p;
   }
-  render(engine: CombatEngine, now: number, enabled: boolean): void {
+  render(engine: DisplaySource, now: number, enabled: boolean): void {
     if (!enabled || !Number.isFinite(now) || this.owner !== engine.playerShip.id || !mayFire(engine.playerShip)
       || projectileVisualLayer(engine)) { this.reset(engine); return; }
     if (!this.pending.size && !this.handoffs.size) { setPredictedProjectileLayer(engine); return; }
@@ -281,3 +279,6 @@ export class LocalFirePrediction {
     setPredictedProjectileLayer(engine, projectiles.length || corrections.size ? { projectiles, corrections } : undefined);
   }
 }
+
+/** Minimal display capabilities; never an authority-world requirement. */
+type DisplaySource = Pick<CombatDisplayReads, 'playerShip' | 'projectiles' | 'combatTime'>;

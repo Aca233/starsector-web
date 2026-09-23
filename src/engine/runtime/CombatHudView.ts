@@ -1,8 +1,20 @@
+import type { CombatDisplayReads, CombatDisplayShip } from './CombatDisplayReads';
 import type { CombatEngine } from '../simulation/CombatEngine';
 import type { Ship } from '../simulation/Ship';
 import type { ShipSystem } from '../simulation/ShipSystem';
 import type { WeaponMount } from '../simulation/Weapon';
 import { Vector2 } from '../math/Vector2';
+
+/** HUD projection reads, shared by the authority and display-owned legacy Ship graphs.
+ * The deployment replica needs no deploy/retreat or other authority capabilities. */
+export type CombatHudSource = Readonly<Pick<CombatDisplayReads,
+  'playerShip' | 'ships' | 'capitalShips' | 'fighters' | 'bombers' | 'allCapitalShips'
+  | 'playerWings' | 'enemyWings' | 'findHostile' | 'isTacticalMap' | 'isSimulation'
+  | 'openBattlefield' | 'multiTeamBattle' | 'battleResult' | 'isBattleResultReady'
+  | 'combatTime' | 'shipLossNotifications' | 'notificationTime'
+>> & {
+  readonly deployment: Readonly<Pick<CombatEngine['deployment'], 'enabled' | 'isReserve'>>;
+};
 
 /** Display capabilities only. No damage, AI, controls, RNG or simulation services. */
 export type HudContact = Readonly<Pick<Ship, 'id'|'spec'|'pos'|'prevPos'|'vel'|'facingRad'|'teamId'|'playerTargetId'|'hullHp'|'maxHullHp'|'currentCR'|'isDead'|'isDocked'|'isRetreated'|'isPhased'|'retreating'|'visibilityMask'|'visibilityOverflow'|'flightDeckWingId'|'interpolatedPos'|'isVisibleTo'>> & {
@@ -53,8 +65,8 @@ const systemKeys = ['name','type','description','state','available','disabled','
 /** Records retain identity for delta encoding and RAF readers. Only the flagship and
  * locked target carry armor/weapon detail; ordinary contacts never walk those graphs. */
 export class CombatHudProjector {
-  private readonly contacts = new WeakMap<Ship, HudContact>();
-  private readonly detailed = new WeakMap<Ship, HudShip>();
+  private readonly contacts = new WeakMap<CombatDisplayShip, HudContact>();
+  private readonly detailed = new WeakMap<CombatDisplayShip, HudShip>();
   private readonly parts = new WeakMap<object, object>();
   private select<T extends object, K extends keyof T>(source: T, keys: readonly K[]): Pick<T, K> {
     let result = this.parts.get(source) as Pick<T,K> | undefined;
@@ -62,13 +74,13 @@ export class CombatHudProjector {
     for (const key of keys) result[key] = source[key];
     return result;
   }
-  private contact(ship: Ship, detail: boolean, engine: CombatEngine): HudContact {
+  private contact(ship: CombatDisplayShip, detail: boolean, engine: CombatHudSource): HudContact {
     const cache = detail ? this.detailed : this.contacts;
     let result = cache.get(ship);
     if (!result) { result = new HudContactRecord() as HudShip; cache.set(ship, result as HudShip); }
     Object.assign(result, Object.fromEntries(contactKeys.map(key => [key, ship[key]])), {flux: this.select(ship.flux, fluxKeys)});
     if (detail) {
-      const system = (value: ShipSystem) => Object.assign(this.select(value, systemKeys), {definition: this.select(value.definition, ['charges','audio'])});
+      const system = (value: HudSystem) => Object.assign(this.select(value, systemKeys), {definition: this.select(value.definition, ['charges','audio'])});
       Object.assign(result, Object.fromEntries(richKeys.map(key => [key, ship[key]])), {
         // Display records own their array; reading the public mutable view would
         // disable mutation-tracked replication on the live simulation grid.
@@ -83,10 +95,10 @@ export class CombatHudProjector {
     }
     return result;
   }
-  capture(engine: CombatEngine): CombatHudView {
+  capture(engine: CombatHudSource): CombatHudView {
     const player = engine.playerShip;
     const target = engine.ships.find(ship => ship.id === player.playerTargetId && ship.teamId !== player.teamId && !ship.isDead && !ship.isRetreated && !ship.isDocked && ship.isVisibleTo(player.teamId));
-    const map = (ship: Ship) => this.contact(ship, ship === player || ship === target, engine);
+    const map = (ship: CombatDisplayShip) => this.contact(ship, ship === player || ship === target, engine);
     const loops = new Set<string>();
     for (const ship of engine.ships) if (!ship.isDead && !ship.isPhased && !ship.flux.isVenting && !ship.flux.isOverloaded)
       for (const mount of ship.weapons) if (mount.spec.soundLoopKey && !mount.isDisabled && (mount.firingState === 'ACTIVE' || mount.firingState === 'CHARGING')) loops.add(mount.spec.soundLoopKey);
@@ -104,8 +116,8 @@ export class CombatHudProjector {
 export function liveCombatHudView(read: () => CombatHudView): CombatHudView {
   return new Proxy({} as CombatHudView, {get: (_target, key) => read()[key as keyof CombatHudView]});
 }
-const adapters = new WeakMap<CombatEngine, CombatHudView>();
-export function combatHudView(engine: CombatEngine): CombatHudView {
+const adapters = new WeakMap<CombatHudSource, CombatHudView>();
+export function combatHudView(engine: CombatHudSource): CombatHudView {
   let view = adapters.get(engine);
   if (!view) { const projector = new CombatHudProjector(); let snapshot: CombatHudView | undefined;
     view = liveCombatHudView(() => { if (!snapshot) { snapshot = projector.capture(engine); queueMicrotask(() => { snapshot = undefined; }); } return snapshot; }); adapters.set(engine, view); }

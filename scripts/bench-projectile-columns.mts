@@ -1,7 +1,7 @@
 import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';import {deflateRawSync,constants} from 'node:zlib';
 import {createLanWorld} from '../src/network/LanWorld';
 import {captureHostCombat,configureHostCosmetics} from '../src/network/HostSnapshot';
-import {applyCombatSnapshots} from '../src/network/CombatSnapshot';
+import {applyCombatSnapshots} from '../src/network/AuthorityCombatSnapshot';
 import {encodeBinaryState,encodeProjectedBinaryFrame,decodeBinaryState} from '../src/network/BinarySnapshot.mjs';
 import {assetManager} from '../src/engine/assets/AssetResolver';
 import {LanDeltaSender,lanDeltaTarget} from '../server/LanDeltaTransport.mjs';

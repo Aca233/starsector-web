@@ -1,7 +1,7 @@
 import { nativePhaseReader } from './NativePhaseReaders';
 import type { Ship } from '../simulation/Ship';
 import nativeFacts from './native-hull-facts.json';
-import { sound } from '../audio/SoundManager';
+import { combatAudio as sound } from '../audio/CombatAudioEvents';
 interface State { emergency: boolean; progress: number; alpha: number; vanishing: boolean; enhanced: boolean }
 const states = new WeakMap<Ship,State>();
 const facts: Record<string,{deployCR:number}> = nativeFacts;

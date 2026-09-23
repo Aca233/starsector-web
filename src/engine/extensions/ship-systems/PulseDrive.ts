@@ -3,25 +3,15 @@ import { offensiveManeuverAllowed } from './SystemAI';
 import { Vector2 } from '../../math/Vector2';
 import { signedAngle } from '../../math/Angles';
 import type { WeaponMountSlotConfig } from '../../content/ShipSpec';
-import type { Projectile } from '../../simulation/Weapon';
 import type { Ship } from '../../simulation/Ship';
 import type { ShipSystem } from '../../simulation/ShipSystem';
 import { shipMotionStats } from '../../simulation/systems/ShipMotion';
 import { nativeSystem } from './NativeSystemFactory';
 import { spawnSystemProjectile } from './SystemProjectile';
-import type { SystemModifiers } from './Types';
 
-interface Impact { bomb: Projectile; slot: WeaponMountSlotConfig; elapsed: number; forceAngle?: number; impactTime: number; brakingTime?: number }
-interface PlateImpulse { time: number }
-interface State { impacts: Impact[]; compression: number; velocity: number; plate: PlateImpulse[]; mods: SystemModifiers; braking: boolean }
-const states = new WeakMap<ShipSystem, State>();
-function stateFor(s: ShipSystem): State {
-  let state = states.get(s);
-  if (!state) { state = { impacts: [], compression: 0, velocity: 0, plate: [], mods: {}, braking: false }; states.set(s,state); }
-  return state;
-}
+import { stateFor, states } from './PulseDriveState';
+export { pulsePusherOffset } from './PulseDriveState';
 const slotPoint = (ship: Ship, slot: WeaponMountSlotConfig) => new Vector2(slot.x,slot.y).rotate(ship.facingRad).add(ship.pos);
-export function pulsePusherOffset(system: ShipSystem): number { return (states.get(system)?.compression ?? 0)*14; }
 export const pulseDrives = (['orion_device','nova_burst'] as const).map(id => {
   const nova = id === 'nova_burst', fade = nova ? 1 : .15, live = nova ? 0 : .25;
   const mods = (system: ShipSystem) => stateFor(system).mods;

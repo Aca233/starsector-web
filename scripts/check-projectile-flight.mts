@@ -13,7 +13,7 @@ import {advanceSourceProjectile,initializeSourceProjectile} from '../src/engine/
 import {combatRenderView} from '../src/engine/render/CombatRenderView';
 import {assetManager} from '../src/engine/assets/AssetResolver';
 import {createLanWorld} from '../src/network/LanWorld';
-import {captureCombat,applyCombatSnapshot} from '../src/network/CombatSnapshot';
+import {captureCombat,applyCombatSnapshot} from '../src/network/AuthorityCombatSnapshot';
 import {LocalFirePrediction} from '../src/network/LocalFirePrediction';
 
 function shot(type:Projectile['spawnType']='BALLISTIC'):Projectile {

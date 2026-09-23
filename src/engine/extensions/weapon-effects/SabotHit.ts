@@ -1,7 +1,7 @@
 import type { WeaponEffectDefinition } from './Types';
 import { applyComponentDamage } from '../../simulation/systems/weapon/ComponentDamage';
 import { pickEmpShipTarget } from '../../simulation/systems/weapon/TachyonLanceEffect';
-import { sound } from '../../audio/SoundManager';
+import { combatAudio as sound } from '../../audio/CombatAudioEvents';
 export const sabotHit: WeaponEffectDefinition = {
   id: 'com.fs.starfarer.api.impl.combat.SabotOnHitEffect',
   resources:{sounds:['tachyon_lance_emp_impact_01','tachyon_lance_emp_impact_02','tachyon_lance_emp_impact_03']},

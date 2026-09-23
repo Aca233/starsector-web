@@ -7,8 +7,8 @@ export interface ProjectileVisualLayer {
 }
 // Network presentation owns this layer, never CombatEngine.projectiles (a
 // delegated setter into the weapon system). Single-player has no layer.
-const layers = new WeakMap<CombatEngine, ProjectileVisualLayer>();
-export const projectileVisualLayer = (engine: CombatEngine): ProjectileVisualLayer | undefined => layers.get(engine);
-export function setProjectileVisualLayer(engine: CombatEngine, layer: ProjectileVisualLayer | null): void {
+const layers = new WeakMap<object, ProjectileVisualLayer>();
+export const projectileVisualLayer = (engine: object): ProjectileVisualLayer | undefined => layers.get(engine);
+export function setProjectileVisualLayer(engine: object, layer: ProjectileVisualLayer | null): void {
   if (layer) layers.set(engine, layer); else layers.delete(engine);
 }

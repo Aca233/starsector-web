@@ -3,7 +3,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import {deflateRawSync} from 'node:zlib';
 import {captureCombat as beforeCapture} from 'old-combat-projection';
-import {captureCombat} from '../src/network/CombatSnapshot';
+import {captureCombat} from '../src/network/AuthorityCombatSnapshot';
 import {createLanWorld} from '../src/network/LanWorld';
 import {configureHostCosmetics} from '../src/network/HostSnapshot';
 import {assetManager} from '../src/engine/assets/AssetResolver';

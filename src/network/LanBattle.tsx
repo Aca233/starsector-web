@@ -2,7 +2,6 @@ import { combatHudView } from '../engine/runtime/CombatHudView';
 import { engineTacticalMapSource } from '../engine/runtime/TacticalMapView';
 import { engineDeploymentView } from '../engine/runtime/DeploymentView';
 import { LocalTurretPrediction } from './LocalTurretPrediction';
-import { combatRenderView } from '../engine/render/CombatRenderView';
 import { LocalParticleEffects } from './LocalParticleEffects';
 import { LocalFirePrediction } from './LocalFirePrediction';
 import { CriticalCombatReplica } from "./CriticalCombatReplica";
@@ -43,8 +42,8 @@ import { applyTacticalViewCommand } from '../engine/runtime/TacticalControl';
 import { TacticalMap } from '../ui/tactical/TacticalMap';
 import { sameTeam } from "../engine/simulation/CombatTeams";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createLanWorld, setLanPerspective } from "./LanWorld";
-import { CombatEngine } from "../engine/simulation/CombatEngine";
+import { createLanDisplayWorld } from "./LanDisplayBootstrap";
+import type { LanDisplayWorld } from "./LanDisplayWorld";
 import { WebGLCombatRenderer } from "../engine/render/webgl/WebGLCombatRenderer";
 import { Vector2 } from "../engine/math/Vector2";
 import { sound } from "../engine/audio/SoundManager";
@@ -64,7 +63,7 @@ import { CombatRadar } from "../ui/hud/CombatRadar";
 import { CombatContacts } from "../ui/hud/CombatContacts";
 import { getHudDensity } from "../ui/hud/HudLayout";
 import "../ui/combat-pause-menu.css";
-import { applyCombatSnapshots, projectileSnapshotTick } from "./CombatSnapshot";
+import { applyLanDisplaySnapshots, projectileSnapshotTick } from "./LanDisplaySnapshot";
 import type { CombatSnapshot } from "./CombatSnapshot";
 import { KEY_CODES, teamName, teamColor, LAN_BUILD } from "./protocol";
 import type { Action, LanConnection, Match, Seat, PlayerInput } from "./protocol";
@@ -193,9 +192,9 @@ export function LanBattle({
     const timer = setInterval(() => write('sample'), 1000);
     return () => { clearInterval(timer); try { write('battle-stop'); } finally { runtime.dispose(); } };
   }, [connection, match.id, seat]);
-  const [displayEngine, setDisplayEngine] = useState<CombatEngine | null>(null);
-  const mapSource = useMemo(() => displayEngine ? engineTacticalMapSource(displayEngine) : null, [displayEngine]);
-  const deploymentView = useMemo(() => displayEngine ? engineDeploymentView(displayEngine) : null, [displayEngine]);
+  const [displayWorld, setDisplayWorld] = useState<LanDisplayWorld | null>(null);
+  const mapSource = useMemo(() => displayWorld ? engineTacticalMapSource(displayWorld) : null, [displayWorld]);
+  const deploymentView = useMemo(() => displayWorld ? engineDeploymentView(displayWorld) : null, [displayWorld]);
   const [menu, setMenu] = useState<"menu" | "help" | "settings" | "leave" | null>(null);
   const [density, setDensity] = useState(() =>
     getHudDensity(window.innerWidth, window.innerHeight),
@@ -243,7 +242,7 @@ export function LanBattle({
       workerReady = !computesAuthority,
       worker: Worker | null = null,
       renderer: WebGLCombatRenderer | null = null;
-    let engine: CombatEngine,
+    let engine: LanDisplayWorld,
       latest: CombatSnapshot | null = null,
       appliedTick = -1,
       receivedAt = 0,
@@ -382,9 +381,26 @@ export function LanBattle({
       const row = motion.row(engine.playerShip.id, now, appliedTick);
       if (row && !row[8]) prediction.receive(motionAuthority(engine.playerShip, row), frame.acknowledged[seat], now);
     };
+    let firstFrame: CombatSnapshot | undefined;
+    let initializingDisplay = false;
+    const initializeDisplay = async () => {
+      if (!ready || !renderer || engine || initializingDisplay || !firstFrame || disposed || stopped) return;
+      initializingDisplay = true;
+      try {
+        const replica = createLanDisplayWorld(match, seat, firstFrame);
+        await renderer.prepareAssets(replica.world.renderView());
+        if (disposed || stopped) return;
+        engine = replica.world;
+        controlledIdsRef.current = new Set([...replica.controlled.values()].map(ship => ship.id));
+        camera.copy(engine.playerShip.pos);
+        setDisplayWorld(engine);
+      } catch (error) { fail(error instanceof Error ? error.message : String(error), "display-initialization"); }
+      finally { initializingDisplay = false; }
+    };
     const accept = (frame: CombatSnapshot) => {
       if (disposed || stopped || (syncId && frame.tick < minSyncTick)) return;
       if (!playback.push(frame)) return;
+      if (!engine) { firstFrame = frame; void initializeDisplay(); }
       // Discrete events are independent of the replaceable world endpoints.
       // Playback may evict 8+ queued worlds or sample only the final pair; every
       // decoded muzzle window must nevertheless be received in authority order.
@@ -570,11 +586,6 @@ export function LanBattle({
       if (m.type === "ended") stop();
     });
     try {
-      const world = createLanWorld(match);
-      engine = world.engine;
-      controlledIdsRef.current=new Set([...world.controlled.values()].map(ship=>ship.id));
-      setLanPerspective(engine, world.controlled, seat);
-      camera.copy(engine.playerShip.pos);
       const gl = canvas.getContext("webgl2", {
         alpha: false,
         antialias: true,
@@ -618,6 +629,11 @@ export function LanBattle({
             send({ type: "host-recovered", pauseMs: m.pauseMs });
           }
           if (m.type === "deployment-result") send(m);
+          if (m.type === 'combat-state' || m.type === 'projectile-visual') {
+            try { if (launched && connection.ready) connection.sendAuthorityComponent(match.id, m); }
+            catch (error) { fail(error instanceof Error ? error.message : '分流发布失败', 'snapshot-decode'); }
+            finally { worker?.postMessage({ type: m.type === 'combat-state' ? 'combat-consumed' : 'visual-consumed', tick: m.tick }); }
+          }
           if (m.type === "motion") {
             try {
               if (launched && connection.ready && connection.motionState) send({ type: "motion", data: m.data });
@@ -668,18 +684,18 @@ export function LanBattle({
             worker.postMessage({ type: "authority-port", port: channel.port2 }, [channel.port2]);
           } else { channel.port1.close(); channel.port2.close(); }
         }
-        worker.postMessage({ type: "init", match, hidden: document.visibilityState === "hidden", binarySnapshots: connection.canSendBinarySnapshots, motionState: connection.motionState });
+        worker.postMessage({ type: "init", match, hidden: document.visibilityState === "hidden", binarySnapshots: connection.canSendBinarySnapshots, motionState: connection.motionState, visualState: connection.canPublishVisual, combatState: connection.canPublishCombat });
       }
       void (async () => {
         try {
           await assetManager.ensureManifestLoaded();
           await contentManifestManager.ensureLoaded();
           if (disposed) return;
-          await renderer!.prepareAssets(combatRenderView(engine));
-          if (disposed) return;
-          setDisplayEngine(engine);
+          // Loading ACK must not depend on receiving the first snapshot: guests
+          // receive their baseline only after the relay has observed this ACK.
           ready = true;
           loaded();
+          void initializeDisplay();
         } catch (e) {
           fail(e instanceof Error ? e.message : String(e), "resource-load");
         }
@@ -876,7 +892,7 @@ export function LanBattle({
           if (presentation.reset) cameraController.reset(); // Reconnect baselines must not replay historical jumps.
           const started = performance.now();
           if (presentation.reset) { firePrediction.reset(engine); turretPrediction.reset(); projectileFlight.reset(); }
-          applyCombatSnapshots(engine, presentation.frames, presentation.reset, snapshot => {
+          applyLanDisplaySnapshots(engine, presentation.frames, presentation.reset, snapshot => {
             // Prediction needs the player pose at EACH restored endpoint, not
             // all acknowledgements against the final world's pose.
             applyRate.receive(performance.now());
@@ -890,7 +906,7 @@ export function LanBattle({
             turretPrediction.receive(engine, snapshot.tick, snapshot.acknowledged[seat], now);
             combat.apply(engine, snapshot.tick);
             if (!motion.fresh(now, snapshot.tick)) prediction.receive(engine.playerShip, snapshot.acknowledged[seat], now);
-          }, { nativeTargeting: true, nativeProjection: true }); // Locally owned native engine + plain network DTO frames.
+          }); // Explicit display records; no simulation restoration.
           applyMs = applyMs * .7 + (performance.now() - started) * .3;
         }
         if (launched && synced && (now - receivedAt > 1500 || now - lastAckAt > 2000 || (acknowledgementMs ?? 0) > 2000)) {
@@ -948,8 +964,9 @@ export function LanBattle({
         localParticles.update(engine, presentation.visualTime, presentation.reset);
         projectileFlight.render(engine, now, launched && synced && hasCombatInputFocus());
         firePrediction.render(engine, now, active() && now - receivedAt <= 250);
-        renderer.updateVisual(combatRenderView(engine), launched ? dt : 0, frameContext);
-        if (renderer.render(combatRenderView(engine), alpha, camera, zoom, frameContext)) frameCount++;
+        const renderView = engine.renderView();
+        renderer.updateVisual(renderView, launched ? dt : 0, frameContext);
+        if (renderer.render(renderView, alpha, camera, zoom, frameContext)) frameCount++;
         renderMs = renderMs * .9 + (performance.now() - renderStarted) * .1;
         if (now - lastHUD > 100) {
           const p = engine.playerShip,
@@ -1046,20 +1063,20 @@ export function LanBattle({
     onReturn();
   };
   const finished = !!(error || ended);
-  const teamPresence = displayEngine ? lanTeamPresence(match, displayEngine) : [];
+  const teamPresence = displayWorld ? lanTeamPresence(match, displayWorld) : [];
   return (
     <main className="lan-battle">
       <canvas ref={canvasRef} className="lan-canvas" aria-label="局域网战场" />
-      {mapOpen && displayEngine && mapSource && !finished && <TacticalMap onControl={command => command.kind === 'tactical' ? applyTacticalViewCommand(displayEngine, command.command) : { accepted: false, reason: '联机地图不支持此命令。' }} source={mapSource} paused={false} onPausedChange={()=>{}} autopilot={false} onAutopilotChange={()=>{}} readOnlyCommands
+      {mapOpen && displayWorld && mapSource && !finished && <TacticalMap onControl={command => command.kind === 'tactical' ? applyTacticalViewCommand(displayWorld, command.command) : { accepted: false, reason: '联机地图不支持此命令。' }} source={mapSource} paused={false} onPausedChange={()=>{}} autopilot={false} onAutopilotChange={()=>{}} readOnlyCommands
         inputBlocked={!!menu||deploymentOpen} cameraPosRef={cameraRef} canvasRef={canvasRef}
         onClosed={()=>{setMapOpen(false);inputBlockedRef.current=!!menu||deploymentOpen;}}
         onOpenDeployment={()=>{clearInputRef.current();inputBlockedRef.current=true;setDeploymentOpen(true);}}
-        onRetreat={(ids,full)=>fleetRequestRef.current(full?ids.filter(id=>!controlledIdsRef.current.has(id)||id===displayEngine.playerShip.id):ids,full?'withdraw':'retreat')} />}
-      {deploymentOpen && displayEngine && deploymentView && !finished && <FleetDeployment source={deploymentView} team={displayEngine.playerShip.teamId}
+        onRetreat={(ids,full)=>fleetRequestRef.current(full?ids.filter(id=>!controlledIdsRef.current.has(id)||id===displayWorld.playerShip.id):ids,full?'withdraw':'retreat')} />}
+      {deploymentOpen && displayWorld && deploymentView && !finished && <FleetDeployment source={deploymentView} team={displayWorld.playerShip.teamId}
         onDeploy={ids=>fleetRequestRef.current(ids,'deploy')}
         onClose={()=>{setDeploymentOpen(false);inputBlockedRef.current=mapOpen||!!menu;}}
-        onDeployed={()=>{if(displayEngine.isTacticalMap)displayEngine.toggleTacticalMap();setDeploymentOpen(false);setMapOpen(false);inputBlockedRef.current=!!menu;canvasRef.current?.focus();}} />}
-      {hud && displayEngine && (
+        onDeployed={()=>{if(displayWorld.isTacticalMap)displayWorld.toggleTacticalMap();setDeploymentOpen(false);setMapOpen(false);inputBlockedRef.current=!!menu;canvasRef.current?.focus();}} />}
+      {hud && displayWorld && (
         <div
           className="lan-hud hud-overlay ui-font select-none"
           data-hud-density={density}
@@ -1072,12 +1089,12 @@ export function LanBattle({
           data-enemy-hp={hud.enemy.toFixed(1)}
           data-group={hud.group}
         >
-          <CombatContacts engine={combatHudView(displayEngine)} cameraPosRef={cameraRef} zoomRef={hudZoomRef} canvasRef={canvasRef}
+          <CombatContacts engine={combatHudView(displayWorld)} cameraPosRef={cameraRef} zoomRef={hudZoomRef} canvasRef={canvasRef}
             blocked={!controlsReady || !!menu || finished || mapOpen || deploymentOpen} />
           <div className="hud-console-anchor pointer-events-auto absolute z-20">
             <AuthenticTacticalConsole onActivateSystem={value => actionRef.current('system', value)} onToggleRecall={() => actionRef.current('recall')}
-              player={combatHudView(displayEngine).playerShip}
-              engine={combatHudView(displayEngine)}
+              player={combatHudView(displayWorld).playerShip}
+              engine={combatHudView(displayWorld)}
               weaponControls={{
                 onSelectGroup: (index) => actionRef.current("group", index),
                 onToggleMode: (index) => actionRef.current("mode", index),
@@ -1087,7 +1104,7 @@ export function LanBattle({
             />
           </div>
           <div className="hud-radar-anchor pointer-events-none absolute z-20">
-            <CombatRadar engine={combatHudView(displayEngine)} />
+            <CombatRadar engine={combatHudView(displayWorld)} />
           </div>
         </div>
       )}
@@ -1103,8 +1120,8 @@ export function LanBattle({
           <span className="lan-battle-teams" aria-label="阵营与舰船数量">{teamPresence.map(row=><span key={row.team} style={{color:teamColor(row.team)}}
             data-team={row.team} data-deployed={row.deployed} data-reserve={row.reserve} data-visible={row.visible}
             title={teamName(row.team)+"：编成 "+row.total+" · 在场 "+row.deployed+" · 可见 "+row.visible+" · 后备 "+row.reserve+" · 损失 "+row.destroyed+" · 撤离 "+row.retreated+"。在场不等于当前镜头内；后备需部署后才显示。"}>
-            {teamName(row.team)}{row.team===displayEngine?.playerShip.teamId?"（己方）":""} · 场{row.deployed}/总{row.total}{row.reserve>0?" 待命"+row.reserve:""}
-            {(row.missing>0||row.invalidPosition>0||(displayEngine?.openBattlefield&&row.visible<row.deployed))&&" ⚠显示异常"}
+            {teamName(row.team)}{row.team===displayWorld?.playerShip.teamId?"（己方）":""} · 场{row.deployed}/总{row.total}{row.reserve>0?" 待命"+row.reserve:""}
+            {(row.missing>0||row.invalidPosition>0||(displayWorld?.openBattlefield&&row.visible<row.deployed))&&" ⚠显示异常"}
           </span>)}</span>
           {hud && <span className="lan-network-quality" data-quality={!controlsReady || hud.age > 1500 ? "syncing" : (hud.rtt ?? 0) > 180 || (hud.acknowledgementMs ?? 0) > 350 || (hud.fps > 0 && hud.fps < Math.min(40, (getGraphicsSettings().maxFrameRate || 60) * .75)) || (hud.realtimeRatio !== null && hud.realtimeRatio < .9) ? "slow" : "good"}
             title={"服务器往返延迟，不含房主计算；输入确认包含服务器转发、主机处理及权威回执返回（关键或完整状态）。低延迟不代表高帧率；打开菜单中的性能与网络诊断查看详情。"}>
@@ -1135,15 +1152,15 @@ export function LanBattle({
           </p>
           <div className="combat-pause-layout">
             <section className="combat-pause-ship" aria-label="当前舰船">
-              {displayEngine && (
+              {displayWorld && (
                 <>
                   <div className="combat-pause-ship-name">
                     <NativeBitmapText font="caption">
-                      {displayEngine.playerShip.shipName}
+                      {displayWorld.playerShip.shipName}
                     </NativeBitmapText>
                   </div>
                   <div className="combat-pause-portrait">
-                    <ShipStage spec={displayEngine.playerShip.spec} home />
+                    <ShipStage spec={displayWorld.playerShip.spec} home />
                   </div>
                 </>
               )}
@@ -1257,7 +1274,7 @@ export function LanBattle({
                 receivedHz={hud?.hz ?? null} appliedHz={hud?.appliedHz ?? null} local={computesAuthority ? hud?.localFlow : undefined} />
               <LanNetworkDiagnostics transport={connection.lanTransport} />
               <SteamNetworkDiagnostics transport={steamTransport} />
-              <p>页面构建：<code>{LAN_BUILD}</code><br />当前地址：{window.location.host} · {displayEngine?.openBattlefield?"联机公开战场":"传感器视野"}</p>
+              <p>页面构建：<code>{LAN_BUILD}</code><br />当前地址：{window.location.host} · {displayWorld?.openBattlefield?"联机公开战场":"传感器视野"}</p>
               {teamPresence.map(row=><p key={row.team}>{teamName(row.team)}：编成 {row.total} · 已同步 {row.known} · 在场 {row.deployed} · 可见 {row.visible} · 后备 {row.reserve} · 损失 {row.destroyed} · 撤离 {row.retreated}{row.missing>0?" · 缺少身份 "+row.missing:""}{row.invalidPosition>0?" · 坐标异常 "+row.invalidPosition:""}</p>)}
               {hud && (
                 <p>

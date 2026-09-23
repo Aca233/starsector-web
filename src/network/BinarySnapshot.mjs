@@ -536,6 +536,7 @@ class SnapshotReader {
  * Scalars/strings use the original reader, including its legacy UTF8 fallback.
  */
 class RelaySnapshotReader extends SnapshotReader {
+  projectileSpans = null;
   key() {
     let key = this.read();
     if (this.dictionary && typeof key === 'number') key = dictionaryKey(key);
@@ -582,11 +583,19 @@ class RelaySnapshotReader extends SnapshotReader {
       for (let i = 0; i < c.length; i++) this.discard();
       return [];
     }
-    const out = {};
+    const out = {}, spans = this.projectileSpans;
+    const root = spans && fields === RELAY_FRAME_FIELDS;
+    const world = spans && fields === RELAY_FRAME_FIELDS.world;
+    if (root) { spans.entries = c.length; spans.headerEnd = this.offset; }
     for (let i = 0; i < c.length; i++) {
-      const key = this.key();
+      const key = this.key(), start = this.offset;
+      if (root && key === 'world') spans.worlds++;
+      if (root && key === 'projectileVisuals') spans.marked = true;
       if (!Array.isArray(fields) && Object.hasOwn(fields, key)) out[key] = this.project(fields[key]);
       else this.discard();
+      if (world && key === 'projectiles') {
+        spans.projectiles++; spans.start = start; spans.end = this.offset;
+      }
     }
     return out;
   }
@@ -608,7 +617,7 @@ function hydratePacked(value) {
   return value;
 }
 const BoundedSnapshotReader = boundedSnapshotReader(SnapshotReader, dictionaryKey, LIMIT, MAX_DEPTH);
-function decodeFrame(buffer, relay = false) {
+function decodeFrame(buffer, relay = false, spans = null) {
   const packet = bytesOf(buffer);
   const signature = packet.length >= 4 && packet[0] === 83 && packet[1] === 87 && packet[2] === 70;
   const packed = signature && packet[3] === 51;
@@ -623,7 +632,16 @@ function decodeFrame(buffer, relay = false) {
     catch { /* No partial value escaped. Legacy validation below is authoritative. */ }
   }
   preflight(bytes, packed);
-  try { return relay ? new RelaySnapshotReader(bytes, dictionary, packed).project(RELAY_FRAME_FIELDS) : new SnapshotReader(bytes, dictionary, packed).read(); }
+  try {
+    if (!relay) return new SnapshotReader(bytes, dictionary, packed).read();
+    const reader = new RelaySnapshotReader(bytes, dictionary, packed);
+    // Only SWF2/3 have an unambiguous root prefix. Legacy/fallback decoding
+    // still validates normally, but can never expose partially collected spans.
+    if (dictionary) reader.projectileSpans = spans;
+    const value = reader.project(RELAY_FRAME_FIELDS);
+    if (dictionary && spans) spans.valid = true;
+    return value;
+  }
   catch (error) {
     // Preserve the pinned library's legacy handling of malformed short UTF-8.
     if (error !== legacyUtf8) throw error;
@@ -650,15 +668,53 @@ export function encodeBinaryState(matchId, seq, frame) {
   result.set(meta, 8); result.set(payload, 8 + meta.length);
   return result;
 }
-function decodeState(buffer, relay = false) {
+function decodeState(buffer, relay = false, spans = null) {
   const bytes = bytesOf(buffer);
   if (bytes.length < 10 || bytes.length > LIMIT || bytes[0] !== 83 || bytes[1] !== 87 || bytes[2] !== 66 || bytes[3] !== 49) throw Error('Invalid binary state header');
   const size = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(4, true);
   if (!size || size > 1024 || 8 + size >= bytes.length) throw Error('Invalid binary state header');
   const header = JSON.parse(text.decode(bytes.subarray(8, 8 + size)));
   if (!validHeader(header)) throw Error('Invalid binary state header');
-  return { type: 'state', ...header, frame: decodeFrame(bytes.subarray(8 + size), relay) };
+  if (spans) spans.frameStart = 8 + size;
+  return { type: 'state', ...header, frame: decodeFrame(bytes.subarray(8 + size), relay, spans) };
 }
 export function decodeBinaryState(buffer) { return decodeState(buffer); }
 /** Relay-only projection. Must still pass summarizeCombatFrame before forwarding the ORIGINAL bytes. */
 export function decodeBinaryStateForRelay(buffer) { return decodeState(buffer, true); }
+
+/** Byte-splice only after the SAME bounded validation/projection walk completed.
+ * No second graph decode/encode and no host duplicate upload. Preserve every
+ * other byte, including SWB1 metadata, packed numbers and discrete events. */
+function deriveProjectileVariant(bytes, spans) {
+  if (!spans.valid || spans.worlds !== 1 || spans.projectiles !== 1 || spans.marked ||
+      !(spans.entries > 0 && spans.entries < 65536)) return null;
+  const count = spans.entries + 1, width = count < 16 ? 1 : count < 65536 ? 3 : 5;
+  const key = utf8.encode('projectileVisuals'), marker = new Uint8Array(key.length + 2);
+  marker[0] = 0xa0 + key.length; marker.set(key, 1); marker[marker.length - 1] = 1;
+  const length = bytes.length + width - spans.headerEnd - (spans.end - spans.start) + 1 + marker.length;
+  if (length >= bytes.length || length > LIMIT) return null;
+  const out = new Uint8Array(length), body = spans.frameStart + 4;
+  out.set(bytes.subarray(0, body));
+  if (width === 1) out[body] = 0x80 + count;
+  else {
+    out[body] = width === 3 ? 0xde : 0xdf;
+    const view = new DataView(out.buffer);
+    if (width === 3) view.setUint16(body + 1, count); else view.setUint32(body + 1, count);
+  }
+  let at = body + width;
+  const before = bytes.subarray(body + spans.headerEnd, body + spans.start);
+  out.set(before, at); at += before.length; out[at++] = 0x90;
+  const after = bytes.subarray(body + spans.end);
+  out.set(after, at); at += after.length; out.set(marker, at);
+  return out;
+}
+/** Incomplete relay state plus a lazy SAME-packet viewer variant. The caller
+ * must summarize/validate the state and require current consumed visual credit
+ * for EACH recipient before invoking/selecting the variant. Input bytes must
+ * remain immutable until that broadcast ends. Null means use the original. */
+export function decodeBinaryStateWithProjectileVariantForRelay(buffer) {
+  const bytes = bytesOf(buffer), spans = { valid: false, worlds: 0, projectiles: 0, marked: false };
+  const state = decodeState(bytes, true, spans);
+  let variant;
+  return { state, projectileVariant: () => variant === undefined ? (variant = deriveProjectileVariant(bytes, spans)) : variant };
+}

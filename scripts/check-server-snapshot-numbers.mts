@@ -5,7 +5,7 @@ import path from 'node:path';
 import {createLanWorld} from '../src/network/LanWorld';
 import {assetManager} from '../src/engine/assets/AssetResolver';
 import {captureHostCombat,configureHostCosmetics} from '../src/network/HostSnapshot';
-import {captureCombat} from '../src/network/CombatSnapshot';
+import {captureCombat} from '../src/network/AuthorityCombatSnapshot';
 import {encodeProjectedBinaryFrame,decodeBinaryFrame} from '../src/network/BinarySnapshot.mjs';
 import protocol from '../src/network/protocol.json';
 

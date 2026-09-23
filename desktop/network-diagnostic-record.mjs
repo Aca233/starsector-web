@@ -45,6 +45,8 @@ const steamSchema = { mode: choice('legacy-p2p', 'sockets'), role: choice('host'
   outbound: numbers('inflight queued oldestAckMs inflightBytes queuedBytes coalesced'), nativeHostSession: nativeSchema,
   incomingSnapshots: numbers('fullStates deltaStates misses baselineBytes binaryFullStates binaryDeltaStates motionDeltas'),
   peers: list({ preparation: numbers('attempts discarded totalMs discardedMs maxMs'), ...numbers('byteLimit inflight window inflightBytes oldestAckMs ackMs baseAckMs sentStates skippedStates ackedStates queueAckMs'), probing: choice('drain', 'measure'),
+    components: { active: bool, fallback: choice('component-loss-or-consumer-stall','component-sdk-refused'), ...numbers('sent consumed discarded fragment skipped failed inflight bytes') },
+    motion: { fallback: choice('motion-loss-or-consumer-stall'), ...numbers('sent consumed superseded expired skipped refused wireBytes inflight bytes'), world: { mode: choice('auto'), status: choice('awaiting-world','eligible','fallback'), fallbackReason: choice('whole-state-late','whole-state-stalled'), ...numbers('worldSenderAgeMs pending maxAgeMs') } },
     consumption: { enabled: bool, ...numbers('inflight bytes rawBytes consumed oldestMs') },
     blockedBy: blockReason, lastSnapshotSkip: blockReason,
     lastSnapshot: { ...numbers('rawBytes wireBytes fragments prepareMs'), format: choice('full', 'delta', 'legacy-full', 'binary-full', 'binary-delta') },
@@ -58,7 +60,7 @@ export function normalizeNetworkRecord(input) {
   const record = { version: 1, event: v.event, build, transport: v.transport,
     ...project(v, { wallTimeMs: numeric, monotonicMs: numeric, battle: numeric, seat: numeric, role: choice('host', 'guest'),
       failureStage: choice(...NETWORK_FAILURE_STAGES), hidden: bool, connected: bool, socketBufferedBytes: numeric, sampleGapMs: numeric, hudAgeMs: numeric, pipelineAgeMs: numeric, steamAgeMs: numeric,
-      features: { policy: choice('auto', 'off', 'experimental'), negotiated: bool, motionRequested: bool, motion: bool, visuals: bool, combat: bool, motionWire: bool, bulkChunks: bool, binaryDelta: bool, binarySnapshots: bool, reason: choice('steam-motion-not-implemented', 'disabled-by-build', 'awaiting-welcome', 'server-did-not-negotiate', 'no-helper-lane', 'check-receiver-activity') },
+      features: { policy: choice('auto', 'off', 'experimental'), negotiated: bool, motionRequested: bool, motion: bool, visuals: bool, combat: bool, motionWire: bool, bulkChunks: bool, binaryDelta: bool, binarySnapshots: bool, reason: choice('steam-motion-not-implemented', 'disabled-by-build', 'awaiting-welcome', 'server-did-not-negotiate', 'no-helper-lane', 'check-receiver-activity', 'steam-datagram-check-receiver', 'steam-components-check-receiver', 'component-fallback') },
       runtime: runtimeSchema, hud: hudSchema, pipeline: pipelineSchema, lan: lanSchema, steam: steamSchema }) };
   // Stale values are explicitly unavailable, not a fresh repetition or measured zero.
   record.hudFresh = record.hudAgeMs !== null && record.hudAgeMs <= 2500;

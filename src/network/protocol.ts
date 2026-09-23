@@ -1,3 +1,4 @@
+import { AuthorityComponentPublisher } from './AuthorityComponents.mjs';
 import { networkFeaturePolicy, networkHelloFeatures, networkFeatureStatus } from './NetworkFeaturePolicy.mjs';
 import { VisualPacketAssembler, visualReceipt } from './ProjectileVisualPacket.mjs';
 import { publicAuthorityPerformance } from "./SnapshotFlow.mjs";
@@ -126,6 +127,10 @@ export class LanConnection {
   ready = false;
   private stateCredits = false;
   combatState = false;
+  private componentUpload = false;
+  get canPublishVisual() { return this.componentUpload && NETWORK_FEATURE_POLICY.visuals; }
+  get canPublishCombat() { return this.componentUpload && NETWORK_FEATURE_POLICY.combat; }
+  private authorityComponents = new AuthorityComponentPublisher();
   motionState = false;
   visualState = false;
   private readonly visualPackets = new VisualPacketAssembler();
@@ -331,10 +336,12 @@ export class LanConnection {
       if (typeof m?.type === "string") this.lastMessageAt = performance.now();
       if (m.type === "welcome") {
         // Opt in only when the relay confirms; legacy LAN/Steam relays omit it.
+        this.componentUpload = m.componentUpload === 1;
+        this.authorityComponents.reset();
         this.stateCredits = m.stateCredits === 1;
-        this.combatState = LAN_CRITICAL_COMBAT_ENABLED && this.transport === "lan" && m.combatState === 1;
-        this.visualState = LAN_LAYERED_SYNC_ENABLED && this.transport === "lan" && m.visualState === 1;
-        this.motionState = LAN_MOTION_SYNC_ENABLED && this.transport === "lan" && m.motionState === 1;
+        this.combatState = networkFeatureStatus(this.transport, NETWORK_FEATURE_POLICY, m).combat;
+        this.visualState = networkFeatureStatus(this.transport, NETWORK_FEATURE_POLICY, m).visuals;
+        this.motionState = networkFeatureStatus(this.transport, NETWORK_FEATURE_POLICY, m).motion;
         this.networkFeatures = networkFeatureStatus(this.transport, NETWORK_FEATURE_POLICY, m);
         this.binaryDelta = this.transport === "lan" && this.stateCredits && m.binaryDelta === 1;
         this.steamBinarySnapshots = this.transport === "steam" && m.binarySnapshots === 1;
@@ -375,7 +382,10 @@ export class LanConnection {
           /* optional */
         }
       }
+      if (m.type === "layered-ready" && this.transport === "steam") { this.visualState = NETWORK_FEATURE_POLICY.visuals && m.visualState === 1; this.combatState = NETWORK_FEATURE_POLICY.combat && m.combatState === 1; this.networkFeatures = { ...this.networkFeatures, visuals: this.visualState, combat: this.combatState, reason: "steam-components-check-receiver" }; }
+      if (m.type === "layered-unavailable") { this.visualState = this.combatState = false; this.visualPackets.reset(); this.networkFeatures = { ...this.networkFeatures, visuals: false, combat: false, reason: "component-fallback" }; }
       if (m.type === "match" || m.type === "ended") {
+        this.authorityComponents.reset();
         this.resetPipeline();
         if (m.type === "ended" || this.authoritySample?.matchId !== m.match?.id) this.authoritySample = null;
       }
@@ -478,6 +488,13 @@ export class LanConnection {
       this.realtimeGate.snapshotSent(performance.now());
       return "sent";
     } catch (error) { return error instanceof RangeError ? "oversized" : "disconnected"; }
+  }
+  sendAuthorityComponent(matchId: string, message: { type: string }): boolean {
+    if (this.socket?.readyState !== WebSocket.OPEN || this.socket.bufferedAmount > 0 ||
+        (message.type === 'combat-state' ? !this.canPublishCombat : !this.canPublishVisual)) return false;
+    const choice = this.authorityComponents.prepare(matchId, message);
+    if (!this.send(choice.message)) return false;
+    choice.commit(); return true;
   }
   send(message: unknown): boolean {
     if (

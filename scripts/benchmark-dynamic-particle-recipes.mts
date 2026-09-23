@@ -3,7 +3,7 @@ import {assetManager} from '../src/engine/assets/AssetResolver';
 import {createLanWorld} from '../src/network/LanWorld';
 import {configureHostCosmetics,captureAuthorityCombat} from '../src/network/HostSnapshot';
 import {encodeBinaryState,encodeProjectedBinaryFrame} from '../src/network/BinarySnapshot.mjs';
-import {applyCombatSnapshot} from '../src/network/CombatSnapshot';
+import {applyCombatSnapshot} from '../src/network/AuthorityCombatSnapshot';
 import {decodeBinaryState} from '../src/network/BinarySnapshot.mjs';
 import {Vector2} from '../src/engine/math/Vector2';
 import {withoutBulkProjectiles} from '../src/network/ProjectileBulkVariant.mjs';

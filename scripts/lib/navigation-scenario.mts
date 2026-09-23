@@ -1,4 +1,4 @@
-import {assets} from './native-projectile-fixture.mts';import {createLanWorld} from '../../src/network/LanWorld';import {configureHostCosmetics} from '../../src/network/HostSnapshot';import {captureCombat} from '../../src/network/CombatSnapshot';import {encodeProjectedBinaryFrame} from '../../src/network/BinarySnapshot.mjs';
+import {assets} from './native-projectile-fixture.mts';import {createLanWorld} from '../../src/network/LanWorld';import {configureHostCosmetics} from '../../src/network/HostSnapshot';import {captureCombat} from '../../src/network/AuthorityCombatSnapshot';import {encodeProjectedBinaryFrame} from '../../src/network/BinarySnapshot.mjs';
 import {CombatStepProfiler} from '../../src/engine/diagnostics/CombatStepProfiler';
 export {assets};
 export function scenario(players:number){

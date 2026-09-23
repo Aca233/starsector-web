@@ -5,7 +5,7 @@ import type { CommandResult } from '../CombatCommands';
 import type { CombatOutcome } from '../../game/GameState';
 import type { LocalCombatConfig, LocalCombatCommand, LocalCombatKernel } from './LocalCombatKernel';
 
-export const LOCAL_COMBAT_PROTOCOL = 13;
+export const LOCAL_COMBAT_PROTOCOL = 14;
 export interface CombatAudioEvent { key: string; volume: number; rate: number; position?: [number, number] }
 export type LocalCombatRequest = (
   | { protocol: number; epoch: number; sequence: number; kind: 'init'; config: LocalCombatConfig }

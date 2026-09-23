@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';import fs from 'node:fs';import path fro
 import {decodeBinaryState as oldDecode} from 'scanner-reference/src/network/BinarySnapshot.mjs';
 import {LanDeltaReceiver as OldReceiver} from 'scanner-reference/src/network/LanBinaryDelta.mjs';
 import {LanDeltaSender as OldSender,lanDeltaTarget as oldTarget} from 'scanner-reference/server/LanDeltaTransport.mjs';
-import {captureCombat,applyCombatSnapshots} from '../src/network/CombatSnapshot';
+import {captureCombat,applyCombatSnapshots} from '../src/network/AuthorityCombatSnapshot';
 import {encodeProjectedBinaryFrame,encodeBinaryState,decodeBinaryState} from '../src/network/BinarySnapshot.mjs';
 import {isLanDelta,LanDeltaReceiver} from '../src/network/LanBinaryDelta.mjs';import {LanDeltaSender,lanDeltaTarget} from '../server/LanDeltaTransport.mjs';
 import {assets,world} from './lib/native-projectile-fixture.mts';

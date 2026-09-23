@@ -6,7 +6,8 @@ import { registerShipDisplayStrings } from '../../content/ShipDisplayStrings';
 import type { ShipSpec } from '../../content/ShipSpec';
 import { localCombatContentSignature } from './LocalCombatContent';
 import { copyControlSample, type CombatControlSample } from '../CombatControl';
-import { CombatPresentationDecoder, type DetachedCombatPresentation } from './CombatPresentation';
+import { CombatPresentationDecoder } from './CombatPresentationDecoder';
+import type { DetachedCombatPresentation } from './CombatPresentationWire';
 import type { LocalCombatConfig, LocalCombatCommand } from './LocalCombatKernel';
 import { LOCAL_COMBAT_PROTOCOL, type LocalCombatAck, type LocalCombatRequest, type LocalCombatResponse } from './LocalCombatProtocol';
 
@@ -32,7 +33,7 @@ export class LocalWorkerHost {
   /** Last ACK only: pending and failed transactions are deliberately excluded. */
   checkpoint(): CombatReplayCheckpoint { return this.journal.checkpoint(); }
   private readonly contentSignature: string;
-  private readonly decoder = new CombatPresentationDecoder(this.epoch);
+  private readonly decoder: CombatPresentationDecoder;
   private readonly queue: Pending[] = [];
   private readonly presentationStrings = new WeakSet<ShipSpec>();
   private inFlight?: Pending;
@@ -60,6 +61,7 @@ export class LocalWorkerHost {
     if (!(timeoutMs > 0) || !Number.isFinite(timeoutMs)) throw new Error('Invalid combat transaction timeout');
     const recovery = checkpoint ? copyReplayCheckpoint(checkpoint, LOCAL_COMBAT_PROTOCOL) : undefined;
     const cloned = structuredClone(recovery?.config ?? config);
+    this.decoder = new CombatPresentationDecoder(this.epoch, 'render-strict');
     this.contentSignature = localCombatContentSignature();
     if (recovery && recovery.config.expectedContent !== this.contentSignature)
       throw new Error('Content changed since the combat checkpoint; recovery refused');

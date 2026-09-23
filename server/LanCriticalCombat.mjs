@@ -21,7 +21,7 @@ export class LanCriticalCombat {
     const row = this.peers.get(peer); if (row) { this.bytes -= row.bytes; this.totals.abandonedBytes += row.bytes; }
     this.peers.delete(peer);
   }
-  flush(recipients, { writable, send }) {
+  flush(recipients, { writable, send, ordered = () => true }) {
     const target = this.target; if (!target) return;
     const start = this.cursor++ % Math.max(1, recipients.length);
     for (const { peer, syncId, idleRttMs } of [...recipients.slice(start), ...recipients.slice(0, start)]) {
@@ -34,6 +34,8 @@ export class LanCriticalCombat {
       const capacity = Math.max(2, Math.min(6, Math.ceil((idleRttMs ?? 0) * .02) + 1));
       if (target.tick <= row.last) continue;
       if (row.pending.size >= capacity || !writable(peer)) { this.totals.skipped++; continue; }
+      // Unordered optional datagrams never depend on a previous wire packet.
+      if (!ordered(peer)) row.wire.reset();
       let choice;
       try { choice = row.wire.prepare(target, this.matchId, syncId); }
       catch {

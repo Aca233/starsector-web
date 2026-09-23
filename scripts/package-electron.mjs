@@ -1,5 +1,6 @@
 import { copySteamMetricsRuntime, steamMetricsExtraResources, verifySteamMetricsRuntime } from './package-steam-metrics-runtime.mjs';
 import fs from 'node:fs/promises';
+import { assertCleanWebBuild } from './web-build-integrity.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -24,6 +25,7 @@ if (!args.includes('--skip-build')) {
   if (result.error) throw result.error;
   if (result.status !== 0) throw Error('前端构建失败');
 }
+await assertCleanWebBuild(path.join(project, 'dist'));
 await fs.access(path.join(project, 'dist', 'index.html'));
 const { build: buildId } = JSON.parse(await fs.readFile(path.join(project, 'dist', 'lan-build.json'), 'utf8'));
 const stamp = new Date().toISOString().replace(/\D/g, '');

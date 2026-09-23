@@ -10,7 +10,7 @@ import { ExplosionPuffDecoder, puffRecipeBudget, reservePuffRecipe, MAX_FRAME_RE
 import { createLanWorld } from '../src/network/LanWorld';
 import { assetManager } from '../src/engine/assets/AssetResolver';
 import { captureHostCombat, configureHostCosmetics } from '../src/network/HostSnapshot';
-import { applyCombatSnapshot, captureCombat } from '../src/network/CombatSnapshot';
+import { applyCombatSnapshot, captureCombat } from '../src/network/AuthorityCombatSnapshot';
 import { encodeProjectedBinaryFrame, encodeBinaryState, decodeBinaryState } from '../src/network/BinarySnapshot.mjs';
 import { SteamSnapshotEncoder, SteamSnapshotSender, SteamSnapshotReceiver } from '../server/steam/snapshot-delta.mjs';
 import { SteamPacketCodec } from '../server/steam/packet-codec.mjs';

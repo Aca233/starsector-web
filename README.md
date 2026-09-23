@@ -428,3 +428,16 @@ The follow-up [main-thread experiments](docs/simulation-main-thread-experiments-
 Steam mode keeps the game in an ordinary browser. Every player runs a small local Steamworks helper; Electron is not required. Use npm run steam to build/start, npm run steam:serve to reuse a build, or npm run package:steam to produce a Windows x64 portable ZIP with a hidden launcher. The default AppID 480 is for Spacewar development testing, not a production release identity. The existing LAN launch/package scripts are preserved.
 
 Steam lobbies and P2P packets bridge into the same room, refit, teams, AI and battle protocol. Share the full Steam lobby ID, not localhost or the six-digit LAN code. Host computation, bounded snapshot recovery and no host migration remain unchanged. Native loading and simulated two-peer protocol checks do not establish real Steam-account or cross-network validation. See [Steam setup and limitations](docs/steam-multiplayer.md).
+
+## 无损 WebP 生产资源
+
+生产 `npm run build` 现会将经像素核验且更小的图片编码为无损 WebP；开发环境及原始 `public` 保持原样。构建机需 Python 3.10+ 和带 WebP/LittleCMS 的 Pillow 12.1+：
+
+```powershell
+python -m pip install --upgrade "Pillow>=12.1"
+npm run images:webp
+```
+
+可通过 `STARSECTOR_PYTHON` 指定 Python。编码缓存位于 `.vite/webp`，不进入发行输出；后续构建会复用并校验缓存。资源 URL、CSS、字体描述符及清单自动匹配，静态托管不需要额外重写规则。无收益或不能安全转换的图片保留原格式，音频不改。
+
+详见 [Web 体积优化及验证记录](docs/web-size-optimization.md)。

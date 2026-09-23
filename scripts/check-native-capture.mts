@@ -1,3 +1,24 @@
+import displayRestoreShapes from './lib/display-restore-shapes.json';
+import { displayRecordRestorer } from '../src/network/DisplayRecordRestore.generated';
+import { initializeLanDisplayWorld as controlDisplayWorld, applyLanDisplaySnapshot as controlDisplayApply } from 'display-snapshot-control';
+import { unpackDisplay as controlUnpackDisplay, unpackDisplayProjectiles as controlUnpackProjectiles } from 'display-codec-control';
+import { unpackDisplay, unpackDisplayProjectiles, displayLayouts } from '../src/network/DisplaySnapshotCodec';
+import { ExplosionPuffDecoder } from '../src/network/ExplosionPuffCodec';
+import { serialize } from 'node:v8';
+import { LanShipProjection } from '../src/network/display/LanShipProjection';
+import { captureLanDisplayCombat } from '../src/network/HostSnapshot';
+import { applyLanDisplaySnapshot, applyLanDisplaySnapshots, projectileSnapshotTick as displayProjectileTick } from '../src/network/LanDisplaySnapshot';
+import { LanDisplayWorld } from '../src/network/LanDisplayWorld';
+import { createLanDisplayWorld } from '../src/network/LanDisplayBootstrap';
+import { setLanPerspective } from '../src/network/LanWorld';
+import { CombatEngine } from '../src/engine/simulation/CombatEngine';
+import { ProjectedRenderShip, renderWeaponRange } from '../src/engine/runtime/local/RenderShipProjection';
+import { TacticalMapViewProjector } from '../src/engine/runtime/TacticalMapView';
+import { DeploymentViewProjector } from '../src/engine/runtime/DeploymentView';
+import { setProjectileFlightLayer } from '../src/engine/render/ProjectileFlightLayer';
+import { setPredictedProjectileLayer } from '../src/engine/render/PredictedProjectileLayer';
+import { setLocalMuzzleLayer } from '../src/engine/render/LocalMuzzleLayer';
+import { setLocalParticleLayer } from '../src/engine/render/LocalParticleLayer';
 import {combatRenderView} from '../src/engine/render/CombatRenderView';
 import {DynamicParticleDecoder,particleRecipeBudget,enableDynamicParticleRecipes,particleRecipeRow} from "../src/engine/visual/DynamicParticleRecipe";
 import {SimulationRandom} from "../src/engine/simulation/SimulationRandom";
@@ -6,7 +27,7 @@ import {deflateRawSync} from "node:zlib";
 import {captureCriticalCombat,CriticalCombatReplica} from "../src/network/CriticalCombatReplica";
 import {decodeCombatState} from "../src/network/CriticalCombatState.mjs";
 import {withoutBulkProjectiles} from '../src/network/ProjectileBulkVariant.mjs';
-import {projectileSnapshotTick} from '../src/network/CombatSnapshot';
+import {projectileSnapshotTick} from '../src/network/AuthorityCombatSnapshot';
 import {projectileVisualLayer} from '../src/engine/render/ProjectileVisualLayer';
 import {missileIdentification} from '../src/engine/visual/IdentificationVisuals';
 import {collectCombatTextureUrls} from '../src/engine/assets/CombatAssetClosure';
@@ -23,7 +44,7 @@ import path from 'node:path';
 import {createLanWorld} from '../src/network/LanWorld';
 import {assetManager} from '../src/engine/assets/AssetResolver';
 import {captureHostCombat,captureAuthorityCombat,configureHostCosmetics} from '../src/network/HostSnapshot';
-import {captureCombat,applyCombatSnapshot} from '../src/network/CombatSnapshot';
+import {captureCombat,applyCombatSnapshot} from '../src/network/AuthorityCombatSnapshot';
 import {projectileColumnPlan} from '../src/network/ProjectileColumns';
 import {encodeProjectedBinaryFrame,decodeBinaryFrame} from '../src/network/BinarySnapshot.mjs';
 import {summarizeCombatFrame} from '../src/network/CombatFrameSummary.mjs';
@@ -52,9 +73,10 @@ function expanded(frame:any){
 const engine=createLanWorld(match()).engine,muzzle=configureHostCosmetics(engine);
 // This legacy native-vs-generic parity check explicitly retains authority work fields.
 // The production pruned read-set is covered by check-native-capture-plans.
-const capture=(tick:number,native:boolean)=>native ? captureAuthorityCombat(engine,tick,{0:tick,1:tick},0,muzzle,false,false,false,false,false,false) : captureHostCombat(engine,tick,{0:tick,1:tick},0,muzzle);
+const capture=(tick:number,native:boolean)=>native ? captureAuthorityCombat(engine,tick,{0:tick,1:tick},0,muzzle,false,false,false,false,false,false,false) : captureHostCombat(engine,tick,{0:tick,1:tick},0,muzzle);
 test('native capture retains complete visible projection, event windows and real receiver state through 32-ship combat',()=>{
  const a=createLanWorld(match()).engine,b=createLanWorld(match()).engine;
+ let display:LanDisplayWorld|undefined;
  let events=0,projectiles=0,damage=0;
  for(let tick=0;tick<=1200;tick++){
   if(tick)engine.fixedUpdate(1/60);
@@ -67,6 +89,13 @@ test('native capture retains complete visible projection, event windows and real
   const oldBytes=encodeProjectedBinaryFrame(old)!,fastBytes=encodeProjectedBinaryFrame(fast)!;
   applyCombatSnapshot(a,decodeBinaryFrame(oldBytes),tick%180===0);applyCombatSnapshot(b,decodeBinaryFrame(fastBytes),tick%180===0);
   assert.deepEqual(expanded(captureHostCombat(a,tick,{0:tick,1:tick},0,null)),expanded(captureHostCombat(b,tick,{0:tick,1:tick},0,null)),'restored at '+tick);
+  const displayFrame=decodeBinaryFrame(encodeProjectedBinaryFrame(captureLanDisplayCombat(engine,tick,{0:tick,1:tick},0,muzzle,false,true),true)!);
+  if(!display)display=createLanDisplayWorld(match(),0,displayFrame).world;
+  else applyLanDisplaySnapshot(display,displayFrame,tick%180===0);
+  assert.deepEqual(display.ships.map(ship=>[ship.id,ship.pos,ship.prevPos,ship.hullHp,ship.currentTargetShip?.id]),b.ships.map(ship=>[ship.id,ship.pos,ship.prevPos,ship.hullHp,ship.currentTargetShip?.id]),'detached viewer at '+tick);
+  assert.deepEqual(display.projectiles,b.projectiles); assert.deepEqual(display.beams,b.beams);
+  const render=display.renderView(); assert.ok(render.playerShip instanceof ProjectedRenderShip);
+  for(const hulk of render.hulkFragments)assert.ok(hulk.sourceShip instanceof ProjectedRenderShip);
   assert.deepEqual(capture(tick,false),old,'fast capture must not mutate authority');
   projectiles+=engine.projectiles.length;events+=fast.muzzleEvents?.events.length??0;damage+=engine.ships.reduce((n,s)=>n+s.damageDecals.marks.length,0);
  }
@@ -414,7 +443,7 @@ test('packed native authority snapshots retain exact restore, JSON and motion-re
 });
 
 import {world as numericBenchmarkWorld} from './lib/native-projectile-fixture.mts';
-import {applyCombatSnapshots as applyNumericBench} from '../src/network/CombatSnapshot';
+import {applyCombatSnapshots as applyNumericBench} from '../src/network/AuthorityCombatSnapshot';
 import {inflateRawSync} from 'node:zlib';
 import {LanDeltaSender,lanDeltaTarget} from '../server/LanDeltaTransport.mjs';
 import {LanDeltaReceiver,isLanDelta} from '../src/network/LanBinaryDelta.mjs';
@@ -519,7 +548,7 @@ test('armor component complete native trajectory matches full capture through co
 });
 
 import {componentReplicationDiagnostics,resolveComponent,decodeComponent,componentCapsule,ComponentCapture} from '../src/network/ComponentReplication';
-import {componentCaptureDiagnostics,combatComponentNotices} from '../src/network/CombatSnapshot';
+import {componentCaptureDiagnostics,combatComponentNotices} from '../src/network/AuthorityCombatSnapshot';
 import {Ship} from '../src/engine/simulation/Ship';
 function componentExpanded(frame:any):any {
  const open=(v:any):any=>{
@@ -619,4 +648,296 @@ test('whole component paired processing benchmark', {skip:process.env.COMPONENT_
  const summary=(rows:any[])=>Object.fromEntries(Object.keys(rows[0]).map(key=>{const values=rows.map(r=>r[key]).sort((x,y)=>x-y);return[key,{p50:values[Math.floor(values.length/2)],p95:values[Math.floor(values.length*.95)]}];}));
  const result={ships:22,guests:2,sequentialGuests:true,baseline:summary(a),candidate:summary(b)};
  fs.writeFileSync('artifacts/network-components-20260922/benchmark.json',JSON.stringify(result,null,2));console.log('COMPONENT PAIRED',JSON.stringify(result));
+});
+
+// Production display packets through the REAL packed/binary decoder, not a clone
+// of PackedSnapshotNumbers (which would discard its type marker).
+const displayWire=(frame:any)=>decodeBinaryFrame(encodeProjectedBinaryFrame(frame,true)!);
+const jsonData=(value:any)=>JSON.parse(JSON.stringify(value));
+test('LAN display world cold join, reserve deployment, carrier lifecycle, overlays and reconnect use only display records',()=>{
+ const fixture=match(6,'drover');fixture.options.initialDeploymentLimit=0;
+ fixture.players.push({id:'c',seat:2,team:2,hull:'hammerhead'});fixture.options.aiHulls.push(['hammerhead']);
+ for(const packed of [false,true]) {
+  const host=createLanWorld(fixture).engine,legacy=createLanWorld(fixture);setLanPerspective(legacy.engine,legacy.controlled,1);
+  const take=(tick:number)=>captureLanDisplayCombat(host,tick,{0:tick,1:tick,2:tick},0,null,false,packed);
+  host.combatTime=15;const first=displayWire(take(900)); // No local tick-zero match construction.
+  const display=createLanDisplayWorld(fixture,1,first).world;
+  const baseline=(tick:number,reset:boolean)=>{
+   applyCombatSnapshot(legacy.engine,displayWire(captureHostCombat(host,tick,{0:tick,1:tick,2:tick},0,null)),reset);
+   // Legacy packets omitted wing membership; the new read model explicitly publishes it.
+   legacy.engine.playerWings.splice(0,legacy.engine.playerWings.length,...structuredClone(host.playerWings));
+   legacy.engine.enemyWings.splice(0,legacy.engine.enemyWings.length,...structuredClone(host.enemyWings));
+  };
+  baseline(900,true);display.isTacticalMap=legacy.engine.isTacticalMap=true;
+  const hud=new CombatHudProjector(),oldHud=new CombatHudProjector(),map=new TacticalMapViewProjector(),oldMap=new TacticalMapViewProjector(),deployment=new DeploymentViewProjector(),oldDeployment=new DeploymentViewProjector();
+  const check=()=>{
+   const ships=(world:any)=>world.ships.map((s:any)=>[s.id,s.teamId,s.pos,s.prevPos,s.hullHp,s.sourceCarrier?.id,s.parentShip?.id,s.currentTargetShip?.id]);
+   assert.deepEqual(ships(display),ships(legacy.engine));
+   assert.deepEqual(jsonData(hud.capture(display)),jsonData(oldHud.capture(legacy.engine)));
+   assert.deepEqual(map.capture(display),oldMap.capture(legacy.engine));
+   assert.deepEqual(jsonData(deployment.capture(display)),jsonData(oldDeployment.capture(legacy.engine)));
+   assert.deepEqual(collectCombatTextureUrls(display.renderView()),collectCombatTextureUrls(combatRenderView(legacy.engine)));
+   assert.equal(display.commandPoints,host.commandPoints);
+   for(const s of display.ships){assert.ok(s instanceof ProjectedRenderShip);assert.ok(!(s instanceof Ship));assert.equal('fixedUpdate' in s,false);assert.equal('applyDamage' in s.armor,false);assert.equal('toggle' in s.shield,false);assert.equal('activate' in s.system,false);}
+  };
+  check();const identity=display.playerShip;
+  const reserve=host.allCapitalShips.find(s=>host.deployment.isReserve(s.id))!;host.deployment.deploy([reserve.id],reserve.teamId);
+  assert.ok(host.fighters.length+host.bombers.length>0);
+  host.combatTime+=1/60;const deployed=displayWire(take(901));
+  baseline(901,false);applyLanDisplaySnapshot(display,deployed);check();
+  reserve.pos.x+=120;host.combatTime+=1/60;
+  baseline(902,false);applyLanDisplaySnapshot(display,displayWire(take(902)));check();assert.equal(display.playerShip,identity);
+  const controlled=host.allCapitalShips.find(s=>s.id===display.playerShip.id)!;
+  controlled.hullHp-=17;controlled.flux.hardFlux=controlled.flux.maxFlux*.4;controlled.shield.isActive=true;
+  const critical=captureCriticalCombat(host,903,true)!;assert.ok(critical);
+  const lane=new CriticalCombatReplica();lane.receive(decodeCombatState(critical),100,902);lane.apply(display,902);
+  assert.equal(display.playerShip.hullHp,controlled.hullHp);assert.equal(display.playerShip.flux.fluxPercent,controlled.flux.fluxPercent);
+  assert.equal(display.playerShip.shield.visualAlpha,controlled.shield.visualAlpha);
+  host.fighters.splice(0);host.bombers.splice(0);reserve.hullHp=0;reserve.isDead=true;
+  baseline(910,false);applyLanDisplaySnapshot(display,displayWire(take(910)));check();
+  baseline(900,true); // Restore the actual earlier authority packet to both receivers below.
+  applyLanDisplaySnapshot(display,first,true);assert.equal(display.playerShip,identity);
+  const fresh=createLanDisplayWorld(fixture,1,displayWire(take(910))).world;
+  assert.deepEqual(fresh.ships.map(s=>[s.id,s.hullHp]),host.ships.map(s=>[s.id,s.hullHp]).sort((a,b)=>fresh.ships.findIndex(s=>s.id===a[0])-fresh.ships.findIndex(s=>s.id===b[0])));
+  const observed:number[]=[];applyLanDisplaySnapshots(display,[deployed,first],true,frame=>observed.push(frame.tick));assert.deepEqual(observed,[901,900]);
+  const noBulk=displayWire(withoutBulkProjectiles(take(911)));applyLanDisplaySnapshot(display,noBulk,true);assert.equal(displayProjectileTick(display),-1);
+ }
+});
+
+test('LAN display world rejects legacy protocols, malformed identities, specs, references and method shadowing',()=>{
+ const fixture=match(4),host=createLanWorld(fixture).engine;
+ const frame=displayWire(captureLanDisplayCombat(host,60,{0:60,1:60},0,null));
+ const make=()=>createLanDisplayWorld(fixture,0,displayWire(frame)).world;
+ assert.throws(()=>createLanDisplayWorld(fixture,0,captureHostCombat(host,0,{0:0},0,null)),/display protocol/);
+ assert.throws(()=>createLanDisplayWorld({...fixture,options:{...fixture.options,aiHulls:[[],[]]}},0,frame),/fleet size/);
+ for(const mutate of [
+  (p:any)=>{p.displayVersion=2;},(p:any)=>{p.ships[1].id=p.ships[0].id;},(p:any)=>{p.ships[0].spec=999999;},
+  (p:any)=>{p.ships[0].state.pos={$ship:'missing'};},(p:any)=>{p.ships[0].state.clearInput=3;},
+  (p:any)=>{p.craftSpecs[p.ships[0].spec].spriteUrl='https://untrusted.invalid/x.png';},
+  (p:any)=>{p.ships[0].state.parentShip={$ship:p.ships[0].id};},(p:any)=>{p.controlled[0]='missing';},
+ ]){const replica=make(),bad=structuredClone(frame);mutate(bad);assert.throws(()=>applyLanDisplaySnapshot(replica,bad));}
+ let called=0;host.playerShip.system.getWeaponRangePercent=()=>{called++;return 0;};
+ assert.throws(()=>captureLanDisplayCombat(host,61,{0:61},0,null),/authority-side adapter/);assert.equal(called,0);
+});
+
+test('LAN display world contains no simulation graph and preserves all renderer sidecars',()=>{
+ const fixture=match(4,'drover'),host=createLanWorld(fixture).engine;
+ const display=createLanDisplayWorld(fixture,0,displayWire(captureLanDisplayCombat(host,0,{0:0,1:0},0,null))).world;
+ const seen=new Set<object>();
+ const visit=(value:any)=>{
+  if(!value||typeof value!=='object'||seen.has(value))return;seen.add(value);
+  for(const cls of [CombatEngine,Ship,ArmorGrid,Shield,FluxTracker,ShipSystem])assert.ok(!(value instanceof cls),'simulation prototype retained: '+cls.name);
+  if(value instanceof Map)for(const [k,v] of value){visit(k);visit(v);}
+  else if(value instanceof Set)for(const v of value)visit(v);
+  else if(!ArrayBuffer.isView(value))for(const d of Object.values(Object.getOwnPropertyDescriptors(value)))if('value' in d)visit(d.value);
+ };visit(display);
+ for(const key of ['fixedUpdate','update','weaponSystem','collisionSystem','fighterSystem','enemyAI','random','statsTracker'])assert.equal(key in display,false,key);
+ assert.equal('deploy' in display.deployment,false);
+ const flight=new Map(),prediction={projectiles:[],corrections:new Map()},muzzles:any[]=[],particles:any[]=[];
+ setProjectileFlightLayer(display,flight);setPredictedProjectileLayer(display,prediction);setLocalMuzzleLayer(display.fxSystem,muzzles);setLocalParticleLayer(display.fxSystem,particles);
+ const view=display.renderView();assert.equal(view,display.renderView());assert.equal(view.playerShip,display.playerShip);
+ assert.equal(view.projectileFlight,flight);assert.equal(view.projectilePrediction,prediction);assert.equal(view.localMuzzles,muzzles);assert.equal(view.localParticles,particles);
+ for(const mount of display.playerShip.weapons)assert.equal(renderWeaponRange(display.playerShip,mount),host.playerShip.getWeaponDisplayRange(host.playerShip.weapons.find(m=>m.slotId===mount.slotId)!.spec));
+});
+
+import { Shield } from '../src/engine/simulation/Shield';
+import { FluxTracker } from '../src/engine/simulation/FluxTracker';
+import { ShipSystem } from '../src/engine/simulation/ShipSystem';
+import { combatAudio, captureCombatAudio, setCombatAudioPlayback } from '../src/engine/audio/CombatAudioEvents';
+import { sound } from '../src/engine/audio/SoundManager';
+test('combat audio outlet copies events, preserves mixer methods and supports nested out-of-order disposal',()=>{
+ const events:any[]=[],inner:any[]=[],fallback:any[]=[];const methods=[sound.play,sound.playAtPos,sound.startLoop,sound.stopLoop,sound.setMuffled];
+ const restore=setCombatAudioPlayback(event=>fallback.push(event));
+ try{
+  const outerOff=captureCombatAudio(event=>events.push(event)),pos={x:1,y:2},listener={x:3,y:4};
+  combatAudio.playAtPos('shot',pos,listener);pos.x=9;listener.y=8;
+  assert.deepEqual(events[0],{kind:'play',key:'shot',position:[1,2],listener:[3,4],volume:.8,rate:1,maxDistance:2800});
+  const innerOff=captureCombatAudio(event=>inner.push(event));outerOff();combatAudio.play('inner');assert.equal(events.length,1);assert.equal(inner.length,1);
+  innerOff();innerOff();combatAudio.startLoop('loop');combatAudio.stopLoop('loop');combatAudio.setMuffled(true);
+  assert.deepEqual(fallback.map(event=>event.kind),['loop','loop','muffled']);
+  assert.deepEqual([sound.play,sound.playAtPos,sound.startLoop,sound.stopLoop,sound.setMuffled],methods);
+ }finally{restore();}
+});
+import { MotionPrediction } from '../src/network/MotionPrediction';
+import { LocalFirePrediction } from '../src/network/LocalFirePrediction';
+import { LocalTurretPrediction } from '../src/network/LocalTurretPrediction';
+import { shipPresentationPose } from '../src/engine/visual/ShipPresentation';
+import { blankInput } from '../src/network/protocol';
+import { CombatPresentationEncoder } from '../src/engine/runtime/local/CombatPresentationEncoder';
+import { CombatPresentationDecoder } from '../src/engine/runtime/local/CombatPresentationDecoder';
+import { build as buildBoundary } from 'esbuild';
+
+test('LAN display world motion/fire/turret reads match authority without writing either world or losing teleport endpoints',()=>{
+ const fixture=match(2);const host=createLanWorld(fixture).engine;
+ host.playerShip.pos.set(0,0);host.playerShip.prevPos.set(0,0);host.playerShip.vel.set(60,0);host.playerShip.facingRad=host.playerShip.prevFacingRad=0;
+ const take=(tick:number)=>displayWire(captureLanDisplayCombat(host,tick,{0:tick,1:tick},0,null));
+ const display=createLanDisplayWorld(fixture,0,take(0)).world;
+ const before=JSON.stringify(take(0)),pa=new MotionPrediction(),pb=new MotionPrediction();
+ const input={...blankInput(),seq:1,keys:1,aim:[2000,0] as [number,number],pointerActive:true,firing:true};
+ for(const [p,ship] of [[pa,host.playerShip],[pb,display.playerShip]] as const){p.record(input,0);p.receive(ship,0,0);for(let t=0;t<=100;t+=1000/60)p.render(ship,input,t,true);}
+ assert.deepEqual(shipPresentationPose(display.playerShip),shipPresentationPose(host.playerShip));
+ const fire=new LocalFirePrediction(),turret=new LocalTurretPrediction();fire.receive(display,0,0,100);turret.receive(display,0,0,100);
+ // Replayed input is visual-only: pose/weapon/flux state remains authority-owned.
+ turret.record(input,100);turret.render(display,input,116,true);fire.record(display,input,116,true);
+ assert.deepEqual(display.playerShip.pos,host.playerShip.pos);assert.equal(display.playerShip.flux.totalFlux,host.playerShip.flux.totalFlux);
+ for(const mount of display.playerShip.weapons){const source=host.playerShip.weapons.find(m=>m.slotId===mount.slotId)!;assert.equal(mount.displaySpeed,host.playerShip.getWeaponDisplaySpeed(source.spec));assert.equal(mount.ammo,source.ammo);}
+ pa.clear(host.playerShip);pb.clear(display.playerShip);turret.reset();fire.reset(display);
+ assert.equal(JSON.stringify(take(0)),before);
+ host.playerShip.pos.x+=20;host.playerShip.teleportSequence++;const one=take(1);
+ host.playerShip.pos.x+=2;const two=take(2);const endpoints:any[]=[];
+ applyLanDisplaySnapshots(display,[one,two],false,()=>endpoints.push([display.playerShip.prevPos.x,display.playerShip.pos.x]));
+ assert.deepEqual(endpoints,[[20,20],[20,22]]);
+});
+
+test('LAN display world stations and phase ships preserve projected component reads across cold join',()=>{
+ for(const hull of ['station1','doom','retribution']){
+  const fixture=match(2);fixture.players[0].hull=hull;
+  const host=createLanWorld(fixture).engine;host.playerShip.shield.phaseState='OUT';host.playerShip.shield.phaseEffectLevel=.61;
+  const display=createLanDisplayWorld(fixture,0,displayWire(captureLanDisplayCombat(host,300,{0:0,1:0},0,null))).world;
+  const actual=display.playerShip,expected=host.playerShip;
+  assert.equal(actual.isPhased,expected.isPhased);assert.equal(actual.phaseVisualAlpha,expected.phaseVisualAlpha);
+  assert.equal(actual.shield.getPhaseSpeedMultiplier(.35),expected.shield.getPhaseSpeedMultiplier(.35));
+  assert.deepEqual(actual.assemblyShips.map(s=>s.id),expected.assemblyShips.map(s=>s.id));
+  assert.deepEqual(collectCombatTextureUrls(display.renderView()),collectCombatTextureUrls(combatRenderView(host)));
+ }
+});
+
+test('local display codec has no compatibility mode and rejects retired simulation class IDs',()=>{
+ const host=createLanWorld(match(2)).engine;
+ const frame=new CombatPresentationEncoder(1).capture(host,0),view=new CombatPresentationDecoder(1).apply(structuredClone(frame));
+ assert.ok(view.view.playerShip instanceof ProjectedRenderShip);assert.ok(!(view.view.playerShip instanceof Ship));
+ for(const type of [1,2,3,4,5,6,7,8,9]){const bad=structuredClone(frame);bad.shapes.find(s=>s.type===11)!.type=type;assert.throws(()=>new CombatPresentationDecoder(1).apply(bad));}
+ assert.throws(()=>new CombatPresentationDecoder(1,'compatibility' as any));assert.throws(()=>new CombatPresentationEncoder(1,'compatibility' as any));
+});
+
+test('display decoder dependency closures exclude simulation constructors and authority codecs',async()=>{
+ for(const entry of ['src/network/LanDisplayBootstrap.ts','src/engine/runtime/local/CombatPresentationDecoder.ts','src/engine/render/ShipRenderQueries.ts']){
+  const result=await buildBoundary({entryPoints:[entry],bundle:true,write:false,metafile:true,platform:'browser',format:'esm',logLevel:'silent',define:{__LAN_BUILD_ID__:'"boundary"','import.meta.env':'{"BASE_URL":"/","DEV":false}'}});
+  const forbidden=Object.keys(result.metafile!.inputs).filter(p=>/\/(CombatEngine|Ship|Shield|FluxTracker|ShipSystem|ArmorGrid)\.ts$/.test(p)||p.endsWith('/AuthorityCombatSnapshot.ts')||p.endsWith('/CombatPresentationEncoder.ts'));
+  assert.deepEqual(forbidden,[],entry);
+ }
+});
+import { i18n } from '../src/engine/i18n/LocalizationManager';
+test('LAN display world registers authority-provided ship labels without installing a simulation design',()=>{
+ const fixture=match(2),host=createLanWorld(fixture).engine,key='lan-display-test.authority-name';
+ host.playerShip.spec={...host.playerShip.spec,nameKey:key,i18n:{zh_CN:{[key]:'纯显示舰名'},en_US:{[key]:'Display ship'}}};
+ assert.equal(i18n.t(key),key);
+ createLanDisplayWorld(fixture,0,displayWire(captureLanDisplayCombat(host,12,{0:0,1:0},0,null)));
+ assert.notEqual(i18n.t(key),key);
+});
+
+
+test('LAN display projection reuse resamples live fields and never mutates prior wire snapshots',()=>{
+ const fixture=match(2),host=createLanWorld(fixture).engine,ship=host.playerShip;
+ const reusable=new LanShipProjection();
+ const project=(projector:LanShipProjection)=>{projector.begin();const row=projector.project(ship);projector.finish();return row;};
+ const firstRow=project(reusable);
+ for(const packed of [false,true]) {
+  const take=(tick:number)=>captureLanDisplayCombat(host,tick,{0:tick,1:tick},0,null,true,packed);
+  const first=take(0),frozen=encodeProjectedBinaryFrame(first,true)!.slice();
+  const rng=JSON.stringify([host.random,host.visualRandom]);
+  ship.hullHp-=17;ship.flux.hardFlux+=123;ship.armor.setCell(0,0,1.25);
+  ship.weapons[0].currentAngleRad+=.125;ship.weapons[0].cooldownTimer+=.25;
+  ship.shield.isActive=!ship.shield.isActive;
+  host.combatTime+=1/60;
+  assert.equal(project(reusable),firstRow,'reuse scratch identity, not prior values');
+  assert.deepEqual(firstRow,project(new LanShipProjection()),'warm and cold full read models agree');
+  const second=take(1),display=createLanDisplayWorld(fixture,0,displayWire(second)).world;
+  assert.equal(display.playerShip.hullHp,ship.hullHp);
+  assert.equal(display.playerShip.flux.hardFlux,ship.flux.hardFlux);
+  assert.equal(display.playerShip.armor.cells[0],1.25);
+  assert.equal(display.playerShip.weapons[0].currentAngleRad,ship.weapons[0].currentAngleRad);
+  assert.equal(JSON.stringify([host.random,host.visualRandom]),rng,'capture must not consume RNG');
+  assert.deepEqual(encodeProjectedBinaryFrame(first,true),frozen,'old packet owns all mutable wire data');
+  // Rewind/republication must not depend on a previously serialized tick.
+  assert.deepEqual(encodeProjectedBinaryFrame(take(1),true),encodeProjectedBinaryFrame(second,true));
+ }
+});
+
+
+test('LAN display fixed record plans preserve cold/warm full data graphs against the frozen receiver',()=>{
+ const fixture=match(4,'drover'),host=createLanWorld(fixture).engine;
+ host.projectiles.push({id:.125,specId:'pulse',sourceShipId:host.playerShip.id,pos:new Vector2(1,2),vel:new Vector2(60,0),ballisticTail:new Vector2(0,2),fadeProgress:.25} as any);
+ const take=(tick:number)=>displayWire(captureLanDisplayCombat(host,tick,{0:tick,1:tick},0,null,true,true));
+ const first=take(0),a=controlDisplayWorld(0,first).world,b=createLanDisplayWorld(fixture,0,first).world;
+ const armor=b.playerShip.armor.cells,weapon=b.playerShip.weapons[0],position=weapon.relativePos;
+ for(let tick=0;tick<12;tick++){
+  if(tick===3)host.playerShip.teleportSequence++;
+  host.playerShip.hullHp-=tick;host.playerShip.pos.x+=tick;
+  host.playerShip.weapons[0].currentAngleRad+=.125;
+  host.projectiles[0].pos.x+=5;host.projectiles[0].fadeProgress+=.01;
+  if(tick===5)host.projectiles.push({...host.projectiles[0],id:.25,pos:new Vector2(100,200)});
+  if(tick===7)host.projectiles.reverse();if(tick===8)host.projectiles.pop();
+  const frame=tick===10?first:take(tick);
+  // Deliberate renderer-side edits must be overwritten, not cached away.
+  for(const replica of [a,b]){replica.playerShip.weapons[0].currentAngleRad=-999;replica.playerShip.armor.cells[0]=-8;}
+  controlDisplayApply(a,frame,tick===10);applyLanDisplaySnapshot(b,frame,tick===10);
+  assert.deepEqual(serialize(b),serialize(a),'complete viewer graph at '+tick);
+  assert.equal(b.playerShip.armor.cells,armor);assert.equal(b.playerShip.weapons[0],weapon);assert.equal(weapon.relativePos,position);
+ }
+});
+
+test('LAN display record plans retain method/accessor guards, restore order, local fields and nested identity',()=>{
+ const layouts=(keys:string[])=>displayLayouts([keys],new ExplosionPuffDecoder(),new DynamicParticleDecoder());
+ const ships=new Map<string,object>(),keys=Array.from({length:80},(_,i)=>'field'+i),values=keys.map((_,i)=>i%3?i:{$vector:[i,-i]});
+ for(const decode of [controlUnpackDisplay,unpackDisplay]){
+  const l=layouts(keys),wire={$record:0,values};const first=decode(wire,undefined,ships,l),vector=first.field0;
+  assert.deepEqual(Object.keys(first),keys);first.local=9;first.field0.set(-9,-9);
+  assert.equal(decode(wire,first,ships,l),first);assert.equal(first.field0,vector);assert.deepEqual(vector,new Vector2(0,-0));assert.equal(first.local,9);
+  let invoked=0;Object.defineProperty(first,'field1',{get(){invoked++;return 4;},configurable:true});
+  assert.throws(()=>decode(wire,first,ships,l),/read capability/);assert.equal(invoked,0);
+  assert.throws(()=>decode({$record:0,values:[1,2]},undefined,ships,layouts(['safe','toString'])),/read capability/);
+  assert.throws(()=>decode({safe:1,toString:2},undefined,ships,layouts([])),/read capability/);
+  const partial:any={safe:0,blocked(){invoked++;}};
+  assert.throws(()=>decode({$record:0,values:[7,8]},partial,ships,layouts(['safe','blocked'])),/read capability/);
+  assert.equal(partial.safe,7);assert.equal(typeof partial.blocked,'function');assert.equal(invoked,0);
+  // A wire-array getter adding a late inherited method must not be hidden by
+  // a record allocation or compiled plan. Do not invoke that inherited capability.
+  const late='displayAllocationLateCapability',lateValues=[1,2];
+  Object.defineProperty(lateValues,1,{get(){Object.defineProperty(Object.prototype,late,{configurable:true,value:()=>{invoked++;}});return 2;}});
+  try{assert.throws(()=>decode({$record:0,values:lateValues},undefined,ships,layouts(['safe',late])),/read capability/);assert.equal(invoked,0);}
+  finally{Reflect.deleteProperty(Object.prototype,late);}
+  const row={local:1},rows=[row];
+  assert.throws(()=>decode({$records:0,values:[[3],[4,5]]},rows,ships,layouts(['v'])),/record row/);
+  assert.equal(rows[0],row);assert.deepEqual(row,{local:1,v:3});assert.equal(rows.length,1);
+ }
+});
+
+test('LAN display direct projectile columns retain fresh-row guards and viewer-owned template restoration',()=>{
+ const fixture=match(2),host=createLanWorld(fixture).engine;
+ const projectile:any={id:.125,specId:'pulse',sourceShipId:host.playerShip.id,pos:new Vector2(1,2),vel:new Vector2(60,0),ballisticTail:new Vector2(0,2),fadeProgress:.25,isPlayer:true,elapsedTime:0,radius:1,damage:5,damageType:'ENERGY',rangeRemaining:100,totalRange:100,color:[1,2,3]};
+ host.projectiles.push(...Array.from({length:16},(_,i)=>({...projectile,id:i+.125,pos:new Vector2(i,2)})));
+ const frame=displayWire(captureLanDisplayCombat(host,1,{0:1,1:1},0,null,true,true));
+ assert.ok(frame.world.projectiles.$projectileColumns);
+ for(const decode of [controlUnpackProjectiles,unpackDisplayProjectiles]){
+  const l=displayLayouts(frame.layouts,new ExplosionPuffDecoder(),new DynamicParticleDecoder()),ships=new Map(host.allCapitalShips.map(s=>[s.id,{}]));
+  const a=decode(frame.world.projectiles,undefined,ships,l),first=a[0],position=first.pos,tail=first.ballisticTail;
+  first.pos.set(-1,-1);first.ballisticTail.set(-1,-1);first.local=7;
+  assert.equal(decode(frame.world.projectiles,a,ships,l),a);assert.equal(a[0],first);assert.equal(first.pos,position);assert.equal(first.ballisticTail,tail);
+  assert.equal(first.pos.x,0);assert.equal(first.local,7);
+  const key=projectileColumnPlan(frame.world.projectiles,frame.layouts).templates[0].keys[0];let called=0;
+  Object.defineProperty(first,key,{configurable:true,get(){called++;return 3;}});
+  assert.throws(()=>decode(frame.world.projectiles,a,ships,l),/read capability/);assert.equal(called,0);
+ }
+});
+
+
+test('LAN display every compiled layout matches generic guard/read/write and exception order',()=>{
+ const denied=()=>{};
+ for(const keys of displayRestoreShapes){
+  assert.ok(displayRecordRestorer(keys));assert.ok(displayRecordRestorer(keys.slice()));
+  assert.equal(displayRecordRestorer([...keys,'unknownDisplayField']),undefined);
+  const changed=keys.slice();changed[changed.length-1]='unknownDisplayField';assert.equal(displayRecordRestorer(changed),undefined);
+  for(const depth of [0,63,64])for(const blocked of [-1,Math.min(4,keys.length-1)]){
+   const run=(decode:typeof unpackDisplay)=>{
+    const events:any[]=[],state=Object.fromEntries(keys.map(key=>[key,0]));if(blocked>=0)state[keys[blocked]]=denied;
+    const target=new Proxy(state,{getOwnPropertyDescriptor(t,k){events.push(['descriptor',k]);return Reflect.getOwnPropertyDescriptor(t,k);},get(t,k){events.push(['get',k]);return Reflect.get(t,k);},set(t,k,v){events.push(['set',k,v]);t[k]=v;return true;}});
+    const values=new Proxy(keys.map((_,i)=>i%3?i:{$vector:[i,-i]}),{get(t,k){if(typeof k==='string'&&/^\d+$/.test(k))events.push(['value',k]);return Reflect.get(t,k);}});
+    const l=displayLayouts([keys],new ExplosionPuffDecoder(),new DynamicParticleDecoder());let error=null;
+    try{decode({$record:0,values},target,new Map(),l,depth);}catch(e){error=(e as Error).message;}
+    return {events,state,error};
+   };
+   assert.deepEqual(run(unpackDisplay),run(controlUnpackDisplay),keys[0]+'/'+keys.length+' depth '+depth+' blocked '+blocked);
+  }
+ }
 });

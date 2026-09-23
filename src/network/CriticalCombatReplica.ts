@@ -1,6 +1,6 @@
+import type { CombatDisplayReads, CombatDisplayShip as Ship } from '../engine/runtime/CombatDisplayReads';
 import { captureWeaponPresentation, applyWeaponPresentation } from './WeaponPresentationReplica';
 import type { CombatEngine } from '../engine/simulation/CombatEngine';
-import type { Ship } from '../engine/simulation/Ship';
 import { COMBAT_FLAGS, COMBAT_NUMBERS, COMBAT_PHASES, COMBAT_STATE_MAX_SHIPS, encodeCombatState } from './CriticalCombatState.mjs';
 import type { CriticalCombatFrame, CombatStateRow } from './CriticalCombatState.mjs';
 // Only these fixed own-data paths may cross the component boundary. This does
@@ -15,7 +15,7 @@ function put(ship: Ship, path: string[], value: number | boolean) {
   const owner = path.length === 1 ? ship : (ship as unknown as Record<string, object>)[path[0]!];
   (owner as unknown as Record<string, unknown>)[path.at(-1)!] = value;
 }
-export function captureCriticalCombat(engine: CombatEngine, tick: number, includeWeapons = false): Uint8Array | null {
+export function captureCriticalCombat(engine: DisplaySource, tick: number, includeWeapons = false): Uint8Array | null {
   const ships = engine.allCapitalShips.filter(ship => !engine.deployment.isReserve(ship.id));
   if (ships.length > COMBAT_STATE_MAX_SHIPS) return null;
   try {
@@ -42,7 +42,7 @@ export function captureCriticalCombat(engine: CombatEngine, tick: number, includ
 export class CriticalCombatReplica {
   private frame: CriticalCombatFrame | null = null;
   private weapons: CriticalCombatFrame | null = null;
-  private appliedWeapons: { engine: CombatEngine; frame: CriticalCombatFrame; worldTick: number } | null = null;
+  private appliedWeapons: { engine: DisplaySource; frame: CriticalCombatFrame; worldTick: number } | null = null;
   private weaponReceivedAt: number | null = null;
   get weaponTick() { return this.weapons?.tick ?? -1; }
   weaponAge(now: number) { return this.weaponReceivedAt === null ? null : Math.max(0, now - this.weaponReceivedAt); }
@@ -54,7 +54,7 @@ export class CriticalCombatReplica {
     if (!Number.isFinite(now) || frame.tick <= this.tick || frame.tick <= worldTick) return false;
     this.frame = frame; if (frame.weapons) { this.weapons = frame; this.weaponReceivedAt = now; } this.receivedAt = now; return true;
   }
-  apply(engine: CombatEngine, worldTick: number, allowCachedWeapons = false) {
+  apply(engine: DisplaySource, worldTick: number, allowCachedWeapons = false) {
     if (!this.frame || this.frame.tick <= worldTick) return;
     const known = new Map(engine.allCapitalShips.map(ship => [ship.id, ship]));
     for (const row of this.frame.ships) {
@@ -72,3 +72,6 @@ export class CriticalCombatReplica {
     }
   }
 }
+
+/** Minimal display capabilities; never an authority-world requirement. */
+type DisplaySource = Pick<CombatDisplayReads, 'allCapitalShips' | 'combatTime'> & { readonly deployment: Pick<CombatEngine['deployment'], 'isReserve'> };

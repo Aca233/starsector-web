@@ -1056,5 +1056,15 @@
     "baseMaxAmmo",
     "ammo",
     "isPermanentlyDisabled"
+  ],
+  [
+    "cellIndex",
+    "localPos",
+    "opacity",
+    "intensity",
+    "size",
+    "rotationRad",
+    "kind",
+    "variant"
   ]
 ]

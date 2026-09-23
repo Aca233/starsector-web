@@ -13,7 +13,7 @@ import { Vector2 } from '../../math/Vector2';
 import { Projectile, Beam, WeaponMount, WeaponSpec, WeaponGroup, LauncherSmokeSpec, MuzzleFlashSpec } from '../Weapon';
 import { ShipSpec } from '../../modding/ModManager';
 import { initializeSourceProjectile } from './weapon/SourceProjectileLifecycle';
-import { sound } from '../../audio/SoundManager';
+import { combatAudio as sound } from '../../audio/CombatAudioEvents';
 import type { Ship } from '../Ship';
 import { contentRegistry } from '../../content/ContentRegistry';
 import { SimulationRandom } from '../SimulationRandom';

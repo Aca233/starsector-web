@@ -143,7 +143,7 @@ export function SystemLoadoutEditor({ draft, spec, disabled, onChange }: { draft
             <div className="system-library-filters" aria-label="技能筛选">{([['compatible', '可装配'], ['all', '全部'], ['equipped', '已装配']] as const).map(([value, label]) => <NativeButton font="body" key={value} aria-pressed={scope === value} onClick={() => setScope(value)}>{label}</NativeButton>)}</div>
             <div className="system-library-list">{results.map(definition => {
               const installed = ids.includes(definition.id) || defenseId === definition.id, requirement = reasonFor(definition);
-              return <button type="button" key={definition.id} className="system-library-item" aria-label={`查看技能：${definition.name}`} aria-pressed={selectedId === definition.id} onClick={() => setSelectedId(definition.id)}>
+              return <button type="button" key={definition.id} className="system-library-item" data-system-id={definition.id} aria-label={`查看技能：${definition.name}`} aria-pressed={selectedId === definition.id} onClick={() => setSelectedId(definition.id)}>
                 <span className={`system-fit-icon ${installed ? 'is-installed' : requirement ? 'is-locked' : ''}`}>{installed ? '●' : requirement ? '×' : '·'}</span>
                 <span><strong><NativeBitmapText font="body">{definition.name}</NativeBitmapText></strong><small>{installed ? defenseId === definition.id ? '已装配 · 右键' : '已装配 · 技能槽' : requirement ? '需要配套设备' : duration(definition)}</small></span><span className="system-row-arrow" aria-hidden="true">›</span>
               </button>;
@@ -152,10 +152,10 @@ export function SystemLoadoutEditor({ draft, spec, disabled, onChange }: { draft
           <section className="system-detail" aria-label="技能详情">
             {selection ? <>
               <div className="system-detail-scroll" key={selection.id}><span className="system-section-kicker">技能详情</span><h3><NativeBitmapText font="button">{selection.name}</NativeBitmapText></h3><span className={`system-detail-state ${installedIndex >= 0 || installedRight ? 'is-installed' : reason ? 'is-locked' : ''}`}>{installedRight ? '已装配 · 右键' : installedIndex >= 0 ? `已装配 · 技能槽 ${installedIndex + 1}` : reason ? '装配条件未满足' : '可装配到当前舰船'}</span>
-                <p className="system-detail-description">{selection.description ?? selection.implementationDetails ?? (selection.id === 'BURN_DRIVE' ? '预热后向前冲刺，快速接近目标。启动期间收起护盾、锁定转向，并保持向前推进。' : '沿用原版技能效果，独立计算冷却与充能。')}</p>
+                <p className="system-detail-description">{selection.description?.trim() || `尚未提供“${selection.name}”（${selection.id}）的效果说明。`}</p>
                 <dl className="system-detail-stats"><div><dt>启动时间</dt><dd>{seconds(selection.chargeUp)}</dd></div><div><dt>持续方式</dt><dd>{duration(selection)}</dd></div><div><dt>冷却时间</dt><dd>{seconds(selection.cooldown)}</dd></div><div><dt>充能上限</dt><dd>{selection.charges !== undefined ? `${selection.charges} 次` : '不限次数'}</dd></div></dl>
                 {selection.controls && Object.entries(controlLabels).some(([key]) => selection.controls?.[key as keyof typeof controlLabels]) && <div className="system-detail-controls"><h4>生效期间</h4><ul>{Object.entries(controlLabels).filter(([key]) => selection.controls?.[key as keyof typeof controlLabels]).map(([key, label]) => <li key={key}>{label}</li>)}</ul></div>}
-                {selection.implementationDetails && selection.description && <details className="system-detail-more"><summary>实现说明</summary><p>{selection.implementationDetails}</p></details>}
+                {selection.implementationDetails && <details className="system-detail-more"><summary>实现说明</summary><p>{selection.implementationDetails}</p></details>}
                 {reason && <div className="system-requirement"><span>{reason}</span></div>}
                 <div className="system-detail-tip"><span>技能共享幅能，冷却和充能独立。每种技能只能装一份，换槽会移动而不是复制。右键装技能后，Shift + 右键仍控制舰体护盾或相位。</span></div>
               </div>

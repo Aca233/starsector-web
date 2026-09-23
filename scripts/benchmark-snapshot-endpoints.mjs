@@ -5,7 +5,7 @@ import path from 'node:path';
 import {build} from 'esbuild';
 import {pathToFileURL} from 'node:url';
 const dir=path.resolve('artifacts/network-stream-20260921');fs.mkdirSync(dir,{recursive:true});
-const original=fs.readFileSync('src/network/CombatSnapshot.ts','utf8');
+const original=fs.readFileSync('src/network/AuthorityCombatSnapshot.ts','utf8');
 const before=original.replace("case CaptureProjection.Ship: return key === 'prevPos' || key === 'prevFacingRad';",'case CaptureProjection.Ship: return false;').replace("return key === 'prevPos' || key === 'prevBallisticTail' || key === 'prevFadeProgress'\n        || key === 'spawnLocation'", "return key === 'spawnLocation'");
 if(before===original||before.includes("return key === 'prevPos'"))throw Error('Endpoint-only source substitution no longer matches');
 const outfile=path.join(dir,'paired-endpoints.mjs');

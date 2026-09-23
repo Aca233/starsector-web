@@ -1,9 +1,20 @@
+import type { CombatDisplayReads, CombatDisplayShip } from './CombatDisplayReads';
 import { ArmorReadCache } from './ArmorReadView';
 import type { CombatEngine } from '../simulation/CombatEngine';
-import type { Ship } from '../simulation/Ship';
 import type { ShipSpec } from '../content/ShipSpec';
 import type { TacticalOrder } from '../simulation/CombatTypes';
 import { combatObservers, contactVisible } from '../simulation/systems/CombatVisibility';
+
+/** World reads needed for map projection, distinct from the published TacticalMapSource.
+ * Legacy Ship records are retained, but no engine or deployment authority is required. */
+export type TacticalMapViewSource = Readonly<Pick<CombatDisplayReads,
+  'playerShip' | 'ships' | 'capitalShips' | 'fighters' | 'bombers' | 'orders'
+  | 'isTacticalMap' | 'selectedUnitId' | 'commandPoints' | 'battleResult'
+  | 'openBattlefield' | 'multiTeamBattle' | 'isSimulation' | 'simulationDeployedPoints'
+  | 'environment' | 'nebulae' | 'asteroids' | 'hulkFragments'
+>> & {
+  readonly deployment: Readonly<Pick<CombatEngine['deployment'], 'enabled' | 'used'>>;
+};
 
 export interface MapPoint { readonly x: number; readonly y: number }
 export interface MapContact {
@@ -41,7 +52,7 @@ export interface TacticalMapView {
 export interface TacticalMapSnapshot { readonly generation: number; readonly available: boolean; readonly map: TacticalMapView | null }
 export interface TacticalMapSource { read(): TacticalMapSnapshot }
 const point = (value: MapPoint): MapPoint => ({ x: value.x, y: value.y });
-function contact(ship: Ship): MapContact {
+function contact(ship: CombatDisplayShip): MapContact {
   const spec = ship.spec;
   return { id: ship.id, teamId: ship.teamId, pos: point(ship.pos), facingRad: ship.facingRad, hullHp: ship.hullHp,
     maxHullHp: ship.maxHullHp, retreating: ship.retreating, flux: { fluxPercent: ship.flux.fluxPercent },
@@ -65,20 +76,20 @@ export function copyTacticalMapSnapshot(value: TacticalMapSnapshot, previous?: T
 
 export class TacticalMapViewProjector {
   private readonly armorCache = new ArmorReadCache();
-  private engine?: CombatEngine;
-  private flagship?: Ship;
+  private engine?: TacticalMapViewSource;
+  private flagship?: CombatDisplayShip;
   private epoch = -1;
   private generation = 0;
   private previous?: TacticalMapSnapshot;
-  capture(engine: CombatEngine, epoch = 0, available = true): TacticalMapSnapshot {
+  capture(engine: TacticalMapViewSource, epoch = 0, available = true): TacticalMapSnapshot {
     if (this.engine !== engine || this.flagship !== engine.playerShip || this.epoch !== epoch) {
       this.engine = engine; this.flagship = engine.playerShip; this.epoch = epoch; this.generation++; this.previous = undefined;
     }
     const envelope = { generation: this.generation, available };
     if (!available || !engine.isTacticalMap) return this.previous = copyTacticalMapSnapshot({ ...envelope, map: null }, this.previous);
     const ships = engine.ships, team = engine.playerShip.teamId;
-    const observers = combatObservers(ships, team), visibility = new Map<Ship, boolean>();
-    const visible = (ship: Ship) => {
+    const observers = combatObservers(ships, team), visibility = new Map<CombatDisplayShip, boolean>();
+    const visible = (ship: CombatDisplayShip) => {
       let result = visibility.get(ship);
       if (result === undefined) { result = contactVisible(ship, observers, team, engine.openBattlefield); visibility.set(ship, result); }
       return result;
@@ -114,7 +125,7 @@ export class TacticalMapViewProjector {
   }
 }
 /** LAN compatibility boundary. React and the painter receive only the read source. */
-export function engineTacticalMapSource(engine: CombatEngine): TacticalMapSource {
+export function engineTacticalMapSource(engine: TacticalMapViewSource): TacticalMapSource {
   const projector = new TacticalMapViewProjector();
   return { read: () => projector.capture(engine) };
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import crypto from 'node:crypto';import {serialize} from 'node:v8';import {deflateRawSync,inflateRawSync} from 'node:zlib';
 import {captureCombat as oldCapture,applyCombatSnapshots as oldApply,projectileSliceForTest as oldSlice} from 'projectiles-reference';
-import {captureCombat,applyCombatSnapshots,projectileSliceForTest} from '../src/network/CombatSnapshot';
+import {captureCombat,applyCombatSnapshots,projectileSliceForTest} from '../src/network/AuthorityCombatSnapshot';
 import {encodeProjectedBinaryFrame,encodeBinaryState,decodeBinaryState} from '../src/network/BinarySnapshot.mjs';
 import {isLanDelta,LanDeltaReceiver} from '../src/network/LanBinaryDelta.mjs';import {LanDeltaSender,lanDeltaTarget} from '../server/LanDeltaTransport.mjs';
 import {assets,world} from './lib/native-projectile-fixture.mts';import {nativeProjectileCaptureDiagnostics} from '../src/network/NativeProjectileCapture';

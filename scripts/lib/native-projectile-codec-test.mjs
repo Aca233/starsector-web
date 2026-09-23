@@ -57,6 +57,6 @@ function candidate(code) {
 }
 export const nativeProjectileCodecPlugin={name:'native-projectile-codec-test',setup(build){
  build.onResolve({filter:/^projectiles-reference$/},()=>({path:'reference',namespace:'projectiles-reference'}));
- build.onLoad({filter:/.*/,namespace:'projectiles-reference'},()=>({contents:fs.readFileSync('src/network/CombatSnapshot.ts','utf8')+extra,loader:'ts',resolveDir:process.cwd()+'/src/network'}));
+ build.onLoad({filter:/.*/,namespace:'projectiles-reference'},()=>({contents:fs.readFileSync('src/network/AuthorityCombatSnapshot.ts','utf8')+extra,loader:'ts',resolveDir:process.cwd()+'/src/network'}));
  build.onLoad({filter:/[\\/]CombatSnapshot\.ts$/},args=>({contents:candidate(fs.readFileSync(args.path,'utf8'))+extra,loader:'ts'}));
 }};

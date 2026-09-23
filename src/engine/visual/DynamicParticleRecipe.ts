@@ -251,7 +251,7 @@ export class DynamicParticleDecoder {
     private groups = new Map<string, Group>();
     private retained = 0;
     stats() { return { groups: this.groups.size, particles: this.retained }; }
-    expand(recipe: unknown, index: number, steps: number, budget: ParticleRecipeBudget, motion?: unknown): Record<string, unknown> {
+    private particle(recipe: unknown, index: number, steps: number, budget: ParticleRecipeBudget, motion?: unknown): DynamicParticle {
         const r = validateParticleRecipe(recipe);
         if (!Number.isSafeInteger(index) || index < 0 || index >= 128 || ++budget.rows > PARTICLE_RECIPE_LIMITS.rows)
             throw Error('Dynamic particle row budget exceeded');
@@ -278,6 +278,10 @@ export class DynamicParticleDecoder {
         const rows = group.at(steps, budget), p = rows?.[index];
         if (!p)
             throw Error('Invalid dynamic particle row');
+        return p;
+    }
+    expand(recipe: unknown, index: number, steps: number, budget: ParticleRecipeBudget, motion?: unknown): Record<string, unknown> {
+        const p = this.particle(recipe, index, steps, budget, motion);
         const wire: Record<string, unknown> = {};
         for (const [k, v] of Object.entries(p))
             wire[k] = v instanceof Vector2 ? { $vector: [v.x, v.y] } : Array.isArray(v) ? v.slice() : v;
@@ -287,5 +291,38 @@ export class DynamicParticleDecoder {
             wire.vel = { $vector: actual.slice(2, 4) };
         }
         return wire;
+    }
+    /** Native DTO receiver only. Copy the private replay result straight into
+     * viewer-owned rows, without constructing a tagged wire tree first. Never
+     * expose replay objects: local visuals may mutate every restored field. */
+    restoreInto(recipe: unknown, index: number, steps: number, budget: ParticleRecipeBudget,
+        motion: unknown, target: unknown, depth: number): Record<string, unknown> {
+        const p = this.particle(recipe, index, steps, budget, motion);
+        const actual = motion === undefined ? null : decodeParticleMotionResidual(motion, [p.pos.x, p.pos.y, p.vel.x, p.vel.y]);
+        if (depth > 64) throw Error('Snapshot nesting exceeds limit');
+        const output = target && typeof target === 'object' && !Array.isArray(target)
+            ? target as Record<string, unknown> : {};
+        const fields = p as unknown as Record<string, unknown>;
+        for (const key of Object.keys(fields)) {
+            if (depth >= 64) throw Error('Snapshot nesting exceeds limit');
+            const value = fields[key];
+            if (value instanceof Vector2) {
+                const offset = key === 'pos' ? 0 : 2;
+                const x = actual ? actual[offset] : value.x, y = actual ? actual[offset + 1] : value.y;
+                if (!Number.isFinite(x) || !Number.isFinite(y)) throw Error('Invalid vector');
+                const previous = output[key];
+                output[key] = previous instanceof Vector2 ? previous.set(x, y) : new Vector2(x, y);
+            } else if (Array.isArray(value)) {
+                // Generated recipes contain only numeric color/empty points
+                // arrays. Preserve the old depth/error prefix and array identity.
+                const previous = output[key], array = Array.isArray(previous) ? previous : [];
+                for (let i = 0; i < value.length; i++) {
+                    if (depth + 1 >= 64) throw Error('Snapshot nesting exceeds limit');
+                    array[i] = value[i];
+                }
+                array.length = value.length; output[key] = array;
+            } else if (!Object.is(output[key], value)) output[key] = value;
+        }
+        return output;
     }
 }

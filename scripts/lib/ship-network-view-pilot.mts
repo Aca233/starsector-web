@@ -2,7 +2,7 @@ import {deflateRawSync,inflateRawSync} from 'node:zlib';
 import {assetManager} from '../../src/engine/assets/AssetResolver';
 import {createLanWorld} from '../../src/network/LanWorld';
 import {configureHostCosmetics} from '../../src/network/HostSnapshot';
-import {pilotCaptureShips,pilotApplyShips} from '../../src/network/CombatSnapshot';
+import {pilotCaptureShips,pilotApplyShips} from '../../src/network/AuthorityCombatSnapshot';
 import {SHIP_VIEW_ROOT_OMISSIONS,SHIP_VIEW_FLUX_OMISSIONS,ShipViewPublisher,ShipViewReceiver} from '../../src/network/experimental/ShipNetworkView';
 import {encodeProjectedBinaryFrame,encodeBinaryState,decodeBinaryState} from '../../src/network/BinarySnapshot.mjs';
 import {isLanDelta,LanDeltaReceiver} from '../../src/network/LanBinaryDelta.mjs';

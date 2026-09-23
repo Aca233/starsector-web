@@ -46,7 +46,7 @@ export function transformSteadyFixture(code, id, commandHeld = false) {
  const file=id.replaceAll('\\','/').split('?')[0];
  if(file.endsWith('/src/network/LanBattle.tsx'))return replaceExactly(code,'clientToCombatWorld(pointer, canvas, camera, zoom)','((globalThis as any).__steadyAim ?? clientToCombatWorld(pointer, canvas, camera, zoom))',3);
  if(!file.endsWith('/src/network/host.worker.ts'))return null;
- code="import {captureCombat as captureSteadyCombat} from './CombatSnapshot';\n"+code+`
+ code="import {captureCombat as captureSteadyCombat} from './AuthorityCombatSnapshot';\n"+code+`
 const steadyCommandHeld = ${commandHeld};
 `+workerFixture;
  code=replaceExactly(code,'function handleMessage(m: any) {',`function handleMessage(m: any) {

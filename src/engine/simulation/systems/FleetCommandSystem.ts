@@ -1,6 +1,6 @@
 import { Vector2 } from '../../math/Vector2';
 import { RadioMessage, TacticalOrder } from '../CombatTypes';
-import { sound } from '../../audio/SoundManager';
+import { combatAudio as sound } from '../../audio/CombatAudioEvents';
 import { SimulationRandom } from '../SimulationRandom';
 
 export interface CommandFXCallbacks {

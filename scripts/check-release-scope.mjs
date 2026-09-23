@@ -4,6 +4,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 const careerOnlyFiles=[
+  "scripts/lib/NativeAutofitSpecInputs.java",
+  "public/game-assets/graphics/fonts/native-menu/insignia21LTaa.fnt",
+  "public/game-assets/graphics/fonts/native-menu/insignia21LTaa_0.png",
+  "public/game-assets/graphics/fonts/native-menu/orbitron20aabold.fnt",
+  "public/game-assets/graphics/fonts/native-menu/orbitron20aabold_0.png",
   "scripts/lib/NativeClockCapture.java",
   "scripts/lib/NativeFactionPersonInputs.java",
   "scripts/lib/NativeFleetCompositionConstants.java",

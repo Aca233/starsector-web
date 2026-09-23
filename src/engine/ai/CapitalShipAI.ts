@@ -16,6 +16,8 @@ import { tacticalPolicy as policy, type TacticalWorld } from './TacticalWorld';
 // still run on every update. Build-time rollback retains the original 60 Hz path.
 const TACTICAL_INTERVAL = import.meta.env?.VITE_AI_TACTICAL_20HZ === 'false' ? 0 : 1 / 20;
 
+const FORECAST_INTERVAL = import.meta.env?.VITE_AI_THREAT_FORECAST_20HZ === 'false' ? 0 : 1 / 20;
+
 /** Composition of Web tactical policies. Not a full native BasicShipAI port.
  * No hull-ID branches; movement, defense and system activation have separate owners. */
 export class CapitalShipAI {
@@ -24,6 +26,11 @@ export class CapitalShipAI {
   // Primitive fields deliberately participate in the existing Publisher/Owner codec.
   // Do not move these into an unreplicated WeakMap or object cache.
   private tacticalRemaining = -1;
+  private forecastRemaining = -1;
+  private forecastFarThreat = false;
+  private forecastEarliest = Infinity;
+  private forecastDefenseWindow = 0;
+  private forecastRosterSize = -1;
   private tacticalOrderKey = '';
   private tacticalIntentKey = '';
   private tacticalTargetId: string | undefined = undefined;
@@ -49,9 +56,9 @@ export class CapitalShipAI {
   public update(dt:number,order:TacticalOrder|null=null,world?:TacticalWorld):void {
     const ship=this.ship;
     // Pilot edge commands set AI ownership before this call and clear diagnostics.
-    if(ship.fireControlMode!=='AI'||!ship.tacticalAI){this.defense.reset();this.withdrawing=false;this.tacticalRemaining=-1;}
+    if(ship.fireControlMode!=='AI'||!ship.tacticalAI){this.defense.reset();this.withdrawing=false;this.tacticalRemaining=-1;this.forecastRemaining=-1;}
     ship.fireControlMode='AI';ship.isFiringMain=false;
-    if(ship.isDead||ship.isRetreated||ship.isDocked||ship.retreating){this.tacticalRemaining=-1;ship.clearInput();ship.defenseFacingRad=undefined;ship.aiHoldOffensiveFire=false;ship.tacticalAI=undefined;return;}
+    if(ship.isDead||ship.isRetreated||ship.isDocked||ship.retreating){this.tacticalRemaining=-1;this.forecastRemaining=-1;ship.clearInput();ship.defenseFacingRad=undefined;ship.aiHoldOffensiveFire=false;ship.tacticalAI=undefined;return;}
     const scene=world??{ships:[ship,this.targetShip],projectiles:[],beams:[],asteroids:[]};
     ship.combatShips = scene.ships;
     const assignment=(scene.fleetPlan ?? planFleetTactics(scene.ships, order ? new Map([[ship.id,order]]) : undefined)).get(ship.id);
@@ -81,7 +88,25 @@ export class CapitalShipAI {
     // Native vent module accounts for the WHOLE vent plus defense recovery, not only its target.
     const recovery=2+(phase?ship.shield.phaseChargeDownDuration+ship.shield.phaseCooldownDuration:ship.shield.unfoldDuration);
     const horizon=Math.max(defenseWindow,ship.flux.getTimeToVent()+recovery);
-    const threat=assessThreats(ship,scene,horizon,defenseWindow);
+    const compactForecast = FORECAST_INTERVAL > 0 && !!scene.weaponThreatEnvelope && ship.hasNativeThreatPhaseHooks;
+    const forecastFirst = this.forecastRemaining < 0;
+    this.forecastRemaining -= Math.max(0, dt);
+    const refreshForecast = !compactForecast || forecastFirst || this.forecastRemaining <= 1e-9
+      || this.forecastDefenseWindow !== defenseWindow || this.forecastRosterSize !== scene.ships.length;
+    let threat = assessThreats(ship,scene,horizon,defenseWindow,refreshForecast ? horizon : Math.min(horizon,defenseWindow));
+    if (refreshForecast) {
+      this.forecastFarThreat = false; this.forecastEarliest = Infinity;
+      for (const incoming of threat.threats) if (incoming.kind === 'WEAPON' && incoming.eta > defenseWindow) {
+        this.forecastFarThreat = true; this.forecastEarliest = Math.min(this.forecastEarliest,incoming.eta);
+      }
+      this.forecastRemaining = !compactForecast ? -1 : forecastFirst
+        ? (this.tacticalPhase + 1) * FORECAST_INTERVAL / 3
+        : FORECAST_INTERVAL + Math.min(0, this.forecastRemaining % FORECAST_INTERVAL);
+      this.forecastDefenseWindow = defenseWindow; this.forecastRosterSize = scene.ships.length;
+    } else {
+      threat.hasDeferredWeaponThreat = this.forecastFarThreat;
+      threat.earliest = Math.min(threat.earliest,this.forecastEarliest);
+    }
     this.defense.observe(dt,threat);
     const profile = decide
       ? target ? combatProfile(ship,target) : {range:0,relativeBearing:0,firepower:0,weapons:0}
@@ -172,7 +197,16 @@ export class CapitalShipAI {
     }
     if (target && ship.spec.rightClickSystemType === undefined) ship.defenseSystem.definition.advanceAI?.({ ship, system: ship.defenseSystem, target, distance: ship.pos.distanceTo(target.pos), angleDiff: signedAngle(facing-ship.facingRad),
       tactical: { allowOffensiveManeuver, desiredRange: profile.range, withdrawing: withdrawing||!!regroup, waypoint: !!waypoint, avoidingCollision: avoidance.avoiding, forwardClear: true, quietFor: this.defense.quietFor, threat } });
-    const defense=this.defense.update(ship,threat);
+    const defense=this.defense.update(ship,threat,compactForecast ? () => {
+      // System AI above may have changed the scene. Never commit a vent using
+      // sampled far-threat absence or advance the calm timer a second time.
+      const livePhase = ship.shield.type === 'PHASE';
+      const liveWindow = policy.imminentWindow + (livePhase ? ship.shield.phaseChargeUpDuration : 0);
+      const liveRecovery = 2 + (livePhase ? ship.shield.phaseChargeDownDuration + ship.shield.phaseCooldownDuration : ship.shield.unfoldDuration);
+      threat = assessThreats(ship,scene,Math.max(liveWindow,ship.flux.getTimeToVent()+liveRecovery),liveWindow);
+      this.forecastRemaining = -1;
+      return threat;
+    } : undefined);
     ship.tacticalAI={fleetRole:assignment?.role,fleetTask:regroup?'REGROUP':disengaging?'DISENGAGE':assignment?.task==='REGROUP'||assignment?.task==='DISENGAGE'?(target?'PRESSURE':'SEARCH'):assignment?.task,targetScore:assignment?.score,pressureRatio:assignment?.pressureRatio,assignedPower:assignment?.assignedPower,
       mode:regroup?'WITHDRAW':escort?'ESCORT':avoiding?'AVOID':defending?'DEFEND':waypoint?'WAYPOINT':!target?'IDLE':withdrawing?'WITHDRAW':'ENGAGE',desiredRange:profile.range,
       positioning:this.tacticalPositioning,positionScoreGain:this.tacticalScoreGain,clearFireFraction:this.tacticalClearFire,

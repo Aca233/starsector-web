@@ -134,16 +134,16 @@ for(const players of [3,4,5])test(`${players} real socket desktops: dedicated au
 
 import vm from 'node:vm';
 const clientCode=(await build({entryPoints:['src/network/protocol.ts'],bundle:true,platform:'browser',format:'cjs',write:false,define:{__LAN_BUILD_ID__:'"visual-client-test"','import.meta.env':'{"VITE_LAN_LAYERED_SYNC":"true"}'},logLevel:'warning'})).outputFiles[0].text;
-function clientFixture(transport='lan',negotiate=true){
+function clientFixture(transport='lan',negotiate=true,adapter=false){
  const sockets=[];const document=new EventTarget();document.visibilityState='visible';
  class Socket{static OPEN=1;readyState=1;bufferedAmount=0;sent=[];constructor(){sockets.push(this);}send(m){this.sent.push(JSON.parse(m));}close(){this.readyState=3;}}
  const sandbox={module:{exports:{}},exports:{},WebSocket:Socket,EventTarget,TextEncoder,TextDecoder,ArrayBuffer,Uint8Array,URL,DOMException,atob,document,crypto:{getRandomValues:a=>a.fill(7)},sessionStorage:{getItem:()=>null,setItem(){},removeItem(){}},performance:{now:()=>1},setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,clearInterval(){}};sandbox.exports=sandbox.module.exports;vm.runInNewContext(clientCode,sandbox);
- const c=new sandbox.module.exports.LanConnection(transport);c.connect('ws://127.0.0.1/lan/ws','test');const ws=sockets[0];ws.onopen();const receive=m=>ws.onmessage({data:JSON.stringify(m)});receive({type:'welcome',resumeToken:'a'.repeat(64),stateCredits:1,...(negotiate?{visualState:1}:{})});return {c,ws,receive};
+ const c=new sandbox.module.exports.LanConnection(transport);c.connect('ws://127.0.0.1/lan/ws','test');const ws=sockets[0];ws.onopen();const receive=m=>ws.onmessage({data:JSON.stringify(m)});receive({type:'welcome',resumeToken:'a'.repeat(64),stateCredits:1,...(negotiate?{visualState:1,motionState:1}:{}),...(adapter?{motionTransport:'steam-datagram-v1',layeredTransport:'steam-components-v1'}:{})});return {c,ws,receive};
 }
-test('production LanConnection ACKs decoded/retained visual state, explicitly discards without a consumer and never negotiates it on Steam',()=>{
+test('production LanConnection ACKs decoded/retained visual state, explicitly discards without a consumer and requires the actual Steam component adapter',()=>{
  const publisher=pub(),p=publisher.publish(frame(0)),m={type:'projectile-visual',matchId:'match',syncId:'sync',key:p.key,tick:p.tick,kind:'baseline',data:Buffer.from(p.baseline).toString('base64')};
- for(const [transport,negotiate]of [['lan',true],['lan',false],['steam',true]]){
-  const {c,ws,receive}=clientFixture(transport,negotiate);const offered=ws.sent[0];assert.equal(offered.visualState,transport==='lan'?1:undefined);assert.equal(c.visualState,transport==='lan'&&negotiate);
+ for(const [transport,negotiate,adapter]of [['lan',true,false],['lan',false,false],['steam',true,false],['steam',true,true]]){
+  const {c,ws,receive}=clientFixture(transport,negotiate,adapter);const offered=ws.sent[0];assert.equal(offered.visualState,1);assert.equal(c.visualState,negotiate&&(transport==='lan'||adapter));
   const before=ws.sent.length;receive(m);
   if(c.visualState){assert.equal(ws.sent.at(-1).status,'discarded');const rx=new AnchoredProjectileReceiver('match');c.subscribe(message=>{if(message.type==='projectile-visual'){rx.baseline(message.key,message.visualBytes);message.visualHandled=true;}});receive(m);assert.equal(ws.sent.at(-1).status,'consumed');assert.equal(ws.sent.at(-1).syncId,'sync');const n=ws.sent.length;receive({...m,data:'bad'});assert.equal(ws.sent.length,n+1);assert.equal(ws.sent.at(-1).status,'discarded','malformed envelope never consumed');}
   else assert.equal(ws.sent.length,before);

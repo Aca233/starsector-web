@@ -5,7 +5,7 @@ import { compactProjectileColumns, projectileColumnPlan, MAX_PROJECTILE_SHARED_N
 import { createLanWorld } from '../src/network/LanWorld';
 import { assetManager } from '../src/engine/assets/AssetResolver';
 import { captureHostCombat, configureHostCosmetics } from '../src/network/HostSnapshot';
-import { captureCombat, applyCombatSnapshots, applyCombatSnapshot } from '../src/network/CombatSnapshot';
+import { captureCombat, applyCombatSnapshots, applyCombatSnapshot } from '../src/network/AuthorityCombatSnapshot';
 import { Vector2 } from '../src/engine/math/Vector2';
 import { Ship } from '../src/engine/simulation/Ship';
 import { encodeProjectedBinaryFrame, encodeBinaryState, decodeBinaryState } from '../src/network/BinarySnapshot.mjs';

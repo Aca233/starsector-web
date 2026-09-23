@@ -4,7 +4,7 @@ import path from 'node:path';
 import {createLanWorld} from '../src/network/LanWorld';
 import {assetManager} from '../src/engine/assets/AssetResolver';
 // Baseline export is appended by the test-only esbuild plugin, never production.
-import {captureCombat,captureCombatDispatchBaseline,applyCombatSnapshot} from '../src/network/CombatSnapshot';
+import {captureCombat,captureCombatDispatchBaseline,applyCombatSnapshot} from '../src/network/AuthorityCombatSnapshot';
 import {configureHostCosmetics} from '../src/network/HostSnapshot';
 import {encodeProjectedBinaryFrame,decodeBinaryFrame} from '../src/network/BinarySnapshot.mjs';
 const publicRoot=path.resolve('public');

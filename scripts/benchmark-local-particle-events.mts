@@ -8,7 +8,7 @@ import {configureHostCosmetics,captureAuthorityCombat} from '../src/network/Host
 import {hostParticleEvents} from '../src/network/HostParticleEvents';
 import {LocalParticleEffects} from '../src/network/LocalParticleEffects';
 import {localParticleLayer} from '../src/engine/render/LocalParticleLayer';
-import {applyCombatSnapshots} from '../src/network/CombatSnapshot';
+import {applyCombatSnapshots} from '../src/network/AuthorityCombatSnapshot';
 import {encodeProjectedBinaryFrame,decodeBinaryFrame} from '../src/network/BinarySnapshot.mjs';
 const root=path.resolve('public');globalThis.fetch=async(input:any)=>new Response(fs.readFileSync(path.join(root,String(input).replace(/^\//,''))));await assetManager.ensureManifestLoaded();
 const match:any={id:'particle-perf',seed:917,hostId:'a',snapshotHz:60,players:[{id:'a',seat:0,team:0,hull:'onslaught'},{id:'b',seat:1,team:1,hull:'onslaught'}],options:{assignment:'teams',battleSize:3200,aiHulls:[[],[]]}};

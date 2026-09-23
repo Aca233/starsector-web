@@ -1,3 +1,4 @@
+import { findCombatHostile } from '../runtime/CombatHostileQuery';
 import { registerShipDisplayStrings } from '../content/ShipDisplayStrings';
 import { InFlightFireBudget } from '../ai/InFlightFireBudget';
 import { assemblyRadius } from '../content/ModuleGeometry';
@@ -22,7 +23,7 @@ import { ProjectileThreatIndex } from '../ai/ProjectileThreatIndex';
 import { WeaponThreatEnvelope } from '../ai/WeaponThreatEnvelope';
 import { BeamThreatIndex } from '../ai/BeamThreatIndex';
 import { modManager } from '../modding/ModManager';
-import { sound } from '../audio/SoundManager';
+import { combatAudio as sound } from '../audio/CombatAudioEvents';
 import { i18n } from '../i18n/LocalizationManager';
 import { createShipExplosion } from '../visual/ExplosionVisuals';
 
@@ -194,13 +195,7 @@ export class CombatEngine {
   }
 
   public findHostile(ship: Ship, targetId?: string, roster: readonly Ship[] = this.ships): Ship | undefined {
-    const hostiles = roster.filter(candidate => !candidate.hasVastBulk && !candidate.isDead && candidate.isVisibleTo(ship.teamId) && !sameTeam(candidate, ship));
-    const ordered = targetId && hostiles.find(candidate => candidate.id === targetId);
-    if (ordered) return ordered;
-    if (ship.currentTargetShip && hostiles.includes(ship.currentTargetShip)) return ship.currentTargetShip;
-    const mainShips = hostiles.filter(candidate => candidate.spec.hullSize !== 'FIGHTER');
-    return (mainShips.length ? mainShips : hostiles)
-      .reduce<Ship | undefined>((closest, candidate) => !closest || ship.pos.distanceTo(candidate.pos) < ship.pos.distanceTo(closest.pos) ? candidate : closest, undefined);
+    return findCombatHostile(ship, targetId, roster);
   }
 
   public planFleetAI(): FleetPlan {

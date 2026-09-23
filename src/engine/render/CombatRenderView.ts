@@ -20,6 +20,14 @@ type VisualFields = { readonly [K in Exclude<typeof fields[number], 'ships' | 'a
  readonly hulkFragments: readonly RenderHulk[];
 };
 
+/** Reads required by the borrowed adapter. Also implemented by a detached LAN world:
+ * FX is a data container, and contrails expose only their cosmetic strip reader.
+ * Sidecar layers use the source object's identity, not simulation capabilities. */
+export type CombatRenderSource = VisualFields & {
+  readonly fxSystem: Readonly<Pick<CombatEngine['fxSystem'], 'movingRayFades'>>;
+  readonly contrailEngine: Readonly<Pick<CombatEngine['contrailEngine'], 'getStrips'>>;
+};
+
 /** Common legacy renderer capabilities, NOT a ReplayCheckpoint.
  * combatRenderView() returns a synchronous borrowed view; the local worker decoder
  * implements the same reads with a detached, display-owned replica.
@@ -38,9 +46,9 @@ export type CombatRenderView = VisualFields & {
   readonly localMuzzles: ReturnType<typeof localMuzzleLayer>;
   readonly localParticles: ReturnType<typeof localParticleLayer>;
 };
-const views = new WeakMap<CombatEngine, CombatRenderView>();
+const views = new WeakMap<CombatRenderSource, CombatRenderView>();
 /** Stable view identity; all visual layers are looked up at draw time, including LAN sidecars. */
-export function combatRenderView(engine: CombatEngine): CombatRenderView {
+export function combatRenderView(engine: CombatRenderSource): CombatRenderView {
   let view = views.get(engine);
   if (view) return view;
   const descriptors: PropertyDescriptorMap = {};

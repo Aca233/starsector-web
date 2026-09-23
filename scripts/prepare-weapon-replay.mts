@@ -2,7 +2,7 @@
 // never invent per-slot spec identities missing from the projected snapshot.
 import fs from 'node:fs';import path from 'node:path';
 import {assetManager} from '../src/engine/assets/AssetResolver';import {createLanWorld} from '../src/network/LanWorld';
-import {applyCombatSnapshot} from '../src/network/CombatSnapshot';import {decodeBinaryState} from '../src/network/BinarySnapshot.mjs';
+import {applyCombatSnapshot} from '../src/network/AuthorityCombatSnapshot';import {decodeBinaryState} from '../src/network/BinarySnapshot.mjs';
 import {captureCriticalCombat} from '../src/network/CriticalCombatReplica';import {decodeCombatState} from '../src/network/CriticalCombatState.mjs';
 const [directory,output]=process.argv.slice(2);if(!directory||!output)throw Error('recording-dir output.json required');
 const root=path.resolve('public');globalThis.fetch=async(input:any)=>{const p=path.resolve(root,String(input).replace(/^\//,''));if(!p.startsWith(root+path.sep))throw Error('Outside assets');return new Response(fs.readFileSync(p));};await assetManager.ensureManifestLoaded();

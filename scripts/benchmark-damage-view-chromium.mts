@@ -7,7 +7,7 @@ import {assetManager} from '../src/engine/assets/AssetResolver';import {createLa
 (globalThis as any).runReceiverComparison=async()=>{
  await assetManager.ensureManifestLoaded();
  const world=()=>{const e=createLanWorld({id:'native-projectile',seed:917,hostId:'p0',snapshotHz:60,players:[{id:'p0',seat:0,team:0,hull:'onslaught'},{id:'p1',seat:1,team:1,hull:'onslaught'}],options:{assignment:'teams',battleSize:3200,aiHulls:[Array(10).fill('hammerhead'),Array(10).fill('hammerhead')]}} as any).engine;configureHostCosmetics(e,true,true,true);return e;};
- const capture=(e:any,t:number,fn=captureCombat)=>(fn as any)(e,t,{0:t,1:t},0,true,true,true,true,true,true),canonical=(f:any)=>JSON.stringify(normalizedProjection(f,true));
+ const capture=(e:any,t:number,fn=captureCombat)=>(fn as any)(e,t,{0:t,1:t},0,true,true,true,true,true,true,false,false,false,true,true),canonical=(f:any)=>JSON.stringify(normalizedProjection(f,true));
  const q=(v:number[],p:number)=>v.toSorted((a,b)=>a-b)[Math.floor((v.length-1)*p)];
  const stats=(rows:any[])=>Object.fromEntries(['capture','encode','producer','decode','apply','total'].map(k=>[k,{p50:q(rows.map(r=>r[k]),.5),p95:q(rows.map(r=>r[k]),.95)}]));const results=[];
  for(const peers of [3,5])for(let round=0;round<2;round++){
