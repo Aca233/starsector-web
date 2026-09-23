@@ -1,3 +1,4 @@
+import { selectThreatFacing } from './ShieldThreatSector';
 import { remainingProjectileLifetime } from '../simulation/systems/weapon/SourceMissileLifecycle';
 import { sameTeam, combatTeam } from "../simulation/CombatTeams";
 import { Vector2 } from '../math/Vector2';
@@ -20,6 +21,8 @@ export interface IncomingThreat {
 }
 export interface ThreatAssessment {
   threats: IncomingThreat[];
+  /** Native compact planning: far speculative weapons are held, never live damage. */
+  hasDeferredWeaponThreat?: boolean;
   horizon: number;
   imminentDamage: number;
   imminentShieldFlux: number;
@@ -36,7 +39,7 @@ function weaponReadiness(m: import('../simulation/Weapon').WeaponMount): number 
 
 /** Local forecast, not omniscient future simulation: actual trajectories plus earliest
  * plausible follow-up shots from every hostile, including recovery/turn/closing times. */
-export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number, defenseWindow: number): ThreatAssessment {
+export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number, defenseWindow: number, weaponHorizon = horizon): ThreatAssessment {
   const threats: IncomingThreat[] = [];
   // Scratch space is assessment-local: no cross-ship/frame cache or stale live state.
   const forecastEnd = new Vector2();
@@ -47,15 +50,16 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
   const center = ship.getShieldCenter();
   const radius = Math.max(ship.spec.collisionRadius, ship.shield.type !== 'NONE' && ship.shield.type !== 'PHASE' ? ship.shield.radius : 0);
   const add = (kind: IncomingThreat['kind'], sourceId: string, eta: number, damage: number, type: DamageType, origin: Vector2) => {
-    if (!(eta >= 0 && eta <= horizon && damage > 0) || !Number.isFinite(damage)) return;
+    if (!(eta >= 0 && eta <= (kind === 'WEAPON' ? weaponHorizon : horizon) && damage > 0) || !Number.isFinite(damage)) return;
     threats.push({kind,sourceId,eta,damage,shieldFlux:damage*shieldMultiplier(type)*ship.shield.efficiency*ship.shield.damageTakenMultiplierFor(type),
       direction:Math.atan2(origin.y-center.y,origin.x-center.x)});
   };
   const projectiles = world.projectileThreatIndex?.query(world.projectiles, ship, center, radius, horizon) ?? world.projectiles;
+  const lifetimeOf = world.projectileLifetime ?? remainingProjectileLifetime;
   for (const p of projectiles) {
     const owner = combatTeam(p) ?? world.ships.find(s => s.id === p.sourceShipId)?.teamId;
     if (owner === undefined || owner === ship.teamId || p.isFlare || p.isDisarmed || p.collisionDisabled || p.didDamage || !(p.damage > 0)) continue;
-    const lifetime = Math.min(horizon, remainingProjectileLifetime(p));
+    const lifetime = Math.min(horizon, lifetimeOf(p));
     if (!(lifetime > 0)) continue;
     const endX = p.pos.x+(p.vel.x-ship.vel.x)*lifetime;
     const endY = p.pos.y+(p.vel.y-ship.vel.y)*lifetime;
@@ -80,7 +84,8 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
     add('PROJECTILE',p.sourceShipId,eta,p.damage,p.damageType,p.pos);
   }
   const activeBeams = new Set<string>();
-  for (const b of world.beams) {
+  const beams = world.beamThreatIndex?.query(world.beams, world.ships, ship, center, radius) ?? world.beams;
+  for (const b of beams) {
     const source = world.ships.find(s=>s.id===b.sourceShipId);
     if (!source || sameTeam(source, ship) || source.isDead || b.damageActive===false || b.duration<=0) continue;
     if (segmentCircleEntry(b.startPos,b.endPos,center,radius) === null) continue;
@@ -88,7 +93,7 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
     const duration = Math.min(defenseWindow,b.duration);
     add('BEAM',b.sourceShipId,0,b.damagePerSec*duration,b.damageType,b.startPos);
   }
-  const weaponEnvelopes = world.weaponThreatEnvelope && finiteHorizon && horizon >= 0 && ship.hasNativeThreatPhaseHooks
+  const weaponEnvelopes = world.weaponThreatEnvelope && Number.isFinite(weaponHorizon) && weaponHorizon >= 0 && ship.hasNativeThreatPhaseHooks
     ? world.weaponThreatEnvelope : undefined;
   for (const enemy of world.ships) {
     if (enemy===ship || enemy.isDead || !enemy.isVisibleTo(ship.teamId) || sameTeam(enemy, ship)) continue;
@@ -96,13 +101,13 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
       enemy.flux.isVenting ? enemy.flux.getTimeToVent() : 0,
       enemy.isPhased ? enemy.shield.phaseChargeDownDuration : 0,
       enemy.system.blocksWeapons ? enemy.system.chargeDownDuration : 0);
-    // Travel time is nonnegative: recovery beyond the horizon cannot contribute a threat.
-    if (recovery > horizon) continue;
+    // Travel time is nonnegative: recovery beyond the weaponHorizon cannot contribute a threat.
+    if (recovery > weaponHorizon) continue;
     const envelope = weaponEnvelopes?.get(enemy);
     if (envelope) {
       if (envelope.maxRangeAndMuzzle === -Infinity) continue;
       const distance = Math.max(Math.abs(center.x - enemy.pos.x), Math.abs(center.y - enemy.pos.y));
-      const approach = radius + horizon * Math.max(1, envelope.maxSpeed
+      const approach = radius + weaponHorizon * Math.max(1, envelope.maxSpeed
         + Math.abs(enemy.vel.x - ship.vel.x) + Math.abs(enemy.vel.y - ship.vel.y));
       const reach = approach + envelope.maxRangeAndMuzzle;
       // This stricter aggregate bound implies every original per-mount bound
@@ -115,7 +120,7 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
     let motion: ReturnType<Ship['getMotionStats']> | undefined;
     // Only audited pure stat hooks may move the range query ahead of muzzle reads.
     // Custom systems/hullmods keep their original callback and mutable-state order.
-    let boundWeapons = finiteHorizon && horizon >= 0 && enemy.system.hasNativeStats && hasOnlyNativeRangeModifiers(enemy.spec);
+    let boundWeapons = Number.isFinite(weaponHorizon) && weaponHorizon >= 0 && enemy.system.hasNativeStats && hasOnlyNativeRangeModifiers(enemy.spec);
     const distanceFromOrigin = Math.max(Math.abs(center.x-enemy.pos.x), Math.abs(center.y-enemy.pos.y));
     let approachReach = 0, coordinateScale = 0;
     let mountIndex = 0;
@@ -128,9 +133,9 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
       if (!motion) {
         motion = envelope?.motion ?? enemy.getMotionStats();
         // L1 relative speed bounds the original radial closing speed, including its
-        // near-zero normalization rule. Keep the full horizon, even while venting.
+        // near-zero normalization rule. Keep the full weaponHorizon, even while venting.
         if (boundWeapons) {
-          approachReach = radius + horizon*Math.max(1,motion.maxSpeed+Math.abs(enemy.vel.x-ship.vel.x)+Math.abs(enemy.vel.y-ship.vel.y));
+          approachReach = radius + weaponHorizon*Math.max(1,motion.maxSpeed+Math.abs(enemy.vel.x-ship.vel.x)+Math.abs(enemy.vel.y-ship.vel.y));
           coordinateScale = Math.max(1,Math.abs(center.x),Math.abs(center.y),Math.abs(enemy.pos.x),Math.abs(enemy.pos.y),Math.abs(radius),Math.abs(approachReach));
         }
       }
@@ -162,7 +167,7 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
       const relativeClosing = Math.max(0,(enemy.vel.x-ship.vel.x)*unitX+(enemy.vel.y-ship.vel.y)*unitY);
       const approachTime = Math.max(0,distance-radius-range)/Math.max(1,motion.maxSpeed+relativeClosing);
       // Exact lower bound for the existing ETA, not a shorter awareness radius.
-      if (approachTime > horizon) continue;
+      if (approachTime > weaponHorizon) continue;
       // The native envelope keeps weapon state stable within this AI query; unknown hooks retain
       // their original field reads below. Do not query readiness for weapons
       // already excluded by the original distance/approach bounds.
@@ -170,7 +175,7 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
       // Even perfect aim cannot arrive before recovery/readiness/approach plus
       // travel. Equality and uncertain comparisons keep the original calculation.
       const travelHint = envelope ? (m.spec.isBeam ? 0 : Math.max(0,Math.min(range,distance-radius))/Math.max(1,m.spec.maxSpeed ?? m.spec.projSpeed)) : undefined;
-      if (travelHint !== undefined && Math.max(recovery,readinessHint!,approachTime)+travelHint > horizon) continue;
+      if (travelHint !== undefined && Math.max(recovery,readinessHint!,approachTime)+travelHint > weaponHorizon) continue;
       const base = enemy.facingRad+m.baseAngleDeg*Math.PI/180;
       const halfArc = m.mountType==='HARDPOINT' || (m.spec.turnRateDegPerSec ?? 1)<=0 ? 0 : m.arcDeg*Math.PI/360;
       const turn = Math.abs(signedAngle(delta.heading()-base));
@@ -180,7 +185,7 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
       const readiness = readinessHint ?? weaponReadiness(m);
       const travel = travelHint ?? (m.spec.isBeam ? 0 : Math.max(0,Math.min(range,distance-radius))/Math.max(1,m.spec.maxSpeed ?? m.spec.projSpeed));
       const eta = Math.max(recovery,readiness,turnTime,approachTime)+travel;
-      // Forecast the first burst, not unlimited DPS over the entire vent horizon.
+      // Forecast the first burst, not unlimited DPS over the entire vent weaponHorizon.
       const count = Math.min(m.ammo,Math.max(1,m.spec.burstSize ?? 1));
       const damage = m.spec.isBeam ? dps*Math.min(defenseWindow,m.spec.beamDuration ?? defenseWindow) : m.spec.damagePerShot*count;
       add('WEAPON',enemy.id,eta,damage,m.spec.type,muzzle);
@@ -193,21 +198,23 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
   // Pick the shield sector covering the largest weighted threat, not the fleet's attack target.
   let facing: number|null = null, best = -1;
   const halfArc = ship.shield.maxArcDeg*Math.PI/360;
-  const weights = imminent.map(t => t.shieldFlux / (1 + t.eta));
-  for (const candidate of imminent) {
-    let weight = 0;
-    // Preserve accumulation order and ties without an array per candidate sector.
-    for (let i = 0; i < imminent.length; i++) {
-      const difference = imminent[i].direction - candidate.direction;
-      const absolute = Math.abs(difference), separation = absolute <= Math.PI ? absolute : Math.PI * 2 - absolute;
-      // Directions come from atan2. Away from the boundary, a wrapped difference
-      // gives the same predicate without three transcendental calls per pair.
-      // Keep original evaluation at rounding-sensitive seams and exceptional inputs.
-      const covered = absolute <= Math.PI * 2 && Math.abs(separation - halfArc) > 1e-12
-        ? separation <= halfArc : Math.abs(signedAngle(difference)) <= halfArc;
-      if (covered) weight += weights[i];
+  if (imminent.length >= 128) {
+    facing = selectThreatFacing(imminent, halfArc);
+  } else {
+    // Keep the established small-set loop in the caller's hot path. The sorted
+    // sector kernel only pays for itself with dense incoming threat sets.
+    const weights = imminent.map(t => t.shieldFlux / (1 + t.eta));
+    for (const candidate of imminent) {
+      let weight = 0;
+      for (let i = 0; i < imminent.length; i++) {
+        const difference = imminent[i].direction - candidate.direction;
+        const absolute = Math.abs(difference), separation = absolute <= Math.PI ? absolute : Math.PI * 2 - absolute;
+        const covered = absolute <= Math.PI * 2 && Math.abs(separation - halfArc) > 1e-12
+          ? separation <= halfArc : Math.abs(signedAngle(difference)) <= halfArc;
+        if (covered) weight += weights[i];
+      }
+      if (weight>best) { best=weight;facing=candidate.direction; }
     }
-    if (weight>best) { best=weight;facing=candidate.direction; }
   }
   let imminentDamage = 0, imminentShieldFlux = 0, actualDamage = 0, earliest = Infinity;
   for (const t of threats) {

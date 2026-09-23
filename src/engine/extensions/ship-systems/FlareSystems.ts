@@ -2,7 +2,7 @@ import data from './native-flare-weapons.json';
 import { nativeSystem } from './NativeSystemFactory';
 import { systemWeaponLauncher } from './SystemWeaponLauncher';
 import { Vector2 } from '../../math/Vector2';
-import { sound } from '../../audio/SoundManager';
+import { combatAudio as sound } from '../../audio/CombatAudioEvents';
 import type { LauncherSmokeSpec, Projectile } from '../../simulation/Weapon';
 
 export const flareSystems = (Object.keys(data) as (keyof typeof data)[]).map(id => {
@@ -11,7 +11,11 @@ export const flareSystems = (Object.keys(data) as (keyof typeof data)[]).map(id 
   const engine = source.engineSlots[0];
   const jammer = source.missileType === 'FLARE_JAMMER';
   return nativeSystem(id, {
-    description: jammer ? '按原生发射口释放500耐久的战机类诱饵，朝附近敌舰盾缘环绕，吸引敌方火控；不会虚构强制改写导弹锁定。' : '按舰体原生发射口投放热诱弹；敌方可见制导导弹进入300范围时按原版概率与ECCM判定，失败后不重复重骰。',
+    description: jammer
+      ? `每个发射口释放${number('burst size')}枚500耐久的战机类诱饵，朝附近敌舰的护盾边缘环绕，吸引敌方火控；不同于普通热诱弹，不直接改写导弹锁定。`
+      : source.missileType === 'FLARE_SEEKER'
+        ? `每个发射口连续投放${number('burst size')}枚追踪热诱弹，诱骗${source.behaviorSpec.effectRange}范围内的制导导弹，并主动靠近敌方导弹进行拦截；诱骗效果受ECCM影响。`
+        : `每个发射口连续投放${number('burst size')}枚普通热诱弹，尝试将${source.behaviorSpec.effectRange}范围内的敌方制导导弹引离本舰；不主动追踪，诱骗效果受ECCM影响。`,
     implementationDetails: 'FlareAI/SeekerFlareAI 的连发、范围、概率、单诱饵免疫集合、延迟追踪与真实弹体锁定；使用原生引擎尺寸/颜色。追踪拦截点由Web制导计算，原版粒子尾迹和引擎逐帧推力光变尚未完整还原。',
     resources: {textures: ['/game-assets/' + source.sprite], sounds: [weapon.fireSoundTwo]},
     ...systemWeaponLauncher(number('burst size'), (ship, slot, world) => {

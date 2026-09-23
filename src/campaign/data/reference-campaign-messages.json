@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "version": "0.98a-RC8",
+  "sources": [
+    "com/fs/starfarer/campaign/CampaignState.java:375-376,515-539,646-648",
+    "com/fs/starfarer/campaign/comms/super.java:49-70",
+    "com/fs/starfarer/campaign/comms/C.java:30-85,110-133",
+    "com/fs/starfarer/campaign/fleet/RepairTracker.java:368-400",
+    "data/config/settings.json:1062,1101,1104,1575"
+  ],
+  "layout": {
+    "left": 10,
+    "bottom": 287,
+    "pad": 3,
+    "infoWidth": 400,
+    "iconHeight": 40,
+    "iconGap": 10,
+    "rowPadding": 10,
+    "showDuration": 15,
+    "fadeIn": 0.125,
+    "fadeOut": 1,
+    "maxFrameSeconds": 0.03333333507180214
+  },
+  "colors": {
+    "enemy": [
+      255,
+      100,
+      0,
+      255
+    ],
+    "highlight": [
+      255,
+      215,
+      0,
+      255
+    ]
+  },
+  "repairsIcon": "graphics/icons/intel/repairs_finished.png",
+  "sound": "ui_intel_minor_message"
+}

@@ -1,3 +1,4 @@
+import type { BeamThreatIndex } from './BeamThreatIndex';
 import type { FriendlyFireLaneIndex } from './FriendlyFireLaneIndex';
 import type { FleetPlan, FleetRole, FleetTask } from './FleetTactics';
 import type { WeaponThreatEnvelope } from './WeaponThreatEnvelope';
@@ -12,6 +13,9 @@ export interface TacticalWorld {
   noteNavigationObstacle?: (ship: Ship, other: Ship, horizon: number) => void;
   /** Only supplied inside an audited, synchronous native AI phase. */
   projectileThreatIndex?: ProjectileThreatIndex;
+  beamThreatIndex?: BeamThreatIndex;
+  /** Exact authority-derived lifetime, supplied only by an immutable owner frame. */
+  projectileLifetime?: (projectile: Projectile) => number;
   weaponThreatEnvelope?: WeaponThreatEnvelope;
   friendlyFireLaneIndex?: FriendlyFireLaneIndex;
   ships: readonly Ship[];

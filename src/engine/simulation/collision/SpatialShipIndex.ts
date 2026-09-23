@@ -76,16 +76,35 @@ export class SpatialShipIndex {
       this.queryEpoch = 1;
     }
 
+    // Sparse large-roster queries restore only touched ordinals, not all ships.
+    // Dense queries retain the original linear recovery instead of sorting O(N) hits.
+    const sparseLimit = this.ships.length >>> 2;
+    const queryCells = (maxCellX - minCellX + 1) * (maxCellY - minCellY + 1);
+    let sparse: number[] | null = this.ships.length >= 64 && queryCells < this.ships.length / 2 ? [] : null;
     for (let cy = minCellY; cy <= maxCellY; cy++) {
       const row = this.rows.get(cy);
       if (!row) continue;
       for (let cx = minCellX; cx <= maxCellX; cx++) {
         const bucket = row.get(cx);
         if (!bucket) continue;
-        for (const index of bucket) this.visitMarks[index] = this.queryEpoch;
+        // A dense bucket already makes linear recovery cheaper than collecting/sorting.
+        if (sparse && bucket.length > sparseLimit) sparse = null;
+        if (sparse) {
+          for (const index of bucket) if (this.visitMarks[index] !== this.queryEpoch) {
+            this.visitMarks[index] = this.queryEpoch;
+            sparse.push(index);
+          }
+          if (sparse.length > sparseLimit) sparse = null;
+        } else {
+          for (const index of bucket) this.visitMarks[index] = this.queryEpoch;
+        }
       }
     }
 
+    if (sparse) {
+      sparse.sort((a, b) => a - b);
+      return sparse.map(index => this.ships[index]);
+    }
     const candidates: Ship[] = [];
     for (let index = 0; index < this.ships.length; index++) {
       if (this.visitMarks[index] === this.queryEpoch) candidates.push(this.ships[index]);

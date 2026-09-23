@@ -1,6 +1,6 @@
 import { advanceSourceMissile, hasSourceMissileLifecycle, initializeSourceMissile } from './weapon/SourceMissileLifecycle';
 import { sameTeam } from "../CombatTeams";
-import { sound } from '../../audio/SoundManager';
+import { combatAudio as sound } from '../../audio/CombatAudioEvents';
 import { ProjectileInterceptionIndex } from '../collision/ProjectileInterceptionIndex';
 import { requireWeaponEffect } from '../../extensions/weapon-effects/Registry';
 import { ProjectileExplosionSystem } from './weapon/ProjectileExplosionSystem';

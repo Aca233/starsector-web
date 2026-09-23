@@ -45,3 +45,26 @@ test('only exact explicit idle-resume credit discards stale sounds; ordinary LAN
  const resumed=authority();resumed.acknowledgeSnapshot(99,true);assert.equal(resumed.sounds.length,1);
  resumed.acknowledgeSnapshot(1,true);assert.equal(resumed.sounds.length,0);assert.deepEqual([...resumed.sent],[9]);
 });
+
+test('actual host snapshot function splits display/network mailboxes and retains bounded display sounds',async()=>{
+ const {encodeProjectedBinaryFrame,decodeBinaryFrame,ProjectionEncodingCache}=await import('../src/network/BinarySnapshot.mjs');
+ const snapshotFn=ast.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='snapshot');
+ const soundStmt=ast.statements.find(n=>ts.isVariableStatement(n)&&n.declarationList.declarations.some(d=>d.name.getText(ast)==='queueSound'));
+ const compiled=(await transform([snapshotFn, ...ast.statements.filter(n=>ts.isFunctionDeclaration(n)&&['consumeSnapshotSounds','cancelSnapshotEncoding','flushSnapshotEncoding'].includes(n.name?.text)), soundStmt].map(n=>n.getText(ast)).join('\n'),{loader:'ts',target:'es2022',define:{'import.meta.env':'{}'}})).code;
+ const shown=[],published=[];
+ const c={running:true,snapshotEncoderWorker:null,pendingEncoding:null,ProjectionEncodingCache,encodedFragmentReuses:0,pollIoCompletion(){},tick:1,lastSnapshotTick:-1,snapshotInFlight:null,directReady:true,directLaunched:true,directInFlight:null,directLastTick:-1,directSequence:0,directAttempt:0,directRetryAt:0,
+  directIo:{postMessage:(m,transfer=[])=>published.push(structuredClone(m,{transfer}))},send:(m,transfer=[])=>shown.push(structuredClone(m,{transfer})),
+  engine:{projectiles:[]},controls:new Map([[0,{acknowledged:3}]]),elapsedCost:0,samples:0,captureMs:0,encodeMs:0,muzzleEvents:null,compactParticles:true,
+  captureAuthorityCombat:(_engine,tick,acknowledged)=>({tick,acknowledged,ships:[],world:{combatTime:tick/60}}),performance:{now:()=>0},LAN_SNAPSHOT_HZ:60,
+  measureClock(){},realtimeRatio:1,combatRate:1,sounds:[],networkSounds:[],soundId:0,authoritySummaryShips:null,binarySnapshots:true,visualEnabled:false,
+  capturedFrame:null,captures:0,captureReuses:0,snapshotEncoder:new TextEncoder(),encodeProjectedBinaryFrame,snapshotFlow:{count(){}},
+ };
+ vm.createContext(c);vm.runInContext(compiled,c);
+ const sound=()=>vm.runInContext("queueSound('test',1,1)",c);
+ for(let tick=1;tick<=80;tick++){c.tick=tick;c.directInFlight=null;sound();c.snapshot();}
+ assert.equal(shown.length,1,'stalled renderer owns exactly one unacknowledged publication');assert.equal(published.length,80,'network does not wait for that display ACK');assert.equal(c.sounds.length,64);assert.equal(c.networkSounds.length,0);
+ for(let i=0;i<published.length;i++){const frame=decodeBinaryFrame(published[i].binary);assert.equal(frame.tick,i+1);assert.equal(frame.sounds.length,1);assert.equal(frame.sounds[0].id,i+1);}
+ c.snapshotInFlight=null;c.snapshot();assert.equal(shown.length,2);assert.equal(published.length,80,'display-only refresh cannot upload a duplicate tick');
+ const latest=decodeBinaryFrame(shown[1].binary);assert.equal(latest.tick,80);assert.equal(latest.sounds.length,64);assert.equal(latest.sounds[0].id,2);assert.equal(latest.sounds.at(-1).id,65);assert.equal(c.sounds.length,0);
+ c.tick=81;c.snapshot(true);assert.equal(shown.length,3);assert.equal(published.length,81,'one terminal slot is independent of held normal credits');
+});

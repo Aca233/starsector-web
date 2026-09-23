@@ -19,7 +19,7 @@ export function captureFleetMember(ship: Ship, memberId: string): FleetMember {
     combatReadiness: fraction(ship.currentCR - ship.pendingCombatCRLoss),
     armor: {
       cols: ship.armor.cols, rows: ship.armor.rows,
-      fractions: Array.from(ship.armor.cells, value => fraction(value / ship.armor.maxCellArmor))
+      fractions: Array.from(ship.armor.copyCells(), value => fraction(value / ship.armor.maxCellArmor))
     },
     hullMods: [...(ship.spec.hullMods ?? [])], sMods: [...(ship.spec.sMods ?? [])], captainSkills: { ...ship.spec.captainSkills },
     fighterWings: structuredClone(ship.spec.fighterWings ?? []),
@@ -72,7 +72,7 @@ function applyMember(ship: Ship, member: FleetMember): void {
   ship.hullHp = member.hullFraction * ship.maxHullHp;
   ship.currentCR = member.combatReadiness;
   if (member.armor) {
-    ship.armor.cells.set(member.armor.fractions.map(f => f * ship.armor.maxCellArmor));
+    ship.armor.replaceCells(member.armor.fractions.map(f => f * ship.armor.maxCellArmor));
     ship.armor.dirtyVersion++;
   }
   for (const weapon of ship.weapons) {
@@ -95,7 +95,7 @@ export class CombatHandoff {
     }
   }
 
-  public deploy(session: CombatSession): void {
+  public deploy(session: Pick<CombatSession, 'engine' | 'beginEncounter' | 'refreshPresentationAssets'>): void {
     const request = this.request;
     session.beginEncounter(fleetMemberSpec(request.playerFleet[0]), fleetMemberSpec(request.enemyFleet[0]), request.seed);
     this.bindings.clear();
@@ -115,7 +115,7 @@ export class CombatHandoff {
     session.refreshPresentationAssets();
   }
 
-  public collect(session: CombatSession): CombatOutcome {
+  public collect(session: Pick<CombatSession, 'engine'>): CombatOutcome {
     const report = session.engine.battleResult;
     if (!report) throw new Error('战斗尚未结束，不能写回舰队。');
     if (this.request.kind === 'fleet' && session.engine.allCapitalShips.some(ship => !session.engine.isTransientCombatShip(ship) && ![...this.bindings.values()].includes(ship))) {

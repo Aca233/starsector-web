@@ -1,6 +1,6 @@
 // 缓存 HTMLImage 元素避免每帧重新实例化与闪烁
 import { assetResolver } from '../../engine/assets/AssetResolver';
-import type { WeaponMount } from '../../engine/simulation/Weapon';
+import type { HudWeapon as WeaponMount } from '../../engine/runtime/CombatHudView';
 
 const hudImageCache = new Map<string, HTMLImageElement>();
 
@@ -39,7 +39,7 @@ const EMPTY_GROUP_AMMO: GroupAmmoSummary = {
  * 汇总一个武器组的弹药状况，供 HUD 显示"还剩多少发"。
  * 无限弹药 (实弹/能量武器) 的挂点不参与统计，因此纯实弹编组不会显示弹药。
  */
-export function summarizeGroupAmmo(mounts: WeaponMount[]): GroupAmmoSummary {
+export function summarizeGroupAmmo(mounts: readonly WeaponMount[]): GroupAmmoSummary {
   const limitedMounts = mounts.filter((mount) => Number.isFinite(mount.ammo));
   if (limitedMounts.length === 0) return EMPTY_GROUP_AMMO;
 

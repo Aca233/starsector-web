@@ -1,0 +1,1170 @@
+{
+  "schemaVersion": 1,
+  "id": "reference-corvus-body-visuals-v1",
+  "sources": [
+    {
+      "id": "core:data/config/custom_entities.json",
+      "root": "core",
+      "path": "data/config/custom_entities.json",
+      "sha256": "a072d86edb3eb55f776eadb25e45c5d2b61413097872c08e1d34a3eb263e2c05",
+      "bytes": 55424
+    },
+    {
+      "id": "core:data/config/planets.json",
+      "root": "core",
+      "path": "data/config/planets.json",
+      "sha256": "f2367de64a3a8f52dd0e17fba163661ca8d7147ac8742007a8a41b363785244b",
+      "bytes": 37313
+    },
+    {
+      "id": "core:data/config/settings.json",
+      "root": "core",
+      "path": "data/config/settings.json",
+      "sha256": "96f3f6aa457e85ab6480bf302e35d3e8df390339321711b982d45fbe71c4dfa9",
+      "bytes": 103146
+    },
+    {
+      "id": "core:data/scripts/world/corvus/Corvus.java",
+      "root": "core",
+      "path": "data/scripts/world/corvus/Corvus.java",
+      "sha256": "a41192c4a9a473f6a641fb074822792ae557a7cb6ffc45cba7270c71c416ad2c",
+      "bytes": 13642
+    },
+    {
+      "id": "core:graphics/fx/star_halo.png",
+      "root": "core",
+      "path": "graphics/fx/star_halo.png",
+      "sha256": "ef01e62eac6328c7a52f41caaae9b1d8f0137aa76b4237526ac005a947f88aca",
+      "bytes": 53364
+    },
+    {
+      "id": "core:graphics/planets/asharu_sparse_glow.png",
+      "root": "core",
+      "path": "graphics/planets/asharu_sparse_glow.png",
+      "sha256": "c4331ee9aeef5031e27c23e1f20a9c8df76629c000ab121002a3e7899a457518",
+      "bytes": 25069
+    },
+    {
+      "id": "core:graphics/planets/barren00.jpg",
+      "root": "core",
+      "path": "graphics/planets/barren00.jpg",
+      "sha256": "54d6dd9706fe850918703d9cf3133a827dd4fd28df18ff28957b10995ee28a40",
+      "bytes": 413687
+    },
+    {
+      "id": "core:graphics/planets/clouds_banded01.png",
+      "root": "core",
+      "path": "graphics/planets/clouds_banded01.png",
+      "sha256": "f31f7c97b0f2eb678588992893ab8bf2e01e1897671d52522b5ba1019c4f091c",
+      "bytes": 69806
+    },
+    {
+      "id": "core:graphics/planets/cryovolcanic01.jpg",
+      "root": "core",
+      "path": "graphics/planets/cryovolcanic01.jpg",
+      "sha256": "cc789bf3f70efbfaed5ceef5593a9755d8d504db676f86583fb5bc9b29b2e48a",
+      "bytes": 152414
+    },
+    {
+      "id": "core:graphics/planets/desert.jpg",
+      "root": "core",
+      "path": "graphics/planets/desert.jpg",
+      "sha256": "3e98ef7d8efc35d391cc72de07946f758d3d32680bceb8eb3da38f9bde6aa1ff",
+      "bytes": 451449
+    },
+    {
+      "id": "core:graphics/planets/gas_giant.jpg",
+      "root": "core",
+      "path": "graphics/planets/gas_giant.jpg",
+      "sha256": "d8ac94308c5ce9cbb8f59a56053a7b3aa75553e969f8e459867ab2f0ad77d02a",
+      "bytes": 78813
+    },
+    {
+      "id": "core:graphics/planets/jungle.jpg",
+      "root": "core",
+      "path": "graphics/planets/jungle.jpg",
+      "sha256": "e699e3cc4de5eeaa2de92b3cf9e5a6ca63fb70043df592f8cf716a4dd539b1f5",
+      "bytes": 454674
+    },
+    {
+      "id": "core:graphics/planets/star_texture_yellow.jpg",
+      "root": "core",
+      "path": "graphics/planets/star_texture_yellow.jpg",
+      "sha256": "7e45c9e77264a54d7501a24a1b5a4e4fbc3f74e7ed8f6d0c9f84e75d4953c5fb",
+      "bytes": 26420
+    },
+    {
+      "id": "core:graphics/planets/sun_halo.png",
+      "root": "core",
+      "path": "graphics/planets/sun_halo.png",
+      "sha256": "72a79b569d9c0f6ccbb561e53d0bc0cd459bf3a945d8b8d4b9bf0a1f75831781",
+      "bytes": 1982
+    },
+    {
+      "id": "core:graphics/planets/volturn_glow.png",
+      "root": "core",
+      "path": "graphics/planets/volturn_glow.png",
+      "sha256": "2b2814a1d34770173d00e71b8fd7bc9e967fee915601e1e181d43048ace80d07",
+      "bytes": 128997
+    },
+    {
+      "id": "core:graphics/ships/com_relay.png",
+      "root": "core",
+      "path": "graphics/ships/com_relay.png",
+      "sha256": "ead1dda59e0eeed6b18029c5bc514675cb174e7d56c79fe140b7db9535d59ff4",
+      "bytes": 29449
+    },
+    {
+      "id": "core:graphics/ships/sensor_array_makeshift.png",
+      "root": "core",
+      "path": "graphics/ships/sensor_array_makeshift.png",
+      "sha256": "b144cfa593b18b708a6e1456745db9350b7769f31bd9daef230aeed12923f257",
+      "bytes": 8547
+    },
+    {
+      "id": "core:graphics/stations/gate.png",
+      "root": "core",
+      "path": "graphics/stations/gate.png",
+      "sha256": "84197fe5eeac3c8c30d3f88993293055fd8792a7a876974dd139cbb74e5b0e2d",
+      "bytes": 52960
+    },
+    {
+      "id": "core:graphics/stations/station_jangala2.png",
+      "root": "core",
+      "path": "graphics/stations/station_jangala2.png",
+      "sha256": "cfb92d5cdf2ab9ac03ab1fd49da0657aec3cf040a37833b120abab353eec7883",
+      "bytes": 51531
+    },
+    {
+      "id": "core:graphics/stations/station_lowtech1.png",
+      "root": "core",
+      "path": "graphics/stations/station_lowtech1.png",
+      "sha256": "c87f79b2266f43e5186687098b0dfc3ca8bbd8eefe5c80e7703d255dcad9a355",
+      "bytes": 24595
+    },
+    {
+      "id": "core:graphics/stations/station_side06.png",
+      "root": "core",
+      "path": "graphics/stations/station_side06.png",
+      "sha256": "59198083dddfd02b020089fb4eedc8c302da9fb9bc857165906022fe20aa373d",
+      "bytes": 43209
+    },
+    {
+      "id": "core:graphics/stations/stellar_shade.png",
+      "root": "core",
+      "path": "graphics/stations/stellar_shade.png",
+      "sha256": "d6539ccb8f074c8efbaebb965aaa3053a0832405bd4ad8eba5c0b2e800a26d7d",
+      "bytes": 38087
+    },
+    {
+      "id": "decompiled:fs.common_obf/com/fs/graphics/Sprite.java",
+      "root": "decompiled",
+      "path": "fs.common_obf/com/fs/graphics/Sprite.java",
+      "sha256": "7e1c90b38fc4cc8ad6009c68907eb89fb4ed876baa133f29916b1bdccd157e50",
+      "bytes": 18637
+    },
+    {
+      "id": "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/BaseCampaignObjectivePlugin.java",
+      "root": "decompiled",
+      "path": "starfarer.api/com/fs/starfarer/api/impl/campaign/BaseCampaignObjectivePlugin.java",
+      "sha256": "c534990e82ff6195160c2ed9d90f11d1d2781c037de4cc21f0ff33d0cba467a1",
+      "bytes": 2448
+    },
+    {
+      "id": "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/BaseCustomEntityPlugin.java",
+      "root": "decompiled",
+      "path": "starfarer.api/com/fs/starfarer/api/impl/campaign/BaseCustomEntityPlugin.java",
+      "sha256": "87c616ed38213a7f252916de64fde0e07ae7df18db568b96461fd360da30d29c",
+      "bytes": 1349
+    },
+    {
+      "id": "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/CommRelayEntityPlugin.java",
+      "root": "decompiled",
+      "path": "starfarer.api/com/fs/starfarer/api/impl/campaign/CommRelayEntityPlugin.java",
+      "sha256": "d697d7fd913ba1002b6b2f50cbc76f5f2173e3d84914a84c587d82c065adc24c",
+      "bytes": 5317
+    },
+    {
+      "id": "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/GateEntityPlugin.java",
+      "root": "decompiled",
+      "path": "starfarer.api/com/fs/starfarer/api/impl/campaign/GateEntityPlugin.java",
+      "sha256": "56c7e9c28928d8d7f8a78ea8076201630b1b54f570e0ca897e41c3a1ce9354ae",
+      "bytes": 19952
+    },
+    {
+      "id": "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/SensorArrayEntityPlugin.java",
+      "root": "decompiled",
+      "path": "starfarer.api/com/fs/starfarer/api/impl/campaign/SensorArrayEntityPlugin.java",
+      "sha256": "bbbe802c33d7a9880e16e52c14f92caeea63b344c88c376c42925a2b3a4ad664",
+      "bytes": 9576
+    },
+    {
+      "id": "decompiled:starfarer_obf/com/fs/starfarer/campaign/CustomCampaignEntity.java",
+      "root": "decompiled",
+      "path": "starfarer_obf/com/fs/starfarer/campaign/CustomCampaignEntity.java",
+      "sha256": "4f21bf20ad994452c7424725cf1c642af82663b226ec324a415774c1255dcc9a",
+      "bytes": 18773
+    },
+    {
+      "id": "decompiled:starfarer_obf/com/fs/starfarer/loading/S.java",
+      "root": "decompiled",
+      "path": "starfarer_obf/com/fs/starfarer/loading/S.java",
+      "sha256": "064806d509c314ddfeed6cfbfb0a9d52f4a4cd69f06277d688ad09e9ffe01dc6",
+      "bytes": 1177
+    },
+    {
+      "id": "decompiled:starfarer_obf/com/fs/starfarer/loading/SpecStore.java",
+      "root": "decompiled",
+      "path": "starfarer_obf/com/fs/starfarer/loading/SpecStore.java",
+      "sha256": "23151e3c6f2e01762982baa962d16349db1dd320f9050bf66ee53b51fed9d003",
+      "bytes": 139490
+    },
+    {
+      "id": "decompiled:starfarer_obf/com/fs/starfarer/loading/String.java",
+      "root": "decompiled",
+      "path": "starfarer_obf/com/fs/starfarer/loading/String.java",
+      "sha256": "acb79d529294803898afd9ddb44699b69fbed6898b994a8cddb2da67a27c76d3",
+      "bytes": 15102
+    },
+    {
+      "id": "decompiled:starfarer_obf/com/fs/starfarer/loading/specs/PlanetSpec.java",
+      "root": "decompiled",
+      "path": "starfarer_obf/com/fs/starfarer/loading/specs/PlanetSpec.java",
+      "sha256": "3995aa714ccc1056aaa699431ece071a7427274572a233b9cdc57cd4b060870a",
+      "bytes": 20212
+    },
+    {
+      "id": "decompiled:starfarer_obf/com/fs/starfarer/loading/specs/int.java",
+      "root": "decompiled",
+      "path": "starfarer_obf/com/fs/starfarer/loading/specs/int.java",
+      "sha256": "1f25a417f940314be2bf9b2b1b90f52a0a6614174085ab9dab503aa0dc8627c8",
+      "bytes": 13686
+    },
+    {
+      "id": "project:src/campaign/data/reference-corvus.json",
+      "root": "project",
+      "path": "src/campaign/data/reference-corvus.json",
+      "sha256": "62c5e59073626b1fae24c775e6992a3c46b2c44a4feb29faa24c804e1285bb15",
+      "bytes": 133792
+    }
+  ],
+  "planetSpecs": {
+    "star_yellow": {
+      "kind": "planet",
+      "tilt": 0,
+      "pitch": 0,
+      "rotation": -3,
+      "cloudRotation": 0,
+      "cloudAlpha": 255,
+      "atmosphereThickness": 0.25,
+      "atmosphereThicknessMin": 10,
+      "coronaSize": 5.119999885559082,
+      "planetColor": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "atmosphereColor": [
+        255,
+        255,
+        160,
+        255
+      ],
+      "cloudColor": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "glowColor": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "coronaColor": [
+        255,
+        255,
+        150,
+        60
+      ],
+      "isStar": true,
+      "useReverseLightForGlow": false,
+      "cloudTexture": null,
+      "glowTexture": null,
+      "coronaTexture": "graphics/fx/star_halo.png",
+      "lightPosition": [
+        0,
+        0,
+        10
+      ],
+      "texture": "graphics/planets/star_texture_yellow.jpg",
+      "audit": {
+        "supportedLayers": [
+          "surface",
+          "atmosphere",
+          "corona"
+        ],
+        "unsupported": [
+          "native-shader-and-runtime-phase",
+          "runtime-light-source"
+        ],
+        "sourceIds": [
+          "core:data/config/planets.json",
+          "core:data/config/settings.json",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/specs/PlanetSpec.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/String.java"
+        ],
+        "overriddenFields": []
+      }
+    },
+    "desert": {
+      "kind": "planet",
+      "tilt": 30,
+      "pitch": 0,
+      "rotation": -3,
+      "cloudRotation": -10,
+      "cloudAlpha": 255,
+      "atmosphereThickness": 0.10000000149011612,
+      "atmosphereThicknessMin": 40,
+      "coronaSize": 0,
+      "planetColor": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "atmosphereColor": [
+        150,
+        150,
+        145,
+        130
+      ],
+      "cloudColor": [
+        220,
+        190,
+        160,
+        180
+      ],
+      "glowColor": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "coronaColor": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "isStar": false,
+      "useReverseLightForGlow": false,
+      "cloudTexture": "graphics/planets/clouds_banded01.png",
+      "glowTexture": null,
+      "coronaTexture": "graphics/planets/sun_halo.png",
+      "lightPosition": [
+        -2,
+        2,
+        7
+      ],
+      "texture": "graphics/planets/desert.jpg",
+      "audit": {
+        "supportedLayers": [
+          "surface",
+          "clouds",
+          "atmosphere"
+        ],
+        "unsupported": [
+          "native-shader-and-runtime-phase",
+          "runtime-light-source"
+        ],
+        "sourceIds": [
+          "core:data/config/planets.json",
+          "core:data/config/settings.json",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/specs/PlanetSpec.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/String.java"
+        ],
+        "overriddenFields": []
+      }
+    },
+    "jungle": {
+      "kind": "planet",
+      "tilt": -40,
+      "pitch": 12,
+      "rotation": -2.5999999046325684,
+      "cloudRotation": -6,
+      "cloudAlpha": 255,
+      "atmosphereThickness": 0.3199999928474426,
+      "atmosphereThicknessMin": 38,
+      "coronaSize": 0,
+      "planetColor": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "atmosphereColor": [
+        70,
+        110,
+        130,
+        235
+      ],
+      "cloudColor": [
+        70,
+        115,
+        140,
+        235
+      ],
+      "glowColor": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "coronaColor": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "isStar": false,
+      "useReverseLightForGlow": false,
+      "cloudTexture": "graphics/planets/clouds_banded01.png",
+      "glowTexture": null,
+      "coronaTexture": "graphics/planets/sun_halo.png",
+      "lightPosition": [
+        -5,
+        -0.5,
+        9
+      ],
+      "texture": "graphics/planets/jungle.jpg",
+      "audit": {
+        "supportedLayers": [
+          "surface",
+          "clouds",
+          "atmosphere"
+        ],
+        "unsupported": [
+          "native-shader-and-runtime-phase",
+          "runtime-light-source"
+        ],
+        "sourceIds": [
+          "core:data/config/planets.json",
+          "core:data/config/settings.json",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/specs/PlanetSpec.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/String.java"
+        ],
+        "overriddenFields": []
+      }
+    },
+    "gas_giant": {
+      "kind": "planet",
+      "tilt": -10,
+      "pitch": -15,
+      "rotation": -3,
+      "cloudRotation": -7,
+      "cloudAlpha": 255,
+      "atmosphereThickness": 0.18000000715255737,
+      "atmosphereThicknessMin": 62,
+      "coronaSize": 0,
+      "planetColor": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "atmosphereColor": [
+        140,
+        100,
+        45,
+        140
+      ],
+      "cloudColor": [
+        220,
+        174,
+        96,
+        200
+      ],
+      "glowColor": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "coronaColor": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "isStar": false,
+      "useReverseLightForGlow": false,
+      "cloudTexture": "graphics/planets/clouds_banded01.png",
+      "glowTexture": null,
+      "coronaTexture": "graphics/planets/sun_halo.png",
+      "lightPosition": [
+        5,
+        -2,
+        3
+      ],
+      "texture": "graphics/planets/gas_giant.jpg",
+      "audit": {
+        "supportedLayers": [
+          "surface",
+          "clouds",
+          "atmosphere"
+        ],
+        "unsupported": [
+          "native-shader-and-runtime-phase",
+          "runtime-light-source"
+        ],
+        "sourceIds": [
+          "core:data/config/planets.json",
+          "core:data/config/settings.json",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/specs/PlanetSpec.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/String.java"
+        ],
+        "overriddenFields": []
+      }
+    },
+    "cryovolcanic": {
+      "kind": "planet",
+      "tilt": 30,
+      "pitch": 0,
+      "rotation": -3,
+      "cloudRotation": -5,
+      "cloudAlpha": 255,
+      "atmosphereThickness": 0.07999999821186066,
+      "atmosphereThicknessMin": 30,
+      "coronaSize": 0,
+      "planetColor": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "atmosphereColor": [
+        130,
+        220,
+        230,
+        90
+      ],
+      "cloudColor": [
+        120,
+        210,
+        230,
+        150
+      ],
+      "glowColor": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "coronaColor": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "isStar": false,
+      "useReverseLightForGlow": false,
+      "cloudTexture": "graphics/planets/clouds_banded01.png",
+      "glowTexture": null,
+      "coronaTexture": "graphics/planets/sun_halo.png",
+      "lightPosition": [
+        -10,
+        1,
+        0
+      ],
+      "texture": "graphics/planets/cryovolcanic01.jpg",
+      "audit": {
+        "supportedLayers": [
+          "surface",
+          "clouds",
+          "atmosphere"
+        ],
+        "unsupported": [
+          "native-shader-and-runtime-phase",
+          "runtime-light-source"
+        ],
+        "sourceIds": [
+          "core:data/config/planets.json",
+          "core:data/config/settings.json",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/specs/PlanetSpec.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/String.java"
+        ],
+        "overriddenFields": []
+      }
+    },
+    "barren": {
+      "kind": "planet",
+      "tilt": -27,
+      "pitch": 2,
+      "rotation": -3,
+      "cloudRotation": 0,
+      "cloudAlpha": 255,
+      "atmosphereThickness": 0,
+      "atmosphereThicknessMin": 12,
+      "coronaSize": 0,
+      "planetColor": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "atmosphereColor": [
+        100,
+        140,
+        160,
+        155
+      ],
+      "cloudColor": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "glowColor": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "coronaColor": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "isStar": false,
+      "useReverseLightForGlow": false,
+      "cloudTexture": null,
+      "glowTexture": null,
+      "coronaTexture": "graphics/planets/sun_halo.png",
+      "lightPosition": [
+        -2,
+        -8,
+        10
+      ],
+      "texture": "graphics/planets/barren00.jpg",
+      "audit": {
+        "supportedLayers": [
+          "surface",
+          "atmosphere"
+        ],
+        "unsupported": [
+          "native-shader-and-runtime-phase",
+          "runtime-light-source"
+        ],
+        "sourceIds": [
+          "core:data/config/planets.json",
+          "core:data/config/settings.json",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/specs/PlanetSpec.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/String.java"
+        ],
+        "overriddenFields": []
+      }
+    }
+  },
+  "customSpecs": {
+    "sensor_array_makeshift": {
+      "kind": "custom",
+      "sprite": "graphics/ships/sensor_array_makeshift.png",
+      "width": 86,
+      "height": 86,
+      "showInCampaign": true,
+      "useLightColor": true,
+      "renderShadow": true,
+      "color": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "alphaMult": 1,
+      "additive": false,
+      "facingOffsetDegrees": -90,
+      "nativeLayers": [
+        "STATIONS"
+      ],
+      "pluginClass": "com.fs.starfarer.api.impl.campaign.SensorArrayEntityPlugin",
+      "pluginRender": "inherited-noop",
+      "audit": {
+        "supportedLayers": [
+          "base-sprite"
+        ],
+        "unsupported": [
+          "sensor-viewport-fading",
+          "campaign-indicators-and-labels",
+          "dynamic-light-tint",
+          "native-shadow-pass"
+        ],
+        "sourceIds": [
+          "core:data/config/custom_entities.json",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/specs/int.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/SpecStore.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/S.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/campaign/CustomCampaignEntity.java",
+          "decompiled:fs.common_obf/com/fs/graphics/Sprite.java",
+          "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/SensorArrayEntityPlugin.java",
+          "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/BaseCampaignObjectivePlugin.java",
+          "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/BaseCustomEntityPlugin.java"
+        ],
+        "overriddenFields": []
+      }
+    },
+    "station_side06": {
+      "kind": "custom",
+      "sprite": "graphics/stations/station_side06.png",
+      "width": 60,
+      "height": 60,
+      "showInCampaign": true,
+      "useLightColor": true,
+      "renderShadow": true,
+      "color": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "alphaMult": 1,
+      "additive": false,
+      "facingOffsetDegrees": -90,
+      "nativeLayers": [
+        "STATIONS"
+      ],
+      "pluginClass": null,
+      "pluginRender": "none",
+      "audit": {
+        "supportedLayers": [
+          "base-sprite"
+        ],
+        "unsupported": [
+          "sensor-viewport-fading",
+          "campaign-indicators-and-labels",
+          "dynamic-light-tint",
+          "native-shadow-pass"
+        ],
+        "sourceIds": [
+          "core:data/config/custom_entities.json",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/specs/int.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/SpecStore.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/S.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/campaign/CustomCampaignEntity.java",
+          "decompiled:fs.common_obf/com/fs/graphics/Sprite.java"
+        ],
+        "overriddenFields": []
+      }
+    },
+    "stellar_shade": {
+      "kind": "custom",
+      "sprite": "graphics/stations/stellar_shade.png",
+      "width": 50,
+      "height": 50,
+      "showInCampaign": true,
+      "useLightColor": true,
+      "renderShadow": true,
+      "color": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "alphaMult": 1,
+      "additive": false,
+      "facingOffsetDegrees": -90,
+      "nativeLayers": [
+        "STATIONS"
+      ],
+      "pluginClass": null,
+      "pluginRender": "none",
+      "audit": {
+        "supportedLayers": [
+          "base-sprite"
+        ],
+        "unsupported": [
+          "sensor-viewport-fading",
+          "campaign-indicators-and-labels",
+          "dynamic-light-tint",
+          "native-shadow-pass"
+        ],
+        "sourceIds": [
+          "core:data/config/custom_entities.json",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/specs/int.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/SpecStore.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/S.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/campaign/CustomCampaignEntity.java",
+          "decompiled:fs.common_obf/com/fs/graphics/Sprite.java"
+        ],
+        "overriddenFields": []
+      }
+    },
+    "station_jangala_type": {
+      "kind": "custom",
+      "sprite": "graphics/stations/station_jangala2.png",
+      "width": 120,
+      "height": 120,
+      "showInCampaign": true,
+      "useLightColor": true,
+      "renderShadow": false,
+      "color": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "alphaMult": 1,
+      "additive": false,
+      "facingOffsetDegrees": -90,
+      "nativeLayers": [
+        "STATIONS"
+      ],
+      "pluginClass": null,
+      "pluginRender": "none",
+      "audit": {
+        "supportedLayers": [
+          "base-sprite"
+        ],
+        "unsupported": [
+          "sensor-viewport-fading",
+          "campaign-indicators-and-labels",
+          "dynamic-light-tint"
+        ],
+        "sourceIds": [
+          "core:data/config/custom_entities.json",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/specs/int.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/SpecStore.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/S.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/campaign/CustomCampaignEntity.java",
+          "decompiled:fs.common_obf/com/fs/graphics/Sprite.java"
+        ],
+        "overriddenFields": []
+      }
+    },
+    "comm_relay": {
+      "kind": "custom",
+      "sprite": "graphics/ships/com_relay.png",
+      "width": 89,
+      "height": 48,
+      "showInCampaign": true,
+      "useLightColor": true,
+      "renderShadow": true,
+      "color": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "alphaMult": 1,
+      "additive": false,
+      "facingOffsetDegrees": -90,
+      "nativeLayers": [
+        "STATIONS"
+      ],
+      "pluginClass": "com.fs.starfarer.api.impl.campaign.CommRelayEntityPlugin",
+      "pluginRender": "inherited-noop",
+      "audit": {
+        "supportedLayers": [
+          "base-sprite"
+        ],
+        "unsupported": [
+          "sensor-viewport-fading",
+          "campaign-indicators-and-labels",
+          "dynamic-light-tint",
+          "native-shadow-pass"
+        ],
+        "sourceIds": [
+          "core:data/config/custom_entities.json",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/specs/int.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/SpecStore.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/S.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/campaign/CustomCampaignEntity.java",
+          "decompiled:fs.common_obf/com/fs/graphics/Sprite.java",
+          "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/CommRelayEntityPlugin.java",
+          "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/BaseCampaignObjectivePlugin.java",
+          "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/BaseCustomEntityPlugin.java"
+        ],
+        "overriddenFields": []
+      }
+    },
+    "inactive_gate": {
+      "kind": "custom",
+      "sprite": "graphics/stations/gate.png",
+      "width": 192,
+      "height": 192,
+      "showInCampaign": true,
+      "useLightColor": true,
+      "renderShadow": true,
+      "color": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "alphaMult": 1,
+      "additive": false,
+      "facingOffsetDegrees": -90,
+      "nativeLayers": [
+        "STATIONS",
+        "BELOW_STATIONS"
+      ],
+      "pluginClass": "com.fs.starfarer.api.impl.campaign.GateEntityPlugin",
+      "pluginRender": "partial-base-sprite",
+      "audit": {
+        "supportedLayers": [
+          "base-sprite"
+        ],
+        "unsupported": [
+          "sensor-viewport-fading",
+          "campaign-indicators-and-labels",
+          "dynamic-light-tint",
+          "native-shadow-pass",
+          "gate-plugin-stateful-effects"
+        ],
+        "sourceIds": [
+          "core:data/config/custom_entities.json",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/specs/int.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/SpecStore.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/S.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/campaign/CustomCampaignEntity.java",
+          "decompiled:fs.common_obf/com/fs/graphics/Sprite.java",
+          "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/GateEntityPlugin.java"
+        ],
+        "overriddenFields": []
+      }
+    },
+    "station_lowtech1": {
+      "kind": "custom",
+      "sprite": "graphics/stations/station_lowtech1.png",
+      "width": 66,
+      "height": 80,
+      "showInCampaign": true,
+      "useLightColor": true,
+      "renderShadow": true,
+      "color": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "alphaMult": 1,
+      "additive": false,
+      "facingOffsetDegrees": -90,
+      "nativeLayers": [
+        "STATIONS"
+      ],
+      "pluginClass": null,
+      "pluginRender": "none",
+      "audit": {
+        "supportedLayers": [
+          "base-sprite"
+        ],
+        "unsupported": [
+          "sensor-viewport-fading",
+          "campaign-indicators-and-labels",
+          "dynamic-light-tint",
+          "native-shadow-pass"
+        ],
+        "sourceIds": [
+          "core:data/config/custom_entities.json",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/specs/int.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/SpecStore.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/S.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/campaign/CustomCampaignEntity.java",
+          "decompiled:fs.common_obf/com/fs/graphics/Sprite.java"
+        ],
+        "overriddenFields": []
+      }
+    },
+    "stable_location": {
+      "kind": "custom",
+      "sprite": null,
+      "width": 64,
+      "height": 64,
+      "showInCampaign": true,
+      "useLightColor": true,
+      "renderShadow": true,
+      "color": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "alphaMult": 1,
+      "additive": false,
+      "facingOffsetDegrees": -90,
+      "nativeLayers": [
+        "STATIONS"
+      ],
+      "pluginClass": null,
+      "pluginRender": "none",
+      "audit": {
+        "supportedLayers": [],
+        "unsupported": [
+          "sensor-viewport-fading",
+          "campaign-indicators-and-labels"
+        ],
+        "sourceIds": [
+          "core:data/config/custom_entities.json",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/specs/int.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/SpecStore.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/loading/S.java",
+          "decompiled:starfarer_obf/com/fs/starfarer/campaign/CustomCampaignEntity.java",
+          "decompiled:fs.common_obf/com/fs/graphics/Sprite.java"
+        ],
+        "overriddenFields": []
+      }
+    }
+  },
+  "sourceHandles": {
+    "star": {
+      "kind": "star",
+      "nativeType": "star_yellow",
+      "overrides": {},
+      "sourceIds": [
+        "project:src/campaign/data/reference-corvus.json",
+        "core:data/scripts/world/corvus/Corvus.java"
+      ]
+    },
+    "corvusI": {
+      "kind": "planet",
+      "nativeType": "desert",
+      "overrides": {
+        "glowTexture": "graphics/planets/asharu_sparse_glow.png",
+        "glowColor": [
+          255,
+          255,
+          255,
+          255
+        ],
+        "useReverseLightForGlow": true
+      },
+      "sourceIds": [
+        "project:src/campaign/data/reference-corvus.json",
+        "core:data/scripts/world/corvus/Corvus.java",
+        "core:data/config/settings.json"
+      ]
+    },
+    "corvus_loc1": {
+      "kind": "custom",
+      "nativeType": "sensor_array_makeshift",
+      "overrides": {},
+      "sourceIds": [
+        "project:src/campaign/data/reference-corvus.json",
+        "core:data/scripts/world/corvus/Corvus.java"
+      ]
+    },
+    "neutralStation": {
+      "kind": "custom",
+      "nativeType": "station_side06",
+      "overrides": {},
+      "sourceIds": [
+        "project:src/campaign/data/reference-corvus.json",
+        "core:data/scripts/world/corvus/Corvus.java"
+      ]
+    },
+    "asharu_shade": {
+      "kind": "custom",
+      "nativeType": "stellar_shade",
+      "overrides": {},
+      "sourceIds": [
+        "project:src/campaign/data/reference-corvus.json",
+        "core:data/scripts/world/corvus/Corvus.java"
+      ]
+    },
+    "corvusII": {
+      "kind": "planet",
+      "nativeType": "jungle",
+      "overrides": {
+        "glowTexture": "graphics/planets/volturn_glow.png",
+        "glowColor": [
+          255,
+          255,
+          255,
+          255
+        ],
+        "useReverseLightForGlow": true
+      },
+      "sourceIds": [
+        "project:src/campaign/data/reference-corvus.json",
+        "core:data/scripts/world/corvus/Corvus.java",
+        "core:data/config/settings.json"
+      ]
+    },
+    "hegemonyStation": {
+      "kind": "custom",
+      "nativeType": "station_jangala_type",
+      "overrides": {},
+      "sourceIds": [
+        "project:src/campaign/data/reference-corvus.json",
+        "core:data/scripts/world/corvus/Corvus.java"
+      ]
+    },
+    "relay": {
+      "kind": "custom",
+      "nativeType": "comm_relay",
+      "overrides": {},
+      "sourceIds": [
+        "project:src/campaign/data/reference-corvus.json",
+        "core:data/scripts/world/corvus/Corvus.java"
+      ]
+    },
+    "gate": {
+      "kind": "custom",
+      "nativeType": "inactive_gate",
+      "overrides": {},
+      "sourceIds": [
+        "project:src/campaign/data/reference-corvus.json",
+        "core:data/scripts/world/corvus/Corvus.java"
+      ]
+    },
+    "corvusIII": {
+      "kind": "planet",
+      "nativeType": "gas_giant",
+      "overrides": {},
+      "sourceIds": [
+        "project:src/campaign/data/reference-corvus.json",
+        "core:data/scripts/world/corvus/Corvus.java"
+      ]
+    },
+    "corvusIIIA": {
+      "kind": "planet",
+      "nativeType": "cryovolcanic",
+      "overrides": {},
+      "sourceIds": [
+        "project:src/campaign/data/reference-corvus.json",
+        "core:data/scripts/world/corvus/Corvus.java"
+      ]
+    },
+    "pirateStation": {
+      "kind": "custom",
+      "nativeType": "station_lowtech1",
+      "overrides": {},
+      "sourceIds": [
+        "project:src/campaign/data/reference-corvus.json",
+        "core:data/scripts/world/corvus/Corvus.java"
+      ]
+    },
+    "corvusIIIB": {
+      "kind": "planet",
+      "nativeType": "barren",
+      "overrides": {},
+      "sourceIds": [
+        "project:src/campaign/data/reference-corvus.json",
+        "core:data/scripts/world/corvus/Corvus.java"
+      ]
+    },
+    "corvus_loc3": {
+      "kind": "custom",
+      "nativeType": "stable_location",
+      "overrides": {},
+      "sourceIds": [
+        "project:src/campaign/data/reference-corvus.json",
+        "core:data/scripts/world/corvus/Corvus.java"
+      ]
+    }
+  }
+}

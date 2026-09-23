@@ -1,3 +1,4 @@
+import type { RenderWeaponSpec } from '../render/ShipRenderState';
 import { defenseSystemId, tacticalSystemIds } from '../extensions/ship-systems/Loadout';
 import { systemWeaponSpec } from '../extensions/ship-systems/SystemWeaponCatalog';
 import { resolveSystemId, shipSystemDefinitions } from '../extensions/ship-systems/Registry';
@@ -5,7 +6,7 @@ import { weaponEffects } from '../extensions/weapon-effects/Registry';
 import { installedHullMods } from '../extensions/HullMods';
 import type { ExtensionResources } from '../extensions/Dependencies';
 import { DEBRIS_TEXTURES } from './CombatFXAssets';
-import type { CombatEngine } from '../simulation/CombatEngine';
+import type { CombatRenderView } from '../render/CombatRenderView';
 import type { WeaponSpec } from '../simulation/Weapon';
 import type { ShipSpec } from '../content/ShipSpec';
 import { contentRegistry } from '../content/ContentRegistry';
@@ -17,7 +18,7 @@ const WEAPON_TEXTURE_FIELDS = [
 ] as const satisfies readonly (keyof WeaponSpec)[];
 
 /** Include current combatants, their equipment, and craft that can be rebuilt. */
-export function collectCombatTextureUrls(engine: CombatEngine): string[] {
+export function collectCombatTextureUrls(engine: CombatRenderView): string[] {
   const urls = new Set<string>(ESSENTIAL_TEXTURE_URLS);
   // Future impacts may choose any shard, even when no debris exists at prepare time.
   for (const variants of Object.values(DEBRIS_TEXTURES)) for (const path of variants) urls.add('/game-assets/' + path);
@@ -43,11 +44,11 @@ export function collectCombatTextureUrls(engine: CombatEngine): string[] {
       addWeapon(weapon);
     }
   };
-  const addWeapon = (spec: WeaponSpec) => {
+  const addWeapon = (spec: RenderWeaponSpec) => {
     if (visitedWeapons.has(spec.id)) return;
     visitedWeapons.add(spec.id);
     for (const field of WEAPON_TEXTURE_FIELDS) if (spec[field]) urls.add(spec[field]);
-    for (const id of [spec.beamEffect,spec.onHitEffect,spec.everyFrameEffect,spec.mirv?.childProjectile.onHitEffect]) if (id) addResources(weaponEffects.require(id).resources);
+    for (const id of [spec.beamEffect,spec.onHitEffect,spec.everyFrameEffect,spec.mirv?.childProjectile?.onHitEffect]) if (id) addResources(weaponEffects.require(id).resources);
     const child = spec.mirv?.childProjectile;
     if (child) for (const field of WEAPON_TEXTURE_FIELDS) if (child[field]) urls.add(child[field]);
   };
@@ -78,7 +79,7 @@ export function collectCombatTextureUrls(engine: CombatEngine): string[] {
     addHull(sourceShip.spec);
     for (const mount of sourceShip.weapons) addWeapon(mount.spec);
   }
-  for (const projectile of engine.projectiles) if (projectile.projSpriteUrl) urls.add(projectile.projSpriteUrl);
+  for (const projectile of (engine.projectileVisuals?.projectiles ?? engine.projectiles)) if (projectile.projSpriteUrl) urls.add(projectile.projSpriteUrl);
   for (const nebula of engine.nebulae) urls.add(nebula.spriteUrl);
   for (const asteroid of engine.asteroids) urls.add(asteroid.spriteUrl);
   return [...urls];

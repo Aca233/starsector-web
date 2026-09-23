@@ -1,3 +1,5 @@
+import { captureCombatAudio } from '../../audio/CombatAudioEvents';
+captureCombatAudio(() => {}); // Only this worker realm discards proposal audio.
 import { Owner } from './Owner';
 import type { OwnerRequest, OwnerReply } from './Types';
 let owner: Owner | undefined;

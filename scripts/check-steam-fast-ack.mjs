@@ -22,7 +22,7 @@ test('only tiny ACKs get identical fast + reliable copies; loss/refusal never re
  }
 });
 test('duplicate ACK cannot drain twice, consume a later control, or suppress a reliable send error',()=>{
- let id=0;const q=new SteamReliableQueue(()=>({id:++id,packets:[Buffer.alloc(20)]}));q.enqueue('{}');q.enqueue('{}');q.ack(1);const before=q.diagnostics();q.ack(1);q.ack(999);assert.deepEqual(q.diagnostics(),before);
+ let id=0;const q=new SteamReliableQueue(()=>({id:++id,packets:[Buffer.alloc(20)]}));q.enqueue('{}');q.enqueue('{}');q.ack(1);const now=Date.now(),before=q.diagnostics(now);q.ack(1);q.ack(999);assert.deepEqual(q.diagnostics(now),before); // Same sample time: elapsed wall milliseconds are not a queue mutation.
  const g=new SteamGateway({ snapshotPreparation: false,build:'test',client:{networking:{sendP2PPacket(_r,type){return type===1;}}}});
  try{assert.throws(()=>g.transmit(remote,connection,'ack',{id:1}),/Steam/);}finally{g.wss.close();}
 });

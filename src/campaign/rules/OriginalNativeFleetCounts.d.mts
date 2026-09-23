@@ -1,0 +1,5 @@
+import type {OriginalNativeFleet,OriginalNativeFleetMember} from './OriginalFleetData.mjs';
+export interface OriginalNativeFleetCounts {numCapitals:number;numCruisers:number;numDestroyers:number;numFrigates:number;numFighters:number;hasUniqueSig:boolean;largestShipSize:string|null;mostExpensiveShip:OriginalNativeFleetMember|null;isOnlyOneLargestShip:boolean;fleetSizeNum:number}
+export function createOriginalNativeFleetCounts():OriginalNativeFleetCounts;
+export function updateOriginalNativeFleetCounts(fleet:OriginalNativeFleet):OriginalNativeFleetCounts;
+export function updateOriginalNativeFleetSizeCount(fleet:OriginalNativeFleet):number;

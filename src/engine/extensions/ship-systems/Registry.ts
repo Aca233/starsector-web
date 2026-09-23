@@ -41,7 +41,7 @@ export const shipSystemDefinitions = new DefinitionRegistry<ShipSystemDefinition
   for (const value of [d.chargeRegen ?? 0, d.fluxPerUseFraction ?? 0, d.fluxPerUseFlat ?? 0, d.fluxPerUseDissipationFraction ?? 0]) if (!Number.isFinite(value) || value < 0) throw new Error(`${d.id}: invalid cost/regen`);
   for (const alias of d.sourceIds) if (shipSystemDefinitions.all().some(other => other.sourceIds.includes(alias))) throw new Error(`Duplicate source system ${alias}`);
 });
-shipSystemDefinitions.register({id:'NONE', sourceIds:[], name:'无', chargeUp:0, active:0, chargeDown:0, cooldown:0});
+shipSystemDefinitions.register({id:'NONE', sourceIds:[], name:'无', description:'不装配舰船技能。', chargeUp:0, active:0, chargeDown:0, cooldown:0});
 for (const definition of [burnDrive, fortressShield, mineStrike, maneuveringJets, plasmaJets, highEnergyFocus, ammoFeed, displacer, displacerDegraded, phaseTeleporter, droneSkimmer, canisterFlak, targetingFeed, reserveWing, lidarArray, recallDevice, ...droneLaunchers, ...energyLashSystems, ...pulseDrives, empEmitter, chiralFigment, droneStrike, moteControl, convulsiveLunge, ...flareSystems, ...nativeCombatSystems]) shipSystemDefinitions.register(withNativeSystemVisuals(definition));
 // Only this audited set has side-effect-free modifiers/passiveModifiers/isExecuting.
 // Registration by external extensions does not confer this property.

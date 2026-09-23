@@ -1,0 +1,10 @@
+import type {OriginalNativeFleet,OriginalNativeFleetMember} from './OriginalFleetData.mjs';
+export function originalAdjustedHRSModifier(fleet:OriginalNativeFleet,skipId?:string|null,add?:number):number;
+export function originalTopKValuesSum(values:number[],k:number):number;
+export function originalPhaseFieldData(fleet:OriginalNativeFleet,skipId?:string|null,addProfile?:number,addSensor?:number):{mult:number;profile:number;phaseSensors:number};
+export function reportOriginalHullmodFleetSync(fleet:OriginalNativeFleet,plugins?:Record<string,(fleet:OriginalNativeFleet)=>void>):void;
+export type OriginalMemberCampaignHullmodPlugins=Record<string,(member:OriginalNativeFleetMember,seconds:number,fleet:OriginalNativeFleet)=>void>;
+export function advanceOriginalMemberHullmods(member:OriginalNativeFleetMember,seconds:number,fleet:OriginalNativeFleet,plugins?:OriginalMemberCampaignHullmodPlugins,services?:import('./OriginalFleetData.mjs').OriginalFleetLifecycleServices):void;
+export function originalFleetwideTotalMod(fleet:OriginalNativeFleet,key:string,base:number):number;
+export function applyOriginalPhaseFieldFleetEffect(fleet:OriginalNativeFleet):void;
+export function advanceOriginalFleetCampaignHullmods(fleet:import('./OriginalCampaignFleet.mjs').OriginalConstructedCampaignFleet,services?:import('./OriginalFleetData.mjs').OriginalFleetLifecycleServices):void;

@@ -1,0 +1,477 @@
+{
+  "schemaVersion": 1,
+  "originalReference": "Starsector 0.98a-RC8",
+  "sources": {
+    "data/config/settings.json": {
+      "sha256": "96f3f6aa457e85ab6480bf302e35d3e8df390339321711b982d45fbe71c4dfa9"
+    },
+    "data/campaign/commodities.csv": {
+      "sha256": "94e3b32f1176c775a56b4b37ae32ba597d60cf61aad5cc3c51f907123c904842"
+    },
+    "starfarer_obf/com/fs/starfarer/campaign/econ/reach/MainWorkTask2.java": {
+      "sha256": "a5ef72fd328a8802545f6ab04cbc7133cee142ac22c36e62fc36769713268da6"
+    },
+    "starfarer_obf/com/fs/starfarer/campaign/econ/reach/ReachEconomyStepper.java": {
+      "sha256": "fb141d643b8dd3ad5b7ff43f1756b269571188be291e20c042eaa37e5ce18f99"
+    },
+    "starfarer_obf/com/fs/starfarer/campaign/econ/reach/CommodityMarketData.java": {
+      "sha256": "75b5add5888acd526900253da248725d8bb5b2eeef20f8fa4a6f818fad4e9a93"
+    },
+    "starfarer_obf/com/fs/starfarer/campaign/econ/reach/UpdateMarketsAgainTask.java": {
+      "sha256": "538c04f9100ae6e657df53ffcd154fa87235c0d270d9ee42864825002701dd3d"
+    },
+    "starfarer_obf/com/fs/starfarer/campaign/econ/Market.java": {
+      "sha256": "8ca0c019abc8543a80fa63c3826b3ac1f766af3dbc35875161842306378aa945"
+    },
+    "starfarer_obf/com/fs/starfarer/campaign/econ/CommodityOnMarket.java": {
+      "sha256": "333e58f37a1c7d508d766304ad64e759174b52dafa3fd205cf15efd9da371346"
+    },
+    "starfarer_obf/com/fs/starfarer/campaign/econ/MarketDemand.java": {
+      "sha256": "c6f4821c29c6f60f26dd3db939228c85e68b855c7ece253a7bfc065b835b0a1d"
+    },
+    "starfarer_obf/com/fs/starfarer/campaign/econ/Economy.java": {
+      "sha256": "94d23a73786493720d4639582bba17461506935288da5d133c8d803711a43841"
+    },
+    "starfarer_obf/com/fs/starfarer/campaign/CampaignClock.java": {
+      "sha256": "00c00d08296811f9d3031a35660ddd9c7fdc652eae30b26595605a59051bd3f9"
+    },
+    "starfarer.api/com/fs/starfarer/api/impl/campaign/econ/CommodityIconCounts.java": {
+      "sha256": "b379080ce2b33bf31eec54335f2340c0d198516e1e0a346ff197b5e312c9b08a"
+    },
+    "starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/BaseIndustry.java": {
+      "sha256": "bc3ff7aee903318926a532910fd6a1495ff3db3cfd7a1e345388d70bf718ace8"
+    },
+    "starfarer.api/com/fs/starfarer/api/combat/MutableStat.java": {
+      "sha256": "a584da937e50822808fb80367183d8bd5b7ded64600b8b78aebbc8ec4cc03f21"
+    },
+    "starfarer.api/com/fs/starfarer/api/combat/StatBonus.java": {
+      "sha256": "1b0f272d231f28c737bfc7c6c70bfa00d0d2c9bb6af2c41b2bfa9b5c89028ea0"
+    },
+    "starfarer.api/com/fs/starfarer/api/combat/MutableStatWithTempMods.java": {
+      "sha256": "1832af483d20baaf4be460047be8ac089f08b50503acf8425dd7182792f06e53"
+    },
+    "starfarer.api/com/fs/starfarer/api/impl/campaign/submarkets/BaseSubmarketPlugin.java": {
+      "sha256": "105d3bcb156c321a69c76f8021ba5d692e7f0b8b76b81d07797991019a6a5e32"
+    }
+  },
+  "settings": {
+    "economyIterPerMonth": 10,
+    "economyMinStockpileForPricing": 100,
+    "economyGreedFraction": 0.25,
+    "economyNoDemandPriceMult": 0.5,
+    "economyDeficitPriceIncrPerUnit": 0.25,
+    "economyDeficitPriceMultMax": 1.25,
+    "economyExcessPriceDecrPerUnit": 0.15,
+    "economyExcessPriceMultMin": 0.85,
+    "accessibilitySameFactionBonus": 0.5,
+    "accessibilityPerUnitShipping": 0.1,
+    "secondsPerDay": 10,
+    "tradeImpactDays": 120
+  },
+  "formulas": {
+    "stockpilePricePass": "MainWorkTask2.updateStockpileAndPriceV2",
+    "industryAggregation": "CommodityOnMarket.updateMaxSupplyAndDemand",
+    "availability": "CommodityMarketData constructor core_local/core_base/core_shortage/core_lowaccess branch",
+    "tradeTime": "MutableStatWithTempMods.advance subtracts float days each frame; no gradual amplitude decay",
+    "taskOrder": [
+      "MainWorkTask2",
+      "UpdateMarketsAgainTask",
+      "ImmigrationTask",
+      "FinishEconomyUpdateTask"
+    ],
+    "support": "Deterministic primary economic commodity kernels from explicit industry/network/modifier inputs. No automatic global economy, inventory generation, admission, or snapshot freshness certification."
+  },
+  "commodities": {
+    "supplies": {
+      "id": "supplies",
+      "demandClass": "supplies",
+      "econUnit": 750,
+      "utility": 1,
+      "tags": [
+        "military",
+        "expensive"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "fuel": {
+      "id": "fuel",
+      "demandClass": "fuel",
+      "econUnit": 1500,
+      "utility": 1,
+      "tags": [
+        "military"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "crew": {
+      "id": "crew",
+      "demandClass": "crew",
+      "econUnit": 500,
+      "utility": 1,
+      "tags": [
+        "crew",
+        "personnel"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "marines": {
+      "id": "marines",
+      "demandClass": "marines",
+      "econUnit": 100,
+      "utility": 1,
+      "tags": [
+        "marines",
+        "military",
+        "personnel"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "food": {
+      "id": "food",
+      "demandClass": "food",
+      "econUnit": 2000,
+      "utility": 1,
+      "tags": [
+        "food"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "organics": {
+      "id": "organics",
+      "demandClass": "organics",
+      "econUnit": 1500,
+      "utility": 1,
+      "tags": [],
+      "origin": null,
+      "plugin": null
+    },
+    "volatiles": {
+      "id": "volatiles",
+      "demandClass": "volatiles",
+      "econUnit": 200,
+      "utility": 1,
+      "tags": [
+        "expensive"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "ore": {
+      "id": "ore",
+      "demandClass": "ore",
+      "econUnit": 5000,
+      "utility": 1,
+      "tags": [],
+      "origin": null,
+      "plugin": null
+    },
+    "rare_ore": {
+      "id": "rare_ore",
+      "demandClass": "rare_ore",
+      "econUnit": 500,
+      "utility": 1,
+      "tags": [
+        "expensive"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "metals": {
+      "id": "metals",
+      "demandClass": "metals",
+      "econUnit": 2000,
+      "utility": 1,
+      "tags": [],
+      "origin": null,
+      "plugin": null
+    },
+    "rare_metals": {
+      "id": "rare_metals",
+      "demandClass": "rare_metals",
+      "econUnit": 200,
+      "utility": 1,
+      "tags": [
+        "expensive"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "heavy_machinery": {
+      "id": "heavy_machinery",
+      "demandClass": "heavy_machinery",
+      "econUnit": 300,
+      "utility": 1,
+      "tags": [
+        "expensive"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "domestic_goods": {
+      "id": "domestic_goods",
+      "demandClass": "domestic_goods",
+      "econUnit": 1000,
+      "utility": 1,
+      "tags": [],
+      "origin": null,
+      "plugin": null
+    },
+    "organs": {
+      "id": "organs",
+      "demandClass": "organs",
+      "econUnit": 200,
+      "utility": 1,
+      "tags": [
+        "medical",
+        "expensive"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "drugs": {
+      "id": "drugs",
+      "demandClass": "drugs",
+      "econUnit": 400,
+      "utility": 1,
+      "tags": [
+        "expensive"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "hand_weapons": {
+      "id": "hand_weapons",
+      "demandClass": "hand_weapons",
+      "econUnit": 200,
+      "utility": 1,
+      "tags": [
+        "military"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "luxury_goods": {
+      "id": "luxury_goods",
+      "demandClass": "luxury_goods",
+      "econUnit": 500,
+      "utility": 1,
+      "tags": [
+        "luxury",
+        "expensive"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "lobster": {
+      "id": "lobster",
+      "demandClass": "luxury_goods",
+      "econUnit": 500,
+      "utility": 1,
+      "tags": [
+        "exotic",
+        "luxury",
+        "expensive",
+        "codex_unlockable"
+      ],
+      "origin": "volturn",
+      "plugin": null
+    },
+    "ships": {
+      "id": "ships",
+      "demandClass": "ships",
+      "econUnit": 200,
+      "utility": 1,
+      "tags": [
+        "meta"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "ai_cores": {
+      "id": "ai_cores",
+      "demandClass": "ai_cores",
+      "econUnit": 500,
+      "utility": 1,
+      "tags": [
+        "nonecon",
+        "ai_core",
+        "hide_in_codex"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "alpha_core": {
+      "id": "alpha_core",
+      "demandClass": "ai_cores",
+      "econUnit": 500,
+      "utility": 150,
+      "tags": [
+        "nonecon",
+        "ai_core",
+        "no_loss_from_combat",
+        "codex_unlockable"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "beta_core": {
+      "id": "beta_core",
+      "demandClass": "ai_cores",
+      "econUnit": 500,
+      "utility": 30,
+      "tags": [
+        "nonecon",
+        "ai_core",
+        "no_loss_from_combat",
+        "codex_unlockable"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "gamma_core": {
+      "id": "gamma_core",
+      "demandClass": "ai_cores",
+      "econUnit": 500,
+      "utility": 10,
+      "tags": [
+        "nonecon",
+        "ai_core",
+        "no_loss_from_combat",
+        "codex_unlockable"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "omega_core": {
+      "id": "omega_core",
+      "demandClass": "ai_cores",
+      "econUnit": 500,
+      "utility": 1000,
+      "tags": [
+        "nonecon",
+        "ai_core",
+        "no_loss_from_combat",
+        "no_drop",
+        "hide_in_codex"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "survey_data": {
+      "id": "survey_data",
+      "demandClass": "survey_data",
+      "econUnit": 500,
+      "utility": 1,
+      "tags": [
+        "nonecon",
+        "hide_in_codex"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "survey_data_1": {
+      "id": "survey_data_1",
+      "demandClass": "survey_data",
+      "econUnit": 500,
+      "utility": 1,
+      "tags": [
+        "nonecon",
+        "no_loss_from_combat"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "survey_data_2": {
+      "id": "survey_data_2",
+      "demandClass": "survey_data",
+      "econUnit": 500,
+      "utility": 3,
+      "tags": [
+        "nonecon",
+        "no_loss_from_combat"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "survey_data_3": {
+      "id": "survey_data_3",
+      "demandClass": "survey_data",
+      "econUnit": 500,
+      "utility": 5,
+      "tags": [
+        "nonecon",
+        "no_loss_from_combat"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "survey_data_4": {
+      "id": "survey_data_4",
+      "demandClass": "survey_data",
+      "econUnit": 500,
+      "utility": 10,
+      "tags": [
+        "nonecon",
+        "no_loss_from_combat"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "survey_data_5": {
+      "id": "survey_data_5",
+      "demandClass": "survey_data",
+      "econUnit": 500,
+      "utility": 30,
+      "tags": [
+        "nonecon",
+        "no_loss_from_combat"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "blueprints": {
+      "id": "blueprints",
+      "demandClass": "blueprints",
+      "econUnit": 500,
+      "utility": 1,
+      "tags": [
+        "nonecon",
+        "meta",
+        "hide_in_codex"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "ship_weapons": {
+      "id": "ship_weapons",
+      "demandClass": "ship_weapons",
+      "econUnit": 500,
+      "utility": 1,
+      "tags": [
+        "nonecon",
+        "meta",
+        "hide_in_codex"
+      ],
+      "origin": null,
+      "plugin": null
+    },
+    "credits": {
+      "id": "credits",
+      "demandClass": "ship_weapons",
+      "econUnit": 500,
+      "utility": 1,
+      "tags": [
+        "nonecon",
+        "meta",
+        "hide_in_codex"
+      ],
+      "origin": null,
+      "plugin": null
+    }
+  }
+}

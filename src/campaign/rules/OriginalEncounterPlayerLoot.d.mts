@@ -1,0 +1,10 @@
+import type {OriginalEncounterState} from './OriginalEncounterState.mjs';
+import type {OriginalFleetEncounterServices} from './OriginalFleetEncounterContext.mjs';
+import type {OriginalNativeFleetMember} from './OriginalFleetData.mjs';
+import type {OriginalConstructedCampaignFleet} from './OriginalCampaignFleet.mjs';
+import type {OriginalJavaRandomState} from './OriginalJavaRandom.mjs';
+export function originalEncounterSalvageMultiplier(status:string):number;
+export function originalEncounterDerivedRandom(seed:string,level:number,services?:OriginalFleetEncounterServices):OriginalJavaRandomState;
+export function originalEncounterShipSalvageSeed(member:OriginalNativeFleetMember,loserFleet:OriginalConstructedCampaignFleet|null,extraSeed:string,services?:OriginalFleetEncounterServices):string;
+export function originalEncounterGantryValue(fleet:OriginalConstructedCampaignFleet,services?:OriginalFleetEncounterServices):number;
+export function generateOriginalEncounterPlayerLoot(state:OriginalEncounterState,recoveredShips:OriginalNativeFleetMember[]|null,withCredits:boolean,services?:OriginalFleetEncounterServices):void;

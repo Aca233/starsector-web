@@ -6,7 +6,7 @@ import type { Projectile, ProjectileExplosionSpec } from '../Weapon';
 import type { WeaponSimContext } from './weapon/WeaponSimContext';
 import { ProjectileExplosionSystem } from './weapon/ProjectileExplosionSystem';
 import { getShipExplosionContact } from '../collision/ExplosionContact';
-import { sound } from '../../audio/SoundManager';
+import { combatAudio as sound } from '../../audio/CombatAudioEvents';
 import { SimulationRandom } from '../SimulationRandom';
 import spec from '../../data/generated/mine-spec.json';
 import { nativeMineSpec, type NativeMineWeapon } from '../../extensions/NativeMines';

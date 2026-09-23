@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 1,
+  "originalReference": "Starsector 0.98a-RC8",
+  "scope": "population-advance-with-explicit-resize-effects-not-whole-world-economy",
+  "sources": {
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/PopulationAndInfrastructure.java": {
+      "sha256": "7bae6eb71b6e00ff2c8cfaa416d2379c124f7364813b518ff573f10fb41d6446"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/Spaceport.java": {
+      "sha256": "f768a6bbb31b5067e544675bf9384a2b7e7be7c6edee44f9a13ed3709201238e"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/MilitaryBase.java": {
+      "sha256": "ef451be1bb529e202f9792bc494467fe3b7d1aed42713aa62b71594909682f87"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/GroundDefenses.java": {
+      "sha256": "b0a7082cdb50e0334544e829e47356c241e066a57d908129fdc5fcb196454fbc"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/OrbitalStation.java": {
+      "sha256": "83550682d372644a19dda657093c4fe0cad7f80d40bc48bc143267f2904854e1"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/BaseIndustry.java": {
+      "sha256": "bc3ff7aee903318926a532910fd6a1495ff3db3cfd7a1e345388d70bf718ace8"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/Population.java": {
+      "sha256": "9a2af31a69a39e49ea366ec0f45fbc8437ecb6c658086703f9855162ef17a998"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/BaseHazardCondition.java": {
+      "sha256": "8ed8ef6e3c98ae05f9fb73cbbf5bf6f4d1c66f549aed3e0a9d699c6bf89b0f97"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/LCAttractorLow.java": {
+      "sha256": "c5c4318f83b57e92fc95b9995ef166919c1262c81fa304d4c8d92727573aa455"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/LCAttractorMedium.java": {
+      "sha256": "0180351c13324431b137080042f78fd3a8fd5b135fc9a2db6484043f19d2888d"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/Habitable.java": {
+      "sha256": "3cafc80ebf48d88487fad54db10fe5b10f790050a89151911a93094e3f08982b"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/FreeMarket.java": {
+      "sha256": "618a57271bedd61908a19a5d1726ecea9c96ff7636af4620f3f9e19ab90d17da"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/CommRelayCondition.java": {
+      "sha256": "e16b5bde3b4ea36b70e68e17a88a2f90608da1e9b901bae780c280a6d5ae997c"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/RecentUnrest.java": {
+      "sha256": "e53cbe8d153e7b7f6d9d0e460c9bdf748b59424bb0e44b80d4a1debd10a0e3a7"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/DecivilizedSubpop.java": {
+      "sha256": "580137aa1e51a5e111df4f33687a4bec71b7c0479fee7e441015bab15eb4496b"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/Pollution.java": {
+      "sha256": "3755afbfe99ac1038b7717bcd01f4b766776f711bbf75eb0891da6b982023e53"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/ResourceDepositsCondition.java": {
+      "sha256": "e3c4ab552acf873b6ae03b5394de47017a98858a815a26083a6c322aaf1d8daa"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/Market.java": {
+      "sha256": "8ca0c019abc8543a80fa63c3826b3ac1f766af3dbc35875161842306378aa945"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/CommodityOnMarket.java": {
+      "sha256": "333e58f37a1c7d508d766304ad64e759174b52dafa3fd205cf15efd9da371346"
+    },
+    "core:data/campaign/industries.csv": {
+      "sha256": "dce37cbd88bb844194259fa597da42fa36f15ec26897e1de0202650765ce3656"
+    },
+    "core:data/campaign/market_conditions.csv": {
+      "sha256": "27329b3dce8082125c6338a62c7fe6cef5cf00ed7f1b531504d4686ffd14abab"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/LightIndustry.java": {
+      "sha256": "d7765951d3445c54781e7c3b1b70975968428236fd1f73992367820fd608d8b0"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/Refining.java": {
+      "sha256": "13b2bd803fdb1b26f8e40aad3ffc9378ad45510ac66d759918167c33fe922dab"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/HeavyIndustry.java": {
+      "sha256": "aeb1dfd8b037c0b01f82c437fcbab8880dea5cc59c5eeff5151ac89badaaeedb"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/FuelProduction.java": {
+      "sha256": "b713f15532bfa20b6852320a7e15fee4b5deaad900fd8c40d01348e4d8513c84"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/ItemEffectsRepo.java": {
+      "sha256": "2d845c39865f81604b439af70d657ec9ca8d86fc877232e3ca7aadb6ccd719a9"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/BoostIndustryInstallableItemEffect.java": {
+      "sha256": "95ebd06dc8baf9920c83f71acd8efb7fb8ca93b038d27466df216ed9d788cc42"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/BaseInstallableItemEffect.java": {
+      "sha256": "955972ca614de7e153af069382780e176b2e87fe3c800f01b7282f286ac285ea"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/combat/MutableStat.java": {
+      "sha256": "a584da937e50822808fb80367183d8bd5b7ded64600b8b78aebbc8ec4cc03f21"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/combat/StatBonus.java": {
+      "sha256": "1b0f272d231f28c737bfc7c6c70bfa00d0d2c9bb6af2c41b2bfa9b5c89028ea0"
+    },
+    "core:data/campaign/special_items.csv": {
+      "sha256": "c68e42eca0b1efe0367a2452014d586cfee52b1916bb707044e4adc6449779f8"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/TradeCenter.java": {
+      "sha256": "3d4ad34895a0032f38abd054f82d266b9ceb56a5c56fcd219dfcf93b2bc8bc6e"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/TechMining.java": {
+      "sha256": "440dd120956f8384803d96c2880c7a8961cd548a7175630c546a86ce35ba7d77"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/LionsGuardHQ.java": {
+      "sha256": "92abbd80a00a7144cf7014bf8e1d6bf367ee2f535a868869e2f4f31e156cac27"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/Cryosanctum.java": {
+      "sha256": "cfd8352405b52ff45b333a9577d02a9eba000618deb5573daf10e5806e479b9d"
+    },
+    "core:starfarer.api.jar": {
+      "sha256": "0798e624c949657ab524188928bb13d618a70cb451dc7da9789545569a05081b"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/CoreLifecyclePluginImpl.java": {
+      "sha256": "ca7384b9f6a8ff9b82faf4df9e1e896ce0e3222c721bd68712146c1130070898"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/util/Misc.java": {
+      "sha256": "067e4d2664eca98929e9e46ba8ada8468769c19dcd12cce8c8a3c730e14d2ffb"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/BaseMarketConditionPlugin.java": {
+      "sha256": "c7169992955cee310d926ebaba85306ba6952a79eaed7059e7244e599a6c97ba"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/Farming.java": {
+      "sha256": "5768e658316ed3eee708cd77fcc12b147c9168f7ac7b3a4e73c03edd4228f452"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/Mining.java": {
+      "sha256": "b1c4d5140c512cc5a8c4022ea31bc8a14308e8517639f2cf8a1478a0907380e0"
+    },
+    "core:data/config/settings.json": {
+      "sha256": "96f3f6aa457e85ab6480bf302e35d3e8df390339321711b982d45fbe71c4dfa9"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/loading/specs/H.java": {
+      "sha256": "2a7fbdfc276ecd7eccce22a2209d36b9f9f0d28bb80bc5b55bdee8de4b3fb8c4"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/loading/SpecStore.java": {
+      "sha256": "23151e3c6f2e01762982baa962d16349db1dd320f9050bf66ee53b51fed9d003"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/loading/while.java": {
+      "sha256": "bd53adc9437f56af32db1971d688c9b4445ae72a402b817c088cfd4aa631431c"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/reach/CommodityMarketData.java": {
+      "sha256": "75b5add5888acd526900253da248725d8bb5b2eeef20f8fa4a6f818fad4e9a93"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/reach/MarketShareData.java": {
+      "sha256": "be1c514ce3432873b9121f6ba5901ff62f9f3f00cd1c7d361dea92e211e1d5ab"
+    },
+    "core:data/campaign/commodities.csv": {
+      "sha256": "94e3b32f1176c775a56b4b37ae32ba597d60cf61aad5cc3c51f907123c904842"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/population/CoreImmigrationPluginImpl.java": {
+      "sha256": "99d558a6f7802c085524b3c27eca165ff2b827f3f4baf47469dcd0b2b96ab57e"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/population/PopulationComposition.java": {
+      "sha256": "a78c9a3e34009e79fc4a000f47cc6326fba7045043de2be4782e8de15ff0f3f2"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/procgen/ConditionGenDataSpec.java": {
+      "sha256": "e22a245493637bb3cad745334d1985d1416bf80cbd782b4a0573c4ffe6f8001d"
+    },
+    "core:lwjgl_util.jar": {
+      "sha256": "6f4a261384e1688a3359420efce5275c8693b822a8c6eaa1e20d5cc126a51571"
+    },
+    "core:data/campaign/procgen/condition_gen_data.csv": {
+      "sha256": "2bdca93201f5126b620d7c134d9f1c2789d5ef274f14e9f5430a57a7f863220f"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/MarketCondition.java": {
+      "sha256": "2dfd2d3a12d8fccee54d2f0b84a4779588b7f1c8390ce724ed62c6ee91f69f68"
+    }
+  },
+  "settings": {
+    "immigrationPerHazard": 0.05,
+    "immigrationHazardMultExtraPerColonySizeAbove3": 0.5,
+    "immigrationIncentiveCostPerPoint": 1000,
+    "immigrationIncentivePointsAboveHazardPenalty": 5,
+    "maxColonySize": 6,
+    "accessibilityPerUnitShipping": 0.1,
+    "unitsPerLightYear": 2000,
+    "GROWTH_NO_INDUSTRIES": 0.01,
+    "MIN_GROWTH": 3,
+    "MAX_GROWTH": 10,
+    "MAX_DAYS": 365
+  }
+}

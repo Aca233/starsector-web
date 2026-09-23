@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 1,
+  "originalReference": "Starsector 0.98a-RC8",
+  "scope": "administrator-identity-and-saved-skill-order-only",
+  "sources": {
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/econ/Market.java": {
+      "sha256": "8ca0c019abc8543a80fa63c3826b3ac1f766af3dbc35875161842306378aa945"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/rpg/Person.java": {
+      "sha256": "6aca8cd6f3e75f3c8776184db6c10743b998cc38b0f54369161258fc801df555"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/CharacterStats.java": {
+      "sha256": "3ee51840820aefd8422864d66e969add1729a0545c85b1ae9a58ea2dfa9b3962"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/CampaignEngine.java": {
+      "sha256": "5d3916a830fcef1a28bf51f78d229987bfaf47fe0ca897aa4ab34e30ec186267"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/PlayerCharacterData.java": {
+      "sha256": "b9926cf338d986f9c458d00955eb81a3e8fc437ef9dba8c0051b7ae716474194"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/save/CampaignGameManager.java": {
+      "sha256": "8ebf0c86c896768c7bd4d124fba4b2005e2f185bcf0e2ad377b355995836ddc5"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/util/DynamicStats.java": {
+      "sha256": "377515f6b8ac988cb1d3f3205c6ec306c320645ba4e1cd1aff85f20e02ef2211"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/CommDirectory.java": {
+      "sha256": "d1aad21d7715a54c0902d78e335c115e5f93bb0646464721171c3643fae2f4b7"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/CommDirectoryEntry.java": {
+      "sha256": "1c76c01f52c5b6aefe69c7dd7c0d5fa85193830c4ec5be72a44c76ee85675160"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/characters/AdminData.java": {
+      "sha256": "9ded424305602582e9a0eb29a51f1bc34ea19ac54bff0e7696b72de55ce1361e"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/characters/FullName.java": {
+      "sha256": "35b081b360bf7ed4fce23c3cb21c1d4567c2240eb42f729a1fca7d9439d61cce"
+    },
+    "starsector-core/json.jar": {
+      "sha256": "63c3541f323f3dfdd595da9257a2099b6a6c39f35a6b3909d86c48a8aa456911"
+    },
+    "jre/release": {
+      "sha256": "98fb9db20009c5c6a9a0e771e431c267c2fdd6eb0f262bbe24de802035c5cb49"
+    },
+    "starsector-core/data/config/settings.json": {
+      "sha256": "96f3f6aa457e85ab6480bf302e35d3e8df390339321711b982d45fbe71c4dfa9"
+    },
+    "starsector-web/src/campaign/data/reference-governed-skills.json": {
+      "sha256": "82f16285464fe0ef04c0ddfc21cc8d13f7ec5cfc59fd68535c2e7ab51c076189"
+    }
+  },
+  "defaultPortrait": "graphics/portraits/portrait_generic_grayscale.png",
+  "javaVersion": "17.0.10",
+  "bucketBounds": [
+    {
+      "capacity": 16,
+      "max": 7
+    },
+    {
+      "capacity": 32,
+      "max": 5
+    },
+    {
+      "capacity": 64,
+      "max": 3
+    },
+    {
+      "capacity": 128,
+      "max": 2
+    }
+  ],
+  "knownSkillIds": [
+    "aptitude_combat",
+    "aptitude_industry",
+    "aptitude_leadership",
+    "aptitude_technology",
+    "automated_ships",
+    "auxiliary_support",
+    "ballistic_mastery",
+    "best_of_the_best",
+    "bulk_transport",
+    "carrier_group",
+    "colony_management",
+    "combat_endurance",
+    "containment_procedures",
+    "coordinated_maneuvers",
+    "crew_training",
+    "cybernetic_augmentation",
+    "damage_control",
+    "derelict_contingent",
+    "electronic_warfare",
+    "energy_weapon_mastery",
+    "field_modulation",
+    "field_repairs",
+    "fighter_uplink",
+    "flux_regulation",
+    "force_concentration",
+    "gunnery_implants",
+    "helmsmanship",
+    "hull_restoration",
+    "hypercognition",
+    "impact_mitigation",
+    "industrial_planning",
+    "makeshift_equipment",
+    "missile_specialization",
+    "navigation",
+    "neural_link",
+    "officer_management",
+    "officer_training",
+    "omega_ecm",
+    "ordnance_expert",
+    "phase_corps",
+    "phase_mastery",
+    "planetary_operations",
+    "point_defense",
+    "polarized_armor",
+    "ranged_specialization",
+    "reliability_engineering",
+    "salvaging",
+    "sensors",
+    "shield_modulation",
+    "space_operations",
+    "special_modifications",
+    "strike_commander",
+    "support_doctrine",
+    "systems_expertise",
+    "tactical_drills",
+    "target_analysis",
+    "weapon_drills",
+    "wolfpack_tactics"
+  ]
+}

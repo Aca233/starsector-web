@@ -1,3 +1,5 @@
+import { isImmutableMetadata } from '../../extensions/Immutable';
+import { FireControlQueryBatch } from '../../ai/FireControlQueryBatch';
 import { initializeSourceMissile } from './weapon/SourceMissileLifecycle';
 import { effectiveHullModWeaponSpec } from '../../extensions/HullMods';
 import { AutofireController, type FireControlWorld } from '../../ai/AutofireController';
@@ -8,10 +10,10 @@ import { bindProjectileSource } from './weapon/OutgoingDamage';
 import { canPermanentlyDisableWeapon, finalizePermanentWeaponMalfunction, weaponIsInFiringCycle } from './ComponentMalfunctions';
 import { advanceWeaponComponent, createWeaponHealthTracker, damageWeaponComponent, disableWeaponComponent, weaponHealthProfile } from './weapon/WeaponComponentHealth';
 import { Vector2 } from '../../math/Vector2';
-import { Projectile, Beam, WeaponMount, WeaponGroup, LauncherSmokeSpec, MuzzleFlashSpec } from '../Weapon';
+import { Projectile, Beam, WeaponMount, WeaponSpec, WeaponGroup, LauncherSmokeSpec, MuzzleFlashSpec } from '../Weapon';
 import { ShipSpec } from '../../modding/ModManager';
 import { initializeSourceProjectile } from './weapon/SourceProjectileLifecycle';
-import { sound } from '../../audio/SoundManager';
+import { combatAudio as sound } from '../../audio/CombatAudioEvents';
 import type { Ship } from '../Ship';
 import { contentRegistry } from '../../content/ContentRegistry';
 import { SimulationRandom } from '../SimulationRandom';
@@ -22,6 +24,22 @@ import { SimulationRandom } from '../SimulationRandom';
  */
 export class ShipWeaponControlSystem {
   private readonly autofire = new AutofireController();
+  public static hasNativeQueryLoop(control: ShipWeaponControlSystem): boolean {
+    // Mount specs are mutable by design; do not freeze/refit them for this cache.
+    // Reject accessors and unregistered nested metadata instead of assuming purity.
+    for (const mount of control.weapons) {
+      const spec = Object.getOwnPropertyDescriptor(mount, 'spec')?.value as WeaponSpec | undefined;
+      if (!spec) return false;
+      for (const key of Object.getOwnPropertyNames(spec)) {
+        const d = Object.getOwnPropertyDescriptor(spec, key)!;
+        if (!('value' in d) || typeof d.value === 'function'
+          || d.value && typeof d.value === 'object' && !isImmutableMetadata(d.value)) return false;
+      }
+    }
+    const ai = control.autofire;
+    return Object.getPrototypeOf(ai) === AutofireController.prototype
+      && nativeAutofireReaders.every(([key, value]) => ai[key] === value);
+  }
   private previousHullFacingRad = 0;
   public weapons: WeaponMount[] = [];
   public weaponGroups: WeaponGroup[] = [];
@@ -270,113 +288,118 @@ export class ShipWeaponControlSystem {
 
     const manualSlots = manualFireSlots(ship, this.weapons, activeSlotSet, alternatingSlotId);
     const fireRequests = new Set<string>();
-    for (const mount of this.weapons) {
-      mount.triggerHeld = false;
-      if (mount.isDisabled) {
-        this.autofire.clear(mount);
-        // 故障挂点电机失灵无法旋转瞄准，射控电路短路无法击发
-        mount.burstRemaining = 0;
-        mount.burstFluxReserved = false;
-        mount.firingState = 'IDLE';
-        mount.firingStateTimer = 0;
-        continue;
-      }
-
-      const isInActiveGroup = activeSlotSet.has(mount.slotId);
-      const isAutofireSlot = autofireGroupMap.has(mount.slotId);
-
-      const mountOffset = new Vector2(mount.relativePos.x, mount.relativePos.y).rotate(ship.facingRad);
-      const mountX = ship.pos.x + mountOffset.x;
-      const mountY = ship.pos.y + mountOffset.y;
-      const mountBaseWorldAngle = ship.facingRad + (mount.baseAngleDeg * Math.PI) / 180;
-      const halfArcRad = (mount.arcDeg * Math.PI) / 360;
-
-      // 硬挂点或固定主炮不可独立转动 (对齐 Starsector: if.java:781)
-      const isHardpoint = mount.mountType === 'HARDPOINT' || (mount.spec.turnRateDegPerSec !== undefined && mount.spec.turnRateDegPerSec <= 0);
-      const turretTurnRateRad = isHardpoint ? 0 : (((mount.spec.turnRateDegPerSec ?? 30) * Math.PI) / 180);
-
-      // 官方炮塔瞄准算法 (com.fs.starfarer.combat.entities.ship.trackers.oooo_0.java:106-171)
-      const aimTurret = (targetPoint: Vector2 | null): void => {
-        if (isHardpoint || turretTurnRateRad <= 0) {
-          mount.currentAngleRad = mountBaseWorldAngle;
-          return;
+    const queryBatch = FireControlQueryBatch.create(ship, world);
+    const aimWorld = queryBatch ? { ...world, queryBatch } : world;
+    try {
+      for (const mount of this.weapons) {
+        mount.triggerHeld = false;
+        if (mount.isDisabled) {
+          this.autofire.clear(mount);
+          // 故障挂点电机失灵无法旋转瞄准，射控电路短路无法击发
+          mount.burstRemaining = 0;
+          mount.burstFluxReserved = false;
+          mount.firingState = 'IDLE';
+          mount.firingStateTimer = 0;
+          continue;
         }
 
-        if (!targetPoint) {
-          mount.aimIdleSeconds = (mount.aimIdleSeconds ?? 15.1) + dt;
-          if (mount.aimIdleSeconds > 15) mount.currentAngleRad = advanceTurretAim(mount.currentAngleRad,mountBaseWorldAngle,mountBaseWorldAngle,mount.arcDeg,turretTurnRateRad,ship.angularVelRad,dt);
-          return;
-        }
+        const isInActiveGroup = activeSlotSet.has(mount.slotId);
+        const isAutofireSlot = autofireGroupMap.has(mount.slotId);
 
-        mount.aimIdleSeconds = 0;
-        // 1. 各挂点独立计算朝向目标的世界角度 (从该挂点实际世界坐标计算，避免舰体视差)
-        const dx = targetPoint.x - mountX;
-        const dy = targetPoint.y - mountY;
-        const targetAngle = Math.atan2(dy, dx);
+        const mountOffset = new Vector2(mount.relativePos.x, mount.relativePos.y).rotate(ship.facingRad);
+        const mountX = ship.pos.x + mountOffset.x;
+        const mountY = ship.pos.y + mountOffset.y;
+        const mountBaseWorldAngle = ship.facingRad + (mount.baseAngleDeg * Math.PI) / 180;
+        const halfArcRad = (mount.arcDeg * Math.PI) / 360;
 
-        // 2. 官方射界判定与边界吸附 (Starsector: trackers/oooo_0.java:162-171)
-        let diffFromBase = targetAngle - mountBaseWorldAngle;
-        while (diffFromBase > Math.PI) diffFromBase -= Math.PI * 2;
-        while (diffFromBase < -Math.PI) diffFromBase += Math.PI * 2;
+        // 硬挂点或固定主炮不可独立转动 (对齐 Starsector: if.java:781)
+        const isHardpoint = mount.mountType === 'HARDPOINT' || (mount.spec.turnRateDegPerSec !== undefined && mount.spec.turnRateDegPerSec <= 0);
+        const turretTurnRateRad = isHardpoint ? 0 : (((mount.spec.turnRateDegPerSec ?? 30) * Math.PI) / 180);
 
-        const isWithinArc = mount.arcDeg >= 360 || Math.abs(diffFromBase) <= halfArcRad;
-        let desiredAngle = targetAngle;
-        if (!isWithinArc) {
-          // 原版机制：光标超出射界时，炮塔紧贴射界边缘指向光标，绝不倒转回中！
-          desiredAngle = mountBaseWorldAngle + Math.sign(diffFromBase) * halfArcRad;
-        }
+        // 官方炮塔瞄准算法 (com.fs.starfarer.combat.entities.ship.trackers.oooo_0.java:106-171)
+        const aimTurret = (targetPoint: Vector2 | null): void => {
+          if (isHardpoint || turretTurnRateRad <= 0) {
+            mount.currentAngleRad = mountBaseWorldAngle;
+            return;
+          }
 
-        mount.currentAngleRad = advanceTurretAim(mount.currentAngleRad,mountBaseWorldAngle,desiredAngle,mount.arcDeg,turretTurnRateRad,ship.angularVelRad,dt);
+          if (!targetPoint) {
+            mount.aimIdleSeconds = (mount.aimIdleSeconds ?? 15.1) + dt;
+            if (mount.aimIdleSeconds > 15) mount.currentAngleRad = advanceTurretAim(mount.currentAngleRad,mountBaseWorldAngle,mountBaseWorldAngle,mount.arcDeg,turretTurnRateRad,ship.angularVelRad,dt);
+            return;
+          }
 
-      };
+          mount.aimIdleSeconds = 0;
+          // 1. 各挂点独立计算朝向目标的世界角度 (从该挂点实际世界坐标计算，避免舰体视差)
+          const dx = targetPoint.x - mountX;
+          const dy = targetPoint.y - mountY;
+          const targetAngle = Math.atan2(dy, dx);
 
-      // 1. 当前选中的主力武器编组 (Active Group - 玩家手动瞄准与击发，绝对优先级)
-      if (manualControl && isInActiveGroup) {
-        this.autofire.clear(mount);
-        if (isHardpoint) {
-          mount.currentAngleRad = mountBaseWorldAngle;
-        } else {
-          aimTurret(ship.aimTargetWorld);
-        }
+          // 2. 官方射界判定与边界吸附 (Starsector: trackers/oooo_0.java:162-171)
+          let diffFromBase = targetAngle - mountBaseWorldAngle;
+          while (diffFromBase > Math.PI) diffFromBase -= Math.PI * 2;
+          while (diffFromBase < -Math.PI) diffFromBase += Math.PI * 2;
 
-        // Manual fire follows the group selection rule, not an invented alignment tolerance.
-        if (ship.isFiringMain && canShipFire && mount.cooldownTimer <= 0 && !mount.spec.isBeam
-          && (mount.firingState === 'CHARGING' || mount.burstRemaining > 0)) fireRequests.add(mount.slotId);
-        if (ship.isFiringMain && canShipFire && mount.cooldownTimer <= 0 && manualSlots.has(mount.slotId)) {
-          if (activeGroup.mode === 'LINKED') {
-            fireRequests.add(mount.slotId);
-          } else if (activeGroup.mode === 'ALTERNATING') {
-            // 原版交替模式：本帧只把开火指令发给当前活动挂点，其余挂点禁止击发。
-            // 活动权由 advanceAlternatingActive 按时间片轮换，因此两门炮会错开半个周期。
-            if (mount.slotId === alternatingSlotId) {
+          const isWithinArc = mount.arcDeg >= 360 || Math.abs(diffFromBase) <= halfArcRad;
+          let desiredAngle = targetAngle;
+          if (!isWithinArc) {
+            // 原版机制：光标超出射界时，炮塔紧贴射界边缘指向光标，绝不倒转回中！
+            desiredAngle = mountBaseWorldAngle + Math.sign(diffFromBase) * halfArcRad;
+          }
+
+          mount.currentAngleRad = advanceTurretAim(mount.currentAngleRad,mountBaseWorldAngle,desiredAngle,mount.arcDeg,turretTurnRateRad,ship.angularVelRad,dt);
+
+        };
+
+        // 1. 当前选中的主力武器编组 (Active Group - 玩家手动瞄准与击发，绝对优先级)
+        if (manualControl && isInActiveGroup) {
+          this.autofire.clear(mount);
+          if (isHardpoint) {
+            mount.currentAngleRad = mountBaseWorldAngle;
+          } else {
+            aimTurret(ship.aimTargetWorld);
+          }
+
+          // Manual fire follows the group selection rule, not an invented alignment tolerance.
+          if (ship.isFiringMain && canShipFire && mount.cooldownTimer <= 0 && !mount.spec.isBeam
+            && (mount.firingState === 'CHARGING' || mount.burstRemaining > 0)) fireRequests.add(mount.slotId);
+          if (ship.isFiringMain && canShipFire && mount.cooldownTimer <= 0 && manualSlots.has(mount.slotId)) {
+            if (activeGroup.mode === 'LINKED') {
               fireRequests.add(mount.slotId);
+            } else if (activeGroup.mode === 'ALTERNATING') {
+              // 原版交替模式：本帧只把开火指令发给当前活动挂点，其余挂点禁止击发。
+              // 活动权由 advanceAlternatingActive 按时间片轮换，因此两门炮会错开半个周期。
+              if (mount.slotId === alternatingSlotId) {
+                fireRequests.add(mount.slotId);
+              }
             }
           }
         }
-      }
-      // Aim/safety are per mount; the group scheduler gates new automatic firing cycles below.
-      // AI owns all mounts; a manual pilot owns the selected group and opts others into autofire.
-      else if (!manualControl || isAutofireSlot) {
-        const solution = this.autofire.aim(dt, ship, mount, world);
-        aimTurret(solution?.point ?? this.autofire.preAim(ship, mount, world));
-        if (this.autofire.decide(ship, mount, solution, world, dt) === 'FIRE' && canShipFire && mount.cooldownTimer <= 0) {
-          fireRequests.add(mount.slotId);
+        // Aim/safety are per mount; the group scheduler gates new automatic firing cycles below.
+        // AI owns all mounts; a manual pilot owns the selected group and opts others into autofire.
+        else if (!manualControl || isAutofireSlot) {
+          const solution = this.autofire.aim(dt, ship, mount, aimWorld);
+          aimTurret(solution?.point ?? this.autofire.preAim(ship, mount, aimWorld));
+          if (this.autofire.decide(ship, mount, solution, aimWorld, dt) === 'FIRE' && canShipFire && mount.cooldownTimer <= 0) {
+            fireRequests.add(mount.slotId);
+          }
         }
-      }
-      // 3. 其余未激活且非自动开火挂点 (Inactive Manual Weapons: Starsector WeaponGroup.java:334)
-      else {
-        this.autofire.clear(mount);
-        const idleTargetAngle = Math.atan2(ship.aimTargetWorld.y-mountY,ship.aimTargetWorld.x-mountX);
-        const cursorNearArc = Math.abs(signedAngle(idleTargetAngle-mountBaseWorldAngle)) <= (mount.arcDeg+30)*Math.PI/360;
-        // Native inactive manual turrets receive the cursor only near their arc.
-        if (ship.isPlayer && !isHardpoint && (cursorNearArc || mount.spec.alwaysFire)) {
-          aimTurret(ship.aimTargetWorld);
-        } else {
-          aimTurret(null);
+        // 3. 其余未激活且非自动开火挂点 (Inactive Manual Weapons: Starsector WeaponGroup.java:334)
+        else {
+          this.autofire.clear(mount);
+          const idleTargetAngle = Math.atan2(ship.aimTargetWorld.y-mountY,ship.aimTargetWorld.x-mountX);
+          const cursorNearArc = Math.abs(signedAngle(idleTargetAngle-mountBaseWorldAngle)) <= (mount.arcDeg+30)*Math.PI/360;
+          // Native inactive manual turrets receive the cursor only near their arc.
+          if (ship.isPlayer && !isHardpoint && (cursorNearArc || mount.spec.alwaysFire)) {
+            aimTurret(ship.aimTargetWorld);
+          } else {
+            aimTurret(null);
+          }
         }
+
       }
 
-    }
+    } finally { queryBatch?.close(); }
 
     // Resolve every mount before choosing an automatic group member: an out-of-arc,
     // empty or obstructed first gun must not starve the rest of the group.
@@ -1053,3 +1076,6 @@ export class ShipWeaponControlSystem {
     return true;
   }
 }
+
+const nativeAutofireReaders = (['aim', 'preAim', 'decide', 'hasFluxBudget'] as const)
+  .map(key => [key, AutofireController.prototype[key]] as const);

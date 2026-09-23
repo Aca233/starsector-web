@@ -106,6 +106,7 @@ export class SnapshotPrepareBroker {
       for (const result of message.results) {
         const r = this.records.get(result.key);
         if (!r || r.epoch !== result.epoch || result.stale) { this.metrics.stale++; continue; }
+        if (typeof result.matchId !== 'string' || !result.matchId.length || result.matchId.length > 128 || !Number.isSafeInteger(result.tick) || result.tick < 0) throw Error('Invalid preparation motion metadata');
         if (this.deliver(r.owner, { ...result, prepared: { ...result.prepared, payload: Buffer.from(result.prepared.payload) } })) {
           accepted.push(r.key); this.metrics.accepted++;
         }

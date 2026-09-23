@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { Ship } from '../../engine/simulation/Ship';
+import type { MapFlagship } from '../../engine/runtime/TacticalMapView';
 import { i18n } from '../../engine/i18n/LocalizationManager';
 import { shipLocalToSpritePixel } from '../../engine/render/ShipDamageVisuals';
 import { getCachedImage } from '../hud/hudUtils';
@@ -7,12 +7,15 @@ import { HudMeter } from '../hud/HudMeter';
 import { NativeBitmapText } from '../NativeBitmapText';
 
 /** Fixed, bow-up cyan silhouette with live armor cells, hull and CR. No rotating portrait. */
-export function TacticalShipStatus({ ship }: { ship: Ship }) {
+export function TacticalShipStatus({ ship, readShip }: { ship: MapFlagship; readShip: () => MapFlagship }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const live = useRef(readShip);
+  useEffect(() => { live.current = readShip; }, [readShip]);
   useEffect(() => {
     const canvas=ref.current,ctx=canvas?.getContext('2d');if(!canvas||!ctx)return;
     let frame=0,last=-100;
     const draw=(time:number)=>{
+      const ship = live.current();
       if(time-last>66){last=time;ctx.clearRect(0,0,190,166);
         const image=getCachedImage(ship.spec.spriteUrl);
         if(image.complete&&image.naturalWidth){
@@ -21,8 +24,8 @@ export function TacticalShipStatus({ ship }: { ship: Ship }) {
           ctx.drawImage(image,x,y,w,h);ctx.globalCompositeOperation='source-in';ctx.fillStyle='#287a92';ctx.fillRect(0,0,190,166);
           ctx.globalCompositeOperation='source-atop';
           for(let r=0;r<ship.armor.rows;r++)for(let c=0;c<ship.armor.cols;c++){
-            const p=shipLocalToSpritePixel(ship.spec,ship.armor.getCellCenterLocal(c,r));
-            const ratio=Math.max(0,Math.min(1,ship.armor.getCell(c,r)/ship.armor.maxCellArmor));
+            const p=shipLocalToSpritePixel(ship.spec,{ x: ship.armor.minX + (c + .5) * ship.armor.cellWidth, y: ship.armor.minY + (r + .5) * ship.armor.cellHeight });
+            const ratio=Math.max(0,Math.min(1,ship.armor.cells[r * ship.armor.cols + c]/ship.armor.maxCellArmor));
             const cw=ship.armor.cellHeight*scale,ch=ship.armor.cellWidth*scale;
             ctx.fillStyle=ratio>.75?'rgba(54,197,201,.44)':ratio>.25?'rgba(225,175,53,.85)':ratio>.03?'rgba(208,83,20,.9)':'rgba(0,2,5,.95)';
             ctx.fillRect(x+p.x*scale-cw/2,y+p.y*scale-ch/2,cw-.6,ch-.6);
@@ -36,7 +39,7 @@ export function TacticalShipStatus({ ship }: { ship: Ship }) {
         }
       }frame=requestAnimationFrame(draw);
     };frame=requestAnimationFrame(draw);return()=>cancelAnimationFrame(frame);
-  },[ship]);
+  },[]);
   const value=(text:string)=><NativeBitmapText font="caption" color="currentColor">{text}</NativeBitmapText>;
   return <aside className="tactical-ship-status" aria-label="旗舰状态">
     <div className="tactical-status-meter"><span>幅能</span><HudMeter label="旗舰幅能" value={ship.flux.fluxPercent} minimum={ship.flux.hardFlux/ship.flux.maxFlux} width={80} /><b>{value(String(Math.round(ship.flux.totalFlux)))}</b></div>

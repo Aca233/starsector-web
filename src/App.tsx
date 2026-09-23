@@ -1,6 +1,5 @@
 import { steamRequest } from "./network/SteamApi";
-import { lazy, Suspense, useEffect, useState } from "react";
-import { preloadNativeUIFonts } from "./ui/native-fonts";
+import { lazy, Suspense, useState } from "react";
 import { NativeHome } from "./studio/NativeHome";
 import { pushStudioLocation, type StudioPage } from "./studio/StudioNavigation";
 import "./studio/studio.css";
@@ -11,7 +10,6 @@ const CombatView = lazy(() => import("./CombatView"));
 const dedicatedWeb = import.meta.env.VITE_SERVER_AUTHORITY === "true";
 const staticHosted = import.meta.env.VITE_STATIC_HOST === "github-pages";
 export function App() {
-  useEffect(() => { preloadNativeUIFonts(); }, []);
   const [view] = useState(() => new URLSearchParams(window.location.search).get("view"));
   const [studioRequested, setStudioRequested] = useState(view === "catalog" || view === "skills" || view === "design");
   const [entryError, setEntryError] = useState("");

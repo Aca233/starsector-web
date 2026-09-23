@@ -10,9 +10,11 @@ import { runtimeAssetUrl } from '../engine/runtime/RuntimePaths';
 import { Button, ConfirmDialog, Modal, Notice, type Confirmation } from './core/UI';
 import { ConditionBar, Readout, ShipPreview } from './core/ShipPreview';
 
-interface Props { game: GameSession; onClose: () => void; onAction: (action: () => void) => void; actionError?: string | null; onClearError?: () => void }
-export function GameStatePanel({ game, onClose, onAction, actionError, onClearError }: Props) {
+interface Props { onCheckpointAction: (kind:'save'|'resume') => Promise<void>; game: GameSession; onClose: () => void; onAction: (action: () => void) => void; actionError?: string | null; onClearError?: () => void }
+export function GameStatePanel({ game, onClose, onAction, actionError, onClearError, onCheckpointAction }: Props) {
   const state = game.getSnapshot();
+  const checkpoint = game.combatCheckpointStatus;
+  const [confirmResume, setConfirmResume] = useState(false);
   const activeFleet = state.pendingCombat?.kind === 'fleet';
   const [firstWave,setFirstWave]=useState<string[]>([]);
   const [deploymentLimit,setDeploymentLimit]=useState(()=>battleTeamLimit(readBattleSize()));
@@ -45,6 +47,17 @@ export function GameStatePanel({ game, onClose, onAction, actionError, onClearEr
         <aside className="native-side">
           {(actionError || game.error) && <Notice tone="danger" onDismiss={onClearError}>{actionError || game.error}</Notice>}
           {game.saveStatus.state !== 'saved' && <Notice tone="warning">{game.saveStatus.message}</Notice>}
+          <h3>中场保存点 · Web 扩展</h3>
+          <p role="status">{checkpoint.message}</p>
+          <div className="ui-stack">
+            <Button size="sm" disabled={!game.canSaveCombatCheckpoint} onClick={() => { void onCheckpointAction('save'); }}>保存中场进度</Button>
+            <Button size="sm" disabled={!game.canResumeCombatCheckpoint} onClick={() => setConfirmResume(true)}>继续中场进度</Button>
+            {confirmResume && <>
+              <Notice tone="warning">将回到中场保存点，放弃此点之后未保存的战斗进度；恢复完成后保持暂停。舰队存档不会被另一场遭遇替换。</Notice>
+              <Button size="sm" disabled={!game.canResumeCombatCheckpoint} onClick={() => { setConfirmResume(false); void onCheckpointAction('resume'); }}>确认继续中场</Button>
+              <Button size="sm" onClick={() => setConfirmResume(false)}>取消继续</Button>
+            </>}
+          </div>
           {selected && <><h3>舰船状态</h3><ConditionBar label="结构完整度" value={selected.hullFraction} /><ConditionBar label="战备值 CR" value={selected.combatReadiness} kind="cr" />
             <Readout label="装配武器" value={`${selected.weapons.length} 门`} /><Readout label="战斗状态" value={selected.status === 'destroyed' ? '战沉' : activeFleet ? '出击中' : '待命'} />
             {!activeFleet && selected.status === 'ready' && <>
@@ -56,7 +69,7 @@ export function GameStatePanel({ game, onClose, onAction, actionError, onClearEr
             {activeFleet && <Button size="sm" onClick={() => onAction(() => game.restartCombat())}>从战前重新开始</Button>}
           </>}
           {state.outcomes.length > 0 && <><h3>最近战果</h3><div className="native-history">{ state.outcomes.slice(-5).reverse().map(outcome => <div key={outcome.encounterId}><strong className={outcome.victory ? '' : 'loss'}>{outcome.victory ? '胜利' : '失败'}</strong> · {outcome.kind === 'fleet' ? '舰队' : '沙盒'}<span style={{ float: 'right' }}>{outcome.duration.toFixed(1)} 秒</span></div>)}</div></>}
-          <p className="ui-caption" style={{ marginTop: 16 }}>刷新从战前检查点恢复，不保存战斗中途。沙盒不改变存档舰队；导出可另存为文件。</p>
+          <p className="ui-caption" style={{ marginTop: 16 }}>中场点需手动保存，显示保存成功后再关闭页面。同一浏览器、同一站点和代码版本可继续；清理站点数据会删除中场点。导出的 JSON 只含舰队战前/战后存档，不含中场日志。</p>
         </aside>
       </div>
       <input ref={importRef} type="file" accept=".json,application/json" hidden aria-label="选择存档文件" onChange={async event => {

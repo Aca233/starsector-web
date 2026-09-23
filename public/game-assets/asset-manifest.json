@@ -33806,5 +33806,47 @@
       "magFilter": "linear",
       "mipmap": false
     }
+  },
+  {
+    "id": "graphics/fx/ship_shadow_mask.png",
+    "path": "graphics/fx/ship_shadow_mask.png",
+    "type": "image",
+    "bytes": 809,
+    "hash": "733a102fae4e83afa0b15f4f7a9523a7774e6c1f5ba17e2452ff9d2f1cb7bbb4",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/warroom/ship_arrow.png",
+    "path": "graphics/warroom/ship_arrow.png",
+    "type": "image",
+    "bytes": 546,
+    "hash": "2c03e02a47165dc87f8497f9007fe7605cb0f21b6d9b161192bc881c144015b6",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
+  },
+  {
+    "id": "graphics/fx/particleline32ln.png",
+    "path": "graphics/fx/particleline32ln.png",
+    "type": "image",
+    "bytes": 189,
+    "hash": "7ab1d61861604c7d83a4d34e32b0420a01caa8b41591b081a17773edc39cefc6",
+    "group": "graphics",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": false
+    }
   }
 ]

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Ship } from '../../engine/simulation/Ship';
+import type { HudContact as Ship } from '../../engine/runtime/CombatHudView';
 import { Vector2 } from '../../engine/math/Vector2';
 import { HudMeter } from './HudMeter';
 import { updateHudMeter } from './hudUtils';

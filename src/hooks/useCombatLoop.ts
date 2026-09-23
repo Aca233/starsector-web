@@ -1,6 +1,6 @@
-import { applyPlayerControls, clientToCombatWorld } from '../engine/runtime/PlayerControls';
+import { clientToCombatWorld } from '../engine/runtime/PlayerControls';
 import { hasCombatInputFocus } from '../engine/runtime/CombatInputFocus';
-import { WeaponLoopAudio } from '../engine/audio/WeaponLoopAudio';
+
 import { syncSystemAudio } from '../engine/audio/SystemAudio';
 import { useEffect } from 'react';
 import { CombatSession } from '../engine/runtime/CombatSession';
@@ -22,18 +22,21 @@ export interface UseCombatLoopParams {
   visualScenarioController?: { tick: (dt: number) => boolean };
 }
 
-const weaponLoopAudio = new WeakMap<CombatSession, WeaponLoopAudio>();
+const weaponLoopAudio = new WeakMap<CombatSession, Set<string>>();
 
 export function syncCombatPresentationAudio(session: CombatSession, presentationReady: boolean): void {
-  const player = session.engine.playerShip;
+  const player = session.read.playerShip;
   let weaponAudio = weaponLoopAudio.get(session);
   if (!weaponAudio) {
-    weaponAudio = new WeaponLoopAudio();
+    weaponAudio = new Set<string>();
     weaponLoopAudio.set(session, weaponAudio);
   }
-  weaponAudio.sync(session.engine.ships, presentationReady && session.state === 'running' && !session.engine.battleResult, sound);
-  syncSystemAudio(player.allSystems, presentationReady && session.state === 'running' && !player.isDead && !session.engine.battleResult);
-  if (!presentationReady || session.state !== 'running' || session.engine.battleResult) {
+  const next = new Set(presentationReady && session.state === 'running' && !session.read.battleResult ? session.read.weaponAudioLoops : []);
+  for (const key of weaponAudio) if (!next.has(key)) sound.stopLoop(key);
+  for (const key of next) sound.startLoop(key, .7);
+  weaponLoopAudio.set(session, next);
+  syncSystemAudio(player.allSystems, presentationReady && session.state === 'running' && !player.isDead && !session.read.battleResult);
+  if (!presentationReady || session.state !== 'running' || session.read.battleResult) {
     sound.stopLoop('flux_flush_loop');
     return;
   }
@@ -67,35 +70,9 @@ export function useCombatLoop({
     });
     syncCombatPresentationAudio(session, session.isPresentationReady());
 
-    const updatePlayerControls = (fixedDt: number) => {
-      const engine = session.engine;
-      if (engine.battleResult || engine.playerShip.isDead || engine.playerShip.isRetreated) {
-        engine.playerShip.clearInput();
-        return;
-      }
-      if (isAutopilotRef.current) {
-        engine.updateShipAI(session.playerAI, fixedDt);
-        return;
-      }
-
-      engine.playerShip.fireControlMode = 'MANUAL';
-      engine.playerShip.defenseFacingRad = undefined;
-      engine.playerShip.aiHoldOffensiveFire = false;
-      engine.playerShip.tacticalAI = undefined;
-      if (engine.isTacticalMap || inputBlockedRef.current || !hasCombatInputFocus()) {
-        keysPressed.current = {}; isMouseDown.current = false; mouseAimActiveRef.current = false;
-        engine.playerShip.clearInput();
-        return;
-      }
-      const curCanvas = canvasRef.current;
-      if (!curCanvas) return;
-      const aim = clientToCombatWorld(mouseScreenPos.current, curCanvas, cameraPosRef.current, zoomRef.current);
-      applyPlayerControls(engine.playerShip, keysPressed.current, aim, isMouseDown.current, defaultMouseSteeringRef.current, mouseAimActiveRef.current);
-    };
-
     const gameLoop = (currentTimeMs: number) => {
       const nowSec = currentTimeMs / 1000;
-      const engine = session.engine;
+      const engine = session.read;
 
       if (session.isPresentationReady()) {
         session.scheduler.update(
@@ -103,7 +80,18 @@ export function useCombatLoop({
           (fixedDt) => {
             const handledByVisualLab = visualScenarioController?.tick(fixedDt) ?? false;
             if (!handledByVisualLab) {
-              return session.fixedUpdateScheduled(fixedDt, () => updatePlayerControls(fixedDt));
+              const blocked = engine.isTacticalMap || inputBlockedRef.current || !hasCombatInputFocus();
+              const livePilot = !engine.battleResult && !engine.playerShip.isDead && !engine.playerShip.isRetreated;
+              if (livePilot && !isAutopilotRef.current && blocked) {
+                keysPressed.current = {}; isMouseDown.current = false; mouseAimActiveRef.current = false;
+              }
+              const aim = livePilot && !isAutopilotRef.current && !blocked
+                ? clientToCombatWorld(mouseScreenPos.current, canvas, cameraPosRef.current, zoomRef.current) : { x: 0, y: 0 };
+              return session.fixedUpdateControlled(fixedDt, {
+                autopilot: isAutopilotRef.current, blocked, keys: keysPressed.current,
+                aim: [aim.x, aim.y], firing: isMouseDown.current,
+                mouseSteering: defaultMouseSteeringRef.current, pointerActive: mouseAimActiveRef.current
+              });
             }
           },
           (alpha) => {

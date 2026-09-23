@@ -6,7 +6,7 @@
  * 3. 过载 (Overload): 护盾受击导致总幅能超过容量时系统暴走，护盾熄灭、武器宕机、进入长达数秒的强制过载。
  * 4. 主动排散 (Vent): 玩家主动关盾全功率散热，散热速度加倍，但短时间内丧失防御与火控。
  */
-import { sound } from '../audio/SoundManager';
+import { combatAudio as sound } from '../audio/CombatAudioEvents';
 
 export type HullSize = 'FIGHTER' | 'FRIGATE' | 'DESTROYER' | 'CRUISER' | 'CAPITAL_SHIP';
 

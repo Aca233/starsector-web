@@ -13,9 +13,10 @@ import type { WeaponMount } from '../../simulation/Weapon';
 import type { ShipSpec } from '../../content/ShipSpec';
 import type { CombatEngine } from '../../simulation/CombatEngine';
 
-// Separate opt-in tier. The standalone Onslaught gate remains deliberately unchanged.
+// Shared audited tier for LAN and local hosts. The legacy Onslaught contract stays unchanged.
 // These systems' AI only requests activation; all event dispatch stays on the host.
-const systemIds = new Set(['NONE', 'BURN_DRIVE', 'AMMO_FEED']);
+const systemIds = new Set(['NONE', 'BURN_DRIVE', 'AMMO_FEED',
+    'FORTRESS_SHIELD', 'HIGH_ENERGY_FOCUS']);
 const nativeSystems = new Map(shipSystemDefinitions.all().map(d => [d, { ...d }]));
 const nativeMods = new Map(hullModDefinitions.all().map(d => [d, { ...d }]));
 const prototypes = new Map<object, { descriptors: [string, PropertyDescriptor][]; hooks: Set<string> }>([Ship, Shield, FluxTracker, ShipSystem, CapitalShipAI, ShipDefenseController]
@@ -156,7 +157,14 @@ export class LanOwnershipGate {
     }
     jobs(ais: CapitalShipAI[]): CapitalShipAI[] {
         const audit = phaseAudit();
-        return lanPhaseAIs(this.engine, ais).filter(ai => this.ownedShips.has(ai.ship) && !lanSerialReason(this.engine, ai, audit));
+        const jobs: CapitalShipAI[] = [];
+        // The ordered commit cannot cross an unaudited job's arbitrary side effects.
+        // Publishing work after that guaranteed serial barrier only wastes CPU/transfer.
+        for (const ai of lanPhaseAIs(this.engine, ais)) {
+            if (!this.ownedShips.has(ai.ship) || lanSerialReason(this.engine, ai, audit)) break;
+            jobs.push(ai);
+        }
+        return jobs;
     }
     /** Captures control, orders and prephase flags even if they produce the same fleet plan. */
     context(): string {

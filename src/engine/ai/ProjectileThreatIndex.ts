@@ -17,7 +17,7 @@ export class ProjectileThreatIndex {
   private readonly guided = new Map<string, number[]>();
   private readonly sourceLength: number;
 
-  constructor(private readonly source: readonly Projectile[]) {
+  constructor(private readonly source: readonly Projectile[], lifetimeOf = remainingProjectileLifetime) {
     this.sourceLength = source.length;
     for (let order = 0; order < source.length; order++) {
       const p = source[order];
@@ -28,7 +28,7 @@ export class ProjectileThreatIndex {
       }
       // Full remaining straight trajectory, independent of the assessed ship's
       // horizon. Unbounded/exceptional lifetimes cannot safely enter the tree.
-      const lifetime = remainingProjectileLifetime(p);
+      const lifetime = lifetimeOf(p);
       const x = p.pos.x, y = p.pos.y, endX = x + p.vel.x * lifetime, endY = y + p.vel.y * lifetime;
       const radius = Math.abs(p.radius) + Math.abs(p.proximityFuse?.range ?? 0);
       const pad = 1e-6 * Math.max(1, Math.abs(x), Math.abs(y), Math.abs(endX), Math.abs(endY), radius);

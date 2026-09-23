@@ -1,0 +1,209 @@
+{
+  "schemaVersion": 1,
+  "originalReference": "Starsector 0.98a-RC8",
+  "scope": "resource-industry-commodity-methods-only",
+  "sources": {
+    "starfarer.api/com/fs/starfarer/api/impl/campaign/econ/ResourceDepositsCondition.java": {
+      "sha256": "e3c4ab552acf873b6ae03b5394de47017a98858a815a26083a6c322aaf1d8daa"
+    },
+    "starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/BaseIndustry.java": {
+      "sha256": "bc3ff7aee903318926a532910fd6a1495ff3db3cfd7a1e345388d70bf718ace8"
+    },
+    "starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/Farming.java": {
+      "sha256": "5768e658316ed3eee708cd77fcc12b147c9168f7ac7b3a4e73c03edd4228f452"
+    },
+    "starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/Mining.java": {
+      "sha256": "b1c4d5140c512cc5a8c4022ea31bc8a14308e8517639f2cf8a1478a0907380e0"
+    },
+    "starfarer.api/com/fs/starfarer/api/combat/MutableStat.java": {
+      "sha256": "a584da937e50822808fb80367183d8bd5b7ded64600b8b78aebbc8ec4cc03f21"
+    },
+    "starfarer.api/com/fs/starfarer/api/combat/StatBonus.java": {
+      "sha256": "1b0f272d231f28c737bfc7c6c70bfa00d0d2c9bb6af2c41b2bfa9b5c89028ea0"
+    },
+    "starfarer_obf/com/fs/starfarer/campaign/econ/Market.java": {
+      "sha256": "8ca0c019abc8543a80fa63c3826b3ac1f766af3dbc35875161842306378aa945"
+    },
+    "starfarer_obf/com/fs/starfarer/campaign/econ/reach/MainWorkTask2.java": {
+      "sha256": "a5ef72fd328a8802545f6ab04cbc7133cee142ac22c36e62fc36769713268da6"
+    },
+    "starfarer_obf/com/fs/starfarer/campaign/econ/reach/UpdateMarketsAgainTask.java": {
+      "sha256": "538c04f9100ae6e657df53ffcd154fa87235c0d270d9ee42864825002701dd3d"
+    }
+  },
+  "settings": {
+    "SUPPLY_BONUS": 1,
+    "DEMAND_REDUCTION": 1,
+    "DEFAULT_IMPROVE_SUPPLY_BONUS": 1
+  },
+  "conditions": {
+    "ore_sparse": {
+      "commodityId": "ore",
+      "industryId": "mining",
+      "modifier": -1,
+      "baseModifier": 0,
+      "addMarketSize": true
+    },
+    "ore_moderate": {
+      "commodityId": "ore",
+      "industryId": "mining",
+      "modifier": 0,
+      "baseModifier": 0,
+      "addMarketSize": true
+    },
+    "ore_abundant": {
+      "commodityId": "ore",
+      "industryId": "mining",
+      "modifier": 1,
+      "baseModifier": 0,
+      "addMarketSize": true
+    },
+    "ore_rich": {
+      "commodityId": "ore",
+      "industryId": "mining",
+      "modifier": 2,
+      "baseModifier": 0,
+      "addMarketSize": true
+    },
+    "ore_ultrarich": {
+      "commodityId": "ore",
+      "industryId": "mining",
+      "modifier": 3,
+      "baseModifier": 0,
+      "addMarketSize": true
+    },
+    "rare_ore_sparse": {
+      "commodityId": "rare_ore",
+      "industryId": "mining",
+      "modifier": -1,
+      "baseModifier": -2,
+      "addMarketSize": true
+    },
+    "rare_ore_moderate": {
+      "commodityId": "rare_ore",
+      "industryId": "mining",
+      "modifier": 0,
+      "baseModifier": -2,
+      "addMarketSize": true
+    },
+    "rare_ore_abundant": {
+      "commodityId": "rare_ore",
+      "industryId": "mining",
+      "modifier": 1,
+      "baseModifier": -2,
+      "addMarketSize": true
+    },
+    "rare_ore_rich": {
+      "commodityId": "rare_ore",
+      "industryId": "mining",
+      "modifier": 2,
+      "baseModifier": -2,
+      "addMarketSize": true
+    },
+    "rare_ore_ultrarich": {
+      "commodityId": "rare_ore",
+      "industryId": "mining",
+      "modifier": 3,
+      "baseModifier": -2,
+      "addMarketSize": true
+    },
+    "organics_trace": {
+      "commodityId": "organics",
+      "industryId": "mining",
+      "modifier": -1,
+      "baseModifier": 0,
+      "addMarketSize": true
+    },
+    "organics_common": {
+      "commodityId": "organics",
+      "industryId": "mining",
+      "modifier": 0,
+      "baseModifier": 0,
+      "addMarketSize": true
+    },
+    "organics_abundant": {
+      "commodityId": "organics",
+      "industryId": "mining",
+      "modifier": 1,
+      "baseModifier": 0,
+      "addMarketSize": true
+    },
+    "organics_plentiful": {
+      "commodityId": "organics",
+      "industryId": "mining",
+      "modifier": 2,
+      "baseModifier": 0,
+      "addMarketSize": true
+    },
+    "volatiles_trace": {
+      "commodityId": "volatiles",
+      "industryId": "mining",
+      "modifier": -1,
+      "baseModifier": -2,
+      "addMarketSize": true
+    },
+    "volatiles_diffuse": {
+      "commodityId": "volatiles",
+      "industryId": "mining",
+      "modifier": 0,
+      "baseModifier": -2,
+      "addMarketSize": true
+    },
+    "volatiles_abundant": {
+      "commodityId": "volatiles",
+      "industryId": "mining",
+      "modifier": 1,
+      "baseModifier": -2,
+      "addMarketSize": true
+    },
+    "volatiles_plentiful": {
+      "commodityId": "volatiles",
+      "industryId": "mining",
+      "modifier": 2,
+      "baseModifier": -2,
+      "addMarketSize": true
+    },
+    "farmland_poor": {
+      "commodityId": "food",
+      "industryId": "farming",
+      "modifier": -1,
+      "baseModifier": 0,
+      "addMarketSize": true
+    },
+    "farmland_adequate": {
+      "commodityId": "food",
+      "industryId": "farming",
+      "modifier": 0,
+      "baseModifier": 0,
+      "addMarketSize": true
+    },
+    "farmland_rich": {
+      "commodityId": "food",
+      "industryId": "farming",
+      "modifier": 1,
+      "baseModifier": 0,
+      "addMarketSize": true
+    },
+    "farmland_bountiful": {
+      "commodityId": "food",
+      "industryId": "farming",
+      "modifier": 2,
+      "baseModifier": 0,
+      "addMarketSize": true
+    },
+    "volturnian_lobster_pens": {
+      "commodityId": "lobster",
+      "industryId": "farming",
+      "modifier": 1,
+      "baseModifier": 0,
+      "addMarketSize": false
+    },
+    "water_surface": {
+      "commodityId": "food",
+      "industryId": "farming",
+      "modifier": 0,
+      "baseModifier": 0,
+      "addMarketSize": true
+    }
+  }
+}

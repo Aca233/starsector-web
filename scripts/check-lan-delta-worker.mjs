@@ -43,3 +43,23 @@ test('Worker missing motion confirmation rejects a predicted delta without trans
  for(let seq=1;seq<=2;seq++){const frame=motionFrame();frame.tick+=seq;const c=s.prepare(lanDeltaTarget(motionBytes(frame,seq),seq));s.commit(c);f.receive(c.packet.buffer);if(seq===1)f.release();}
  assert.equal(f.closed,true);assert.equal(f.ws.sent.length,1);assert.equal(f.cells[3],0);assert.equal(f.messages.at(-1).type,'failed');
 });
+
+// Actual bundled I/O worker, not just the bridge policy object. Main-thread
+// messages deliberately stay queued: direct input and publication still work.
+test('I/O Worker authority port bypasses render queue without bypassing socket accounting',()=>{
+ const messages=[],wire=[],events=[],cells=new Int32Array(new SharedArrayBuffer(32));let socket,now=0;
+ class Socket{readyState=1;bufferedAmount=0;constructor(){socket=this;}send(data){wire.push(data);this.bufferedAmount+=typeof data==='string'?data.length:data.byteLength;}close(){this.readyState=3;}}
+ const sandbox={WebSocket:Socket,TextEncoder,TextDecoder,ArrayBuffer,Uint8Array,Int32Array,SharedArrayBuffer,Atomics,performance:{now:()=>now},setTimeout:()=>1,clearTimeout(){},close(){},postMessage:m=>messages.push(m)};
+ vm.runInNewContext(code,sandbox);const command=data=>sandbox.onmessage({data});
+ command({type:'init',shared:cells.buffer});command({type:'connect',url:'ws://private/lan/ws'});socket.onopen();
+ const port={onmessage:null,start(){},postMessage:m=>events.push(m),close(){}};command({type:'authority',port,matchId:'match',seq:0});
+ socket.onmessage({data:JSON.stringify({type:'launch',matchId:'match'})});
+ const pending=messages.length,bytes=cells[3];
+ socket.onmessage({data:JSON.stringify({type:'input',matchId:'match',seat:1,input:{seq:1}})});
+ assert.equal(events.at(-1).type,'input');assert.equal(messages.length,pending);assert.equal(cells[3],bytes);
+ const binary=encodeProjectedBinaryFrame({tick:1,ships:[]}).buffer;
+ port.onmessage({data:{type:'snapshot',tick:1,binary,bytes:binary.byteLength}});
+ assert.equal(decodeBinaryState(wire.at(-1)).frame.tick,1);assert.equal(cells[2],socket.bufferedAmount);assert.equal(cells[0],0);assert.equal(cells[4],0);
+ now=100;port.onmessage({data:{type:'snapshot',tick:2,binary,bytes:binary.byteLength}});assert.equal(events.at(-1).delivery,'skipped');assert.equal(wire.length,1);
+ socket.onclose({code:1006,reason:'gone',wasClean:false});assert.ok(events.some(m=>m.type==='io-unavailable'));assert.equal(cells[6],3);
+});

@@ -1,0 +1,372 @@
+{
+  "schemaVersion": 1,
+  "scope": "native-campaign-fleet-construction-inputs",
+  "originalReference": "Starsector 0.98a-RC8",
+  "sources": {
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/BaseCampaignEntity.java": {
+      "sha256": "865edfbe067e2c522c3eb889a92b9c8e1c8dfe4fe2fb75432ea137b21a277670"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/fleet/CampaignFleet.java": {
+      "sha256": "3f668722703982ef12719c2635c831176748e63c5b64521dd871574639f26a5f"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/fleet/CampaignFleetView.java": {
+      "sha256": "53ad90fe55dd101f19ee1e0f7cd65bbdd9266d27315e68b3010fa0f1aef22d3f"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/fleet/ContrailEngineV2.java": {
+      "sha256": "e4259a996f835fbf1a6895fdf35a7a4aee671e05a0410f11ff2132f6521d64a0"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/fleet/LogisticsModule.java": {
+      "sha256": "438b0b189421164687ef63e67f3fc7fa9a4669f757c3e63edf278c0598f5a72f"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/util/CollectionView.java": {
+      "sha256": "e02f324f7ad3b1c18654c8953196a128a6895e412b0fd5de004f948ef43b13e2"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/util/super.java": {
+      "sha256": "70c355159a0ea9f8e2a730ac6fee3a998d651963a8cdc3d6d15f0efa5470eb1f"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/ui/oOO0.java": {
+      "sha256": "aaaca201566bc08aad8603e6e1ed03a2fae938987f06f34e9f71119c8443840d"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/E.java": {
+      "sha256": "2234052e8de992611a0eafd5cbc5d0d04fa6502457acbdeedfcff4845ea4a4a8"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/accidents/AccidentManager.java": {
+      "sha256": "77dde735340d07692f4085f311f01e4316cfc5ee668931b0a3f606371acb4b2c"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/accidents/AccidentRisk.java": {
+      "sha256": "fccb6b8adbff48565b8224bb89fd6d8be5d04404a1eb1281fd422143f2f0b7ca"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/accidents/O0oO.java": {
+      "sha256": "a69d46cd0070a8eb5e722b8ba39d33e9e173f28442e51777f934d654cacca809"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/accidents/oooo_0.java": {
+      "sha256": "c29b48d44985cb6dd4aae004227dbf7d2dc0a3a4329e9263db69dc6b20a2767d"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/util/IntervalTracker.java": {
+      "sha256": "7f8fc935d76225e107bebb87566955a5681bd6928680ef3f03021d003c1787a5"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/O0OO.java": {
+      "sha256": "0fc23b8f11eadd01fd1a40d64517ffd8dbaa839298481c5c69875a31a0593f87"
+    },
+    "decompiled/fs.common_obf/com/fs/graphics/util/B.java": {
+      "sha256": "480e4cefb621a5a841027ea44a090b7da51f7ff1d723ec0e9d03ae68f4f23783"
+    },
+    "decompiled/fs.common_obf/com/fs/graphics/util/Fader.java": {
+      "sha256": "308a066a0cf5c4176116250bd726259558e05fe626e3529136b9411a5b52f437"
+    },
+    "decompiled/fs.common_obf/com/fs/graphics/Sprite.java": {
+      "sha256": "7e1c90b38fc4cc8ad6009c68907eb89fb4ed876baa133f29916b1bdccd157e50"
+    },
+    "decompiled/fs.common_obf/com/fs/graphics/Object.java": {
+      "sha256": "1c65489510b9713296e66843c579e8c5e754212ecd7ae35f5cb55236325462a2"
+    },
+    "decompiled/fs.common_obf/com/fs/graphics/TextureLoader.java": {
+      "sha256": "10aa048bd7b720b8a8fa187ae4faf7f193e228512e92ebd0219e27f8d188d461"
+    },
+    "decompiled/fs.common_obf/com/fs/graphics/oooo_0.java": {
+      "sha256": "be57b0f458df7bffde88b10bc393844ec7744aa05292e773a93190fb7da8b85b"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/impl/combat/CRPluginImpl.java": {
+      "sha256": "40b24c9320233d16d6e6dd69c73071f9c76dfc5ab24e4be62c79a0d140b2cf92"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/util/Misc.java": {
+      "sha256": "067e4d2664eca98929e9e46ba8ada8468769c19dcd12cce8c8a3c730e14d2ffb"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/fleet/FleetData.java": {
+      "sha256": "fc0b7ee6a001c6008748c515cbf2e95ae7cac46dd24cdb682b687cfaff7d94b7"
+    },
+    "starsector-core/starfarer_obf.jar": {
+      "sha256": "8ae5516bf879ec068d206714fd67b90ebfa113c990f9e473357a5923b9700d6a"
+    },
+    "starsector-core/fs.common_obf.jar": {
+      "sha256": "864124c5c6ea34fc182a750f29505f2b6d53141d2e2098f421401c6f9c5af66c"
+    },
+    "starsector-core/starfarer.api.jar": {
+      "sha256": "0798e624c949657ab524188928bb13d618a70cb451dc7da9789545569a05081b"
+    },
+    "starsector-core/data/config/settings.json": {
+      "sha256": "96f3f6aa457e85ab6480bf302e35d3e8df390339321711b982d45fbe71c4dfa9"
+    },
+    "starsector-core/graphics/hud/line8x8.png": {
+      "sha256": "60b5444d9f1126312f257bd4a21f11752cc5dd36198e67539a571a0a020abfb2"
+    },
+    "starsector-core/graphics/warroom/ship_arrow.png": {
+      "sha256": "2c03e02a47165dc87f8497f9007fe7605cb0f21b6d9b161192bc881c144015b6"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/fleet/CampaignFleetMemberView.java": {
+      "sha256": "4c99b475602acffd01d42548eb34444f167e7eebe77457ba9640d8d9925ae4f2"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/fleet/CampaignShipEngineGlow.java": {
+      "sha256": "10deec335aad95552643cc3943fd129436cd2eaa74f5dc126c64438e4657ec18"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/prototype/Utils.java": {
+      "sha256": "42727019119dc578c6c3e05693ce7ca73f1364d086dfdcfbc300d1e5f6fdd438"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/loading/specs/EngineSlot.java": {
+      "sha256": "36b0a5db24a2132c9ddc2857902ab2b1be56cbf41430cc176959044982b6f1cf"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/combat/entities/ContrailEngine.java": {
+      "sha256": "9b8d55c09dabec810a8c256d13e2fd5c02dedb579d9d7810b88a393a0a08cfe4"
+    },
+    "decompiled/fs.common_obf/com/fs/util/oOOO.java": {
+      "sha256": "4cbd1b134411b90fee613394e7e06fd4a20727e515834ad3959707f2da376be3"
+    },
+    "starsector-core/graphics/fx/contrail64b.png": {
+      "sha256": "18ada369b2d131cbc1874d362afcdf5389b5059328d0700ddf7a792411f76152"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/rules/Memory.java": {
+      "sha256": "a034f0c2629c479fd83ec7d149c7503fa8b3e5b2e896e347d62d153269ed2c8d"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/renderers/O.java": {
+      "sha256": "1a91b3708197989e8d081c4b02f93b304b111ebcbfeb5dc531f5b978c1a26ebb"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/rpg/Person.java": {
+      "sha256": "6aca8cd6f3e75f3c8776184db6c10743b998cc38b0f54369161258fc801df555"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/fleet/CargoData.java": {
+      "sha256": "405988db6b805b7c4a8a20496c5e9b09e94ecbaef919b65888f9b503cb425ced"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/fleet/RepairTracker.java": {
+      "sha256": "d69adff3a68228d3b18d4c1241e5ed3625ee9d7924242981d01a185f6703bc0e"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/SensorContactIndicatorManager.java": {
+      "sha256": "be2617330868e6710683cca3e089e1e6710113606c03436a3a31b301d570e3cb"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/ListenerManager.java": {
+      "sha256": "601d050fd485f0115e23449f7bc6c93da6f02765442ac7465e6d02651ca2ab27"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/BaseLocation.java": {
+      "sha256": "117ab6012c0a62d2f1f16de7578779d02436625f3d0f0352736ace8d09ff210e"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/CampaignEntity.java": {
+      "sha256": "2187b4503e7245f0baf7e80986bfe035c790276a171a5469d9115b17fff65068"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/fleet/FleetAbilityRenderer.java": {
+      "sha256": "06b3f6e8d3fb31d9221b5fca548ad8919159a9f132ba1c7932ec4bf69c01e096"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/fleet/SmoothMovementModule.java": {
+      "sha256": "39e2ae8165703ef4ee1550d08f47d2915e8f935dded7bdc3166483f3d581a72b"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/CampaignEngine.java": {
+      "sha256": "5d3916a830fcef1a28bf51f78d229987bfaf47fe0ca897aa4ab34e30ec186267"
+    },
+    "decompiled/fs.common_obf/com/fs/util/container/repo/ObjectRepository.java": {
+      "sha256": "2840b3606e9ef8108806f3be65735d580742db39b1e439b75a5ebea8c2aa3e11"
+    },
+    "decompiled/fs.common_obf/com/fs/util/container/repo/FastIterationClassifier.java": {
+      "sha256": "ff1780ba240d80f1901418c7bd65df766ba074091efc179509a4cd5c438b989c"
+    },
+    "decompiled/fs.common_obf/com/fs/graphics/LayeredRenderer.java": {
+      "sha256": "aa52165a6b66dd7acebbae08e989d04ea8bb3b3763c4b2fd7544de0409562055"
+    },
+    "decompiled/fs.common_obf/com/fs/graphics/LayeredRenderable.java": {
+      "sha256": "c7578bcaa1a98000492a2606830a3fe64536ba5d025698cc63b7e9954ff631b7"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/campaign/CampaignFleetAPI.java": {
+      "sha256": "65632116d88ec7f351b4b29d782a162270eac49674dcfdce4b689c26c0ae7e6b"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/campaign/SectorEntityToken.java": {
+      "sha256": "420de733e85ceda24d53dc184cd05e5a1218566be8c3959c78568a1e300efcb3"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/campaign/FleetOrStubAPI.java": {
+      "sha256": "870e58a575ee638eedcc421e777239d6cf2d0b66a9f71cb286851d9ed74e69d0"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/campaign/rules/HasMemory.java": {
+      "sha256": "e47352e811242b4e706987e4ffe09ce8e3508107816c2eb0b06be50ad594ead2"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/campaign/listeners/DetectedEntityListener.java": {
+      "sha256": "5353974065cb209e81600f8df40a583ea65ed432dd00527cabc7d16f19f21e75"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/campaign/listeners/DiscoverEntityPlugin.java": {
+      "sha256": "9de5539cfed370f6e04391d11a1964b2f0f9dd649f66230de0fa804e6ae485d3"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/campaign/listeners/ListenerUtil.java": {
+      "sha256": "f2aacb9133910e6daf8ea7126c9d31106a68d90c8e22a9303f2c14a556175bac"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/campaign/CampaignEngineLayers.java": {
+      "sha256": "f7dd2618e27601ea333453fd84cc117560a677f49959c1d388a77a7d017a96e2"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/CustomCampaignEntity.java": {
+      "sha256": "4f21bf20ad994452c7424725cf1c642af82663b226ec324a415774c1255dcc9a"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/loading/specs/int.java": {
+      "sha256": "1f25a417f940314be2bf9b2b1b90f52a0a6614174085ab9dab503aa0dc8627c8"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/impl/campaign/CargoPodsEntityPlugin.java": {
+      "sha256": "e17be072ef2d84b5ea8910872de0c61d16099e078d1d1e5d0f75bad38e9c1a75"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/impl/campaign/CoreScript.java": {
+      "sha256": "37dd23f29addf1ca2edabe8b9868035edc16cda5af58bcf8623201ca0d924d30"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/impl/campaign/GenericFieldItemManager.java": {
+      "sha256": "95251a8a17dd6bf169c38b2043913f00720a425ff55ad9c318a945f5c5b10ca8"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/impl/campaign/GenericFieldItemSprite.java": {
+      "sha256": "f84b23153e1c4ea7aaf3c70def99e7b355b4ba2efdd4b09df6ffae290c212bfa"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/util/FaderUtil.java": {
+      "sha256": "bf6455a92be2b069d502828bb68850a3245cc6e39e485e5037b56d4d894c5e2a"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/campaign/CustomCampaignEntityAPI.java": {
+      "sha256": "790168ebb0100afbc312f26ecf55c7077a158f90c3f935edf10fc49cf73d4ced"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/campaign/listeners/CargoScreenListener.java": {
+      "sha256": "0eddd7f6db150fd2f0479e3d48686ae364c74cf105931007a43af7277fec39a9"
+    },
+    "starsector-core/data/config/custom_entities.json": {
+      "sha256": "a072d86edb3eb55f776eadb25e45c5d2b61413097872c08e1d34a3eb263e2c05"
+    },
+    "starsector-core/graphics/illustrations/cargo_pod_drift.jpg": {
+      "sha256": "4da82333975ea4bf050255d7c43f7006b8fb2199991c351ce3a640bc8f3ad4c6"
+    },
+    "starsector-core/graphics/icons/cargo_pod0.png": {
+      "sha256": "9ab85e6a570bcb2af46139531f4071eedd4396b040e8e12e00784c90c0a54074"
+    },
+    "starsector-core/graphics/debris/cargo_pod_sheet1.png": {
+      "sha256": "8390cd9a422863be4a84a2b32c40ad4d76ddcd3f2680b26a94e5a2381abe9139"
+    },
+    "starsector-core/graphics/fx/ship_shadow_mask.png": {
+      "sha256": "733a102fae4e83afa0b15f4f7a9523a7774e6c1f5ba17e2452ff9d2f1cb7bbb4"
+    }
+  },
+  "worldRegistration": {
+    "layers": [
+      "TERRAIN_1",
+      "TERRAIN_2",
+      "PLANETS",
+      "TERRAIN_3",
+      "RINGS",
+      "TERRAIN_4",
+      "ASTEROIDS",
+      "TERRAIN_5",
+      "JUMP_POINTS",
+      "TERRAIN_6",
+      "TERRAIN_6A",
+      "TERRAIN_6B",
+      "BELOW_STATIONS",
+      "STATIONS",
+      "ABOVE_STATIONS",
+      "TERRAIN_7",
+      "TERRAIN_7A",
+      "TERRAIN_SLIPSTREAM",
+      "FLEETS",
+      "TERRAIN_8",
+      "TERRAIN_9",
+      "TERRAIN_10",
+      "ABOVE"
+    ],
+    "fleetClasses": [
+      "java.lang.Object",
+      "com.fs.starfarer.campaign.BaseCampaignEntity",
+      "com.fs.starfarer.campaign.CampaignEntity",
+      "com.fs.starfarer.api.campaign.SectorEntityToken",
+      "com.fs.starfarer.api.campaign.rules.HasMemory",
+      "com.fs.util.DoNotObfuscate",
+      "com.fs.graphics.LayeredRenderable",
+      "com.fs.starfarer.campaign.fleet.CampaignFleet",
+      "com.fs.starfarer.api.campaign.CampaignFleetAPI",
+      "com.fs.starfarer.api.campaign.FleetOrStubAPI",
+      "com.fs.starfarer.campaign.fleet.SmoothMovementModule$MovementModuleDelegate",
+      "java.lang.Cloneable"
+    ],
+    "customEntityClasses": [
+      "java.lang.Object",
+      "com.fs.starfarer.campaign.BaseCampaignEntity",
+      "com.fs.starfarer.campaign.CampaignEntity",
+      "com.fs.starfarer.api.campaign.SectorEntityToken",
+      "com.fs.starfarer.api.campaign.rules.HasMemory",
+      "com.fs.util.DoNotObfuscate",
+      "com.fs.graphics.LayeredRenderable",
+      "com.fs.starfarer.campaign.CustomCampaignEntity",
+      "com.fs.starfarer.api.campaign.CustomCampaignEntityAPI"
+    ]
+  },
+  "cargoPods": {
+    "fieldTexture": {
+      "kind": "native-texture-source",
+      "path": "graphics/debris/cargo_pod_sheet1.png",
+      "sha256": "8390cd9a422863be4a84a2b32c40ad4d76ddcd3f2680b26a94e5a2381abe9139",
+      "width": 128,
+      "height": 128,
+      "texWidth": 1,
+      "texHeight": 1
+    },
+    "shadowTexture": {
+      "kind": "native-texture-source",
+      "path": "graphics/fx/ship_shadow_mask.png",
+      "sha256": "733a102fae4e83afa0b15f4f7a9523a7774e6c1f5ba17e2452ff9d2f1cb7bbb4",
+      "width": 32,
+      "height": 32,
+      "texWidth": 1,
+      "texHeight": 1
+    },
+    "spec": {
+      "spriteWidth": 64,
+      "spriteHeight": 64,
+      "interactable": true,
+      "detectionRange": -1,
+      "defaultName": "货物吊舱",
+      "defaultRadius": 20,
+      "nameInText": "货物吊舱",
+      "shortName": "货物吊舱",
+      "aOrAn": "一处",
+      "isOrAre": "可能",
+      "showInCampaign": true,
+      "scaleIconSizeBasedOnDefaultRadius": false,
+      "showIconOnMap": true,
+      "scaleIconWithZoom": true,
+      "iconWidth": 20,
+      "iconHeight": 20,
+      "icon": "graphics/icons/cargo_pod0.png",
+      "customDescriptionId": "cargo_pods",
+      "interactionImage": "graphics/illustrations/cargo_pod_drift.jpg",
+      "layers": [
+        "TERRAIN_7A"
+      ],
+      "tags": [
+        "has_interaction_dialog",
+        "neutrino",
+        "salvage_music"
+      ],
+      "pluginClass": "com.fs.starfarer.api.impl.campaign.CargoPodsEntityPlugin"
+    },
+    "interactionImage": {
+      "path": "graphics/illustrations/cargo_pod_drift.jpg",
+      "width": 480,
+      "height": 300,
+      "sha256": "4da82333975ea4bf050255d7c43f7006b8fb2199991c351ce3a640bc8f3ad4c6"
+    }
+  },
+  "selectionColor": [
+    100,
+    220,
+    255,
+    255
+  ],
+  "combatReadinessPlugin": "com.fs.starfarer.api.impl.combat.CRPluginImpl",
+  "textures": {
+    "graphics/hud/line8x8.png": {
+      "kind": "native-texture-source",
+      "path": "graphics/hud/line8x8.png",
+      "sha256": "60b5444d9f1126312f257bd4a21f11752cc5dd36198e67539a571a0a020abfb2",
+      "width": 8,
+      "height": 8,
+      "texWidth": 1,
+      "texHeight": 1
+    },
+    "graphics/warroom/ship_arrow.png": {
+      "kind": "native-texture-source",
+      "path": "graphics/warroom/ship_arrow.png",
+      "sha256": "2c03e02a47165dc87f8497f9007fe7605cb0f21b6d9b161192bc881c144015b6",
+      "width": 32,
+      "height": 32,
+      "texWidth": 1,
+      "texHeight": 1
+    }
+  },
+  "motionSettings": {
+    "sneakBurnMult": 0.5,
+    "baseTravelSpeed": 0,
+    "speedPerBurnLevel": 20
+  }
+}

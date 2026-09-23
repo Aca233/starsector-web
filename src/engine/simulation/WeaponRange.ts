@@ -8,7 +8,11 @@ interface RangeEntry {
   range: number; weaponType: WeaponSpec['weaponType']; mountSize: WeaponSpec['mountSize'];
   mountTypeOverride: WeaponSpec['mountTypeOverride']; isPointDefense: WeaponSpec['isPointDefense'];
   missileBody: boolean;
-  isBeam: WeaponSpec['isBeam']; rangefinderPD: boolean | undefined; value: number;
+  isBeam: WeaponSpec['isBeam']; rangefinderPD: boolean | undefined;
+  baseRange: number; percent: number; multiplier: number; flat: number;
+  rangeThreshold: number; rangePastThresholdMultiplier: number;
+  /** Only the neutral-runtime result is memoized; dynamic inputs stay live. */
+  value?: number;
 }
 const rangeCaches = new WeakMap<ShipSpec, WeakMap<WeaponSpec, RangeEntry> | null>();
 
@@ -29,7 +33,7 @@ export function combatProjectileSpeed(ship: Ship, weapon: WeaponSpec): number {
 }
 function resolveWeaponRange(ship: ShipSpec, weapon: WeaponSpec, runtimeMultiplier: number, runtimePercent: number, runtimeFlat = 0): number {
   const dynamic = runtimeMultiplier !== 1 || runtimePercent !== 0 || runtimeFlat !== 0;
-  let cache = dynamic ? null : rangeCaches.get(ship);
+  let cache = rangeCaches.get(ship);
   if (cache === undefined && isImmutableMetadata(ship)) {
     cache = hasOnlyNativeRangeModifiers(ship) ? new WeakMap<WeaponSpec, RangeEntry>() : null;
     rangeCaches.set(ship, cache);
@@ -38,11 +42,34 @@ function resolveWeaponRange(ship: ShipSpec, weapon: WeaponSpec, runtimeMultiplie
   // range hooks (including in-place PD hint edits); never memoize arbitrary mod behavior.
   const missileBody = !!weapon.isRocket || weapon.spawnType === 'MISSILE';
   const rangefinderPD = weapon.aiHints ? weapon.aiHints.includes('PD') : weapon.isPointDefense;
-  const entry = cache?.get(weapon);
-  if (entry && entry.range === weapon.range && entry.weaponType === weapon.weaponType
-    && entry.mountSize === weapon.mountSize && entry.mountTypeOverride === weapon.mountTypeOverride
-    && entry.isPointDefense === weapon.isPointDefense && entry.isBeam === weapon.isBeam
-    && entry.missileBody === missileBody && entry.rangefinderPD === rangefinderPD) return entry.value;
+  let entry = cache?.get(weapon);
+  if (cache) {
+    if (!entry || entry.range !== weapon.range || entry.weaponType !== weapon.weaponType
+      || entry.mountSize !== weapon.mountSize || entry.mountTypeOverride !== weapon.mountTypeOverride
+      || entry.isPointDefense !== weapon.isPointDefense || entry.isBeam !== weapon.isBeam
+      || entry.missileBody !== missileBody || entry.rangefinderPD !== rangefinderPD) {
+      // Only native hooks over recursively immutable ship metadata reach here.
+      // Save invariant contributions, NOT the ECM/system/carrier inputs. Keep
+      // source hook order and the final floating-point expression unchanged.
+      const baseRange = weapon.range + hullModRangeBaseFlat(ship, weapon);
+      const percent = hullModRangePercent(ship, weapon);
+      const multiplier = hullModRangeMultiplier(ship, weapon);
+      const flat = hullModRangeFlat(ship, weapon);
+      const stats = hullModRangeThresholdStats(ship);
+      entry = { range: weapon.range, weaponType: weapon.weaponType,
+        mountSize: weapon.mountSize, mountTypeOverride: weapon.mountTypeOverride,
+        isPointDefense: weapon.isPointDefense, isBeam: weapon.isBeam, missileBody, rangefinderPD,
+        baseRange, percent, multiplier, flat, ...stats };
+      cache.set(weapon, entry);
+    }
+    if (!dynamic && entry.value !== undefined) return entry.value;
+    const range = (entry.baseRange * (1 + (entry.percent + runtimePercent) / 100) * entry.multiplier * runtimeMultiplier
+      + entry.flat + runtimeFlat) * (ship.weaponRangeMult ?? 1);
+    const value = Math.max(0, weapon.weaponType === 'MISSILE' || range <= entry.rangeThreshold ? range
+      : entry.rangeThreshold + (range - entry.rangeThreshold) * entry.rangePastThresholdMultiplier);
+    if (!dynamic) entry.value = value;
+    return value;
+  }
   // Source order: WeaponBaseRangeModifier, percent/mult, extra flat, threshold.
   // Weapon type, not projectile spawnType, controls missile exclusions (e.g. bombs).
   const baseRange = weapon.range + hullModRangeBaseFlat(ship, weapon);
@@ -51,8 +78,6 @@ function resolveWeaponRange(ship: ShipSpec, weapon: WeaponSpec, runtimeMultiplie
   const stats = hullModRangeThresholdStats(ship);
   const value = Math.max(0, weapon.weaponType === 'MISSILE' || range <= stats.rangeThreshold ? range
     : stats.rangeThreshold + (range - stats.rangeThreshold) * stats.rangePastThresholdMultiplier);
-  if (cache) cache.set(weapon, { range: weapon.range, weaponType: weapon.weaponType,
-    mountSize: weapon.mountSize, mountTypeOverride: weapon.mountTypeOverride,
-    isPointDefense: weapon.isPointDefense, isBeam: weapon.isBeam, missileBody, rangefinderPD, value });
+
   return value;
 }

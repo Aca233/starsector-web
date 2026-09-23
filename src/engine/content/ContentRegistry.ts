@@ -48,6 +48,23 @@ export class ContentRegistry {
     }
     this.ships = stagedShips; this.weapons = stagedWeapons; this.currentRevision++;
   }
+  /** Bootstrap a new authority from a validated data-only snapshot. Never a live merge. */
+  installSnapshot(ships: ShipSpec[], weapons: WeaponSpec[]): void {
+    if (!Array.isArray(ships) || !Array.isArray(weapons) || ships.length > 32768 || weapons.length > 32768) throw new Error('Invalid content snapshot');
+    const copies = structuredClone({ships, weapons});
+    const stagedShips = new Map(copies.ships.map(spec => [spec.id, spec]));
+    const stagedWeapons = new Map(copies.weapons.map(spec => [spec.id, spec]));
+    if (stagedShips.size !== ships.length || stagedWeapons.size !== weapons.length) throw new Error('Duplicate content snapshot ID');
+    const registry = {getShip: (id: string) => stagedShips.get(id), getWeapon: (id: string) => stagedWeapons.get(id)};
+    for (const spec of copies.weapons) validateWeaponSpec(spec, false);
+    for (const spec of copies.ships) {
+      validateShipSpec(spec, {registry, allowExistingId:true, requireBundledAssets:false});
+      for (const wing of spec.fighterWings ?? []) if (stagedShips.get(wing.specId)?.hullSize !== 'FIGHTER') throw new Error('Invalid snapshot wing: ' + wing.specId);
+    }
+    this.ships = new Map(copies.ships.map(spec => [spec.id, immutableCopy(spec)]));
+    this.weapons = new Map(copies.weapons.map(spec => [spec.id, immutableCopy(spec)]));
+    this.currentRevision++;
+  }
   getShip(id: string): ShipSpec | undefined { return this.ships.get(id); }
   getWeapon(id: string): WeaponSpec | undefined { return this.weapons.get(id); }
   getAllShips(): ShipSpec[] { return [...this.ships.values()]; }

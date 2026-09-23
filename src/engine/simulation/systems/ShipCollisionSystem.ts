@@ -2,7 +2,7 @@ import { applyComponentDamage } from './weapon/ComponentDamage';
 import { isImmutableMetadata } from '../../extensions/Immutable';
 import { Vector2 } from '../../math/Vector2';
 import { Ship } from '../Ship';
-import { sound } from '../../audio/SoundManager';
+import { combatAudio as sound } from '../../audio/CombatAudioEvents';
 import {
   isShieldCollisionActive,
   shieldCenterOffset,

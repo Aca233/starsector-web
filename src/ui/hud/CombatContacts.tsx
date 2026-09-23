@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState, type MutableRefObject, type RefObject } from 'react';
-import type { CombatEngine } from '../../engine/simulation/CombatEngine';
-import type { Ship } from '../../engine/simulation/Ship';
+import type { CombatHudView as CombatEngine } from '../../engine/runtime/CombatHudView';
+import type { HudShip, HudContact as Ship } from '../../engine/runtime/CombatHudView';
 import type { FixedTimestepScheduler } from '../../engine/simulation/FixedTimestepScheduler';
 import { Vector2 } from '../../engine/math/Vector2';
 import { hasCombatInputFocus } from '../../engine/runtime/CombatInputFocus';
 import { clientToCombatWorld } from '../../engine/runtime/PlayerControls';
-import { lockedCombatTarget, pickCombatContact } from '../../engine/runtime/CombatTargeting';
+import { pickCombatContact } from '../../engine/runtime/CombatTargeting';
 import { FloatingShipHUD } from './FloatingShipHUD';
 import { TargetShipHUD } from './TargetShipHUD';
 
@@ -21,7 +21,7 @@ interface Props {
 
 /** One pointer/roster observer for the entire fleet; at most one hover and one locked HUD. */
 export function CombatContacts({ engine, cameraPosRef, zoomRef, canvasRef, scheduler, paused = false, blocked = false }: Props) {
-  const [contacts, setContacts] = useState<{ hover: Ship | null; target: Ship | null }>({ hover: null, target: null });
+  const [contacts, setContacts] = useState<{ hover: Ship | null; target: HudShip | null }>({ hover: null, target: null });
   const state = useRef({ blocked, paused });
   useLayoutEffect(() => { state.current = { blocked, paused }; }, [blocked, paused]);
   const alphaRef = useRef(1);
@@ -30,7 +30,7 @@ export function CombatContacts({ engine, cameraPosRef, zoomRef, canvasRef, sched
     if (!canvas) return;
     const pointer = new Vector2(), origin = new Vector2();
     let pointerActive = false, frame = 0, lastRefresh = 0;
-    let current = { hover: null as Ship | null, target: null as Ship | null };
+    let current = { hover: null as Ship | null, target: null as HudShip | null };
     const clear = () => { pointerActive = false; };
     const sample = (event: MouseEvent) => {
       pointerActive = event.target === canvas && !state.current.blocked && !engine.isTacticalMap && hasCombatInputFocus();
@@ -41,7 +41,7 @@ export function CombatContacts({ engine, cameraPosRef, zoomRef, canvasRef, sched
       const suppressed = state.current.blocked || engine.isTacticalMap || !hasCombatInputFocus();
       if (suppressed) clear();
       const player = engine.playerShip, ships = engine.ships;
-      const target = suppressed ? null : lockedCombatTarget(ships, player);
+      const target = suppressed ? null : engine.targetShip;
       const zoom = zoomRef?.current ?? 1;
       const point = pointerActive ? clientToCombatWorld(pointer, canvas, cameraPosRef?.current ?? origin, zoom) : null;
       const hover = point ? pickCombatContact(ships, player, point, 8 * canvas.width / Math.max(1, canvas.clientWidth) / zoom, false, alphaRef.current) : null;

@@ -1,0 +1,5 @@
+import fs from 'node:fs';import path from 'node:path';import {build} from 'esbuild';import {pathToFileURL} from 'node:url';import {receiverFieldsPlugin} from './lib/receiver-fields-comparison.mjs';
+const base='artifacts/network-stream-20260922/phase48/';
+process.env.RECEIVER_FIELDS_FROZEN=base+'before.json';process.env.RECEIVER_FIELDS_CONTROL_SOURCE=base+'CombatSnapshot.before.ts';process.env.RECEIVER_FIELDS_SOURCE=base+'CombatSnapshot.candidate.ts';process.env.DIRECT_PARTICLE_RECIPE_SOURCE=base+'DynamicParticleRecipe.candidate.ts';
+const outfile=path.resolve(base+'check.mjs');fs.mkdirSync(path.dirname(outfile),{recursive:true});
+await build({entryPoints:['scripts/check-direct-particle-restore.mts'],outfile,bundle:true,platform:'node',format:'esm',packages:'external',plugins:[receiverFieldsPlugin()],define:{__LAN_BUILD_ID__:'"direct-particle-check"','import.meta.env':'{"BASE_URL":"/","DEV":false,"VITE_LAN_AI_WORKERS":"false","VITE_DIRECT_PARTICLE_STATS":"true"}'},logLevel:'warning'});await import(pathToFileURL(outfile).href);

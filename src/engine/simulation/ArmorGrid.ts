@@ -28,7 +28,19 @@ export class ArmorGrid {
   public maxCellArmor: number;
   
   // 单元格装甲当前值数组 (一维扁平存储，优化内存连续性)
-  public cells: Float32Array;
+  public cells!: Float32Array;
+  #cellStorage: Float32Array;
+  #cellMutation = 0;
+  #cellsExposed = false;
+  #internalCellAccess = 0;
+  #readPublicCells = () => {
+    if (!this.#internalCellAccess) this.#cellsExposed = true;
+    return this.#cellStorage;
+  };
+  #writePublicCells = (value: Float32Array) => {
+    if (!this.#internalCellAccess) this.#cellsExposed = true;
+    this.#cellStorage = value; this.#cellMutation++;
+  };
   // 脏版本计数器，供 ShipPaperDoll 等装甲可视化按需重绘
   public dirtyVersion = 0;
   public damageTakenModifiers?: (type: DamageType) => { armor: number; hull: number };
@@ -57,21 +69,57 @@ export class ArmorGrid {
     
     // 原版公式：单个单元格满装甲约为总装甲的 1/15
     this.maxCellArmor = Math.max(1, maxArmorRating / 15);
-    this.cells = new Float32Array(cols * rows);
-    this.cells.fill(this.maxCellArmor);
+    this.#cellStorage = new Float32Array(cols * rows);
+    this.#cellStorage.fill(this.maxCellArmor);
+    // Preserve the enumerable field/order and mutable public API. Once a raw
+    // view escapes, direct writes cannot be observed: reuse must fail closed.
+    Object.defineProperty(this, 'cells', { enumerable: true, configurable: true,
+      get: this.#readPublicCells, set: this.#writePublicCells });
+  }
+
+  #readCells(): Float32Array {
+    this.#internalCellAccess++;
+    try { return this.cells; } finally { this.#internalCellAccess--; }
+  }
+
+  /** Null means a public mutable view/custom property prevents trusted reuse. */
+  public get cellMutationRevision(): number | null {
+    const descriptor = Object.getOwnPropertyDescriptor(this, 'cells');
+    return !this.#cellsExposed && descriptor?.get === this.#readPublicCells
+      && descriptor?.set === this.#writePublicCells ? this.#cellMutation : null;
+  }
+
+  /** Owned copy for snapshots/handoffs, not an escaping mutable engine view. */
+  public copyCells(): Float32Array { return this.#readCells().slice(); }
+
+  /** Tracked bulk write. Callers retain their existing dirtyVersion policy. */
+  public replaceCells(values: ArrayLike<number>): void {
+    // Array-like getters can throw after a partial write; never retain a stale revision.
+    try { this.#readCells().set(values); } finally { this.#cellMutation++; }
+  }
+
+  /** Receiver restoration may also replace an array after a layout change. */
+  public restoreCellSnapshot(values: ArrayLike<number>): void {
+    if (this.#readCells().length === values.length) this.replaceCells(values);
+    else {
+      this.#internalCellAccess++;
+      try { this.cells = new Float32Array(values); } finally { this.#internalCellAccess--; }
+    }
   }
 
   public getCell(c: number, r: number): number {
     if (c < 0 || c >= this.cols || r < 0 || r >= this.rows) return 0;
-    return this.cells[r * this.cols + c];
+    return this.#readCells()[r * this.cols + c];
   }
 
   public setCell(c: number, r: number, val: number) {
     if (c >= 0 && c < this.cols && r >= 0 && r < this.rows) {
       const idx = r * this.cols + c;
       const next = Math.max(0, val);
-      if (this.cells[idx] !== next) {
-        this.cells[idx] = next;
+      const cells = this.#readCells();
+      if (cells[idx] !== next) {
+        cells[idx] = next;
+        this.#cellMutation++;
         this.dirtyVersion++;
       }
     }
@@ -239,10 +287,11 @@ export class ArmorGrid {
    */
   public getIntegrityPercentage(): number {
     let total = 0;
-    for (let i = 0; i < this.cells.length; i++) {
-      total += this.cells[i];
+    const cells = this.#readCells();
+    for (let i = 0; i < cells.length; i++) {
+      total += cells[i];
     }
-    const maxTotal = this.cells.length * this.maxCellArmor;
+    const maxTotal = cells.length * this.maxCellArmor;
     return maxTotal > 0 ? total / maxTotal : 0;
   }
 }

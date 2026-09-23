@@ -5,7 +5,7 @@ import { Vector2 } from '../../../math/Vector2';
 import { bindProjectileSource, projectileSource } from './OutgoingDamage';
 import { Projectile } from '../../Weapon';
 import { Ship } from '../../Ship';
-import { sound } from '../../../audio/SoundManager';
+import { combatAudio as sound } from '../../../audio/CombatAudioEvents';
 import { WeaponSimContext } from './WeaponSimContext';
 
 import { missileGuidancePoint } from './MissileLeading';

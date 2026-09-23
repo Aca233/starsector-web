@@ -1,3 +1,4 @@
+import { shieldUnfoldRate, shieldVisualAlpha, shieldRenderArc, phaseEngaged, shieldPhased, phaseCooldown, phaseSpeed } from '../render/ShieldDisplayMath';
 import { Vector2 } from '../math/Vector2';
 import { DamageType } from './ArmorGrid';
 
@@ -10,8 +11,7 @@ export type ShieldType = 'FRONT' | 'OMNI' | 'PHASE' | 'NONE';
 export type PhaseCloakState = 'IDLE' | 'IN' | 'ACTIVE' | 'OUT' | 'COOLDOWN';
 
 /** PhaseCloakStats.FLUX_LEVEL_AFFECTS_SPEED / MIN_SPEED_MULT / BASE_FLUX_LEVEL_FOR_MIN_SPEED */
-export const PHASE_MIN_SPEED_MULT = 0.33;
-export const PHASE_BASE_FLUX_LEVEL_FOR_MIN_SPEED = 0.5;
+export { PHASE_MIN_SPEED_MULT, PHASE_BASE_FLUX_LEVEL_FOR_MIN_SPEED } from '../render/ShieldDisplayMath';
 
 /**
  * 能量护盾系统 (Shield)
@@ -54,7 +54,7 @@ export class Shield {
   public turnRateMultiplier = 1;
 
   public get unfoldRateDeg(): number {
-    return 100 * 180 / (Math.PI * Math.max(1, this.radius)) * (this.type === 'FRONT' ? 2 : 1) * this.unfoldRateMultiplier;
+    return shieldUnfoldRate(this.type,this.radius,this.unfoldRateMultiplier);
   }
 
   public get unfoldDuration(): number {
@@ -63,9 +63,7 @@ export class Shield {
 
   /** The source charge tracker fades brightness independently of the collision arc. */
   public get visualAlpha(): number {
-    if (!this.isActive) return this.closeTimeRemaining / 0.35;
-    const fadeIn = Math.min(0.75, this.unfoldDuration);
-    return fadeIn > 0 ? Math.min(1, this.currentArcDeg / this.unfoldRateDeg / fadeIn) : 1;
+    return shieldVisualAlpha(this.isActive,this.closeTimeRemaining,this.maxArcDeg,this.currentArcDeg,this.unfoldRateDeg);
   }
   
   private hitLevels = new Float32Array(0);
@@ -84,9 +82,18 @@ export class Shield {
     return this.hitLevels;
   }
 
+  /** Snapshot the lazy visual geometry without initializing authoritative hit state.
+   * Existing storage is borrowed until the synchronous projection has copied it. */
+  public presentationHitSegmentLevels(): Float32Array {
+    if (this.hitRadius === this.radius && this.hitArcDeg === this.maxArcDeg) return this.hitLevels;
+    const arcLength = 2 * Math.PI * Math.max(0, this.radius) * this.maxArcDeg / 360;
+    const count = Math.max(2, Math.floor(arcLength / 20) + 1, Math.floor(this.maxArcDeg / 5) + 1);
+    return new Float32Array(count).fill(100);
+  }
+
   /** Five degrees of visual fringe at each full-deployment arc endpoint. */
   public get renderArcRad(): number {
-    return (this.maxArcDeg + 10) * this.deploymentLevel * Math.PI / 180;
+    return shieldRenderArc(this.maxArcDeg,this.currentArcDeg);
   }
 
   public resetVisualHits(): void {
@@ -131,23 +138,19 @@ export class Shield {
   private pendingActivationCost = 0;
 
   public get phaseCooldownLevel(): number {
-    return this.phaseState === 'COOLDOWN' && this.phaseCooldownDuration > 0
-      ? Math.max(0, Math.min(1, this.phaseStageTimer / this.phaseCooldownDuration)) : 0;
+    return phaseCooldown(this.phaseState,this.phaseCooldownDuration,this.phaseStageTimer);
   }
 
   /** 相位成本入账回调 (硬幅能，永不触发过载)，由 Ship 注入 flux 追踪器。 */
   private readonly raisePhaseFlux?: (amount: number) => void;
 
   public get isPhased(): boolean {
-    if (this.type !== 'PHASE') return false;
-    if (this.phaseState === 'IN' || this.phaseState === 'ACTIVE') return true;
-    // PhaseCloakStats: OUT 阶段 effectLevel > 0.5 时仍然处于相位潜航。
-    return this.phaseState === 'OUT' && this.phaseEffectLevel > 0.5;
+    return shieldPhased(this.type,this.phaseState,this.phaseEffectLevel);
   }
 
   /** 相位线圈是否处于已开启生命周期 (IN / ACTIVE / OUT)，对齐 ShipSystemAPI.isActive()。 */
   public get isPhaseEngaged(): boolean {
-    return this.phaseState === 'IN' || this.phaseState === 'ACTIVE' || this.phaseState === 'OUT';
+    return phaseEngaged(this.phaseState);
   }
 
   /** 相位维持成本只在 IN 与 ACTIVE 阶段产生 (原版 charge tracker)。 */
@@ -307,13 +310,7 @@ export class Shield {
    * 满缺口时降到 33%。
    */
   public getPhaseSpeedMultiplier(hardFluxLevel: number): number {
-    if (!this.isPhaseEngaged) return 1;
-    const threshold = PHASE_BASE_FLUX_LEVEL_FOR_MIN_SPEED * this.phaseMinSpeedFluxThresholdMultiplier;
-    if (threshold <= 0) return PHASE_MIN_SPEED_MULT;
-    let disruption = hardFluxLevel / threshold;
-    if (disruption > 1) disruption = 1;
-    if (disruption <= 0) return 1;
-    return PHASE_MIN_SPEED_MULT + (1 - PHASE_MIN_SPEED_MULT) * (1 - disruption * this.phaseEffectLevel);
+    return phaseSpeed(this.isPhaseEngaged,hardFluxLevel,this.phaseMinSpeedFluxThresholdMultiplier,this.phaseEffectLevel);
   }
 
   /** Arc coverage is retained throughout the separate fade-out. */

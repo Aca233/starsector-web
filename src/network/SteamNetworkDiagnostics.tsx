@@ -4,7 +4,7 @@ type RecordValue = Record<string, unknown>;
 const record = (value: unknown): RecordValue => value !== null && typeof value === "object" && !Array.isArray(value) ? value as RecordValue : {};
 const num = (value: unknown, digits = 0) => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value.toFixed(digits) : "未知";
 const kb = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0 ? (value / 1024).toFixed(1) + " KiB" : "未知";
-const reasons: Record<string, string> = { "disconnected": "已断开", "frame-window": "等待网络 ACK（帧数）", "wire-byte-window": "等待网络 ACK（字节）", "renderer-consumption": "等待客机接纳状态", "shared-uplink-window": "共享上行额度不足" };
+const reasons: Record<string, string> = { "disconnected": "已断开", "frame-window": "等待网络 ACK（帧数）", "wire-byte-window": "等待网络 ACK（字节）", "renderer-consumption": "等待客机接纳状态", "shared-uplink-window": "共享上行额度不足", "codec-work-budget": "差分计算预算用尽，等待最新状态" };
 const reason = (value: unknown) => value == null ? "无" : typeof value === "string" && Object.hasOwn(reasons, value) ? reasons[value] : "未知";
 function NativeQueue({ value }: { value: unknown }) {
   const s = record(value);
@@ -21,10 +21,12 @@ export function SteamNetworkDiagnostics({ transport }: { transport: unknown }) {
     {t.role === "host" ? <>
       <p>共享在途 {kb(shared.inflightBytes)} / {kb(shared.limitBytes)} · 等待额度 {num(shared.waitingPeers)} 人</p>
       {peers.map((p, index) => {
-        const packet = record(p.lastSnapshot), delta = record(p.delta);
+        const packet = record(p.lastSnapshot), delta = record(p.delta), motion = record(p.motion), world = record(motion.world), components = record(p.components);
         return <p key={index}>连接 {index + 1}：在途 {num(p.inflight)} / {num(p.window)} 帧 · {kb(p.inflightBytes)} · 最老 ACK {num(p.oldestAckMs)} ms<br />
           网络 ACK 均值 {num(p.ackMs)} ms · 路径基线 {num(p.baseAckMs)} ms · 当前门控：{reason(p.blockedBy)} · 最近跳过：{reason(p.lastSnapshotSkip)}<br />
           上次成功快照：完整 {kb(packet.rawBytes)} → 线上 {kb(packet.wireBytes)} / {num(packet.fragments)} 分片 · 网关准备 {num(packet.prepareMs, 1)} ms<br />
+          运动通道：{p.motion ? (motion.fallback || world.fallbackReason ? "已回退完整状态" : "已协商") : "未协商"} · 发出 {num(motion.sent)} / 接纳 {num(motion.consumed)} / 过期丢弃 {num(motion.expired)} · 在途 {kb(motion.bytes)}<br />
+          视觉／战斗分流：{p.components ? (components.fallback ? "已回退完整状态" : components.active ? "近期已接纳" : "已协商，等待接纳") : "未协商"} · 接纳 {num(components.consumed)} / 丢弃 {num(components.discarded)} · 在途 {kb(components.bytes)}<br />
           累计全量 {num(delta.fullStates)} / 增量 {num(delta.deltaStates)} / 回退全量 {num(delta.legacyStates)} · <NativeQueue value={p.nativeSession} />
         </p>;
       })}

@@ -95,6 +95,9 @@ export class SnapshotPlayback {
       // world restorations in a burst. Discrete authority is never simulated here.
       frames: frames.length > 2 ? frames.slice(-2) : frames, reset, alpha,
       visualTime: this.previousTime + ((this.current?.world.combatTime ?? this.previousTime) - this.previousTime) * alpha,
+      // Proven simulation progress, not extrapolated wall time or motion ACKs.
+      // Local weapon cadence may discount only this already-received lead.
+      confirmedTime: newest?.world.combatTime ?? this.current?.world.combatTime ?? 0,
       delayMs: Math.max(0, this.receivedTick - this.cursor) * 1000 / 60,
     };
   }

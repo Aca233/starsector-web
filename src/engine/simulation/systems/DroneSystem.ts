@@ -1,6 +1,6 @@
 import { sameTeam } from "../CombatTeams";
 import { Vector2 } from '../../math/Vector2';
-import { sound } from '../../audio/SoundManager';
+import { combatAudio as sound } from '../../audio/CombatAudioEvents';
 import { signedAngle } from '../../math/Angles';
 import { nativeVariantSpec } from '../../content/NativeVariantSpec';
 import type { ShipSpec, WeaponMountSlotConfig } from '../../content/ShipSpec';

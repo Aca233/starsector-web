@@ -1,0 +1,102 @@
+{
+  "version": "0.98a-RC8",
+  "sources": [
+    "data/config/sounds.json",
+    "data/config/settings.json",
+    "D/M.java:160-207,286-357",
+    "campaign/CampaignState.java:789-806",
+    "sound/C.java:202-252"
+  ],
+  "referenceDistance": 200,
+  "maxDistance": 2500,
+  "listenerZ": 200,
+  "maxSources": 128,
+  "specs": {
+    "default_campaign_ping": [
+      {
+        "file": "sounds/sfx_interface/ui_radar_detect_vessel.ogg",
+        "pitch": 1,
+        "volume": 0.05000000074505806
+      }
+    ],
+    "detected_by_player": [
+      {
+        "file": "sounds/sfx_interface/ui_campaign_sensor_detect_fleet_01.ogg",
+        "pitch": 1,
+        "volume": 0.75
+      },
+      {
+        "file": "sounds/sfx_interface/ui_campaign_sensor_detect_fleet_02.ogg",
+        "pitch": 1,
+        "volume": 0.75
+      },
+      {
+        "file": "sounds/sfx_interface/ui_campaign_sensor_detect_fleet_03.ogg",
+        "pitch": 1,
+        "volume": 0.75
+      },
+      {
+        "file": "sounds/sfx_interface/ui_campaign_sensor_detect_fleet_04.ogg",
+        "pitch": 1,
+        "volume": 0.75
+      },
+      {
+        "file": "sounds/sfx_interface/ui_campaign_sensor_detect_fleet_05.ogg",
+        "pitch": 1,
+        "volume": 0.75
+      },
+      {
+        "file": "sounds/sfx_interface/ui_campaign_sensor_detect_fleet_06.ogg",
+        "pitch": 1,
+        "volume": 0.75
+      }
+    ],
+    "lost_sight_of_by_player": [
+      {
+        "file": "sounds/sfx_interface/ui_campaign_sensor_lose_fleet_01.ogg",
+        "pitch": 1,
+        "volume": 0.75
+      },
+      {
+        "file": "sounds/sfx_interface/ui_campaign_sensor_lose_fleet_02.ogg",
+        "pitch": 1,
+        "volume": 0.75
+      },
+      {
+        "file": "sounds/sfx_interface/ui_campaign_sensor_lose_fleet_03.ogg",
+        "pitch": 1,
+        "volume": 0.75
+      },
+      {
+        "file": "sounds/sfx_interface/ui_campaign_sensor_lose_fleet_04.ogg",
+        "pitch": 1,
+        "volume": 0.75
+      },
+      {
+        "file": "sounds/sfx_interface/ui_campaign_sensor_lose_fleet_05.ogg",
+        "pitch": 1,
+        "volume": 0.75
+      },
+      {
+        "file": "sounds/sfx_interface/ui_campaign_sensor_lose_fleet_06.ogg",
+        "pitch": 1,
+        "volume": 0.75
+      }
+    ]
+  },
+  "sha256": {
+    "sounds/sfx_interface/ui_radar_detect_vessel.ogg": "679fa4800d812783c7ae8f2fb284320a0959de8310d35742892f96f54d1e35de",
+    "sounds/sfx_interface/ui_campaign_sensor_detect_fleet_01.ogg": "d914ee3d66ab78208366040601f26f9d5ea1d65a2a344e7f4bf8aef43a0fa7d0",
+    "sounds/sfx_interface/ui_campaign_sensor_detect_fleet_02.ogg": "a410bca2ce50970e5d87b340c494439395d4bf44bc1d064b4d8a5e1ade77ea63",
+    "sounds/sfx_interface/ui_campaign_sensor_detect_fleet_03.ogg": "5b95f46aa098ed57761967245130520669dacd8bdea6c470345414234447322a",
+    "sounds/sfx_interface/ui_campaign_sensor_detect_fleet_04.ogg": "6606df8b138f1e9bb6409769d8fe3e5f1798284d647eba0f4e6d5e2c1e89a1d4",
+    "sounds/sfx_interface/ui_campaign_sensor_detect_fleet_05.ogg": "53e1d37c7150a6453c40a324ac71bbf10c47d4824ba444e791f58d605d26174b",
+    "sounds/sfx_interface/ui_campaign_sensor_detect_fleet_06.ogg": "79f5ea57d2a30e4c0c4ed654a4bab4311cdd06ccd493f9dde9de5a851d971547",
+    "sounds/sfx_interface/ui_campaign_sensor_lose_fleet_01.ogg": "1fa4c6e47fbc024647564f72b74c903bbf9febb0840b75db76597283ebb0816e",
+    "sounds/sfx_interface/ui_campaign_sensor_lose_fleet_02.ogg": "510938fbfd798838a1b07a2c202f07c17630e741729558e28e41cff9e7071ece",
+    "sounds/sfx_interface/ui_campaign_sensor_lose_fleet_03.ogg": "f6dd01af00cc82e934f333436ee7125a1c3daa804628c897587b9b8f70fe961c",
+    "sounds/sfx_interface/ui_campaign_sensor_lose_fleet_04.ogg": "42c0bd1010a639f902179285db5ef30f00b36f548fb6e1317fefa943a1dcd794",
+    "sounds/sfx_interface/ui_campaign_sensor_lose_fleet_05.ogg": "09843fc4d86763b2838d6367a4f9b88526f98b86032eb5a76c8f799e5742d00a",
+    "sounds/sfx_interface/ui_campaign_sensor_lose_fleet_06.ogg": "73638cdbf1b1f80ea995c7200db4206ea6ca0ec117a5ce9b437e4eae962868de"
+  }
+}

@@ -1,9 +1,10 @@
 import type { Ship } from '../Ship';
+type VisibleContact = Pick<Ship,'id'|'teamId'|'isDead'|'isRetreated'|'isDocked'|'isSystemDrone'|'spec'|'flightDeckWingId'|'pos'|'sightRadius'>;
 // Ring formations land exactly on sensor range; trig roundoff must not hide one flank.
 const SIGHT_BOUNDARY_EPSILON = 1e-6;
 const teamNumber = (side: number | boolean) => typeof side === 'boolean' ? (side ? 0 : 1) : side;
 /** Shared vision belongs only to the observer's actual team, never all non-host ships. */
-export function combatObservers(ships: readonly Ship[], side: number | boolean): Ship[] {
+export function combatObservers<T extends VisibleContact>(ships: readonly T[], side: number | boolean): T[] {
   const team = teamNumber(side), wings = new Set<string>();
   return ships.filter(ship => {
     if (ship.teamId !== team || ship.isDead || ship.isRetreated || ship.isDocked || ship.isSystemDrone) return false;
@@ -12,7 +13,7 @@ export function combatObservers(ships: readonly Ship[], side: number | boolean):
     wings.add(ship.flightDeckWingId); return true;
   });
 }
-export function contactVisible(ship: Ship, observers: readonly Ship[], side: number | boolean, revealAll = false): boolean {
+export function contactVisible(ship: VisibleContact, observers: readonly VisibleContact[], side: number | boolean, revealAll = false): boolean {
   return !ship.isDead && !ship.isRetreated && !ship.isDocked && (revealAll || ship.teamId === teamNumber(side) || observers.some(observer => observer.pos.distanceTo(ship.pos) <= observer.sightRadius + SIGHT_BOUNDARY_EPSILON));
 }
 export function updateCombatVisibility(ships: readonly Ship[], revealAll = false): void {

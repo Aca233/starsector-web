@@ -1,4 +1,4 @@
-import { runtimeAssetUrl } from '../runtime/RuntimePaths';
+import { runtimeAssetPath, runtimeAssetUrl } from '../runtime/RuntimePaths';
 
 export type AssetKind = 'image' | 'audio' | 'font' | 'data' | 'other';
 
@@ -70,7 +70,7 @@ export class AssetResolver {
   }
 
   public url(resource: string): string {
-    return `${this.baseUrl}/${this.normalize(resource)}`;
+    return `${this.baseUrl}/${runtimeAssetPath(this.normalize(resource))}`;
   }
 }
 
@@ -131,7 +131,7 @@ export class AssetManager {
   public get isLoaded(): boolean { return this.loaded; }
 
   public getByPath(path: string): AssetManifestEntry | undefined {
-    return this.manifestByPath.get(assetResolver.normalize(path));
+    return this.manifestByPath.get(runtimeAssetPath(assetResolver.normalize(path)));
   }
 
   public hasPath(path: string): boolean {

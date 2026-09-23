@@ -1,8 +1,8 @@
-import { readSystemBindings, selectedSystemSlot } from './SystemBindings';
+import { mouseBindingCode, readSystemBindings, selectedSystemSlot } from './SystemBindings';
 import type { Ship } from '../simulation/Ship';
 import type { Vector2 } from '../math/Vector2';
 import { pickCombatContact } from './CombatTargeting';
-import { sound } from '../audio/SoundManager';
+import { combatAudio as sound } from '../audio/CombatAudioEvents';
 
 /** Shared by local input, HUD, LAN authority and the Worker experiment. */
 export type ShipCommand =
@@ -20,7 +20,7 @@ export function flightKey(code: string): string | undefined {
   return (flightKeys as readonly string[]).includes(canonical) ? canonical : undefined;
 }
 /** Only declared chords are consumed; Ctrl+F/Ctrl+R/Alt+arrows stay browser commands. */
-export function shipCommandForKey(key: CombatKey, ship?: Ship): ShipCommand | undefined {
+export function shipCommandForKey(key: CombatKey, ship?: { readonly systems: readonly unknown[] }): ShipCommand | undefined {
   if (key.altKey || key.metaKey) return undefined;
   const digit = /^(?:Digit|Numpad)([1-7])$/.exec(key.code);
   if (digit) {
@@ -36,6 +36,12 @@ export function shipCommandForKey(key: CombatKey, ship?: Ship): ShipCommand | un
   if (key.code === 'KeyR') return { kind: 'target' };
   if (key.code === 'KeyZ') return { kind: 'recall' };
   return undefined;
+}
+/** Side buttons share the exact slot/selection/modifier rules of keyboard skills. */
+export function shipCommandForMouse(mouse: Omit<CombatKey, 'code'> & { button: number }, ship?: { readonly systems: readonly unknown[] }): ShipCommand | undefined {
+  const code = mouseBindingCode(mouse.button);
+  if (!code) return undefined;
+  return shipCommandForKey({ code, ctrlKey: mouse.ctrlKey, altKey: mouse.altKey, metaKey: mouse.metaKey, shiftKey: mouse.shiftKey }, ship);
 }
 export function shipCommandFailure(ship: Ship, command: ShipCommand): string | undefined {
   if (ship.isDead || ship.hullHp <= 0) return '舰船已失去战斗能力';

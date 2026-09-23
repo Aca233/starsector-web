@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "originalReference": "Starsector 0.98a-RC8",
+  "scope": "local-access-and-group-network-not-complete-economy",
+  "sources": {
+    "core:data/config/settings.json": {
+      "sha256": "96f3f6aa457e85ab6480bf302e35d3e8df390339321711b982d45fbe71c4dfa9"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/reach/CommodityMarketData.java": {
+      "sha256": "75b5add5888acd526900253da248725d8bb5b2eeef20f8fa4a6f818fad4e9a93"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/reach/ReachEconomy.java": {
+      "sha256": "7957c1fbc6e754a2ee1ab5cda2667a4b3350fc22e109add39c1d00e3d7ce1faa"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/reach/MainWorkTask2.java": {
+      "sha256": "a5ef72fd328a8802545f6ab04cbc7133cee142ac22c36e62fc36769713268da6"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/Market.java": {
+      "sha256": "8ca0c019abc8543a80fa63c3826b3ac1f766af3dbc35875161842306378aa945"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/util/Misc.java": {
+      "sha256": "067e4d2664eca98929e9e46ba8ada8468769c19dcd12cce8c8a3c730e14d2ffb"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/combat/StatBonus.java": {
+      "sha256": "1b0f272d231f28c737bfc7c6c70bfa00d0d2c9bb6af2c41b2bfa9b5c89028ea0"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/combat/MutableStat.java": {
+      "sha256": "a584da937e50822808fb80367183d8bd5b7ded64600b8b78aebbc8ec4cc03f21"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/BaseIndustry.java": {
+      "sha256": "bc3ff7aee903318926a532910fd6a1495ff3db3cfd7a1e345388d70bf718ace8"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/Spaceport.java": {
+      "sha256": "f768a6bbb31b5067e544675bf9384a2b7e7be7c6edee44f9a13ed3709201238e"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/PopulationAndInfrastructure.java": {
+      "sha256": "7bae6eb71b6e00ff2c8cfaa416d2379c124f7364813b518ff573f10fb41d6446"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/FreeMarket.java": {
+      "sha256": "618a57271bedd61908a19a5d1726ecea9c96ff7636af4620f3f9e19ab90d17da"
+    },
+    "core:lwjgl_util.jar": {
+      "sha256": "6f4a261384e1688a3359420efce5275c8693b822a8c6eaa1e20d5cc126a51571"
+    }
+  },
+  "settings": {
+    "accessibilityBaseValue": 0.5,
+    "accessibilityDistFromCOM": 50,
+    "accessibilityLossWhenAllHostile": 1,
+    "accessibilityNoSpaceport": -1,
+    "accessibilitySameFactionBonus": 0.5,
+    "accessibilityPerUnitShipping": 0.1,
+    "unitsPerLightYear": 2000
+  },
+  "portSettings": {
+    "BASE_ACCESSIBILITY": 0.5,
+    "MEGAPORT_ACCESSIBILITY": 0.8,
+    "ALPHA_CORE_ACCESSIBILITY": 0.2,
+    "IMPROVE_ACCESSIBILITY": 0.2
+  },
+  "freeMarketSettings": {
+    "MIN_ACCESS_BONUS": 0.05,
+    "MAX_ACCESS_BONUS": 0.25,
+    "MAX_DAYS": 365
+  },
+  "populationSizeBonus": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0.1,
+    0.15,
+    0.2,
+    0.25,
+    0.3,
+    0.3
+  ]
+}

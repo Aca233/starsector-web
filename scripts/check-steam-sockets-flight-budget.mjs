@@ -87,3 +87,76 @@ test('fair reservation is work-conserving when independent pacer order visits a 
  assert.equal(b.allows(a,8256,a.stateJob),true);track(b,a,100,8256,10);
  assert.equal(b.bytes,39*1024+8256);assert.ok(b.bytes<=b.limit);
 });
+test('healthy receipt-driven growth is bounded and idle/native-empty observations cannot mint flight credit',()=>{
+ const b=new SteamSocketFlightBudget(),peers=Array.from({length:5},peer);let now=0,id=0;
+ for(let round=0;round<40;round++){
+  const admitted=[];let cursor=0;
+  while(b.bytes+1024<=b.limit){
+   const s=peers[cursor++%peers.length];if(b.record(s).bytes+1024>L.peer)continue;
+   if(!b.allows(s,1024,s.stateJob))break;
+   admitted.push({s,p:track(b,s,++id,1024,now)});
+  }
+  const before=b.limit;now+=100;
+  for(const s of peers)b.observeNative(s,empty,now);
+  assert.equal(b.limit,before);assert.equal(b.bytes,admitted.length*1024);
+  for(const {s,p}of admitted)b.acknowledge(s,[receipt(p)],now);
+  assert.ok(b.limit<=L.max&&b.limit>=L.min);assert.equal(b.bytes,0);assert.equal(b.count,0);
+ }
+ assert.equal(b.limit,L.max);assert.ok(b.stats.increased>0);
+ const limit=b.limit;for(const s of peers){b.observeNative(s,empty,now+100000);b.acknowledge(s,[[999,999,999]],now+100000);}
+ assert.equal(b.limit,limit);assert.equal(b.bytes,0);
+});
+test('one reliable frame completes SDK admission before another starts; snapshots retain spare credit',()=>{
+ const b=new SteamSocketFlightBudget(),a=peer(),z=peer();
+ const job={frame:{kind:'anchor',count:3},startedAt:0};a.stateJob=job;z.stateJob={frame:{kind:'anchor',count:2},startedAt:null};
+ const packet=index=>({epoch:1,id:91,index,bytes:1200,kind:'anchor'});
+ b.track(a,packet(0),1,job);assert.equal(b.bytes,1200);
+ assert.equal(b.allows(z,1200,z.stateJob),false);
+ assert.equal(b.allows(z,800,{frame:{kind:'snapshot',count:1}}),true);
+ b.track(a,packet(1),2,job);assert.equal(b.allows(z,1200,z.stateJob),false);
+ b.track(a,packet(2),3,job);assert.equal(b.frameAdmission,null);
+ assert.equal(b.allows(z,1200,z.stateJob),true);assert.equal(b.bytes,3600,'finishing admission does not fake remote receipts');
+ b.acknowledge(a,[receipt(packet(0)),receipt(packet(1)),receipt(packet(2))],100);assert.equal(b.bytes,0);
+});
+test('reliable admission ownership retires on close/replacement without erasing outstanding debt',()=>{
+ for(const close of [false,true]){
+  const b=new SteamSocketFlightBudget(),a=peer(),z=peer();a.stateJob={frame:{kind:'anchor',count:2},startedAt:0};z.stateJob={frame:{kind:'anchor',count:2},startedAt:null};
+  b.track(a,{epoch:1,id:92,index:0,bytes:1200,kind:'anchor'},1,a.stateJob);assert.equal(b.allows(z,1200,z.stateJob),false);
+  if(close)b.retire(a);else a.stateJob=null;
+  assert.equal(b.allows(z,1200,z.stateJob),true);assert.equal(b.bytes,1200);
+  b.clear();assert.equal(b.frameAdmission,null);assert.equal(b.count,0);
+ }
+});
+
+test('two wide packets at the congestion floor can earn recovery credit from genuine healthy receipts',()=>{
+ const b=new SteamSocketFlightBudget(),a=peer(),z=peer();b.limit=L.min;
+ const first=track(b,a,101,8256,0),second=track(b,z,102,8256,0);
+ assert.ok(b.bytes>=b.limit*.5);assert.ok(b.bytes-first.bytes<b.limit*.5);
+ b.acknowledge(a,[receipt(first)],100);assert.ok(b.limit>L.min);assert.equal(b.bytes,8256);
+ b.acknowledge(z,[receipt(second)],100);assert.equal(b.bytes,0);
+ const recovered=b.limit;b.observeNative(a,empty,10000);b.acknowledge(a,[receipt(first)],10000);
+ assert.equal(b.limit,recovered,'only a new real receipt permits growth');
+});
+
+test('large lossy worlds finish one admission before competing worlds start; expiry releases turn not debt',()=>{
+ const b=new SteamSocketFlightBudget(),a=peer(),z=peer();
+ a.stateJob={frame:{kind:'snapshot',count:7},startedAt:0};z.stateJob={frame:{kind:'snapshot',count:8},startedAt:null};
+ b.track(a,{epoch:1,id:93,index:0,bytes:8256,kind:'snapshot'},1,a.stateJob);
+ assert.equal(b.allows(z,8256,z.stateJob),false);assert.equal(b.allows(z,800,{frame:{kind:'snapshot',count:1}}),true);
+ assert.equal(b.allows(a,8256,a.stateJob),true);a.stateJob=null;
+ assert.equal(b.allows(z,8256,z.stateJob),true);assert.equal(b.bytes,8256);assert.equal(b.stats.lostPackets,0);
+});
+
+test('whole-frame turns are FIFO across large-world peers even when the next pacer visit has spare bytes',()=>{
+ const b=new SteamSocketFlightBudget(),a=peer(),z=peer(),last=peer();
+ for(const s of [a,z,last])s.stateJob={frame:{kind:'snapshot',count:2},startedAt:null};
+ b.track(a,{epoch:1,id:1,index:0,bytes:1200,kind:'snapshot'},1,a.stateJob);
+ assert.equal(b.allows(z,1200,z.stateJob),false);assert.equal(b.allows(last,1200,last.stateJob),false);
+ b.track(a,{epoch:1,id:1,index:1,bytes:1200,kind:'snapshot'},2,a.stateJob);a.stateJob={frame:{kind:'snapshot',count:2},startedAt:null};
+ assert.equal(b.allows(a,1200,a.stateJob),false);assert.equal(b.allows(last,1200,last.stateJob),false);
+ assert.equal(b.allows(z,1200,z.stateJob),true);assert.equal(b.bytes,2400);
+});
+test('one app-limited packet draining all debt is not evidence that a larger flight window is needed',()=>{
+ const b=new SteamSocketFlightBudget(),a=peer(),p=track(b,a,1,40000);
+ b.acknowledge(a,[receipt(p)],100);assert.equal(b.bytes,0);assert.equal(b.limit,L.initial);
+});

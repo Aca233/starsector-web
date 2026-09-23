@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "gameVersion": "0.98a-RC8",
+  "sources": [
+    {
+      "path": "decompiled/starfarer_obf/com/fs/starfarer/campaign/BackgroundAndStars.java",
+      "sha256": "dc178c641c606ef707173a7ec0fc612fe5beebaa2b6dd709273fbb9d83711f9e"
+    },
+    {
+      "path": "decompiled/starfarer_obf/com/fs/starfarer/campaign/BaseLocation.java",
+      "sha256": "117ab6012c0a62d2f1f16de7578779d02436625f3d0f0352736ace8d09ff210e"
+    },
+    {
+      "path": "decompiled/starfarer_obf/com/fs/starfarer/campaign/CampaignState.java",
+      "sha256": "dd08ca36cc84b8c23763ab8c164b07124e0425da99c911fcfefec881b63ff0cd"
+    },
+    {
+      "path": "decompiled/starfarer_obf/com/fs/starfarer/combat/OOOo.java",
+      "sha256": "d4426a4740fe2069d0ff2a5cf0a212d570175abed70c6894a7dd643dedba5a7d"
+    },
+    {
+      "path": "decompiled/starfarer_obf/com/fs/starfarer/util/ReplaceableSprite.java",
+      "sha256": "c89ead7a1c59749f28323c96b4b0085baa87f1741db843d43d3ee5d368c73498"
+    },
+    {
+      "path": "decompiled/fs.common_obf/com/fs/graphics/Sprite.java",
+      "sha256": "7e1c90b38fc4cc8ad6009c68907eb89fb4ed876baa133f29916b1bdccd157e50"
+    },
+    {
+      "path": "decompiled/fs.common_obf/com/fs/graphics/particle/SmoothParticle.java",
+      "sha256": "f8b9c3eaf9e9253c9dbe21043233375e0a73f7774b1a8d7fadd180b4230f94f0"
+    },
+    {
+      "path": "starsector-core/data/config/settings.json",
+      "sha256": "96f3f6aa457e85ab6480bf302e35d3e8df390339321711b982d45fbe71c4dfa9"
+    }
+  ],
+  "defaultSpaceBackground": "graphics/backgrounds/background4.jpg",
+  "defaultHyperBackground": "graphics/backgrounds/hyperspace_bg_cool.jpg",
+  "stars": [
+    "graphics/backgrounds/star0.png",
+    "graphics/backgrounds/star1.png",
+    "graphics/backgrounds/star2.png",
+    "graphics/backgrounds/star3.png"
+  ],
+  "textures": [
+    {
+      "path": "graphics/backgrounds/background4.jpg",
+      "width": 2048,
+      "height": 2048,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "23e940822ea1a170399fb320f178cfdfe77b4a7d1f32d8ea81414c8999a0d9c8"
+    },
+    {
+      "path": "graphics/backgrounds/hyperspace_bg_cool.jpg",
+      "width": 2048,
+      "height": 2048,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "2de23bf73d485b86c18e523b469799def20449e260459c0a2ab796b00d1a0142"
+    },
+    {
+      "path": "graphics/backgrounds/star0.png",
+      "width": 17,
+      "height": 17,
+      "texWidth": 0.53125,
+      "texHeight": 0.53125,
+      "sha256": "aa8c8b44270726d742a449c0f8533f5bd7feb9f5ab9ac5add8c7622a6661c454"
+    },
+    {
+      "path": "graphics/backgrounds/star1.png",
+      "width": 28,
+      "height": 28,
+      "texWidth": 0.875,
+      "texHeight": 0.875,
+      "sha256": "f6d9a57d6be6cba4002e2bf04a4369debec4cd087bea1aa0dab64cc39bba75c0"
+    },
+    {
+      "path": "graphics/backgrounds/star2.png",
+      "width": 27,
+      "height": 27,
+      "texWidth": 0.84375,
+      "texHeight": 0.84375,
+      "sha256": "2ad4b3b2564b4144f29847ef0d1741aa1505d007c931086ae22858d742b3a24c"
+    },
+    {
+      "path": "graphics/backgrounds/star3.png",
+      "width": 21,
+      "height": 21,
+      "texWidth": 0.65625,
+      "texHeight": 0.65625,
+      "sha256": "9c26d04a578676e976c20ab08a6cf3eccbe115701c702253ccf64af22be3f7ca"
+    },
+    {
+      "path": "graphics/backgrounds/background2.jpg",
+      "width": 2048,
+      "height": 2048,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "032f67d1fc46689e28732347d76f35a414e61a54c2108739e9799f0c829d345c"
+    }
+  ]
+}

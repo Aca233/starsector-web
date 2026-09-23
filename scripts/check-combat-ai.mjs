@@ -288,11 +288,183 @@ test('owner packet and serial AI agree on a blocked-lane scene', () => {
   if(window==='low-hull') target.hullHp=target.maxHullHp*.2;
   const ai=new CapitalShipAI(ship,target), ais=[ai,...e.getNativeAIs()];
   const publisher=new Publisher(e.ships,ais), owner=new Owner(publisher.models,[0]);
-  const frame=publisher.publish(e,ais,1/60), row=owner.plan(frame).rows[0];
-  e.updateShipAI(ai,1/60,undefined,undefined,new Map(frame.fleetPlan));
-  assert.deepEqual(row.tactical,ship.tacticalAI);
-  assert.ok(row.navigationDeps.includes(e.ships.indexOf(ally)));
+  assert.ok(publisher.models[0].schema.find(p=>p.kind==='ai').keys.includes('tacticalRemaining'));
+  for(let tick=0;tick<12;tick++){
+    if(tick===5)ship.flux.softFlux=ship.flux.maxFlux*.95;
+    const frame=publisher.publish(e,ais,1/60), row=owner.plan(frame).rows[0];
+    const forecastEnvelope=new lab.WeaponThreatEnvelope();
+    e.updateShipAI(ai,1/60,undefined,forecastEnvelope,new Map(frame.fleetPlan));forecastEnvelope.close();
+    assert.deepEqual(row.tactical,ship.tacticalAI,'owner/serial tactical tick '+tick);
+    for(const [part,fields] of row.changes)for(const [key,value] of Object.entries(fields))
+      assert.deepEqual(publisher.nodes[0][part][1][key],value,'owner/serial scalar '+key+' tick '+tick);
+    assert.ok(row.navigationDeps.includes(e.ships.indexOf(ally)));
   }
+  }
+});
+
+
+function tacticalFixture(id = 'cadence-ship') {
+  const ship = new Ship(id, modManager.requireShip('hammerhead'), true, new Vector2(), 0);
+  const target = new Ship('cadence-target', modManager.requireShip('hammerhead'), false, new Vector2(3000, 0), Math.PI);
+  const ai = new CapitalShipAI(ship, target);
+  const scene = {ships:[ship,target],projectiles:[],beams:[],asteroids:[],fleetPlan:new Map([[ship.id,{role:'LINE',task:'PRESSURE',targetId:target.id}]])};
+  const order = {id:'move',type:'WAYPOINT',targetPos:new Vector2(1000,0),issuedTime:0};
+  let decisions=0, observed=0, defended=0, x=ai.tacticalX;
+  Object.defineProperty(ai,'tacticalX',{enumerable:true,configurable:true,get:()=>x,set:v=>{x=v;decisions++;}});
+  const observe=ai.defense.observe.bind(ai.defense), defend=ai.defense.update.bind(ai.defense);
+  ai.defense.observe=(...args)=>{observed++;return observe(...args);};
+  ai.defense.update=(...args)=>{defended++;return defend(...args);};
+  const step=()=>ai.update(1/60,order,scene);
+  return {ship,target,ai,scene,order,step,counts:()=>({decisions,observed,defended})};
+}
+function offDecision(f) {
+  // Stop just BEFORE a non-decision step, without changing the schedule.
+  for(let i=0;i<4 && f.ai.tacticalRemaining <= 1/60+1e-9;i++)f.step();
+  assert.ok(f.ai.tacticalRemaining>1/60+1e-9);
+}
+test('20Hz tactical intent is staggered and keeps defense observation/actions at 60Hz',()=>{
+  const schedules=new Map();
+  for(let n=0;n<9;n++){
+    const f=tacticalFixture('cadence-'+n),ticks=[];
+    for(let tick=0;tick<61;tick++){const before=f.counts().decisions;f.step();if(f.counts().decisions>before)ticks.push(tick);}
+    const c=f.counts();assert.equal(c.observed,61);assert.equal(c.defended,61);
+    assert.equal(ticks[0],0);assert.equal(ticks.length,21);
+    assert.equal(ticks[1],f.ai.tacticalPhase+1);
+    for(let i=2;i<ticks.length;i++)assert.equal(ticks[i]-ticks[i-1],3);
+    schedules.set(f.ai.tacticalPhase,ticks.slice(1));
+    assert.ok(Math.abs(f.ai.defense.quietFor-61/60)<1e-9);
+  }
+  assert.equal(schedules.size,3);
+});
+test('in-place orders, unsafe flux and manual-to-AI handoff refresh intent immediately',()=>{
+  const f=tacticalFixture();f.step();offDecision(f);
+  let before=f.counts().decisions;f.order.targetPos.set(-1000,0);f.step();
+  assert.equal(f.counts().decisions,before+1);assert.ok(f.ai.tacticalX<0);
+  offDecision(f);before=f.counts().decisions;f.ship.flux.softFlux=f.ship.flux.maxFlux*.95;f.step();
+  assert.equal(f.counts().decisions,before+1);assert.equal(f.ship.aiHoldOffensiveFire,true);
+  offDecision(f);before=f.counts().decisions;f.ship.fireControlMode='MANUAL';f.ship.pos.x=-2000;f.step();
+  assert.equal(f.counts().decisions,before+1);assert.ok(f.ai.tacticalX>0);
+  // Real pilot edge commands have already set AI mode and cleared diagnostics.
+  offDecision(f);before=f.counts().decisions;f.ship.fireControlMode='AI';f.ship.tacticalAI=undefined;
+  f.ship.pos.x=2000;f.step();assert.equal(f.counts().decisions,before+1);assert.ok(f.ai.tacticalX<0);
+});
+test('hidden, dead, removed, docked and friendly targets invalidate before a scheduled decision',()=>{
+  for(const invalidate of [f=>f.target.visibilityMask=0,f=>f.target.isDead=true,f=>f.scene.ships.pop(),f=>f.target.isDocked=true,f=>f.target.teamId=f.ship.teamId]){
+    const f=tacticalFixture();f.step();offDecision(f);const before=f.counts().decisions;
+    invalidate(f);f.step();assert.equal(f.ship.currentTargetShip,null);assert.equal(f.counts().decisions,before+1);
+  }
+});
+test('a new close obstacle changes avoidance on an unscheduled tactical step',()=>{
+  const f=tacticalFixture();f.step();offDecision(f);assert.equal(f.ship.tacticalAI.avoidingCollision,false);
+  const blocker=new Ship('sudden-obstacle',f.ship.spec,true,new Vector2(160,0),Math.PI);
+  f.scene.ships.push(blocker);const before=f.counts().decisions;f.step();
+  assert.equal(f.counts().decisions,before);assert.equal(f.ship.tacticalAI.avoidingCollision,true);
+});
+test('new incoming fire raises shields on an unscheduled tactical step',()=>{
+  const f=tacticalFixture();f.step();offDecision(f);f.ship.shield.isActive=false;
+  f.scene.projectiles.push({id:777,sourceShipId:f.target.id,teamId:f.target.teamId,specId:'railgun',
+    pos:new Vector2(300,0),prevPos:new Vector2(310,0),vel:new Vector2(-800,0),radius:2,damage:100,
+    damageType:'ENERGY',rangeRemaining:1000,totalRange:1000,elapsedTime:.1,color:[255,255,255]});
+  const before=f.counts().decisions;f.step();assert.equal(f.counts().decisions,before);
+  assert.ok(f.ship.tacticalAI.incomingDamage>0);assert.equal(f.ship.shield.isActive,true);
+});
+test('retreat and death clear control immediately; re-entry starts with a fresh decision',()=>{
+  for(const field of ['retreating','isDead','isRetreated','isDocked']){
+    const f=tacticalFixture();f.step();f.ship[field]=true;f.step();
+    assert.equal(f.ship.tacticalAI,undefined);assert.equal(f.ship.throttle,0);assert.equal(f.ai.tacticalRemaining,-1);
+    f.ship[field]=false;const before=f.counts().decisions;f.step();assert.equal(f.counts().decisions,before+1);
+  }
+});
+
+
+function trackedFireBudget(f) {
+  const ledger=new InFlightFireBudget(f.world.ships,[incoming(f,{damage:100})]);
+  let reads=0;const get=ledger.byTarget.get;
+  ledger.byTarget.get=function(...args){reads++;return get.apply(this,args);};
+  f.world.fireBudget=ledger;return {ledger,reads:()=>reads};
+}
+test('uncontested hull skips only native overkill ranking, keeping immediate firing safety',()=>{
+  const f=fixture(),track=trackedFireBudget(f),controller=new AutofireController();
+  assert.equal(track.ledger.canOmitUncontestedPenalty,true);
+  const aim=controller.aim(1/60,f.ship,f.mount,f.world);assert.ok(aim);assert.equal(aim.target.entity,f.target);
+  assert.equal(track.reads(),0,'one hull cannot be reordered by overkill score');
+  const friend=new Ship('new-friendly-blocker',f.ship.spec,true,new Vector2(250,0),0);f.world.ships.push(friend);
+  assert.equal(controller.decide(f.ship,f.mount,aim,f.world,1/60),'FRIENDLY_BLOCKED');
+});
+test('competing damaged hull targets still run the complete in-flight damage penalty',()=>{
+  const f=fixture();const alternative=new Ship('other-hull',f.target.spec,false,new Vector2(500,180),Math.PI);
+  alternative.shield.isActive=false;alternative.hullHp=100;f.target.hullHp=100;f.world.ships.push(alternative);const track=trackedFireBudget(f);
+  const aim=new AutofireController().aim(1/60,f.ship,f.mount,f.world);assert.ok(aim);
+  assert.ok(track.reads()>=2,'each competing hull must retain its budget score');
+});
+test('custom fire-budget estimators and penalties are never pruned for a sole hull',()=>{
+  for(const method of ['estimate','penalty']){
+    const f=fixture(),ledger=new InFlightFireBudget(f.world.ships,[]);let calls=0;
+    ledger[method]=()=>{calls++;return 0;};f.world.fireBudget=ledger;
+    assert.equal(ledger.canOmitUncontestedPenalty,false);
+    assert.ok(new AutofireController().aim(1/60,f.ship,f.mount,f.world));assert.ok(calls>0);
+  }
+});
+
+
+test('adaptive fire budget keeps damaged hulls, heavy friendly volleys and new launches precise',()=>{
+  const f=fixture(),ledger=new InFlightFireBudget(f.world.ships,[]);f.target.hullHp=f.target.maxHullHp;
+  assert.equal(ledger.needsDetailedPenalty(f.ship,f.target),false);
+  ledger.add(incoming(f,{id:400,damage:f.target.hullHp*.249}));assert.equal(ledger.needsDetailedPenalty(f.ship,f.target),false);
+  ledger.add(incoming(f,{id:401,damage:1e9,teamId:7}));assert.equal(ledger.needsDetailedPenalty(f.ship,f.target),false);
+  ledger.add(incoming(f,{id:402,damage:f.target.hullHp*.002}));assert.equal(ledger.needsDetailedPenalty(f.ship,f.target),true);
+  const empty=new InFlightFireBudget(f.world.ships,[]);f.target.hullHp=f.target.maxHullHp*.5;
+  assert.equal(empty.needsDetailedPenalty(f.ship,f.target),true);
+});
+test('unknown armor hooks/runtime effects and custom scorers retain detailed prediction',()=>{
+  const f=fixture(),ledger=new InFlightFireBudget(f.world.ships,[]);f.target.hullHp=f.target.maxHullHp;
+  f.target.runtimeModifiers.set('external',{hullDamageMultiplier:3});assert.equal(ledger.needsDetailedPenalty(f.ship,f.target),true);f.target.runtimeModifiers.clear();
+  f.target.armor.damageTakenModifiers=()=>({armor:1,hull:20});assert.equal(ledger.needsDetailedPenalty(f.ship,f.target),true);
+  ledger.penalty=()=>1;assert.equal(ledger.needsDetailedPenalty(f.ship,f.target),true);
+});
+
+
+test('short weapon horizon preserves full-horizon actual projectiles and live near weapons',()=>{
+  const f=tacticalFixture();f.target.pos.set(500,0);
+  const m=f.target.weapons[0];f.target.weapons.splice(1);m.relativePos.set(0,0);m.arcDeg=360;m.currentAngleRad=Math.PI;
+  m.spec={...m.spec,range:2000,damagePerShot:100,damagePerSecond:100,projSpeed:1000,isBeam:false,isGuided:false,chargeTime:0};
+  m.cooldownTimer=4;m.firingState='IDLE';m.burstRemaining=0;
+  const full=lab.assessThreats(f.ship,f.scene,10,1),near=lab.assessThreats(f.ship,f.scene,10,1,1);
+  assert.ok(full.threats.some(t=>t.kind==='WEAPON'&&t.eta>1));assert.equal(near.threats.length,0);
+  f.scene.projectiles.push({id:999,sourceShipId:f.target.id,teamId:f.target.teamId,pos:new Vector2(1800,0),vel:new Vector2(-500,0),radius:2,damage:100,damageType:'ENERGY',rangeRemaining:10000,spawnType:'BALLISTIC'});
+  const live=lab.assessThreats(f.ship,f.scene,10,1,1);
+  assert.ok(live.threats.some(t=>t.kind==='PROJECTILE'&&t.eta>1),'actual trajectories keep the long horizon');
+  m.cooldownTimer=0;
+  const a=lab.assessThreats(f.ship,f.scene,10,1),b=lab.assessThreats(f.ship,f.scene,10,1,1);
+  assert.ok(b.imminentDamage>0);assert.equal(b.imminentDamage,a.imminentDamage);assert.equal(b.imminentShieldFlux,a.imminentShieldFlux);assert.equal(b.facing,a.facing);
+});
+
+test('deferred far threats block vent calm, and fresh vent validation resets it without double time',()=>{
+  const f=tacticalFixture(),d=new lab.ShipDefenseController();
+  const calm={threats:[],horizon:10,imminentDamage:0,imminentShieldFlux:0,actualDamage:0,earliest:Infinity,facing:null};
+  d.observe(1,{...calm,hasDeferredWeaponThreat:true});assert.equal(d.safeVentFor,0);
+  d.observe(1,calm);f.ship.flux.softFlux=f.ship.flux.maxFlux*.75;f.ship.shield.isActive=false;
+  const danger={...calm,threats:[{sourceId:f.target.id,kind:'WEAPON',eta:3,damage:100,shieldFlux:100,direction:0}]};
+  let refreshed=0;d.update(f.ship,calm,()=>{refreshed++;return danger;});
+  assert.equal(refreshed,1);assert.equal(f.ship.flux.isVenting,false);assert.equal(d.safeVentFor,0);assert.equal(d.quietFor,2);
+  d.observe(1,calm);d.update(f.ship,calm,()=>calm);assert.equal(f.ship.flux.isVenting,true);
+});
+
+test('native forecast cadence is staggered, while fallback and control re-entry refresh immediately',()=>{
+  const schedules=new Map();
+  for(let n=0;n<9;n++){
+    const f=tacticalFixture('forecast-'+n),ticks=[];let writes=0,value=f.ai.forecastFarThreat;
+    Object.defineProperty(f.ai,'forecastFarThreat',{enumerable:true,configurable:true,get:()=>value,set:v=>{writes++;value=v;}});
+    for(let tick=0;tick<61;tick++){
+      const before=writes;f.scene.weaponThreatEnvelope=new lab.WeaponThreatEnvelope();f.step();f.scene.weaponThreatEnvelope.close();
+      if(writes>before)ticks.push(tick);
+    }
+    assert.equal(ticks.length,21);assert.equal(ticks[0],0);assert.equal(ticks[1],f.ai.tacticalPhase+1);
+    for(let i=2;i<ticks.length;i++)assert.equal(ticks[i]-ticks[i-1],3);
+    schedules.set(f.ai.tacticalPhase,ticks);delete f.scene.weaponThreatEnvelope;f.step();assert.equal(f.ai.forecastRemaining,-1);
+    f.ship.fireControlMode='MANUAL';f.scene.weaponThreatEnvelope=new lab.WeaponThreatEnvelope();f.step();assert.ok(f.ai.forecastRemaining>0);
+  }
+  assert.equal(schedules.size,3);
 });
 
 console.log(`PASS ${passed} combat AI foundation checks`);

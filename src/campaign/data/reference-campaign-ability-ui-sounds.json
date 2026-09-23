@@ -1,0 +1,30 @@
+{
+  "ui_sustained_burn_on": [
+    {
+      "file": "sounds/sfx_abilities/ability-sustained_burn_01.ogg",
+      "pitch": 1,
+      "volume": 0.4
+    }
+  ],
+  "ui_sustained_burn_off": [
+    {
+      "file": "sounds/sfx_abilities/ability-sustained_burn_02.ogg",
+      "pitch": 1,
+      "volume": 0.4
+    }
+  ],
+  "ui_go_dark_on": [
+    {
+      "file": "sounds/sfx_abilities/ability-go_dark_01_enabled.ogg",
+      "pitch": 1,
+      "volume": 0.3
+    }
+  ],
+  "ui_go_dark_off": [
+    {
+      "file": "sounds/sfx_abilities/ability-go_dark_02_disabled.ogg",
+      "pitch": 1,
+      "volume": 0.3
+    }
+  ]
+}

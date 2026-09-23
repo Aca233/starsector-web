@@ -4,7 +4,7 @@ import type { Projectile } from '../Weapon';
 import { ENGINE_VISUAL_PROFILES } from '../../visual/VisualProfiles';
 import { Vector2 } from '../../math/Vector2';
 import { Ship } from '../Ship';
-import { sound } from '../../audio/SoundManager';
+import { combatAudio as sound } from '../../audio/CombatAudioEvents';
 import { i18n } from '../../i18n/LocalizationManager';
 import { CombatFXSystem } from './CombatFXSystem';
 import { SimulationRandom } from '../SimulationRandom';

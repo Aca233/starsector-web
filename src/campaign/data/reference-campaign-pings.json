@@ -1,0 +1,313 @@
+{
+  "version": "0.98a-RC8",
+  "sources": [
+    "data/campaign/pings.json",
+    "data/config/settings.json:1104,1107",
+    "CampaignPingSpec.java:20-57",
+    "SpecStore.java:249-267",
+    "campaign/ActionIndicator.java:56-107",
+    "campaign/util/super.java:170-245,289-320",
+    "graphics/hud/line8x8.png"
+  ],
+  "specs": {
+    "danger": {
+      "id": "danger",
+      "sounds": [
+        "default_campaign_ping"
+      ],
+      "color": [
+        255,
+        100,
+        0,
+        255
+      ],
+      "minRange": 0,
+      "range": 100,
+      "duration": 1,
+      "delay": 0.5,
+      "width": 15,
+      "alphaMult": 1,
+      "inFraction": 0.10000000149011612,
+      "num": 1,
+      "invert": false,
+      "useFactionColor": false
+    },
+    "flee": {
+      "id": "flee",
+      "sounds": [
+        "default_campaign_ping"
+      ],
+      "color": [
+        175,
+        175,
+        175,
+        180
+      ],
+      "minRange": 0,
+      "range": 50,
+      "duration": 0.5,
+      "delay": 1,
+      "width": 8,
+      "alphaMult": 1,
+      "inFraction": 0.10000000149011612,
+      "num": 1,
+      "invert": true,
+      "useFactionColor": false
+    },
+    "comms": {
+      "id": "comms",
+      "sounds": [
+        "default_campaign_ping",
+        "",
+        "default_campaign_ping"
+      ],
+      "color": null,
+      "minRange": 0,
+      "range": 150,
+      "duration": 1,
+      "delay": 0.25,
+      "width": 15,
+      "alphaMult": 1,
+      "inFraction": 0.10000000149011612,
+      "num": 3,
+      "invert": false,
+      "useFactionColor": true
+    },
+    "warning_beacon1": {
+      "id": "warning_beacon1",
+      "sounds": [
+        "default_campaign_ping"
+      ],
+      "color": [
+        255,
+        165,
+        30,
+        255
+      ],
+      "minRange": 0,
+      "range": 250,
+      "duration": 1,
+      "delay": 1,
+      "width": 7,
+      "alphaMult": 1,
+      "inFraction": 0.10000000149011612,
+      "num": 1,
+      "invert": false,
+      "useFactionColor": false
+    },
+    "warning_beacon2": {
+      "id": "warning_beacon2",
+      "sounds": [
+        "default_campaign_ping",
+        ""
+      ],
+      "color": [
+        255,
+        165,
+        30,
+        255
+      ],
+      "minRange": 0,
+      "range": 250,
+      "duration": 1,
+      "delay": 1,
+      "width": 7,
+      "alphaMult": 1,
+      "inFraction": 0.10000000149011612,
+      "num": 2,
+      "invert": false,
+      "useFactionColor": false
+    },
+    "warning_beacon3": {
+      "id": "warning_beacon3",
+      "sounds": [
+        "default_campaign_ping",
+        "",
+        "default_campaign_ping"
+      ],
+      "color": [
+        255,
+        165,
+        30,
+        255
+      ],
+      "minRange": 0,
+      "range": 250,
+      "duration": 1,
+      "delay": 1,
+      "width": 7,
+      "alphaMult": 1,
+      "inFraction": 0.10000000149011612,
+      "num": 3,
+      "invert": false,
+      "useFactionColor": false
+    },
+    "sensor_burst": {
+      "id": "sensor_burst",
+      "sounds": [],
+      "color": null,
+      "minRange": 0,
+      "range": 750,
+      "duration": 2,
+      "delay": 0.25,
+      "width": 7,
+      "alphaMult": 1,
+      "inFraction": 0.10000000149011612,
+      "num": 1,
+      "invert": false,
+      "useFactionColor": true
+    },
+    "remote_survey": {
+      "id": "remote_survey",
+      "sounds": [
+        "",
+        "",
+        "default_campaign_ping",
+        "",
+        "",
+        "",
+        "default_campaign_ping"
+      ],
+      "color": null,
+      "minRange": 0,
+      "range": 750,
+      "duration": 2,
+      "delay": 0.25,
+      "width": 7,
+      "alphaMult": 1,
+      "inFraction": 0.10000000149011612,
+      "num": 7,
+      "invert": false,
+      "useFactionColor": true
+    },
+    "distress_call": {
+      "id": "distress_call",
+      "sounds": [
+        "",
+        "",
+        "default_campaign_ping"
+      ],
+      "color": [
+        255,
+        0,
+        0,
+        255
+      ],
+      "minRange": 0,
+      "range": 500,
+      "duration": 2,
+      "delay": 0.25,
+      "width": 7,
+      "alphaMult": 1,
+      "inFraction": 0.10000000149011612,
+      "num": 1,
+      "invert": false,
+      "useFactionColor": true
+    },
+    "transverse_jump": {
+      "id": "transverse_jump",
+      "sounds": [],
+      "color": null,
+      "minRange": 0,
+      "range": 100,
+      "duration": 1,
+      "delay": 0.5,
+      "width": 7,
+      "alphaMult": 1,
+      "inFraction": 0.10000000149011612,
+      "num": 6,
+      "invert": true,
+      "useFactionColor": true
+    },
+    "interdict": {
+      "id": "interdict",
+      "sounds": [],
+      "color": null,
+      "minRange": 0,
+      "range": 100,
+      "duration": 1,
+      "delay": 0.33000001311302185,
+      "width": 7,
+      "alphaMult": 1,
+      "inFraction": 0.10000000149011612,
+      "num": 6,
+      "invert": true,
+      "useFactionColor": true
+    },
+    "slipsurge": {
+      "id": "slipsurge",
+      "sounds": [],
+      "color": [
+        166,
+        127,
+        255,
+        255
+      ],
+      "minRange": 0,
+      "range": 150,
+      "duration": 1,
+      "delay": 0.33000001311302185,
+      "width": 7,
+      "alphaMult": 1,
+      "inFraction": 0.10000000149011612,
+      "num": 6,
+      "invert": true,
+      "useFactionColor": false
+    },
+    "new_sensor_contact": {
+      "id": "new_sensor_contact",
+      "sounds": [
+        "detected_by_player"
+      ],
+      "color": null,
+      "minRange": 0,
+      "range": 100,
+      "duration": 1,
+      "delay": 0.25,
+      "width": 15,
+      "alphaMult": 1,
+      "inFraction": 0.10000000149011612,
+      "num": 3,
+      "invert": true,
+      "useFactionColor": true
+    },
+    "noticed_player": {
+      "id": "noticed_player",
+      "sounds": [],
+      "color": null,
+      "minRange": 0,
+      "range": 50,
+      "duration": 1,
+      "delay": 1,
+      "width": 15,
+      "alphaMult": 0.25,
+      "inFraction": 0.10000000149011612,
+      "num": 1,
+      "invert": false,
+      "useFactionColor": true
+    },
+    "lost_sight_of_player": {
+      "id": "lost_sight_of_player",
+      "sounds": [],
+      "color": null,
+      "minRange": 0,
+      "range": 50,
+      "duration": 1,
+      "delay": 1,
+      "width": 15,
+      "alphaMult": 0.25,
+      "inFraction": 0.10000000149011612,
+      "num": 1,
+      "invert": true,
+      "useFactionColor": true
+    }
+  },
+  "indicatorTexture": {
+    "path": "graphics/hud/line8x8.png",
+    "width": 8,
+    "height": 8,
+    "texWidth": 1,
+    "texHeight": 1,
+    "sha256": "60b5444d9f1126312f257bd4a21f11752cc5dd36198e67539a571a0a020abfb2"
+  }
+}

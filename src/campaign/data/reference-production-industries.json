@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "originalReference": "Starsector 0.98a-RC8",
+  "scope": "production-commodity-and-quality-effects-not-world-lifecycle",
+  "sources": {
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/LightIndustry.java": {
+      "sha256": "d7765951d3445c54781e7c3b1b70975968428236fd1f73992367820fd608d8b0"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/Refining.java": {
+      "sha256": "13b2bd803fdb1b26f8e40aad3ffc9378ad45510ac66d759918167c33fe922dab"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/HeavyIndustry.java": {
+      "sha256": "aeb1dfd8b037c0b01f82c437fcbab8880dea5cc59c5eeff5151ac89badaaeedb"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/FuelProduction.java": {
+      "sha256": "b713f15532bfa20b6852320a7e15fee4b5deaad900fd8c40d01348e4d8513c84"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/BaseIndustry.java": {
+      "sha256": "bc3ff7aee903318926a532910fd6a1495ff3db3cfd7a1e345388d70bf718ace8"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/ItemEffectsRepo.java": {
+      "sha256": "2d845c39865f81604b439af70d657ec9ca8d86fc877232e3ca7aadb6ccd719a9"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/BoostIndustryInstallableItemEffect.java": {
+      "sha256": "95ebd06dc8baf9920c83f71acd8efb7fb8ca93b038d27466df216ed9d788cc42"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/BaseInstallableItemEffect.java": {
+      "sha256": "955972ca614de7e153af069382780e176b2e87fe3c800f01b7282f286ac285ea"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/combat/MutableStat.java": {
+      "sha256": "a584da937e50822808fb80367183d8bd5b7ded64600b8b78aebbc8ec4cc03f21"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/combat/StatBonus.java": {
+      "sha256": "1b0f272d231f28c737bfc7c6c70bfa00d0d2c9bb6af2c41b2bfa9b5c89028ea0"
+    },
+    "core:data/campaign/industries.csv": {
+      "sha256": "dce37cbd88bb844194259fa597da42fa36f15ec26897e1de0202650765ce3656"
+    },
+    "core:data/campaign/special_items.csv": {
+      "sha256": "c68e42eca0b1efe0367a2452014d586cfee52b1916bb707044e4adc6449779f8"
+    }
+  },
+  "industries": {
+    "refining": {
+      "plugin": "com.fs.starfarer.api.impl.campaign.econ.impl.Refining",
+      "className": "Refining",
+      "tags": [
+        "refining",
+        "industry",
+        "industrial"
+      ],
+      "image": "graphics/icons/industry/refining.png"
+    },
+    "lightindustry": {
+      "plugin": "com.fs.starfarer.api.impl.campaign.econ.impl.LightIndustry",
+      "className": "LightIndustry",
+      "tags": [
+        "lightindustry",
+        "industry",
+        "rural"
+      ],
+      "image": "graphics/icons/industry/light_industry.png"
+    },
+    "heavyindustry": {
+      "plugin": "com.fs.starfarer.api.impl.campaign.econ.impl.HeavyIndustry",
+      "className": "HeavyIndustry",
+      "tags": [
+        "heavyindustry",
+        "uses_blueprints",
+        "industry",
+        "industrial"
+      ],
+      "image": "graphics/icons/industry/heavy_industry.png"
+    },
+    "orbitalworks": {
+      "plugin": "com.fs.starfarer.api.impl.campaign.econ.impl.HeavyIndustry",
+      "className": "HeavyIndustry",
+      "tags": [
+        "heavyindustry",
+        "uses_blueprints",
+        "industry",
+        "industrial"
+      ],
+      "image": "graphics/icons/industry/orbital_works.png"
+    },
+    "fuelprod": {
+      "plugin": "com.fs.starfarer.api.impl.campaign.econ.impl.FuelProduction",
+      "className": "FuelProduction",
+      "tags": [
+        "fuelprod",
+        "industry",
+        "industrial"
+      ],
+      "image": "graphics/icons/industry/fuel_production.png"
+    }
+  },
+  "items": {
+    "corrupted_nanoforge": {
+      "industryIds": [
+        "heavyindustry",
+        "orbitalworks"
+      ],
+      "supplyBonus": 1,
+      "requiredCondition": null,
+      "qualityBonus": 0.20000000298023224
+    },
+    "pristine_nanoforge": {
+      "industryIds": [
+        "heavyindustry",
+        "orbitalworks"
+      ],
+      "supplyBonus": 3,
+      "requiredCondition": null,
+      "qualityBonus": 0.5
+    },
+    "synchrotron": {
+      "industryIds": [
+        "fuelprod"
+      ],
+      "supplyBonus": 3,
+      "requiredCondition": "no_atmosphere",
+      "qualityBonus": null
+    },
+    "catalytic_core": {
+      "industryIds": [
+        "refining"
+      ],
+      "supplyBonus": 3,
+      "requiredCondition": "no_atmosphere",
+      "qualityBonus": null
+    },
+    "biofactory_embryo": {
+      "industryIds": [
+        "lightindustry"
+      ],
+      "supplyBonus": 2,
+      "requiredCondition": "habitable",
+      "qualityBonus": null
+    }
+  },
+  "orbitalWorksQualityBonus": 0.20000000298023224,
+  "pollution": {
+    "daysBeforePollution": 0,
+    "daysBeforePermanent": 90
+  }
+}

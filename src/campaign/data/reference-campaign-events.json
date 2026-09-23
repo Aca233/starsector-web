@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "gameVersion": "0.98a-RC8",
+  "scope": "native-campaign-event-manager",
+  "sources": [
+    {
+      "path": "starsector-core/data/config/settings.json",
+      "bytes": 103146,
+      "sha256": "96f3f6aa457e85ab6480bf302e35d3e8df390339321711b982d45fbe71c4dfa9"
+    },
+    {
+      "path": "starsector-core/data/campaign/events.json",
+      "bytes": 3920,
+      "sha256": "70cc4c1da867c0bc83e0e3e019d82eb6542e6b5f07fa4af57d41afdfaceb8f46"
+    },
+    {
+      "path": "decompiled/starfarer_obf/com/fs/starfarer/campaign/events/CampaignEventManager.java",
+      "bytes": 12305,
+      "sha256": "aae5f318101a63bf0197a89c873cb29971795392be535d2c8d04cbc239ea0fd0"
+    },
+    {
+      "path": "decompiled/starfarer_obf/com/fs/starfarer/campaign/events/EventProbability.java",
+      "bytes": 2812,
+      "sha256": "5b0f791035bc4243bead1e94da503d7c517729d72eaa8ed8439e31b02063683c"
+    },
+    {
+      "path": "decompiled/starfarer_obf/com/fs/starfarer/util/IntervalTracker.java",
+      "bytes": 1774,
+      "sha256": "7f8fc935d76225e107bebb87566955a5681bd6928680ef3f03021d003c1787a5"
+    },
+    {
+      "path": "decompiled/starfarer.api/com/fs/starfarer/api/campaign/events/CampaignEventTarget.java",
+      "bytes": 3621,
+      "sha256": "e33e07ddc9846f9ddc541242f4f2c216864c7b7b132a724fbb066f2891f0061f"
+    },
+    {
+      "path": "decompiled/fs.common_obf/com/fs/util/container/Pair.java",
+      "bytes": 1039,
+      "sha256": "d85339a534facd020fad8f8268e61df5dbe2f59886d14d17cdd3a16b47f455d8"
+    }
+  ],
+  "eventCheckInterval": 30,
+  "specs": [
+    {
+      "id": "rep_tracker",
+      "pluginClass": "com.fs.starfarer.api.impl.campaign.events.RepTrackerEvent",
+      "image": "graphics/icons/intel/reputation.png",
+      "probabilityMult": 1,
+      "maxOngoing": -1
+    },
+    {
+      "id": "nearby_events",
+      "pluginClass": "com.fs.starfarer.api.impl.campaign.events.nearby.NearbyEventsEvent",
+      "image": null,
+      "probabilityMult": 1,
+      "maxOngoing": -1
+    }
+  ]
+}

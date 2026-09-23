@@ -75,3 +75,21 @@ test('capability changes, missing bases and resets cannot reuse an old reference
   assert.throws(() => recv.decode(stale.packet)); recv.setMotionReference(true);
   assert.equal(deliver(sender, recv, target(3)).motionSteps, 0);
 });
+
+
+test('healthy delivery avoids reference CPU; measured congestion enables exact references with bounded recovery hold',()=>{
+ const sender=new LanDeltaSender({ordered:true,motionReference:true}),recv=receiver();
+ const healthy={capacity:5,idleCapacity:5},congested={capacity:3,idleCapacity:5};
+ const send=(seq,now,credits)=>{
+  const t=target(seq);t.now=now;const choice=sender.prepareForDelivery(t,credits);
+  assert.deepEqual(recv.decode(choice.packet),t.bytes);assert.ok(sender.commit(choice));return choice;
+ };
+ send(1,0,healthy);assert.equal(send(2,17,healthy).motionSteps,0);
+ assert.ok(send(3,34,congested).motionSteps>0);
+ assert.ok(send(4,5033,healthy).motionSteps>0,'do not oscillate as compressed traffic drains');
+ assert.equal(send(5,5035,healthy).motionSteps,0,'healthy path eventually regains lower CPU mode');
+ sender.reset();recv.reset();send(6,6000,healthy);assert.equal(send(7,6017,healthy).motionSteps,0);
+ const legacy=new LanDeltaSender({ordered:true,motionReference:false});
+ const t1=target(1);t1.now=0;legacy.commit(legacy.prepareForDelivery(t1,congested));
+ const t2=target(2);t2.now=17;assert.equal(legacy.prepareForDelivery(t2,congested).motionSteps,0,'never exceed negotiated capability');
+});

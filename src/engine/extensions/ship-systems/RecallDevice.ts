@@ -1,3 +1,4 @@
+import { nativePhaseReader } from '../NativePhaseReaders';
 import { needsWings } from './Requirements';
 import type { Ship } from '../../simulation/Ship';
 import type { ShipSystem } from '../../simulation/ShipSystem';
@@ -11,9 +12,9 @@ function capture(carrier: Ship, world: SystemWorld, system: ShipSystem): Ship[] 
     targets = world.ships.filter(c => c.sourceCarrier === carrier && !!c.flightDeckWingId && !c.isDead && !c.isDocked);
     recalled.set(system, targets);
     const serial = system.activationSerial;
-    for (const craft of targets) craft.externalPhaseEffects.set(system, () =>
+    for (const craft of targets) craft.externalPhaseEffects.set(system, nativePhaseReader(() =>
       !carrier.isDead && carrier.hullHp > 0 && !craft.isDead && system.isActive && system.activationSerial === serial
-        ? 1 - .5 * system.effectLevel : undefined);
+        ? 1 - .5 * system.effectLevel : undefined));
   }
   return targets;
 }

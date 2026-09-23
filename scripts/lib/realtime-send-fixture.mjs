@@ -18,15 +18,17 @@ export function producer(connection) {
  let engine={playerShip:{aimTargetWorld:{x:0,y:0}}}, launched=true, synced=true;
  let seq=0, keys=0, firing=false, pointerActive=true, actions=[], pointer={x:0,y:0};
  let canvas={}, camera={}, zoom=1, focused=true;
- let inputBudget=new InputSendBudget(), sentInputs=new Map(), records=[];
+ let inputBudget=new InputSendBudget(), sentInputs=new Map(), records=[], fireRecords=[], turretRecords=[];
  const active=()=>focused, resetInput=()=>{keys=0;firing=false;pointerActive=false;actions=[];};
  const clientToCombatWorld=(p)=>p;
  const prediction={record:(input,now)=>records.push({input,now})};
+ const turretPrediction={record:(input,now)=>turretRecords.push({input,now})};
+ const firePrediction={record:(_engine,input,now,enabled)=>fireRecords.push({input,now,enabled})};
  const send=message=>connection.send({...message,matchId:'test',syncId:'current'});
  ${inputHandler}
- return {tick:sendInput, set:(patch)=>{if('keys' in patch)keys=patch.keys;if('x' in patch)pointer={x:patch.x,y:0};if('focused' in patch)focused=patch.focused;},
+ return {tick:sendInput, set:(patch)=>{if('keys' in patch)keys=patch.keys;if('x' in patch)pointer={x:patch.x,y:0};if('focused' in patch)focused=patch.focused;if('firing' in patch)firing=patch.firing;},
   action:(id)=>{if(actions.length<16)actions.push({id,kind:'shield'});},
-  get actions(){return actions;},get seq(){return seq;},get records(){return records;}};
+  get actions(){return actions;},get seq(){return seq;},get records(){return records;},get fireRecords(){return fireRecords;},get turretRecords(){return turretRecords;}};
 }
 `, loader: 'ts', resolveDir: process.cwd() }, bundle: true, platform: 'browser', format: 'cjs', write: false, logLevel: 'silent', define: { __LAN_BUILD_ID__: '"offline"' }, plugins: protocolSource ? [{name:'offline-baseline',setup(b){b.onLoad({filter:/[\\/]protocol\.ts$/},args=>({contents:protocolSource,loader:'ts',resolveDir:path.dirname(args.path)}));}}] : [] })).outputFiles[0].text;
 return function fixture(transport) {

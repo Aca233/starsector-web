@@ -3,6 +3,9 @@ import type { SystemWorld, ShipSystemDefinition, SystemWeaponType } from '../ext
 import type { Ship } from './Ship';
 import type { Vector2 } from '../math/Vector2';
 import { combineSystemModifiers } from '../extensions/ship-systems/Modifiers';
+import { OwnedNativeSystemModifiers } from './OwnedNativeSystemModifiers';
+
+const ownedModifierSystems = new WeakSet<ShipSystem>();
 
 /** Content references registered IDs; extending systems never requires widening an enum. */
 export type ShipSystemType = string;
@@ -10,6 +13,23 @@ export type ShipSystemState = 'IDLE' | 'IN' | 'ACTIVE' | 'OUT' | 'COOLDOWN';
 
 /** Shared lifecycle only. Timing, effects, AI, presentation and controls belong to definitions. */
 export class ShipSystem {
+  /** Internal opt-in for a runtime that never exports mutable Ship/System objects.
+   * Install once, without adding a branch/cache lookup to legacy stat queries. */
+  public enableOwnedNativeModifiers(): boolean {
+    if (ownedModifierSystems.has(this)) return true;
+    if (Object.getPrototypeOf(this) !== ShipSystem.prototype) return false;
+    const reader = OwnedNativeSystemModifiers.create(this.definition);
+    if (!reader) return false;
+    // Non-enumerable: derived cache/closures never enter snapshots or projections.
+    // Only own modifiers are memoized; preserve the original live, ordered fold.
+    Object.defineProperty(this, 'modifiers', { value: (capacity = this.baseFluxCapacity) => {
+      const own = reader.read(this, capacity);
+      const composed = this.auxiliary?.available ? combineSystemModifiers(own, this.auxiliary.modifiers(capacity)) : own;
+      return this.owner?.system === this && !this.owner.runtimeModifiers.empty ? combineSystemModifiers(composed, this.owner.runtimeModifiers.value) : composed;
+    } });
+    ownedModifierSystems.add(this);
+    return true;
+  }
   public readonly definition: ShipSystemDefinition;
   /** Compatibility composition chain (other tactical slots, then defense); never advances siblings. */
   public auxiliary?: ShipSystem;

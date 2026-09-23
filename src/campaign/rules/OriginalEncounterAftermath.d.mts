@@ -1,0 +1,10 @@
+import type {OriginalEncounterState,OriginalEncounterSideState} from './OriginalEncounterState.mjs';
+import type {OriginalFleetEncounterServices} from './OriginalFleetEncounterContext.mjs';
+import type {OriginalNativeFleetMember} from './OriginalFleetData.mjs';
+import type {OriginalConstructedCampaignFleet} from './OriginalCampaignFleet.mjs';
+export function originalEncounterScuttlingBonus(member:OriginalNativeFleetMember,services?:OriginalFleetEncounterServices):[number,number];
+export function gainOriginalEncounterOfficerXP(state:OriginalEncounterState,side:OriginalEncounterSideState,xp:number,services?:OriginalFleetEncounterServices):void;
+export function gainOriginalEncounterXP(state:OriginalEncounterState,services?:OriginalFleetEncounterServices):void;
+export function addOriginalEncounterPotentialOfficer(state:OriginalEncounterState,services?:OriginalFleetEncounterServices):void;
+export function forgetOriginalEncounterTransponder(fleet:OriginalConstructedCampaignFleet,services?:OriginalFleetEncounterServices):void;
+export function applyOriginalEncounterAfterBattleEffects(state:OriginalEncounterState,services?:OriginalFleetEncounterServices):void;

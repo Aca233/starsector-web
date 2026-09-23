@@ -4,7 +4,7 @@ import { pickEmpShipTarget } from '../../simulation/systems/weapon/TachyonLanceE
 import { damageToMissiles } from '../../simulation/systems/weapon/DamageToMissiles';
 import { projectileOutgoingMultiplier } from '../../simulation/systems/weapon/OutgoingDamage';
 import { highFrequencyMotes } from '../ship-systems/MoteState';
-import { sound } from '../../audio/SoundManager';
+import { combatAudio as sound } from '../../audio/CombatAudioEvents';
 export const moteHit:WeaponEffectDefinition={
   id:'com.fs.starfarer.api.impl.combat.MoteOnHitEffect',
   resources:{sounds:['mote_attractor_impact_emp_arc','mote_attractor_impact_normal','mote_attractor_impact_damage']},

@@ -1,0 +1,532 @@
+{
+  "schemaVersion": 1,
+  "originalReference": "Starsector 0.98a-RC8",
+  "scope": "military-industry-apply-effects-not-fleet-spawning",
+  "sources": {
+    "decompiled/starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/MilitaryBase.java": {
+      "sha256": "ef451be1bb529e202f9792bc494467fe3b7d1aed42713aa62b71594909682f87"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/ItemEffectsRepo.java": {
+      "sha256": "2d845c39865f81604b439af70d657ec9ca8d86fc877232e3ca7aadb6ccd719a9"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/BaseIndustry.java": {
+      "sha256": "bc3ff7aee903318926a532910fd6a1495ff3db3cfd7a1e345388d70bf718ace8"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/BaseInstallableItemEffect.java": {
+      "sha256": "955972ca614de7e153af069382780e176b2e87fe3c800f01b7282f286ac285ea"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/ConstructionQueue.java": {
+      "sha256": "109c39c3bd41ce4555bb3eed66c724fb88512eb39f55349dba0a6406d64e49b0"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/impl/campaign/CoreLifecyclePluginImpl.java": {
+      "sha256": "ca7384b9f6a8ff9b82faf4df9e1e896ce0e3222c721bd68712146c1130070898"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/impl/campaign/fleets/RouteManager.java": {
+      "sha256": "5a7365746f0b5f250dd8ea6e5339a66ad41ed8e0679fa3e0a7716f8750789640"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/impl/campaign/fleets/FleetFactory.java": {
+      "sha256": "390ba629e1d32848b7609163bf0f4b569c0e54fd11417be81515c716abeac8b5"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/util/IntervalUtil.java": {
+      "sha256": "9fda62d3a881d45e0fe0635435375ee7cea7f81663c2ce32bc671a5ef6ce9878"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/util/WeightedRandomPicker.java": {
+      "sha256": "244cb2a21e4c26e9ae1c5904b16fff2064f9744df0678fae84427a2159a2e705"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/util/Misc.java": {
+      "sha256": "067e4d2664eca98929e9e46ba8ada8468769c19dcd12cce8c8a3c730e14d2ffb"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/combat/StatBonus.java": {
+      "sha256": "1b0f272d231f28c737bfc7c6c70bfa00d0d2c9bb6af2c41b2bfa9b5c89028ea0"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/combat/MutableStat.java": {
+      "sha256": "a584da937e50822808fb80367183d8bd5b7ded64600b8b78aebbc8ec4cc03f21"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/rules/Memory.java": {
+      "sha256": "a034f0c2629c479fd83ec7d149c7503fa8b3e5b2e896e347d62d153269ed2c8d"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/save/CampaignGameManager.java": {
+      "sha256": "8ebf0c86c896768c7bd4d124fba4b2005e2f185bcf0e2ad377b355995836ddc5"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/econ/Market.java": {
+      "sha256": "8ca0c019abc8543a80fa63c3826b3ac1f766af3dbc35875161842306378aa945"
+    },
+    "starsector-core/data/campaign/industries.csv": {
+      "sha256": "dce37cbd88bb844194259fa597da42fa36f15ec26897e1de0202650765ce3656"
+    },
+    "starsector-core/data/campaign/special_items.csv": {
+      "sha256": "c68e42eca0b1efe0367a2452014d586cfee52b1916bb707044e4adc6449779f8"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/ShipQuality.java": {
+      "sha256": "cfdf815ff24485289986f722892544413e8a2388e5138faa1be844bca2f6eaf8"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/impl/campaign/DebugFlags.java": {
+      "sha256": "917771c46f7e6e17216f2d956e780cb89476f52396d0802cc261170c2046df01"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/Faction.java": {
+      "sha256": "9803ee657a0a696bfb2968f1ba13e88936c5fd614e2ed8138dbea5ec42610853"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/loading/specs/FactionDoctrine.java": {
+      "sha256": "d8f810cd0444f284947af3d652ea56ce67ff6cbde935142ea4ff66d066a9c4b8"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/loading/SpecStore.java": {
+      "sha256": "23151e3c6f2e01762982baa962d16349db1dd320f9050bf66ee53b51fed9d003"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/BaseCampaignEntity.java": {
+      "sha256": "865edfbe067e2c522c3eb889a92b9c8e1c8dfe4fe2fb75432ea137b21a277670"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/BaseLocation.java": {
+      "sha256": "117ab6012c0a62d2f1f16de7578779d02436625f3d0f0352736ace8d09ff210e"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/StarSystem.java": {
+      "sha256": "5046b7505286cf6454e0a29a538890ae2b3922d018a58220c4b382b8707756bd"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/fleet/CampaignFleet.java": {
+      "sha256": "3f668722703982ef12719c2635c831176748e63c5b64521dd871574639f26a5f"
+    },
+    "starsector-core/data/world/factions/derelict.faction": {
+      "sha256": "a30044e0e717c5a2624b0b0556ab7add25b0e3940fc21f00ae9b9c974c4ce2a3"
+    },
+    "starsector-core/data/world/factions/dweller.faction": {
+      "sha256": "0a6014648fae73b108d3020d07eefa9eebe07be3df8cf4a2215142173696453c"
+    },
+    "starsector-core/data/world/factions/hegemony.faction": {
+      "sha256": "48d9134c2e5a5601e7bc608afd2b0319dab5211738454d53d5cc3a32bbfa076e"
+    },
+    "starsector-core/data/world/factions/independent.faction": {
+      "sha256": "4d9c1c5efdb53108238088bf25a935c8c338d0bd2f1a63c5e764fe27d7f29102"
+    },
+    "starsector-core/data/world/factions/knights_of_ludd.faction": {
+      "sha256": "0db5ae57953379706765c2831225e0f1f47bc33ac839e1f4223380271d9cbe33"
+    },
+    "starsector-core/data/world/factions/lions_guard.faction": {
+      "sha256": "7046013c8fcdcd54c8417d3b50731e3106f2dffde1d224ce43118e076118cb60"
+    },
+    "starsector-core/data/world/factions/luddic_church.faction": {
+      "sha256": "ca65c53a0e490c2bcae1f0be42d464db2438f805abfab6b92fc9c04209e97fec"
+    },
+    "starsector-core/data/world/factions/luddic_path.faction": {
+      "sha256": "e212720dc6b13ceee15f01c2edd6cd536ee083ad72c43dc785c0101172ef1d26"
+    },
+    "starsector-core/data/world/factions/mercenary.faction": {
+      "sha256": "e9799fde635efb151c0e435eb6da4647718def63198f84541e6c4c2dad4ff0f3"
+    },
+    "starsector-core/data/world/factions/neutral.faction": {
+      "sha256": "63149bba0be69446d9bec841400b50aab8de94372c0ad1779b09555cdf19f911"
+    },
+    "starsector-core/data/world/factions/omega.faction": {
+      "sha256": "cdf445ae23cdf68b56718e27152bc52e163aed5da760fc4da877c838a088367e"
+    },
+    "starsector-core/data/world/factions/persean_league.faction": {
+      "sha256": "f3484dacd89a941ef932cfa1f443d83fed482864db69a3bc903f2eab453545ab"
+    },
+    "starsector-core/data/world/factions/pirates.faction": {
+      "sha256": "2926d58ac74ff14610ecf1f02daa79d9a39161482a5cd54587795437f9cc7c7b"
+    },
+    "starsector-core/data/world/factions/player.faction": {
+      "sha256": "c7e9fc91d2f748edc8791ee9a6b0e5928812217a47fe5bec016d8728fdf4d8ce"
+    },
+    "starsector-core/data/world/factions/poor.faction": {
+      "sha256": "bd5d788cb78ce78c99143d391d0be8cff840c8792b1b8f62566d70555816bfe0"
+    },
+    "starsector-core/data/world/factions/remnants.faction": {
+      "sha256": "72d9d38e0aec5679faf46b0aec3218ac2b29a30349e00a58c6c5fb6fbf48344e"
+    },
+    "starsector-core/data/world/factions/scavengers.faction": {
+      "sha256": "20a2aa111f2b77358f5f619bcfc45f678a4d4d4117cb96f2caba32f8e74bf236"
+    },
+    "starsector-core/data/world/factions/sindrian_diktat.faction": {
+      "sha256": "0e0b21fd116409e37f203955091f8c81f1e4c1f8f49e51de19c01c2d99c55ea4"
+    },
+    "starsector-core/data/world/factions/sleeper.faction": {
+      "sha256": "2c82d1af3af143497f0270b550e44cf6fed26b19fff8e044c04a86bc3a0c67ef"
+    },
+    "starsector-core/data/world/factions/threat.faction": {
+      "sha256": "39aa7a73654425e955d2e18b9ae11e9fb30bf35b618cfbbe28fe17619dfe0e86"
+    },
+    "starsector-core/data/world/factions/tritachyon.faction": {
+      "sha256": "de1c844596ce883065edced39afba4e9346403347db2d782bf904b473788d962"
+    },
+    "starsector-core/data/config/settings.json": {
+      "sha256": "96f3f6aa457e85ab6480bf302e35d3e8df390339321711b982d45fbe71c4dfa9"
+    }
+  },
+  "constants": {
+    "OFFICER_PROB_MOD_PATROL_HQ": 0.10000000149011612,
+    "OFFICER_PROB_MOD_MILITARY_BASE": 0.20000000298023224,
+    "OFFICER_PROB_MOD_HIGH_COMMAND": 0.30000001192092896,
+    "DEFENSE_BONUS_PATROL": 0.10000000149011612,
+    "DEFENSE_BONUS_MILITARY": 0.20000000298023224,
+    "DEFENSE_BONUS_COMMAND": 0.30000001192092896,
+    "IMPROVE_NUM_PATROLS_BONUS": 1,
+    "ALPHA_CORE_BONUS": 0.25
+  },
+  "industries": {
+    "patrolhq": {
+      "tags": [
+        "patrol",
+        "unraidable",
+        "tactical_bombardment",
+        "structure"
+      ]
+    },
+    "militarybase": {
+      "tags": [
+        "military",
+        "unraidable",
+        "tactical_bombardment",
+        "industry"
+      ]
+    },
+    "highcommand": {
+      "tags": [
+        "command",
+        "unraidable",
+        "tactical_bombardment",
+        "industry"
+      ]
+    }
+  },
+  "industrySpecs": {
+    "population": {
+      "tags": [
+        "population",
+        "unraidable",
+        "no_saturation_bombardment"
+      ],
+      "upgradeId": null,
+      "buildTime": 0
+    },
+    "farming": {
+      "tags": [
+        "farming",
+        "industry",
+        "rural"
+      ],
+      "upgradeId": null,
+      "buildTime": 60
+    },
+    "aquaculture": {
+      "tags": [
+        "farming",
+        "industry",
+        "rural"
+      ],
+      "upgradeId": null,
+      "buildTime": 60
+    },
+    "mining": {
+      "tags": [
+        "mining",
+        "industry",
+        "industrial"
+      ],
+      "upgradeId": null,
+      "buildTime": 60
+    },
+    "techmining": {
+      "tags": [
+        "techmining",
+        "industry",
+        "industrial"
+      ],
+      "upgradeId": null,
+      "buildTime": 45
+    },
+    "refining": {
+      "tags": [
+        "refining",
+        "industry",
+        "industrial"
+      ],
+      "upgradeId": null,
+      "buildTime": 90
+    },
+    "spaceport": {
+      "tags": [
+        "spaceport",
+        "important",
+        "structure"
+      ],
+      "upgradeId": "megaport",
+      "buildTime": 15
+    },
+    "megaport": {
+      "tags": [
+        "spaceport",
+        "structure"
+      ],
+      "upgradeId": null,
+      "buildTime": 150
+    },
+    "lightindustry": {
+      "tags": [
+        "lightindustry",
+        "industry",
+        "rural"
+      ],
+      "upgradeId": null,
+      "buildTime": 90
+    },
+    "heavyindustry": {
+      "tags": [
+        "heavyindustry",
+        "uses_blueprints",
+        "industry",
+        "industrial"
+      ],
+      "upgradeId": "orbitalworks",
+      "buildTime": 120
+    },
+    "orbitalworks": {
+      "tags": [
+        "heavyindustry",
+        "uses_blueprints",
+        "industry",
+        "industrial"
+      ],
+      "upgradeId": null,
+      "buildTime": 150
+    },
+    "fuelprod": {
+      "tags": [
+        "fuelprod",
+        "industry",
+        "industrial"
+      ],
+      "upgradeId": null,
+      "buildTime": 120
+    },
+    "commerce": {
+      "tags": [
+        "industry",
+        "urban"
+      ],
+      "upgradeId": null,
+      "buildTime": 90
+    },
+    "station_base": {
+      "tags": [
+        "station",
+        "parent_item",
+        "important",
+        "structure"
+      ],
+      "upgradeId": null,
+      "buildTime": 0
+    },
+    "orbitalstation": {
+      "tags": [
+        "station",
+        "sub_item",
+        "unraidable",
+        "structure"
+      ],
+      "upgradeId": "battlestation",
+      "buildTime": 90
+    },
+    "battlestation": {
+      "tags": [
+        "station",
+        "battlestation",
+        "unraidable",
+        "structure"
+      ],
+      "upgradeId": "starfortress",
+      "buildTime": 120
+    },
+    "starfortress": {
+      "tags": [
+        "station",
+        "starfortress",
+        "unraidable",
+        "structure"
+      ],
+      "upgradeId": null,
+      "buildTime": 180
+    },
+    "orbitalstation_mid": {
+      "tags": [
+        "station",
+        "sub_item",
+        "unraidable",
+        "structure"
+      ],
+      "upgradeId": "battlestation_mid",
+      "buildTime": 90
+    },
+    "battlestation_mid": {
+      "tags": [
+        "station",
+        "battlestation",
+        "unraidable",
+        "structure"
+      ],
+      "upgradeId": "starfortress_mid",
+      "buildTime": 120
+    },
+    "starfortress_mid": {
+      "tags": [
+        "station",
+        "starfortress",
+        "unraidable",
+        "structure"
+      ],
+      "upgradeId": null,
+      "buildTime": 180
+    },
+    "orbitalstation_high": {
+      "tags": [
+        "station",
+        "sub_item",
+        "unraidable",
+        "structure"
+      ],
+      "upgradeId": "battlestation_high",
+      "buildTime": 90
+    },
+    "battlestation_high": {
+      "tags": [
+        "station",
+        "battlestation",
+        "unraidable",
+        "structure"
+      ],
+      "upgradeId": "starfortress_high",
+      "buildTime": 120
+    },
+    "starfortress_high": {
+      "tags": [
+        "station",
+        "starfortress",
+        "unraidable",
+        "structure"
+      ],
+      "upgradeId": null,
+      "buildTime": 180
+    },
+    "grounddefenses": {
+      "tags": [
+        "grounddefenses",
+        "unraidable",
+        "tactical_bombardment",
+        "structure"
+      ],
+      "upgradeId": "heavybatteries",
+      "buildTime": 60
+    },
+    "heavybatteries": {
+      "tags": [
+        "grounddefenses",
+        "unraidable",
+        "tactical_bombardment",
+        "structure"
+      ],
+      "upgradeId": null,
+      "buildTime": 90
+    },
+    "patrolhq": {
+      "tags": [
+        "patrol",
+        "unraidable",
+        "tactical_bombardment",
+        "structure"
+      ],
+      "upgradeId": "militarybase",
+      "buildTime": 60
+    },
+    "militarybase": {
+      "tags": [
+        "military",
+        "unraidable",
+        "tactical_bombardment",
+        "industry"
+      ],
+      "upgradeId": "highcommand",
+      "buildTime": 120
+    },
+    "highcommand": {
+      "tags": [
+        "command",
+        "unraidable",
+        "tactical_bombardment",
+        "industry"
+      ],
+      "upgradeId": null,
+      "buildTime": 120
+    },
+    "lionsguard": {
+      "tags": [
+        "military",
+        "unraidable",
+        "tactical_bombardment",
+        "structure",
+        "codex_unlockable"
+      ],
+      "upgradeId": null,
+      "buildTime": 60
+    },
+    "planetaryshield": {
+      "tags": [
+        "grounddefenses",
+        "structure",
+        "codex_unlockable"
+      ],
+      "upgradeId": null,
+      "buildTime": 90
+    },
+    "waystation": {
+      "tags": [
+        "waystation",
+        "structure"
+      ],
+      "upgradeId": null,
+      "buildTime": 60
+    },
+    "cryosanctum": {
+      "tags": [
+        "cryosanctum",
+        "structure",
+        "codex_unlockable"
+      ],
+      "upgradeId": null,
+      "buildTime": 90
+    },
+    "cryorevival": {
+      "tags": [
+        "cryorevival",
+        "structure",
+        "codex_unlockable"
+      ],
+      "upgradeId": null,
+      "buildTime": 60
+    }
+  },
+  "item": {
+    "id": "cryoarithmetic_engine",
+    "industryIds": [
+      "patrolhq",
+      "militarybase",
+      "highcommand"
+    ],
+    "conditionBonuses": {
+      "hot": 0.25,
+      "very_hot": 1
+    },
+    "requirementName": "炎热或极端炎热"
+  },
+  "settings": {
+    "doctrineFleetQualityPerPoint": 0.125,
+    "averagePatrolSpawnInterval": 14
+  },
+  "routeManager": {
+    "IN_OUT_PHASE_DAYS": 3,
+    "IN_OUT_PHASE_FRACTION": 0.20000000298023224,
+    "DAYS_SINCE_SEEN_BEFORE_DESPAWN_IF_FAR": 30,
+    "DAYS_SINCE_SEEN_BEFORE_DESPAWN_IF_CLOSE": 60,
+    "DESPAWN_DIST_LY_FAR": 4,
+    "DESPAWN_DIST_LY_CLOSE": 3,
+    "SPAWN_DIST_LY": 1.600000023841858,
+    "unitsPerLightYear": 2000
+  }
+}

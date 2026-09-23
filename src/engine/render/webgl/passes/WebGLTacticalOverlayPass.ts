@@ -1,6 +1,6 @@
 import { lockedCombatTarget } from '../../../runtime/CombatTargeting';
-import { combatWeaponRange } from '../../../simulation/WeaponRange';
-import { CombatEngine } from '../../../simulation/CombatEngine';
+import { renderWeaponRange } from '../../ShipRenderQueries';
+import type { CombatRenderView } from '../../CombatRenderView';
 import { WebGLPassContext } from '../WebGLPassContext';
 import { Vector2 } from '../../../math/Vector2';
 import { SpriteBatcher } from '../SpriteBatcher';
@@ -15,7 +15,7 @@ import { SpriteBatcher } from '../SpriteBatcher';
  */
 export class WebGLTacticalOverlayPass {
   public render(
-    engine: CombatEngine,
+    engine: CombatRenderView,
     ctx: WebGLPassContext,
     nowSec: number,
     _enemyPos: Vector2,
@@ -80,7 +80,7 @@ export class WebGLTacticalOverlayPass {
 
             const pFacingDeg = (p.facingRad * 180) / Math.PI;
             const f9 = pFacingDeg + mount.baseAngleDeg;
-            const f10 = combatWeaponRange(p, mount.spec);
+            const f10 = renderWeaponRange(p, mount);
             let f11 = Math.floor(f10 / 125.0);
             if (f11 < 1.0) f11 = 1.0;
             let f4 = f11;
@@ -183,7 +183,7 @@ export class WebGLTacticalOverlayPass {
 
   /** Visual-Lab-only geometry probes for V04 pivot, hardpoint, muzzle and nozzle validation. */
   public renderDebugMarkers(
-    engine: CombatEngine,
+    engine: CombatRenderView,
     ctx: WebGLPassContext,
     enemyPos: Vector2,
     playerPos: Vector2

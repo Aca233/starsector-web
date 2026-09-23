@@ -116,7 +116,7 @@ export function updateHulkBreakups(hulks: HulkFragment[], dt: number, random: Si
   }
 }
 
-export function getHulkAppearance(hulk: HulkFragment): { tint: number; alpha: number } {
+export function getHulkAppearance(hulk: Pick<HulkFragment, 'age' | 'visualBounds'> & { sourceShip: { spec: Ship['spec'] } }): { tint: number; alpha: number } {
   const tint = hulk.visualBounds === null ? 1 + (120 / 255 - 1) * Math.min(1, hulk.age / 0.5) : 120 / 255;
   const alpha = hulk.sourceShip.spec.hullSize === 'FIGHTER'
     ? Math.min(1, Math.max(0, (10.5 - hulk.age) / 0.5)) : 1;

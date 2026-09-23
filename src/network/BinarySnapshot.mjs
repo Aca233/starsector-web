@@ -1,4 +1,9 @@
+import { PackedSnapshotNumbers, validatePackedNumbers, readPackedNumbers } from './PackedSnapshotNumbers.mjs';
+import { SnapshotTapeReader, SNAPSHOT_TAPE_TAGS } from './SnapshotTape.mjs';
+import { boundedSnapshotReader } from './BoundedSnapshotReader.mjs';
+import { FIXED_TAG_BYTES } from './BinaryTagWidths.mjs';
 import { Encoder, Decoder } from '@msgpack/msgpack';
+import { RELAY_FRAME_FIELDS } from './CombatFrameSummary.mjs';
 import protocol from './protocol.json' with { type: 'json' };
 import { KEY_DICTIONARY } from './KeyDictionary.mjs';
 
@@ -78,7 +83,7 @@ function compatible(value, depth = 0) {
   if (typeof value === 'number') return Number.isFinite(value);
   if (typeof value === 'string') return validString(value);
   if (value == null || typeof value === 'boolean') return true;
-  if (typeof value !== 'object' || ArrayBuffer.isView(value) || value instanceof Date) return false;
+  if (typeof value !== 'object' || value instanceof PackedSnapshotNumbers || ArrayBuffer.isView(value) || value instanceof Date) return false;
   if (Array.isArray(value)) {
     for (const item of value) {
       if (depth >= MAX_DEPTH) return false;
@@ -104,45 +109,48 @@ function bytesOf(value) {
   throw Error('Invalid binary snapshot buffer');
 }
 /** Reject impossible lengths/depth before the general decoder allocates containers.
- * Only JSON-shaped MessagePack is accepted: no binary blobs, extensions or timestamps. */
-function preflight(bytes) {
+ * SWF3 alone adds validated numeric blocks; never arbitrary extensions/timestamps. */
+function preflight(bytes, packed = false) {
   if (!bytes.length || bytes.length > LIMIT) throw new RangeError('Binary snapshot exceeds budget');
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  let offset = 0;
-  const stack = [1];
-  const need = count => { if (offset + count > bytes.length) throw Error('Truncated binary snapshot'); };
-  const length = width => {
-    need(width);
-    const value = width === 1 ? bytes[offset] : width === 2 ? view.getUint16(offset) : view.getUint32(offset);
-    offset += width; return value;
-  };
-  while (stack.length) {
-    if (stack[stack.length - 1] === 0) { stack.pop(); continue; }
-    stack[stack.length - 1]--;
-    need(1); const tag = bytes[offset++];
-    let count = 0, skip = 0, map = false;
-    if (tag <= 0x7f || tag >= 0xe0 || tag === 0xc0 || tag === 0xc2 || tag === 0xc3) continue;
-    if (tag >= 0xa0 && tag <= 0xbf) skip = tag & 31;
-    else if (tag >= 0x90 && tag <= 0x9f) count = tag & 15;
-    else if (tag >= 0x80 && tag <= 0x8f) { count = (tag & 15) * 2; map = true; }
-    else switch (tag) {
-      case 0xcc: case 0xd0: skip = 1; break;
-      case 0xcd: case 0xd1: skip = 2; break;
-      case 0xca: case 0xce: case 0xd2: skip = 4; break;
-      case 0xcb: case 0xcf: case 0xd3: skip = 8; break;
-      case 0xd9: skip = length(1); break;
-      case 0xda: skip = length(2); break;
-      case 0xdb: skip = length(4); break;
-      case 0xdc: count = length(2); break;
-      case 0xdd: count = length(4); break;
-      case 0xde: count = length(2) * 2; map = true; break;
-      case 0xdf: count = length(4) * 2; map = true; break;
-      default: throw Error('Unsupported binary snapshot tag');
+  // Bounded explicit stack; validation still precedes all graph allocations.
+  const stack = new Uint32Array(MAX_DEPTH);
+  let offset = 0, level = 0, remaining = 1;
+  while (true) {
+    if (remaining === 0) { if (level === 0) break; remaining = stack[--level]; continue; }
+    remaining--;
+    if (offset >= bytes.length) throw Error('Truncated binary snapshot');
+    const tag = bytes[offset++], fixedWidth = FIXED_TAG_BYTES[tag];
+    if (fixedWidth) {
+      offset += fixedWidth - 1;
+      if (offset > bytes.length) throw Error('Truncated binary snapshot');
+      continue;
     }
-    need(skip); offset += skip;
+    let count = 0, skip = 0, map = false;
+    const bin = tag === 0xc4 || tag === 0xc5 || tag === 0xc6;
+    if (bin && !packed) throw Error('Unsupported binary snapshot tag');
+    if (tag >= 0x90 && tag <= 0x9f) count = tag & 15;
+    else if (tag >= 0x80 && tag <= 0x8f) { count = (tag & 15) * 2; map = true; }
+    else {
+      let width;
+      switch (tag) {
+        case 0xc4: case 0xd9: width = 1; break;
+        case 0xc5: case 0xda: case 0xdc: case 0xde: width = 2; break;
+        case 0xc6: case 0xdb: case 0xdd: case 0xdf: width = 4; break;
+        default: throw Error('Unsupported binary snapshot tag');
+      }
+      if (width > bytes.length - offset) throw Error('Truncated binary snapshot');
+      const length = width === 1 ? bytes[offset] : width === 2 ? view.getUint16(offset) : view.getUint32(offset);
+      offset += width;
+      if (tag <= 0xdb) skip = length;
+      else { map = tag >= 0xde; count = map ? length * 2 : length; }
+    }
+    if (skip > bytes.length - offset) throw Error('Truncated binary snapshot');
+    if (bin) validatePackedNumbers(bytes.subarray(offset, offset + skip));
+    offset += skip;
     if (count) {
-      if ((map && count > 131072) || count > bytes.length - offset || stack.length >= MAX_DEPTH) throw Error('Invalid binary snapshot container');
-      stack.push(count);
+      if ((map && count > 131072) || count > bytes.length - offset || level + 1 >= MAX_DEPTH) throw Error('Invalid binary snapshot container');
+      stack[level++] = remaining; remaining = count;
     }
   }
   if (offset !== bytes.length) throw Error('Trailing binary snapshot data');
@@ -162,10 +170,35 @@ export function encodeBinaryFrame(frame) {
 // No values/keys bypass validation. SWF2 prefixes a key-only MessagePack variant.
 // Numeric wire semantics stay unchanged (non-integer numbers: float64).
 const incompatible = {};
+/** One immutable captured tick only. These are independently owned bytes, not
+ * views into transferable outputs. Never cache mutable publication metadata or
+ * one-shot sounds; the owner drops this object before mutating the next tick.
+ * This is encoding reuse, NOT a network baseline or compressed wire protocol. */
+export class ProjectionEncodingCache {
+  constructor(frame) {
+    this.candidates = new WeakSet(); this.fragments = new WeakMap();
+    this.bytes = 0; this.hits = 0; this.packed = false;
+    for (const key of ['world', 'ships', 'crafts', 'craftSpecs', 'layouts', 'deployment']) {
+      const value = frame[key];
+      if (value && typeof value === 'object') this.candidates.add(value);
+    }
+  }
+  get(value) {
+    const bytes = this.fragments.get(value);
+    if (bytes) this.hits++;
+    return bytes;
+  }
+  retain(value, bytes, start, end) {
+    const size = end - start;
+    if (!this.candidates.has(value) || this.bytes + size > LIMIT) return;
+    this.fragments.set(value, bytes.slice(start, end)); this.bytes += size;
+  }
+}
 class ProjectedSnapshotEncoder extends SnapshotEncoder {
   reinitializeState() {
     super.reinitializeState();
-    this.writeU32(0x53574632); // SWF2, included in the library's one owned output copy.
+    this.packed = false;
+    this.writeU32(0x53574632); // Upgraded to SWF3 only when numeric blocks occur.
   }
   doEncode(value, depth) {
     if (depth > this.maxDepth) throw Error('Snapshot exceeds maximum depth');
@@ -173,7 +206,16 @@ class ProjectedSnapshotEncoder extends SnapshotEncoder {
     else if (typeof value === 'number') { if (!Number.isFinite(value)) throw incompatible; this.encodeNumber(value); }
     else if (typeof value === 'string') { if (!validString(value)) throw incompatible; this.encodeString(value); }
     else if (typeof value === 'boolean') this.encodeBoolean(value);
-    else if (typeof value !== 'object' || ArrayBuffer.isView(value) || value instanceof Date) throw incompatible;
+    else if (value instanceof PackedSnapshotNumbers) {
+      this.packed = true;
+      if (this.projectionCache) this.projectionCache.packed = true;
+      const size = value.byteLength;
+      this.ensureBufferSizeToWrite(size + 5);
+      if (size < 256) { this.writeU8(0xc4); this.writeU8(size); }
+      else if (size < 65536) { this.writeU8(0xc5); this.writeU16(size); }
+      else { this.writeU8(0xc6); this.writeU32(size); }
+      value.copyBytesTo(this.bytes, this.pos); this.pos += size;
+    } else if (typeof value !== 'object' || ArrayBuffer.isView(value) || value instanceof Date) throw incompatible;
     else if (Array.isArray(value)) this.encodeArray(value, depth);
     else this.encodeMap(value, depth);
   }
@@ -193,7 +235,16 @@ class ProjectedSnapshotEncoder extends SnapshotEncoder {
         const code = keyCodes[key];
         if (code === undefined) this.encodeString(key);
         else this.writeU8(code); // 0..127 positive fixint, ONLY in map-key position.
-        this.doEncode(item, depth + 1);
+        const cache = depth === 1 && item && typeof item === 'object' ? this.projectionCache : null;
+        const fragment = cache?.get(item);
+        if (fragment) {
+          this.ensureBufferSizeToWrite(fragment.length);
+          this.bytes.set(fragment, this.pos); this.pos += fragment.length;
+        } else if (cache) {
+          const start = this.pos;
+          this.doEncode(item, depth + 1);
+          cache.retain(item, this.bytes, start, this.pos);
+        } else this.doEncode(item, depth + 1);
       }
     }
   }
@@ -244,16 +295,129 @@ class FastProjectedSnapshotEncoder extends ProjectedSnapshotEncoder {
 const fastProjectedEncoder = new FastProjectedSnapshotEncoder({ ignoreUndefined: true, maxDepth: MAX_DEPTH });
 const projectedEncoder = new ProjectedSnapshotEncoder({ ignoreUndefined: true, maxDepth: MAX_DEPTH });
 /** Fresh captureCombat projection only. Null retains the existing JSON fallback. */
-export function encodeProjectedBinaryFrame(frame, fastNumbers = false) {
+export function encodeProjectedBinaryFrame(frame, fastNumbers = false, projectionCache = null) {
+  const writer = fastNumbers ? fastProjectedEncoder : projectedEncoder;
+  writer.projectionCache = projectionCache;
   try {
     // encode() owns its output; the next encode must not mutate transferred bytes.
-    const bytes = (fastNumbers ? fastProjectedEncoder : projectedEncoder).encode(frame);
+    const bytes = writer.encode(frame);
+    if (writer.packed || projectionCache?.packed) bytes[3] = 51; // SWF3, same dictionary
     if (bytes.length > LIMIT) throw new RangeError('Binary snapshot exceeds budget');
     return bytes;
   } catch (error) {
     if (error === incompatible) return null;
     throw error;
+  } finally {
+    writer.projectionCache = null; // Never retain a capture in the singleton encoder.
   }
+}
+
+// Private tape -> the SAME owned SWF2 bytes. No bulk DTO reconstruction: only
+// the small root sound batch is materialized, preserving the existing ID-based
+// display/network sound contract. Default synchronous encoding stays unchanged.
+class TapeSnapshotEncoder extends FastProjectedSnapshotEncoder {
+  tapeValue(reader, depth) {
+    if (depth > MAX_DEPTH || reader.pos >= reader.words) return reader.bad();
+    const at = reader.pos++, value = reader.numbers[at];
+    if (Number.isFinite(value)) { this.encodeNumber(value); return; }
+    const kind = reader.tags[at * 2 + 1] - SNAPSHOT_TAPE_TAGS.NAN, size = reader.tags[at * 2];
+    switch (kind) {
+      case SNAPSHOT_TAPE_TAGS.NIL:
+      case SNAPSHOT_TAPE_TAGS.FALSE:
+      case SNAPSHOT_TAPE_TAGS.TRUE:
+        if (size !== 0) return reader.bad();
+        this.writeU8(kind === SNAPSHOT_TAPE_TAGS.NIL ? 0xc0 : kind === SNAPSHOT_TAPE_TAGS.FALSE ? 0xc2 : 0xc3); return;
+      case SNAPSHOT_TAPE_TAGS.STRING: {
+        if (size >= reader.strings.length) return reader.bad();
+        const str = reader.strings[size]; if (!validString(str)) throw incompatible;
+        this.encodeString(str); return;
+      }
+      case SNAPSHOT_TAPE_TAGS.ARRAY:
+        if (size > reader.words - reader.pos || (size > 0 && depth >= MAX_DEPTH)) return reader.bad();
+        if (size < 16) this.writeU8(0x90 + size);
+        else if (size < 65536) { this.writeU8(0xdc); this.writeU16(size); }
+        else { this.writeU8(0xdd); this.writeU32(size); }
+        for (let i = 0; i < size; i++) {
+          // Common numeric rows do not re-enter the recursive dispatcher.
+          if (reader.pos >= reader.words) return reader.bad();
+          const n = reader.numbers[reader.pos];
+          if (Number.isFinite(n)) { reader.pos++; this.encodeNumber(n); }
+          else this.tapeValue(reader, depth + 1);
+        }
+        return;
+      case SNAPSHOT_TAPE_TAGS.MAP: {
+        if (size > (reader.words - reader.pos) / 2 || (size > 0 && depth >= MAX_DEPTH)) return reader.bad();
+        if (size < 16) this.writeU8(0x80 + size);
+        else if (size < 65536) { this.writeU8(0xde); this.writeU16(size); }
+        else { this.writeU8(0xdf); this.writeU32(size); }
+        // Most projection envelopes have just one or two fields. Check duplicate
+        // keys without allocating a Set for every vector/record wrapper.
+        const keys = size > 2 ? new Set() : null;
+        let first, lastIndex = -1, stringKeys = false;
+        for (let i = 0; i < size; i++) {
+          const key = reader.value(depth + 1);
+          if (typeof key !== 'string' || (keys ? keys.has(key) : i > 0 && key === first)) return reader.bad();
+          if (!validKey(key)) throw incompatible;
+          if (keys) keys.add(key); else first = key;
+          // Native Object.keys tapes have canonical integer-key order. A
+          // handcrafted tape with another order must fall back, not silently
+          // change the old object reader's JavaScript property enumeration.
+          const digit = key.charCodeAt(0), index = digit >= 48 && digit <= 57 ? Number(key) : -1;
+          if (Number.isInteger(index) && index >= 0 && index < 4294967295 && String(index) === key) {
+            if (stringKeys || index <= lastIndex) throw incompatible;
+            lastIndex = index;
+          } else stringKeys = true;
+          const code = keyCodes[key];
+          if (code === undefined) this.encodeString(key); else this.writeU8(code);
+          if (depth === 1 && key === 'sounds') {
+            this.soundStart = this.pos;
+            this.sounds = reader.value(depth + 1);
+            this.doEncode(this.sounds, depth + 1);
+            this.soundEnd = this.pos;
+          } else this.tapeValue(reader, depth + 1);
+        }
+        return;
+      }
+      default: return reader.bad();
+    }
+  }
+  transcode(tape) {
+    const reader = new SnapshotTapeReader(tape);
+    this.reinitializeState(); this.soundStart = -1; this.soundEnd = -1; this.sounds = undefined;
+    try {
+      this.tapeValue(reader, 1);
+      if (reader.pos !== reader.words) return reader.bad();
+      if (this.pos > LIMIT) throw new RangeError('Binary snapshot exceeds budget');
+      return {bytes:this.bytes.slice(0, this.pos), sounds:this.sounds, soundStart:this.soundStart, soundEnd:this.soundEnd};
+    } catch (error) {
+      if (error === incompatible) return null;
+      throw error;
+    } finally { this.sounds = undefined; }
+  }
+}
+const tapeSnapshotEncoder = new TapeSnapshotEncoder({ignoreUndefined:true,maxDepth:MAX_DEPTH});
+/** Private trusted SnapshotTape only, NOT bytes received from a peer. Null uses
+ * the broker's existing synchronous fallback; malformed tapes throw. */
+export function encodeProjectedSnapshotTape(tape) { return tapeSnapshotEncoder.transcode(tape); }
+// Sounds live one level below the frame root. Retain that exact depth budget.
+class TapeSoundEncoder extends FastProjectedSnapshotEncoder {
+  doEncode(value, depth) { super.doEncode(value, depth === 1 ? 2 : depth); }
+}
+const tapeSoundEncoder = new TapeSoundEncoder({ignoreUndefined:true,maxDepth:MAX_DEPTH});
+/** Replaces only a recorded root sounds value. All other bytes stay identical,
+ * including field order and dictionary IDs. Returned bytes own their storage. */
+export function replaceProjectedTapeSounds(frame, sounds) {
+  if (frame.soundStart < 0 || frame.soundEnd < frame.soundStart || frame.soundEnd > frame.bytes.length) throw Error('Missing tape sounds');
+  let encoded;
+  try { encoded = tapeSoundEncoder.encode(sounds); }
+  catch (error) { if (error === incompatible) return null; throw error; }
+  const payload = encoded.subarray(4); // Discard ONLY the helper's SWF2 magic.
+  const size = frame.bytes.length - (frame.soundEnd - frame.soundStart) + payload.length;
+  if (size > LIMIT) throw new RangeError('Binary snapshot exceeds budget');
+  const result = new Uint8Array(size);
+  result.set(frame.bytes.subarray(0, frame.soundStart)); result.set(payload, frame.soundStart);
+  result.set(frame.bytes.subarray(frame.soundEnd), frame.soundStart + payload.length);
+  return result;
 }
 
 // A complete, preflighted frame needs no streaming container-state machine.
@@ -264,7 +428,13 @@ const longText = new TextDecoder('utf-8');
 const legacyUtf8 = {};
 class SnapshotReader {
   offset = 0;
-  constructor(bytes, dictionary = false) { this.bytes = bytes; this.view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength); this.dictionary = dictionary; }
+  constructor(bytes, dictionary = false, packed = false) { this.bytes = bytes; this.view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength); this.dictionary = dictionary; this.packed = packed; }
+  binary(length) {
+    if (!this.packed) throw Error('Unsupported binary snapshot tag');
+    if (length > this.bytes.length - this.offset) throw Error('Truncated binary snapshot');
+    const value = readPackedNumbers(this.bytes.subarray(this.offset, this.offset + length));
+    this.offset += length; return value;
+  }
   string(length) {
     const start = this.offset, end = start + length, bytes = this.bytes;
     this.offset = end;
@@ -299,6 +469,10 @@ class SnapshotReader {
       else if (tag >= 224) { result[i] = tag - 256; this.offset = at + 1; }
       else if (tag === 0xcb) { result[i] = view.getFloat64(at + 1); this.offset = at + 9; }
       else if (tag === 0xc0) { result[i] = null; this.offset = at + 1; }
+      else if (tag === 0xc2 || tag === 0xc3) { result[i] = tag === 0xc3; this.offset = at + 1; }
+      else if (tag === 0xcc) { result[i] = bytes[at + 1]; this.offset = at + 2; }
+      else if (tag === 0xcd) { result[i] = view.getUint16(at + 1); this.offset = at + 3; }
+      else if (tag === 0xce) { result[i] = view.getUint32(at + 1); this.offset = at + 5; }
       else result[i] = this.read();
     }
     return result;
@@ -306,7 +480,15 @@ class SnapshotReader {
   map(length) {
     const result = {};
     for (let i = 0; i < length; i++) {
-      let key = this.read();
+      const at = this.offset, tag = this.bytes[at];
+      let key;
+      // preflight already validated the bytes. Dictionary uint keys need no
+      // generic value dispatch, but still pass dictionary/range/denylist checks.
+      if (this.dictionary && (tag < 128 || tag === 0xcc || tag === 0xcd)) {
+        if (tag < 128) { key = tag; this.offset = at + 1; }
+        else if (tag === 0xcc) { key = this.bytes[at + 1]; this.offset = at + 2; }
+        else { key = this.view.getUint16(at + 1); this.offset = at + 3; }
+      } else key = this.read();
       if (this.dictionary && typeof key === 'number') key = dictionaryKey(key);
       if (typeof key !== 'string' || key === '__proto__' || key === 'prototype' || key === 'constructor') throw Error('Invalid binary snapshot key');
       result[key] = this.read();
@@ -322,6 +504,9 @@ class SnapshotReader {
     if (tag >= 128 && tag < 144) return this.map(tag & 15);
     const p = this.offset;
     switch (tag) {
+      case 0xc4: this.offset++; return this.binary(this.bytes[p]);
+      case 0xc5: this.offset += 2; return this.binary(view.getUint16(p));
+      case 0xc6: this.offset += 4; return this.binary(view.getUint32(p));
       case 0xc0: return null;
       case 0xc2: return false;
       case 0xc3: return true;
@@ -346,21 +531,128 @@ class SnapshotReader {
     }
   }
 }
-export function decodeBinaryFrame(buffer) {
+/** Same preflight and all-map-key checks as a full decode, but no unneeded
+ * presentation object graph. Never accept a client-supplied summary instead.
+ * Scalars/strings use the original reader, including its legacy UTF8 fallback.
+ */
+class RelaySnapshotReader extends SnapshotReader {
+  projectileSpans = null;
+  key() {
+    let key = this.read();
+    if (this.dictionary && typeof key === 'number') key = dictionaryKey(key);
+    if (typeof key !== 'string' || key === '__proto__' || key === 'prototype' || key === 'constructor') throw Error('Invalid binary snapshot key');
+    return key;
+  }
+  container() {
+    const at = this.offset, tag = this.bytes[at];
+    if (tag >= 0x80 && tag < 0x90) { this.offset++; return { map: true, length: tag & 15 }; }
+    if (tag >= 0x90 && tag < 0xa0) { this.offset++; return { map: false, length: tag & 15 }; }
+    if (tag === 0xdc || tag === 0xde) { this.offset += 3; return { map: tag === 0xde, length: this.view.getUint16(at + 1) }; }
+    if (tag === 0xdd || tag === 0xdf) { this.offset += 5; return { map: tag === 0xdf, length: this.view.getUint32(at + 1) }; }
+    return null;
+  }
+  discard() {
+    const at = this.offset, tag = this.bytes[at];
+    // Dominant numeric tuples: validate bounds in preflight, advance without
+    // allocating their containing arrays or reading numbers nobody will use.
+    if (tag < 0x80 || tag >= 0xe0 || tag === 0xc0 || tag === 0xc2 || tag === 0xc3) { this.offset++; return; }
+    if (tag === 0xcc || tag === 0xd0) { this.offset += 2; return; }
+    if (tag === 0xcd || tag === 0xd1) { this.offset += 3; return; }
+    if (tag === 0xca || tag === 0xce || tag === 0xd2) { this.offset += 5; return; }
+    if (tag === 0xcb || tag === 0xcf || tag === 0xd3) { this.offset += 9; return; }
+    if (this.packed && (tag === 0xc4 || tag === 0xc5 || tag === 0xc6)) {
+      // preflight validated the block, including its finite/type/size contract.
+      const width = tag === 0xc4 ? 1 : tag === 0xc5 ? 2 : 4, at = this.offset + 1;
+      const length = width === 1 ? this.bytes[at] : width === 2 ? this.view.getUint16(at) : this.view.getUint32(at);
+      this.offset = at + width + length; return;
+    }
+    const c = this.container();
+    if (!c) { this.read(); return; }
+    for (let i = 0; i < c.length; i++) { if (c.map) this.key(); this.discard(); }
+  }
+  project(fields) {
+    if (fields === true) return this.read();
+    const c = this.container();
+    if (!c) return this.read(); // Preserve wrong types; semantic validation rejects them.
+    if (!c.map) {
+      if (Array.isArray(fields) && fields.length) {
+        const out = new Array(c.length);
+        for (let i = 0; i < c.length; i++) out[i] = this.project(fields[0]);
+        return out;
+      }
+      for (let i = 0; i < c.length; i++) this.discard();
+      return [];
+    }
+    const out = {}, spans = this.projectileSpans;
+    const root = spans && fields === RELAY_FRAME_FIELDS;
+    const world = spans && fields === RELAY_FRAME_FIELDS.world;
+    if (root) { spans.entries = c.length; spans.headerEnd = this.offset; }
+    for (let i = 0; i < c.length; i++) {
+      const key = this.key(), start = this.offset;
+      if (root && key === 'world') spans.worlds++;
+      if (root && key === 'projectileVisuals') spans.marked = true;
+      if (!Array.isArray(fields) && Object.hasOwn(fields, key)) out[key] = this.project(fields[key]);
+      else this.discard();
+      if (world && key === 'projectiles') {
+        spans.projectiles++; spans.start = start; spans.end = this.offset;
+      }
+    }
+    return out;
+  }
+}
+// Rare malformed-short-UTF8 compatibility falls back to the unchanged library
+// decoder, then uses this selection. It is not permission to bypass validation.
+function selectRelayFields(value, fields) {
+  if (fields === true || value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return Array.isArray(fields) && fields.length ? value.map(row => selectRelayFields(row, fields[0])) : [];
+  const out = {};
+  if (!Array.isArray(fields)) for (const key of Object.keys(fields)) if (Object.hasOwn(value, key)) out[key] = selectRelayFields(value[key], fields[key]);
+  return out;
+}
+// Rare malformed UTF8 compatibility still enforces the same numeric blocks.
+function hydratePacked(value) {
+  if (value instanceof Uint8Array) return readPackedNumbers(value);
+  if (Array.isArray(value)) { for (let i = 0; i < value.length; i++) value[i] = hydratePacked(value[i]); }
+  else if (value && typeof value === 'object') for (const key of Object.keys(value)) value[key] = hydratePacked(value[key]);
+  return value;
+}
+const BoundedSnapshotReader = boundedSnapshotReader(SnapshotReader, dictionaryKey, LIMIT, MAX_DEPTH);
+function decodeFrame(buffer, relay = false, spans = null) {
   const packet = bytesOf(buffer);
-  const dictionary = packet.length >= 4 && packet[0] === 83 && packet[1] === 87 && packet[2] === 70 && packet[3] === 50;
+  const signature = packet.length >= 4 && packet[0] === 83 && packet[1] === 87 && packet[2] === 70;
+  const packed = signature && packet[3] === 51;
+  const dictionary = packed || signature && packet[3] === 50;
   // Count the SWF2 prefix toward the SAME total budget; preflight depth is unchanged.
   if (dictionary && packet.length > LIMIT) throw new RangeError('Binary snapshot exceeds budget');
   const bytes = dictionary ? packet.subarray(4) : packet;
-  preflight(bytes);
-  try { return new SnapshotReader(bytes, dictionary).read(); }
+  // Ordinary packets are validated as they are decoded, not scanned twice.
+  // Keep the old parser for exact error precedence and rare legacy UTF8.
+  if (!relay) {
+    try { return new BoundedSnapshotReader(bytes, dictionary, packed).complete(); }
+    catch { /* No partial value escaped. Legacy validation below is authoritative. */ }
+  }
+  preflight(bytes, packed);
+  try {
+    if (!relay) return new SnapshotReader(bytes, dictionary, packed).read();
+    const reader = new RelaySnapshotReader(bytes, dictionary, packed);
+    // Only SWF2/3 have an unambiguous root prefix. Legacy/fallback decoding
+    // still validates normally, but can never expose partially collected spans.
+    if (dictionary) reader.projectileSpans = spans;
+    const value = reader.project(RELAY_FRAME_FIELDS);
+    if (dictionary && spans) spans.valid = true;
+    return value;
+  }
   catch (error) {
     // Preserve the pinned library's legacy handling of malformed short UTF-8.
     if (error !== legacyUtf8) throw error;
     // Decoder retains its input/partial stack; never share this instance.
-    return new Decoder(dictionary ? dictionaryDecoderOptions : decoderOptions).decode(bytes);
+    const options = dictionary ? dictionaryDecoderOptions : decoderOptions;
+    const decoded = new Decoder(packed ? {...options, maxBinLength: LIMIT} : options).decode(bytes);
+    const value = packed ? hydratePacked(decoded) : decoded;
+    return relay ? selectRelayFields(value, RELAY_FRAME_FIELDS) : value;
   }
 }
+export function decodeBinaryFrame(buffer) { return decodeFrame(buffer); }
 function validHeader(header) {
   return header && Object.keys(header).length === 2 && typeof header.matchId === 'string' && header.matchId.length > 0 && header.matchId.length <= 128 &&
     Number.isSafeInteger(header.seq) && header.seq >= 0;
@@ -376,12 +668,53 @@ export function encodeBinaryState(matchId, seq, frame) {
   result.set(meta, 8); result.set(payload, 8 + meta.length);
   return result;
 }
-export function decodeBinaryState(buffer) {
+function decodeState(buffer, relay = false, spans = null) {
   const bytes = bytesOf(buffer);
   if (bytes.length < 10 || bytes.length > LIMIT || bytes[0] !== 83 || bytes[1] !== 87 || bytes[2] !== 66 || bytes[3] !== 49) throw Error('Invalid binary state header');
   const size = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(4, true);
   if (!size || size > 1024 || 8 + size >= bytes.length) throw Error('Invalid binary state header');
   const header = JSON.parse(text.decode(bytes.subarray(8, 8 + size)));
   if (!validHeader(header)) throw Error('Invalid binary state header');
-  return { type: 'state', ...header, frame: decodeBinaryFrame(bytes.subarray(8 + size)) };
+  if (spans) spans.frameStart = 8 + size;
+  return { type: 'state', ...header, frame: decodeFrame(bytes.subarray(8 + size), relay, spans) };
+}
+export function decodeBinaryState(buffer) { return decodeState(buffer); }
+/** Relay-only projection. Must still pass summarizeCombatFrame before forwarding the ORIGINAL bytes. */
+export function decodeBinaryStateForRelay(buffer) { return decodeState(buffer, true); }
+
+/** Byte-splice only after the SAME bounded validation/projection walk completed.
+ * No second graph decode/encode and no host duplicate upload. Preserve every
+ * other byte, including SWB1 metadata, packed numbers and discrete events. */
+function deriveProjectileVariant(bytes, spans) {
+  if (!spans.valid || spans.worlds !== 1 || spans.projectiles !== 1 || spans.marked ||
+      !(spans.entries > 0 && spans.entries < 65536)) return null;
+  const count = spans.entries + 1, width = count < 16 ? 1 : count < 65536 ? 3 : 5;
+  const key = utf8.encode('projectileVisuals'), marker = new Uint8Array(key.length + 2);
+  marker[0] = 0xa0 + key.length; marker.set(key, 1); marker[marker.length - 1] = 1;
+  const length = bytes.length + width - spans.headerEnd - (spans.end - spans.start) + 1 + marker.length;
+  if (length >= bytes.length || length > LIMIT) return null;
+  const out = new Uint8Array(length), body = spans.frameStart + 4;
+  out.set(bytes.subarray(0, body));
+  if (width === 1) out[body] = 0x80 + count;
+  else {
+    out[body] = width === 3 ? 0xde : 0xdf;
+    const view = new DataView(out.buffer);
+    if (width === 3) view.setUint16(body + 1, count); else view.setUint32(body + 1, count);
+  }
+  let at = body + width;
+  const before = bytes.subarray(body + spans.headerEnd, body + spans.start);
+  out.set(before, at); at += before.length; out[at++] = 0x90;
+  const after = bytes.subarray(body + spans.end);
+  out.set(after, at); at += after.length; out.set(marker, at);
+  return out;
+}
+/** Incomplete relay state plus a lazy SAME-packet viewer variant. The caller
+ * must summarize/validate the state and require current consumed visual credit
+ * for EACH recipient before invoking/selecting the variant. Input bytes must
+ * remain immutable until that broadcast ends. Null means use the original. */
+export function decodeBinaryStateWithProjectileVariantForRelay(buffer) {
+  const bytes = bytesOf(buffer), spans = { valid: false, worlds: 0, projectiles: 0, marked: false };
+  const state = decodeState(bytes, true, spans);
+  let variant;
+  return { state, projectileVariant: () => variant === undefined ? (variant = deriveProjectileVariant(bytes, spans)) : variant };
 }

@@ -1,3 +1,4 @@
+import type { CombatDisplayReads } from '../engine/runtime/CombatDisplayReads';
 import type { CombatEngine } from '../engine/simulation/CombatEngine';
 import type { Match } from './protocol';
 
@@ -16,7 +17,7 @@ export interface LanTeamPresence {
 
 /** Count the frozen roster independently of what happens to be on-screen.
  * A budgeted reserve is not a missing texture; camera framing is not sensor visibility. */
-export function lanTeamPresence(match: Match, engine: CombatEngine): LanTeamPresence[] {
+export function lanTeamPresence(match: Match, engine: DisplaySource): LanTeamPresence[] {
   const teams = new Map<number, LanTeamPresence>();
   const get = (team: number) => {
     let row = teams.get(team);
@@ -46,3 +47,6 @@ export function lanTeamPresence(match: Match, engine: CombatEngine): LanTeamPres
   for (const row of teams.values()) row.missing = Math.max(0, row.total - row.known);
   return [...teams.values()].sort((a,b) => a.team - b.team);
 }
+
+/** Minimal display capabilities; never an authority-world requirement. */
+type DisplaySource = Pick<CombatDisplayReads, 'allCapitalShips' | 'playerShip'> & { readonly deployment: Pick<CombatEngine['deployment'], 'isReserve'> };

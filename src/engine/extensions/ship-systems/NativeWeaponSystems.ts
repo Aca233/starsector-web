@@ -1,7 +1,7 @@
 import data from './native-system-weapons.json';
 import { nativeSystem } from './NativeSystemFactory';
 import { Vector2 } from '../../math/Vector2';
-import { sound } from '../../audio/SoundManager';
+import { combatAudio as sound } from '../../audio/CombatAudioEvents';
 import type { Ship } from '../../simulation/Ship';
 import { systemWeaponLauncher } from './SystemWeaponLauncher';
 import type { WeaponMountSlotConfig } from '../../content/ShipSpec';

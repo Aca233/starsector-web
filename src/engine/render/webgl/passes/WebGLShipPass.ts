@@ -1,10 +1,12 @@
+import { presentationPulseOffset } from '../../ShipSystemPresentation';
+import { hullOverlayInViewport } from '../HullOverlayVisibility';
 import { activeSystemVisuals, renderSystemHull, weaponSystemGlows, systemTeleportCopies, systemTeleportBodyAlpha } from '../ShipSystemRenderer';
-import { pulsePusherOffset } from '../../../extensions/ship-systems/PulseDrive';
+import { renderPulseOffset, renderWeaponAngle } from '../../ShipRenderQueries';
 import { visualRandom } from '../../RenderDeterminism';
-import { CombatEngine } from '../../../simulation/CombatEngine';
+import type { CombatRenderView } from '../../CombatRenderView';
 import { WebGLPassContext } from '../WebGLPassContext';
-import { Ship } from '../../../simulation/Ship';
-import type { HulkFragment } from '../../../simulation/CombatTypes';
+import type { ShipRenderState as Ship } from '../../../render/ShipRenderState';
+import type { RenderHulk as HulkFragment } from '../../../render/ShipRenderState';
 import { getHulkAppearance } from '../../../visual/HulkVisuals';
 import { renderHulkHullCanvas } from '../../HulkSpriteMask';
 import { Vector2 } from '../../../math/Vector2';
@@ -30,6 +32,7 @@ import {
  * 6. 舰载机中队 (Fighters, Bombers & Dogfights)
  */
 export class WebGLShipPass {
+  public culledDamageOverlays = 0;
   private ventingRenderers = new Map<Ship, ShipVentingRenderer>();
   private overloadRenderers = new Map<Ship, ShipOverloadRenderer>();
   private hulkHullStates = new WeakMap<HulkFragment, { canvas: HTMLCanvasElement; ready: boolean; instanceId: number }>();
@@ -42,7 +45,7 @@ export class WebGLShipPass {
   }>();
   private damageOverlaySerial = 0;
 
-  public updateVisual(engine: CombatEngine, dt: number, random: VisualRandom): void {
+  public updateVisual(engine: CombatRenderView, dt: number, random: VisualRandom): void {
     const ships = new Set(engine.ships);
     for (const ship of this.ventingRenderers.keys()) if (!ships.has(ship)) this.ventingRenderers.delete(ship);
     for (const ship of this.overloadRenderers.keys()) if (!ships.has(ship) || ship.isDead) this.overloadRenderers.delete(ship);
@@ -71,7 +74,8 @@ export class WebGLShipPass {
     this.hulkHullStates = new WeakMap();
   }
 
-  public render(engine: CombatEngine, ctx: WebGLPassContext, nowSec: number) {
+  public render(engine: CombatRenderView, ctx: WebGLPassContext, nowSec: number) {
+    this.culledDamageOverlays = 0;
     const { batcher, textures, hitGlowTex, alpha } = ctx;
     const activeDamageTextures = new Set<string>();
     // Damage state advances before this synchronous pass. Reuse only its hot/cold
@@ -143,9 +147,11 @@ export class WebGLShipPass {
 
       if (systemVisuals.length) renderSystemHull(systemVisuals, 'over', ship, shipPos, shipFacing, shipTex, shipAlpha, ctx);
 
+      const overlayVisible = import.meta.env.VITE_CULL_DAMAGE_OVERLAYS === "false" || hullOverlayInViewport(shipPos.x, shipPos.y, shipFacing, ship.spec, ctx.viewport, ctx.zoom);
+      if (!overlayVisible && (ship.scorchMarks.length > 0 || ship.flux.isOverloaded)) this.culledDamageOverlays++;
       // Cell-centered native damage tiles retain their randomized size and armor-derived opacity.
       // Decals use ship alpha, not the disabled hull RGB tint; pieces keep only overlapping cell decals.
-      if (ship.scorchMarks.length > 0) {
+      if (overlayVisible && ship.scorchMarks.length > 0) {
         let damageState = this.damageOverlayStates.get(damageOwner);
         if (!damageState) {
           damageState = {
@@ -223,13 +229,13 @@ export class WebGLShipPass {
       }
 
       // I.java renders the hull-masked EMP texture before weapons; it follows the hull.
-      if (!hulk) this.overloadRenderers.get(ship)?.render(ship, shipPos, shipFacing, ctx);
+      if (!hulk && overlayVisible) this.overloadRenderers.get(ship)?.render(ship, shipPos, shipFacing, ctx);
 
       // Native non-firing pusher plates are artwork, not fake playable weapons.
       if (!hulk) for (const decoration of ship.spec.decorativeWeapons ?? []) {
         const info = textures.getTextureInfo(decoration.spriteUrl);
         if (!info.texture || info.width <= 0 || info.height <= 0) continue;
-        const compression = decoration.tags?.includes('pusherplate') ? Math.max(0, ...ship.allSystems.map(pulsePusherOffset)) : 0;
+        const compression = decoration.tags?.includes('pusherplate') ? Math.max(0, ...ship.allSystems.map(system => presentationPulseOffset(system) ?? renderPulseOffset(system))) : 0;
         const offset = new Vector2(decoration.x+compression,decoration.y).rotate(shipFacing);
         batcher.setBlendMode('NORMAL');
         batcher.drawSprite(info.texture,shipPos.x+offset.x,shipPos.y+offset.y,info.width,info.height,
@@ -244,7 +250,8 @@ export class WebGLShipPass {
         const mountOffset = new Vector2(mount.relativePos.x, mount.relativePos.y).rotate(shipFacing);
         const mountX = shipPos.x + mountOffset.x;
         const mountY = shipPos.y + mountOffset.y;
-        const mountFacing = isHardpoint ? (mount.baseAngleDeg * Math.PI) / 180 + shipFacing : mount.currentAngleRad + (hulk || copyAlpha !== undefined ? shipFacing - ship.facingRad : 0);
+        const predictedAngle = !hulk && copyAlpha === undefined ? renderWeaponAngle(mount, shipFacing) : undefined;
+        const mountFacing = isHardpoint ? (mount.baseAngleDeg * Math.PI) / 180 + shipFacing : predictedAngle ?? mount.currentAngleRad + (hulk || copyAlpha !== undefined ? shipFacing - ship.facingRad : 0);
         const weaponVisual = getWeaponVisualProfile(mount.spec.id, mount.spec.spawnType, mount.spec.isRocket, mount.spec.isBeam);
 
         // Some built-in hardpoints (notably Onslaught's TPC) deliberately specify hardpointSprite:"".

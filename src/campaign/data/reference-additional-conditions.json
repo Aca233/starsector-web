@@ -1,0 +1,440 @@
+{
+  "schemaVersion": 1,
+  "originalReference": "Starsector 0.98a-RC8",
+  "scope": "additional-condition-local-callbacks-not-restored-market",
+  "sources": {
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/WorldArid.java": {
+      "sha256": "06442e2b80953a8c52924f3e72d9896bd7b07b38478fafd60ef83c1a19439b7b"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/WorldBarrenMarginal.java": {
+      "sha256": "ec1251ee2f788c556e74f1cb1e5ffee5ac4c985750a190860fb358b7fc130eae"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/WorldIce.java": {
+      "sha256": "db0ef7f6bc2fc84667b1bfbc18e13efbeefe5338762d42493660cd580f23fa50"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/WorldTundra.java": {
+      "sha256": "66da49d780718d9bb749cfd9e73de9f8cd852a586891391035200fd78844e065"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/HighGravity.java": {
+      "sha256": "0cf1e4dafd939805db96a70303f2b12b0bcedbddcc76a349e40d4f4cc55681aa"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/LowGravity.java": {
+      "sha256": "97157b2f7484019106572755c63fca811ef81c3039610ebbf2b82f4f809a7e0b"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/MildClimate.java": {
+      "sha256": "d798994fa6e59f17940f10ce3949563c19b697ac14c9f77a9bd7aa38f13d68f7"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/SolarArray.java": {
+      "sha256": "46099d59be5639a8ee2d1f09f103795c3af2f0cba8c96038f3218287c90b451d"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/LuddicMajority.java": {
+      "sha256": "6a3fb08e939b2639b25c88a3ab5109f76d8dcdc1c8f16ea98546a522e7ae38dd"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/intel/bases/PirateActivity.java": {
+      "sha256": "33f572f1bc0643be81cf977dcf7812f96d5fd9420e1de8e3fef005d741b704d0"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/intel/bases/LuddicPathCells.java": {
+      "sha256": "2eee4ecc63c24c2bb9748ef66c188a160215c7b01189ccacb264acf9719b8a3a"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/ShippingDisruption.java": {
+      "sha256": "585885845f57ea3d36af534c28f13e8e6b4837635ecf714e62f4c10bad3ed20f"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/WorldFarming.java": {
+      "sha256": "951544cc5db221776825318cc25fffe0df96b75a97fa186ba6260287f05e4bdd"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/BaseHazardCondition.java": {
+      "sha256": "8ed8ef6e3c98ae05f9fb73cbbf5bf6f4d1c66f549aed3e0a9d699c6bf89b0f97"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/LCAttractorHigh.java": {
+      "sha256": "2d1212191c285ce6fff119583e17f34be7b9bfe4cd7a025072ceadb288daf7ab"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/intel/bases/PirateBaseIntel.java": {
+      "sha256": "40edc1681b084e25ec5be7d62a374daa2df652622e6e135f04711f73cc1c9450"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/intel/bases/LuddicPathCellsIntel.java": {
+      "sha256": "43852ff6ce2aa7cde54ca862e8b0f360f322bee22700fa44de95232930297fa8"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/combat/MutableStat.java": {
+      "sha256": "a584da937e50822808fb80367183d8bd5b7ded64600b8b78aebbc8ec4cc03f21"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/combat/StatBonus.java": {
+      "sha256": "1b0f272d231f28c737bfc7c6c70bfa00d0d2c9bb6af2c41b2bfa9b5c89028ea0"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/combat/MutableStatWithTempMods.java": {
+      "sha256": "1832af483d20baaf4be460047be8ac089f08b50503acf8425dd7182792f06e53"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/population/PopulationComposition.java": {
+      "sha256": "a78c9a3e34009e79fc4a000f47cc6326fba7045043de2be4782e8de15ff0f3f2"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/Market.java": {
+      "sha256": "8ca0c019abc8543a80fa63c3826b3ac1f766af3dbc35875161842306378aa945"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/CommodityOnMarket.java": {
+      "sha256": "333e58f37a1c7d508d766304ad64e759174b52dafa3fd205cf15efd9da371346"
+    },
+    "core:starfarer.api.jar": {
+      "sha256": "0798e624c949657ab524188928bb13d618a70cb451dc7da9789545569a05081b"
+    },
+    "core:json.jar": {
+      "sha256": "63c3541f323f3dfdd595da9257a2099b6a6c39f35a6b3909d86c48a8aa456911"
+    },
+    "core:data/campaign/procgen/condition_gen_data.csv": {
+      "sha256": "2bdca93201f5126b620d7c134d9f1c2789d5ef274f14e9f5430a57a7f863220f"
+    },
+    "core:data/campaign/market_conditions.csv": {
+      "sha256": "27329b3dce8082125c6338a62c7fe6cef5cf00ed7f1b531504d4686ffd14abab"
+    },
+    "core:data/campaign/industries.csv": {
+      "sha256": "dce37cbd88bb844194259fa597da42fa36f15ec26897e1de0202650765ce3656"
+    }
+  },
+  "conditions": {
+    "luddic_majority": {
+      "plugin": "com.fs.starfarer.api.impl.campaign.econ.LuddicMajority",
+      "className": "LuddicMajority",
+      "hazard": null
+    },
+    "ice": {
+      "plugin": "com.fs.starfarer.api.impl.campaign.econ.WorldIce",
+      "className": "WorldIce",
+      "hazard": null
+    },
+    "arid": {
+      "plugin": "com.fs.starfarer.api.impl.campaign.econ.WorldArid",
+      "className": "WorldArid",
+      "hazard": null
+    },
+    "barren_marginal": {
+      "plugin": "com.fs.starfarer.api.impl.campaign.econ.WorldBarrenMarginal",
+      "className": "WorldBarrenMarginal",
+      "hazard": null
+    },
+    "tundra": {
+      "plugin": "com.fs.starfarer.api.impl.campaign.econ.WorldTundra",
+      "className": "WorldTundra",
+      "hazard": null
+    },
+    "pirate_activity": {
+      "plugin": "com.fs.starfarer.api.impl.campaign.intel.bases.PirateActivity",
+      "className": "PirateActivity",
+      "hazard": null
+    },
+    "pather_cells": {
+      "plugin": "com.fs.starfarer.api.impl.campaign.intel.bases.LuddicPathCells",
+      "className": "LuddicPathCells",
+      "hazard": null
+    },
+    "shipping_disruption": {
+      "plugin": "com.fs.starfarer.api.impl.campaign.econ.ShippingDisruption",
+      "className": "ShippingDisruption",
+      "hazard": null
+    },
+    "mild_climate": {
+      "plugin": "com.fs.starfarer.api.impl.campaign.econ.MildClimate",
+      "className": "MildClimate",
+      "hazard": -0.25
+    },
+    "low_gravity": {
+      "plugin": "com.fs.starfarer.api.impl.campaign.econ.LowGravity",
+      "className": "LowGravity",
+      "hazard": 0.25
+    },
+    "high_gravity": {
+      "plugin": "com.fs.starfarer.api.impl.campaign.econ.HighGravity",
+      "className": "HighGravity",
+      "hazard": 0.5
+    },
+    "solar_array": {
+      "plugin": "com.fs.starfarer.api.impl.campaign.econ.SolarArray",
+      "className": "SolarArray",
+      "hazard": null
+    }
+  },
+  "industries": {
+    "population": {
+      "tags": [
+        "population",
+        "unraidable",
+        "no_saturation_bombardment"
+      ]
+    },
+    "farming": {
+      "tags": [
+        "farming",
+        "industry",
+        "rural"
+      ]
+    },
+    "aquaculture": {
+      "tags": [
+        "farming",
+        "industry",
+        "rural"
+      ]
+    },
+    "mining": {
+      "tags": [
+        "mining",
+        "industry",
+        "industrial"
+      ]
+    },
+    "techmining": {
+      "tags": [
+        "techmining",
+        "industry",
+        "industrial"
+      ]
+    },
+    "refining": {
+      "tags": [
+        "refining",
+        "industry",
+        "industrial"
+      ]
+    },
+    "spaceport": {
+      "tags": [
+        "spaceport",
+        "important",
+        "structure"
+      ]
+    },
+    "megaport": {
+      "tags": [
+        "spaceport",
+        "structure"
+      ]
+    },
+    "lightindustry": {
+      "tags": [
+        "lightindustry",
+        "industry",
+        "rural"
+      ]
+    },
+    "heavyindustry": {
+      "tags": [
+        "heavyindustry",
+        "uses_blueprints",
+        "industry",
+        "industrial"
+      ]
+    },
+    "orbitalworks": {
+      "tags": [
+        "heavyindustry",
+        "uses_blueprints",
+        "industry",
+        "industrial"
+      ]
+    },
+    "fuelprod": {
+      "tags": [
+        "fuelprod",
+        "industry",
+        "industrial"
+      ]
+    },
+    "commerce": {
+      "tags": [
+        "industry",
+        "urban"
+      ]
+    },
+    "station_base": {
+      "tags": [
+        "station",
+        "parent_item",
+        "important",
+        "structure"
+      ]
+    },
+    "orbitalstation": {
+      "tags": [
+        "station",
+        "sub_item",
+        "unraidable",
+        "structure"
+      ]
+    },
+    "battlestation": {
+      "tags": [
+        "station",
+        "battlestation",
+        "unraidable",
+        "structure"
+      ]
+    },
+    "starfortress": {
+      "tags": [
+        "station",
+        "starfortress",
+        "unraidable",
+        "structure"
+      ]
+    },
+    "orbitalstation_mid": {
+      "tags": [
+        "station",
+        "sub_item",
+        "unraidable",
+        "structure"
+      ]
+    },
+    "battlestation_mid": {
+      "tags": [
+        "station",
+        "battlestation",
+        "unraidable",
+        "structure"
+      ]
+    },
+    "starfortress_mid": {
+      "tags": [
+        "station",
+        "starfortress",
+        "unraidable",
+        "structure"
+      ]
+    },
+    "orbitalstation_high": {
+      "tags": [
+        "station",
+        "sub_item",
+        "unraidable",
+        "structure"
+      ]
+    },
+    "battlestation_high": {
+      "tags": [
+        "station",
+        "battlestation",
+        "unraidable",
+        "structure"
+      ]
+    },
+    "starfortress_high": {
+      "tags": [
+        "station",
+        "starfortress",
+        "unraidable",
+        "structure"
+      ]
+    },
+    "grounddefenses": {
+      "tags": [
+        "grounddefenses",
+        "unraidable",
+        "tactical_bombardment",
+        "structure"
+      ]
+    },
+    "heavybatteries": {
+      "tags": [
+        "grounddefenses",
+        "unraidable",
+        "tactical_bombardment",
+        "structure"
+      ]
+    },
+    "patrolhq": {
+      "tags": [
+        "patrol",
+        "unraidable",
+        "tactical_bombardment",
+        "structure"
+      ]
+    },
+    "militarybase": {
+      "tags": [
+        "military",
+        "unraidable",
+        "tactical_bombardment",
+        "industry"
+      ]
+    },
+    "highcommand": {
+      "tags": [
+        "command",
+        "unraidable",
+        "tactical_bombardment",
+        "industry"
+      ]
+    },
+    "lionsguard": {
+      "tags": [
+        "military",
+        "unraidable",
+        "tactical_bombardment",
+        "structure",
+        "codex_unlockable"
+      ]
+    },
+    "planetaryshield": {
+      "tags": [
+        "grounddefenses",
+        "structure",
+        "codex_unlockable"
+      ]
+    },
+    "waystation": {
+      "tags": [
+        "waystation",
+        "structure"
+      ]
+    },
+    "cryosanctum": {
+      "tags": [
+        "cryosanctum",
+        "structure",
+        "codex_unlockable"
+      ]
+    },
+    "cryorevival": {
+      "tags": [
+        "cryorevival",
+        "structure",
+        "codex_unlockable"
+      ]
+    }
+  },
+  "constants": {
+    "SolarArray.FARMING_BONUS": 2,
+    "LuddicMajority.STABILITY": 1,
+    "LuddicMajority.IMMIGRATION_BASE": 5,
+    "LuddicMajority.PRODUCTION_BASE_RURAL": 1,
+    "LuddicMajority.BONUS_MULT_DEFEATED_EXPEDITION": 2,
+    "ShippingDisruption.ACCESS_LOSS_DURATION": 120,
+    "ShippingDisruption.ACCESS_PER_UNITS_LOST": 0.10000000149011612,
+    "LuddicPathCells.STABLITY_PENALTY": 1,
+    "LowGravity.ACCESS_BONUS": 10
+  },
+  "suppressedConditions": [
+    "hot",
+    "poor_light"
+  ],
+  "productionOverrides": {},
+  "pirateTiers": {
+    "TIER_1_1MODULE": {
+      "accessibility": 0.10000000149011612,
+      "stability": 1
+    },
+    "TIER_2_1MODULE": {
+      "accessibility": 0.20000000298023224,
+      "stability": 1
+    },
+    "TIER_3_2MODULE": {
+      "accessibility": 0.30000001192092896,
+      "stability": 2
+    },
+    "TIER_4_3MODULE": {
+      "accessibility": 0.4000000059604645,
+      "stability": 2
+    },
+    "TIER_5_3MODULE": {
+      "accessibility": 0.5,
+      "stability": 3
+    }
+  }
+}

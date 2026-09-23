@@ -7,6 +7,8 @@
  * No Math.exp/sin/hypot, native engine hooks, field removal or quantization.
  * Unsupported representations fail to null so callers retain ordinary deltas.
  */
+import { validatePackedNumbers } from './PackedSnapshotNumbers.mjs';
+import { FIXED_TAG_BYTES } from './BinaryTagWidths.mjs';
 import { KEY_DICTIONARY } from './KeyDictionary.mjs';
 
 export const MOTION_REFERENCE_VERSION = 1;
@@ -53,6 +55,11 @@ class Reader {
     if (tag < 0x80) return { value: tag, offset: -1 };
     if (tag >= 0xe0) return { value: tag - 256, offset: -1 };
     if (tag === 0xc0 || tag === 0xc2 || tag === 0xc3) return { value: tag === 0xc0 ? null : tag === 0xc3, offset: -1 };
+    if (tag === 0xcb) {
+      this.guard(8); const value = this.view.getFloat64(this.at); this.at += 8;
+      if (!Number.isFinite(value)) invalid();
+      return { value, offset: start + 1 };
+    }
     const format = numericTags[tag];
     if (format) {
       this.guard(format[1]); const value = Number(this.view[format[0]](this.at)); this.at += format[1];
@@ -62,7 +69,13 @@ class Reader {
     return { value: this.string(tag), offset: -1 };
   }
   key() {
-    const key = this.scalar().value;
+    // Dictionary keys overwhelmingly use uint tags. Avoid boxing a scalar span
+    // which is immediately discarded; retain the same node and bounds checks.
+    const tag = this.bytes[this.at];
+    let key;
+    if (tag < 0x80 || tag === 0xcc || tag === 0xcd) {
+      this.visit(); this.byte(); key = tag < 0x80 ? tag : this.unsigned(tag === 0xcc ? 1 : 2);
+    } else key = this.scalar().value;
     const value = typeof key === 'number' && Number.isInteger(key) && key >= 0 && key < KEY_DICTIONARY.length ? KEY_DICTIONARY[key] : key;
     if (typeof value !== 'string' || denied.has(value)) invalid();
     return value;
@@ -84,26 +97,42 @@ class Reader {
   }
   skip(depth = 0) {
     this.visit(depth); const tag = this.bytes[this.at];
-    if (arrayTag(tag)) { const count = this.count('array', depth); for (let i = 0; i < count; i++) this.skip(depth + 1); return; }
-    if (mapTag(tag)) { const count = this.count('map', depth); for (let i = 0; i < count; i++) { this.key(); this.skip(depth + 1); } return; }
+    const fixedWidth = FIXED_TAG_BYTES[tag];
+    if (fixedWidth) { if (fixedWidth > this.bytes.length - this.at) invalid(); this.at += fixedWidth; return; }
+    if (arrayTag(tag) || mapTag(tag)) {
+      const map = mapTag(tag), count = this.count(map ? 'map' : 'array', depth);
+      for (let i = 0; i < count; i++) {
+        if (map) this.key(); // Never skip validation of a map key.
+        const width = FIXED_TAG_BYTES[this.bytes[this.at]];
+        if (width) {
+          // Inline leaf traversal, preserving the original one visit per value.
+          this.visit(depth + 1);
+          if (width > this.bytes.length - this.at) invalid();
+          this.at += width;
+        } else this.skip(depth + 1);
+      }
+      return;
+    }
     this.byte(); let length = 0;
     if (tag < 0x80 || tag >= 0xe0 || tag === 0xc0 || tag === 0xc2 || tag === 0xc3) return;
     if ((tag & 0xe0) === 0xa0) length = tag & 31;
     else if (tag === 0xd9) length = this.unsigned(1);
     else if (tag === 0xda) length = this.unsigned(2);
     else if (tag === 0xdb) length = this.unsigned(4);
-    else if (numericTags[tag]) length = numericTags[tag][1];
+    else if (this.packed && (tag === 0xc4 || tag === 0xc5 || tag === 0xc6)) {
+      length = this.unsigned(tag === 0xc4 ? 1 : tag === 0xc5 ? 2 : 4);
+      this.guard(length); validatePackedNumbers(this.bytes.subarray(this.at, this.at + length));
+    } else if (numericTags[tag]) length = numericTags[tag][1];
     else invalid();
     this.guard(length); this.at += length;
   }
-  number() { const { value, offset } = this.scalar(); if (typeof value !== 'number') invalid(); return { value, offset }; }
+  number() { const span = this.scalar(); if (typeof span.value !== 'number') invalid(); return span; }
   vector() {
-    let result;
-    if (this.map(key => {
-      if (key !== '$vector') return invalid(); result = [];
-      if (this.array(() => result.push(this.number()), 2) !== 2) invalid();
-    }) !== 1 || !result) invalid();
-    return result;
+    // The wire contract is exactly one $vector member and two numeric spans.
+    // Keep the same visits/bounds, without two per-vector callback closures,
+    // a one-key Set, and a push-grown array.
+    if (this.count('map') !== 1 || this.key() !== '$vector' || this.count('array') !== 2) invalid();
+    return [this.number(), this.number()];
   }
 }
 
@@ -119,7 +148,9 @@ function frameReader(value) {
   if (!header || Object.keys(header).length !== 2 || typeof header.matchId !== 'string' || !header.matchId || header.matchId.length > 128
     || !Number.isSafeInteger(header.seq) || header.seq < 0) invalid();
   reader.at = 8 + headerLength;
-  if (view.getUint32(reader.at) !== 0x53574632) invalid(); // Only the frozen SWF2 layout.
+  const magic = view.getUint32(reader.at);
+  reader.packed = magic === 0x53574633;
+  if (magic !== 0x53574632 && !reader.packed) invalid(); // Same frozen dictionary.
   reader.at += 4; return reader;
 }
 
@@ -133,6 +164,16 @@ export function motionSnapshotTick(bytes) {
     }
   } catch { /* Optional representation. */ }
   return null;
+}
+
+// Parser-private, stable-shaped spans. These are never exposed as game state.
+class MotionRow {
+  kind; pos; prevPos; vel; life; maxLife; rotation; angularVel; material; alpha;
+  elapsedTime; flightTimeRemaining; armingTimeRemaining; sourceMoveSpeed; rangeRemaining; didDamage;
+  constructor(kind, common, commonKeys) {
+    this.kind = kind;
+    if (common) for (const key of commonKeys) this[key] = common[key];
+  }
 }
 
 function collect(reader) {
@@ -162,7 +203,7 @@ function collect(reader) {
     }
   };
   const rowValues = (keys, kind) => {
-    const row = { kind };
+    const row = new MotionRow(kind);
     if (reader.array(i => { if (i >= keys.length) invalid(); const value = field(keys[i]); if (value !== undefined) row[keys[i]] = value; }, 2048) !== keys.length) invalid();
     accept(row);
   };
@@ -176,12 +217,14 @@ function collect(reader) {
   };
   const collection = kind => {
     if (arrayTag(reader.bytes[reader.at])) { reader.array(() => record(kind), MAX_ROWS); return; }
-    let keys, values = false;
-    if (reader.map(key => {
-      if (key === '$records') keys = layoutKeys(reader.scalar().value);
+    let keys, values = false, recipe = false;
+    const count = reader.map(key => {
+      if (key === '$dynamicParticles') { reader.skip(); recipe = true; }
+      else if (key === '$records') keys = layoutKeys(reader.scalar().value);
       else if (key === 'values' && keys) { reader.array(() => rowValues(keys, kind), MAX_ROWS); values = true; }
       else invalid();
-    }) !== 2 || !values) invalid();
+    });
+    if (recipe ? count !== 1 : count !== 2 || !values) invalid();
   };
   const fx = () => {
     let keys, values = false;
@@ -210,14 +253,14 @@ function collect(reader) {
               if (reader.array(j => { if (j >= indices.length) invalid(); const name = keys[indices[j]], value = field(name); if (value !== undefined) common[name] = fixed(value); }, 256) !== indices.length) invalid();
             } else invalid();
           }, 3) !== 3 || keys.length > 256) invalid();
-          const shared = new Set(indices); templates.push({ common, keys: keys.filter((_key, i) => !shared.has(i)), width: keys.length });
+          const shared = new Set(indices); templates.push({ common, commonKeys: Object.keys(common), keys: keys.filter((_key, i) => !shared.has(i)), width: keys.length });
         }, 128); gotTemplates = true;
       } else if (key === 'values' && gotTemplates) {
         reader.array(() => {
           if (!arrayTag(reader.bytes[reader.at])) { record('projectiles'); return; }
           let template, row;
           const count = reader.array(i => {
-            if (i === 0) { const id = reader.scalar().value; if (!Number.isInteger(id) || id < 0 || !templates[id]) invalid(); template = templates[id]; row = { ...template.common, kind: 'projectiles' }; }
+            if (i === 0) { const id = reader.scalar().value; if (!Number.isInteger(id) || id < 0 || !templates[id]) invalid(); template = templates[id]; row = new MotionRow('projectiles', template.common, template.commonKeys); }
             else { const name = template.keys[i - 1]; if (i > template.keys.length) invalid(); const value = field(name); if (value !== undefined) row[name] = value; }
           }, 257);
           if (!template || count !== template.keys.length + 1) invalid();

@@ -2,7 +2,7 @@ import { signedAngle } from '../../../math/Angles';
 import type { Ship } from '../../Ship';
 import type { WeaponMount } from '../../Weapon';
 /** Native WeaponGroup.weaponsThatWouldBeFiredAtPoint: manual trigger is not an AI aim gate. */
-export function manualFireSlots(ship: Ship, mounts: WeaponMount[], activeSlots: ReadonlySet<string>, alternatingSlot?: string): Set<string> {
+export function manualFireSlots(ship: Pick<Ship,'pos'|'facingRad'|'aimTargetWorld'>, mounts: WeaponMount[], activeSlots: ReadonlySet<string>, alternatingSlot?: string): Set<string> {
   if (alternatingSlot !== undefined) return new Set([alternatingSlot]);
   const result = new Set<string>();
   let closest: WeaponMount | undefined, closestDistance = Infinity;

@@ -116,3 +116,122 @@ test('nine complete Steam receipt/consumption diagnostics fit the existing recor
  const record=normalizeNetworkRecord(sample({transport:'steam',steam:{mode:'legacy-p2p',role:'host',receipts,peers:Array.from({length:9},()=>peer)}}));
  assert.ok(new TextEncoder().encode(JSON.stringify(record)).length<MAX_RECORD_BYTES);const ring=new NetworkDiagnosticBuffer();assert.equal(ring.write(record),true);
 });
+
+
+test('control-lane diagnostics preserve counters but never capability, URL or identity', () => {
+  const r = normalizeNetworkRecord(sample({ lan: { mode: 'lan-websocket', role: 'guest', receivers: [{
+    seat: 2, controlLane: { active: true, received: 12, sent: 7, fallbacks: 2, bufferedBytes: 0,
+      token: 'SECRET', url: 'SECRET', primary: { name: 'SECRET' }, peer: { id: 'SECRET' } }
+  }] } }));
+  assert.deepEqual(r.lan.receivers[0].controlLane, { active: true, received: 12, sent: 7, fallbacks: 2, bufferedBytes: 0, motionWire:null });
+  assert.ok(!JSON.stringify(r).includes('SECRET'));
+});
+
+test('layered state metrics retain real rates/windows without leaking entity data',()=>{
+ const record=normalizeNetworkRecord(sample({hud:{motionHz:58,motionAgeMs:12,motionTick:999,hz:4.6,fps:144},lan:{mode:'lan-websocket',role:'guest',receivers:[{seat:1,detailSkipped:300,motion:{active:true,fresh:false,sent:100,consumed:99,skipped:12,inflight:1,bytes:1800,capacity:4,idleRttMs:60,deliveryHz:58,acknowledgementMs:75,detailIntervalMs:200,data:'SECRET',ships:['SECRET']}}]}}));
+ assert.equal(record.hud.motionHz,58);assert.equal(record.hud.hz,4.6);assert.equal(record.hud.fps,144);
+ assert.equal(record.lan.receivers[0].motion.fresh,false);assert.equal(record.lan.receivers[0].motion.idleRttMs,60);assert.equal(record.lan.receivers[0].detailSkipped,300);
+ assert.ok(!JSON.stringify(record).includes('SECRET'));
+});
+
+test('codec-work deferral is reported distinctly from network/renderer ACK starvation',()=>{
+ const r=normalizeNetworkRecord(sample({transport:'steam',steam:{mode:'legacy-p2p',role:'host',peers:[{lastSnapshotSkip:'codec-work-budget'}]},lan:{mode:'lan-websocket',role:'guest',receivers:[{seat:1,codecDeferred:7}]}}));
+ assert.equal(r.steam.peers[0].lastSnapshotSkip,'codec-work-budget');assert.equal(r.lan.receivers[0].codecDeferred,7);
+});
+test('chunk scheduler diagnostics separate transport delivery, cancellation debt and teardown loss without tokens',()=>{
+ const record=normalizeNetworkRecord(sample({lan:{mode:'lan-websocket',role:'host',bulk:{adaptive:true,wireBytes:20480,flightBytes:4096,retiredBytes:2048,abandonedBytes:10240,retainedBytes:80000,ownedJobs:2,jobs:1,receipts:10,completed:1,limit:8192,token:'SECRET',ledger:'SECRET'},receivers:Array.from({length:9},(_,seat)=>({seat,bulkChunks:true,chunkDeferred:33,codecDeferred:5}))}}));
+ assert.equal(record.lan.bulk.wireBytes,20480);assert.equal(record.lan.bulk.abandonedBytes,10240);assert.equal(record.lan.bulk.retiredBytes,2048);
+ assert.equal(record.lan.bulk.completed,1);assert.equal(record.lan.receivers[0].chunkDeferred,33);assert.equal(record.lan.receivers[8].bulkChunks,true);
+ assert.ok(!JSON.stringify(record).includes('SECRET'));assert.ok(Buffer.byteLength(JSON.stringify(record))<MAX_RECORD_BYTES);
+ const ring=new NetworkDiagnosticBuffer();assert.equal(ring.write(record),true);
+ const unknown=normalizeNetworkRecord(sample({lan:{mode:'lan-websocket'}}));assert.equal(unknown.lan.bulk,null);
+});
+
+test('capture demand and projectile credits survive normalization without payloads, epochs or identities',()=>{
+ const r=normalizeNetworkRecord(sample({hud:{input:{projectileVisuals:{tick:123,received:40,entities:90,rows:['SECRET']}}},lan:{mode:'lan-websocket',captureDemand:{held:true,reason:'relay',heldTick:123,heldMs:200,granted:30,withheld:29,worker:'SECRET'},projectileVisuals:{publications:50,sent:49,fragment:5,consumed:44,flightBytes:7000,baseline:'SECRET'},receivers:[{seat:1,visualBulkSent:3}]}}));
+ assert.equal(r.lan.captureDemand.held,true);assert.equal(r.lan.captureDemand.reason,'relay');assert.equal(r.lan.captureDemand.withheld,29);
+ assert.equal(r.lan.projectileVisuals.fragment,5);assert.equal(r.lan.receivers[0].visualBulkSent,3);assert.equal(r.hud.input.projectileVisuals.received,40);
+ assert.ok(!JSON.stringify(r).includes('SECRET'));assert.ok(Buffer.byteLength(JSON.stringify(r))<MAX_RECORD_BYTES);
+ const absent=normalizeNetworkRecord(sample());assert.equal(absent.lan,null);assert.equal(absent.hud.input,null);
+});
+
+test('motion wire diagnostics count actual full/delta admissions without serializing the retained base',()=>{
+ const r=normalizeNetworkRecord(sample({lan:{mode:'lan-websocket',receivers:[{seat:1,controlLane:{active:true,motionWire:{full:1,delta:30,rawBytes:43000,packetBytes:23000,fallbacks:2,retainedBytes:1388,base:'SECRET',scope:'SECRET',choices:'SECRET'}}}]}}));
+ assert.equal(r.lan.receivers[0].controlLane.motionWire.delta,30);assert.equal(r.lan.receivers[0].controlLane.motionWire.retainedBytes,1388);assert.ok(!JSON.stringify(r).includes('SECRET'));
+});
+test('critical combat clocks, browser receipt debt and wire costs remain distinct from motion/whole-world Hz',()=>{
+ const r=normalizeNetworkRecord(sample({hud:{input:{criticalCombat:{tick:20,hz:19.5,ageMs:52,frame:'SECRET'}}},lan:{mode:'lan-websocket',criticalCombat:{publications:20,sent:40,consumed:35,discarded:2,abandonedBytes:900,wireBytes:5000,retainedBytes:700,payload:'SECRET'},receivers:[{seat:1,combat:{tick:19,inflight:2,bytes:1700,acknowledgementMs:120,scope:'SECRET'}}]}}));
+ assert.equal(r.hud.input.criticalCombat.hz,19.5);assert.equal(r.lan.criticalCombat.discarded,2);assert.equal(r.lan.receivers[0].combat.inflight,2);assert.ok(!JSON.stringify(r).includes('SECRET'));
+});
+
+test('relay decode diagnostics retain real activation counters, detach, strip secrets and expire',()=>{
+  const source=sample();source.pipeline.relayDecode={metadataFrames:17,fullFrames:2,lastMs:0.81,token:'SECRET',frame:{ships:['SECRET']}};
+  const result=normalizeNetworkRecord(source);
+  assert.deepEqual(result.pipeline.relayDecode,{metadataFrames:17,fullFrames:2,lastMs:0.81});assert.ok(!JSON.stringify(result).includes('SECRET'));
+  source.pipeline.relayDecode.metadataFrames=99;assert.equal(result.pipeline.relayDecode.metadataFrames,17);
+  source.pipelineAgeMs=5001;assert.equal(normalizeNetworkRecord(source).pipeline,null);
+});
+
+test('local firing diagnostics distinguish predictions, matches and no-projectile resolutions without leaking state',()=>{
+  const source=sample();source.hud.input={firePrediction:{predicted:8,matched:4,resolvedWithoutProjectile:2,expired:1,suppressed:3,pending:1,lastResponseMs:16.667,shipId:'SECRET',projectiles:['SECRET']}};
+  const r=normalizeNetworkRecord(source);assert.equal(r.hud.input.firePrediction.predicted,8);assert.equal(r.hud.input.firePrediction.pending,1);
+  assert.equal(r.hud.input.firePrediction.lastResponseMs,16.667);assert.ok(!JSON.stringify(r).includes('SECRET'));
+  source.hudAgeMs=2501;assert.equal(normalizeNetworkRecord(source).hud,null);
+});
+
+test('render culling reports active flags and frame work without raw scene data', () => {
+  const hud={...sample().hud,renderCulling:{spritesEnabled:true,hullOverlaysEnabled:false,shipSpritesRejected:123,hullOverlaysRejected:0,world:'SECRET'}};
+  assert.deepEqual(normalizeNetworkRecord(sample({hud})).hud.renderCulling,{spritesEnabled:true,hullOverlaysEnabled:false,shipSpritesRejected:123,hullOverlaysRejected:0});
+  assert.equal(normalizeNetworkRecord(sample()).hud.renderCulling,null);
+  hud.renderCulling.shipSpritesRejected=Infinity;
+  assert.equal(normalizeNetworkRecord(sample({hud})).hud.renderCulling.shipSpritesRejected,null);
+});
+test('serializer diagnostics distinguish explicit opt-in, real progress, and failure without logging arbitrary reasons',()=>{
+ for(const reason of ['opt-in','active','job-timeout','no-shared-memory']){
+  const input=sample();input.hud.authority.serializer={enabled:reason==='active',reason,ready:reason==='active',busy:false,submitted:12,completed:11,fallbacks:0,prepareMs:1,workerMs:2,transferBytes:4096};
+  const result=normalizeNetworkRecord(input).hud.authority.serializer;assert.equal(result.reason,reason);assert.equal(result.completed,11);assert.equal(result.enabled,reason==='active');
+ }
+ const input=sample();input.hud.authority.serializer={reason:'SECRET',url:'SECRET',enabled:false};assert.ok(!JSON.stringify(normalizeNetworkRecord(input)).includes('SECRET'));
+});
+test('capture plan diagnostics preserve actual reuse counts separately from network Hz',()=>{
+ const input=sample();input.hud.authority.capturePlans={enabled:true,hits:1200,compiled:80,fallbacks:1,shapes:79,world:'SECRET'};
+ const result=normalizeNetworkRecord(input);assert.deepEqual(result.hud.authority.capturePlans,{enabled:true,hits:1200,compiled:80,fallbacks:1,shapes:79});assert.equal(result.hud.hz,17);assert.ok(!JSON.stringify(result).includes('SECRET'));
+});
+
+test('movement prediction diagnostics report real activation and bounded errors, never fake network Hz',()=>{
+ const source=sample();source.hud.input={motionPrediction:{active:true,reason:'active',renderedFrames:60,suspendedFrames:4,reconciliations:10,hardSnaps:1,correctionDistance:2.5,correctionAngleDeg:1,replayMs:50,pendingInputs:3,ship:'SECRET',keys:'SECRET'}};
+ const r=normalizeNetworkRecord(source);assert.equal(r.hud.input.motionPrediction.active,true);assert.equal(r.hud.input.motionPrediction.replayMs,50);assert.equal(r.hud.hz,17);assert.ok(!JSON.stringify(r).includes('SECRET'));
+ source.hud.input.motionPrediction.reason='SECRET';source.hud.input.motionPrediction.correctionDistance=Infinity;
+ const invalid=normalizeNetworkRecord(source).hud.input.motionPrediction;assert.equal(invalid.reason,null);assert.equal(invalid.correctionDistance,null);
+ source.hudAgeMs=2501;assert.equal(normalizeNetworkRecord(source).hud,null);
+});
+
+test('local turret and held-repeat telemetry is bounded, privacy-safe and separate from Hz',()=>{
+ const source=sample();source.hud.input={turretPrediction:{active:true,reason:'active',renderedFrames:60,reconciliations:10,hardSnaps:0,mounts:2,pendingInputs:3,angles:'SECRET'},firePrediction:{predicted:10,repeated:8,observedCycles:1,recoveredCycles:2}};
+ const r=normalizeNetworkRecord(source);assert.equal(r.hud.input.turretPrediction.mounts,2);assert.equal(r.hud.input.firePrediction.repeated,8);assert.equal(r.hud.input.firePrediction.recoveredCycles,2);assert.equal(r.hud.hz,17);assert.ok(!JSON.stringify(r).includes('SECRET'));
+ source.hud.input.turretPrediction.reason='SECRET';assert.equal(normalizeNetworkRecord(source).hud.input.turretPrediction.reason,null);
+});
+
+test('projectile flight diagnostics report display work, not authority Hz or identities',()=>{
+ const source=sample();source.hud.input={projectileFlight:{active:true,tick:10,entities:43,renderedFrames:60,extrapolationMs:100,projectiles:'SECRET'}};
+ const r=normalizeNetworkRecord(source);assert.equal(r.hud.input.projectileFlight.entities,43);assert.equal(r.hud.input.projectileFlight.active,true);
+ assert.equal(r.hud.hz,17);assert.ok(!JSON.stringify(r).includes('SECRET'));
+});
+
+test('failure summaries retain engine class/category and numeric stack locations, never free text',async()=>{
+  const {summarizeNetworkFailure,networkCloseCause}=await import('../desktop/network-diagnostic-record.mjs');
+  const error=new TypeError("Cannot read properties of undefined (reading 'SECRET')");
+  error.stack="TypeError: SECRET\n    at privateFunction (http://SECRET/assets/host.worker.js?token=SECRET:81:23)\n    at C:\\Users\\SECRET\\worker.js:90:2";
+  const summary=summarizeNetworkFailure(error);
+  assert.deepEqual(summary,{name:'TypeError',code:'null-property',frames:[{line:81,column:23},{line:90,column:2}]});
+  const row=normalizeNetworkRecord(sample({event:'battle-failed',failureStage:'worker-runtime',failure:{...summary,message:'SECRET',stack:'SECRET'},close:{code:1013,cause:networkCloseCause('Steam link stalled'),reason:'SECRET'}}));
+  assert.equal(row.failure.code,'null-property');assert.equal(row.failure.name,'TypeError');assert.equal(row.close.cause,'steam-link-stalled');
+  assert.ok(!JSON.stringify(row).includes('SECRET'));
+  assert.equal(networkCloseCause('Steam 状态确认超过 8 秒未返回'),'steam-state-timeout');
+  assert.equal(networkCloseCause('Steam 前台消费确认超过 8 秒未返回'),'steam-consumption-timeout');
+  assert.equal(networkCloseCause('arbitrary SECRET'),'socket-close');
+  const bad=normalizeNetworkRecord(sample({failure:{name:'SECRET',code:'SECRET',frames:Array.from({length:30},()=>({line:Infinity,column:-1,text:'SECRET'}))},close:{cause:'SECRET'}}));
+  assert.equal(bad.failure.name,null);assert.equal(bad.failure.frames.length,6);assert.ok(!JSON.stringify(bad).includes('SECRET'));
+  const ring=new NetworkDiagnosticBuffer({maxRecords:1});ring.write({...row,monotonicMs:100});ring.write(sample({monotonicMs:2000}));
+  const info=JSON.parse(ring.text().split('\n')[0]);assert.equal(info.latestEvents.find(e=>e.event==='battle-failed').failure.code,'null-property');
+});

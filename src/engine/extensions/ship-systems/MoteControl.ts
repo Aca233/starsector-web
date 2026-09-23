@@ -3,7 +3,7 @@ import { nativeSystem } from './NativeSystemFactory';
 import { moteState,resetMotes,highFrequencyMotes } from './MoteState';
 import { spawnSystemProjectile } from './SystemProjectile';
 import { Vector2 } from '../../math/Vector2';
-import { sound } from '../../audio/SoundManager';
+import { combatAudio as sound } from '../../audio/CombatAudioEvents';
 import type { Ship } from '../../simulation/Ship';
 const attractorSlot=(ship:Ship)=>ship.spec.systemWeaponSlots?.find(s=>s.slotSize==='MEDIUM');
 export const moteControl=nativeSystem('mote_control',{

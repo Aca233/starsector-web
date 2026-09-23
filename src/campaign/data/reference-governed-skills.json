@@ -1,0 +1,367 @@
+{
+  "schemaVersion": 1,
+  "originalReference": "Starsector 0.98a-RC8",
+  "scope": "governed-market-skill-stat-effects-only",
+  "sources": {
+    "starsector-core/data/characters/skills/skill_data.csv": {
+      "sha256": "915d1464a50f9ba1dd026f6584fe90086e0e02e0fe7006b617171cc8477a11fb"
+    },
+    "starsector-core/data/characters/skills/aptitude_data.csv": {
+      "sha256": "8707cbb8b0ff1464fc203d87212dc7b0b1b19c97095b770f72f9e3264906f6aa"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/CharacterStats.java": {
+      "sha256": "3ee51840820aefd8422864d66e969add1729a0545c85b1ae9a58ea2dfa9b3962"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/econ/Market.java": {
+      "sha256": "8ca0c019abc8543a80fa63c3826b3ac1f766af3dbc35875161842306378aa945"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/loading/SkillSpec.java": {
+      "sha256": "304b3a92542be98b1ca6a4bdf23f065319a4968e1dd29b42bc47cbd2e63da806"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/loading/SpecStore.java": {
+      "sha256": "23151e3c6f2e01762982baa962d16349db1dd320f9050bf66ee53b51fed9d003"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/util/DynamicStats.java": {
+      "sha256": "377515f6b8ac988cb1d3f3205c6ec306c320645ba4e1cd1aff85f20e02ef2211"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/combat/MutableStat.java": {
+      "sha256": "a584da937e50822808fb80367183d8bd5b7ded64600b8b78aebbc8ec4cc03f21"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/combat/StatBonus.java": {
+      "sha256": "1b0f272d231f28c737bfc7c6c70bfa00d0d2c9bb6af2c41b2bfa9b5c89028ea0"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/impl/campaign/skills/Hypercognition.java": {
+      "sha256": "7b80f0256010ba9f2321c5c8017cf2d1b85270b6c1557c30cf2782f374192546"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/impl/campaign/skills/PlanetaryOperations.java": {
+      "sha256": "e2cbccdc20a5216165a6487555f8cb66d90c87753518abf892032323fad32728"
+    },
+    "decompiled/starfarer.api/com/fs/starfarer/api/impl/campaign/skills/SpaceOperations.java": {
+      "sha256": "9448ce35e88d0e95999f629b32eeceb1e61e6dad73512e3535bfb8f889c02033"
+    },
+    "starsector-core/data/characters/skills/aptitude_combat.skill": {
+      "sha256": "28b2ff0c5f4f29ccbf3c7669b49023ef57b802e001273a744273f0f8bd58f99d"
+    },
+    "starsector-core/data/characters/skills/aptitude_industry.skill": {
+      "sha256": "65b8293590b8920ef06bb1b5705708b7b070219ac8f77d7e15b65855218470f0"
+    },
+    "starsector-core/data/characters/skills/aptitude_leadership.skill": {
+      "sha256": "c16ac1d1a02e91c62d0cd93bd95fca9b092a37a9332f33d20ed67fc24d5a8ec1"
+    },
+    "starsector-core/data/characters/skills/aptitude_technology.skill": {
+      "sha256": "a3c0581d70820ae2b98b56b8a1d5a5b89cdcced7703469ee8bfd95ee9e6ea47e"
+    },
+    "starsector-core/data/characters/skills/automated_ships.skill": {
+      "sha256": "f85510ce6506979cebff04312e44622f5e88d443aed5bc5e76cd5b9364bb8e98"
+    },
+    "starsector-core/data/characters/skills/auxiliary_support.skill": {
+      "sha256": "0adc64a9fd0dc02925722abfbbc6bf1b033d7300c1dfffa85a5aed17d0cf2be1"
+    },
+    "starsector-core/data/characters/skills/ballistic_mastery.skill": {
+      "sha256": "cce386fffedba09255be44e556ea243f4cacb28b125c60b158458a89d28366c6"
+    },
+    "starsector-core/data/characters/skills/best_of_the_best.skill": {
+      "sha256": "117fff57c02a709b957ef8202e848fa4a23976b12ae14dbdf133026026341b67"
+    },
+    "starsector-core/data/characters/skills/bulk_transport.skill": {
+      "sha256": "2ea99b54cb8686d19d81b28548e71a6cb3be264e2cf39df21fee0cf843e227ce"
+    },
+    "starsector-core/data/characters/skills/carrier_group.skill": {
+      "sha256": "ae2147e4c59a8d56afecd352a8951d968e1715c3af6ba08b33492c425f2d9106"
+    },
+    "starsector-core/data/characters/skills/colony_management.skill": {
+      "sha256": "bd9b7fe04d5d3d9171e4967d497381f885ed3e2fb51319ffb89b8db28a4c264d"
+    },
+    "starsector-core/data/characters/skills/combat_endurance.skill": {
+      "sha256": "3ae8ee3467527556fa56bb430dbae8d6c027eaf472d898b4ca891c0dba31e714"
+    },
+    "starsector-core/data/characters/skills/containment_procedures.skill": {
+      "sha256": "6d32f6676890525ad309f531609e6a16074330a7e9657671be4009c81a513d57"
+    },
+    "starsector-core/data/characters/skills/coordinated_maneuvers.skill": {
+      "sha256": "74b8c024f0636082701954f81fa48d6ff245788ac482b9c5b903bae2f95c3ffb"
+    },
+    "starsector-core/data/characters/skills/crew_training.skill": {
+      "sha256": "6e3d3950fc583ab3bd385d16883f75b1f8aa303f99f5650514d5c27fbb9a06c9"
+    },
+    "starsector-core/data/characters/skills/cybernetic_augmentation.skill": {
+      "sha256": "b2e9be9ff8596a43c700cb3cb90822fe1606e8f311a47599b598a23137161c02"
+    },
+    "starsector-core/data/characters/skills/damage_control.skill": {
+      "sha256": "efea826e63356e6742c30d2b5e58516f934ac442054990cdb890c599fe1e82ef"
+    },
+    "starsector-core/data/characters/skills/derelict_contingent.skill": {
+      "sha256": "5087a9dcb2ba5e32c7609f367e2358cc3f5ead2e44160b80542dcaf1598f1608"
+    },
+    "starsector-core/data/characters/skills/electronic_warfare.skill": {
+      "sha256": "8c8ffd8b82c19dc12bad00353ea951d004db9eaed35e3b2749d5daae0e01d526"
+    },
+    "starsector-core/data/characters/skills/energy_weapon_mastery.skill": {
+      "sha256": "f2f42693fbce6b3f8f834e1d37fbfc6e34258839d988ecc77c7e84ef053d102b"
+    },
+    "starsector-core/data/characters/skills/field_modulation.skill": {
+      "sha256": "3639062e9bf27fcef816f1b617dc2f4f542c0ab363f6a4e3f748ec063b5a5d2a"
+    },
+    "starsector-core/data/characters/skills/field_repairs.skill": {
+      "sha256": "3fe014a6f7be1d8434d139322b1e1ccf03900ff47285cc01f2b9dbfb0b6e3d2d"
+    },
+    "starsector-core/data/characters/skills/fighter_uplink.skill": {
+      "sha256": "e0b6846553b450385774d6c754f881aa7c897afc4ef89ddfd7f87a6c2f81cf1f"
+    },
+    "starsector-core/data/characters/skills/flux_regulation.skill": {
+      "sha256": "2503f2f9de58e6ce7834fa2d5dd90bb35412075cc81a79deaebdc30746b9c03a"
+    },
+    "starsector-core/data/characters/skills/force_concentration.skill": {
+      "sha256": "9baf24e3d4f8be4a1a0706c46d983a216250f6ace1ae4ba27a6d0cc0a0288b3e"
+    },
+    "starsector-core/data/characters/skills/gunnery_implants.skill": {
+      "sha256": "ff9e08b0f7d8e5196419acaa828757acf750baad7cb93f76d7da6d31c4cddb8f"
+    },
+    "starsector-core/data/characters/skills/helmsmanship.skill": {
+      "sha256": "a2ad52867840702c02ab94272a7b1d58eb2566f21f28258059786dfc6bb8ffdf"
+    },
+    "starsector-core/data/characters/skills/hull_restoration.skill": {
+      "sha256": "3eca80915eb9c6441985813da20c373b02ce95dc077a356653a89fffeb8cd634"
+    },
+    "starsector-core/data/characters/skills/hypercognition.skill": {
+      "sha256": "8a38b26cb671350602c35c3ea35fa5f88a683e2cd8052b61be05276c3c30a79c"
+    },
+    "starsector-core/data/characters/skills/impact_mitigation.skill": {
+      "sha256": "85c02ab6e2491c8beaf9d551e3ab7483b6ad8faaa7b0b9624b5c3f87b91f6a74"
+    },
+    "starsector-core/data/characters/skills/industrial_planning.skill": {
+      "sha256": "adb93ce21b1e527abd923d7930a1c9443cdaaf9b869f639e94abb60e42711b2e"
+    },
+    "starsector-core/data/characters/skills/makeshift_equipment.skill": {
+      "sha256": "ff8ce91cbc474bbe62a5beaf45d2ed05f0c7a60a2fbc5d5aa91f12cb8f044524"
+    },
+    "starsector-core/data/characters/skills/missile_specialization.skill": {
+      "sha256": "fa4c990b8c3c8829e0b0d9b31602f95066edb854e9d2bde7edc3ec2b9962a02a"
+    },
+    "starsector-core/data/characters/skills/navigation.skill": {
+      "sha256": "198b229db5bd7debaafa6e93e29fe763e8fa547fbb87046613139374ccb093c2"
+    },
+    "starsector-core/data/characters/skills/neural_link.skill": {
+      "sha256": "1f7366987bdd0f11e10d6ecf4af73dd746fa03a1cef637b5f89dfc448dc4441d"
+    },
+    "starsector-core/data/characters/skills/officer_management.skill": {
+      "sha256": "473ae58ba6efca7bdad66b3eb1884bbf7694717dfdeef35a7013aeb249c268cc"
+    },
+    "starsector-core/data/characters/skills/officer_training.skill": {
+      "sha256": "9b90e45fd49c8e85743800f2b23cd9bcef7b781be73a33045b660ca008dae789"
+    },
+    "starsector-core/data/characters/skills/omega_ecm.skill": {
+      "sha256": "4e1f4cd32540aed5d1b4022b027927f01638f467ff7acb2200d056d745a3c266"
+    },
+    "starsector-core/data/characters/skills/ordnance_expert.skill": {
+      "sha256": "0922de3a619318319fba978736c4afe8b41d67e52fd172d0b46506ff7a482441"
+    },
+    "starsector-core/data/characters/skills/phase_corps.skill": {
+      "sha256": "105522fb4921046b1ae94d977c780dcde8408e93e4bcf06931da20b7019b0e0c"
+    },
+    "starsector-core/data/characters/skills/phase_mastery.skill": {
+      "sha256": "a1f59155071afa4d6b340dfabad3bc51750eb0ed488b9f337ec2a9a076b4cb93"
+    },
+    "starsector-core/data/characters/skills/planetary_operations.skill": {
+      "sha256": "3e3f45384e329ee7815072ddd7ea6f572e9f5e6a9a14d9b5ed5efe5241cb5e7c"
+    },
+    "starsector-core/data/characters/skills/point_defense.skill": {
+      "sha256": "e9583a8705b1ff563ec8be2daaf1d6a4ef81ccf4184749b1192dbdbad4bc8cce"
+    },
+    "starsector-core/data/characters/skills/polarized_armor.skill": {
+      "sha256": "e1dee2067d849196fff40eca6df786f307a63896bd6c887a0c1b7ebb2078c617"
+    },
+    "starsector-core/data/characters/skills/ranged_specialization.skill": {
+      "sha256": "a27497569ad2bdab7f322d0da1b05462952d441a64c59a8e31e3c7d4d3db0406"
+    },
+    "starsector-core/data/characters/skills/reliability_engineering.skill": {
+      "sha256": "358bba076aa1c4e36a61a673d3eb2d0ae1bf2c1e659fbe867fd96a988f6a2f46"
+    },
+    "starsector-core/data/characters/skills/salvaging.skill": {
+      "sha256": "f7ff50509e5581951eecaffb27a42495cd70559c813f129e17baaa795c8c19a8"
+    },
+    "starsector-core/data/characters/skills/sensors.skill": {
+      "sha256": "e0925200e67f3c2198bbf2bfc3893425a248cd50f03983c07f9770f8bdd0ef19"
+    },
+    "starsector-core/data/characters/skills/shield_modulation.skill": {
+      "sha256": "4ec6788c5c8795a993c0a2ceb9b340635f4b69b94a5b62def86cac0ada1ba972"
+    },
+    "starsector-core/data/characters/skills/space_operations.skill": {
+      "sha256": "5b0145f642df9fc992f4e417ef3af8fc991047ea4bdd619f3a38741d666d3d0c"
+    },
+    "starsector-core/data/characters/skills/special_modifications.skill": {
+      "sha256": "49aa3e58c1818cd0b768b1d06145a75b6f6b71d015626cf7e996c69ab8750391"
+    },
+    "starsector-core/data/characters/skills/strike_commander.skill": {
+      "sha256": "785169ea4f7efd4d27d186a81ff161e5ce7ebb4e8bbc75997a8a7ee932105780"
+    },
+    "starsector-core/data/characters/skills/support_doctrine.skill": {
+      "sha256": "4cb227dbb61fca3cb67ea6b95fd8c16467ae262605901b2fa4abbe193d315abe"
+    },
+    "starsector-core/data/characters/skills/systems_expertise.skill": {
+      "sha256": "8bc91acaf53952ffd452c04e2c0d3222b84b462590eb7b5eb81c7e9b541b8545"
+    },
+    "starsector-core/data/characters/skills/tactical_drills.skill": {
+      "sha256": "51f4541f145ba7219c73c6448bf6cecdf3bca7e296aefd8718287eddb7387b8b"
+    },
+    "starsector-core/data/characters/skills/target_analysis.skill": {
+      "sha256": "6c1be5b32511cf7db9ea70ad8e10ffc67e6f158041d5456f28feabb0dbe6f056"
+    },
+    "starsector-core/data/characters/skills/weapon_drills.skill": {
+      "sha256": "bd3b53d6f986c4a3e33ef37418bd635e0d61813c217fb6d8d433264e732ce46c"
+    },
+    "starsector-core/data/characters/skills/wolfpack_tactics.skill": {
+      "sha256": "d044c22e2ea24fc11b54eb1a70559d9e66a871f8a8a78b672d46d0c09e3c3e3a"
+    }
+  },
+  "knownSkillIds": [
+    "aptitude_combat",
+    "aptitude_industry",
+    "aptitude_leadership",
+    "aptitude_technology",
+    "automated_ships",
+    "auxiliary_support",
+    "ballistic_mastery",
+    "best_of_the_best",
+    "bulk_transport",
+    "carrier_group",
+    "colony_management",
+    "combat_endurance",
+    "containment_procedures",
+    "coordinated_maneuvers",
+    "crew_training",
+    "cybernetic_augmentation",
+    "damage_control",
+    "derelict_contingent",
+    "electronic_warfare",
+    "energy_weapon_mastery",
+    "field_modulation",
+    "field_repairs",
+    "fighter_uplink",
+    "flux_regulation",
+    "force_concentration",
+    "gunnery_implants",
+    "helmsmanship",
+    "hull_restoration",
+    "hypercognition",
+    "impact_mitigation",
+    "industrial_planning",
+    "makeshift_equipment",
+    "missile_specialization",
+    "navigation",
+    "neural_link",
+    "officer_management",
+    "officer_training",
+    "omega_ecm",
+    "ordnance_expert",
+    "phase_corps",
+    "phase_mastery",
+    "planetary_operations",
+    "point_defense",
+    "polarized_armor",
+    "ranged_specialization",
+    "reliability_engineering",
+    "salvaging",
+    "sensors",
+    "shield_modulation",
+    "space_operations",
+    "special_modifications",
+    "strike_commander",
+    "support_doctrine",
+    "systems_expertise",
+    "tactical_drills",
+    "target_analysis",
+    "weapon_drills",
+    "wolfpack_tactics"
+  ],
+  "effects": [
+    {
+      "skillId": "hypercognition",
+      "index": 0,
+      "requiredLevel": 1,
+      "script": "Hypercognition$Level1",
+      "operation": {
+        "target": "accessibility",
+        "channel": "flat",
+        "value": 0.10000000149011612
+      }
+    },
+    {
+      "skillId": "hypercognition",
+      "index": 1,
+      "requiredLevel": 1,
+      "script": "Hypercognition$Level2",
+      "operation": {
+        "target": "combatFleetSize",
+        "channel": "flat",
+        "value": 0.20000000298023224
+      }
+    },
+    {
+      "skillId": "hypercognition",
+      "index": 2,
+      "requiredLevel": 1,
+      "script": "Hypercognition$Level3",
+      "operation": {
+        "target": "groundDefenses",
+        "channel": "mult",
+        "value": 1.5
+      }
+    },
+    {
+      "skillId": "hypercognition",
+      "index": 3,
+      "requiredLevel": 1,
+      "script": "Hypercognition$Level4",
+      "operation": {
+        "target": "stability",
+        "channel": "flat",
+        "value": 1
+      }
+    },
+    {
+      "skillId": "planetary_operations",
+      "index": 0,
+      "requiredLevel": 1,
+      "script": "PlanetaryOperations$Level1",
+      "operation": {
+        "target": "groundDefenses",
+        "channel": "mult",
+        "value": 2
+      }
+    },
+    {
+      "skillId": "planetary_operations",
+      "index": 1,
+      "requiredLevel": 1,
+      "script": "PlanetaryOperations$Level2",
+      "operation": {
+        "target": "stability",
+        "channel": "flat",
+        "value": 2
+      }
+    },
+    {
+      "skillId": "space_operations",
+      "index": 0,
+      "requiredLevel": 1,
+      "script": "SpaceOperations$Level1",
+      "operation": {
+        "target": "accessibility",
+        "channel": "flat",
+        "value": 0.30000001192092896
+      }
+    },
+    {
+      "skillId": "space_operations",
+      "index": 1,
+      "requiredLevel": 1,
+      "script": "SpaceOperations$Level2",
+      "operation": {
+        "target": "combatFleetSize",
+        "channel": "flat",
+        "value": 0.25
+      }
+    }
+  ]
+}

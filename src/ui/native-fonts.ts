@@ -1,10 +1,10 @@
 import { runtimeAssetUrl } from "../engine/runtime/RuntimePaths";
 
-export type NativeFont = "action" | "button" | "caption" | "body";
+export type NativeFont = "action" | "button" | "caption" | "body" | "tiny" | "credits" | "burn";
 type MenuFont = NativeFont;
 export type Glyph = { x: number; y: number; width: number; height: number; xoffset: number; yoffset: number; xadvance: number };
 export type BitmapFont = { image: HTMLImageElement; lineHeight: number; glyphs: Map<number, Glyph>; kernings: Map<string, number> };
-const faces: Record<MenuFont, string> = { action: "orbitron24aabold", button: "orbitron20aa", caption: "orbitron12condensed", body: "insignia15LTaa" };
+const faces: Record<MenuFont, string> = { action: "orbitron24aabold", button: "orbitron20aa", caption: "orbitron12condensed", body: "insignia15LTaa", tiny: "victor10", credits: "orbitron20aabold", burn: "insignia21LTaa" };
 const cached = new Map<MenuFont, Promise<BitmapFont>>();
 const loaded = new Map<MenuFont, BitmapFont>();
 
@@ -19,7 +19,7 @@ export function loadNativeFont(font: MenuFont): Promise<BitmapFont> {
     const numberFields = (line: string) => Object.fromEntries([...line.matchAll(/(\w+)=(-?\d+)/g)].map((m) => [m[1], Number(m[2])]));
     const glyphs = new Map<number, Glyph>();
     const kernings = new Map<string, number>();
-    let lineHeight = ({ action: 24, button: 20, caption: 16, body: 17 })[font];
+    let lineHeight = ({ action: 24, button: 20, caption: 16, body: 17, tiny: 10, credits: 20 })[font];
     for (const line of source.split(/\r?\n/)) {
       const fields = numberFields(line);
       if (line.startsWith("common ")) lineHeight = fields.lineHeight;

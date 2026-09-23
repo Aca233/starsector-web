@@ -1,0 +1,219 @@
+{
+  "schemaVersion": 1,
+  "originalReference": "Starsector 0.98a-RC8",
+  "scope": "market-planet-gas-getter-only",
+  "sources": {
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/econ/Market.java": {
+      "sha256": "8ca0c019abc8543a80fa63c3826b3ac1f766af3dbc35875161842306378aa945"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/CampaignPlanet.java": {
+      "sha256": "c3bcd3d1fd66eae31de17c5fac5be0a78899f82caa87bb1c2dc31cc14d5f2f1a"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/CustomCampaignEntity.java": {
+      "sha256": "4f21bf20ad994452c7424725cf1c642af82663b226ec324a415774c1255dcc9a"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/BaseCampaignEntity.java": {
+      "sha256": "865edfbe067e2c522c3eb889a92b9c8e1c8dfe4fe2fb75432ea137b21a277670"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/combat/entities/terrain/Planet.java": {
+      "sha256": "5de3d067ee3e9e756e8fa022d2b5c310161edecd3fb18d895b18174bd743e41f"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/loading/specs/PlanetSpec.java": {
+      "sha256": "3995aa714ccc1056aaa699431ece071a7427274572a233b9cdc57cd4b060870a"
+    },
+    "decompiled/starfarer_obf/com/fs/starfarer/campaign/save/CampaignGameManager.java": {
+      "sha256": "8ebf0c86c896768c7bd4d124fba4b2005e2f185bcf0e2ad377b355995836ddc5"
+    },
+    "starsector-core/data/config/planets.json": {
+      "sha256": "f2367de64a3a8f52dd0e17fba163661ca8d7147ac8742007a8a41b363785244b"
+    }
+  },
+  "entityClasses": {
+    "Plnt": {
+      "planet": true
+    },
+    "CCEnt": {
+      "planet": false
+    }
+  },
+  "specFields": [
+    "tilt",
+    "pitch",
+    "rotation",
+    "planetColor",
+    "cloudRotation",
+    "atmosphereThickness",
+    "atmosphereThicknessMin",
+    "atmosphereColor",
+    "cloudColor",
+    "iconColor",
+    "texture",
+    "descriptionId",
+    "cloudTexture",
+    "iconTexture",
+    "starscapeIcon",
+    "glowTexture",
+    "coronaTexture",
+    "shieldThickness",
+    "shieldTexture",
+    "shieldColor",
+    "shieldThickness2",
+    "shieldTexture2",
+    "shieldColor2",
+    "coronaColor",
+    "glowColor",
+    "useReverseLightForGlow",
+    "coronaSize",
+    "isStar",
+    "isBlackHole",
+    "isNebulaCenter",
+    "scaleMultMapIcon",
+    "scaleMultStarscapeIcon",
+    "lightPosition",
+    "cloudAlpha",
+    "planetType",
+    "name",
+    "aOrAn",
+    "isGasGiant",
+    "isPulsar",
+    "doNotShowInCombat",
+    "tags"
+  ],
+  "types": {
+    "nebula_center_old": {
+      "isGasGiant": false
+    },
+    "nebula_center_average": {
+      "isGasGiant": false
+    },
+    "nebula_center_young": {
+      "isGasGiant": false
+    },
+    "star_neutron": {
+      "isGasGiant": false
+    },
+    "black_hole": {
+      "isGasGiant": false
+    },
+    "star_yellow": {
+      "isGasGiant": false
+    },
+    "star_white": {
+      "isGasGiant": false
+    },
+    "star_blue_giant": {
+      "isGasGiant": false
+    },
+    "star_blue_supergiant": {
+      "isGasGiant": false
+    },
+    "star_orange": {
+      "isGasGiant": false
+    },
+    "star_orange_giant": {
+      "isGasGiant": false
+    },
+    "star_red_supergiant": {
+      "isGasGiant": false
+    },
+    "star_red_giant": {
+      "isGasGiant": false
+    },
+    "star_red_dwarf": {
+      "isGasGiant": false
+    },
+    "star_browndwarf": {
+      "isGasGiant": false
+    },
+    "gas_giant": {
+      "isGasGiant": true
+    },
+    "ice_giant": {
+      "isGasGiant": true
+    },
+    "lava": {
+      "isGasGiant": false
+    },
+    "lava_minor": {
+      "isGasGiant": false
+    },
+    "frozen": {
+      "isGasGiant": false
+    },
+    "frozen1": {
+      "isGasGiant": false
+    },
+    "frozen2": {
+      "isGasGiant": false
+    },
+    "frozen3": {
+      "isGasGiant": false
+    },
+    "barren": {
+      "isGasGiant": false
+    },
+    "barren_castiron": {
+      "isGasGiant": false
+    },
+    "barren2": {
+      "isGasGiant": false
+    },
+    "barren3": {
+      "isGasGiant": false
+    },
+    "barren_venuslike": {
+      "isGasGiant": false
+    },
+    "toxic": {
+      "isGasGiant": false
+    },
+    "toxic_cold": {
+      "isGasGiant": false
+    },
+    "jungle": {
+      "isGasGiant": false
+    },
+    "terran": {
+      "isGasGiant": false
+    },
+    "desert": {
+      "isGasGiant": false
+    },
+    "desert1": {
+      "isGasGiant": false
+    },
+    "arid": {
+      "isGasGiant": false
+    },
+    "cryovolcanic": {
+      "isGasGiant": false
+    },
+    "rocky_metallic": {
+      "isGasGiant": false
+    },
+    "rocky_unstable": {
+      "isGasGiant": false
+    },
+    "water": {
+      "isGasGiant": false
+    },
+    "rocky_ice": {
+      "isGasGiant": false
+    },
+    "irradiated": {
+      "isGasGiant": false
+    },
+    "barren-bombarded": {
+      "isGasGiant": false
+    },
+    "tundra": {
+      "isGasGiant": false
+    },
+    "barren-desert": {
+      "isGasGiant": false
+    },
+    "terran-eccentric": {
+      "isGasGiant": false
+    }
+  }
+}

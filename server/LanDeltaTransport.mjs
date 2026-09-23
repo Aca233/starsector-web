@@ -11,15 +11,25 @@ export function lanDeltaTarget(value, seq, now = performance.now()) {
 }
 export class LanDeltaSender {
   constructor({ ordered = false, motionReference = false } = {}) { this.ordered = ordered; this.motionReference = motionReference === true; this.reset(); this.totals = { full: 0, delta: 0, anchors: 0, originalBytes: 0, encodedBytes: 0, budgetFallbacks: 0, motionDeltas: 0 }; }
-  reset() { this.base = null; this.pending = null; this.generation = (this.generation ?? 0) + 1; this.revision = 0; this.choices = new WeakSet(); }
-  prepare(target) {
+  reset() { this.referenceUntil = -Infinity; this.base = null; this.pending = null; this.generation = (this.generation ?? 0) + 1; this.revision = 0; this.choices = new WeakSet(); }
+  // Negotiation grants decoder capability, not a reason to scan both endpoints
+  // on every healthy/local delivery. Use predictive references only after the
+  // existing congestion controller actually reduced flight. A short hold avoids
+  // oscillating codecs as the smaller packets drain that queue. No credit is
+  // changed and both choices keep the exact original bytes as their next base.
+  prepareForDelivery(target, credits) {
+    if (credits.capacity < credits.idleCapacity) this.referenceUntil = target.now + 5000;
+    return this.prepare(target, target.now < this.referenceUntil);
+  }
+  prepare(target, useReference = this.motionReference) {
+    const motionReference = this.motionReference && useReference;
     // On a reliable ordered WebSocket, the previous successful send is already
     // a safe base: receiver reconstruction precedes consumption/ACK. Waiting an
     // RTT for that ACK needlessly ages the base and inflates moving-state deltas.
     // Keep confirmed-anchor mode for non-FIFO callers and controlled comparisons.
     const anchor = this.ordered || !this.pending;
     let patch = null, budgetFallback = false, motionSteps = 0;
-    const cache = this.motionReference ? target.motionPatches : target.patches;
+    const cache = motionReference ? target.motionPatches : target.patches;
     if (this.base) {
       if (!cache.has(this.base.bytes)) {
         // Bound per-broadcast compute, not just retained bytes. The relay rotates
@@ -30,7 +40,7 @@ export class LanDeltaSender {
           // original and negotiated caches separate; both share the old total
           // broadcast work budget. Commit ALWAYS retains the full target bytes.
           let source = this.base.bytes, steps = 0;
-          if (this.motionReference) {
+          if (motionReference) {
             const beforeTick = motionSnapshotTick(source), afterTick = motionSnapshotTick(target.bytes);
             const count = beforeTick === null || afterTick === null ? 0 : afterTick - beforeTick;
             if (count > 0 && count <= 60) {
@@ -39,13 +49,13 @@ export class LanDeltaSender {
             }
           }
           const candidate = createLanBytePatch(source, target.bytes);
-          cache.set(this.base.bytes, this.motionReference ? { patch: candidate, steps: candidate ? steps : 0 } : candidate);
+          cache.set(this.base.bytes, motionReference ? { patch: candidate, steps: candidate ? steps : 0 } : candidate);
           target.patchMs += performance.now() - started; target.patchBuilds++;
         } else budgetFallback = true;
       }
       const cached = cache.get(this.base.bytes);
-      patch = this.motionReference ? cached?.patch ?? null : cached ?? null;
-      motionSteps = this.motionReference ? cached?.steps ?? 0 : 0;
+      patch = motionReference ? cached?.patch ?? null : cached ?? null;
+      motionSteps = motionReference ? cached?.steps ?? 0 : 0;
     }
     // Prepared packets are immutable broadcast payloads. Equal patch objects
     // still need matching wire base metadata/flags; full packets ignore bases.

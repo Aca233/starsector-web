@@ -1,0 +1,300 @@
+{
+  "schemaVersion": 1,
+  "originalReference": "Starsector 0.98a-RC8",
+  "scope": "native-task-orchestration-and-cache-lifecycle-not-authoritative-world-completion",
+  "sources": {
+    "core:data/config/settings.json": {
+      "sha256": "96f3f6aa457e85ab6480bf302e35d3e8df390339321711b982d45fbe71c4dfa9"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/reach/MainWorkTask.java": {
+      "sha256": "7d6394762af6c0c20f0e7bde6a23dea36efe886ed0df826f8c21407fca4aae2b"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/reach/MainWorkTask2.java": {
+      "sha256": "a5ef72fd328a8802545f6ab04cbc7133cee142ac22c36e62fc36769713268da6"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/reach/ReachEconomy.java": {
+      "sha256": "7957c1fbc6e754a2ee1ab5cda2667a4b3350fc22e109add39c1d00e3d7ce1faa"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/reach/ReachEconomyStepper.java": {
+      "sha256": "fb141d643b8dd3ad5b7ff43f1756b269571188be291e20c042eaa37e5ce18f99"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/reach/UpdateMarketsAgainTask.java": {
+      "sha256": "538c04f9100ae6e657df53ffcd154fa87235c0d270d9ee42864825002701dd3d"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/reach/ImmigrationTask.java": {
+      "sha256": "12edf309f1b3ca6b0a55e975766c5dd283a5d067968e4f5e6b3d6e8e0b4518bf"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/reach/FinishEconomyUpdateTask.java": {
+      "sha256": "d77d84d08856d2ec6939221481aefcf41d9b7631ec4663723ce2bfcb0fb8593c"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/reach/CommodityMarketData.java": {
+      "sha256": "75b5add5888acd526900253da248725d8bb5b2eeef20f8fa4a6f818fad4e9a93"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/Economy.java": {
+      "sha256": "94d23a73786493720d4639582bba17461506935288da5d133c8d803711a43841"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/CommodityOnMarket.java": {
+      "sha256": "333e58f37a1c7d508d766304ad64e759174b52dafa3fd205cf15efd9da371346"
+    },
+    "core:starfarer_obf.jar": {
+      "sha256": "8ae5516bf879ec068d206714fd67b90ebfa113c990f9e473357a5923b9700d6a"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/loading/while.java": {
+      "sha256": "bd53adc9437f56af32db1971d688c9b4445ae72a402b817c088cfd4aa631431c"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/loading/SpecStore.java": {
+      "sha256": "23151e3c6f2e01762982baa962d16349db1dd320f9050bf66ee53b51fed9d003"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/ShipQuality.java": {
+      "sha256": "cfdf815ff24485289986f722892544413e8a2388e5138faa1be844bca2f6eaf8"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/intel/BaseIntelPlugin.java": {
+      "sha256": "3ef03039f78ad06b38a050cad9474e01e4934870c0b7bbf01a042bf0acdb684a"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/intel/bases/PirateActivity.java": {
+      "sha256": "33f572f1bc0643be81cf977dcf7812f96d5fd9420e1de8e3fef005d741b704d0"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/intel/bases/PirateBaseIntel.java": {
+      "sha256": "40edc1681b084e25ec5be7d62a374daa2df652622e6e135f04711f73cc1c9450"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/intel/bases/LuddicPathBaseIntel.java": {
+      "sha256": "6927ddbe4ab733d5223677007e4fe22b9ea6133f36fb9bea43ba38c55ffdfa2f"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/submarkets/LocalResourcesSubmarketPlugin.java": {
+      "sha256": "d89a773e45c19e5e2d95d73e21765ba9766f213bf5989473a8d49cb3f0596776"
+    },
+    "core:data/campaign/commodities.csv": {
+      "sha256": "94e3b32f1176c775a56b4b37ae32ba597d60cf61aad5cc3c51f907123c904842"
+    }
+  },
+  "iterationsPerMonth": 10,
+  "qualityPenaltyForImports": -0.25,
+  "commodities": {
+    "supplies": {
+      "economyTier": 2.0999999046325684,
+      "tags": [
+        "military",
+        "expensive"
+      ]
+    },
+    "fuel": {
+      "economyTier": 2,
+      "tags": [
+        "military"
+      ]
+    },
+    "crew": {
+      "economyTier": 3.0999999046325684,
+      "tags": [
+        "crew",
+        "personnel"
+      ]
+    },
+    "marines": {
+      "economyTier": 3.4000000953674316,
+      "tags": [
+        "marines",
+        "military",
+        "personnel"
+      ]
+    },
+    "food": {
+      "economyTier": 1,
+      "tags": [
+        "food"
+      ]
+    },
+    "organics": {
+      "economyTier": 0,
+      "tags": []
+    },
+    "volatiles": {
+      "economyTier": 1.2000000476837158,
+      "tags": [
+        "expensive"
+      ]
+    },
+    "ore": {
+      "economyTier": 0.20000000298023224,
+      "tags": []
+    },
+    "rare_ore": {
+      "economyTier": 0.30000001192092896,
+      "tags": [
+        "expensive"
+      ]
+    },
+    "metals": {
+      "economyTier": 1.100000023841858,
+      "tags": []
+    },
+    "rare_metals": {
+      "economyTier": 1.2000000476837158,
+      "tags": [
+        "expensive"
+      ]
+    },
+    "heavy_machinery": {
+      "economyTier": 2.200000047683716,
+      "tags": [
+        "expensive"
+      ]
+    },
+    "domestic_goods": {
+      "economyTier": 2.299999952316284,
+      "tags": []
+    },
+    "organs": {
+      "economyTier": 2.4000000953674316,
+      "tags": [
+        "medical",
+        "expensive"
+      ]
+    },
+    "drugs": {
+      "economyTier": 2.5,
+      "tags": [
+        "expensive"
+      ]
+    },
+    "hand_weapons": {
+      "economyTier": 2.5999999046325684,
+      "tags": [
+        "military"
+      ]
+    },
+    "luxury_goods": {
+      "economyTier": 2.700000047683716,
+      "tags": [
+        "luxury",
+        "expensive"
+      ]
+    },
+    "lobster": {
+      "economyTier": 2.799999952316284,
+      "tags": [
+        "exotic",
+        "luxury",
+        "expensive",
+        "codex_unlockable"
+      ]
+    },
+    "ships": {
+      "economyTier": 4,
+      "tags": [
+        "meta"
+      ]
+    },
+    "ai_cores": {
+      "economyTier": 0,
+      "tags": [
+        "nonecon",
+        "ai_core",
+        "hide_in_codex"
+      ]
+    },
+    "alpha_core": {
+      "economyTier": 0,
+      "tags": [
+        "nonecon",
+        "ai_core",
+        "no_loss_from_combat",
+        "codex_unlockable"
+      ]
+    },
+    "beta_core": {
+      "economyTier": 0,
+      "tags": [
+        "nonecon",
+        "ai_core",
+        "no_loss_from_combat",
+        "codex_unlockable"
+      ]
+    },
+    "gamma_core": {
+      "economyTier": 0,
+      "tags": [
+        "nonecon",
+        "ai_core",
+        "no_loss_from_combat",
+        "codex_unlockable"
+      ]
+    },
+    "omega_core": {
+      "economyTier": 0,
+      "tags": [
+        "nonecon",
+        "ai_core",
+        "no_loss_from_combat",
+        "no_drop",
+        "hide_in_codex"
+      ]
+    },
+    "survey_data": {
+      "economyTier": 0,
+      "tags": [
+        "nonecon",
+        "hide_in_codex"
+      ]
+    },
+    "survey_data_1": {
+      "economyTier": 0,
+      "tags": [
+        "nonecon",
+        "no_loss_from_combat"
+      ]
+    },
+    "survey_data_2": {
+      "economyTier": 0,
+      "tags": [
+        "nonecon",
+        "no_loss_from_combat"
+      ]
+    },
+    "survey_data_3": {
+      "economyTier": 0,
+      "tags": [
+        "nonecon",
+        "no_loss_from_combat"
+      ]
+    },
+    "survey_data_4": {
+      "economyTier": 0,
+      "tags": [
+        "nonecon",
+        "no_loss_from_combat"
+      ]
+    },
+    "survey_data_5": {
+      "economyTier": 0,
+      "tags": [
+        "nonecon",
+        "no_loss_from_combat"
+      ]
+    },
+    "blueprints": {
+      "economyTier": 0,
+      "tags": [
+        "nonecon",
+        "meta",
+        "hide_in_codex"
+      ]
+    },
+    "ship_weapons": {
+      "economyTier": 0,
+      "tags": [
+        "nonecon",
+        "meta",
+        "hide_in_codex"
+      ]
+    },
+    "credits": {
+      "economyTier": 0,
+      "tags": [
+        "nonecon",
+        "meta",
+        "hide_in_codex"
+      ]
+    }
+  }
+}

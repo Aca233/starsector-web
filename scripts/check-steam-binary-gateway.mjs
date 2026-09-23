@@ -149,3 +149,26 @@ test('negotiated binary guest still accepts small/large JSON fallbacks and later
  for(const value of [small,large,state(3)]){f.peer.send(JSON.stringify(value));f.pump();const row=f.sends.at(-1);assert.deepEqual(typeof row.text==='string'?JSON.parse(row.text):decodeBinaryState(row.text),value);row.callback();f.pump();f.ws.emit('message',Buffer.from(JSON.stringify({type:'state-consumed',matchId:value.matchId,seq:value.seq})),false);f.pump();}
  assert.equal(f.guest.receiptTrace.snapshot().rendererJsonWrites,2);assert.equal(f.guest.receiptTrace.snapshot().rendererBinaryWrites,1);assert.deepEqual(f.closes,[]);
 });
+
+test('repeated sync launch keeps both baselines and outstanding credits; a new epoch still resets',t=>{
+  const f=pair(t,{binaryRenderer:true});
+  const launch=syncId=>JSON.stringify({type:'launch',matchId:'binary-gateway',syncId,minTick:101});
+  f.peer.send(launch('sync1'));f.pump();
+  f.peer.send(JSON.stringify(state(1)));f.pump();const first=f.sends.at(-1);
+  assert.equal(f.peer.lastSnapshot.format,'binary-full');
+  const debt=f.peer.inflightBytes,consumption=f.peer.consumption.bytes;
+  const receiver=f.guest.motionReceiver,worlds=receiver.worlds;
+  let resets=0;const reset=f.peer.resetSnapshots.bind(f.peer);f.peer.resetSnapshots=()=>{resets++;return reset();};
+  for(let i=0;i<4;i++){f.peer.send(launch('sync1'));f.pump();}
+  assert.equal(resets,0,'sync retry must not cancel prepared deltas or reset host motion');
+  assert.equal(receiver.worlds,worlds,'guest keeps the current epoch, not just its object identity');
+  assert.equal(f.peer.inflightBytes,debt);assert.equal(f.peer.consumption.bytes,consumption);
+  first.callback();f.pump();f.ws.emit('message',Buffer.from(JSON.stringify({type:'state-consumed',matchId:'binary-gateway',seq:1})),false);f.pump();
+  f.peer.send(JSON.stringify(state(2)));f.pump();const second=f.sends.at(-1);
+  assert.equal(f.peer.lastSnapshot.format,'binary-delta','retry cannot force a larger full baseline');
+  assert.deepEqual(decodeBinaryState(second.text),state(2));
+  second.callback();f.pump();f.ws.emit('message',Buffer.from(JSON.stringify({type:'state-consumed',matchId:'binary-gateway',seq:2})),false);f.pump();
+  f.peer.send(launch('sync2'));f.pump();assert.equal(resets,1);assert.notEqual(receiver.worlds,worlds);
+  f.peer.send(JSON.stringify(state(3)));f.pump();assert.equal(f.peer.lastSnapshot.format,'binary-full');
+  assert.deepEqual(f.closes,[]);
+});

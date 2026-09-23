@@ -1,0 +1,25 @@
+# Phase 9 dynamic particle recipe source notes (2026-09-21)
+
+Scope: lossless snapshot representation of existing cosmetic objects only. No density/rule/art/UI changes; no OS/network settings; no campaign. Native desktop UI comparison remains pending permission. The local decompiled tree/resources are the same source set used in existing combat audits, not a fresh native executable verification.
+
+Evidence:
+- `../decompiled/fs.common_obf/com/fs/graphics/particle/SmoothParticle.java:24-50,57+`: source smooth particles have size/color and additive textured presentation.
+- `../decompiled/fs.common_obf/com/fs/graphics/particle/BaseParticle.java:66+`: original particle advance.
+- `../decompiled/starfarer_obf/com/fs/starfarer/combat/entities/EmitterFactory.java:263+`: yellow `(255,200,55)` armor-damage smooth particles. Decompilation is corroborated by existing Web `ArmorImpactVisuals.ts:6-22`, not used to invent new rules.
+- Web `CombatFXSystem.ts:130-159`: SOURCE_SMOOTH advances life/position and linear alpha; `:305-316` debris advances life/position/velocity/rotation; `:643-681` debris generation; `ArmorImpactVisuals.ts:6-22` armor particle generation. Existing debris appearance is retained, NOT newly claimed native-equivalent.
+- `SimulationRandom.reserveSamples(0)` observes the native cursor without consuming draws; `fromCursor` is a private replay stream. Existing `ExplosionPuffRecipe` is the supported static-recipe precedent.
+
+Measured root cause: recorded 22-ship compact (projectiles omitted) whole world averages 168849 raw / 51188 deflate-1 bytes; removing fxSystem in a diagnostic-only ablation saves ~24811 compressed bytes on average, and at recording row180 saves ~37012. This is NOT permission to drop FX. Particles and debris dominate that subsystem. Deflate6/Brotli4/Zstd3 hardly improve large stale deltas; unconditional XOR literal patches make them worse. No such experiments are enabled.
+
+Expected representation: native source armor particles/debris retain the authority's real objects and RNG sequence. Sidecars remember bounded spawn arguments/cursor and exact fixed-step counts. Capture regenerates expected objects on a private RNG and compares actual own data (including float bits/order/prototypes) before replacing any row with a recipe. Unsupported timestep, mutation, custom prototype/vector/RNG/hooks or over-budget reconstruction keeps ordinary state. Restore expands into viewer-owned existing objects; immutable recipe templates are never returned to callers. Array ordering/removals/mixed raw effects are preserved. Nothing is predicted or acknowledged as gameplay.
+
+Verification required: exact ordinary-vs-recipe captured projection and restored object equality at arbitrary mid-life ticks, reordered/removed/mutated rows and custom hooks, no authority RNG or source mutation, malicious recipes/work bounds, source and decoded frame bytes/CPU under actual 22/32-ship native simulation, actual WebGL pixel comparison for equivalent source/decoded states where practical. Then replay complete LAN/Steam snapshot paths. Same-build snapshot compatibility, no unnegotiated helper dependency.
+## Phase 9 follow-up: cross-runtime evidence and correction
+
+The initial seed-only prototype was **rejected** by the headless browser test: Node v24 and Chromium produced different last-bit `sin`/`cos` results (e.g. spark velocity -89.05333133669976 vs -89.05333133669978). Node-only equality was not sufficient. Final recipe rows carry the four authoritative position/velocity scalars; these override replay values after decoding. No quantization/tolerance, locally predicted damage or display-only Hz is used. Remaining replay expressions use the same source arithmetic for life, size, alpha, and rotation. The receiver does not redundantly integrate the motion values it will overwrite.
+
+Existing Web sparks and explosion bursts (`CombatFXSystem.spawnSparks` / `spawnExplosion`) are also eligible; the authority first selects the **existing** density-adjusted count, then records it. Their frozen recipe kernel retains the existing branch boundaries, colors, size/fade/drag inputs and random-draw order. This is preservation of the current Web presentation, not new native-equivalence evidence. Source `CombatFXSystem.update` still performs the real update, allocation, removals and RNG work unchanged.
+
+Cold-receiver safety is based on a full cold reconstruction budget, not the authority's warm cache: 128 groups, 4096 initial retained members and 262144 member-steps per snapshot. Partially updated groups use raw fallback, preventing a single frame from forcing repeated rewinds. Unsupported dt, custom RNG/vector/prototype/accessors, modified particle fields, and over-budget data keep the ordinary snapshot representation.
+
+Final validation includes 27 exact complete-world comparisons of **Node-produced** binaries restored in Chromium, plus six same-context 640x360 actual WebGL FX pixel comparisons. This does not prove original-game UI parity or hardware/client FPS. Authority and ordinary restore bytes remain the reference.

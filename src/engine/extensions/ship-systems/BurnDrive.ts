@@ -2,6 +2,7 @@ import { offensiveManeuverAllowed } from './SystemAI';
 import type { ShipSystemDefinition } from './Types';
 export const burnDrive: ShipSystemDefinition = {
   id: 'BURN_DRIVE', sourceIds: ['burndrive'], name: '冲刺推进',
+  description: '预热后启动冲刺推进，最高航速增加200，并持续向前推进。期间关闭护盾、锁定转向；引擎熄火会中断冲刺。',
   chargeUp: 2, active: 5, chargeDown: 1, cooldown: 10, toggle: true,
   controls: { blockShields: true, lockTurning: true, forceForward: true, cancelOnFlameout: true, suppressZeroFlux: true },
   visuals: { engineBoost: true },

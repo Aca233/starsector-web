@@ -1,7 +1,7 @@
 import '../studio/system-loadout.css';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { NativeButton } from './NativeChrome';
-import { bindingError, bindingKeyLabel, defaultSystemBindings, readSystemBindings, saveSystemBindings, type SystemBindings } from '../engine/runtime/SystemBindings';
+import { bindingError, bindingKeyLabel, mouseBindingCode, defaultSystemBindings, readSystemBindings, saveSystemBindings, type SystemBindings } from '../engine/runtime/SystemBindings';
 
 export function SystemBindingSettings({ slotCount = 3, slotNames, value, onEdit, onChange }: {
   slotCount?: number; slotNames?: string[]; value?: SystemBindings; onEdit?: (next: SystemBindings) => void; onChange?: () => void;
@@ -9,35 +9,51 @@ export function SystemBindingSettings({ slotCount = 3, slotNames, value, onEdit,
   const [saved, setSaved] = useState<SystemBindings>(() => readSystemBindings());
   const [message, setMessage] = useState('');
   const [listening, setListening] = useState<number | null>(null);
+  const listeningInput = useRef<HTMLInputElement | null>(null);
   const bindings = value ?? saved;
   const count = Math.max(3, slotCount, bindings.slots.length);
-  const apply = (next: SystemBindings) => {
+  const apply = useCallback((next: SystemBindings) => {
     const error = bindingError(next);
     if (error) { setMessage(error); return; }
     if (onEdit) { onEdit(next); setMessage('按键已修改，应用更改后生效'); }
     else { saveSystemBindings(next); setSaved(next); setMessage('快捷键已保存'); }
     onChange?.();
-  };
-  const setKey = (index: number, code: string | null) => {
+  }, [onEdit, onChange]);
+  const setKey = useCallback((index: number, code: string | null) => {
     const slots = Array.from({ length: count }, (_, i) => bindings.slots[i] ?? null);
     if (index >= 0) slots[index] = code;
     apply({ ...bindings, slots, ...(index < 0 ? { selectedKey: code } : {}) });
-  };
+  }, [bindings, count, apply]);
+  useEffect(() => {
+    if (listening === null) return;
+    const captureMouse = (event: MouseEvent) => {
+      const code = mouseBindingCode(event.button);
+      if (!code || document.activeElement !== listeningInput.current) return;
+      event.preventDefault(); event.stopPropagation();
+      if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) { setMessage('请使用单个字母键或鼠标侧键，不覆盖浏览器组合键'); return; }
+      setKey(listening, code);
+      listeningInput.current?.blur();
+    };
+    // Capture anywhere while the keycap is focused, not just over its small hitbox.
+    window.addEventListener('mousedown', captureMouse, true);
+    return () => window.removeEventListener('mousedown', captureMouse, true);
+  }, [listening, setKey]);
   const field = (index: number, code: string | null | undefined) => <input
     aria-label={index < 0 ? '轮选技能释放键' : `技能槽 ${index + 1} 快捷键`}
-    value={listening === index ? '请按键…' : bindingKeyLabel(code)} readOnly title="点击后按字母键绑定；Backspace / Delete 清除"
-    onFocus={() => setListening(index)} onBlur={() => setListening(null)}
+    value={listening === index ? '请按键…' : bindingKeyLabel(code)} readOnly title="点击后按字母键或鼠标侧键绑定；Backspace / Delete 清除"
+    onFocus={event => { listeningInput.current = event.currentTarget; setListening(index); }}
+    onBlur={() => { listeningInput.current = null; setListening(null); }}
     onKeyDownCapture={event => {
       if (event.code === 'Tab') return;
       event.preventDefault(); event.stopPropagation(); if (event.repeat) return;
-      if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) { setMessage('请使用单个字母键，不覆盖浏览器组合键'); return; }
+      if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) { setMessage('请使用单个字母键或鼠标侧键，不覆盖浏览器组合键'); return; }
       if (event.code === 'Escape') { event.currentTarget.blur(); return; }
       setKey(index, ['Backspace', 'Delete'].includes(event.code) ? null : event.code);
       event.currentTarget.blur();
     }} />;
   return <section className="system-binding-settings" aria-label="舰船技能快捷键">
     <div className="system-binding-heading"><h3>直接释放</h3><span>按槽位绑定</span></div>
-    <p className="system-binding-help">点击键帽，再按下要使用的字母键。Delete / Backspace 清除绑定。</p>
+    <p className="system-binding-help">点击键帽，再按字母键或鼠标侧键。侧键 1 / 2 对应后退 / 前进键。Delete / Backspace 清除绑定。</p>
     <div className="system-binding-grid">{Array.from({ length: count }, (_, i) => <label className="system-binding-slot" key={i}><span><small>技能槽 {String(i + 1).padStart(2, '0')}</small><strong>{slotNames?.[i] ?? '释放此槽位技能'}</strong></span>{field(i, bindings.slots[i])}</label>)}</div>
     {count < 64 && <NativeButton font="body" className="system-reset" onClick={() => apply({ ...bindings, slots: [...Array.from({ length: count }, (_, i) => bindings.slots[i] ?? null), null] })}>增加绑定槽</NativeButton>}
     <div className="system-wheel-settings"><label className="system-wheel-toggle"><span><strong>滚轮选择技能</strong><small>按住 Shift 滚动，松开后按释放键使用</small></span><input type="checkbox" checked={bindings.wheelSelect} onChange={e => apply({ ...bindings, wheelSelect: e.target.checked })}/></label>

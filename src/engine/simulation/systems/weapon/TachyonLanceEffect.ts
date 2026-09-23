@@ -5,7 +5,7 @@ import type { Beam } from '../../Weapon';
 import type { Ship } from '../../Ship';
 import type { SimulationRandom } from '../../SimulationRandom';
 import type { WeaponSimContext } from './WeaponSimContext';
-import { sound } from '../../../audio/SoundManager';
+import { combatAudio as sound } from '../../../audio/CombatAudioEvents';
 
 /** IntervalUtil carries no overshoot; its next interval starts on the next
  * eligible advance, even if that frame has a zero dpsDuration. */

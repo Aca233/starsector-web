@@ -1,0 +1,4583 @@
+{
+  "schemaVersion": 1,
+  "originalReference": "Starsector 0.98a-RC8",
+  "provenance": {
+    "commoditiesSha256": "94e3b32f1176c775a56b4b37ae32ba597d60cf61aad5cc3c51f907123c904842",
+    "settingsSha256": "96f3f6aa457e85ab6480bf302e35d3e8df390339321711b982d45fbe71c4dfa9",
+    "catalogSha256": "06368c8ba90e70b198ffa20771f5a812ac576afc1014633bb7e07903ace8f229",
+    "referenceVersionEvidence": "Local starsector-core/starsector.log launcher line observed 2026-09-19; does not verify all installed modifications",
+    "settings": "data/config/settings.json",
+    "hulls": "Existing native-catalog.json ship stats (origin data/hulls/ship_data.csv)",
+    "timeConstants": "CampaignClock.java SECONDS_PER_GAME_DAY and convertToMonths, source inspected 2026-09-19",
+    "scope": "Base hull logistics data and quoted effective-stat formulas; no claim of modifier, repair advancement, economy or gameplay parity"
+  },
+  "settings": {
+    "daysPerMonth": 30,
+    "secondsPerDay": 10,
+    "crewPerDay": 0,
+    "marinesPerDay": 0,
+    "excessCargoPerDay": 0.1,
+    "excessFuelPerDay": 0.1,
+    "excessPersonnelPerDay": 0.1,
+    "excessPerCategoryCap": 50,
+    "maxShips": 30,
+    "excessShipFraction": 0.2
+  },
+  "recovery": {
+    "mothballedMaintenanceMult": 0,
+    "repairPercentPerDay": {
+      "FRIGATE": 10,
+      "DESTROYER": 10,
+      "CRUISER": 8,
+      "CAPITAL_SHIP": 6
+    }
+  },
+  "navigation": {
+    "baseFleetSelectionRadius": 22,
+    "fleetSelectionRadiusPerUnitSize": 1.8,
+    "maxFleetSelectionRadius": 100,
+    "minTravelSpeed": 20,
+    "unitsPerLightYear": 2000,
+    "baseTravelSpeed": 0,
+    "speedPerBurnLevel": 20
+  },
+  "commodities": {
+    "supplies": {
+      "id": "supplies",
+      "name": "补给",
+      "cargoSpace": 1,
+      "tags": [
+        "military",
+        "expensive"
+      ]
+    },
+    "fuel": {
+      "id": "fuel",
+      "name": "燃料",
+      "cargoSpace": 0,
+      "tags": [
+        "military"
+      ]
+    },
+    "crew": {
+      "id": "crew",
+      "name": "船员",
+      "cargoSpace": 0,
+      "tags": [
+        "crew",
+        "personnel"
+      ]
+    },
+    "marines": {
+      "id": "marines",
+      "name": "陆战队员",
+      "cargoSpace": 0,
+      "tags": [
+        "marines",
+        "military",
+        "personnel"
+      ]
+    },
+    "food": {
+      "id": "food",
+      "name": "食品",
+      "cargoSpace": 1,
+      "tags": [
+        "food"
+      ]
+    },
+    "organics": {
+      "id": "organics",
+      "name": "有机物",
+      "cargoSpace": 1,
+      "tags": []
+    },
+    "volatiles": {
+      "id": "volatiles",
+      "name": "挥发物",
+      "cargoSpace": 1,
+      "tags": [
+        "expensive"
+      ]
+    },
+    "ore": {
+      "id": "ore",
+      "name": "矿石",
+      "cargoSpace": 1,
+      "tags": []
+    },
+    "rare_ore": {
+      "id": "rare_ore",
+      "name": "稀有矿石",
+      "cargoSpace": 1,
+      "tags": [
+        "expensive"
+      ]
+    },
+    "metals": {
+      "id": "metals",
+      "name": "金属",
+      "cargoSpace": 1,
+      "tags": []
+    },
+    "rare_metals": {
+      "id": "rare_metals",
+      "name": "稀有元素",
+      "cargoSpace": 1,
+      "tags": [
+        "expensive"
+      ]
+    },
+    "heavy_machinery": {
+      "id": "heavy_machinery",
+      "name": "重型机械",
+      "cargoSpace": 1,
+      "tags": [
+        "expensive"
+      ]
+    },
+    "domestic_goods": {
+      "id": "domestic_goods",
+      "name": "日用品",
+      "cargoSpace": 1,
+      "tags": []
+    },
+    "organs": {
+      "id": "organs",
+      "name": "器官",
+      "cargoSpace": 1,
+      "tags": [
+        "medical",
+        "expensive"
+      ]
+    },
+    "drugs": {
+      "id": "drugs",
+      "name": "毒品",
+      "cargoSpace": 1,
+      "tags": [
+        "expensive"
+      ]
+    },
+    "hand_weapons": {
+      "id": "hand_weapons",
+      "name": "重型武器",
+      "cargoSpace": 1,
+      "tags": [
+        "military"
+      ]
+    },
+    "luxury_goods": {
+      "id": "luxury_goods",
+      "name": "奢侈品",
+      "cargoSpace": 1,
+      "tags": [
+        "luxury",
+        "expensive"
+      ]
+    },
+    "lobster": {
+      "id": "lobster",
+      "name": "蓝龙虾",
+      "cargoSpace": 1,
+      "tags": [
+        "exotic",
+        "luxury",
+        "expensive",
+        "codex_unlockable"
+      ]
+    },
+    "ships": {
+      "id": "ships",
+      "name": "船体 & 武器",
+      "cargoSpace": 1,
+      "tags": [
+        "meta"
+      ]
+    },
+    "ai_cores": {
+      "id": "ai_cores",
+      "name": "AI 核心",
+      "cargoSpace": 1,
+      "tags": [
+        "nonecon",
+        "ai_core",
+        "hide_in_codex"
+      ]
+    },
+    "alpha_core": {
+      "id": "alpha_core",
+      "name": "Alpha 核心",
+      "cargoSpace": 1,
+      "tags": [
+        "nonecon",
+        "ai_core",
+        "no_loss_from_combat",
+        "codex_unlockable"
+      ]
+    },
+    "beta_core": {
+      "id": "beta_core",
+      "name": "Beta 核心",
+      "cargoSpace": 1,
+      "tags": [
+        "nonecon",
+        "ai_core",
+        "no_loss_from_combat",
+        "codex_unlockable"
+      ]
+    },
+    "gamma_core": {
+      "id": "gamma_core",
+      "name": "Gamma 核心",
+      "cargoSpace": 1,
+      "tags": [
+        "nonecon",
+        "ai_core",
+        "no_loss_from_combat",
+        "codex_unlockable"
+      ]
+    },
+    "survey_data": {
+      "id": "survey_data",
+      "name": "调查数据",
+      "cargoSpace": 1,
+      "tags": [
+        "nonecon",
+        "hide_in_codex"
+      ]
+    },
+    "survey_data_1": {
+      "id": "survey_data_1",
+      "name": "I 级调查数据",
+      "cargoSpace": 1,
+      "tags": [
+        "nonecon",
+        "no_loss_from_combat"
+      ]
+    },
+    "survey_data_2": {
+      "id": "survey_data_2",
+      "name": "II 级调查数据",
+      "cargoSpace": 1,
+      "tags": [
+        "nonecon",
+        "no_loss_from_combat"
+      ]
+    },
+    "survey_data_3": {
+      "id": "survey_data_3",
+      "name": "III 级调查数据",
+      "cargoSpace": 1,
+      "tags": [
+        "nonecon",
+        "no_loss_from_combat"
+      ]
+    },
+    "survey_data_4": {
+      "id": "survey_data_4",
+      "name": "IV 级调查数据",
+      "cargoSpace": 1,
+      "tags": [
+        "nonecon",
+        "no_loss_from_combat"
+      ]
+    },
+    "survey_data_5": {
+      "id": "survey_data_5",
+      "name": "V 级调查数据",
+      "cargoSpace": 1,
+      "tags": [
+        "nonecon",
+        "no_loss_from_combat"
+      ]
+    },
+    "blueprints": {
+      "id": "blueprints",
+      "name": "蓝图",
+      "cargoSpace": 1,
+      "tags": [
+        "nonecon",
+        "meta",
+        "hide_in_codex"
+      ]
+    }
+  },
+  "excludedCommodities": [
+    {
+      "id": "omega_core",
+      "reason": "Missing or invalid cargo space; no default inferred"
+    },
+    {
+      "id": "ship_weapons",
+      "reason": "Missing or invalid cargo space; no default inferred"
+    },
+    {
+      "id": "credits",
+      "reason": "Missing or invalid cargo space; no default inferred"
+    }
+  ],
+  "hulls": {
+    "afflictor": {
+      "id": "afflictor",
+      "name": "折磨",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/afflictor.ship",
+      "builtInMods": [
+        "phasefield",
+        "delicate"
+      ],
+      "hasModules": false,
+      "minCrew": 5,
+      "maxCrew": 10,
+      "cargoCapacity": 25,
+      "fuelCapacity": 50,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 42000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 30,
+      "deploymentSupplies": 12,
+      "suppliesPerMonth": 12
+    },
+    "afflictor_d_pirates": {
+      "id": "afflictor_d_pirates",
+      "name": "折磨 (P)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/afflictor_d_pirates.skin",
+      "builtInMods": [
+        "phasefield",
+        "delicate"
+      ],
+      "hasModules": false,
+      "minCrew": 5,
+      "maxCrew": 10,
+      "cargoCapacity": 25,
+      "fuelCapacity": 50,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 33600,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 30,
+      "deploymentSupplies": 9,
+      "suppliesPerMonth": 9
+    },
+    "anubis": {
+      "id": "anubis",
+      "name": "阿努比斯",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/anubis.ship",
+      "builtInMods": [
+        "design_compromises"
+      ],
+      "hasModules": false,
+      "minCrew": 50,
+      "maxCrew": 100,
+      "cargoCapacity": 100,
+      "fuelCapacity": 80,
+      "fuelPerLightYear": 3,
+      "maxBurn": 8,
+      "baseValue": 100000,
+      "baseRecoveryPercentPerDay": 4,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 18,
+      "suppliesPerMonth": 18
+    },
+    "apex": {
+      "id": "apex",
+      "name": "折光",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/apex.ship",
+      "builtInMods": [
+        "automated",
+        "coherer"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 120,
+      "fuelCapacity": 90,
+      "fuelPerLightYear": 3,
+      "maxBurn": 9,
+      "baseValue": 170000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 15,
+      "deploymentSupplies": 30,
+      "suppliesPerMonth": 30
+    },
+    "apogee": {
+      "id": "apogee",
+      "name": "至高点",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/apogee.ship",
+      "builtInMods": [
+        "hiressensors",
+        "surveying_equipment"
+      ],
+      "hasModules": false,
+      "minCrew": 150,
+      "maxCrew": 450,
+      "cargoCapacity": 400,
+      "fuelCapacity": 200,
+      "fuelPerLightYear": 2,
+      "maxBurn": 8,
+      "baseValue": 140000,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 15,
+      "deploymentSupplies": 20,
+      "suppliesPerMonth": 20
+    },
+    "assault_unit": {
+      "id": "assault_unit",
+      "name": "",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/assault_unit.ship",
+      "builtInMods": [
+        "automated",
+        "threat_hullmod"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 80,
+      "fuelCapacity": 100,
+      "fuelPerLightYear": 0.5,
+      "maxBurn": 9,
+      "baseValue": 80000,
+      "baseRecoveryPercentPerDay": 100,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 10,
+      "suppliesPerMonth": 10
+    },
+    "astral": {
+      "id": "astral",
+      "name": "星体",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/astral.ship",
+      "builtInMods": [
+        "advancedcore",
+        "missleracks"
+      ],
+      "hasModules": false,
+      "minCrew": 450,
+      "maxCrew": 1000,
+      "cargoCapacity": 250,
+      "fuelCapacity": 200,
+      "fuelPerLightYear": 10,
+      "maxBurn": 7,
+      "baseValue": 400000,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 15,
+      "deploymentSupplies": 50,
+      "suppliesPerMonth": 50
+    },
+    "atlas": {
+      "id": "atlas",
+      "name": "阿特拉斯",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/atlas.ship",
+      "builtInMods": [
+        "civgrade"
+      ],
+      "hasModules": false,
+      "minCrew": 50,
+      "maxCrew": 100,
+      "cargoCapacity": 2000,
+      "fuelCapacity": 400,
+      "fuelPerLightYear": 6,
+      "maxBurn": 6,
+      "baseValue": 75000,
+      "baseRecoveryPercentPerDay": 2,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 10,
+      "suppliesPerMonth": 10
+    },
+    "atlas2": {
+      "id": "atlas2",
+      "name": "阿特拉斯 Mk.II",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/atlas2.ship",
+      "builtInMods": [
+        "civgrade"
+      ],
+      "hasModules": false,
+      "minCrew": 250,
+      "maxCrew": 300,
+      "cargoCapacity": 200,
+      "fuelCapacity": 400,
+      "fuelPerLightYear": 10,
+      "maxBurn": 7,
+      "baseValue": 150000,
+      "baseRecoveryPercentPerDay": 2,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 24,
+      "suppliesPerMonth": 24
+    },
+    "aurora": {
+      "id": "aurora",
+      "name": "极光",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/aurora.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 75,
+      "maxCrew": 200,
+      "cargoCapacity": 150,
+      "fuelCapacity": 90,
+      "fuelPerLightYear": 3,
+      "maxBurn": 8,
+      "baseValue": 200000,
+      "baseRecoveryPercentPerDay": 4,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 30,
+      "suppliesPerMonth": 30
+    },
+    "bastillon": {
+      "id": "bastillon",
+      "name": "棱堡",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/bastillon.ship",
+      "builtInMods": [
+        "automated",
+        "rugged"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 80,
+      "fuelCapacity": 40,
+      "fuelPerLightYear": 2,
+      "maxBurn": 8,
+      "baseValue": 40000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 6,
+      "suppliesPerMonth": 6
+    },
+    "berserker": {
+      "id": "berserker",
+      "name": "狂战士",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/berserker.ship",
+      "builtInMods": [
+        "automated",
+        "rugged"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 80,
+      "fuelCapacity": 40,
+      "fuelPerLightYear": 2,
+      "maxBurn": 8,
+      "baseValue": 40000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 6,
+      "suppliesPerMonth": 6
+    },
+    "brawler": {
+      "id": "brawler",
+      "name": "斗士",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/brawler.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 15,
+      "maxCrew": 30,
+      "cargoCapacity": 40,
+      "fuelCapacity": 20,
+      "fuelPerLightYear": 1,
+      "maxBurn": 9,
+      "baseValue": 12000,
+      "baseRecoveryPercentPerDay": 8,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 5,
+      "suppliesPerMonth": 5
+    },
+    "brawler_LG": {
+      "id": "brawler_LG",
+      "name": "斗士 (LG)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/brawler_LG.skin",
+      "builtInMods": [
+        "andrada_mods",
+        "solar_shielding",
+        "coherer"
+      ],
+      "hasModules": false,
+      "minCrew": 15,
+      "maxCrew": 30,
+      "cargoCapacity": 40,
+      "fuelCapacity": 20,
+      "fuelPerLightYear": 1,
+      "maxBurn": 9,
+      "baseValue": 12000,
+      "baseRecoveryPercentPerDay": 8,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 5,
+      "suppliesPerMonth": 5
+    },
+    "brawler_pather": {
+      "id": "brawler_pather",
+      "name": "斗士 (LP)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/brawler_pather.skin",
+      "builtInMods": [
+        "ill_advised",
+        "safetyoverrides"
+      ],
+      "hasModules": false,
+      "minCrew": 15,
+      "maxCrew": 30,
+      "cargoCapacity": 40,
+      "fuelCapacity": 20,
+      "fuelPerLightYear": 1,
+      "maxBurn": 9,
+      "baseValue": 9000,
+      "baseRecoveryPercentPerDay": 8,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 6,
+      "suppliesPerMonth": 6
+    },
+    "brawler_tritachyon": {
+      "id": "brawler_tritachyon",
+      "name": "斗士 (TT)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/brawler_tritachyon.skin",
+      "builtInMods": [
+        "insulatedengine"
+      ],
+      "hasModules": false,
+      "minCrew": 15,
+      "maxCrew": 30,
+      "cargoCapacity": 40,
+      "fuelCapacity": 20,
+      "fuelPerLightYear": 1,
+      "maxBurn": 9,
+      "baseValue": 18000,
+      "baseRecoveryPercentPerDay": 8,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 5,
+      "suppliesPerMonth": 5
+    },
+    "brilliant": {
+      "id": "brilliant",
+      "name": "辉煌",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/brilliant.ship",
+      "builtInMods": [
+        "automated"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 120,
+      "fuelCapacity": 90,
+      "fuelPerLightYear": 3,
+      "maxBurn": 9,
+      "baseValue": 140000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 15,
+      "deploymentSupplies": 25,
+      "suppliesPerMonth": 25
+    },
+    "buffalo": {
+      "id": "buffalo",
+      "name": "水牛",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/buffalo.ship",
+      "builtInMods": [
+        "civgrade"
+      ],
+      "hasModules": false,
+      "minCrew": 10,
+      "maxCrew": 20,
+      "cargoCapacity": 400,
+      "fuelCapacity": 80,
+      "fuelPerLightYear": 2,
+      "maxBurn": 8,
+      "baseValue": 20000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 3,
+      "suppliesPerMonth": 3
+    },
+    "buffalo_d": {
+      "id": "buffalo_d",
+      "name": "水牛 (D)",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/skins/buffalo_d.skin",
+      "builtInMods": [
+        "civgrade",
+        "degraded_engines"
+      ],
+      "hasModules": false,
+      "minCrew": 10,
+      "maxCrew": 20,
+      "cargoCapacity": 400,
+      "fuelCapacity": 80,
+      "fuelPerLightYear": 2,
+      "maxBurn": 8,
+      "baseValue": 13400,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 3,
+      "suppliesPerMonth": 3
+    },
+    "buffalo_hegemony": {
+      "id": "buffalo_hegemony",
+      "name": "水牛 (A)",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/skins/buffalo_hegemony.skin",
+      "builtInMods": [
+        "civgrade",
+        "militarized_subsystems"
+      ],
+      "hasModules": false,
+      "minCrew": 10,
+      "maxCrew": 20,
+      "cargoCapacity": 400,
+      "fuelCapacity": 80,
+      "fuelPerLightYear": 2,
+      "maxBurn": 8,
+      "baseValue": 30000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 3,
+      "suppliesPerMonth": 3
+    },
+    "buffalo_luddic_church": {
+      "id": "buffalo_luddic_church",
+      "name": "水牛 (LC)",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/skins/buffalo_luddic_church.skin",
+      "builtInMods": [
+        "civgrade"
+      ],
+      "hasModules": false,
+      "minCrew": 10,
+      "maxCrew": 20,
+      "cargoCapacity": 400,
+      "fuelCapacity": 80,
+      "fuelPerLightYear": 2,
+      "maxBurn": 8,
+      "baseValue": 20000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 3,
+      "suppliesPerMonth": 3
+    },
+    "buffalo_pirates": {
+      "id": "buffalo_pirates",
+      "name": "水牛 (P)",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/skins/buffalo_pirates.skin",
+      "builtInMods": [
+        "civgrade",
+        "shielded_holds"
+      ],
+      "hasModules": false,
+      "minCrew": 10,
+      "maxCrew": 20,
+      "cargoCapacity": 400,
+      "fuelCapacity": 80,
+      "fuelPerLightYear": 2,
+      "maxBurn": 8,
+      "baseValue": 20000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 3,
+      "suppliesPerMonth": 3
+    },
+    "buffalo_tritachyon": {
+      "id": "buffalo_tritachyon",
+      "name": "水牛 (TT)",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/skins/buffalo_tritachyon.skin",
+      "builtInMods": [
+        "civgrade"
+      ],
+      "hasModules": false,
+      "minCrew": 10,
+      "maxCrew": 20,
+      "cargoCapacity": 400,
+      "fuelCapacity": 80,
+      "fuelPerLightYear": 2,
+      "maxBurn": 8,
+      "baseValue": 20000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 3,
+      "suppliesPerMonth": 3
+    },
+    "buffalo2": {
+      "id": "buffalo2",
+      "name": "水牛 Mk.II",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/buffalo_mk2.ship",
+      "builtInMods": [
+        "civgrade"
+      ],
+      "hasModules": false,
+      "minCrew": 40,
+      "maxCrew": 40,
+      "cargoCapacity": 20,
+      "fuelCapacity": 30,
+      "fuelPerLightYear": 2,
+      "maxBurn": 9,
+      "baseValue": 18000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 4,
+      "suppliesPerMonth": 4
+    },
+    "centurion": {
+      "id": "centurion",
+      "name": "百夫长",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/centurion.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 30,
+      "maxCrew": 50,
+      "cargoCapacity": 50,
+      "fuelCapacity": 25,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 20000,
+      "baseRecoveryPercentPerDay": 8,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 4,
+      "suppliesPerMonth": 4
+    },
+    "centurion_LG": {
+      "id": "centurion_LG",
+      "name": "百夫长 (LG)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/centurion_LG.skin",
+      "builtInMods": [
+        "andrada_mods",
+        "solar_shielding",
+        "coherer"
+      ],
+      "hasModules": false,
+      "minCrew": 30,
+      "maxCrew": 50,
+      "cargoCapacity": 50,
+      "fuelCapacity": 25,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 20000,
+      "baseRecoveryPercentPerDay": 8,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 4,
+      "suppliesPerMonth": 4
+    },
+    "cerberus": {
+      "id": "cerberus",
+      "name": "地狱犬",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/warhound.ship",
+      "builtInMods": [
+        "rugged",
+        "shielded_holds"
+      ],
+      "hasModules": false,
+      "minCrew": 20,
+      "maxCrew": 50,
+      "cargoCapacity": 100,
+      "fuelCapacity": 40,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 9000,
+      "baseRecoveryPercentPerDay": 8,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 4,
+      "suppliesPerMonth": 4
+    },
+    "cerberus_d": {
+      "id": "cerberus_d",
+      "name": "地狱犬 (D)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/cerberus_d.skin",
+      "builtInMods": [
+        "rugged",
+        "shielded_holds",
+        "comp_armor",
+        "faulty_grid"
+      ],
+      "hasModules": false,
+      "minCrew": 20,
+      "maxCrew": 50,
+      "cargoCapacity": 100,
+      "fuelCapacity": 40,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 6030,
+      "baseRecoveryPercentPerDay": 8,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 4,
+      "suppliesPerMonth": 4
+    },
+    "cerberus_d_pirates": {
+      "id": "cerberus_d_pirates",
+      "name": "地狱犬 (P)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/cerberus_d_pirates.skin",
+      "builtInMods": [
+        "rugged",
+        "shielded_holds"
+      ],
+      "hasModules": false,
+      "minCrew": 20,
+      "maxCrew": 50,
+      "cargoCapacity": 100,
+      "fuelCapacity": 40,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 9000,
+      "baseRecoveryPercentPerDay": 8,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 4,
+      "suppliesPerMonth": 4
+    },
+    "cerberus_luddic_path": {
+      "id": "cerberus_luddic_path",
+      "name": "地狱犬 (LP)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/cerberus_luddic_path.skin",
+      "builtInMods": [
+        "rugged",
+        "shielded_holds",
+        "safetyoverrides",
+        "ill_advised"
+      ],
+      "hasModules": false,
+      "minCrew": 20,
+      "maxCrew": 50,
+      "cargoCapacity": 100,
+      "fuelCapacity": 40,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 7200,
+      "baseRecoveryPercentPerDay": 8,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 4,
+      "suppliesPerMonth": 4
+    },
+    "champion": {
+      "id": "champion",
+      "name": "捍卫者",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/champion.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 200,
+      "maxCrew": 300,
+      "cargoCapacity": 150,
+      "fuelCapacity": 150,
+      "fuelPerLightYear": 4,
+      "maxBurn": 8,
+      "baseValue": 125000,
+      "baseRecoveryPercentPerDay": 4,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 25,
+      "suppliesPerMonth": 25
+    },
+    "colossus": {
+      "id": "colossus",
+      "name": "巨像",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/colossus.ship",
+      "builtInMods": [
+        "civgrade"
+      ],
+      "hasModules": false,
+      "minCrew": 40,
+      "maxCrew": 200,
+      "cargoCapacity": 900,
+      "fuelCapacity": 120,
+      "fuelPerLightYear": 4,
+      "maxBurn": 7,
+      "baseValue": 40000,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 6,
+      "suppliesPerMonth": 6
+    },
+    "colossus2": {
+      "id": "colossus2",
+      "name": "巨像 Mk.II",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/colossus2.ship",
+      "builtInMods": [
+        "civgrade",
+        "ill_advised",
+        "safetyoverrides"
+      ],
+      "hasModules": false,
+      "minCrew": 60,
+      "maxCrew": 120,
+      "cargoCapacity": 300,
+      "fuelCapacity": 60,
+      "fuelPerLightYear": 4,
+      "maxBurn": 7,
+      "baseValue": 50000,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 9,
+      "suppliesPerMonth": 9
+    },
+    "colossus3": {
+      "id": "colossus3",
+      "name": "巨像 Mk.III",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/colossus3.ship",
+      "builtInMods": [
+        "civgrade",
+        "converted_bay",
+        "ground_support"
+      ],
+      "hasModules": false,
+      "minCrew": 80,
+      "maxCrew": 160,
+      "cargoCapacity": 300,
+      "fuelCapacity": 60,
+      "fuelPerLightYear": 4,
+      "maxBurn": 7,
+      "baseValue": 50000,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 8,
+      "suppliesPerMonth": 8
+    },
+    "condor": {
+      "id": "condor",
+      "name": "秃鹰",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/condor.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 90,
+      "maxCrew": 150,
+      "cargoCapacity": 120,
+      "fuelCapacity": 30,
+      "fuelPerLightYear": 2,
+      "maxBurn": 9,
+      "baseValue": 32000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 10,
+      "suppliesPerMonth": 10
+    },
+    "conquest": {
+      "id": "conquest",
+      "name": "征服者",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/conquest.ship",
+      "builtInMods": [
+        "hbi"
+      ],
+      "hasModules": false,
+      "minCrew": 400,
+      "maxCrew": 500,
+      "cargoCapacity": 300,
+      "fuelCapacity": 300,
+      "fuelPerLightYear": 10,
+      "maxBurn": 8,
+      "baseValue": 300000,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 15,
+      "deploymentSupplies": 40,
+      "suppliesPerMonth": 40
+    },
+    "crig": {
+      "id": "crig",
+      "name": "",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/constructionrig.ship",
+      "builtInMods": [
+        "civgrade",
+        "repair_gantry"
+      ],
+      "hasModules": false,
+      "minCrew": 20,
+      "maxCrew": 2,
+      "cargoCapacity": 0,
+      "fuelCapacity": 0,
+      "fuelPerLightYear": 2,
+      "maxBurn": 8,
+      "baseValue": 20000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 3,
+      "suppliesPerMonth": 3
+    },
+    "defender": {
+      "id": "defender",
+      "name": "后卫",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/defender.ship",
+      "builtInMods": [
+        "automated",
+        "rugged"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 20,
+      "fuelCapacity": 20,
+      "fuelPerLightYear": 1,
+      "maxBurn": 9,
+      "baseValue": 10000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 5,
+      "deploymentSupplies": 3,
+      "suppliesPerMonth": 3
+    },
+    "dominator": {
+      "id": "dominator",
+      "name": "统治者",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/dominator.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 200,
+      "maxCrew": 300,
+      "cargoCapacity": 150,
+      "fuelCapacity": 150,
+      "fuelPerLightYear": 5,
+      "maxBurn": 8,
+      "baseValue": 125000,
+      "baseRecoveryPercentPerDay": 4,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 25,
+      "suppliesPerMonth": 25
+    },
+    "dominator_d": {
+      "id": "dominator_d",
+      "name": "统治者 (D)",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/skins/dominator_d.skin",
+      "builtInMods": [
+        "comp_armor",
+        "faulty_grid"
+      ],
+      "hasModules": false,
+      "minCrew": 200,
+      "maxCrew": 300,
+      "cargoCapacity": 150,
+      "fuelCapacity": 150,
+      "fuelPerLightYear": 5,
+      "maxBurn": 8,
+      "baseValue": 75000,
+      "baseRecoveryPercentPerDay": 4,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 25,
+      "suppliesPerMonth": 25
+    },
+    "dominator_xiv": {
+      "id": "dominator_xiv",
+      "name": "统治者 (XIV)",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/skins/dominator_xiv.skin",
+      "builtInMods": [
+        "fourteenth"
+      ],
+      "hasModules": false,
+      "minCrew": 200,
+      "maxCrew": 300,
+      "cargoCapacity": 150,
+      "fuelCapacity": 150,
+      "fuelPerLightYear": 5,
+      "maxBurn": 8,
+      "baseValue": 187500,
+      "baseRecoveryPercentPerDay": 4,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 25,
+      "suppliesPerMonth": 25
+    },
+    "doom": {
+      "id": "doom",
+      "name": "厄运",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/doom.ship",
+      "builtInMods": [
+        "phasefield",
+        "delicate"
+      ],
+      "hasModules": false,
+      "minCrew": 50,
+      "maxCrew": 100,
+      "cargoCapacity": 120,
+      "fuelCapacity": 150,
+      "fuelPerLightYear": 3,
+      "maxBurn": 8,
+      "baseValue": 250000,
+      "baseRecoveryPercentPerDay": 4,
+      "deployCRPercent": 30,
+      "deploymentSupplies": 35,
+      "suppliesPerMonth": 35
+    },
+    "dram": {
+      "id": "dram",
+      "name": "德拉姆",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/dram.ship",
+      "builtInMods": [
+        "civgrade"
+      ],
+      "hasModules": false,
+      "minCrew": 5,
+      "maxCrew": 10,
+      "cargoCapacity": 15,
+      "fuelCapacity": 300,
+      "fuelPerLightYear": 1,
+      "maxBurn": 9,
+      "baseValue": 8000,
+      "baseRecoveryPercentPerDay": 8,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 2,
+      "suppliesPerMonth": 2
+    },
+    "drover": {
+      "id": "drover",
+      "name": "赶牛人",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/drover.ship",
+      "builtInMods": [
+        "bdeck"
+      ],
+      "hasModules": false,
+      "minCrew": 90,
+      "maxCrew": 150,
+      "cargoCapacity": 40,
+      "fuelCapacity": 40,
+      "fuelPerLightYear": 2,
+      "maxBurn": 9,
+      "baseValue": 40000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 15,
+      "deploymentSupplies": 12,
+      "suppliesPerMonth": 12
+    },
+    "eagle": {
+      "id": "eagle",
+      "name": "雄鹰",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/eagle.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 150,
+      "maxCrew": 250,
+      "cargoCapacity": 150,
+      "fuelCapacity": 100,
+      "fuelPerLightYear": 3,
+      "maxBurn": 8,
+      "baseValue": 100000,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 20,
+      "suppliesPerMonth": 20
+    },
+    "eagle_d": {
+      "id": "eagle_d",
+      "name": "雄鹰 (D)",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/skins/eagle_d.skin",
+      "builtInMods": [
+        "degraded_engines",
+        "comp_armor",
+        "faulty_grid"
+      ],
+      "hasModules": false,
+      "minCrew": 150,
+      "maxCrew": 250,
+      "cargoCapacity": 150,
+      "fuelCapacity": 100,
+      "fuelPerLightYear": 3,
+      "maxBurn": 8,
+      "baseValue": 60000,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 20,
+      "suppliesPerMonth": 20
+    },
+    "eagle_LG": {
+      "id": "eagle_LG",
+      "name": "雄鹰 (LG)",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/skins/eagle_LG.skin",
+      "builtInMods": [
+        "andrada_mods",
+        "solar_shielding",
+        "coherer"
+      ],
+      "hasModules": false,
+      "minCrew": 150,
+      "maxCrew": 250,
+      "cargoCapacity": 150,
+      "fuelCapacity": 100,
+      "fuelPerLightYear": 3,
+      "maxBurn": 8,
+      "baseValue": 100000,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 20,
+      "suppliesPerMonth": 20
+    },
+    "eagle_xiv": {
+      "id": "eagle_xiv",
+      "name": "雄鹰 (XIV)",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/skins/eagle_xiv.skin",
+      "builtInMods": [
+        "fourteenth"
+      ],
+      "hasModules": false,
+      "minCrew": 150,
+      "maxCrew": 250,
+      "cargoCapacity": 150,
+      "fuelCapacity": 100,
+      "fuelPerLightYear": 3,
+      "maxBurn": 8,
+      "baseValue": 175000,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 20,
+      "suppliesPerMonth": 20
+    },
+    "enforcer": {
+      "id": "enforcer",
+      "name": "执法者",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/enforcer.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 60,
+      "maxCrew": 100,
+      "cargoCapacity": 90,
+      "fuelCapacity": 90,
+      "fuelPerLightYear": 3,
+      "maxBurn": 9,
+      "baseValue": 38000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 9,
+      "suppliesPerMonth": 9
+    },
+    "enforcer_d": {
+      "id": "enforcer_d",
+      "name": "执法者 (D)",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/skins/enforcer_d.skin",
+      "builtInMods": [
+        "degraded_engines",
+        "comp_armor",
+        "faulty_grid"
+      ],
+      "hasModules": false,
+      "minCrew": 60,
+      "maxCrew": 100,
+      "cargoCapacity": 90,
+      "fuelCapacity": 90,
+      "fuelPerLightYear": 3,
+      "maxBurn": 9,
+      "baseValue": 25460,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 9,
+      "suppliesPerMonth": 9
+    },
+    "enforcer_d_pirates": {
+      "id": "enforcer_d_pirates",
+      "name": "执法者 (P)",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/skins/enforcer_d_pirates.skin",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 60,
+      "maxCrew": 100,
+      "cargoCapacity": 90,
+      "fuelCapacity": 90,
+      "fuelPerLightYear": 3,
+      "maxBurn": 9,
+      "baseValue": 38000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 9,
+      "suppliesPerMonth": 9
+    },
+    "enforcer_xiv": {
+      "id": "enforcer_xiv",
+      "name": "执法者 (XIV)",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/skins/enforcer_xiv.skin",
+      "builtInMods": [
+        "fourteenth"
+      ],
+      "hasModules": false,
+      "minCrew": 60,
+      "maxCrew": 100,
+      "cargoCapacity": 90,
+      "fuelCapacity": 90,
+      "fuelPerLightYear": 3,
+      "maxBurn": 9,
+      "baseValue": 66500,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 9,
+      "suppliesPerMonth": 9
+    },
+    "eradicator": {
+      "id": "eradicator",
+      "name": "根除者",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/eradicator.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 120,
+      "maxCrew": 170,
+      "cargoCapacity": 100,
+      "fuelCapacity": 120,
+      "fuelPerLightYear": 4,
+      "maxBurn": 9,
+      "baseValue": 100000,
+      "baseRecoveryPercentPerDay": 4,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 22,
+      "suppliesPerMonth": 22
+    },
+    "eradicator_pirates": {
+      "id": "eradicator_pirates",
+      "name": "根除者 (P)",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/skins/eradicator_pirates.skin",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 120,
+      "maxCrew": 170,
+      "cargoCapacity": 100,
+      "fuelCapacity": 120,
+      "fuelPerLightYear": 4,
+      "maxBurn": 9,
+      "baseValue": 75000,
+      "baseRecoveryPercentPerDay": 4,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 18,
+      "suppliesPerMonth": 18
+    },
+    "executor": {
+      "id": "executor",
+      "name": "执行官",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/skins/executor.skin",
+      "builtInMods": [
+        "solar_shielding",
+        "andrada_mods",
+        "coherer"
+      ],
+      "hasModules": false,
+      "minCrew": 500,
+      "maxCrew": 600,
+      "cargoCapacity": 400,
+      "fuelCapacity": 300,
+      "fuelPerLightYear": 10,
+      "maxBurn": 7,
+      "baseValue": 500000,
+      "baseRecoveryPercentPerDay": 4,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 50,
+      "suppliesPerMonth": 50
+    },
+    "fabricator_unit": {
+      "id": "fabricator_unit",
+      "name": "",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/fabricator_unit.ship",
+      "builtInMods": [
+        "automated",
+        "advancedcore",
+        "threat_hullmod"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 2000,
+      "fuelCapacity": 1000,
+      "fuelPerLightYear": 1,
+      "maxBurn": 8,
+      "baseValue": 500000,
+      "baseRecoveryPercentPerDay": 1000,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 20,
+      "suppliesPerMonth": 20
+    },
+    "facet": {
+      "id": "facet",
+      "name": "",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/facet.ship",
+      "builtInMods": [
+        "automated",
+        "fluxbreakers",
+        "shard_spawner",
+        "do_not_back_off"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 20,
+      "fuelCapacity": 100,
+      "fuelPerLightYear": 2,
+      "maxBurn": 11,
+      "baseValue": 200000,
+      "baseRecoveryPercentPerDay": 20,
+      "deployCRPercent": 5,
+      "deploymentSupplies": 12,
+      "suppliesPerMonth": 12
+    },
+    "falcon": {
+      "id": "falcon",
+      "name": "猎鹰",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/falcon.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 100,
+      "maxCrew": 180,
+      "cargoCapacity": 120,
+      "fuelCapacity": 100,
+      "fuelPerLightYear": 3,
+      "maxBurn": 9,
+      "baseValue": 80000,
+      "baseRecoveryPercentPerDay": 4,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 14,
+      "suppliesPerMonth": 14
+    },
+    "falcon_d": {
+      "id": "falcon_d",
+      "name": "猎鹰 (D)",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/skins/falcon_d.skin",
+      "builtInMods": [
+        "degraded_engines",
+        "faulty_grid"
+      ],
+      "hasModules": false,
+      "minCrew": 100,
+      "maxCrew": 180,
+      "cargoCapacity": 120,
+      "fuelCapacity": 100,
+      "fuelPerLightYear": 3,
+      "maxBurn": 9,
+      "baseValue": 44000,
+      "baseRecoveryPercentPerDay": 4,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 14,
+      "suppliesPerMonth": 14
+    },
+    "falcon_LG": {
+      "id": "falcon_LG",
+      "name": "猎鹰 (LG)",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/skins/falcon_LG.skin",
+      "builtInMods": [
+        "andrada_mods",
+        "solar_shielding",
+        "coherer"
+      ],
+      "hasModules": false,
+      "minCrew": 100,
+      "maxCrew": 180,
+      "cargoCapacity": 120,
+      "fuelCapacity": 100,
+      "fuelPerLightYear": 3,
+      "maxBurn": 9,
+      "baseValue": 80000,
+      "baseRecoveryPercentPerDay": 4,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 14,
+      "suppliesPerMonth": 14
+    },
+    "falcon_p": {
+      "id": "falcon_p",
+      "name": "猎鹰 (P)",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/skins/falcon_p.skin",
+      "builtInMods": [
+        "augmentedengines",
+        "unstable_injector"
+      ],
+      "hasModules": false,
+      "minCrew": 100,
+      "maxCrew": 180,
+      "cargoCapacity": 120,
+      "fuelCapacity": 100,
+      "fuelPerLightYear": 3,
+      "maxBurn": 9,
+      "baseValue": 100000,
+      "baseRecoveryPercentPerDay": 4,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 20,
+      "suppliesPerMonth": 20
+    },
+    "falcon_xiv": {
+      "id": "falcon_xiv",
+      "name": "猎鹰 (XIV)",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/skins/falcon_xiv.skin",
+      "builtInMods": [
+        "fourteenth"
+      ],
+      "hasModules": false,
+      "minCrew": 100,
+      "maxCrew": 180,
+      "cargoCapacity": 120,
+      "fuelCapacity": 100,
+      "fuelPerLightYear": 3,
+      "maxBurn": 9,
+      "baseValue": 140000,
+      "baseRecoveryPercentPerDay": 4,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 14,
+      "suppliesPerMonth": 14
+    },
+    "fulgent": {
+      "id": "fulgent",
+      "name": "光辉",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/fulgent.ship",
+      "builtInMods": [
+        "automated",
+        "coherer"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 80,
+      "fuelCapacity": 60,
+      "fuelPerLightYear": 2,
+      "maxBurn": 10,
+      "baseValue": 50000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 15,
+      "deploymentSupplies": 10,
+      "suppliesPerMonth": 10
+    },
+    "fury": {
+      "id": "fury",
+      "name": "狂怒",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/fury.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 60,
+      "maxCrew": 120,
+      "cargoCapacity": 60,
+      "fuelCapacity": 80,
+      "fuelPerLightYear": 3,
+      "maxBurn": 9,
+      "baseValue": 115000,
+      "baseRecoveryPercentPerDay": 4,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 20,
+      "suppliesPerMonth": 20
+    },
+    "gemini": {
+      "id": "gemini",
+      "name": "双子座",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/gemini.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 55,
+      "maxCrew": 120,
+      "cargoCapacity": 250,
+      "fuelCapacity": 70,
+      "fuelPerLightYear": 2,
+      "maxBurn": 9,
+      "baseValue": 36000,
+      "baseRecoveryPercentPerDay": 4,
+      "deployCRPercent": 8,
+      "deploymentSupplies": 9,
+      "suppliesPerMonth": 9
+    },
+    "glimmer": {
+      "id": "glimmer",
+      "name": "微光",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/glimmer.ship",
+      "builtInMods": [
+        "automated"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 50,
+      "fuelCapacity": 40,
+      "fuelPerLightYear": 1,
+      "maxBurn": 11,
+      "baseValue": 30000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 5,
+      "suppliesPerMonth": 5
+    },
+    "gremlin": {
+      "id": "gremlin",
+      "name": "小精灵",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/gremlin.ship",
+      "builtInMods": [
+        "rugged"
+      ],
+      "hasModules": false,
+      "minCrew": 4,
+      "maxCrew": 10,
+      "cargoCapacity": 10,
+      "fuelCapacity": 20,
+      "fuelPerLightYear": 1,
+      "maxBurn": 9,
+      "baseValue": 26000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 6,
+      "suppliesPerMonth": 6
+    },
+    "gremlin_d_pirates": {
+      "id": "gremlin_d_pirates",
+      "name": "小精灵 (P)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/gremlin_d_pirates.skin",
+      "builtInMods": [
+        "rugged"
+      ],
+      "hasModules": false,
+      "minCrew": 4,
+      "maxCrew": 10,
+      "cargoCapacity": 10,
+      "fuelCapacity": 20,
+      "fuelPerLightYear": 1,
+      "maxBurn": 9,
+      "baseValue": 26000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 6,
+      "suppliesPerMonth": 6
+    },
+    "gremlin_luddic_path": {
+      "id": "gremlin_luddic_path",
+      "name": "小精灵 (LP)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/gremlin_luddic_path.skin",
+      "builtInMods": [
+        "rugged",
+        "safetyoverrides",
+        "ill_advised"
+      ],
+      "hasModules": false,
+      "minCrew": 4,
+      "maxCrew": 10,
+      "cargoCapacity": 10,
+      "fuelCapacity": 20,
+      "fuelPerLightYear": 1,
+      "maxBurn": 9,
+      "baseValue": 20800,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 6,
+      "suppliesPerMonth": 6
+    },
+    "grendel": {
+      "id": "grendel",
+      "name": "格伦德尔",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/grendel.ship",
+      "builtInMods": [
+        "rugged",
+        "distributed_fire_control"
+      ],
+      "hasModules": false,
+      "minCrew": 120,
+      "maxCrew": 120,
+      "cargoCapacity": 100,
+      "fuelCapacity": 75,
+      "fuelPerLightYear": 3,
+      "maxBurn": 8,
+      "baseValue": 100000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 18,
+      "suppliesPerMonth": 18
+    },
+    "gryphon": {
+      "id": "gryphon",
+      "name": "狮鹫",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/gryphon.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 150,
+      "maxCrew": 250,
+      "cargoCapacity": 120,
+      "fuelCapacity": 80,
+      "fuelPerLightYear": 3,
+      "maxBurn": 8,
+      "baseValue": 110000,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 20,
+      "suppliesPerMonth": 20
+    },
+    "guardian": {
+      "id": "guardian",
+      "name": "守护者",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/guardian.ship",
+      "builtInMods": [
+        "automated",
+        "advancedcore",
+        "missile_reload"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 300,
+      "fuelCapacity": 400,
+      "fuelPerLightYear": 15,
+      "maxBurn": 7,
+      "baseValue": 500000,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 40,
+      "suppliesPerMonth": 40
+    },
+    "hammerhead": {
+      "id": "hammerhead",
+      "name": "锤头",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/hammerhead.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 50,
+      "maxCrew": 100,
+      "cargoCapacity": 100,
+      "fuelCapacity": 60,
+      "fuelPerLightYear": 2,
+      "maxBurn": 9,
+      "baseValue": 40000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 10,
+      "suppliesPerMonth": 10
+    },
+    "hammerhead_d": {
+      "id": "hammerhead_d",
+      "name": "锤头 (D)",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/skins/hammerhead_d.skin",
+      "builtInMods": [
+        "degraded_engines",
+        "comp_armor",
+        "faulty_grid"
+      ],
+      "hasModules": false,
+      "minCrew": 50,
+      "maxCrew": 100,
+      "cargoCapacity": 100,
+      "fuelCapacity": 60,
+      "fuelPerLightYear": 2,
+      "maxBurn": 9,
+      "baseValue": 24000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 10,
+      "suppliesPerMonth": 10
+    },
+    "hammerhead_LG": {
+      "id": "hammerhead_LG",
+      "name": "锤头 (LG)",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/skins/hammerhead_LG.skin",
+      "builtInMods": [
+        "andrada_mods",
+        "solar_shielding",
+        "coherer"
+      ],
+      "hasModules": false,
+      "minCrew": 50,
+      "maxCrew": 100,
+      "cargoCapacity": 100,
+      "fuelCapacity": 60,
+      "fuelPerLightYear": 2,
+      "maxBurn": 9,
+      "baseValue": 40000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 10,
+      "suppliesPerMonth": 10
+    },
+    "harbinger": {
+      "id": "harbinger",
+      "name": "灾星",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/harbinger.ship",
+      "builtInMods": [
+        "phasefield",
+        "delicate"
+      ],
+      "hasModules": false,
+      "minCrew": 25,
+      "maxCrew": 50,
+      "cargoCapacity": 60,
+      "fuelCapacity": 100,
+      "fuelPerLightYear": 2,
+      "maxBurn": 9,
+      "baseValue": 120000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 30,
+      "deploymentSupplies": 18,
+      "suppliesPerMonth": 18
+    },
+    "hermes": {
+      "id": "hermes",
+      "name": "赫尔墨斯",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/hermes.ship",
+      "builtInMods": [
+        "civgrade"
+      ],
+      "hasModules": false,
+      "minCrew": 2,
+      "maxCrew": 10,
+      "cargoCapacity": 50,
+      "fuelCapacity": 15,
+      "fuelPerLightYear": 0.5,
+      "maxBurn": 9,
+      "baseValue": 4000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 2,
+      "suppliesPerMonth": 2
+    },
+    "hermes_d": {
+      "id": "hermes_d",
+      "name": "赫尔墨斯 (D)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/hermes_d.skin",
+      "builtInMods": [
+        "civgrade",
+        "degraded_engines"
+      ],
+      "hasModules": false,
+      "minCrew": 2,
+      "maxCrew": 10,
+      "cargoCapacity": 50,
+      "fuelCapacity": 15,
+      "fuelPerLightYear": 0.5,
+      "maxBurn": 9,
+      "baseValue": 2600,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 2,
+      "suppliesPerMonth": 2
+    },
+    "heron": {
+      "id": "heron",
+      "name": "苍鹭",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/heron.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 150,
+      "maxCrew": 250,
+      "cargoCapacity": 90,
+      "fuelCapacity": 60,
+      "fuelPerLightYear": 3,
+      "maxBurn": 8,
+      "baseValue": 120000,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 20,
+      "suppliesPerMonth": 20
+    },
+    "hive_unit": {
+      "id": "hive_unit",
+      "name": "",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/hive_unit.ship",
+      "builtInMods": [
+        "automated",
+        "threat_hullmod"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 150,
+      "fuelCapacity": 150,
+      "fuelPerLightYear": 0.75,
+      "maxBurn": 10,
+      "baseValue": 200000,
+      "baseRecoveryPercentPerDay": 100,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 22,
+      "suppliesPerMonth": 22
+    },
+    "hound": {
+      "id": "hound",
+      "name": "猎犬",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/hound.ship",
+      "builtInMods": [
+        "rugged",
+        "shielded_holds"
+      ],
+      "hasModules": false,
+      "minCrew": 10,
+      "maxCrew": 40,
+      "cargoCapacity": 75,
+      "fuelCapacity": 30,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 7500,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 3,
+      "suppliesPerMonth": 3
+    },
+    "hound_d": {
+      "id": "hound_d",
+      "name": "猎犬 (D)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/hound_d.skin",
+      "builtInMods": [
+        "rugged",
+        "shielded_holds",
+        "degraded_engines"
+      ],
+      "hasModules": false,
+      "minCrew": 10,
+      "maxCrew": 40,
+      "cargoCapacity": 75,
+      "fuelCapacity": 30,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 4875,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 3,
+      "suppliesPerMonth": 3
+    },
+    "hound_d_pirates": {
+      "id": "hound_d_pirates",
+      "name": "猎犬 (P)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/hound_d_pirates.skin",
+      "builtInMods": [
+        "rugged",
+        "shielded_holds"
+      ],
+      "hasModules": false,
+      "minCrew": 10,
+      "maxCrew": 40,
+      "cargoCapacity": 75,
+      "fuelCapacity": 30,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 7500,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 3,
+      "suppliesPerMonth": 3
+    },
+    "hound_hegemony": {
+      "id": "hound_hegemony",
+      "name": "猎犬 (A)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/hound_hegemony.skin",
+      "builtInMods": [
+        "rugged",
+        "shielded_holds",
+        "armoredweapons"
+      ],
+      "hasModules": false,
+      "minCrew": 10,
+      "maxCrew": 40,
+      "cargoCapacity": 75,
+      "fuelCapacity": 30,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 11250,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 3,
+      "suppliesPerMonth": 3
+    },
+    "hound_luddic_church": {
+      "id": "hound_luddic_church",
+      "name": "猎犬 (LC)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/hound_luddic_church.skin",
+      "builtInMods": [
+        "rugged",
+        "shielded_holds"
+      ],
+      "hasModules": false,
+      "minCrew": 10,
+      "maxCrew": 40,
+      "cargoCapacity": 75,
+      "fuelCapacity": 30,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 7500,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 3,
+      "suppliesPerMonth": 3
+    },
+    "hound_luddic_path": {
+      "id": "hound_luddic_path",
+      "name": "猎犬 (LP)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/hound_luddic_path.skin",
+      "builtInMods": [
+        "rugged",
+        "shielded_holds",
+        "safetyoverrides",
+        "ill_advised"
+      ],
+      "hasModules": false,
+      "minCrew": 10,
+      "maxCrew": 40,
+      "cargoCapacity": 75,
+      "fuelCapacity": 30,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 6750,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 3,
+      "suppliesPerMonth": 3
+    },
+    "hyperion": {
+      "id": "hyperion",
+      "name": "亥伯龙",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/hyperion.ship",
+      "builtInMods": [
+        "high_maintenance",
+        "delicate"
+      ],
+      "hasModules": false,
+      "minCrew": 5,
+      "maxCrew": 15,
+      "cargoCapacity": 10,
+      "fuelCapacity": 15,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 95000,
+      "baseRecoveryPercentPerDay": 8,
+      "deployCRPercent": 40,
+      "deploymentSupplies": 15,
+      "suppliesPerMonth": 15
+    },
+    "invictus": {
+      "id": "invictus",
+      "name": "不败",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/invictus.ship",
+      "builtInMods": [
+        "hbi",
+        "ablative_armor",
+        "distributed_fire_control",
+        "vast_hangar"
+      ],
+      "hasModules": false,
+      "minCrew": 4000,
+      "maxCrew": 6000,
+      "cargoCapacity": 1000,
+      "fuelCapacity": 800,
+      "fuelPerLightYear": 20,
+      "maxBurn": 6,
+      "baseValue": 700000,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 60,
+      "suppliesPerMonth": 60
+    },
+    "kite": {
+      "id": "kite",
+      "name": "风筝",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/kite.ship",
+      "builtInMods": [
+        "civgrade"
+      ],
+      "hasModules": false,
+      "minCrew": 2,
+      "maxCrew": 30,
+      "cargoCapacity": 30,
+      "fuelCapacity": 15,
+      "fuelPerLightYear": 1,
+      "maxBurn": 9,
+      "baseValue": 4000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 2,
+      "suppliesPerMonth": 2
+    },
+    "kite_d": {
+      "id": "kite_d",
+      "name": "风筝 (D)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/kite_d.skin",
+      "builtInMods": [
+        "civgrade",
+        "degraded_engines",
+        "comp_armor",
+        "faulty_grid"
+      ],
+      "hasModules": false,
+      "minCrew": 2,
+      "maxCrew": 30,
+      "cargoCapacity": 30,
+      "fuelCapacity": 15,
+      "fuelPerLightYear": 1,
+      "maxBurn": 9,
+      "baseValue": 2600,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 2,
+      "suppliesPerMonth": 2
+    },
+    "kite_hegemony": {
+      "id": "kite_hegemony",
+      "name": "风筝 (A)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/kite_hegemony.skin",
+      "builtInMods": [
+        "civgrade",
+        "militarized_subsystems"
+      ],
+      "hasModules": false,
+      "minCrew": 2,
+      "maxCrew": 30,
+      "cargoCapacity": 30,
+      "fuelCapacity": 15,
+      "fuelPerLightYear": 1,
+      "maxBurn": 9,
+      "baseValue": 6000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 2,
+      "suppliesPerMonth": 2
+    },
+    "kite_luddic_path": {
+      "id": "kite_luddic_path",
+      "name": "风筝 (LP)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/kite_luddic_path.skin",
+      "builtInMods": [
+        "civgrade",
+        "safetyoverrides",
+        "ill_advised"
+      ],
+      "hasModules": false,
+      "minCrew": 2,
+      "maxCrew": 30,
+      "cargoCapacity": 30,
+      "fuelCapacity": 15,
+      "fuelPerLightYear": 1,
+      "maxBurn": 9,
+      "baseValue": 3000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 2,
+      "suppliesPerMonth": 2
+    },
+    "kite_original": {
+      "id": "kite_original",
+      "name": "风筝 (S)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/kite_original.skin",
+      "builtInMods": [
+        "civgrade"
+      ],
+      "hasModules": false,
+      "minCrew": 2,
+      "maxCrew": 30,
+      "cargoCapacity": 30,
+      "fuelCapacity": 15,
+      "fuelPerLightYear": 1,
+      "maxBurn": 9,
+      "baseValue": 6000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 2,
+      "suppliesPerMonth": 2
+    },
+    "kite_pirates": {
+      "id": "kite_pirates",
+      "name": "风筝 (P)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/kite_pirates.skin",
+      "builtInMods": [
+        "civgrade"
+      ],
+      "hasModules": false,
+      "minCrew": 2,
+      "maxCrew": 30,
+      "cargoCapacity": 30,
+      "fuelCapacity": 15,
+      "fuelPerLightYear": 1,
+      "maxBurn": 9,
+      "baseValue": 4000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 2,
+      "suppliesPerMonth": 2
+    },
+    "lasher": {
+      "id": "lasher",
+      "name": "鞭笞者",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/lasher.ship",
+      "builtInMods": [
+        "ballistic_rangefinder"
+      ],
+      "hasModules": false,
+      "minCrew": 25,
+      "maxCrew": 50,
+      "cargoCapacity": 40,
+      "fuelCapacity": 25,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 9000,
+      "baseRecoveryPercentPerDay": 8,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 4,
+      "suppliesPerMonth": 4
+    },
+    "lasher_d": {
+      "id": "lasher_d",
+      "name": "鞭笞者 (D)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/lasher_d.skin",
+      "builtInMods": [
+        "ballistic_rangefinder",
+        "degraded_engines",
+        "faulty_grid"
+      ],
+      "hasModules": false,
+      "minCrew": 25,
+      "maxCrew": 50,
+      "cargoCapacity": 40,
+      "fuelCapacity": 25,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 6300,
+      "baseRecoveryPercentPerDay": 8,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 4,
+      "suppliesPerMonth": 4
+    },
+    "lasher_luddic_church": {
+      "id": "lasher_luddic_church",
+      "name": "鞭笞者 (LC)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/lasher_luddic_church.skin",
+      "builtInMods": [
+        "ballistic_rangefinder"
+      ],
+      "hasModules": false,
+      "minCrew": 25,
+      "maxCrew": 50,
+      "cargoCapacity": 40,
+      "fuelCapacity": 25,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 9000,
+      "baseRecoveryPercentPerDay": 8,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 4,
+      "suppliesPerMonth": 4
+    },
+    "lasher_pather": {
+      "id": "lasher_pather",
+      "name": "鞭笞者 (LP)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/lasher_pather.skin",
+      "builtInMods": [
+        "ballistic_rangefinder",
+        "safetyoverrides",
+        "ill_advised"
+      ],
+      "hasModules": false,
+      "minCrew": 25,
+      "maxCrew": 50,
+      "cargoCapacity": 40,
+      "fuelCapacity": 25,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 7200,
+      "baseRecoveryPercentPerDay": 8,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 4,
+      "suppliesPerMonth": 4
+    },
+    "legion": {
+      "id": "legion",
+      "name": "军团",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/legion.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 700,
+      "maxCrew": 1500,
+      "cargoCapacity": 300,
+      "fuelCapacity": 300,
+      "fuelPerLightYear": 15,
+      "maxBurn": 7,
+      "baseValue": 375000,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 40,
+      "suppliesPerMonth": 40
+    },
+    "legion_xiv": {
+      "id": "legion_xiv",
+      "name": "军团 (XIV)",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/skins/legion_xiv.skin",
+      "builtInMods": [
+        "fourteenth"
+      ],
+      "hasModules": false,
+      "minCrew": 700,
+      "maxCrew": 1500,
+      "cargoCapacity": 300,
+      "fuelCapacity": 300,
+      "fuelPerLightYear": 15,
+      "maxBurn": 7,
+      "baseValue": 656250,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 40,
+      "suppliesPerMonth": 40
+    },
+    "lumen": {
+      "id": "lumen",
+      "name": "流明",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/lumen.ship",
+      "builtInMods": [
+        "automated"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 40,
+      "fuelCapacity": 40,
+      "fuelPerLightYear": 1,
+      "maxBurn": 11,
+      "baseValue": 30000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 4,
+      "suppliesPerMonth": 4
+    },
+    "manticore": {
+      "id": "manticore",
+      "name": "蝎尾狮",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/manticore.ship",
+      "builtInMods": [
+        "ballistic_rangefinder"
+      ],
+      "hasModules": false,
+      "minCrew": 50,
+      "maxCrew": 80,
+      "cargoCapacity": 80,
+      "fuelCapacity": 50,
+      "fuelPerLightYear": 2,
+      "maxBurn": 9,
+      "baseValue": 45000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 12,
+      "suppliesPerMonth": 12
+    },
+    "manticore_luddic_path": {
+      "id": "manticore_luddic_path",
+      "name": "蝎尾狮 (LP)",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/skins/manticore_pather.skin",
+      "builtInMods": [
+        "safetyoverrides",
+        "ill_advised"
+      ],
+      "hasModules": false,
+      "minCrew": 50,
+      "maxCrew": 80,
+      "cargoCapacity": 80,
+      "fuelCapacity": 50,
+      "fuelPerLightYear": 2,
+      "maxBurn": 9,
+      "baseValue": 45000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 14,
+      "suppliesPerMonth": 14
+    },
+    "manticore_pirates": {
+      "id": "manticore_pirates",
+      "name": "蝎尾狮 (P)",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/skins/manticore_pirates.skin",
+      "builtInMods": [
+        "ballistic_rangefinder"
+      ],
+      "hasModules": false,
+      "minCrew": 50,
+      "maxCrew": 80,
+      "cargoCapacity": 80,
+      "fuelCapacity": 50,
+      "fuelPerLightYear": 2,
+      "maxBurn": 9,
+      "baseValue": 45000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 12,
+      "suppliesPerMonth": 12
+    },
+    "medusa": {
+      "id": "medusa",
+      "name": "美杜莎",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/medusa.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 35,
+      "maxCrew": 50,
+      "cargoCapacity": 50,
+      "fuelCapacity": 40,
+      "fuelPerLightYear": 2,
+      "maxBurn": 9,
+      "baseValue": 60000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 12,
+      "suppliesPerMonth": 12
+    },
+    "mercury": {
+      "id": "mercury",
+      "name": "墨丘利",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/mercury.ship",
+      "builtInMods": [
+        "civgrade"
+      ],
+      "hasModules": false,
+      "minCrew": 1,
+      "maxCrew": 30,
+      "cargoCapacity": 20,
+      "fuelCapacity": 15,
+      "fuelPerLightYear": 0.5,
+      "maxBurn": 9,
+      "baseValue": 4000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 2,
+      "suppliesPerMonth": 2
+    },
+    "mercury_d": {
+      "id": "mercury_d",
+      "name": "墨丘利 (D)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/mercury_d.skin",
+      "builtInMods": [
+        "civgrade",
+        "degraded_engines"
+      ],
+      "hasModules": false,
+      "minCrew": 1,
+      "maxCrew": 30,
+      "cargoCapacity": 20,
+      "fuelCapacity": 15,
+      "fuelPerLightYear": 0.5,
+      "maxBurn": 9,
+      "baseValue": 2600,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 2,
+      "suppliesPerMonth": 2
+    },
+    "monitor": {
+      "id": "monitor",
+      "name": "监视者",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/monitor.ship",
+      "builtInMods": [
+        "fluxshunt"
+      ],
+      "hasModules": false,
+      "minCrew": 15,
+      "maxCrew": 30,
+      "cargoCapacity": 30,
+      "fuelCapacity": 20,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 25000,
+      "baseRecoveryPercentPerDay": 8,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 6,
+      "suppliesPerMonth": 6
+    },
+    "mora": {
+      "id": "mora",
+      "name": "莫拉",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/mora.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 200,
+      "maxCrew": 300,
+      "cargoCapacity": 100,
+      "fuelCapacity": 60,
+      "fuelPerLightYear": 4,
+      "maxBurn": 8,
+      "baseValue": 125000,
+      "baseRecoveryPercentPerDay": 4,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 20,
+      "suppliesPerMonth": 20
+    },
+    "mudskipper": {
+      "id": "mudskipper",
+      "name": "弹涂鱼",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/mudskipper.ship",
+      "builtInMods": [
+        "civgrade"
+      ],
+      "hasModules": false,
+      "minCrew": 5,
+      "maxCrew": 100,
+      "cargoCapacity": 70,
+      "fuelCapacity": 40,
+      "fuelPerLightYear": 1,
+      "maxBurn": 9,
+      "baseValue": 3000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 2,
+      "suppliesPerMonth": 2
+    },
+    "mudskipper2": {
+      "id": "mudskipper2",
+      "name": "弹涂鱼 Mk.II",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/mudskipper2.skin",
+      "builtInMods": [
+        "civgrade",
+        "ill_advised",
+        "comp_storage"
+      ],
+      "hasModules": false,
+      "minCrew": 5,
+      "maxCrew": 100,
+      "cargoCapacity": 70,
+      "fuelCapacity": 40,
+      "fuelPerLightYear": 1,
+      "maxBurn": 9,
+      "baseValue": 6000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 2,
+      "suppliesPerMonth": 2
+    },
+    "mule": {
+      "id": "mule",
+      "name": "骡子",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/mule.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 40,
+      "maxCrew": 100,
+      "cargoCapacity": 250,
+      "fuelCapacity": 80,
+      "fuelPerLightYear": 2,
+      "maxBurn": 9,
+      "baseValue": 34000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 7,
+      "suppliesPerMonth": 7
+    },
+    "mule_d": {
+      "id": "mule_d",
+      "name": "骡子 (D)",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/skins/mule_d.skin",
+      "builtInMods": [
+        "degraded_engines",
+        "erratic_injector",
+        "increased_maintenance"
+      ],
+      "hasModules": false,
+      "minCrew": 40,
+      "maxCrew": 100,
+      "cargoCapacity": 250,
+      "fuelCapacity": 80,
+      "fuelPerLightYear": 2,
+      "maxBurn": 9,
+      "baseValue": 22100,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 7,
+      "suppliesPerMonth": 7
+    },
+    "mule_d_pirates": {
+      "id": "mule_d_pirates",
+      "name": "骡子 (P)",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/skins/mule_d_pirates.skin",
+      "builtInMods": [
+        "shielded_holds"
+      ],
+      "hasModules": false,
+      "minCrew": 40,
+      "maxCrew": 100,
+      "cargoCapacity": 250,
+      "fuelCapacity": 80,
+      "fuelPerLightYear": 2,
+      "maxBurn": 9,
+      "baseValue": 40800,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 7,
+      "suppliesPerMonth": 7
+    },
+    "nebula": {
+      "id": "nebula",
+      "name": "星云",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/nebula.ship",
+      "builtInMods": [
+        "civgrade"
+      ],
+      "hasModules": false,
+      "minCrew": 15,
+      "maxCrew": 400,
+      "cargoCapacity": 120,
+      "fuelCapacity": 80,
+      "fuelPerLightYear": 2,
+      "maxBurn": 8,
+      "baseValue": 20000,
+      "baseRecoveryPercentPerDay": 4,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 4,
+      "suppliesPerMonth": 4
+    },
+    "nova": {
+      "id": "nova",
+      "name": "新星",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/nova.ship",
+      "builtInMods": [
+        "automated"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 150,
+      "fuelCapacity": 300,
+      "fuelPerLightYear": 10,
+      "maxBurn": 9,
+      "baseValue": 350000,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 15,
+      "deploymentSupplies": 40,
+      "suppliesPerMonth": 40
+    },
+    "odyssey": {
+      "id": "odyssey",
+      "name": "奥德赛",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/odyssey.ship",
+      "builtInMods": [
+        "hiressensors",
+        "eccm"
+      ],
+      "hasModules": false,
+      "minCrew": 400,
+      "maxCrew": 800,
+      "cargoCapacity": 400,
+      "fuelCapacity": 450,
+      "fuelPerLightYear": 8,
+      "maxBurn": 8,
+      "baseValue": 330000,
+      "baseRecoveryPercentPerDay": 4,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 45,
+      "suppliesPerMonth": 45
+    },
+    "omen": {
+      "id": "omen",
+      "name": "预兆",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/omen.ship",
+      "builtInMods": [
+        "hiressensors",
+        "ecm",
+        "eccm"
+      ],
+      "hasModules": false,
+      "minCrew": 10,
+      "maxCrew": 20,
+      "cargoCapacity": 30,
+      "fuelCapacity": 20,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 20000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 6,
+      "suppliesPerMonth": 6
+    },
+    "onslaught": {
+      "id": "onslaught",
+      "name": "攻势",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/onslaught.ship",
+      "builtInMods": [
+        "hbi"
+      ],
+      "hasModules": false,
+      "minCrew": 750,
+      "maxCrew": 1500,
+      "cargoCapacity": 300,
+      "fuelCapacity": 400,
+      "fuelPerLightYear": 15,
+      "maxBurn": 7,
+      "baseValue": 350000,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 40,
+      "suppliesPerMonth": 40
+    },
+    "onslaught_mk1": {
+      "id": "onslaught_mk1",
+      "name": "攻势 Mk.I",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/onslaught_mk1.ship",
+      "builtInMods": [
+        "automated",
+        "hbi",
+        "rugged"
+      ],
+      "hasModules": true,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 700,
+      "fuelCapacity": 800,
+      "fuelPerLightYear": 10,
+      "maxBurn": 7,
+      "baseValue": 300000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 50,
+      "suppliesPerMonth": 50
+    },
+    "onslaught_xiv": {
+      "id": "onslaught_xiv",
+      "name": "攻势 (XIV)",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/skins/onslaught_xiv.skin",
+      "builtInMods": [
+        "hbi",
+        "fourteenth"
+      ],
+      "hasModules": false,
+      "minCrew": 750,
+      "maxCrew": 1500,
+      "cargoCapacity": 300,
+      "fuelCapacity": 400,
+      "fuelPerLightYear": 15,
+      "maxBurn": 7,
+      "baseValue": 612500,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 40,
+      "suppliesPerMonth": 40
+    },
+    "overseer_unit": {
+      "id": "overseer_unit",
+      "name": "",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/overseer_unit.ship",
+      "builtInMods": [
+        "automated",
+        "threat_hullmod"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 40,
+      "fuelCapacity": 100,
+      "fuelPerLightYear": 0.5,
+      "maxBurn": 9,
+      "baseValue": 100000,
+      "baseRecoveryPercentPerDay": 100,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 8,
+      "suppliesPerMonth": 8
+    },
+    "ox": {
+      "id": "ox",
+      "name": "公牛",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/ox.ship",
+      "builtInMods": [
+        "drive_field_stabilizer",
+        "high_maintenance",
+        "civgrade"
+      ],
+      "hasModules": false,
+      "minCrew": 2,
+      "maxCrew": 4,
+      "cargoCapacity": 0,
+      "fuelCapacity": 10,
+      "fuelPerLightYear": 5,
+      "maxBurn": 8,
+      "baseValue": 16000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 40,
+      "deploymentSupplies": 5,
+      "suppliesPerMonth": 5
+    },
+    "paragon": {
+      "id": "paragon",
+      "name": "典范",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/paragon.ship",
+      "builtInMods": [
+        "advancedcore"
+      ],
+      "hasModules": false,
+      "minCrew": 400,
+      "maxCrew": 1000,
+      "cargoCapacity": 300,
+      "fuelCapacity": 300,
+      "fuelPerLightYear": 10,
+      "maxBurn": 7,
+      "baseValue": 500000,
+      "baseRecoveryPercentPerDay": 4,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 60,
+      "suppliesPerMonth": 60
+    },
+    "pegasus": {
+      "id": "pegasus",
+      "name": "天马",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/pegasus.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 500,
+      "maxCrew": 600,
+      "cargoCapacity": 400,
+      "fuelCapacity": 300,
+      "fuelPerLightYear": 10,
+      "maxBurn": 7,
+      "baseValue": 400000,
+      "baseRecoveryPercentPerDay": 4,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 50,
+      "suppliesPerMonth": 50
+    },
+    "phaeton": {
+      "id": "phaeton",
+      "name": "辉腾",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/phaeton.ship",
+      "builtInMods": [
+        "civgrade"
+      ],
+      "hasModules": false,
+      "minCrew": 10,
+      "maxCrew": 20,
+      "cargoCapacity": 20,
+      "fuelCapacity": 800,
+      "fuelPerLightYear": 2,
+      "maxBurn": 8,
+      "baseValue": 22000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 4,
+      "suppliesPerMonth": 4
+    },
+    "phantom": {
+      "id": "phantom",
+      "name": "魅影",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/phantom.ship",
+      "builtInMods": [
+        "phasefield",
+        "delicate",
+        "advanced_ground_support"
+      ],
+      "hasModules": false,
+      "minCrew": 5,
+      "maxCrew": 200,
+      "cargoCapacity": 50,
+      "fuelCapacity": 100,
+      "fuelPerLightYear": 2,
+      "maxBurn": 9,
+      "baseValue": 35000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 10,
+      "suppliesPerMonth": 10
+    },
+    "picket": {
+      "id": "picket",
+      "name": "警戒",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/picket.ship",
+      "builtInMods": [
+        "automated",
+        "rugged"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 20,
+      "fuelCapacity": 20,
+      "fuelPerLightYear": 1,
+      "maxBurn": 9,
+      "baseValue": 10000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 5,
+      "deploymentSupplies": 3,
+      "suppliesPerMonth": 3
+    },
+    "prometheus": {
+      "id": "prometheus",
+      "name": "普罗米修斯",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/prometheus.ship",
+      "builtInMods": [
+        "civgrade"
+      ],
+      "hasModules": false,
+      "minCrew": 50,
+      "maxCrew": 100,
+      "cargoCapacity": 200,
+      "fuelCapacity": 3000,
+      "fuelPerLightYear": 6,
+      "maxBurn": 6,
+      "baseValue": 80000,
+      "baseRecoveryPercentPerDay": 2,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 10,
+      "suppliesPerMonth": 10
+    },
+    "prometheus2": {
+      "id": "prometheus2",
+      "name": "普罗米修斯 Mk.II",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/prometheus2.ship",
+      "builtInMods": [
+        "civgrade"
+      ],
+      "hasModules": false,
+      "minCrew": 250,
+      "maxCrew": 300,
+      "cargoCapacity": 200,
+      "fuelCapacity": 800,
+      "fuelPerLightYear": 10,
+      "maxBurn": 7,
+      "baseValue": 200000,
+      "baseRecoveryPercentPerDay": 2,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 30,
+      "suppliesPerMonth": 30
+    },
+    "radiant": {
+      "id": "radiant",
+      "name": "辐射",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/radiant.ship",
+      "builtInMods": [
+        "automated"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 250,
+      "fuelCapacity": 400,
+      "fuelPerLightYear": 10,
+      "maxBurn": 8,
+      "baseValue": 500000,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 15,
+      "deploymentSupplies": 60,
+      "suppliesPerMonth": 60
+    },
+    "rampart": {
+      "id": "rampart",
+      "name": "堡垒",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/rampart.ship",
+      "builtInMods": [
+        "automated",
+        "rugged"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 100,
+      "fuelCapacity": 60,
+      "fuelPerLightYear": 4,
+      "maxBurn": 8,
+      "baseValue": 130000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 15,
+      "suppliesPerMonth": 15
+    },
+    "remnant_station1": {
+      "id": "remnant_station1",
+      "name": "",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/remnant_station1.ship",
+      "builtInMods": [
+        "vastbulk",
+        "axialrotation",
+        "supercomputer"
+      ],
+      "hasModules": true,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 0,
+      "fuelCapacity": 0,
+      "fuelPerLightYear": 1,
+      "maxBurn": 0,
+      "baseValue": 500000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 50,
+      "suppliesPerMonth": 50
+    },
+    "remnant_station2": {
+      "id": "remnant_station2",
+      "name": "",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/remnant_station2.ship",
+      "builtInMods": [
+        "vastbulk",
+        "axialrotation",
+        "supercomputer",
+        "shared_flux_sink"
+      ],
+      "hasModules": true,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 0,
+      "fuelCapacity": 0,
+      "fuelPerLightYear": 1,
+      "maxBurn": 0,
+      "baseValue": 500000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 75,
+      "suppliesPerMonth": 50
+    },
+    "retribution": {
+      "id": "retribution",
+      "name": "惩戒",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/retribution.ship",
+      "builtInMods": [
+        "distributed_fire_control"
+      ],
+      "hasModules": false,
+      "minCrew": 300,
+      "maxCrew": 400,
+      "cargoCapacity": 200,
+      "fuelCapacity": 300,
+      "fuelPerLightYear": 10,
+      "maxBurn": 8,
+      "baseValue": 200000,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 12,
+      "deploymentSupplies": 35,
+      "suppliesPerMonth": 35
+    },
+    "revenant": {
+      "id": "revenant",
+      "name": "幽魂",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/revenant.ship",
+      "builtInMods": [
+        "phasefield",
+        "delicate"
+      ],
+      "hasModules": false,
+      "minCrew": 30,
+      "maxCrew": 80,
+      "cargoCapacity": 600,
+      "fuelCapacity": 900,
+      "fuelPerLightYear": 3,
+      "maxBurn": 8,
+      "baseValue": 80000,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 15,
+      "suppliesPerMonth": 15
+    },
+    "scarab": {
+      "id": "scarab",
+      "name": "圣甲虫",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/scarab.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 35,
+      "maxCrew": 45,
+      "cargoCapacity": 40,
+      "fuelCapacity": 20,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 30000,
+      "baseRecoveryPercentPerDay": 7,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 8,
+      "suppliesPerMonth": 8
+    },
+    "scintilla": {
+      "id": "scintilla",
+      "name": "闪耀",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/scintilla.ship",
+      "builtInMods": [
+        "automated"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 40,
+      "fuelCapacity": 60,
+      "fuelPerLightYear": 2,
+      "maxBurn": 10,
+      "baseValue": 50000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 15,
+      "deploymentSupplies": 12,
+      "suppliesPerMonth": 12
+    },
+    "sentry": {
+      "id": "sentry",
+      "name": "岗哨",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/sentry.ship",
+      "builtInMods": [
+        "automated",
+        "rugged"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 20,
+      "fuelCapacity": 20,
+      "fuelPerLightYear": 1,
+      "maxBurn": 9,
+      "baseValue": 10000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 5,
+      "deploymentSupplies": 3,
+      "suppliesPerMonth": 3
+    },
+    "shade": {
+      "id": "shade",
+      "name": "阴影",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/shade.ship",
+      "builtInMods": [
+        "phasefield",
+        "delicate"
+      ],
+      "hasModules": false,
+      "minCrew": 10,
+      "maxCrew": 15,
+      "cargoCapacity": 25,
+      "fuelCapacity": 50,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 40000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 30,
+      "deploymentSupplies": 8,
+      "suppliesPerMonth": 8
+    },
+    "shade_d_pirates": {
+      "id": "shade_d_pirates",
+      "name": "阴影 (P)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/shade_d_pirates.skin",
+      "builtInMods": [
+        "phasefield",
+        "delicate"
+      ],
+      "hasModules": false,
+      "minCrew": 10,
+      "maxCrew": 15,
+      "cargoCapacity": 25,
+      "fuelCapacity": 50,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 32000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 30,
+      "deploymentSupplies": 6,
+      "suppliesPerMonth": 6
+    },
+    "shard_left": {
+      "id": "shard_left",
+      "name": "",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/shard_left.ship",
+      "builtInMods": [
+        "automated",
+        "fluxbreakers",
+        "shard_spawner",
+        "do_not_back_off"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 10,
+      "fuelCapacity": 50,
+      "fuelPerLightYear": 1,
+      "maxBurn": 12,
+      "baseValue": 100000,
+      "baseRecoveryPercentPerDay": 20,
+      "deployCRPercent": 5,
+      "deploymentSupplies": 6,
+      "suppliesPerMonth": 6
+    },
+    "shard_right": {
+      "id": "shard_right",
+      "name": "",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/shard_right.ship",
+      "builtInMods": [
+        "automated",
+        "fluxbreakers",
+        "shard_spawner",
+        "do_not_back_off"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 10,
+      "fuelCapacity": 50,
+      "fuelPerLightYear": 1,
+      "maxBurn": 12,
+      "baseValue": 100000,
+      "baseRecoveryPercentPerDay": 20,
+      "deployCRPercent": 5,
+      "deploymentSupplies": 6,
+      "suppliesPerMonth": 6
+    },
+    "shepherd": {
+      "id": "shepherd",
+      "name": "牧羊人",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/shepherd.ship",
+      "builtInMods": [
+        "civgrade",
+        "surveying_equipment",
+        "repair_gantry"
+      ],
+      "hasModules": false,
+      "minCrew": 15,
+      "maxCrew": 30,
+      "cargoCapacity": 100,
+      "fuelCapacity": 40,
+      "fuelPerLightYear": 1,
+      "maxBurn": 9,
+      "baseValue": 10000,
+      "baseRecoveryPercentPerDay": 8,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 3,
+      "suppliesPerMonth": 3
+    },
+    "shrike": {
+      "id": "shrike",
+      "name": "伯劳鸟",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/shrike.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 20,
+      "maxCrew": 40,
+      "cargoCapacity": 40,
+      "fuelCapacity": 60,
+      "fuelPerLightYear": 2,
+      "maxBurn": 10,
+      "baseValue": 20000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 15,
+      "deploymentSupplies": 8,
+      "suppliesPerMonth": 8
+    },
+    "shrike_pirates": {
+      "id": "shrike_pirates",
+      "name": "伯劳鸟 (P)",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/skins/shrike_pirates.skin",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 20,
+      "maxCrew": 40,
+      "cargoCapacity": 40,
+      "fuelCapacity": 60,
+      "fuelPerLightYear": 2,
+      "maxBurn": 10,
+      "baseValue": 20000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 15,
+      "deploymentSupplies": 8,
+      "suppliesPerMonth": 8
+    },
+    "skirmish_unit": {
+      "id": "skirmish_unit",
+      "name": "",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skirmish_unit.ship",
+      "builtInMods": [
+        "automated",
+        "threat_hullmod"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 10,
+      "fuelCapacity": 50,
+      "fuelPerLightYear": 0.25,
+      "maxBurn": 10,
+      "baseValue": 10000,
+      "baseRecoveryPercentPerDay": 100,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 4,
+      "suppliesPerMonth": 4
+    },
+    "standoff_unit": {
+      "id": "standoff_unit",
+      "name": "",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/standoff_unit.ship",
+      "builtInMods": [
+        "automated",
+        "threat_hullmod"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 120,
+      "fuelCapacity": 150,
+      "fuelPerLightYear": 0.75,
+      "maxBurn": 9,
+      "baseValue": 150000,
+      "baseRecoveryPercentPerDay": 100,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 20,
+      "suppliesPerMonth": 20
+    },
+    "starliner": {
+      "id": "starliner",
+      "name": "星际线",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/starliner.ship",
+      "builtInMods": [
+        "civgrade"
+      ],
+      "hasModules": false,
+      "minCrew": 50,
+      "maxCrew": 1500,
+      "cargoCapacity": 300,
+      "fuelCapacity": 120,
+      "fuelPerLightYear": 3,
+      "maxBurn": 7,
+      "baseValue": 50000,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 10,
+      "suppliesPerMonth": 10
+    },
+    "station_derelict_survey_mothership": {
+      "id": "station_derelict_survey_mothership",
+      "name": "",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/derelict_mothership.ship",
+      "builtInMods": [
+        "vastbulk",
+        "axialrotation",
+        "supercomputer"
+      ],
+      "hasModules": true,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 0,
+      "fuelCapacity": 0,
+      "fuelPerLightYear": 1,
+      "maxBurn": 0,
+      "baseValue": 500000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 50,
+      "suppliesPerMonth": 50
+    },
+    "station_small": {
+      "id": "station_small",
+      "name": "模块测试舰",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/station_small.ship",
+      "builtInMods": [
+        "axialrotation",
+        "supercomputer"
+      ],
+      "hasModules": true,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 0,
+      "fuelCapacity": 0,
+      "fuelPerLightYear": 1,
+      "maxBurn": 0,
+      "baseValue": 500000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 50,
+      "suppliesPerMonth": 50
+    },
+    "station1": {
+      "id": "station1",
+      "name": "轨道空间站",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/station1.ship",
+      "builtInMods": [
+        "vastbulk",
+        "axialrotation",
+        "supercomputer",
+        "shared_flux_sink"
+      ],
+      "hasModules": true,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 0,
+      "fuelCapacity": 0,
+      "fuelPerLightYear": 1,
+      "maxBurn": 0,
+      "baseValue": 500000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 50,
+      "suppliesPerMonth": 50
+    },
+    "station1_hightech": {
+      "id": "station1_hightech",
+      "name": "轨道空间站",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/station1_hightech.ship",
+      "builtInMods": [
+        "vastbulk",
+        "axialrotation",
+        "supercomputer",
+        "shared_flux_sink"
+      ],
+      "hasModules": true,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 0,
+      "fuelCapacity": 0,
+      "fuelPerLightYear": 1,
+      "maxBurn": 0,
+      "baseValue": 500000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 50,
+      "suppliesPerMonth": 50
+    },
+    "station1_midline": {
+      "id": "station1_midline",
+      "name": "轨道空间站",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/station1_midline.ship",
+      "builtInMods": [
+        "vastbulk",
+        "axialrotation",
+        "supercomputer",
+        "shared_flux_sink"
+      ],
+      "hasModules": true,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 0,
+      "fuelCapacity": 0,
+      "fuelPerLightYear": 1,
+      "maxBurn": 0,
+      "baseValue": 500000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 50,
+      "suppliesPerMonth": 50
+    },
+    "station2": {
+      "id": "station2",
+      "name": "作战基地",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/station2.ship",
+      "builtInMods": [
+        "vastbulk",
+        "axialrotation",
+        "supercomputer",
+        "shared_flux_sink"
+      ],
+      "hasModules": true,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 0,
+      "fuelCapacity": 0,
+      "fuelPerLightYear": 1,
+      "maxBurn": 0,
+      "baseValue": 500000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 75,
+      "suppliesPerMonth": 50
+    },
+    "station2_hightech": {
+      "id": "station2_hightech",
+      "name": "作战基地",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/station2_hightech.ship",
+      "builtInMods": [
+        "vastbulk",
+        "axialrotation",
+        "supercomputer",
+        "shared_flux_sink"
+      ],
+      "hasModules": true,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 0,
+      "fuelCapacity": 0,
+      "fuelPerLightYear": 1,
+      "maxBurn": 0,
+      "baseValue": 500000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 75,
+      "suppliesPerMonth": 50
+    },
+    "station2_midline": {
+      "id": "station2_midline",
+      "name": "作战基地",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/station2_midline.ship",
+      "builtInMods": [
+        "vastbulk",
+        "axialrotation",
+        "supercomputer",
+        "shared_flux_sink"
+      ],
+      "hasModules": true,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 0,
+      "fuelCapacity": 0,
+      "fuelPerLightYear": 1,
+      "maxBurn": 0,
+      "baseValue": 500000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 75,
+      "suppliesPerMonth": 50
+    },
+    "station3": {
+      "id": "station3",
+      "name": "作战基地",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/station3.ship",
+      "builtInMods": [
+        "vastbulk",
+        "axialrotation",
+        "supercomputer",
+        "stealth_minefield_lt",
+        "shared_flux_sink"
+      ],
+      "hasModules": true,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 0,
+      "fuelCapacity": 0,
+      "fuelPerLightYear": 1,
+      "maxBurn": 0,
+      "baseValue": 500000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 100,
+      "suppliesPerMonth": 50
+    },
+    "station3_hightech": {
+      "id": "station3_hightech",
+      "name": "作战基地",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/station3_hightech.ship",
+      "builtInMods": [
+        "vastbulk",
+        "axialrotation",
+        "supercomputer",
+        "shared_flux_sink"
+      ],
+      "hasModules": true,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 0,
+      "fuelCapacity": 0,
+      "fuelPerLightYear": 1,
+      "maxBurn": 0,
+      "baseValue": 500000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 100,
+      "suppliesPerMonth": 50
+    },
+    "station3_midline": {
+      "id": "station3_midline",
+      "name": "作战基地",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/station3_midline.ship",
+      "builtInMods": [
+        "vastbulk",
+        "axialrotation",
+        "supercomputer",
+        "stealth_minefield",
+        "shared_flux_sink"
+      ],
+      "hasModules": true,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 0,
+      "fuelCapacity": 0,
+      "fuelPerLightYear": 1,
+      "maxBurn": 0,
+      "baseValue": 500000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 100,
+      "suppliesPerMonth": 50
+    },
+    "sunder": {
+      "id": "sunder",
+      "name": "破阵",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/sunder.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 50,
+      "maxCrew": 70,
+      "cargoCapacity": 80,
+      "fuelCapacity": 50,
+      "fuelPerLightYear": 2,
+      "maxBurn": 9,
+      "baseValue": 45000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 15,
+      "deploymentSupplies": 11,
+      "suppliesPerMonth": 11
+    },
+    "sunder_d": {
+      "id": "sunder_d",
+      "name": "破阵 (D)",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/skins/sunder_d.skin",
+      "builtInMods": [
+        "faulty_grid"
+      ],
+      "hasModules": false,
+      "minCrew": 50,
+      "maxCrew": 70,
+      "cargoCapacity": 80,
+      "fuelCapacity": 50,
+      "fuelPerLightYear": 2,
+      "maxBurn": 9,
+      "baseValue": 22500,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 15,
+      "deploymentSupplies": 11,
+      "suppliesPerMonth": 11
+    },
+    "sunder_LG": {
+      "id": "sunder_LG",
+      "name": "破阵 (LG)",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/skins/sunder_LG.skin",
+      "builtInMods": [
+        "andrada_mods",
+        "solar_shielding",
+        "coherer"
+      ],
+      "hasModules": false,
+      "minCrew": 50,
+      "maxCrew": 70,
+      "cargoCapacity": 80,
+      "fuelCapacity": 50,
+      "fuelPerLightYear": 2,
+      "maxBurn": 9,
+      "baseValue": 45000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 15,
+      "deploymentSupplies": 11,
+      "suppliesPerMonth": 11
+    },
+    "tarsus": {
+      "id": "tarsus",
+      "name": "塔尔苏斯",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/tarsus.ship",
+      "builtInMods": [
+        "civgrade"
+      ],
+      "hasModules": false,
+      "minCrew": 30,
+      "maxCrew": 80,
+      "cargoCapacity": 350,
+      "fuelCapacity": 80,
+      "fuelPerLightYear": 3,
+      "maxBurn": 8,
+      "baseValue": 18000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 3,
+      "suppliesPerMonth": 3
+    },
+    "tarsus_d": {
+      "id": "tarsus_d",
+      "name": "塔尔苏斯 (D)",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/skins/tarsus_d.skin",
+      "builtInMods": [
+        "civgrade",
+        "degraded_engines"
+      ],
+      "hasModules": false,
+      "minCrew": 30,
+      "maxCrew": 80,
+      "cargoCapacity": 350,
+      "fuelCapacity": 80,
+      "fuelPerLightYear": 3,
+      "maxBurn": 8,
+      "baseValue": 11700,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 3,
+      "suppliesPerMonth": 3
+    },
+    "tempest": {
+      "id": "tempest",
+      "name": "暴雨",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/tempest.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 15,
+      "maxCrew": 25,
+      "cargoCapacity": 30,
+      "fuelCapacity": 20,
+      "fuelPerLightYear": 1,
+      "maxBurn": 11,
+      "baseValue": 36000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 8,
+      "suppliesPerMonth": 8
+    },
+    "tesseract": {
+      "id": "tesseract",
+      "name": "",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/tesseract.ship",
+      "builtInMods": [
+        "automated",
+        "fluxbreakers",
+        "shard_spawner"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 40,
+      "fuelCapacity": 150,
+      "fuelPerLightYear": 3,
+      "maxBurn": 11,
+      "baseValue": 500000,
+      "baseRecoveryPercentPerDay": 20,
+      "deployCRPercent": 5,
+      "deploymentSupplies": 24,
+      "suppliesPerMonth": 24
+    },
+    "valkyrie": {
+      "id": "valkyrie",
+      "name": "女武神",
+      "hullSize": "DESTROYER",
+      "sourcePath": "data/hulls/valkyrie.ship",
+      "builtInMods": [
+        "ground_support"
+      ],
+      "hasModules": false,
+      "minCrew": 10,
+      "maxCrew": 250,
+      "cargoCapacity": 50,
+      "fuelCapacity": 80,
+      "fuelPerLightYear": 2,
+      "maxBurn": 9,
+      "baseValue": 20000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 15,
+      "deploymentSupplies": 5,
+      "suppliesPerMonth": 5
+    },
+    "vanguard": {
+      "id": "vanguard",
+      "name": "先锋",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/vanguard.ship",
+      "builtInMods": [
+        "rugged"
+      ],
+      "hasModules": false,
+      "minCrew": 30,
+      "maxCrew": 50,
+      "cargoCapacity": 50,
+      "fuelCapacity": 30,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 30000,
+      "baseRecoveryPercentPerDay": 8,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 6,
+      "suppliesPerMonth": 6
+    },
+    "vanguard_pirates": {
+      "id": "vanguard_pirates",
+      "name": "先锋 (P)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/vanguard_pirates.skin",
+      "builtInMods": [
+        "rugged"
+      ],
+      "hasModules": false,
+      "minCrew": 30,
+      "maxCrew": 50,
+      "cargoCapacity": 50,
+      "fuelCapacity": 30,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 30000,
+      "baseRecoveryPercentPerDay": 8,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 6,
+      "suppliesPerMonth": 6
+    },
+    "venture": {
+      "id": "venture",
+      "name": "历险",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/venture.ship",
+      "builtInMods": [
+        "civgrade",
+        "surveying_equipment"
+      ],
+      "hasModules": false,
+      "minCrew": 80,
+      "maxCrew": 300,
+      "cargoCapacity": 600,
+      "fuelCapacity": 180,
+      "fuelPerLightYear": 3,
+      "maxBurn": 7,
+      "baseValue": 70000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 14,
+      "suppliesPerMonth": 14
+    },
+    "venture_p": {
+      "id": "venture_p",
+      "name": "历险 Mk.II",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/skins/venture_p.skin",
+      "builtInMods": [
+        "civgrade",
+        "surveying_equipment",
+        "comp_storage"
+      ],
+      "hasModules": false,
+      "minCrew": 80,
+      "maxCrew": 300,
+      "cargoCapacity": 600,
+      "fuelCapacity": 180,
+      "fuelPerLightYear": 3,
+      "maxBurn": 7,
+      "baseValue": 70000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 14,
+      "suppliesPerMonth": 14
+    },
+    "venture_pather": {
+      "id": "venture_pather",
+      "name": "历险 (LP)",
+      "hullSize": "CRUISER",
+      "sourcePath": "data/hulls/skins/venture_pather.skin",
+      "builtInMods": [
+        "civgrade",
+        "surveying_equipment",
+        "ill_advised"
+      ],
+      "hasModules": false,
+      "minCrew": 80,
+      "maxCrew": 300,
+      "cargoCapacity": 600,
+      "fuelCapacity": 180,
+      "fuelPerLightYear": 3,
+      "maxBurn": 7,
+      "baseValue": 70000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 14,
+      "suppliesPerMonth": 14
+    },
+    "vigilance": {
+      "id": "vigilance",
+      "name": "哨兵",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/vigilance.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 10,
+      "maxCrew": 25,
+      "cargoCapacity": 40,
+      "fuelCapacity": 25,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 10000,
+      "baseRecoveryPercentPerDay": 8,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 5,
+      "suppliesPerMonth": 5
+    },
+    "warden": {
+      "id": "warden",
+      "name": "典狱长",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/warden.ship",
+      "builtInMods": [
+        "automated",
+        "rugged"
+      ],
+      "hasModules": false,
+      "minCrew": 0,
+      "maxCrew": 0,
+      "cargoCapacity": 20,
+      "fuelCapacity": 20,
+      "fuelPerLightYear": 1,
+      "maxBurn": 9,
+      "baseValue": 10000,
+      "baseRecoveryPercentPerDay": 5,
+      "deployCRPercent": 5,
+      "deploymentSupplies": 3,
+      "suppliesPerMonth": 3
+    },
+    "wayfarer": {
+      "id": "wayfarer",
+      "name": "远行者",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/wayfarer.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 25,
+      "maxCrew": 50,
+      "cargoCapacity": 150,
+      "fuelCapacity": 40,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 14000,
+      "baseRecoveryPercentPerDay": 8,
+      "deployCRPercent": 10,
+      "deploymentSupplies": 5,
+      "suppliesPerMonth": 5
+    },
+    "wolf": {
+      "id": "wolf",
+      "name": "野狼",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/wolf.ship",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 15,
+      "maxCrew": 30,
+      "cargoCapacity": 50,
+      "fuelCapacity": 20,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 12000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 5,
+      "suppliesPerMonth": 5
+    },
+    "wolf_d": {
+      "id": "wolf_d",
+      "name": "野狼 (D)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/wolf_d.skin",
+      "builtInMods": [
+        "degraded_engines",
+        "faulty_grid"
+      ],
+      "hasModules": false,
+      "minCrew": 15,
+      "maxCrew": 30,
+      "cargoCapacity": 50,
+      "fuelCapacity": 20,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 9600,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 5,
+      "suppliesPerMonth": 5
+    },
+    "wolf_d_pirates": {
+      "id": "wolf_d_pirates",
+      "name": "野狼 (P)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/wolf_d_pirates.skin",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 15,
+      "maxCrew": 30,
+      "cargoCapacity": 50,
+      "fuelCapacity": 20,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 9600,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 4,
+      "suppliesPerMonth": 4
+    },
+    "wolf_hegemony": {
+      "id": "wolf_hegemony",
+      "name": "野狼 (H)",
+      "hullSize": "FRIGATE",
+      "sourcePath": "data/hulls/skins/wolf_hegemony.skin",
+      "builtInMods": [],
+      "hasModules": false,
+      "minCrew": 15,
+      "maxCrew": 30,
+      "cargoCapacity": 50,
+      "fuelCapacity": 20,
+      "fuelPerLightYear": 1,
+      "maxBurn": 10,
+      "baseValue": 12000,
+      "baseRecoveryPercentPerDay": 10,
+      "deployCRPercent": 20,
+      "deploymentSupplies": 5,
+      "suppliesPerMonth": 5
+    },
+    "ziggurat": {
+      "id": "ziggurat",
+      "name": "通灵塔",
+      "hullSize": "CAPITAL_SHIP",
+      "sourcePath": "data/hulls/ziggurat.ship",
+      "builtInMods": [
+        "phasefield",
+        "delicate",
+        "ex_phase_coils"
+      ],
+      "hasModules": false,
+      "minCrew": 300,
+      "maxCrew": 400,
+      "cargoCapacity": 200,
+      "fuelCapacity": 500,
+      "fuelPerLightYear": 10,
+      "maxBurn": 7,
+      "baseValue": 1000000,
+      "baseRecoveryPercentPerDay": 3,
+      "deployCRPercent": 50,
+      "deploymentSupplies": 75,
+      "suppliesPerMonth": 75
+    }
+  },
+  "excluded": [
+    {
+      "id": "aspect",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "attack_swarm",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "broadsword",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "claw",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "cobra",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "dagger",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "dem_drone",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "derelict_mothership_bow_module",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "derelict_mothership_pod_engine_left",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "derelict_mothership_pod_m_left",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "derelict_mothership_pod_m_right",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "derelict_mothership_pod_s_right",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "derelict_mothership_sensor_mast",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "drone_assault",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "drone_borer",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "drone_pd",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "drone_pd_midline",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "drone_sensor",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "drone_terminator",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "flare",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "flash",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "gargoyle",
+      "reason": "不可用 (无人机)"
+    },
+    {
+      "id": "gladius",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "hoplon",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "longbow",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "lux",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "merlon",
+      "reason": "不可用 (无人机)"
+    },
+    {
+      "id": "mining_drone",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "module_armour1",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_armour2",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_armour3",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_armour4",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_armour5",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_bastion1_lowtech",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_bastion_pd1",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_bastion_pd1",
+      "reason": "Duplicate catalog ID; first record is authoritative, as in catalog consumers"
+    },
+    {
+      "id": "module_blocker1",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_blocker2",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_blocker2b",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_blocker2c",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_citadel1_lowtech",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_decor_midline1",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_decor_midline2",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_hightech_armour",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_hightech_attack",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_hightech_attack_minelayer",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_hightech_citadel",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_hightech_decor",
+      "reason": "Incomplete logistics fields: min crew, max crew, cargo, fuel, fuel/ly, max burn, base value, cr %/day, CR to deploy, supplies/rec, supplies/mo"
+    },
+    {
+      "id": "module_hightech_hangar",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_hightech_shield",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_hightech_strut",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_large1_lowtech",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_large2_lowtech",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_midline_bastion",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_midline_broadside",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_midline_citadel",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_midline_support",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_onslaught_armor_left",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "module_onslaught_armor_right",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "perdition",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "piranha",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "platform1",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "ravelin",
+      "reason": "不可用 (无人机)"
+    },
+    {
+      "id": "remnant_armour1",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "remnant_armour2",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "remnant_armour3",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "remnant_hangar1",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "remnant_shield1",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "remnant_shield2",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "remnant_weapon_platform1",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "remnant_weapon_platform2",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "remnant_weapon_platform3",
+      "reason": "Incomplete logistics fields: max burn, cr %/day"
+    },
+    {
+      "id": "sarissa",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "shrouded_ejecta",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "shrouded_eye",
+      "reason": "不可用"
+    },
+    {
+      "id": "shrouded_maelstrom",
+      "reason": "不可用"
+    },
+    {
+      "id": "shrouded_maw",
+      "reason": "不可用"
+    },
+    {
+      "id": "shrouded_tendril",
+      "reason": "不可用"
+    },
+    {
+      "id": "shrouded_vortex",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "shuttlepod",
+      "reason": "Incomplete logistics fields: max burn, cr %/day, CR to deploy, supplies/rec, supplies/mo"
+    },
+    {
+      "id": "spark",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "talon",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "talon_tritachyon",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "thunder",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "trident",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "warthog",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "wasp",
+      "reason": "Fighter, not an independently owned campaign ship"
+    },
+    {
+      "id": "xyphos",
+      "reason": "Fighter, not an independently owned campaign ship"
+    }
+  ]
+}

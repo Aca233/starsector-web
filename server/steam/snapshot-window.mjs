@@ -13,8 +13,15 @@ export class SnapshotSendWindow {
     this.roundAt = null;
     this.roundSamples = []; this.probe = null; this.restoreLimit = INITIAL_SNAPSHOT_WINDOW;
   }
-  acknowledge(sample, now, flightSize) {
+  acknowledge(sample, now, flightSize, idleProbeAllowed = true) {
     if (!Number.isFinite(sample) || sample <= 0) return;
+    // Draining ONE peer cannot make a shared host uplink idle. Abort a pending
+    // per-peer probe when another peer joins; ACKs may lower, never raise its
+    // baseline until the room can really isolate this stream. Keep the ordinary
+    // count/byte congestion feedback active instead of parking at one frame.
+    if (!idleProbeAllowed && this.probe) {
+      this.probe = null; this.limit = this.restoreLimit; this.roundSamples.length = 0;
+    }
     this.queueRtt = sample;
     this.recentRtts.push({ at: now, rtt: sample });
     while (this.recentRtts.length > 256 || this.recentRtts[0].at < now - 1000) this.recentRtts.shift();
@@ -37,7 +44,7 @@ export class SnapshotSendWindow {
     else this.samples.push({ at: bucket, rtt: sample });
     while (this.samples.length > 32 || this.samples[0].at < now - 30000) this.samples.shift();
     const recentFloor = Math.min(...this.samples.map(item => item.rtt));
-    if (this.baseRtt !== null && recentFloor > this.baseRtt + Math.max(20, this.baseRtt * .1)) {
+    if (idleProbeAllowed && this.baseRtt !== null && recentFloor > this.baseRtt + Math.max(20, this.baseRtt * .1)) {
       // Persistent congestion must not teach the controller that a stale queue
       // is the new normal RTT. Briefly drain on an upward baseline change only;
       // stable routes never periodically lose credit. Size/timeout caps remain.

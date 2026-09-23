@@ -1,5 +1,6 @@
-import type { Ship } from '../../engine/simulation/Ship';
-import type { WeaponGroup, WeaponMount } from '../../engine/simulation/Weapon';
+import type { HudShip as Ship } from '../../engine/runtime/CombatHudView';
+import type { HudWeapon as WeaponMount } from '../../engine/runtime/CombatHudView';
+import type { WeaponGroup } from '../../engine/simulation/Weapon';
 
 // User-selected system font needs 15px rows; source used the font's line height.
 export const WEAPON_HUD_LINE_HEIGHT = 15;

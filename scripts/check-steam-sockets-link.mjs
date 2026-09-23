@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { simulateSocketLink } from './steam-sockets-link-model.mjs';
 function checked(name,config){
  const r=simulateSocketLink(config);fs.writeFileSync(`artifacts/steam-sockets-link-${name}.json`,JSON.stringify(r,null,2)+'\n');
- console.log(JSON.stringify({scenario:name,closed:r.closed,peakExternalHostBytes:r.peakExternalHostBytes,peakSdkPending:r.maxNativePending,flight:r.hostFlight,peers:r.peers}));
+ console.log(JSON.stringify({scenario:name,closed:r.closed,peakExternalHostBytes:r.peakExternalHostBytes,peakSdkPending:r.maxNativePending,flight:r.hostFlight,peers:r.peers.map(({windows:_windows,...peer})=>peer)}));
  assert.deepEqual(r.closed,[],'neither heartbeat nor reliable delivery can extend the original 8s protection');
  assert.equal(r.finalWireBytes,0);assert.equal(r.finalNativePending,0);
  for(const p of r.peers){assert.equal(p.decodeFailures,0);assert.ok(p.steadyHz>0,'every peer receives recent states');assert.ok(p.lastStateAt>config.durationMs-4000,'no frozen guest hidden by healthy control heartbeats');}

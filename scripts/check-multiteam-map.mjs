@@ -1,6 +1,8 @@
 /** Real LAN world, snapshot, radar and tactical-map regression; isolated browser, no user saves.
  * Run with Vite at COMBAT_TEST_URL (default :5173), Playwright on NODE_PATH and optional BROWSER_PATH. */
 import assert from 'node:assert/strict';
+import {checkHostedCombatUI,checkPersistentCombatUI} from './lib/hosted-combat-ui-contracts.mjs';
+import {checkTacticalMapUI} from './lib/tactical-map-ui-contracts.mjs';
 import { createRequire } from 'node:module';
 const { chromium } = createRequire(import.meta.url)('playwright');
 const browser = await chromium.launch({ headless: true, ...(process.env.BROWSER_PATH ? { executablePath: process.env.BROWSER_PATH } : {}) });
@@ -8,9 +10,14 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('pageerror', error => errors.push(String(error)));
 try {
-  await page.route('**/__multiteam_map_check.html', route => route.fulfill({ contentType: 'text/html', body: `<!doctype html><body><div id="radar"></div><canvas id="map" width="1200" height="400"></canvas>
+  await page.route('**/__multiteam_map_check.html*', route => route.fulfill({ headers:{'Cross-Origin-Opener-Policy':'same-origin','Cross-Origin-Embedder-Policy':'require-corp'}, contentType: 'text/html', body: `<!doctype html><body><div id="radar"></div><canvas id="map" width="1200" height="400"></canvas>
 <script type="module">import RefreshRuntime from '/@react-refresh'; RefreshRuntime.injectIntoGlobalHook(window); window.$RefreshReg$ = () => {}; window.$RefreshSig$ = () => type => type; window.__vite_plugin_react_preamble_installed__ = true;</script></body>` }));
   await page.goto(`${process.env.COMBAT_TEST_URL ?? 'http://127.0.0.1:5173'}/__multiteam_map_check.html`);
+  if (process.env.MAP_CHECK_ONLY_PERSISTENT === '1') {
+    const persistent=await checkPersistentCombatUI(page);console.log(JSON.stringify({persistent,pageErrors:errors},null,2));assert.deepEqual(errors,[]);
+  } else if (process.env.MAP_CHECK_ONLY_HOSTED === '1') {
+    const hosted=await checkHostedCombatUI(page);console.log(JSON.stringify({hosted,pageErrors:errors},null,2));assert.deepEqual(errors,[]);
+  } else {
   const results = await page.evaluate(async () => {
     window.__LAN_BUILD_ID__ = 'multiteam-map-check';
     const { createLanWorld, setLanPerspective } = await import('/src/network/LanWorld.ts');
@@ -18,6 +25,9 @@ try {
     const { combatTeamColor } = await import('/src/engine/simulation/CombatTeams.ts');
     const { updateCombatVisibility, contactVisible } = await import('/src/engine/simulation/systems/CombatVisibility.ts');
     const { tacticalContactVisible } = await import('/src/ui/tactical/TacticalVisibility.ts');
+    const {combatHudView} = await import('/src/engine/runtime/CombatHudView.ts');
+    const { TacticalMapViewProjector } = await import('/src/engine/runtime/TacticalMapView.ts');
+    const mapView = engine => { const open=engine.isTacticalMap;engine.isTacticalMap=true;try{return new TacticalMapViewProjector().capture(engine).map;}finally{engine.isTacticalMap=open;} };
     const { fitTacticalView, mapPoint, pickMapShip, TacticalMapPainter } = await import('/src/ui/tactical/TacticalMapPainter.ts');
     const { assetManager } = await import('/src/engine/assets/AssetResolver.ts');
     const { contentManifestManager } = await import('/src/engine/content/ContentManifest.ts');
@@ -47,8 +57,9 @@ try {
     }
     for (const n of [2, 3, 4, 5, 8, 10, 33]) {
       const e = createLanWorld(matchFor(Array.from({length: n}, (_, i) => i))).engine;
-      check(e.openBattlefield === (n >= 3), `${n} teams: correct public/sensor battlefield policy`);
-      if (n >= 3) check(e.capitalShips.every(s => e.capitalShips.every(t => t.isVisibleTo(s.teamId))), `${n} teams: first frame reveals all active teams`);
+      // LAN uses public visibility even with two teams; sensor-mode checks below remain independent.
+      check(e.openBattlefield === true, `${n} teams: LAN uses public battlefield policy`);
+      check(e.capitalShips.every(s => e.capitalShips.every(t => t.isVisibleTo(s.teamId))), `${n} teams: first frame reveals all active teams`);
       // The sensor path remains available to ordinary combat, including numerical edge cases.
       updateCombatVisibility(e.ships);
       const ships = e.capitalShips;
@@ -72,8 +83,8 @@ try {
     const reserve = reserves.allCapitalShips.find(s => reserves.deployment.isReserve(s.id));
     check(reserve && !reserves.ships.includes(reserve), 'public arena excludes reserve hulls from active/render roster');
     if (reserve) {
-      const v = fitTacticalView(reserves, 1200, 400);
-      check(pickMapShip(reserves, mapPoint(reserve.pos, v, 1200, 400), v, 1200, 400) !== reserve, 'public arena cannot pick an undeployed reserve');
+      const v = fitTacticalView(mapView(reserves), 1200, 400);
+      check(pickMapShip(mapView(reserves), mapPoint(reserve.pos, v, 1200, 400), v, 1200, 400)?.id !== reserve.id, 'public arena cannot pick an undeployed reserve');
       reserves.deployment.deploy([reserve.id], reserve.teamId);
       reserves.fixedUpdate(1 / 60);
       check(reserves.ships.includes(reserve) && reserve.isVisibleTo(2), 'public arena reveals newly deployed far-edge reinforcement on next authority tick');
@@ -101,13 +112,13 @@ try {
       painter.image = () => undefined;
       for (let seat = 0; seat < 5; seat++) {
         setLanPerspective(engine, world.controlled, seat); fills.length = 0; strokes.length = 0;
-        root.render(React.createElement(CombatRadar, { engine }));
+        root.render(React.createElement(CombatRadar, { engine:combatHudView(engine) }));
         await new Promise(resolve => setTimeout(resolve, 100));
         const radar = document.querySelector('#radar canvas');
         const own = fills.filter(f => f.canvas === radar && f.transform.e === radar.width / 2 && f.transform.f === radar.height / 2);
         check(own.length && own.every(f => f.color === combatTeamColor(engine.playerShip.teamId)), `radar flagship color matches team from seat ${seat}`, own.map(f => f.color));
         check(engine.capitalShips.every(s => fills.some(f => f.canvas === radar && f.color === combatTeamColor(s.teamId))), `radar shows all five team colors at natural spawn positions from seat ${seat}`);
-        painter.draw(ctx, map.width, fitTacticalView(engine, map.width, map.height), engine, { pos: engine.playerShip.pos, width: 1280, height: 720, zoom: 1 }, null, map.height);
+        painter.draw(ctx, map.width, fitTacticalView(mapView(engine), map.width, map.height), mapView(engine), { pos: engine.playerShip.pos, width: 1280, height: 720, zoom: 1 }, null, map.height);
         check(engine.capitalShips.every(s => strokes.some(f => f.canvas === map && f.color === combatTeamColor(s.teamId))), `tactical map distinguishes all five team colors at natural spawn positions from seat ${seat}`);
       }
       const radar = document.querySelector('#radar canvas');
@@ -123,6 +134,7 @@ try {
       check(fills.some(f => f.canvas === radar && f.transform.e === radar.width / 2 && f.color === '#22c55e'), 'ordinary combat retains green flagship color');
       engine.openBattlefield = true; engine.multiTeamBattle = true;
       // Exercise real WebGL hull rendering without moving the five-team formation closer.
+  const {combatRenderView}=await import('/src/engine/render/CombatRenderView.ts');
       const { WebGLCombatRenderer } = await import('/src/engine/render/webgl/WebGLCombatRenderer.ts');
       const { VisualRandom } = await import('/src/engine/runtime/VisualRandom.ts');
       const battle = document.createElement('canvas'); battle.width = 640; battle.height = 480;
@@ -131,7 +143,7 @@ try {
       if (!gl) throw Error('WebGL2 unavailable');
       const renderer = new WebGLCombatRenderer(battle, gl);
       try {
-        await renderer.prepareAssets(engine);
+        await renderer.prepareAssets(combatRenderView(engine));
         const frame = {visualTime: 1, random: new VisualRandom(917), layers: new Set(['hull']), damageEnabled: true};
         for (let seat = 0; seat < 5; seat++) {
           setLanPerspective(engine, world.controlled, seat);
@@ -142,7 +154,7 @@ try {
               if (args[0] === texture && args[1] === ship.pos.x && args[2] === ship.pos.y && args[3] === ship.spec.spriteWidth && args[4] === ship.spec.spriteHeight && args[11] > 0) draws++;
               return draw.apply(this, args);
             };
-            try { renderer.render(engine, 1, ship.pos, 1, frame); }
+            try { renderer.render(combatRenderView(engine), 1, ship.pos, 1, frame); }
             finally { renderer.batcher.drawSprite = draw; }
             check(draws > 0, `real WebGL: seat ${seat} renders team ${ship.teamId} hull at natural spawn`, draws);
           }
@@ -154,16 +166,19 @@ try {
       for (const [i, s] of ships.entries()) { s.teamId = engine.playerShip.teamId; s.pos.set(0, (i - 1) * 10000); }
       updateCombatVisibility(engine.ships);
       for (const [width, height] of [[1200, 400], [400, 1200], [800, 800], [2000, 250]]) {
-        const view = fitTacticalView(engine, width, height);
+        const view = fitTacticalView(mapView(engine), width, height);
         check(ships.every(s => { const p = mapPoint(s.pos, view, width, height); return p.x > 10 && p.x < width - 10 && p.y > 10 && p.y < height - 10; }), `map overview fits visible ships at ${width}x${height}`);
-        check(ships.every(s => pickMapShip(engine, mapPoint(s.pos, view, width, height), view, width, height) === s), `map picking matches projection at ${width}x${height}`);
+        check(ships.every(s => pickMapShip(mapView(engine), mapPoint(s.pos, view, width, height), view, width, height)?.id === s.id), `map picking matches projection at ${width}x${height}`);
       }
     } finally { root.unmount(); proto.fill = fill; proto.stroke = stroke; proto.strokeRect = strokeRect; }
     return results;
   });
-  console.log(JSON.stringify({ results, pageErrors: errors }, null, 2));
+  const ui = await checkTacticalMapUI(page);
+  const hosted = await checkHostedCombatUI(page);
+  console.log(JSON.stringify({ results, ui, hosted, pageErrors: errors }, null, 2));
   assert.deepEqual(errors, []);
   assert.ok(results.every(r => r.passed), 'multiteam map regressions failed');
+  }
 } finally { await browser.close(); }
 
 

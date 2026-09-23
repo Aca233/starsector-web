@@ -63,7 +63,9 @@ test('LAN exact membership gates delivery feedback; shrink never discards an in-
   assert.equal(credits.capacity,3);assert.equal(credits.stats().inflight,5);
   const before=credits.stats();assert.equal(credits.ack(999),false);assert.equal(credits.ack(16),false);assert.deepEqual(credits.stats(),before);
   assert.equal(credits.reserve(22,1000),false);
-  now+=170;assert.equal(credits.ack(19),true);assert.equal(credits.stats().inflight,2);
+  now+=170;assert.equal(credits.ack(18),true);assert.equal(credits.stats().inflight,3);
+  assert.equal(credits.reserve(22,1000),false, 'three remaining frames must drain, not be thrown away');
+  now+=170;assert.equal(credits.ack(19),true);
   assert.equal(credits.reserve(22,1000),true);
   credits.reset();assert.equal(credits.stats().inflight,0);assert.equal(credits.ack(22),false);
   assert.equal(credits.capacity,5,'new match has no reused consumption-rate estimate');
@@ -83,4 +85,16 @@ test('deterministic bandwidth collapse drains queues, then restores healthy high
     assert.ok(recovered.every(s => s.deliveryHz >= 58));
     assert.equal(result.skipSocket, 0);
   }
+});
+
+// Real log route ~55ms, delivered 4–7Hz: low measured rate must not remove
+// the independent serialization/receiver scheduler slot introduced in v0.2.6.
+test('4–10Hz consumption on a 55ms route retains the third pipeline slot',()=>{
+ for(const gap of [100,150,250]){
+  const {window,advance}=observer(gap);
+  assert.equal(window.limit(5,55,600),3);
+  assert.equal(window.limit(5,55,60),3,'one clean pong does not burst back to five');
+  for(let i=0;i<64;i++)advance(1000/60);
+  assert.equal(window.limit(5,55,60),5,'real recovered consumption restores normal flight');
+ }
 });

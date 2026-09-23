@@ -1,4 +1,4 @@
-import type { Ship } from '../simulation/Ship';
+import type { HudContact as Ship } from '../runtime/CombatHudView';
 
 /** Player-console flux warning: _return + renderers/A/I + graphics/util/Fader. */
 export class CombatHudVisuals {

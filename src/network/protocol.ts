@@ -1,3 +1,7 @@
+import { networkCloseCause } from '../../desktop/network-diagnostic-record.mjs';
+import { AuthorityComponentPublisher } from './AuthorityComponents.mjs';
+import { networkFeaturePolicy, networkHelloFeatures, networkFeatureStatus } from './NetworkFeaturePolicy.mjs';
+import { VisualPacketAssembler, visualReceipt } from './ProjectileVisualPacket.mjs';
 import { publicAuthorityPerformance } from "./SnapshotFlow.mjs";
 import type { PublicAuthorityPerformance } from "./SnapshotFlow.mjs";
 import { LanDeltaReceiver, isLanDelta } from "./LanBinaryDelta.mjs";
@@ -109,6 +113,12 @@ export const blankInput = (): PlayerInput => ({
 export type Listener = (message: any) => void;
 const STORAGE_KEY = "starsector.lan.session.v5";
 /** Session token is tab-local. A new page can resume a guest, never reconstruct a host Worker. */
+const NETWORK_FEATURE_POLICY = networkFeaturePolicy(import.meta.env);
+// Full multirate remains opt-in. Default additive motion never slows full worlds.
+export const LAN_LAYERED_SYNC_ENABLED = NETWORK_FEATURE_POLICY.mode === 'experimental';
+export const LAN_MOTION_SYNC_ENABLED = NETWORK_FEATURE_POLICY.motion;
+export const LAN_CRITICAL_COMBAT_ENABLED = NETWORK_FEATURE_POLICY.combat;
+
 export class LanConnection {
   socket: LanSocket | null = null;
   private readonly realtimeGate = new RealtimeSendGate();
@@ -117,6 +127,14 @@ export class LanConnection {
   }
   ready = false;
   private stateCredits = false;
+  combatState = false;
+  private componentUpload = false;
+  get canPublishVisual() { return this.componentUpload && NETWORK_FEATURE_POLICY.visuals; }
+  get canPublishCombat() { return this.componentUpload && NETWORK_FEATURE_POLICY.combat; }
+  private authorityComponents = new AuthorityComponentPublisher();
+  motionState = false;
+  visualState = false;
+  private readonly visualPackets = new VisualPacketAssembler();
   private binaryDelta = false;
   private steamBinarySnapshots = false;
   get canSendBinarySnapshots(): boolean { return this.transport === "lan" || this.steamBinarySnapshots; }
@@ -129,6 +147,7 @@ export class LanConnection {
   private pipelineEpoch = 0;
   private pipelineProbeEpoch = -1;
   private resetPipeline(): void {
+    this.visualPackets.reset();
     this.snapshotPipeline = null;
     this.snapshotPipelineAt = null;
     this.snapshotPipelineRoundTripMs = 0;
@@ -165,7 +184,9 @@ export class LanConnection {
     crypto.getRandomValues(new Uint8Array(16)),
     (n) => n.toString(16).padStart(2, "0"),
   ).join("");
+  networkFeatures: ReturnType<typeof networkFeatureStatus>;
   constructor(public readonly transport: "lan" | "steam" = "lan") {
+    this.networkFeatures = networkFeatureStatus(transport, NETWORK_FEATURE_POLICY);
     try {
       const saved = JSON.parse(sessionStorage.getItem(this.storageKey) ?? "null");
       if (
@@ -246,6 +267,8 @@ export class LanConnection {
     this.resetPipeline();
     this.authoritySample = null;
     this.stateCredits = false;
+    this.networkFeatures = networkFeatureStatus(this.transport, NETWORK_FEATURE_POLICY);
+    this.motionState = false; this.visualState = false; this.combatState = false;
     this.binaryDelta = false;
     this.steamBinarySnapshots = false;
     this.deltaReceiver.setMotionReference(false);
@@ -262,7 +285,7 @@ export class LanConnection {
     socket.binaryType = "arraybuffer";
     this.handshakeTimer = setTimeout(
       () => {
-        if (this.socket === socket && !this.ready) this.retry(socket, 1006);
+        if (this.socket === socket && !this.ready) this.retry(socket, 1006, 'handshake-timeout');
       },
       Math.min(
         this.transport === "steam" ? 15000 : 5000,
@@ -274,7 +297,7 @@ export class LanConnection {
         this.send({
           type: "hello",
           stateCredits: 1,
-          ...(this.transport === "lan" ? { binaryDelta: 1, motionReference: 1 } : { binarySnapshots: 1, binaryReceive: 1 }),
+          ...networkHelloFeatures(this.transport, NETWORK_FEATURE_POLICY),
           protocol: LAN_PROTOCOL,
           build: LAN_BUILD,
           name: this.name,
@@ -296,6 +319,7 @@ export class LanConnection {
         m = binary ? decodeBinaryState(packet) : JSON.parse(packet);
         if (!binary && (m.type === "state" || m.type === "match")) this.deltaReceiver.reset();
         if (m.type === "state") {
+          if (m.frame?.projectileVisuals === 1 && !this.visualState) throw Error("Unnegotiated projectile projection");
           this.snapshotBytes = event.data instanceof ArrayBuffer ? packet.byteLength : event.data.length;
           this.snapshotParseMs = performance.now() - started;
         }
@@ -303,7 +327,7 @@ export class LanConnection {
         if (this.binaryDelta && event.data instanceof ArrayBuffer && isLanDelta(event.data)) {
           // Never ACK/consume a corrupt or missing-base state. Existing bounded
           // reconnect/resume establishes a fresh anchor; no invented state.
-          this.deltaReceiver.reset(); this.retry(socket, 1006); return;
+          this.deltaReceiver.reset(); this.retry(socket, 1006, 'decode-failed'); return;
         }
         this.emit({ type: "error", message: "无法解析服务器消息" });
         return;
@@ -313,7 +337,13 @@ export class LanConnection {
       if (typeof m?.type === "string") this.lastMessageAt = performance.now();
       if (m.type === "welcome") {
         // Opt in only when the relay confirms; legacy LAN/Steam relays omit it.
+        this.componentUpload = m.componentUpload === 1;
+        this.authorityComponents.reset();
         this.stateCredits = m.stateCredits === 1;
+        this.combatState = networkFeatureStatus(this.transport, NETWORK_FEATURE_POLICY, m).combat;
+        this.visualState = networkFeatureStatus(this.transport, NETWORK_FEATURE_POLICY, m).visuals;
+        this.motionState = networkFeatureStatus(this.transport, NETWORK_FEATURE_POLICY, m).motion;
+        this.networkFeatures = networkFeatureStatus(this.transport, NETWORK_FEATURE_POLICY, m);
         this.binaryDelta = this.transport === "lan" && this.stateCredits && m.binaryDelta === 1;
         this.steamBinarySnapshots = this.transport === "steam" && m.binarySnapshots === 1;
         this.deltaReceiver.setMotionReference(this.binaryDelta && m.motionReference === 1);
@@ -332,7 +362,7 @@ export class LanConnection {
           const silent = now - this.lastMessageAt > 10000;
           const unanswered = this.pingSent > 0 && now - this.pingSent > 10000;
           if (!this.background && (silent || unanswered)) {
-            this.retry(socket, 1006);
+            this.retry(socket, 1006, 'heartbeat-timeout');
             return;
           }
           this.probe();
@@ -353,7 +383,10 @@ export class LanConnection {
           /* optional */
         }
       }
+      if (m.type === "layered-ready" && this.transport === "steam") { this.visualState = NETWORK_FEATURE_POLICY.visuals && m.visualState === 1; this.combatState = NETWORK_FEATURE_POLICY.combat && m.combatState === 1; this.networkFeatures = { ...this.networkFeatures, visuals: this.visualState, combat: this.combatState, reason: "steam-components-check-receiver" }; }
+      if (m.type === "layered-unavailable") { this.visualState = this.combatState = false; this.visualPackets.reset(); this.networkFeatures = { ...this.networkFeatures, visuals: false, combat: false, reason: "component-fallback" }; }
       if (m.type === "match" || m.type === "ended") {
+        this.authorityComponents.reset();
         this.resetPipeline();
         if (m.type === "ended" || this.authoritySample?.matchId !== m.match?.id) this.authoritySample = null;
       }
@@ -376,6 +409,17 @@ export class LanConnection {
       }
       if (m.type === "error" && ["RESUME_EXPIRED", "VERSION"].includes(m.code))
         this.forget();
+      if (m.type === 'projectile-visual') {
+        if (!this.visualState) return;
+        try { m.visualBytes = this.visualPackets.take(m); } catch { this.visualPackets.reset(); this.send(visualReceipt(m,'discarded')); return; }
+        if (!m.visualBytes) { this.send(visualReceipt(m,'fragment')); return; }
+        // Synchronous subscribers set visualHandled only after successful CRC,
+        // epoch and projection validation/retention. No listener => discard,
+        // which frees bounded flight but never grants baseline-ready credit.
+        this.emit(m);
+        this.send(visualReceipt(m,m.visualHandled === true ? 'consumed' : 'discarded'));
+        return;
+      }
       this.emit(m);
       // Application consumption credit, never a GPU/display ACK or RTT sample.
       // Release only after the synchronous subscribers have retained the frame
@@ -383,11 +427,12 @@ export class LanConnection {
       if (m.type === "state" && this.stateCredits && this.socket === socket)
         this.send({type:"state-consumed",matchId:m.matchId,seq:m.seq});
     };
-    socket.onclose = (event) => this.retry(socket, event.code);
+    socket.onclose = (event) => this.retry(socket, event.code, networkCloseCause(event.reason));
     socket.onerror = () => {}; // close owns retry/error reporting.
   }
-  private retry(socket: LanSocket, code: number) {
+  private retry(socket: LanSocket, code: number, cause: string = 'socket-close') {
     if (this.socket !== socket || this.stopped) return;
+    const close = { code, cause };
     clearTimeout(this.handshakeTimer);
     clearInterval(this.heartbeatTimer);
     this.socket = null;
@@ -396,7 +441,7 @@ export class LanConnection {
     if ([1008, 1009, 4001, 4003].includes(code) || !this.saved) {
       this.forget();
       this.emit({
-        type: "disconnected",
+        type: "disconnected", close,
         reason:
           code === 4001
             ? "此身份已在另一个页面连接。"
@@ -409,13 +454,13 @@ export class LanConnection {
     if (remaining <= 0) {
       this.forget();
       this.emit({
-        type: "disconnected",
+        type: "disconnected", close,
         reason: "30 秒内未能重新连接，请重新加入房间。",
       });
       return;
     }
     this.emit({
-      type: "reconnecting",
+      type: "reconnecting", close,
       remaining: Math.ceil(remaining / 1000),
     });
     this.retryTimer = setTimeout(
@@ -446,6 +491,13 @@ export class LanConnection {
       return "sent";
     } catch (error) { return error instanceof RangeError ? "oversized" : "disconnected"; }
   }
+  sendAuthorityComponent(matchId: string, message: { type: string }): boolean {
+    if (this.socket?.readyState !== WebSocket.OPEN || this.socket.bufferedAmount > 0 ||
+        (message.type === 'combat-state' ? !this.canPublishCombat : !this.canPublishVisual)) return false;
+    const choice = this.authorityComponents.prepare(matchId, message);
+    if (!this.send(choice.message)) return false;
+    choice.commit(); return true;
+  }
   send(message: unknown): boolean {
     if (
       this.socket?.readyState !== WebSocket.OPEN ||
@@ -456,11 +508,13 @@ export class LanConnection {
     // (one input + one snapshot); reject further input before serialization.
     // Action/sequence state advances only after a successful local admission.
     if ((message as { type?: string } | null)?.type === "input" && !this.canSendInput()) return false;
+    if ((message as { type?: string } | null)?.type === "motion" && !this.realtimeGate.canSendMotion(this.socket.bufferedAmount, performance.now())) return false;
     try {
       if (wireBytes(message) > LAN_MAX_SNAPSHOT_BYTES) return false;
       this.socket.send(JSON.stringify(message));
       const m = message as { type?: string; input?: PlayerInput };
       if (m.type === "input") this.realtimeGate.inputSent(performance.now());
+      if (m.type === "motion") this.realtimeGate.motionSent(performance.now());
       if (m.type === "input" && m.input) {
         this.inputSequence = Math.max(this.inputSequence, m.input.seq);
         for (const a of m.input.actions)

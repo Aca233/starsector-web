@@ -1,0 +1,10 @@
+export type WeaponStateRow = [slot: string, spec: string, flags: number, phase: number, permanent: number, ...numbers: number[]];
+export type WeaponStateShips = [id: string, weapons: WeaponStateRow[]][];
+export const WEAPON_STATE_MAX_BYTES: number;
+export const WEAPON_STATE_MAX_SHIPS: number;
+export const WEAPON_STATE_MAX_MOUNTS: number;
+export const WEAPON_NUMBERS: readonly string[];
+export const WEAPON_FLAGS: readonly string[];
+export const WEAPON_PHASES: readonly ('IDLE' | 'CHARGING' | 'ACTIVE' | 'CHARGEDOWN')[];
+export function encodeWeaponState(ships: WeaponStateShips): Uint8Array;
+export function decodeWeaponState(bytes: Uint8Array): WeaponStateShips;

@@ -1,0 +1,22 @@
+import type {OriginalFleetWorld,OriginalFleetLocationRegistry} from './OriginalFleetWorld.mjs';
+import type {OriginalCampaignMemory} from './OriginalCampaignMemory.mjs';
+import type {OriginalNativeFleet} from './OriginalFleetData.mjs';
+export interface OriginalCampaignEngineState {scope:'native-campaign-engine-frame-state';/** Uncaptured old CampaignPlugin registry is unavailable, not empty. */campaignPlugins?:import('./OriginalCampaignPluginPicks.mjs').OriginalCampaignPluginRegistry;/** Absent = uncaptured old history, not an empty manager. */genericPlugins?:import('./OriginalGenericPlugins.mjs').OriginalGenericPluginManager;objectRef?:string;kind?:'campaign-engine';world:OriginalFleetWorld;frame:string;hyperspace:OriginalFleetLocationRegistry;starSystems:OriginalFleetLocationRegistry[];currentLocation:OriginalFleetLocationRegistry;removeAsap:OriginalFleetLocationRegistry[];scripts:object[];transientScripts:object[];pings:object[];animationManager?:import('./OriginalCampaignAnimations.mjs').OriginalAnimationManager;memory:OriginalCampaignMemory|null;uiDataFrame?:import('./OriginalCampaignUIData.mjs').OriginalCampaignUIDataFrame;importantPeople?:import('./OriginalImportantPeople.mjs').OriginalImportantPeople;intelManager?:import('./OriginalIntelManager.mjs').OriginalIntelManager;eventManager?:import('./OriginalCampaignEvents.mjs').OriginalCampaignEventManager;idMapDirty:boolean;activeLocations:{location:OriginalFleetLocationRegistry;activeThisFrame:boolean}[]}
+/** isFastForwardIteration is separate from fastAdvance; required by the native location/fleet adapter. */
+export interface OriginalCampaignEngineContext {isFastForwardIteration?:boolean;skipMarketAdvance?:boolean;paused:boolean;fastAdvance:boolean;playerFleet:OriginalNativeFleet|null;input:unknown;campaignHelp:object|null}
+export interface OriginalCampaignEngineServices {
+ removeStarSystem?(location:OriginalFleetLocationRegistry):void;readdChangeListeners?():void;rebuildIDToEntityMap?():void;
+ advanceTooltipManager?(seconds:number,input:unknown):void;advanceIntelManager?(seconds:number):void;advanceEventManager?(seconds:number):void;advanceImportantPeople?(seconds:number):void;advanceUIData?(seconds:number):void;
+ convertToDays?(seconds:number):number;advanceListenersWithTimeout?(days:number):void;
+ advanceEconomyBeforeClock?(seconds:number):unknown;advanceMarketConditionsWhenPaused?(seconds:number):unknown;
+ advanceEngineMemory?(memory:OriginalCampaignMemory,seconds:number):void;advanceCharacterMemory?(seconds:number):void;readAllFactions?():object[];advanceFaction?(faction:object,seconds:number):void;updatePlayerSpeedBonus?(player:OriginalNativeFleet):void;
+ advanceAnimations?(seconds:number):void;advanceClock?(seconds:number):unknown;
+ advanceLocationEvenIfPaused?(location:OriginalFleetLocationRegistry,seconds:number,input:unknown):void;advanceLocation?(location:OriginalFleetLocationRegistry,seconds:number,input:unknown):void;
+ advancePing?(ping:object,seconds:number):void;canCleanUpPing?(ping:object):boolean;
+ isEngineScriptDone?(script:object):boolean;engineScriptRunsWhilePaused?(script:object):boolean;advanceEngineScript?(script:object,seconds:number):void|{effects:(import('./OriginalLocationFrame.mjs').OriginalLocationFrameEffect&{location:OriginalFleetLocationRegistry;playerFleet:OriginalNativeFleet|null})[]};advanceCampaignHelp?(help:object,seconds:number):void;
+}
+export function createOriginalCampaignEngineState(world:OriginalFleetWorld,hyperspace:OriginalFleetLocationRegistry,starSystems:OriginalFleetLocationRegistry[],currentLocation:OriginalFleetLocationRegistry):OriginalCampaignEngineState;
+export function validateOriginalCampaignEngineState(state:OriginalCampaignEngineState,world:OriginalFleetWorld):OriginalCampaignEngineState;
+export function advanceOriginalCampaignEngine(state:OriginalCampaignEngineState,seconds:number,context:OriginalCampaignEngineContext,services:OriginalCampaignEngineServices):{scope:'native-campaign-engine-dispatch';frame:string;economy:unknown;clock:unknown;advances:{locationRef:string;seconds:number}[];effects:(import('./OriginalLocationFrame.mjs').OriginalLocationFrameEffect&{location:OriginalFleetLocationRegistry;playerFleet:OriginalNativeFleet|null})[];readyForAuthority:false};
+
+export function originalCampaignGenericPlugins(state:OriginalCampaignEngineState):import('./OriginalGenericPlugins.mjs').OriginalGenericPluginManager;

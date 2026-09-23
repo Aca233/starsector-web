@@ -1,0 +1,13 @@
+import type {OriginalEncounterState} from './OriginalEncounterState.mjs';
+import type {OriginalFleetEncounterServices} from './OriginalFleetEncounterContext.mjs';
+import type {OriginalNativeFleetMember} from './OriginalFleetData.mjs';
+import type {OriginalConstructedCampaignFleet} from './OriginalCampaignFleet.mjs';
+import type {OriginalStorageVariant} from './OriginalStorage.mjs';
+import type {OriginalJavaRandomState} from './OriginalJavaRandom.mjs';
+export function originalEncounterSalvageSetting(key:string,services?:OriginalFleetEncounterServices):number;
+export function originalEncounterSalvageRandom(state:Pick<OriginalEncounterState,'salvageRandom'>,services?:OriginalFleetEncounterServices):OriginalJavaRandomState;
+export function originalEncounterFleetDynamic(fleet:OriginalConstructedCampaignFleet,key:string,base?:number):number;
+export function returnOriginalEncounterHullmodItems(state:OriginalEncounterState,member:OriginalNativeFleetMember,services?:OriginalFleetEncounterServices):void;
+export function lootOriginalEncounterWeapons(state:OriginalEncounterState,member:OriginalNativeFleetMember,variant:OriginalStorageVariant|null,own:boolean,mult:number,lootingModule?:boolean,services?:OriginalFleetEncounterServices):void;
+export function lootOriginalEncounterWings(state:OriginalEncounterState,member:OriginalNativeFleetMember,variant:OriginalStorageVariant|null,own:boolean,mult:number,services?:OriginalFleetEncounterServices):void;
+export function lootOriginalEncounterHullmods(state:OriginalEncounterState,member:OriginalNativeFleetMember,variant:OriginalStorageVariant|null,mult:number,services?:OriginalFleetEncounterServices):void;

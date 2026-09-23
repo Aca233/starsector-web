@@ -1,8 +1,8 @@
 import { readSystemBindings, selectedSystemSlot, systemBindingLabel } from '../../engine/runtime/SystemBindings';
 import '../../studio/system-loadout.css';
 import React from 'react';
-import { Ship } from '../../engine/simulation/Ship';
-import { CombatEngine } from '../../engine/simulation/CombatEngine';
+import type { HudShip as Ship } from '../../engine/runtime/CombatHudView';
+import type { CombatHudView as CombatEngine } from '../../engine/runtime/CombatHudView';
 import { i18n } from '../../engine/i18n/LocalizationManager';
 import { ShipPaperDoll } from './ShipPaperDoll';
 import { buildWeaponHudGroups, weaponHudHeight } from './WeaponHudModel';
@@ -34,7 +34,7 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
   const hullRatio = Math.min(1.0, Math.max(0, player.hullHp / maxHull));
   // Read the same phase/flux multiplier as shipMotionStats, including refit and IN/OUT effects.
   const phaseSpeedPercent = player.shield.type === 'PHASE' && player.shield.isPhaseEngaged
-    ? Math.round(player.shield.getPhaseSpeedMultiplier(player.flux.maxFlux > 0 ? player.flux.hardFlux / player.flux.maxFlux : 0) * 100)
+    ? Math.round(player.phaseSpeedMultiplier * 100)
     : 100;
 
   // 战术系统名称与状态
@@ -43,10 +43,10 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
     : system.isCoolingDown ? '冷却中 (' + system.cooldownTimer.toFixed(1) + 's)' : system.activationFailureReason ?? system.statusText ?? '就绪';
 
   // 原版参考战备与敌情感知 (RepairTracker.java & C.java)
-  const hasEnemiesInRange = player.areSignificantEnemiesInRange(2500, engine?.findHostile(player));
+  const hasEnemiesInRange = player.significantEnemiesInRange;
   const remainingPPT = Math.max(0, Math.ceil(player.peakPerformanceRemaining));
   const crPercent = Math.round(player.currentCR * 100);
-  const isFlameout = player.getFlameoutRatio() > 0.05;
+  const isFlameout = player.flameoutRatio > 0.05;
 
   const groups = buildWeaponHudGroups(player);
   const groupHeight = Math.max(50, weaponHudHeight(groups));
@@ -98,7 +98,7 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
                 className="w-4 h-4 object-contain"
               />
               <span className="font-bold"><span className="hud-text">幅能排空</span></span>
-              <span className="text-[#9bff00]/90"><span className="hud-text">({Math.ceil(player.flux.getTimeToVent())}s 剩余)</span></span>
+              <span className="text-[#9bff00]/90"><span className="hud-text">({Math.ceil(player.timeToVent)}s 剩余)</span></span>
             </div>
           )}
 
@@ -144,7 +144,7 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
                 className="w-3.5 h-3.5 object-contain"
               />
               <span className="font-bold"><span className="hud-text">引擎受损</span></span>
-              <span className="text-[#9bff00]/80"><span className="hud-text">({Math.round((1 - player.getFlameoutRatio()) * 100)}% 剩余)</span></span>
+              <span className="text-[#9bff00]/80"><span className="hud-text">({Math.round((1 - player.flameoutRatio) * 100)}% 剩余)</span></span>
             </div>
           )}
 
@@ -237,11 +237,11 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
           <div className="pt-1 mt-1 border-t border-[#9bff00]/40 space-y-0.5 text-[10px]">
             <div className="flex items-center justify-between font-bold text-[10px] pb-0.5">
               <span><span className="hud-text">机库甲板 ({carrierWings.length} 联队)</span></span>
-              <button type="button" aria-label={player.fighterRecall ? '本舰联队出击' : '召回本舰联队'}
+              <button type="button" disabled={!onToggleRecall} aria-label={player.fighterRecall ? '本舰联队出击' : '召回本舰联队'}
                 title={player.fighterRecall ? '[Z] 解除本舰联队召回' : '[Z] 召回本舰联队；其他航母不受影响'}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (onToggleRecall) onToggleRecall(); else engine.toggleFighterRecall();
+                  onToggleRecall?.();
                 }}
                 className="cursor-pointer hover:text-white text-[9px] text-[#9bff00]/80"
               ><span className="hud-text">

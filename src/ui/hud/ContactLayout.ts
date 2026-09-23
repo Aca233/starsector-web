@@ -1,4 +1,4 @@
-import type { Ship } from '../../engine/simulation/Ship';
+import type { HudContact as Ship } from '../../engine/runtime/CombatHudView';
 import type { Vector2 } from '../../engine/math/Vector2';
 
 /** Match renderer backing pixels to CSS pixels, including resized/scaled canvases. */

@@ -1,0 +1,35 @@
+import { build } from 'esbuild';
+import fs from 'node:fs';import path from 'node:path';import {pathToFileURL} from 'node:url';
+import {checkRenderProjection} from './lib/render-projection-contracts.mjs';
+const dir=path.resolve('artifacts/render-projection-contracts',Date.now()+'-'+process.pid);fs.mkdirSync(dir,{recursive:true});
+const rawText = {name:'raw-text',setup(b){
+ b.onResolve({filter:/\?raw$/},args=>({path:path.resolve(args.resolveDir,args.path.slice(0,-4)),namespace:'raw-text'}));
+ b.onLoad({filter:/.*/,namespace:'raw-text'},args=>({contents:fs.readFileSync(args.path,'utf8'),loader:'text'}));
+}};
+await build({plugins:[rawText],stdin:{loader:'ts',resolveDir:process.cwd(),contents:`
+ export {CombatHudProjector,HudContactRecord,combatHudView} from './src/engine/runtime/CombatHudView';
+ export {GameSession} from './src/engine/game/GameSession';
+ export {TacticalMapViewProjector,copyTacticalMapSnapshot} from './src/engine/runtime/TacticalMapView';
+ export {combatObservers,contactVisible} from './src/engine/simulation/systems/CombatVisibility';
+ export {DeploymentViewProjector,copyDeploymentView,deploymentViewReason,deploymentViewUsed} from './src/engine/runtime/DeploymentView';
+ export {CombatSession} from './src/engine/runtime/CombatSession';
+ export {contentRegistry} from './src/engine/content/ContentRegistry';
+ export {localCombatContentSignature} from './src/engine/runtime/local/LocalCombatContent';
+ export {CombatEngine} from './src/engine/simulation/CombatEngine';
+ export {LocalCombatKernel} from './src/engine/runtime/local/LocalCombatKernel';
+ export {CombatPresentationEncoder,CombatPresentationDecoder} from './src/engine/runtime/local/CombatPresentation';
+ export {RenderShipProjection,ProjectedRenderShip,ProjectedRenderSystem,renderWeaponRange,renderPulseOffset,renderWeaponAngle} from './src/engine/runtime/local/RenderShipProjection';
+ export {applyTacticalViewCommand} from './src/engine/runtime/TacticalControl';
+ export {RenderWeaponDictionary} from './src/engine/runtime/local/RenderWeaponDictionary';
+ export {isImmutableMetadata} from './src/engine/extensions/Immutable';
+ export {collectCombatTextureUrls} from './src/engine/assets/CombatAssetClosure';
+ export {activeSystemVisuals,systemTeleportCopies,systemEngineVisual} from './src/engine/render/webgl/ShipSystemRenderer';
+ export {getDamageGlowRevision,hasHotDamageGlow} from './src/engine/render/ShipDamageVisuals';
+ export {combatRenderView} from './src/engine/render/CombatRenderView';
+ export {Ship} from './src/engine/simulation/Ship';
+ export {Vector2} from './src/engine/math/Vector2';
+ export {setWeaponPresentationAngle} from './src/engine/visual/WeaponPresentation';
+ export {setShipPresentationPose} from './src/engine/visual/ShipPresentation';
+ export {modManager} from './src/engine/modding/ModManager';
+`},outfile:path.join(dir,'core.mjs'),bundle:true,platform:'node',format:'esm',define:{'import.meta.env.BASE_URL':JSON.stringify('/')}});
+const api=await import(pathToFileURL(path.join(dir,'core.mjs')));await checkRenderProjection(api,path.join(dir,'contracts.json'));

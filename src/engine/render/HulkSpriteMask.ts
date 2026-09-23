@@ -1,5 +1,5 @@
 import type { ShipSpec } from '../content/ShipSpec';
-import type { HulkFragment } from '../simulation/CombatTypes';
+import type { RenderHulk as HulkFragment } from '../render/ShipRenderState';
 import type { Vector2 } from '../math/Vector2';
 import { textureCache } from './TextureCache';
 

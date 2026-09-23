@@ -1,0 +1,2 @@
+import {build} from 'esbuild';import path from 'node:path';import {pathToFileURL} from 'node:url';
+const out=path.resolve('artifacts/network-stream-20260921/particle-recording.mjs');await build({entryPoints:['scripts/benchmark-dynamic-particle-recipes.mts'],outfile:out,bundle:true,platform:'node',format:'esm',packages:'external',define:{__LAN_BUILD_ID__:'"particle-recording"','import.meta.env':'{"BASE_URL":"/","DEV":false,"VITE_LAN_AI_WORKERS":"false"}'},logLevel:'warning'});await import(pathToFileURL(out).href);

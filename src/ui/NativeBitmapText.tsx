@@ -30,7 +30,7 @@ export function NativeBitmapText({ children: text, font = "action", color = "#aa
     }
     return { placements, width, available };
   }, [asset, text]);
-  const height = asset?.lineHeight ?? ({ action: 24, button: 20, caption: 16, body: 17 })[font];
+  const height = asset?.lineHeight ?? ({ action: 24, button: 20, caption: 16, body: 17, tiny: 10, credits: 20, burn: 24 })[font];
   const paintedRef = useRef<{
     canvas: HTMLCanvasElement; asset: BitmapFont; placements: typeof placements; color: string;
   } | null>(null);

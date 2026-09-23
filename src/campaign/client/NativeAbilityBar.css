@@ -1,0 +1,23 @@
+.native-ability-bar{position:absolute;z-index:15;left:285px;bottom:37px;width:587px;height:70px;color:var(--ability-color);isolation:isolate}
+.native-ability-holder{position:absolute;left:-4px;top:-4px;width:596px;height:78px;pointer-events:none;z-index:-1}
+.native-ability-slots{display:grid;grid-template-columns:repeat(10,56px);column-gap:3px}
+.native-ability-slot{position:relative;width:56px;height:56px;border:1px solid var(--ability-color);box-sizing:border-box;background:#000}
+.native-ability-button{position:absolute;inset:3px;border:0;margin:0;padding:0;width:48px;height:48px;background:transparent;cursor:pointer;color:inherit}
+.native-ability-button img{width:48px;height:48px;display:block;pointer-events:none}
+.native-ability-button:hover:not(:disabled) img{filter:brightness(1.25)}
+.native-ability-button:focus-visible{outline:1px solid #fff;outline-offset:1px}
+.native-ability-button:disabled{cursor:default}.native-ability-button:disabled img{opacity:.5}
+.native-ability-indicator{position:absolute;left:-1px;top:-1px;width:56px;height:56px;pointer-events:none}
+.native-ability-key{position:absolute;right:5px;top:2px;pointer-events:none;color:#8b9b9e}
+.native-ability-cooldown{position:absolute;left:1px;bottom:1px;width:52px;background:rgba(0,0,0,.67);pointer-events:none}
+.native-ability-controls{position:absolute;left:0;bottom:0;width:100%;height:12px;display:flex;gap:3px;align-items:center}
+.native-ability-controls>button{width:56px;height:12px;background:#164b5b;color:#aadeff;border:1px solid #407f94;padding:0;display:flex;align-items:center;justify-content:center;clip-path:polygon(2px 0,calc(100% - 2px) 0,100% 2px,100% calc(100% - 2px),calc(100% - 2px) 100%,2px 100%,0 calc(100% - 2px),0 2px)}
+.native-ability-controls button:disabled,.native-ability-lock:has(input:disabled){opacity:.5}
+.native-ability-lock{margin-left:auto;width:45px;display:flex;align-items:center;gap:3px;height:12px;cursor:pointer}
+.native-ability-lock input{appearance:none;width:10px;height:10px;padding:0;margin:0;border:1px solid #85b6c9;background:#06141b;border-radius:2px}
+.native-ability-lock input:checked{background:#7bb5c9;box-shadow:inset 0 0 0 2px #102d38}
+.native-ability-tooltip{position:absolute;bottom:75px;left:0;width:350px;padding:14px;box-sizing:border-box;color:#aacddd;pointer-events:none;font-size:14px;line-height:1.45}
+.native-ability-tooltip h3{margin:0 0 10px}.native-ability-tooltip p{margin:10px 0 0}.native-ability-warning{color:#f79474}.native-ability-muted{color:#86979f}
+.native-ability-note{position:absolute;bottom:75px;left:0;min-width:350px;font-size:12px;color:#aacddd;background:#00131ee8;padding:6px}
+/* Keep the original ten-slot row; narrow windows shift it left, never reorder slots. */
+@media(max-width:900px){.native-ability-bar{left:20px}}

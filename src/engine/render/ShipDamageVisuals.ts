@@ -1,5 +1,6 @@
 import type { ShipSpec } from '../modding/ModManager';
-import type { Ship } from '../simulation/Ship';
+import type { ShipRenderState } from '../render/ShipRenderState';
+type Ship = Pick<ShipRenderState, 'spec'|'isDead'|'scorchMarks'|'scorchMarkVersion'|'armor'>;
 import { textureCache } from './TextureCache';
 import type { Vector2 } from '../math/Vector2';
 import { clipShipPolygon } from './HulkSpriteMask';

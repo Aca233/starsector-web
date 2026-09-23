@@ -1,4 +1,4 @@
-import type { Ship } from '../../simulation/Ship';
+import type { ShipRenderState as Ship } from '../../render/ShipRenderState';
 import type { VisualRandom } from '../../runtime/VisualRandom';
 import { OverloadFlicker, overloadFade, overloadTiles } from '../../visual/OverloadVisuals';
 import { textureCache } from '../TextureCache';

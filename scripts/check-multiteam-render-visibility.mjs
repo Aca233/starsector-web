@@ -24,6 +24,7 @@ try {
     const { createLanWorld, setLanPerspective } = await import('/src/network/LanWorld.ts');
     const { captureCombat, applyCombatSnapshot } = await import('/src/network/CombatSnapshot.ts');
     const { updateCombatVisibility } = await import('/src/engine/simulation/systems/CombatVisibility.ts');
+  const {combatRenderView}=await import('/src/engine/render/CombatRenderView.ts');
     const { WebGLCombatRenderer } = await import('/src/engine/render/webgl/WebGLCombatRenderer.ts');
     const { textureCache } = await import('/src/engine/render/TextureCache.ts');
     const { assetManager } = await import('/src/engine/assets/AssetResolver.ts');
@@ -55,7 +56,7 @@ try {
     const renderer = new WebGLCombatRenderer(canvas, gl);
     const frame = { visualTime: 1, random: new VisualRandom(917), layers: new Set(['hull']), damageEnabled: true };
     try {
-      await renderer.prepareAssets(engine);
+      await renderer.prepareAssets(combatRenderView(engine));
       const sample = (ship, markers = false) => {
         const stats = { hull: 0, markers: 0, pixels: 0 };
         const texture = renderer.textures.getTexture(ship.spec.spriteUrl);
@@ -73,7 +74,7 @@ try {
           try { return debug.apply(this, args); } finally { inDebug = false; }
         };
         try {
-          renderer.render(engine, 1, ship.pos, 1, { ...frame, layers: new Set(markers ? ['hull', 'markers'] : ['hull']) });
+          renderer.render(combatRenderView(engine), 1, ship.pos, 1, { ...frame, layers: new Set(markers ? ['hull', 'markers'] : ['hull']) });
           const pixels = new Uint8Array(400 * 400 * 4);
           gl.readPixels(280, 160, 400, 400, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
           for (let i = 0; i < pixels.length; i += 4) if (Math.max(pixels[i], pixels[i + 1], pixels[i + 2]) > 40) stats.pixels++;

@@ -1,6 +1,6 @@
 import { combatTeam } from "../simulation/CombatTeams";
 import type { Projectile } from '../simulation/Weapon';
-import type { Ship } from '../simulation/Ship';
+import type { ShipRenderState as Ship } from '../render/ShipRenderState';
 import { Vector2 } from '../math/Vector2';
 
 // renderers/OOoO.java and settings.json:textEnemyColor, not weapon/engine tint.

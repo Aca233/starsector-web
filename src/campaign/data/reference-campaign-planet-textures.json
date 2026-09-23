@@ -1,0 +1,401 @@
+{
+  "schemaVersion": 1,
+  "scope": "native-campaign-planet-textures",
+  "atmosphereTexture": "graphics/planets/atmosphere2.png",
+  "sources": [
+    {
+      "path": "data/config/planets.json",
+      "sha256": "f2367de64a3a8f52dd0e17fba163661ca8d7147ac8742007a8a41b363785244b"
+    },
+    {
+      "path": "data/config/settings.json",
+      "sha256": "96f3f6aa457e85ab6480bf302e35d3e8df390339321711b982d45fbe71c4dfa9"
+    },
+    {
+      "path": "loading/specs/PlanetSpec.java",
+      "sha256": "3995aa714ccc1056aaa699431ece071a7427274572a233b9cdc57cd4b060870a"
+    },
+    {
+      "path": "loading/String.java",
+      "sha256": "acb79d529294803898afd9ddb44699b69fbed6898b994a8cddb2da67a27c76d3"
+    },
+    {
+      "path": "campaign/CampaignPlanet.java",
+      "sha256": "c3bcd3d1fd66eae31de17c5fac5be0a78899f82caa87bb1c2dc31cc14d5f2f1a"
+    },
+    {
+      "path": "combat/entities/terrain/Planet.java",
+      "sha256": "5de3d067ee3e9e756e8fa022d2b5c310161edecd3fb18d895b18174bd743e41f"
+    }
+  ],
+  "textures": [
+    {
+      "path": "graphics/fx/star_halo.png",
+      "width": 512,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "ef01e62eac6328c7a52f41caaae9b1d8f0137aa76b4237526ac005a947f88aca"
+    },
+    {
+      "path": "graphics/planets/arid.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "fc40d0b4dae020a4ff8a116a8fd5d3e9844a3afa26c60ddb8741793658c8f7fc"
+    },
+    {
+      "path": "graphics/planets/asharu_sparse_glow.png",
+      "width": 512,
+      "height": 256,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "c4331ee9aeef5031e27c23e1f20a9c8df76629c000ab121002a3e7899a457518"
+    },
+    {
+      "path": "graphics/planets/atmosphere2.png",
+      "width": 32,
+      "height": 32,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "d9ce6c58547c88c16dd878621169bf59617939abc0c5b8387fe0b75c0b403d75"
+    },
+    {
+      "path": "graphics/planets/barren00.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "54d6dd9706fe850918703d9cf3133a827dd4fd28df18ff28957b10995ee28a40"
+    },
+    {
+      "path": "graphics/planets/barren01.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "d6f00f0e735b40e6dc298e6156c6297a12a4a030e81d89a4d8eb85ef5afc6175"
+    },
+    {
+      "path": "graphics/planets/barren02.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "9303ba7f1d9b0075d8dab381151e15aafd83804a909080364de8c17b4c9634a9"
+    },
+    {
+      "path": "graphics/planets/barren03.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "70bd3fe5916218d991401f6b472532483501db6886755d2e312c4b4a1019cae5"
+    },
+    {
+      "path": "graphics/planets/brown_dwarf.jpg",
+      "width": 512,
+      "height": 256,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "d3c9dab98a916d9c5dd514aacbb2808d4a4edc7f49895638d127e9675b78e8f4"
+    },
+    {
+      "path": "graphics/planets/castiron.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "a2fd813068f77ee6179181f20b478ca287f9d726d369359569ca9c86a5cc1a73"
+    },
+    {
+      "path": "graphics/planets/clouds_aurorae.png",
+      "width": 512,
+      "height": 256,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "54066117bf19bb8530e40bb12acf34f39844fbbf32ffdbdcfd1453ea5ab3b247"
+    },
+    {
+      "path": "graphics/planets/clouds_banded01.png",
+      "width": 512,
+      "height": 256,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "f31f7c97b0f2eb678588992893ab8bf2e01e1897671d52522b5ba1019c4f091c"
+    },
+    {
+      "path": "graphics/planets/clouds_white.png",
+      "width": 512,
+      "height": 256,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "5cd8e2942e4e6e470e45860973d86108003b81d1caa3590c45fd331836e2e178"
+    },
+    {
+      "path": "graphics/planets/cryovolcanic01.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "cc789bf3f70efbfaed5ceef5593a9755d8d504db676f86583fb5bc9b29b2e48a"
+    },
+    {
+      "path": "graphics/planets/desert.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "3e98ef7d8efc35d391cc72de07946f758d3d32680bceb8eb3da38f9bde6aa1ff"
+    },
+    {
+      "path": "graphics/planets/desert01.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "8b873db08696ff14b5058f6fcb88c22a4da8e4fda037e273de850960704601c3"
+    },
+    {
+      "path": "graphics/planets/dynamo.png",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "eedcbf337b3916826489d76a3f9ba5bd83ae359e9442fc159b8a9b7358638991"
+    },
+    {
+      "path": "graphics/planets/frozen00.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "073cef9c7de7baa43ecd3d24873c34051505ec43b94d9dcbbe08686045168a5b"
+    },
+    {
+      "path": "graphics/planets/frozen01.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "4e100f485c40a1c31a6ba874af1c3767d231041b98e410cd082db1a1b8498bae"
+    },
+    {
+      "path": "graphics/planets/frozen02.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "0457be8ac33bfa78cedac657f8a6392317eb456973308ce6fb97a9cc17517e70"
+    },
+    {
+      "path": "graphics/planets/gas_giant.jpg",
+      "width": 512,
+      "height": 256,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "d8ac94308c5ce9cbb8f59a56053a7b3aa75553e969f8e459867ab2f0ad77d02a"
+    },
+    {
+      "path": "graphics/planets/ice_giant.jpg",
+      "width": 512,
+      "height": 256,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "5f4dc895c197fc7ea74a380e14e45c8ac276a7290e9d200ee78dcc7af5a57091"
+    },
+    {
+      "path": "graphics/planets/jungle.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "e699e3cc4de5eeaa2de92b3cf9e5a6ca63fb70043df592f8cf716a4dd539b1f5"
+    },
+    {
+      "path": "graphics/planets/lava_major.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "f55db2ae8347fc4c473122e95fbc78a4506108022bdcda6d3b6413a716474616"
+    },
+    {
+      "path": "graphics/planets/lava_major_glow.png",
+      "width": 512,
+      "height": 256,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "e66c49e9f8f2b78fdb0185725a0e59f3cf5d25e7d3e99484041000780814b0ca"
+    },
+    {
+      "path": "graphics/planets/lava_minor.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "ac0e27278ca7a73766ff0d86da2fbb6b59d8e4536b4c73b1708270d042c03200"
+    },
+    {
+      "path": "graphics/planets/lava_minor_glow.png",
+      "width": 512,
+      "height": 256,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "59aca7c4a407eb002953bd9992da5f8e8d2d96a0b30381f923adc3bbaa49514c"
+    },
+    {
+      "path": "graphics/planets/marslike.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "e51fc2c21c47570abd99b76135924aa21d8e9a96fc06f8bf7582a571c6567237"
+    },
+    {
+      "path": "graphics/planets/planet_ice01.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "56b673d83ceac862601243096c3d6b0b1bb56b667557479c06092fb8ee1810a9"
+    },
+    {
+      "path": "graphics/planets/radiated.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "1caefaf5162f8c69feea0a0bd3b8ab0cbd081f6e16e2612ae0d369b8977eee7a"
+    },
+    {
+      "path": "graphics/planets/rocky-metallic.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "05fe57ffbf5594e8465c2d6ece3fcba2906cf3a6c2b67c565378db18af4483d0"
+    },
+    {
+      "path": "graphics/planets/rocky-unstable.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "9f8dcf77346ec41e40017cbceede8f7b771025414554d58deaba7911d1821f0d"
+    },
+    {
+      "path": "graphics/planets/rocky_ice.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "5bd6c0d0ae99278e756c9ba9bb82c95d2722c4bd762dea60ae54a16b5e247d6e"
+    },
+    {
+      "path": "graphics/planets/star_blue.jpg",
+      "width": 512,
+      "height": 256,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "accb370db77ba96dfc65ae513c03262d0a93ca5ca219033441a32aa07e3b503e"
+    },
+    {
+      "path": "graphics/planets/star_orange.jpg",
+      "width": 512,
+      "height": 256,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "7db6acbf2f759a0da8439dc05d8e7f7d2dc9401cee945dda138c184a5d0aa99a"
+    },
+    {
+      "path": "graphics/planets/star_red2.jpg",
+      "width": 512,
+      "height": 256,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "8f1d58cd9c770ec43ae6253c8648ddb2bd038c7faf81a97fb547f7eefa908bbd"
+    },
+    {
+      "path": "graphics/planets/star_texture_yellow.jpg",
+      "width": 512,
+      "height": 256,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "7e45c9e77264a54d7501a24a1b5a4e4fbc3f74e7ed8f6d0c9f84e75d4953c5fb"
+    },
+    {
+      "path": "graphics/planets/star_white.jpg",
+      "width": 512,
+      "height": 256,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "da2dba10640f5f5e9d55a22356e051a861401e07b25a77d36564dcfa528925c1"
+    },
+    {
+      "path": "graphics/planets/sun_halo.png",
+      "width": 64,
+      "height": 64,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "72a79b569d9c0f6ccbb561e53d0bc0cd459bf3a945d8b8d4b9bf0a1f75831781"
+    },
+    {
+      "path": "graphics/planets/terran.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "c7a45c0b7893e89eb2afb538474bc067046a07cf8b1d7d262d2d2b4f802372d3"
+    },
+    {
+      "path": "graphics/planets/terran_eccentric.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "071c277fdb58533bb5ebaeee9f9642b52b1f67299d2ba19bbe4a9f7b70804194"
+    },
+    {
+      "path": "graphics/planets/toxic_atmosphere.jpg",
+      "width": 512,
+      "height": 256,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "b11ec08b034f5336c2116fca9c288e95a50a302f2335defcfedd24c7343ef3a2"
+    },
+    {
+      "path": "graphics/planets/tundra.jpg",
+      "width": 1024,
+      "height": 512,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "150c70adf25a56cbc866316a5ef9a615d2bec40c15ca84c1c107e7f743bb76ea"
+    },
+    {
+      "path": "graphics/planets/venuslike.jpg",
+      "width": 512,
+      "height": 256,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "962266da064cc88ee35fa2ea9d59c825207c79fc50d6d1af41a7a3be0e565e09"
+    },
+    {
+      "path": "graphics/planets/volturn.jpg",
+      "width": 512,
+      "height": 256,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "d2ee126172e690be78c08c5fa9961a709025d8280090adda4c998e59d1136d57"
+    },
+    {
+      "path": "graphics/planets/volturn_glow.png",
+      "width": 512,
+      "height": 256,
+      "texWidth": 1,
+      "texHeight": 1,
+      "sha256": "2b2814a1d34770173d00e71b8fd7bc9e967fee915601e1e181d43048ace80d07"
+    }
+  ]
+}

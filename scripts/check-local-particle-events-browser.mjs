@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';import fs from 'node:fs/promises';import path from 'node:path';import {createRequire} from 'node:module';import {createServer} from 'vite';
+const {chromium}=createRequire(import.meta.url)('playwright');const out=path.resolve('artifacts/network-stream-20260921/phase20/webgl');await fs.mkdir(out,{recursive:true});
+const server=await createServer({configFile:false,optimizeDeps:{noDiscovery:true,entries:[]},server:{host:'127.0.0.1',port:0,open:false,watch:null},define:{__LAN_BUILD_ID__:'"particle-render-test"'},logLevel:'error'});let browser;
+try{
+ await server.listen();browser=await chromium.launch({headless:true,args:['--use-angle=d3d11','--enable-unsafe-swiftshader']});const page=await browser.newPage({viewport:{width:1280,height:360}}),errors=[];page.on('pageerror',e=>errors.push(String(e)));
+ await page.route('**/__particles.html',r=>r.fulfill({contentType:'text/html',body:'<!doctype html><body style="margin:0"><canvas id="a" width="640" height="360"></canvas><canvas id="b" width="640" height="360"></canvas></body>'}));await page.goto('http://127.0.0.1:'+server.httpServer.address().port+'/__particles.html');
+ const report=await page.evaluate(async()=>{
+  window.__LAN_BUILD_ID__="particle-render-test";
+  const {assetManager}=await import('/src/engine/assets/AssetResolver.ts'),{contentManifestManager}=await import('/src/engine/content/ContentManifest.ts');await assetManager.ensureManifestLoaded();await contentManifestManager.ensureLoaded();
+  const {combatRenderView}=await import('/src/engine/render/CombatRenderView.ts');
+  const {createLanWorld}=await import('/src/network/LanWorld.ts'),{configureHostCosmetics}=await import('/src/network/HostSnapshot.ts'),{hostParticleEvents}=await import('/src/network/HostParticleEvents.ts'),{LocalParticleEffects}=await import('/src/network/LocalParticleEffects.ts'),{localParticleLayer}=await import('/src/engine/render/LocalParticleLayer.ts'),{Vector2}=await import('/src/engine/math/Vector2.ts'),{WebGLCombatRenderer}=await import('/src/engine/render/webgl/WebGLCombatRenderer.ts'),{VisualRandom}=await import('/src/engine/runtime/VisualRandom.ts');
+  const match={id:'particle-webgl',seed:917,hostId:'a',snapshotHz:60,players:[{id:'a',seat:0,team:0,hull:'onslaught'},{id:'b',seat:1,team:1,hull:'onslaught'}],options:{assignment:'teams',battleSize:3200,aiHulls:[[],[]]}};
+  const lanes=['a','b'].map((id,i)=>{const engine=createLanWorld(match).engine;configureHostCosmetics(engine,true,true,i===1);engine.playerShip.pos.set(0,0);const canvas=document.getElementById(id),gl=canvas.getContext('webgl2',{antialias:false,preserveDrawingBuffer:true}),renderer=new WebGLCombatRenderer(canvas,gl);return {engine,canvas,gl,renderer,local:new LocalParticleEffects(),random:new VisualRandom(917)};});
+  for(const a of lanes){a.engine.fxSystem.spawnSparks(new Vector2(-70,0),110);a.engine.fxSystem.spawnSparks(new Vector2(70,20),70,[70,140,255]);a.engine.fxSystem.spawnArmorDamageSparks(a.engine.playerShip,new Vector2(0,-20),100);a.engine.fxSystem.spawnExplosion(new Vector2(0,70),35);await a.renderer.prepareAssets(combatRenderView(a.engine));}
+  const rows=[],images=[];for(let tick=0;tick<=65;tick++){
+   if(tick>0)for(const a of lanes)a.engine.fxSystem.update(1/60);
+   const a=lanes[1];a.local.receive(hostParticleEvents(a.engine.fxSystem).snapshot(),tick/60);a.local.update(a.engine,tick/60);
+   if(![0,7,20,35,59,65].includes(tick))continue;
+   for(const a of lanes){const frame={visualTime:tick/60,random:a.random,layers:new Set(['explosion']),damageEnabled:true};a.renderer.updateVisual(combatRenderView(a.engine),0,frame);if(!a.renderer.render(combatRenderView(a.engine),1,new Vector2(),1,frame))throw Error("Render skipped");a.gl.finish();if(a.gl.getError())throw Error('WebGL error');}
+   const pixels=lanes.map(a=>{const p=new Uint8Array(640*360*4);a.gl.readPixels(0,0,640,360,a.gl.RGBA,a.gl.UNSIGNED_BYTE,p);return p;});let different=0,maxDifference=0,nonBlack=0;for(let i=0;i<pixels[0].length;i++){if(i%4!==3&&pixels[0][i]>8)nonBlack++;const d=Math.abs(pixels[0][i]-pixels[1][i]);if(d)different++;maxDifference=Math.max(maxDifference,d);}
+   rows.push({tick,different,maxDifference,nonBlack,ordinaryParticles:lanes[0].engine.particles.length,rawOffloaded:a.engine.particles.length,local:localParticleLayer(a.engine.fxSystem).length});if(tick===7)for(const a of lanes)images.push(a.canvas.toDataURL());
+  }
+  const gl=lanes[0].gl,debug=gl.getExtension('WEBGL_debug_renderer_info'),gpu=gl.getParameter(debug?.UNMASKED_RENDERER_WEBGL??gl.RENDERER);for(const a of lanes)a.renderer.dispose();return{rows,images,gpu};
+ });
+ for(let i=0;i<report.images.length;i++)await fs.writeFile(path.join(out,(i?'offloaded':'ordinary')+'.png'),Buffer.from(report.images[i].split(',')[1],'base64'));delete report.images;await fs.writeFile(path.join(out,'result.json'),JSON.stringify({...report,errors},null,2));console.log(JSON.stringify(report,null,2));assert.deepEqual(errors,[]);assert.ok(report.rows.every(r=>r.different===0),'native/local-particle WebGL pixels must match');assert.ok(report.rows.some(r=>r.local>0&&r.nonBlack>100),'must actually draw local particles');
+}finally{await browser?.close();await server.close();}

@@ -1,3 +1,4 @@
+import { setLanControlledRoster } from './LanRosterIdentity';
 import { aiLoadout, aiHullId } from "./ai-loadouts.mjs";
 import { battleTeamLimit } from "../shared/battle-size.mjs";
 import { deploymentCost } from "../engine/simulation/CombatDeployment";
@@ -59,7 +60,7 @@ export function createLanWorld(match: Match) {
           ? engine.enemyShip
           : engine.addShip(entry.hull, entry.team === hostTeam, new Vector2(), 0, entry.team);
     ship.teamId = entry.team;
-    // Stable construction order gives matching IDs on host and every viewer.
+    // The authority publishes these identities; viewers never reconstruct this order.
     const index = positions.get(entry.team)!;
     positions.set(entry.team, index + 1);
     const columns = Math.ceil(Math.sqrt(counts.get(entry.team)!));
@@ -95,6 +96,7 @@ export function createLanWorld(match: Match) {
   updateCombatVisibility(engine.ships, engine.openBattlefield);
   for (const ship of engine.capitalShips)
     ship.currentTargetShip = engine.findHostile(ship) ?? null;
+  setLanControlledRoster(engine,controlled);
   return { engine, controlled };
 }
 /** Reorder the display world only; never duplicate a reinforcement in capitalShips. */

@@ -7,7 +7,7 @@ import { FighterAIState, BomberAIState, TacticalOrder, ContrailParticle, FlightD
 import { Ship } from '../Ship';
 import { Projectile, Beam, WeaponMount } from '../Weapon';
 import { modManager, type FighterWingSpec } from '../../modding/ModManager';
-import { sound } from '../../audio/SoundManager';
+import { combatAudio as sound } from '../../audio/CombatAudioEvents';
 import { SimulationRandom } from '../SimulationRandom';
 
 export interface FighterFXCallbacks {

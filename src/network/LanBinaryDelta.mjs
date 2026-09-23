@@ -15,7 +15,7 @@ const table = Uint32Array.from({ length: 256 }, (_, n) => {
   return n >>> 0;
 });
 const crcTables = [table];
-for (let k = 1; k < 4; k++) crcTables.push(Uint32Array.from(crcTables[k - 1], c => table[c & 255] ^ (c >>> 8)));
+for (let k = 1; k < 8; k++) crcTables.push(Uint32Array.from(crcTables[k - 1], c => table[c & 255] ^ (c >>> 8)));
 const headerText = new TextDecoder('utf-8', { fatal: true });
 const invalid = () => { throw Error('Invalid LAN delta/baseline'); };
 export function lanBytes(value) {
@@ -26,6 +26,15 @@ export function lanBytes(value) {
 export function lanCrc32(value) {
   const bytes = lanBytes(value); let crc = -1;
   let i = 0;
+  if (bytes.length >= 8) {
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const [t0, t1, t2, t3, t4, t5, t6, t7] = crcTables;
+    for (; i + 8 <= bytes.length; i += 8) {
+      const a = crc ^ view.getUint32(i, true), b = view.getUint32(i + 4, true);
+      crc = t7[a & 255] ^ t6[a >>> 8 & 255] ^ t5[a >>> 16 & 255] ^ t4[a >>> 24]
+        ^ t3[b & 255] ^ t2[b >>> 8 & 255] ^ t1[b >>> 16 & 255] ^ t0[b >>> 24];
+    }
+  }
   for (; i + 4 <= bytes.length; i += 4) {
     const c = crc ^ (bytes[i] | bytes[i + 1] << 8 | bytes[i + 2] << 16 | bytes[i + 3] << 24);
     crc = crcTables[3][c & 255] ^ crcTables[2][c >>> 8 & 255] ^ crcTables[1][c >>> 16 & 255] ^ table[c >>> 24];

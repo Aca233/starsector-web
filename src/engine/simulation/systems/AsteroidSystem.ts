@@ -3,7 +3,7 @@ import { Vector2 } from '../../math/Vector2';
 import { Asteroid } from '../CombatTypes';
 import { Ship } from '../Ship';
 import { Projectile } from '../Weapon';
-import { sound } from '../../audio/SoundManager';
+import { combatAudio as sound } from '../../audio/CombatAudioEvents';
 import { VisualRandom } from '../../runtime/VisualRandom';
 import { SimulationRandom } from '../SimulationRandom';
 import { getShieldCircleContact } from '../collision/ShieldCollisionGeometry';

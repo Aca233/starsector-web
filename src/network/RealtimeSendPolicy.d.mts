@@ -7,6 +7,8 @@ export function submitRealtimeInput<T>(options: {
   accepted: (input: T) => void;
 }): boolean;
 export class RealtimeSendGate {
+  canSendMotion(bufferedAmount: number, now: number): boolean;
+  motionSent(now: number): void;
   canSendSnapshot(bufferedAmount: number, now: number): boolean;
   snapshotSent(now: number): void;
   canSendInput(bufferedAmount: number, now: number): boolean;

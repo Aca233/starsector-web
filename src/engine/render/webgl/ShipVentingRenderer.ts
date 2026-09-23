@@ -1,6 +1,6 @@
 import type { VisualRandom } from '../../runtime/VisualRandom';
 import { Vector2 } from '../../math/Vector2';
-import type { Ship } from '../../simulation/Ship';
+import type { ShipRenderState as Ship } from '../../render/ShipRenderState';
 import type { SpriteBatcher } from './SpriteBatcher';
 import type { RibbonBatcher } from './RibbonBatcher';
 import type { WebGLTextureManager } from './WebGLTextureManager';

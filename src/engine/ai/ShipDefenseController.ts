@@ -8,14 +8,18 @@ export class ShipDefenseController {
   public reset():void {this.quietFor=0;this.safeVentFor=0;}
   public observe(dt:number,threat:ThreatAssessment):void {
     this.quietFor=threat.imminentDamage>0?0:this.quietFor+dt;
-    this.safeVentFor=threat.threats.length?0:this.safeVentFor+dt;
+    this.safeVentFor=threat.threats.length||threat.hasDeferredWeaponThreat?0:this.safeVentFor+dt;
   }
-  public update(ship:Ship,threat:ThreatAssessment):{ventSafe:boolean;state:'UP'|'DOWN'|'PHASE'|'VENTING'} {
+  public update(ship:Ship,threat:ThreatAssessment,refreshBeforeVent?:()=>ThreatAssessment):{ventSafe:boolean;state:'UP'|'DOWN'|'PHASE'|'VENTING'} {
     ship.defenseFacingRad=threat.facing??undefined;
     const committed=ship.weapons.some(m=>m.burstRemaining>0 || m.firingState==='CHARGING' || (m.spec.isBeam&&m.spec.beamVisualMode==='BURST'&&m.firingState==='ACTIVE'));
     const ventSafe=this.safeVentFor>=policy.calmBeforeLowering && ship.flux.baseDissipation>0 && !committed && !ship.system.preventsAIVenting;
     if(ship.flux.isVenting)return {ventSafe,state:'VENTING'};
     if(ventSafe&&ship.flux.fluxPercent>=policy.ventFluxFraction&&!ship.shield.isPhaseEngaged&&!ship.flux.isOverloaded){
+      if(refreshBeforeVent){
+        const fresh=refreshBeforeVent();this.observe(0,fresh);
+        return this.update(ship,fresh);
+      }
       if(ship.startVenting())return {ventSafe,state:'VENTING'};
     }
     if(!ship.canUseShields()) {ship.shield.setActive(false);return {ventSafe,state:'DOWN'};}

@@ -1,0 +1,767 @@
+{
+  "schemaVersion": 1,
+  "originalReference": "Starsector 0.98a-RC8",
+  "scope": "industry-and-commodity-financial-effects-not-income-settlement",
+  "sources": {
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/PopulationAndInfrastructure.java": {
+      "sha256": "7bae6eb71b6e00ff2c8cfaa416d2379c124f7364813b518ff573f10fb41d6446"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/Spaceport.java": {
+      "sha256": "f768a6bbb31b5067e544675bf9384a2b7e7be7c6edee44f9a13ed3709201238e"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/MilitaryBase.java": {
+      "sha256": "ef451be1bb529e202f9792bc494467fe3b7d1aed42713aa62b71594909682f87"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/GroundDefenses.java": {
+      "sha256": "b0a7082cdb50e0334544e829e47356c241e066a57d908129fdc5fcb196454fbc"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/OrbitalStation.java": {
+      "sha256": "83550682d372644a19dda657093c4fe0cad7f80d40bc48bc143267f2904854e1"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/BaseIndustry.java": {
+      "sha256": "bc3ff7aee903318926a532910fd6a1495ff3db3cfd7a1e345388d70bf718ace8"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/Population.java": {
+      "sha256": "9a2af31a69a39e49ea366ec0f45fbc8437ecb6c658086703f9855162ef17a998"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/BaseHazardCondition.java": {
+      "sha256": "8ed8ef6e3c98ae05f9fb73cbbf5bf6f4d1c66f549aed3e0a9d699c6bf89b0f97"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/LCAttractorLow.java": {
+      "sha256": "c5c4318f83b57e92fc95b9995ef166919c1262c81fa304d4c8d92727573aa455"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/LCAttractorMedium.java": {
+      "sha256": "0180351c13324431b137080042f78fd3a8fd5b135fc9a2db6484043f19d2888d"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/Habitable.java": {
+      "sha256": "3cafc80ebf48d88487fad54db10fe5b10f790050a89151911a93094e3f08982b"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/FreeMarket.java": {
+      "sha256": "618a57271bedd61908a19a5d1726ecea9c96ff7636af4620f3f9e19ab90d17da"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/CommRelayCondition.java": {
+      "sha256": "e16b5bde3b4ea36b70e68e17a88a2f90608da1e9b901bae780c280a6d5ae997c"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/RecentUnrest.java": {
+      "sha256": "e53cbe8d153e7b7f6d9d0e460c9bdf748b59424bb0e44b80d4a1debd10a0e3a7"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/DecivilizedSubpop.java": {
+      "sha256": "580137aa1e51a5e111df4f33687a4bec71b7c0479fee7e441015bab15eb4496b"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/Pollution.java": {
+      "sha256": "3755afbfe99ac1038b7717bcd01f4b766776f711bbf75eb0891da6b982023e53"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/ResourceDepositsCondition.java": {
+      "sha256": "e3c4ab552acf873b6ae03b5394de47017a98858a815a26083a6c322aaf1d8daa"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/Market.java": {
+      "sha256": "8ca0c019abc8543a80fa63c3826b3ac1f766af3dbc35875161842306378aa945"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/CommodityOnMarket.java": {
+      "sha256": "333e58f37a1c7d508d766304ad64e759174b52dafa3fd205cf15efd9da371346"
+    },
+    "core:data/campaign/industries.csv": {
+      "sha256": "dce37cbd88bb844194259fa597da42fa36f15ec26897e1de0202650765ce3656"
+    },
+    "core:data/campaign/market_conditions.csv": {
+      "sha256": "27329b3dce8082125c6338a62c7fe6cef5cf00ed7f1b531504d4686ffd14abab"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/LightIndustry.java": {
+      "sha256": "d7765951d3445c54781e7c3b1b70975968428236fd1f73992367820fd608d8b0"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/Refining.java": {
+      "sha256": "13b2bd803fdb1b26f8e40aad3ffc9378ad45510ac66d759918167c33fe922dab"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/HeavyIndustry.java": {
+      "sha256": "aeb1dfd8b037c0b01f82c437fcbab8880dea5cc59c5eeff5151ac89badaaeedb"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/FuelProduction.java": {
+      "sha256": "b713f15532bfa20b6852320a7e15fee4b5deaad900fd8c40d01348e4d8513c84"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/ItemEffectsRepo.java": {
+      "sha256": "2d845c39865f81604b439af70d657ec9ca8d86fc877232e3ca7aadb6ccd719a9"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/BoostIndustryInstallableItemEffect.java": {
+      "sha256": "95ebd06dc8baf9920c83f71acd8efb7fb8ca93b038d27466df216ed9d788cc42"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/BaseInstallableItemEffect.java": {
+      "sha256": "955972ca614de7e153af069382780e176b2e87fe3c800f01b7282f286ac285ea"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/combat/MutableStat.java": {
+      "sha256": "a584da937e50822808fb80367183d8bd5b7ded64600b8b78aebbc8ec4cc03f21"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/combat/StatBonus.java": {
+      "sha256": "1b0f272d231f28c737bfc7c6c70bfa00d0d2c9bb6af2c41b2bfa9b5c89028ea0"
+    },
+    "core:data/campaign/special_items.csv": {
+      "sha256": "c68e42eca0b1efe0367a2452014d586cfee52b1916bb707044e4adc6449779f8"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/TradeCenter.java": {
+      "sha256": "3d4ad34895a0032f38abd054f82d266b9ceb56a5c56fcd219dfcf93b2bc8bc6e"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/TechMining.java": {
+      "sha256": "440dd120956f8384803d96c2880c7a8961cd548a7175630c546a86ce35ba7d77"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/LionsGuardHQ.java": {
+      "sha256": "92abbd80a00a7144cf7014bf8e1d6bf367ee2f535a868869e2f4f31e156cac27"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/Cryosanctum.java": {
+      "sha256": "cfd8352405b52ff45b333a9577d02a9eba000618deb5573daf10e5806e479b9d"
+    },
+    "core:starfarer.api.jar": {
+      "sha256": "0798e624c949657ab524188928bb13d618a70cb451dc7da9789545569a05081b"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/CoreLifecyclePluginImpl.java": {
+      "sha256": "ca7384b9f6a8ff9b82faf4df9e1e896ce0e3222c721bd68712146c1130070898"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/util/Misc.java": {
+      "sha256": "067e4d2664eca98929e9e46ba8ada8468769c19dcd12cce8c8a3c730e14d2ffb"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/BaseMarketConditionPlugin.java": {
+      "sha256": "c7169992955cee310d926ebaba85306ba6952a79eaed7059e7244e599a6c97ba"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/Farming.java": {
+      "sha256": "5768e658316ed3eee708cd77fcc12b147c9168f7ac7b3a4e73c03edd4228f452"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/econ/impl/Mining.java": {
+      "sha256": "b1c4d5140c512cc5a8c4022ea31bc8a14308e8517639f2cf8a1478a0907380e0"
+    },
+    "core:data/config/settings.json": {
+      "sha256": "96f3f6aa457e85ab6480bf302e35d3e8df390339321711b982d45fbe71c4dfa9"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/util/DynamicStats.java": {
+      "sha256": "377515f6b8ac988cb1d3f3205c6ec306c320645ba4e1cd1aff85f20e02ef2211"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/loading/specs/FactionProduction.java": {
+      "sha256": "63758f8769eb9f115e5d033544317e45e8274a468d270a3e99c10bee365940a5"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/loading/specs/H.java": {
+      "sha256": "2a7fbdfc276ecd7eccce22a2209d36b9f9f0d28bb80bc5b55bdee8de4b3fb8c4"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/loading/SpecStore.java": {
+      "sha256": "23151e3c6f2e01762982baa962d16349db1dd320f9050bf66ee53b51fed9d003"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/loading/while.java": {
+      "sha256": "bd53adc9437f56af32db1971d688c9b4445ae72a402b817c088cfd4aa631431c"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/reach/CommodityMarketData.java": {
+      "sha256": "75b5add5888acd526900253da248725d8bb5b2eeef20f8fa4a6f818fad4e9a93"
+    },
+    "decompiled:starfarer_obf/com/fs/starfarer/campaign/econ/reach/MarketShareData.java": {
+      "sha256": "be1c514ce3432873b9121f6ba5901ff62f9f3f00cd1c7d361dea92e211e1d5ab"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/tutorial/GalatianAcademyStipend.java": {
+      "sha256": "ada57befcc3b5bdefd614831d588e86dcd01b369449b9a62cfd7a5dd0247a267"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/campaign/econ/MonthlyReport.java": {
+      "sha256": "debe60734fa3ccd38e0e576a331274884b7ec0287563eec4e89eb177487a98d0"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/CoreScript.java": {
+      "sha256": "37dd23f29addf1ca2edabe8b9868035edc16cda5af58bcf8623201ca0d924d30"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/shared/SharedData.java": {
+      "sha256": "315c6ece74589a49782782bf17441e079158547b0918b562d778344e7119d4ea"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/submarkets/StoragePlugin.java": {
+      "sha256": "97e92da6075f6474682cf7c3f82fcdfb90d370865751a30ad97b0ff37639947e"
+    },
+    "decompiled:starfarer.api/com/fs/starfarer/api/impl/campaign/submarkets/LocalResourcesSubmarketPlugin.java": {
+      "sha256": "d89a773e45c19e5e2d95d73e21765ba9766f213bf5989473a8d49cb3f0596776"
+    },
+    "core:data/campaign/commodities.csv": {
+      "sha256": "94e3b32f1176c775a56b4b37ae32ba597d60cf61aad5cc3c51f907123c904842"
+    }
+  },
+  "settings": {
+    "creditsPerCostUnit": 1000,
+    "industryIncomeMult": 1,
+    "industryUpkeepMult": 0.5,
+    "exportIncomeMult": 1,
+    "economyIterPerMonth": 10,
+    "crewSalary": 10,
+    "marineSalary": 20,
+    "officerSalaryBase": 500,
+    "officerSalaryPerLevel": 400,
+    "officerMercPayMult": 2,
+    "idleAdminSalaryMult": 0.1,
+    "adminSalaryTier0": 2500,
+    "adminSalaryTier1": 20000,
+    "adminSalaryTier2": 20000,
+    "storageFreeFraction": 0.01,
+    "stockpileCostMult": 1,
+    "productionCostMult": 1,
+    "shipProductionCostBase": 1000,
+    "productionCapacityPerSWUnit": 25000,
+    "productionSuppliesBonusFraction": 0.2,
+    "doctrineFleetQualityPerPoint": 0.125,
+    "UPKEEP_MULT": 0.75,
+    "UPKEEP_MULT_PER_DEFICIT": 0.1
+  },
+  "monthlyReportIds": {
+    "CREW": "node_id_crew",
+    "MARINES": "node_id_marines",
+    "FLEET": "node_id_fleet",
+    "OUTPOSTS": "node_id_outposts",
+    "PRODUCTION": "node_id_prod",
+    "PRODUCTION_WEAPONS": "node_id_prod_weapons",
+    "OVERHEAD": "node_id_overhead",
+    "STOCKPILING": "node_id_stockpiling",
+    "RESTOCKING": "node_id_restocking",
+    "INCENTIVES": "node_id_incentives",
+    "INDUSTRIES": "node_id_industries",
+    "EXPORTS": "node_id_exports",
+    "STORAGE": "node_id_storage",
+    "ADMIN": "node_id_admin",
+    "STORAGE_CARGO": "node_id_storage_cargo",
+    "STORAGE_SHIPS": "node_id_storage_ships",
+    "LAST_MONTH_DEBT": "node_id_last_month_debt",
+    "OFFICERS": "node_id_officers"
+  },
+  "monthlyListenerRules": {
+    "enableStipend": true,
+    "academy": {
+      "durationDays": 1115,
+      "stipend": 15000
+    }
+  },
+  "industries": {
+    "population": {
+      "className": "PopulationAndInfrastructure",
+      "tags": [
+        "population",
+        "unraidable",
+        "no_saturation_bombardment"
+      ],
+      "upgrade": null,
+      "name": "居住区 & 基础设施",
+      "incomeCSV": 10,
+      "upkeepCSV": 3,
+      "income": 10000,
+      "upkeep": 1500
+    },
+    "farming": {
+      "className": "Farming",
+      "tags": [
+        "farming",
+        "industry",
+        "rural"
+      ],
+      "upgrade": null,
+      "name": "农业",
+      "incomeCSV": 0,
+      "upkeepCSV": 1,
+      "income": 0,
+      "upkeep": 500
+    },
+    "aquaculture": {
+      "className": "Farming",
+      "tags": [
+        "farming",
+        "industry",
+        "rural"
+      ],
+      "upgrade": null,
+      "name": "水产养殖",
+      "incomeCSV": 0,
+      "upkeepCSV": 3,
+      "income": 0,
+      "upkeep": 1500
+    },
+    "mining": {
+      "className": "Mining",
+      "tags": [
+        "mining",
+        "industry",
+        "industrial"
+      ],
+      "upgrade": null,
+      "name": "采矿业",
+      "incomeCSV": 0,
+      "upkeepCSV": 2,
+      "income": 0,
+      "upkeep": 1000
+    },
+    "techmining": {
+      "className": "TechMining",
+      "tags": [
+        "techmining",
+        "industry",
+        "industrial"
+      ],
+      "upgrade": null,
+      "name": "技术挖掘",
+      "incomeCSV": 0,
+      "upkeepCSV": 2,
+      "income": 0,
+      "upkeep": 1000
+    },
+    "refining": {
+      "className": "Refining",
+      "tags": [
+        "refining",
+        "industry",
+        "industrial"
+      ],
+      "upgrade": null,
+      "name": "冶炼厂",
+      "incomeCSV": 0,
+      "upkeepCSV": 3,
+      "income": 0,
+      "upkeep": 1500
+    },
+    "spaceport": {
+      "className": "Spaceport",
+      "tags": [
+        "spaceport",
+        "important",
+        "structure"
+      ],
+      "upgrade": "megaport",
+      "name": "太空港",
+      "incomeCSV": 0,
+      "upkeepCSV": 3,
+      "income": 0,
+      "upkeep": 1500
+    },
+    "megaport": {
+      "className": "Spaceport",
+      "tags": [
+        "spaceport",
+        "structure"
+      ],
+      "upgrade": null,
+      "name": "特大型港口",
+      "incomeCSV": 0,
+      "upkeepCSV": 4,
+      "income": 0,
+      "upkeep": 2000
+    },
+    "lightindustry": {
+      "className": "LightIndustry",
+      "tags": [
+        "lightindustry",
+        "industry",
+        "rural"
+      ],
+      "upgrade": null,
+      "name": "轻工业",
+      "incomeCSV": 0,
+      "upkeepCSV": 8,
+      "income": 0,
+      "upkeep": 4000
+    },
+    "heavyindustry": {
+      "className": "HeavyIndustry",
+      "tags": [
+        "heavyindustry",
+        "uses_blueprints",
+        "industry",
+        "industrial"
+      ],
+      "upgrade": "orbitalworks",
+      "name": "重工业",
+      "incomeCSV": 0,
+      "upkeepCSV": 12,
+      "income": 0,
+      "upkeep": 6000
+    },
+    "orbitalworks": {
+      "className": "HeavyIndustry",
+      "tags": [
+        "heavyindustry",
+        "uses_blueprints",
+        "industry",
+        "industrial"
+      ],
+      "upgrade": null,
+      "name": "轨道工业设施",
+      "incomeCSV": 0,
+      "upkeepCSV": 12,
+      "income": 0,
+      "upkeep": 6000
+    },
+    "fuelprod": {
+      "className": "FuelProduction",
+      "tags": [
+        "fuelprod",
+        "industry",
+        "industrial"
+      ],
+      "upgrade": null,
+      "name": "燃料生产",
+      "incomeCSV": 0,
+      "upkeepCSV": 10,
+      "income": 0,
+      "upkeep": 5000
+    },
+    "commerce": {
+      "className": "TradeCenter",
+      "tags": [
+        "industry",
+        "urban"
+      ],
+      "upgrade": null,
+      "name": "贸易中心",
+      "incomeCSV": 0,
+      "upkeepCSV": 3,
+      "income": 0,
+      "upkeep": 1500
+    },
+    "station_base": {
+      "className": "OrbitalStation",
+      "tags": [
+        "station",
+        "parent_item",
+        "important",
+        "structure"
+      ],
+      "upgrade": null,
+      "name": "轨道空间站",
+      "incomeCSV": 0,
+      "upkeepCSV": 0,
+      "income": 0,
+      "upkeep": 0
+    },
+    "orbitalstation": {
+      "className": "OrbitalStation",
+      "tags": [
+        "station",
+        "sub_item",
+        "unraidable",
+        "structure"
+      ],
+      "upgrade": "battlestation",
+      "name": "轨道空间站 - 低端技术",
+      "incomeCSV": 0,
+      "upkeepCSV": 3,
+      "income": 0,
+      "upkeep": 1500
+    },
+    "battlestation": {
+      "className": "OrbitalStation",
+      "tags": [
+        "station",
+        "battlestation",
+        "unraidable",
+        "structure"
+      ],
+      "upgrade": "starfortress",
+      "name": "作战基地 - 低端技术",
+      "incomeCSV": 0,
+      "upkeepCSV": 4,
+      "income": 0,
+      "upkeep": 2000
+    },
+    "starfortress": {
+      "className": "OrbitalStation",
+      "tags": [
+        "station",
+        "starfortress",
+        "unraidable",
+        "structure"
+      ],
+      "upgrade": null,
+      "name": "星际要塞 - 低端技术",
+      "incomeCSV": 0,
+      "upkeepCSV": 5,
+      "income": 0,
+      "upkeep": 2500
+    },
+    "orbitalstation_mid": {
+      "className": "OrbitalStation",
+      "tags": [
+        "station",
+        "sub_item",
+        "unraidable",
+        "structure"
+      ],
+      "upgrade": "battlestation_mid",
+      "name": "轨道空间站 - 中线技术",
+      "incomeCSV": 0,
+      "upkeepCSV": 3,
+      "income": 0,
+      "upkeep": 1500
+    },
+    "battlestation_mid": {
+      "className": "OrbitalStation",
+      "tags": [
+        "station",
+        "battlestation",
+        "unraidable",
+        "structure"
+      ],
+      "upgrade": "starfortress_mid",
+      "name": "作战基地 - 中线技术",
+      "incomeCSV": 0,
+      "upkeepCSV": 4,
+      "income": 0,
+      "upkeep": 2000
+    },
+    "starfortress_mid": {
+      "className": "OrbitalStation",
+      "tags": [
+        "station",
+        "starfortress",
+        "unraidable",
+        "structure"
+      ],
+      "upgrade": null,
+      "name": "星际要塞 - 中线技术",
+      "incomeCSV": 0,
+      "upkeepCSV": 5,
+      "income": 0,
+      "upkeep": 2500
+    },
+    "orbitalstation_high": {
+      "className": "OrbitalStation",
+      "tags": [
+        "station",
+        "sub_item",
+        "unraidable",
+        "structure"
+      ],
+      "upgrade": "battlestation_high",
+      "name": "轨道空间站 - 高新技术",
+      "incomeCSV": 0,
+      "upkeepCSV": 3,
+      "income": 0,
+      "upkeep": 1500
+    },
+    "battlestation_high": {
+      "className": "OrbitalStation",
+      "tags": [
+        "station",
+        "battlestation",
+        "unraidable",
+        "structure"
+      ],
+      "upgrade": "starfortress_high",
+      "name": "作战基地 - 高新技术",
+      "incomeCSV": 0,
+      "upkeepCSV": 4,
+      "income": 0,
+      "upkeep": 2000
+    },
+    "starfortress_high": {
+      "className": "OrbitalStation",
+      "tags": [
+        "station",
+        "starfortress",
+        "unraidable",
+        "structure"
+      ],
+      "upgrade": null,
+      "name": "星际要塞 - 高新技术",
+      "incomeCSV": 0,
+      "upkeepCSV": 5,
+      "income": 0,
+      "upkeep": 2500
+    },
+    "grounddefenses": {
+      "className": "GroundDefenses",
+      "tags": [
+        "grounddefenses",
+        "unraidable",
+        "tactical_bombardment",
+        "structure"
+      ],
+      "upgrade": "heavybatteries",
+      "name": "地面防御设施",
+      "incomeCSV": 0,
+      "upkeepCSV": 2,
+      "income": 0,
+      "upkeep": 1000
+    },
+    "heavybatteries": {
+      "className": "GroundDefenses",
+      "tags": [
+        "grounddefenses",
+        "unraidable",
+        "tactical_bombardment",
+        "structure"
+      ],
+      "upgrade": null,
+      "name": "重型防御阵列",
+      "incomeCSV": 0,
+      "upkeepCSV": 3,
+      "income": 0,
+      "upkeep": 1500
+    },
+    "patrolhq": {
+      "className": "MilitaryBase",
+      "tags": [
+        "patrol",
+        "unraidable",
+        "tactical_bombardment",
+        "structure"
+      ],
+      "upgrade": "militarybase",
+      "name": "巡逻队总部",
+      "incomeCSV": 0,
+      "upkeepCSV": 8,
+      "income": 0,
+      "upkeep": 4000
+    },
+    "militarybase": {
+      "className": "MilitaryBase",
+      "tags": [
+        "military",
+        "unraidable",
+        "tactical_bombardment",
+        "industry"
+      ],
+      "upgrade": "highcommand",
+      "name": "军事基地",
+      "incomeCSV": 0,
+      "upkeepCSV": 10,
+      "income": 0,
+      "upkeep": 5000
+    },
+    "highcommand": {
+      "className": "MilitaryBase",
+      "tags": [
+        "command",
+        "unraidable",
+        "tactical_bombardment",
+        "industry"
+      ],
+      "upgrade": null,
+      "name": "最高指挥部",
+      "incomeCSV": 0,
+      "upkeepCSV": 14,
+      "income": 0,
+      "upkeep": 7000
+    },
+    "lionsguard": {
+      "className": "LionsGuardHQ",
+      "tags": [
+        "military",
+        "unraidable",
+        "tactical_bombardment",
+        "structure",
+        "codex_unlockable"
+      ],
+      "upgrade": null,
+      "name": "狮心卫队总部",
+      "incomeCSV": 0,
+      "upkeepCSV": 6,
+      "income": 0,
+      "upkeep": 3000
+    },
+    "cryosanctum": {
+      "className": "Cryosanctum",
+      "tags": [
+        "cryosanctum",
+        "structure",
+        "codex_unlockable"
+      ],
+      "upgrade": null,
+      "name": "低温避难所",
+      "incomeCSV": 0,
+      "upkeepCSV": 5,
+      "income": 0,
+      "upkeep": 2500
+    }
+  },
+  "commodities": {
+    "supplies": {
+      "exportValue": 250
+    },
+    "fuel": {
+      "exportValue": 750
+    },
+    "crew": {
+      "exportValue": 0
+    },
+    "marines": {
+      "exportValue": 0
+    },
+    "food": {
+      "exportValue": 1000
+    },
+    "organics": {
+      "exportValue": 500
+    },
+    "volatiles": {
+      "exportValue": 5000
+    },
+    "ore": {
+      "exportValue": 1500
+    },
+    "rare_ore": {
+      "exportValue": 2000
+    },
+    "metals": {
+      "exportValue": 3000
+    },
+    "rare_metals": {
+      "exportValue": 6000
+    },
+    "heavy_machinery": {
+      "exportValue": 500
+    },
+    "domestic_goods": {
+      "exportValue": 300
+    },
+    "organs": {
+      "exportValue": 2000
+    },
+    "drugs": {
+      "exportValue": 1500
+    },
+    "hand_weapons": {
+      "exportValue": 500
+    },
+    "luxury_goods": {
+      "exportValue": 500
+    },
+    "lobster": {
+      "exportValue": 0
+    },
+    "ships": {
+      "exportValue": 300
+    },
+    "ai_cores": {
+      "exportValue": 0
+    },
+    "alpha_core": {
+      "exportValue": 0
+    },
+    "beta_core": {
+      "exportValue": 0
+    },
+    "gamma_core": {
+      "exportValue": 0
+    },
+    "omega_core": {
+      "exportValue": 0
+    },
+    "survey_data": {
+      "exportValue": 0
+    },
+    "survey_data_1": {
+      "exportValue": 0
+    },
+    "survey_data_2": {
+      "exportValue": 0
+    },
+    "survey_data_3": {
+      "exportValue": 0
+    },
+    "survey_data_4": {
+      "exportValue": 0
+    },
+    "survey_data_5": {
+      "exportValue": 0
+    },
+    "blueprints": {
+      "exportValue": 0
+    },
+    "ship_weapons": {
+      "exportValue": 0
+    },
+    "credits": {
+      "exportValue": 0
+    }
+  }
+}

@@ -1,4 +1,12 @@
+import { validateParticleEvents } from './particle-events.mjs';
 import { validateMuzzleEvents } from './muzzle-events.mjs';
+// Keep this selection next to the validator. It preserves container types and
+// every field consulted below; ignored payload still receives wire/key validation.
+const freezeFields = value => { if (value && typeof value === "object") { for (const child of Object.values(value)) freezeFields(child); Object.freeze(value); } return value; };
+export const RELAY_FRAME_FIELDS = freezeFields({ tick: true,
+  ships: [{ id: true, state: { teamId: true } }], crafts: [{ id: true }],
+  craftSpecs: [], world: {}, muzzleEvents: true, particleEvents: true,
+  deployment: { rows: [{ id: true, teamId: true }] } });
 /** Relay validation metadata. Never retain the large presentation-state graph. */
 export function summarizeCombatFrame(frame, expectedShips, lastTick) {
   const invalid = () => { throw Error("无效战斗状态"); };
@@ -7,6 +15,7 @@ export function summarizeCombatFrame(frame, expectedShips, lastTick) {
   if (!object(frame) || !Number.isSafeInteger(frame.tick) || frame.tick <= lastTick ||
       !Array.isArray(frame.ships) || frame.ships.length !== expectedShips ||
       !Array.isArray(frame.crafts) || !Array.isArray(frame.craftSpecs) || !object(frame.world)) invalid();
+  if (frame.particleEvents !== undefined) validateParticleEvents(frame.particleEvents);
   if (frame.muzzleEvents !== undefined) validateMuzzleEvents(frame.muzzleEvents);
   const ids = new Set();
   const addId = row => {

@@ -3,6 +3,10 @@ import config from "./protocol.json";
 /** Small Worker-local telemetry, independent of delivery of a world snapshot.
  * Step/callback timings are wall time, not CPU samples or server RTT. */
 export interface HostPerformance {
+  capturePlans?: {enabled:boolean;hits:number;compiled:number;fallbacks:number;shapes:number};
+  serializer?: {enabled:boolean;reason:string;ready:boolean;busy:boolean;submitted:number;completed:number;cancelled:number;fallbacks:number;prepareMs:number;workerMs:number;tapeBytes:number;transferBytes:number;ageMs:number};
+  captureReuse?: { produced: number; reused: number; encodedFragments?: number; retained: boolean };
+  io?: { enabled: boolean; sharedCredit?: boolean; sharedCompletions?: number; sent: number; skipped: number; inputs: number; inflight: number; displaySounds: number; flow: import("./SnapshotFlow.mjs").FlowSample };
   flow?: import("./SnapshotFlow.mjs").FlowSample;
   tick: number;
   callbackGapMs: number;

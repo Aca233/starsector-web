@@ -1,0 +1,7 @@
+# Static range terms with live runtime modifiers (before implementation)
+
+Native reference: local Starsector 0.98a-RC8, starsector-core/data/hullmods/IntegratedTargetingUnit.java applyEffectsBeforeShipCreation (ballistic/energy percent), AdvancedTargetingCore.java applyEffectsBeforeShipCreation (range percent and separate PD penalty); re-read this turn. Existing WeaponRange.ts implements base flat -> percent -> multipliers -> flat -> range threshold. The optimization must preserve that exact arithmetic, weapon classification and source order. No UI or gameplay rule change; no desktop/native live playtest.
+
+Current difference: resolveWeaponRange disables its native immutable-spec cache whenever ECM/runtime range percent/carrier flat is non-neutral, recomputing immutable built-in hullmod/skill terms each query. Proposal: retain a per-weapon-key static-term tuple for audited immutable specs, apply current runtimeMultiplier/runtimePercent/runtimeFlat every call; never cache system state or final dynamic range. Registry cannot replace definitions; mutable specs/custom hooks retain full path. Key must cover all native weapon inputs, including in-place PD hints. Read-only subagent audits dependency completeness while main implements.
+
+Verification: original-vs-new range values through runtime changes and weapon in-place edits, mutable/custom hook fallback, then existing same-state complete fixed-step differential with byte/RNG checks and paired timing. Actual match Hz/latency not inferred from isolated range speed.
