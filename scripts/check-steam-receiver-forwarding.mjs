@@ -78,13 +78,13 @@ for (const kind of ['full', 'delta']) test(kind + ': hash/size/body tampering ne
   }
 });
 
-test('missing base drops data with only the existing repair/consumption ACKs', () => {
+test('missing base repairs and releases credit with an explicitly discarded consumption ACK', () => {
   for (const receipts of [false, true]) {
     const f = fixture(); if (receipts) f.gateway.rendererReceipts = {};
     f.dispatch(envelope(state(2), { base: 1, body: null }));
     assert.deepEqual(f.sends, []); assert.equal(f.gateway.receivedStates, 0); assert.equal(f.gateway.lastStateAt, 0);
     assert.deepEqual(f.acks, [['host', 'connection', 'ack', { id: 7, needsFull: true }],
-      ...(receipts ? [['host', 'connection', 'ack', { id: 7, consumed: true }]] : [])]);
+      ...(receipts ? [['host', 'connection', 'ack', { id: 7, consumed: true, discarded: true }]] : [])]);
   }
 });
 

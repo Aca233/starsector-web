@@ -17,8 +17,8 @@ test('healthy 20/60/120/300/1000ms routes keep the original RTT-derived ceiling'
 });
 test('congested delivery learns a BDP window, not an ever-growing busy RTT window', () => {
   const {window} = observer(170);
-  assert.equal(window.limit(5, 60, 800), 3);
-  assert.equal(window.limit(5, 60, 75), 3, 'one drained pong must not refill the slow link');
+  assert.equal(window.limit(5, 60, 800), 2);
+  assert.equal(window.limit(5, 60, 75), 2, 'one drained pong must not refill the slow link');
   assert.equal(window.limit(19, 300, 1800), 4);
   assert.equal(window.limit(2, 5, 800), 2);
 
@@ -40,7 +40,7 @@ test('short, unknown or malformed measurements do not manufacture a rate', () =>
 test('sparse very slow deliveries remain bounded and recover after bandwidth returns', () => {
   const {window,advance} = observer(1500);
   assert.ok(window.deliveryHz > 0 && window.deliveryHz < 1);
-  assert.equal(window.limit(19,300,15000),3);
+  assert.equal(window.limit(19,300,15000),2);
   for(let i=0;i<180;i++)advance(1000/60);
   assert.equal(window.limit(19,300,320),19,'recovered service and RTT restore the old ceiling');
   window.reset();assert.equal(window.deliveryHz,null);assert.equal(window.limit(19,300,15000),19);
@@ -60,7 +60,7 @@ test('LAN exact membership gates delivery feedback; shrink never discards an in-
   for(let i=1;i<=16;i++){now+=170;assert.equal(credits.reserve(i,1000),true);assert.equal(credits.ack(i),true);}
   for(let i=17;i<=21;i++)assert.equal(credits.reserve(i,1000),true);
   const probe=credits.beginNetworkProbe();credits.recordNetworkRtt(800,probe);
-  assert.equal(credits.capacity,3);assert.equal(credits.stats().inflight,5);
+  assert.equal(credits.capacity,2);assert.equal(credits.stats().inflight,5);
   const before=credits.stats();assert.equal(credits.ack(999),false);assert.equal(credits.ack(16),false);assert.deepEqual(credits.stats(),before);
   assert.equal(credits.reserve(22,1000),false);
   now+=170;assert.equal(credits.ack(18),true);assert.equal(credits.stats().inflight,3);

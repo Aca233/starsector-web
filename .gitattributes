@@ -1,0 +1,5 @@
+# Test reference transforms match source text; preserve LF on Windows checkouts.
+*.mjs text eol=lf
+*.mts text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
