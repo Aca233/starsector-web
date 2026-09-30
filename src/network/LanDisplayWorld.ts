@@ -5,7 +5,7 @@ import type { RenderHulk } from '../engine/render/ShipRenderState';
 import { ContrailEngine } from '../engine/simulation/ContrailEngine';
 import type { DeploymentState } from '../engine/simulation/CombatDeployment';
 import { combatRenderView, type CombatRenderView } from '../engine/render/CombatRenderView';
-import { sound } from '../engine/audio/SoundManager';
+import { combatAudio as sound } from '../engine/audio/CombatAudioEvents';
 import { Vector2 } from '../engine/math/Vector2';
 import { LanDisplayDeployment } from './LanDisplayDeployment';
 

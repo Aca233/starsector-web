@@ -67,6 +67,13 @@ export function LanRoomTools({
             </p>
             <BattleSizeControl value={room.options.battleSize} teams={teams} disabled={!editable} onChange={battleSize=>send({type:'options',options:{battleSize}})}/>
             <p>{editable ? '仅房主可修改；更改会取消所有人的准备。这里只调整当前房间，不覆盖主菜单的默认设置。' : '使用房主的房间规则；客机的本地设置不影响本局。'}{!['lobby','ended'].includes(room.status) && ' 本局规则已锁定。'}</p>
+            <label>AI 决策规则<select aria-label="AI 决策规则" disabled={!editable} value={room.options.aiDecisionProfile ?? 'standard'} onChange={e=>send({type:'options',options:{aiDecisionProfile:e.target.value}})}>
+              <option value="standard">标准（默认）</option>
+              <option value="large-battle-v1">大规模战斗 v1（实验性，普通 AI 决策 20Hz）</option>
+              <option value="large-battle-v3">大规模战斗 v3（实验性，AI＋副炮瞄准 20Hz）</option>
+            </select></label>
+            <p>性能规则会简化普通 AI 的反应：避碰、防御和技能决策最多约每 50ms 更新一次；真人控制舰及其模块不降频。运动、碰撞、伤害与武器发射仍按原频率结算；不减少舰船或降低画质。选择后全员需重新准备，开战锁定。</p>
+            <p>v3 另将普通 AI 舰的小中型炮塔（含防空炮）寻敌与瞄准点更新降至约 20Hz，可能降低快速目标跟踪、防空和输出；目标仍逐炮独立。炮塔转动、发射及每步射程/射界/友伤/载荷/弹药安全检查不降频。真人舰及模块、主炮、导弹、舰载机不受此项影响。</p>
             <details><summary>高级部署：首发与后备</summary>
               <label>每队首发目标<select aria-label="联机首发预算" disabled={!editable} value={initial==null?'auto':initial} onChange={e=>send({type:'options',options:{initialDeploymentLimit:e.target.value==='auto'?null:Number(e.target.value)}})}>
                 <option value="auto">自动填满本队额度（{limit} DP）</option>

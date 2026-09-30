@@ -1,3 +1,11 @@
+import {checkDecoderWorklist} from './presentation-decoder-worklist-contracts.mjs';
+import {checkPresentationHudReads} from './presentation-hud-read-contracts.mjs';
+import {checkPackedVisualSlots} from './packed-visual-slot-contracts.mjs';
+import {checkPresentationOwnedScalars} from './presentation-owned-scalar-contracts.mjs';
+import {checkPresentationDecoderPlans} from './presentation-decoder-plan-contracts.mjs';
+import {checkPresentationIdentities} from './presentation-identity-contracts.mjs';
+import {checkPresentationRows} from './presentation-row-contracts.mjs';
+import {checkPresentationShapes} from './presentation-shape-contracts.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 export async function checkRenderProjection(api, output) {
@@ -250,6 +258,53 @@ for(const [playerHull,enemyHull] of [['onslaught','onslaught'],['odyssey','parag
  const late=session.dispatchDeployment({kind:'simulation-wave',ally:[],enemy:['wolf_CS']});
  session.beginEncounter('onslaught','paragon',71);same((await late).accepted,false);same(session.engine.allCapitalShips.length,2);same(session.engine.isSimulation,false);session.dispose();
  const closed=k.dispatchDeployment({kind:'simulation-wave',ally:[],enemy:['wolf_CS']});k.dispose();same((await closed).accepted,false);same(e.allCapitalShips.length,3);
+ // Personal fit snapshots work on worker authority without browser storage.
+ {
+  const customKernel=new LocalCombatKernel({playerHull:'onslaught',enemyHull:'paragon',seed:73,multicore:false,simulationPointLimit:1000});
+  const customEngine=customKernel.engine,contentRevision=api.contentRegistry.revision;
+  let design=api.createDesign('wolf');design.id='simulation-refresh-fixture';design.name='Saved fit before';design.vents=1;design.capacitors=0;
+  const original=structuredClone(design),id=api.savedSimulationId(design);
+  const roster=api.simulationRoster([design]),option=roster.find(o=>o.id===id);
+  same(new Set(roster.map(o=>o.id)).size,roster.length);same(option.origin,'saved');same(option.preset,false);
+  same(roster.filter(o=>o.preset).length,api.simulationRoster().filter(o=>o.preset).length);
+  design.name='Caller changed after listing';same(api.prepareSimulationOption(option).design.name,original.name);
+  const snapshots=api.selectedSimulationDesigns([option,option]);same(snapshots.length,1);
+  const firstExpected=api.evaluate(original).spec;
+  const promise=customKernel.dispatchDeployment({kind:'simulation-wave',ally:[id],enemy:[id],designs:snapshots});
+  snapshots[0].vents=999;snapshots[0].name='Caller changed after submit';
+  same((await promise).accepted,true);
+  const firstShips=customEngine.allCapitalShips.filter(s=>s.spec.id==='sim-'+id);same(firstShips.length,2);
+  same(firstShips[0].shipName,original.name);same(firstShips[0].spec.fluxDissipation,firstExpected.fluxDissipation);
+  same(Object.isFrozen(firstShips[0].spec),true);
+  const removable=Object.keys(original.weapons).find(slot=>original.weapons[slot]&&!api.isBuiltIn(original.hullId,slot));
+  assert.ok(removable);checks++;
+  design=api.withWeapon(original,removable,null);design.name='Saved fit after';design.vents=2;design.updatedAt++;
+  const updatedOption=api.simulationRoster([design]).find(o=>o.id===id),updated=api.prepareSimulationOption(updatedOption);
+  same(updatedOption.revision===option.revision,false);same(updated.design.name,design.name);
+  same((await customKernel.dispatchDeployment({kind:'simulation-wave',ally:[],enemy:[id],designs:[design]})).accepted,true);
+  const nextShip=customEngine.allCapitalShips.filter(s=>s.spec.id==='sim-'+id).at(-1);
+  same(nextShip.shipName,design.name);same(nextShip.spec.fluxDissipation,updated.spec.fluxDissipation);
+  assert.deepEqual(nextShip.spec.weaponSlots,updated.spec.weaponSlots);checks++;
+  same(firstShips[0].spec.fluxDissipation,firstExpected.fluxDissipation);same(firstShips[0].shipName,original.name);
+  same(api.simulationRoster().some(o=>o.id===id),false);
+  const invalid=structuredClone(design);invalid.weapons[removable]='missing-weapon';
+  const count=customEngine.allCapitalShips.length;
+  for(const request of [
+   {kind:'simulation-wave',ally:['wolf_CS'],enemy:[id]},
+   {kind:'simulation-wave',ally:['wolf_CS'],enemy:[id],designs:[invalid]},
+   {kind:'simulation-wave',ally:[],enemy:[id],designs:[design,design]},
+   {kind:'simulation-wave',ally:[],enemy:['wolf_CS'],designs:[design]},
+   {kind:'simulation-wave',ally:[],enemy:[id],designs:Array(101).fill(design)},
+  ]){same((await customKernel.dispatchDeployment(request)).accepted,false);same(customEngine.allCapitalShips.length,count);}
+  const extension=api.simulationRoster().find(o=>o.id==='web-gloriana-arsenal');
+  same(extension.origin,'extension');same(extension.preset,false);
+  const extensionFit=api.prepareSimulationOption(extension);same(extensionFit.errors.length,0);
+  same((await customKernel.dispatchDeployment({kind:'simulation-wave',ally:[],enemy:[extension.id]})).accepted,true);
+  const extensionShip=customEngine.allCapitalShips.find(s=>s.spec.id==='sim-'+extension.id);
+  assert.ok(extensionShip);assert.deepEqual(extensionShip.spec.weaponSlots,extensionFit.spec.weaponSlots);checks+=2;
+  same(api.contentRegistry.revision,contentRevision);same(api.modManager.getShip('sim-'+id),undefined);
+  customKernel.dispose();
+ }
  // The fleet path cannot impersonate a different team and revalidates current reserve status.
  const f=new LocalCombatKernel({playerHull:'onslaught',enemyHull:'paragon',seed:72,multicore:false,additionalShips:[
   {hull:'wolf',isPlayer:true,position:[0,0],facing:0},{hull:'wolf',isPlayer:false,position:[0,0],facing:0},
@@ -462,6 +517,123 @@ for(const [playerHull,enemyHull] of [['onslaught','onslaught'],['odyssey','parag
  for(const command of commands)command.resolve({results:[{accepted:true}]});resolveStep({});
  same((await pilot).accepted,false);same((await release).accepted,false);same(await step,false);same(host.status,'disposed');
 }
+const packedSlotContract=checkPackedVisualSlots(api);checks+=packedSlotContract.checks;reports.push(...packedSlotContract.reports);
+const hudReadContract=checkPresentationHudReads(api);checks+=hudReadContract.checks;reports.push(...hudReadContract.reports);
+const ownedScalarContract=checkPresentationOwnedScalars(api);checks+=ownedScalarContract.checks;reports.push(...ownedScalarContract.reports);
+const indexContract=checkPresentationIndex(api);checks+=indexContract.checks;reports.push(...indexContract.reports);
+const decoderContract=checkPresentationDecoderIndex(api);checks+=decoderContract.checks;reports.push(...decoderContract.reports);
+const worklistContract=checkDecoderWorklist(api);checks+=worklistContract.checks;reports.push(...worklistContract.reports);
+const shapeContract=checkPresentationShapes(api);checks+=shapeContract.checks;reports.push(...shapeContract.reports);
+const rowContract=checkPresentationRows(api);checks+=rowContract.checks;reports.push(...rowContract.reports);
 fs.writeFileSync(output,JSON.stringify({checks,reports},null,2));console.log(JSON.stringify({checks,reports}));
 
+}
+
+export function checkPresentationIndex(api) {
+ const {LocalCombatKernel,CombatPresentationEncoder,CombatPresentationDecoder,Vector2}=api;let checks=0;const reports=[];
+// Persistent encoder indexes may reuse bookkeeping, never a prior field read.
+{
+ const k=new LocalCombatKernel({playerHull:'wolf',enemyHull:'lasher',seed:971,multicore:false});
+ const encoder=new CombatPresentationEncoder(41,'render'),decoder=new CombatPresentationDecoder(41);
+ const old=api.BeforeCombatPresentationEncoder?new api.BeforeCombatPresentationEncoder(41,'render'):null;
+ const snapshots=encoder.snapshots,snapshotRows=()=>encoder.liveEntries?new Map(encoder.liveEntries.map(row=>[row.id,row.snapshot])):encoder.snapshots,liveIds=()=>encoder.liveEntries?encoder.liveEntries.map(row=>row.id):encoder.liveIds,first={label:'first',amount:1},second={label:'second',amount:2},shared={value:3},cycle={};cycle.self=cycle;
+ let reads=[];const graph={items:[first,second,first],map:new Map([[first,second],['shared',shared]]),set:new Set([first,second]),left:shared,right:shared,cycle,
+  typed:new Float64Array([-0,Infinity,NaN]),vector:new Vector2(5,6),meta:api.immutableCopy({name:'immutable',values:[1,2,3]})};
+ Object.defineProperty(graph,'observed',{enumerable:true,configurable:true,get(){reads.push('observed');return shared.value;}});
+ k.engine.orders.set('display-index-probe',graph);
+ let packets=0,exactPackets=0,recycle,recycleVisuals,oldRecycle,oldVisuals,lastPacket;
+ const effective=p=>({...p,buffer:new Uint8Array(p.buffer,0,p.length*8),visuals:{...p.visuals,buffer:new Uint8Array(p.visuals.buffer,0,p.visuals.length*8)}});
+ const capture=()=>{
+  let prior,priorReads;if(old){reads=[];prior=old.capture(k.engine,0,oldRecycle,oldVisuals);priorReads=reads;}
+  reads=[];const packet=encoder.capture(k.engine,0,recycle,recycleVisuals);lastPacket=packet;packets++;
+  assert.deepEqual(reads,['observed']);assert.equal(encoder.snapshots,snapshots);assert.equal(snapshotRows().size,packet.liveNodeCount);assert.equal(liveIds().length,packet.liveNodeCount);assert.equal(new Set(liveIds()).size,packet.liveNodeCount);checks+=5;
+  if(prior){assert.deepEqual(effective(packet),effective(prior));assert.deepEqual(reads,priorReads);checks+=2;exactPackets++;oldRecycle=prior.buffer;oldVisuals=prior.visuals.buffer;}
+  const detached=decoder.apply(structuredClone(packet));recycle=packet.buffer;recycleVisuals=packet.visuals.buffer;
+  return detached.hud.tactical.orders.get('display-index-probe');
+ };
+ let visible=capture();const oldVisibleFirst=visible.items[0];
+ assert.equal(visible.items[0],visible.items[2]);assert.equal(visible.map.get(visible.items[0]),visible.items[1]);assert.equal(visible.left,visible.right);assert.equal(visible.cycle.self,visible.cycle);assert(visible.set.has(visible.items[1]));checks+=5;
+ const firstId=encoder.identities.get(first).id,secondId=encoder.identities.get(second).id;
+ const metadataId=encoder.identities.get(graph.meta).id;
+ // Reorder the old identities before removing both. A reused Map alone would
+ // still report original insertion order instead of the previous frame's BFS.
+ graph.items.splice(0,3,second,first);graph.map.clear();graph.map.set(second,first);graph.set.clear();graph.set.add(second);graph.set.add(first);visible=capture();
+ assert.equal(visible.items[1],oldVisibleFirst);checks++;
+ graph.items=[];graph.map.clear();graph.set.clear();visible=capture();
+ assert(lastPacket.removed.indexOf(secondId)>=0);assert(lastPacket.removed.indexOf(secondId)<lastPacket.removed.indexOf(firstId));assert(!snapshotRows().has(firstId));assert(!snapshotRows().has(secondId));checks+=4;
+ first.amount=99;delete first.label;first.extra='new';graph.items=[first,second,first];shared.value=42;graph.typed[0]=0;graph.typed[1]=-Infinity;graph.vector.set(-0,NaN);visible=capture();
+ assert.equal(encoder.identities.get(first).id,firstId);assert.equal(visible.items[0],visible.items[2]);assert.notEqual(visible.items[0],oldVisibleFirst);assert.equal(Object.getPrototypeOf(visible.items[0]),null);assert.deepEqual({...visible.items[0]},{amount:99,extra:'new'});assert.equal(visible.observed,42);checks+=6;
+ // Metadata isn't a queued node; retirement/reintroduction must still follow
+ // the old independent dictionary rules, even when ordinary nodes keep IDs.
+ const metadata=graph.meta;graph.meta=null;capture();graph.meta=metadata;capture();assert.equal(encoder.identities.get(metadata).id,metadataId);assert(lastPacket.metadata.some(m=>m.id===metadataId));checks+=2;
+ for(let i=0;i<12;i++){graph.ephemeral=Array.from({length:40},(_,j)=>({sample:i,index:j}));capture();graph.ephemeral=[];capture();}
+ assert(![...snapshotRows().values()].some(row=>row.keys?.includes('sample')));checks++;
+ graph.invalid=()=>{};assert.throws(()=>encoder.capture(k.engine,0),/Unsupported presentation value/);delete graph.invalid;
+ assert.throws(()=>encoder.capture(k.engine,0),/Presentation encoder failed/);checks+=2;
+ const fresh=new CombatPresentationEncoder(42,'render'),freshDecoder=new CombatPresentationDecoder(42);assert.doesNotThrow(()=>freshDecoder.apply(fresh.capture(k.engine,0)));checks++;
+ reports.push({scenario:'presentation-index-liveness',packets,exactPackets,sameTick:0,reusedSnapshotIndex:!!snapshots,identitySnapshots:!!encoder.liveEntries,retirementOrderPreserved:true,temporaryNodes:12*40,poisonedEpochRejected:true});k.dispose();
+}
+ const identities=checkPresentationIdentities(api);checks+=identities.checks;reports.push(...identities.reports);
+ return {checks,reports};
+}
+
+export function checkPresentationDecoderIndex(api) {
+ const {LocalCombatKernel,CombatPresentationEncoder,CombatPresentationDecoder,Vector2}=api;
+ const k=new LocalCombatKernel({playerHull:'wolf',enemyHull:'lasher',seed:994,multicore:false}),encoder=new CombatPresentationEncoder(53,'render');
+ const current=new CombatPresentationDecoder(53),old=api.BeforeCombatPresentationDecoder?new api.BeforeCombatPresentationDecoder(53):null;
+ const index=current.objects,shared={amount:1,label:'same'},other={amount:2},buffer=new ArrayBuffer(16,{maxByteLength:64}),typed=new Float64Array(buffer);typed.set([-0,Infinity]);
+ const cycle={};cycle.self=cycle;
+ const graph={shared,alias:shared,items:[shared,other],map:new Map([[shared,other]]),set:new Set([shared,other]),cycle,typed,typedArray:[typed],typedMap:new Map([[typed,typed]]),typedSet:new Set([typed]),vector:new Vector2(2,3),meta:api.immutableCopy({kind:'constant',values:[1,2]})};
+ k.engine.orders.set('decoder-index-probe',graph);
+ let checks=0,packets=0,equivalent=0,rejections=0,recycle,recycleVisuals,visible,oldVisible,lastPacket;
+ const next=()=>{const p=encoder.capture(k.engine,0,recycle,recycleVisuals);recycle=p.buffer;recycleVisuals=p.visuals.buffer;return p;};
+ const apply=packet=>{
+  const input=structuredClone(packet);visible=current.apply(input);if(old){oldVisible=old.apply(structuredClone(packet));assert.deepEqual(visible,oldVisible);checks++;equivalent++;}
+  assert.equal(current.objects,index);assert.equal(current.retainedObjects,packet.liveNodeCount);assert.equal(current.revision,packet.revision);assert.deepEqual([...current.objects.keys()],old?[...old.objects.keys()]:[...current.objects.keys()]);checks+=4;
+  // Incoming shape arrays cannot mutate the accepted keys used for future deltas.
+  const acceptedKeys=[...current.objects].map(([id,e])=>[id,[...e.keys]]);for(const shape of input.shapes)shape.keys.push('forbidden-after-consumption');
+  assert.deepEqual([...current.objects].map(([id,e])=>[id,e.keys]),acceptedKeys);checks++;packets++;lastPacket=packet;
+  return visible.hud.tactical.orders.get('decoder-index-probe');
+ };
+ const reject=(packet,pattern)=>{
+  const before=structuredClone(visible),keys=[...current.objects.keys()],metadata=current.metadata,revision=current.revision,tick=current.tick;
+  const links=[...current.objects].map(([id,e])=>[id,e.kind,e.type,e.units,[...e.keys],[...e.refs],[...e.metadata]]);
+  assert.throws(()=>current.apply(structuredClone(packet)),pattern);checks++;if(old){assert.throws(()=>old.apply(structuredClone(packet)),pattern);checks++;}
+  assert.deepEqual(structuredClone(visible),before);assert.deepEqual([...current.objects.keys()],keys);assert.deepEqual([...current.objects].map(([id,e])=>[id,e.kind,e.type,e.units,e.keys,e.refs,e.metadata]),links);
+  assert.equal(current.objects,index);assert.equal(current.metadata,metadata);assert.equal(current.revision,revision);assert.equal(current.tick,tick);checks+=7;rejections++;
+ };
+ // Find one object's field in a valid encoder packet, never scan arbitrary numbers
+ // for a coincidental tag/id pattern when constructing malformed test packets.
+ const fieldOffset=(packet,id,key)=>{
+  const values=new Float64Array(packet.buffer,0,packet.length);let at=2;
+  for(let i=0;i<packet.nodeCount;i++){
+   const node=values[at++],kind=values[at++];
+   if(kind===0){const shape=packet.shapes[values[at++]];if(node===id){const slot=shape.keys.indexOf(key);assert(slot>=0);return at+slot*2;}at+=shape.keys.length*2;}
+   else if(kind===6){const count=values[at++];const slot=node===id?current.objects.get(id)?.keys.indexOf(key):-1;for(let j=0;j<count;j++){const field=values[at++];if(node===id&&field===slot)return at;at+=2;}}
+   else if(kind===5)at+=2;else if(kind===4){at++;const length=values[at++];at+=length;}else {const length=values[at++];at+=length*2;}
+  }throw Error('Missing fixture field');
+ };
+ try {
+  let shown=apply(next());const stable=shown.shared,oldTyped=shown.typed,sharedId=encoder.identities.get(shared).id;
+  assert.equal(shown.shared,shown.alias);assert.equal(shown.map.get(shown.shared),shown.items[1]);assert(shown.set.has(shown.shared));assert.equal(shown.cycle.self,shown.cycle);checks+=4;
+  // A real length-tracking array retains its wire ID while replacing display
+  // storage; unchanged array/map/set/object parents must all rebind it.
+  buffer.resize(32);typed[2]=NaN;typed[3]=42;shown=apply(next());
+  assert.notEqual(shown.typed,oldTyped);assert.equal(shown.typed.length,4);assert(Object.is(shown.typed[0],-0));assert(Number.isNaN(shown.typed[2]));assert.equal(shown.typedArray[0],shown.typed);assert(shown.typedMap.has(shown.typed));assert(!shown.typedMap.has(oldTyped));assert.equal(shown.typedMap.get(shown.typed),shown.typed);assert(shown.typedSet.has(shown.typed));checks+=9;
+  // Rejected prospective removals cannot hide retained dangling references or
+  // consume the revision; the untouched legal packet is accepted afterwards.
+  k.engine.playerShip.pos.x+=13;let valid=next(),bad=structuredClone(valid);bad.removed.push(sharedId);bad.liveNodeCount--;reject(bad,/Unresolved presentation reference/);
+  bad=structuredClone(valid);bad.liveNodeCount++;reject(bad,/Invalid live presentation count/);
+  bad=structuredClone(valid);bad.removed.push(sharedId,sharedId);bad.liveNodeCount-=2;reject(bad,/Invalid retired presentation identity/);
+  shown=apply(valid);assert.equal(shown.shared,stable);checks++;
+  graph.tail={only:'unreachable probe'};valid=next();bad=structuredClone(valid);const offset=fieldOffset(bad,encoder.identities.get(graph).id,'tail');const values=new Float64Array(bad.buffer);values[offset]=1;values[offset+1]=0;reject(bad,/Unreachable presentation records/);apply(valid);
+  delete graph.tail;shared.amount=8;delete shared.label;shared.newField='fresh';graph.items.reverse();graph.map.clear();graph.map.set(other,shared);shown=apply(next());assert.equal(shown.shared,stable);assert.deepEqual({...shown.shared},{amount:8,newField:'fresh'});checks+=2;
+  graph.shared=null;graph.alias=null;graph.items=[];graph.map.clear();graph.set.clear();apply(next());assert(!current.objects.has(sharedId));checks++;
+  graph.shared=shared;graph.alias=shared;shown=apply(next());assert.notEqual(shown.shared,stable);assert.equal(shown.shared,shown.alias);checks+=2;
+  for(let i=0;i<10;i++){graph.transient=Array.from({length:32},(_,j)=>({i,j}));apply(next());graph.transient=[];apply(next());}
+  assert(![...current.objects.values()].some(entry=>entry.keys.includes('j')));checks++;
+  const retained=current.retainedObjects;reject(lastPacket,/Invalid or stale presentation packet/);assert.equal(current.retainedObjects,retained);checks++;
+  const plans=checkPresentationDecoderPlans(api);checks+=plans.checks;
+  return{checks,reports:[{scenario:'presentation-decoder-index',packets,equivalent,rejections,transientNodes:320,typedResizeRebindings:4,stableIndex:true,fullGraphAndAliasing:true},...plans.reports]};
+ } finally { k.dispose(); }
 }

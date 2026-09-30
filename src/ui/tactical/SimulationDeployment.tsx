@@ -1,5 +1,7 @@
+import { AssemblyThumbnail } from '../core/AssemblyThumbnail';
 import type { DeploymentCommand } from '../../engine/runtime/DeploymentControl';
 import type { CommandResult } from '../../engine/runtime/CombatCommands';
+import { useSimulationLibrary } from './useSimulationLibrary';
 import { useDeploymentPicker } from './useDeploymentPicker';
 import { RefitHint } from '../../studio/RefitHint';
 import { RefitInspection } from '../../studio/RefitInspection';
@@ -10,11 +12,10 @@ import { BATTLE_SIZE_PRESETS, BATTLE_SIZE_STEP, MIN_BATTLE_SIZE, MAX_BATTLE_SIZE
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DeploymentViewSource } from '../../engine/runtime/DeploymentView';
 import { useDeploymentView, useDeploymentSelection } from './useDeploymentView';
-import { runtimeAssetUrl } from '../../engine/runtime/RuntimePaths';
 import { Modal } from '../core/UI';
 import { NativeButton } from '../NativeChrome';
 import { NativeBitmapText } from '../NativeBitmapText';
-import { simulationRoster, groupSimulationHulls, prepareSimulationOption, simulationOptionErrors, type SimulationOption } from './SimulationRoster';
+import { simulationRoster, groupSimulationHulls, prepareSimulationOption, simulationOptionErrors, selectedSimulationDesigns, simulationOptionSourceLabel, type SimulationOption } from './SimulationRoster';
 import { SimulationLoadoutPicker } from './SimulationLoadoutPicker';
 import './simulation-deployment.css';
 
@@ -28,7 +29,9 @@ export function SimulationDeployment({ source, onClose, onDeployed, onDeployment
   const pending = useRef(false), mounted = useRef(true), generation = useRef(0);
   const [busyOwner, setBusyOwner] = useState<{ source: DeploymentViewSource; generation: number } | null>(null);
   const busy = busyOwner?.source === source && busyOwner.generation === view.generation;
-  const roster = useMemo(() => simulationRoster(), []);
+  const library = useSimulationLibrary();
+  const roster = useMemo(() => simulationRoster(library.designs), [library.designs]);
+  const previousRoster = useRef(roster);
   const [side,setSide]=useState<Side>('enemy');
   const [selected,setSelected]=useDeploymentSelection<Record<Side,string[]>>(source, view.generation, {ally:[],enemy:[]});
   const [hover,setHover]=useState<SimulationOption|null>(null);
@@ -40,6 +43,19 @@ export function SimulationDeployment({ source, onClose, onDeployed, onDeployment
     mounted.current = true; generation.current++; pending.current = false;
     return () => { mounted.current = false; };
   }, [source, view.generation]);
+  useEffect(() => {
+    if (previousRoster.current === roster) return;
+    const latest = new Map(roster.map(option => [option.id, option]));
+    const changed = new Set(previousRoster.current.filter(option => option.origin === 'saved' &&
+      (!latest.has(option.id) || latest.get(option.id)?.revision !== option.revision)).map(option => option.id));
+    previousRoster.current = roster;
+    if (selected.ally.some(id => changed.has(id)) || selected.enemy.some(id => changed.has(id))) {
+      setSelected(current => ({ ally: current.ally.filter(id => !changed.has(id)), enemy: current.enemy.filter(id => !changed.has(id)) }));
+      setError('已保存装配发生修改或删除，已取消对应选择；请检查新装配后重新选择。');
+    }
+    setHover(null);
+    closePicker();
+  }, [roster, selected, setSelected, closePicker]);
   const options=useMemo(()=>roster.filter(option=>hullMatchesCategory(option.spec,size)&&(scope!=='preset'||option.preset)
     &&matchesRefitSearch(query,option.name,option.variantName,option.hullId,option.id,hullSearchAliases(option.spec))),[roster,size,scope,query]);
   const hulls=useMemo(()=>groupSimulationHulls(options),[options]);
@@ -74,8 +90,11 @@ export function SimulationDeployment({ source, onClose, onDeployed, onDeployment
   };
   const deploy = () => {
     if (!total || over.ally || over.enemy) return;
-    // Catalogue identities only: authority compiles BOTH sides and determines their DP.
-    void commit({ kind: 'simulation-wave', ally: picks.ally.map(option => option.id), enemy: picks.enemy.map(option => option.id) }, true);
+    // Send only selected saved snapshots. Authority compiles BOTH sides and determines DP.
+    try {
+      void commit({ kind: 'simulation-wave', ally: picks.ally.map(option => option.id), enemy: picks.enemy.map(option => option.id),
+        designs: selectedSimulationDesigns([...picks.ally, ...picks.enemy]) }, true);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
   };
   const changePointLimit = (limit: number) => { void commit({ kind: 'simulation-limit', limit }); };
   const filtered=()=>{setPage(0);closePicker();};
@@ -91,9 +110,10 @@ export function SimulationDeployment({ source, onClose, onDeployed, onDeployment
     <div className="sim-deployment-intro">
       <h2 data-side={side}><NativeBitmapText font="action" color="currentColor">{side==='enemy'?'选择敌方参战舰船':'选择友方参战舰船'}</NativeBitmapText></h2>
       {hover?<div className="sim-deployment-detail"><strong>{hover.name} · {hover.variantName}</strong><RefitHint text="部署点（DP）是此舰船入场占用的额度，不是装配点（OP）；友敌分别核算，模块随母舰入场，不重复添加。"><span>{hover.cost?hover.cost+' DP':'缺少独立部署费用'} · {hover.spec.designation??''}</span></RefitHint>
-          {hover.errors.length?<small>不可部署：{hover.errors.join('；')}</small>:hover.warnings.length?<RefitInspection title="装配适配说明" content={<ul>{hover.warnings.map((warning,i)=><li key={i}>{warning}</li>)}</ul>}><button type="button" className="sim-inspection-note">装配适配说明（{hover.warnings.length}）</button></RefitInspection>:<small>使用已导入的原版装配方案</small>}</div>
+          {hover.errors.length?<small>不可部署：{hover.errors.join('；')}</small>:hover.warnings.length?<RefitInspection title="装配适配说明" content={<ul>{hover.warnings.map((warning,i)=><li key={i}>{warning}</li>)}</ul>}><button type="button" className="sim-inspection-note">装配适配说明（{hover.warnings.length}）</button></RefitInspection>:<small>使用{simulationOptionSourceLabel(hover)}</small>}</div>
         :<p className="sim-deployment-hint">停留后移入选择，移出自动收起；点击舰体可立即进入。友敌选择分别保留，确认后一起入场。</p>}
     </div>
+    {library.error && <p className="refit-inspection-warnings" role="alert">已保存装配未能读取：{library.error}</p>}
     <div className="sim-deployment-filters"><input aria-label="筛选模拟舰船" value={query} onChange={e=>{setQuery(e.target.value);filtered();}} placeholder="舰名 / 舰体ID / 装配"/>
       <select aria-label="筛选舰级" value={size} onChange={e=>{setSize(e.target.value);if(e.target.value==='STATION'||e.target.value==='MODULAR'){setScope('all');setQuery('');}filtered();}}><option value="">全部舰级</option><option value="STATION">空间站</option><option value="MODULAR">模块化舰体</option><option value="CAPITAL_SHIP">主力舰</option><option value="CRUISER">巡洋舰</option><option value="DESTROYER">驱逐舰</option><option value="FRIGATE">护卫舰</option></select>
       <select aria-label="舰船目录" value={scope} onChange={e=>{setScope(e.target.value);filtered();}}><option value="all">完整舰船目录</option><option value="preset">原版模拟预设</option></select></div>
@@ -104,7 +124,7 @@ export function SimulationDeployment({ source, onClose, onDeployed, onDeployment
           aria-label={option.name+' · '+hull.options.length+' 项配装'+(count?' · 已选 '+count:'')}
           aria-pressed={count>0} data-unavailable={hull.options.every(fit=>simulationOptionErrors(fit).length>0)}
           {...hullButtonProps(hull.hullId,()=>inspect(option))}>
-          <img src={runtimeAssetUrl(option.spec.spriteUrl)} alt="" draggable={false} style={{width:option.spec.spriteWidth*Math.min(.2,52/option.spec.spriteWidth,56/option.spec.spriteHeight)+'px',height:option.spec.spriteHeight*Math.min(.2,52/option.spec.spriteWidth,56/option.spec.spriteHeight)+'px'}}/>
+          <AssemblyThumbnail spec={option.spec} fit={{width:52,height:56,scale:.2}} />
           <b><NativeBitmapText font="caption" color="currentColor">{option.cost?String(option.cost):'—'}</NativeBitmapText></b>
           <span className="sim-hull-fits">{count?'✓ '+count:hull.options.length+' 配装'}</span>
         </button>;

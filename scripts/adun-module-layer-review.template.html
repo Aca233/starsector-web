@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>亚顿之矛 · 模块图层审阅</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0b1018;color:#d9e2ec;font:14px/1.6 "Microsoft YaHei",sans-serif}header{padding:24px 32px 18px;border-bottom:1px solid #283342;display:flex;align-items:center;justify-content:space-between}h1{font-size:24px;letter-spacing:2px;color:#e6cc8e;margin:0}p{margin:7px 0;color:#96a8bd}.tag{color:#dfbb7a;border:1px solid #6a5836;padding:5px 12px;border-radius:4px}main{display:grid;grid-template-columns:minmax(550px,1fr) 340px;gap:24px;padding:24px 32px}.stage{background:#111924;border:1px solid #273447;border-radius:6px;position:relative;display:flex;justify-content:center;min-height:690px;overflow:hidden}.stage canvas{width:min(100%,620px);height:auto;aspect-ratio:620/900;object-fit:contain}.caption{position:absolute;left:16px;top:12px;font-size:12px;color:#7d8fa5}.stage:focus-within{outline:1px solid #688aa5}aside{display:flex;flex-direction:column;gap:16px}section{padding:17px 19px;border:1px solid #283547;border-radius:6px;background:#121b27}h2{margin:0 0 10px;font-size:15px;color:#dfc893}.module{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:10px 0;border-bottom:1px solid #243142}.module:last-child{border:0}.module span{display:block}.detail{font-size:12px;color:#8c9fb5}input[type=checkbox]{accent-color:#d6b96f;width:18px;height:18px}select,button{font:inherit;color:#d9e2ec;background:#1b2b3c;border:1px solid #405169;border-radius:4px;padding:8px}select{width:100%}button{cursor:pointer}button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid #d6b96f}button:hover{background:#263d51}.row{display:flex;gap:8px;margin-top:12px}.row button{flex:1}input[type=range]{width:100%;accent-color:#d6b96f}#error{display:none;color:#ffb5a5;background:#45231d;padding:12px}#metrics{font-size:12px;color:#8fa9bb}.note{font-size:12px;color:#ac9a7b}footer{padding:10px 32px 24px;color:#6f8298;font-size:12px}@media(max-width:900px){main{grid-template-columns:1fr;padding:16px}aside{display:grid;grid-template-columns:1fr 1fr}.stage{min-height:500px}header{padding:16px}.stage canvas{max-height:750px} }@media(max-width:580px){aside{display:flex}main{padding:8px}header{gap:10px}h1{font-size:19px}.tag{font-size:11px}}
+</style>
+<header><div><h1>亚顿之矛 · 模块图层审阅</h1><p>真实模型烘焙 → 有归属的二维子层 → 五段独立显隐</p></div><span class="tag">离线制作 · 非游戏实装</span></header>
+<main><div class="stage"><div class="caption">二维 PNG 拼合 / 不加载三维模型</div><canvas id="ship" width="1240" height="1800" aria-label="实际二维分层舰体"></canvas></div>
+<aside><section><h2>模块显隐</h2><p class="detail">取消勾选会移除该段的全部绘制子层，不留下悬浮的装甲补片。</p>
+<label class="module"><div><span>太阳核心 / 指挥主干</span><span class="detail">完整旋转环 · 固定保留</span></div><input checked disabled type="checkbox" aria-label="核心"></label>
+<label class="module"><div><span>舰艏武备段</span><span class="detail">FORE · 前肩与原生机构</span></div><input id="FORE" checked type="checkbox" aria-label="舰艏"></label>
+<label class="module"><div><span>左舷支援段</span><span class="detail">PORT · 左侧翼根与外甲</span></div><input id="PORT" checked type="checkbox" aria-label="左翼"></label>
+<label class="module"><div><span>右舷支援段</span><span class="detail">STARBOARD · 独立于左翼</span></div><input id="STARBOARD" checked type="checkbox" aria-label="右翼"></label>
+<label class="module"><div><span>后部工程段</span><span class="detail">AFT · 中央尾部与后肩</span></div><input id="AFT" checked type="checkbox" aria-label="尾段"></label>
+<div class="row"><button id="restore">全部恢复</button><button id="coreOnly">仅保留核心</button></div></section>
+<section><h2>姿态与整体转向</h2><label for="pose" class="detail">已烘焙的姿态采样（不是最终动画帧率）</label><select id="pose"></select><label for="heading" class="detail">整舰转向 <output id="angle">0°</output></label><input id="heading" type="range" min="-180" max="180" value="0" step="1"><div class="row"><button id="cycle">轮播检查姿态</button><button id="resetHeading">回正</button></div><p id="metrics"></p><p id="error" role="alert"></p></section>
+<section><h2>本次检查范围</h2><p class="detail">舰体层序、隐藏结构、模块归属与姿态同步。源模型已有的结构保留；新的二维炮头不烘焙进舰体。</p><p class="note">战损断面、移除模块后的接触阴影与游戏控制仍未完成。这里没有爆炸占位，也不等于已接入战斗。</p></section></aside></main>
+<footer>Catholomew / CC BY-NC 4.0 · 本地制作研究。旧 v05、游戏存档与 5173 服务未改动。</footer>
+<script id="manifest" type="application/json">__MANIFEST__</script>
+<script>
+'use strict';
+const manifest=JSON.parse(document.getElementById('manifest').textContent);
+const canvas=document.getElementById('ship'),ctx=canvas.getContext('2d');
+const pose=document.getElementById('pose'),heading=document.getElementById('heading');
+const owners=['CORE','FORE','PORT','STARBOARD','AFT'];
+const cache=new Map();let active=null,request=0,timer=null;
+for(const frame of manifest.frames){const option=document.createElement('option');option.value=frame.frame;option.textContent=frame.label;pose.append(option);}
+function load(file){if(!cache.has(file)){cache.set(file,new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error('无法读取素材：'+file));img.src=file;}));}return cache.get(file);}
+function alive(owner){return owner==='CORE'||document.getElementById(owner).checked;}
+function paint(){if(!active)return;ctx.clearRect(0,0,canvas.width,canvas.height);ctx.save();ctx.translate(canvas.width/2,canvas.height/2);ctx.rotate(Number(heading.value)*Math.PI/180);ctx.scale(1.56,1.56);ctx.translate(-256,-512);
+const visible=active.draws.filter(row=>alive(row.owner));for(const row of visible){ctx.drawImage(row.image,row.sourceBox[0],row.sourceBox[1]);}ctx.restore();
+const present=owners.filter(alive);document.getElementById('angle').value=heading.value+'°';document.getElementById('metrics').textContent=present.length+' / 5 个模块 · '+visible.length+' 个实际绘制子层 · 帧 '+active.frame;
+canvas.dataset.frame=String(active.frame);canvas.dataset.owners=present.join(',');canvas.dataset.drawIds=visible.map(r=>r.id).join(',');canvas.dataset.ready='true';}
+async function selectFrame(){const generation=++request;canvas.dataset.ready='loading';try{const frame=manifest.frames.find(r=>r.frame===Number(pose.value));const images=await Promise.all(frame.draws.map(r=>load(r.file)));if(generation!==request)return;active={...frame,draws:frame.draws.map((row,i)=>({...row,image:images[i]}))};paint();}catch(e){const error=document.getElementById('error');error.textContent=e.message;error.style.display='block';canvas.dataset.ready='error';}}
+pose.addEventListener('change',selectFrame);heading.addEventListener('input',paint);
+for(const owner of owners.slice(1))document.getElementById(owner).addEventListener('change',paint);
+document.getElementById('restore').addEventListener('click',()=>{for(const owner of owners.slice(1))document.getElementById(owner).checked=true;paint();});
+document.getElementById('coreOnly').addEventListener('click',()=>{for(const owner of owners.slice(1))document.getElementById(owner).checked=false;paint();});
+document.getElementById('resetHeading').addEventListener('click',()=>{heading.value='0';paint();});
+document.getElementById('cycle').addEventListener('click',event=>{if(timer){clearInterval(timer);timer=null;event.target.textContent='轮播检查姿态';return;}event.target.textContent='停止轮播';timer=setInterval(()=>{pose.selectedIndex=(pose.selectedIndex+1)%pose.options.length;selectFrame();},1200);});
+selectFrame();
+</script></html>

@@ -1,0 +1,63 @@
+{
+  "battery": {
+    "sourceBox": [
+      43,
+      52,
+      522,
+      956
+    ],
+    "sourcePivot": [
+      283,
+      716
+    ],
+    "scale": 0.105,
+    "width": 54,
+    "height": 144,
+    "offsets": [
+      68.833,
+      -6.576,
+      68.833,
+      6.472
+    ]
+  },
+  "suppressor": {
+    "sourceBox": [
+      633,
+      232,
+      1038,
+      932
+    ],
+    "sourcePivot": [
+      837,
+      748
+    ],
+    "scale": 0.083,
+    "width": 38,
+    "height": 90,
+    "offsets": [
+      41.76,
+      -5.289,
+      41.76,
+      5.121
+    ]
+  },
+  "interceptor": {
+    "sourceBox": [
+      1200,
+      435,
+      1502,
+      929
+    ],
+    "sourcePivot": [
+      1352,
+      761
+    ],
+    "scale": 0.075,
+    "width": 28,
+    "height": 52,
+    "offsets": [
+      23.593,
+      0.076
+    ]
+  }
+}

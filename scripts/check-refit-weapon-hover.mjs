@@ -65,7 +65,7 @@ try {
   await mount.hover();
   await card.waitFor();
   const text = await card.innerText();
-  for (const expected of ['PD 激光炮', '原始数据', '战术应用', '武器射程', '伤害 / 秒', '幅能 / 伤害', '精确度', '转向速度', '左键更换武器']) assert.ok(text.includes(expected), expected);
+  for (const expected of ['PD 激光炮', '原始数据', '战术应用', '武器射程', '伤害 / 秒', '载荷 / 秒', '载荷 / 每发射弹', '载荷 / 伤害', '精确度', '转向速度', '左键更换武器']) assert.ok(text.includes(expected), expected);
   assert.equal(await mount.getAttribute('aria-describedby'), await card.getAttribute('id'));
   assert.equal(await mount.getAttribute('title'), null, 'no duplicate browser title tooltip');
   assert.equal(await page.locator('.ship-arc path').count(), 1);
@@ -79,7 +79,7 @@ try {
   assert.ok(box.x + box.width < anchor.x || box.x > anchor.x + anchor.width || box.y + box.height < anchor.y || box.y > anchor.y + anchor.height, 'card does not cover hovered weapon');
   const hullBox = await page.locator('.refit-vessel .studio-ship').boundingBox();
   assert.ok(box.x + box.width < hullBox.x, 'desktop hover card sits beside the hull, not over its other mounts');
-  assert.equal(await value('幅能 / 伤害'), '0.53');
+  assert.equal(await value('载荷 / 伤害'), '0.53');
   assert.equal(await card.locator('.source-weapon-attribution').isVisible(), false, 'hover shows short description; codex keeps full lore');
   await page.screenshot({ path: 'artifacts/refit-weapon-hover.png' });
   passed.push('PD laser hover shows original data, links the accessible card, highlights the slot and arc');

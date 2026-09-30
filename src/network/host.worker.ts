@@ -1,9 +1,13 @@
+import { enableWorkerOwnedMotionReads } from '../engine/simulation/systems/ShipMotion';
+import {attachAuthorityAdmission, isAuthoritySnapshotBlocked} from './AuthorityIoAdmission.mjs';
 import { summarizeNetworkFailure } from '../../desktop/network-diagnostic-record.mjs';
 import {capturePlanDiagnostics} from './AuthorityCombatSnapshot';
 import {SnapshotEncoderBroker} from './SnapshotEncoderBroker';
 import {attachAuthorityCompletion, readAuthorityCompletion} from './AuthorityLocalCompletion.mjs';
 import type {AuthorityCompletion} from './AuthorityLocalCompletion.mjs';
 import { CombatAuthority } from '../engine/runtime/CombatAuthority';
+import { FireControlQueryRoster } from '../engine/ai/FireControlQueryBatch';
+import { enableWorkerOwnedPreAimRange } from '../engine/ai/AutofireController';
 import { withoutBulkProjectiles } from './ProjectileBulkVariant.mjs';
 import { AnchoredProjectilePublisher } from './AnchoredProjectileVisual.mjs';
 import { captureProjectileState } from './CaptureProjectiles';
@@ -24,6 +28,7 @@ import { createLanWorld } from "./LanWorld";
 import type { Ship } from "../engine/simulation/Ship";
 import { CombatEngine } from "../engine/simulation/CombatEngine";
 import { Vector2 } from "../engine/math/Vector2";
+import { applyModuleWeaponInput, stopModuleFiring } from '../engine/runtime/ModuleFireControl';
 import { applyPlayerControls } from "../engine/runtime/PlayerControls";
 import { DEFAULT_MOUSE_STEERING } from "../engine/runtime/CombatControlSettings";
 import { dispatchShipCommand } from "../engine/runtime/CombatCommands";
@@ -105,7 +110,7 @@ function flushSnapshotEncoding() {
   // batch. Capture/physics are never invoked here, and sounds retire only now.
   pollIoCompletion();
   let published = false;
-  if (job.network && result.network && directIo && directInFlight === null && job.tick > directLastTick && performance.now() >= directRetryAt) {
+  if (job.network && result.network && directIo && directInFlight === null && job.tick > directLastTick && performance.now() >= directRetryAt && !isAuthoritySnapshotBlocked(directAdmission)) {
     directInFlight = directLastTick = job.tick; published = true;
     if (!Number.isSafeInteger(++directAttempt)) throw Error("Authority attempt limit exceeded");
     directIo.postMessage({type:'snapshot',tick:job.tick,attempt:directAttempt,binary:result.network.buffer,bytes:result.network.byteLength},[result.network.buffer]);
@@ -143,8 +148,9 @@ let directInFlight: number | null = null, directLastTick = -1;
 let directAttempt = 0, directRetryAt = 0;
 let directSequence = 0;
 let directCompletion: Int32Array | null = null;
+let directAdmission: Int32Array | null = null;
 let directFinish: Record<string, unknown> | null = null;
-const ioStats = { sent: 0, skipped: 0, inputs: 0, sharedCompletions: 0 };
+const ioStats = { sent: 0, skipped: 0, inputs: 0, sharedCompletions: 0, preflightSkips: 0 };
 const queueSound = (
   key: string,
   volume: number,
@@ -244,11 +250,11 @@ function measureClock(now: number) {
   combatRate = (engine.combatTime - clockCombat) * 1000 / elapsed;
   clockAt = now; clockTick = tick; clockCombat = engine.combatTime;
 }
-function diagnostics(): HostPerformance & { io: { enabled: boolean; sharedCredit: boolean; sharedCompletions: number; sent: number; skipped: number; inputs: number; inflight: number; displaySounds: number; flow: import("./SnapshotFlow.mjs").FlowSample }; multicore: LanCombatMulticore["status"] & { budget: HostAiBudget["status"] } } {
+function diagnostics(): HostPerformance & { io: { enabled: boolean; sharedCredit: boolean; sharedAdmission: boolean; preflightSkips: number; sharedCompletions: number; sent: number; skipped: number; inputs: number; inflight: number; displaySounds: number; flow: import("./SnapshotFlow.mjs").FlowSample }; multicore: LanCombatMulticore["status"] & { budget: HostAiBudget["status"] } } {
   const owners: LanCombatMulticore["status"] = multicore?.status ?? {
     mode: 'serial', tier: 'audited', reason: 'ai-workers-disabled', workers: 0, metrics: null,
   };
-  return { capturePlans: capturePlanDiagnostics(), captureReuse: { produced: captures, reused: captureReuses, encodedFragments: encodedFragmentReuses, retained: capturedFrame !== null }, serializer: serializerDiagnostics(), io: { enabled: !!directIo && directReady, sharedCredit: directCompletion !== null, ...ioStats, inflight: Number(directInFlight !== null), displaySounds: sounds.length, flow: ioFlow.sample() }, flow: snapshotFlow.sample(), tick, callbackGapMs, lastStepMs, maxStepMs, backlogMs: accumulator,
+  return { capturePlans: capturePlanDiagnostics(), captureReuse: { produced: captures, reused: captureReuses, encodedFragments: encodedFragmentReuses, retained: capturedFrame !== null }, serializer: serializerDiagnostics(), io: { enabled: !!directIo && directReady, sharedCredit: directCompletion !== null, sharedAdmission: directAdmission !== null, ...ioStats, inflight: Number(directInFlight !== null), displaySounds: sounds.length, flow: ioFlow.sample() }, flow: snapshotFlow.sample(), tick, callbackGapMs, lastStepMs, maxStepMs, backlogMs: accumulator,
     simulationMs: samples ? elapsedCost / samples : lastStepMs, captureMs, encodeMs, realtimeRatio, combatRate, multicore: { ...owners, reason: owners.workers || owners.reason !== "not-started" ? owners.reason : aiBudget.status.reason, budget: aiBudget.status } };
 }
 function snapshot(final = false) {
@@ -257,7 +263,12 @@ function snapshot(final = false) {
   pollIoCompletion();
   if (snapshotEncoderWorker?.busy) { snapshotFlow.count('blocked'); return; }
   const display = tick !== lastSnapshotTick && (final || snapshotInFlight === null);
-  const network = !!directIo && directReady && directLaunched && tick !== directLastTick && (final || directInFlight === null && performance.now() >= directRetryAt);
+  const networkEligible = !!directIo && directReady && directLaunched && tick !== directLastTick && (final || directInFlight === null && performance.now() >= directRetryAt);
+  // Advisory rejection only: no credit release, payload queue or physics wait.
+  // Display remains independent; terminal publication still reaches the real gate.
+  const networkBlocked = !final && isAuthoritySnapshotBlocked(directAdmission);
+  const network = networkEligible && !networkBlocked;
+  if (networkEligible && networkBlocked) ioStats.preflightSkips++;
   if (!display && !network) { if (tick !== lastSnapshotTick) snapshotFlow.count('blocked'); return; }
   if (engine) {
     const cacheable = !!directIo && directReady && directLaunched;
@@ -291,7 +302,7 @@ function snapshot(final = false) {
     // Prepare both lanes of this immutable tick once. While the helper runs a
     // held lane can return credit; flush still requires that REAL exact credit.
     const encodeDisplay = display || !!asynchronous && tick > lastSnapshotTick;
-    const encodeNetwork = network || !!asynchronous && cacheable && tick > directLastTick;
+    const encodeNetwork = !networkBlocked && (network || !!asynchronous && cacheable && tick > directLastTick);
     frame.sounds = encodeDisplay ? sounds.slice() : [];
     // Serialize off the rendering thread. Share the capture/encoding when sound
     // batches match; otherwise keep bounded display/network sound history separate.
@@ -314,8 +325,9 @@ function snapshot(final = false) {
     if (!network) networkFrame = null;
     if (display) lastSnapshotTick = tick;
     // Simultaneous identical sound batches already share one encoding. Do not
-    // allocate retained fragments when no second encoding can use them.
-    const encodingCache = cacheable && binarySnapshots && (!display || !network || !sameSounds)
+    // allocate retained fragments when no second encoding can use them. A
+    // known-blocked network still retains the projection, not speculative fragments.
+    const encodingCache = cacheable && !networkBlocked && binarySnapshots && (!display || !network || !sameSounds)
       && import.meta.env.VITE_LAN_CAPTURE_ENCODING_CACHE !== 'false'
       ? previous?.frame === captured ? previous.encoding : new ProjectionEncodingCache(captured) : null;
     const priorFragmentHits = encodingCache?.hits ?? 0;
@@ -368,7 +380,7 @@ function clearControls(state: Controls, ship: Ship) {
   state.input = { ...state.input, keys: 0, firing: false, pointerActive: false, actions: [] };
   state.queued = [];
   state.received = 0;
-  ship.clearInput();
+  ship.clearInput(); stopModuleFiring(ship);
   if (state.connected) {
     engine?.externallyControlledShipIds.add(ship.id);
     applyPlayerControls(ship, {}, new Vector2(...state.input.aim), false, DEFAULT_MOUSE_STEERING, false);
@@ -443,12 +455,13 @@ async function step() {
           DEFAULT_MOUSE_STEERING,
           fresh && input.pointerActive,
         );
+        applyModuleWeaponInput(ship, new Vector2(...input.aim), fresh && input.firing, fresh && input.pointerActive);
         const queued = state.queued.splice(0);
         for (const action of queued) {
           if (action.id <= state.lastAction) continue;
           state.lastAction = action.id;
           if (!fresh) continue; // Expired edge commands must not fire after recovery.
-          if (action.kind === 'group' || action.kind === 'mode' || action.kind === 'autofire') {
+          if (action.kind === 'group' || action.kind === 'mode' || action.kind === 'autofire' || action.kind === 'module') {
             dispatchShipCommand(ship, { kind: action.kind, value: action.value ?? 0 }, action.aim ? new Vector2(...action.aim) : undefined);
           } else dispatchShipCommand(ship, { kind: action.kind, ...(action.kind === 'system' ? {value: action.value ?? 0} : {}) }, action.aim ? new Vector2(...action.aim) : undefined, engine.ships);
         }
@@ -550,12 +563,12 @@ function handleMessage(m: any) {
     if (m.type === "authority-port") {
       cancelSnapshotEncoding();
       directIo?.close(); directIo = m.port; directReady = false; directLaunched = false;
-      directInFlight = null; directCompletion = null; directLastTick = -1; directAttempt = 0; directRetryAt = 0; motionInFlight = null; networkSounds.length = 0;
+      directInFlight = null; directCompletion = null; directAdmission = null; directLastTick = -1; directAttempt = 0; directRetryAt = 0; motionInFlight = null; networkSounds.length = 0;
       const port = directIo!;
       port.onmessage = event => {
         if (directIo !== port) return;
         const value = event.data;
-        if (value.type === 'io-ready') { directReady = true; directCompletion = attachAuthorityCompletion(value.completion); }
+        if (value.type === 'io-ready') { directReady = true; directCompletion = attachAuthorityCompletion(value.completion); directAdmission = attachAuthorityAdmission(value.admission); }
         else if (value.type === 'io-unavailable') {
           handleMessage({ type: 'authority-fallback' });
           send({ type: 'io-unavailable', nextSequence: value.nextSequence });
@@ -576,7 +589,7 @@ function handleMessage(m: any) {
     }
     if (m.type === 'authority-fallback') {
       cancelSnapshotEncoding();
-      directIo?.close(); directIo = null; directReady = directLaunched = false; directInFlight = null; directCompletion = null; motionInFlight = null; networkSounds.length = 0; return;
+      directIo?.close(); directIo = null; directReady = directLaunched = false; directInFlight = null; directCompletion = null; directAdmission = null; motionInFlight = null; networkSounds.length = 0; return;
     }
     if (m.type === "init") {
       cancelSnapshotEncoding(true);
@@ -601,6 +614,12 @@ function handleMessage(m: any) {
         ? match.players.length + match.options.aiHulls.reduce((n, rows) => n + rows.length, 0) : null;
       const world = createLanWorld(match);
       engine = world.engine;
+      // This authority accepts cloned data only; no mutable ship or executable plugin escapes.
+      // Register each new epoch, while retaining live per-ship hook/effect fallback checks.
+      FireControlQueryRoster.ownForWorker(engine);
+      // Experimental same-call stat composition, never a cross-step motion cache.
+      if (import.meta.env.VITE_LAN_OWNED_MOTION_READS === 'true') enableWorkerOwnedMotionReads();
+      if (import.meta.env.VITE_LAN_EARLY_PREAIM_RANGE === 'true') enableWorkerOwnedPreAimRange();
       authorityRuntime = new CombatAuthority(engine);
       muzzleEvents = configureHostCosmetics(engine, true, compactParticles, localParticles);
       controlled = world.controlled;

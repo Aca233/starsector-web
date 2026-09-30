@@ -1,3 +1,5 @@
+import { enableWorkerOwnedPhaseReads } from '../../simulation/Ship';
+import { FireControlQueryRoster } from '../../ai/FireControlQueryBatch';
 import { copyReplayCheckpoint, sameReplayWitness } from './CombatReplayCheckpoint';
 import { captureCombatAudio } from '../../audio/CombatAudioEvents';
 import { LocalCombatKernel } from './LocalCombatKernel';
@@ -33,6 +35,8 @@ self.onmessage = async (event: MessageEvent<LocalCombatRequest>) => {
       const checkpoint = copyReplayCheckpoint(request.checkpoint, LOCAL_COMBAT_PROTOCOL);
       epoch = request.epoch; replaying = true;
       kernel = new LocalCombatKernel(checkpoint.config);
+      FireControlQueryRoster.ownForWorker(kernel.engine);
+      enableWorkerOwnedPhaseReads();
       encoder = new CombatPresentationEncoder(epoch, checkpoint.config.presentation ?? 'render-strict');
       let completed = 0;
       const total = checkpoint.entries.reduce((sum, entry) => sum + (entry.kind === 'step' ? entry.count : 1), 0);
@@ -60,7 +64,10 @@ self.onmessage = async (event: MessageEvent<LocalCombatRequest>) => {
       replaying = false; audio.length = 0;
     } else if (request.kind === 'init') {
       if (kernel || sequence) throw new Error('Local combat worker already initialized');
-      epoch = request.epoch; kernel = new LocalCombatKernel(request.config); encoder = new CombatPresentationEncoder(epoch, request.config.presentation ?? 'render-strict');
+      epoch = request.epoch; kernel = new LocalCombatKernel(request.config);
+      FireControlQueryRoster.ownForWorker(kernel.engine);
+      enableWorkerOwnedPhaseReads();
+      encoder = new CombatPresentationEncoder(epoch, request.config.presentation ?? 'render-strict');
     } else {
       if (!kernel || !encoder || request.epoch !== epoch) throw new Error('Stale local combat epoch');
       if (request.kind === 'step') { await kernel.stepScheduled(request.sample); if (failed) return; }

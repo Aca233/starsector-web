@@ -1,12 +1,20 @@
+import { FireTargetQualification } from './QualifiedFireTargets';
+import { PreAimRangeIndex } from './PreAimRangeIndex';
+import type { WeaponMount } from '../simulation/Weapon';
 import { FireControlBlockerIndex } from './FireControlBlockerIndex';
 import { Vector2 } from '../math/Vector2';
-import { hasNativeFireControlReaders, nativeFireControlPrototypes, type Ship } from '../simulation/Ship';
+import { hasNativeFireControlReaders, OwnedFireControlReadGuard, nativeFireControlPrototypes, type Ship } from '../simulation/Ship';
+import type { CombatEngine } from '../simulation/CombatEngine';
 import { sameTeam } from '../simulation/CombatTeams';
 import { InFlightFireBudget } from './InFlightFireBudget';
 import type { FireControlWorld } from './AutofireController';
 
 // Metadata qualification is not amortized in smaller battles; keep their original path.
 export const FIRE_CONTROL_QUERY_MIN_SHIPS = 100;
+
+/** Not a DTO permission bit: only the module-private production Worker registers
+ * its own engine. Mutable/inline engines never acquire this ownership implicitly. */
+const workerOwnedEngines = new WeakSet<CombatEngine>();
 
 const budgetEstimate = InFlightFireBudget.prototype.estimate;
 const budgetPenalty = InFlightFireBudget.prototype.penalty;
@@ -28,8 +36,12 @@ export class FireControlQueryBatch {
   private readonly zeroTravel = new Vector2();
   private blockerIndex?: FireControlBlockerIndex;
   private readonly length: number;
-  private constructor(private readonly shooter: Ship, private readonly ships: readonly Ship[]) {
+  private readonly targetQualification?: FireTargetQualification;
+  private preAimQueries = 0;
+  private preAimIndex?: PreAimRangeIndex;
+  private constructor(private readonly shooter: Ship, private readonly ships: readonly Ship[], private readonly workerOwned = false) {
     this.length = ships.length;
+    this.targetQualification = workerOwned ? new FireTargetQualification(shooter, ships) : undefined;
   }
 
   public static create(ship: Ship, world: FireControlWorld): FireControlQueryBatch | undefined {
@@ -38,8 +50,8 @@ export class FireControlQueryBatch {
   }
 
   /** Called only by an audited native roster, with a fresh per-ship lifetime. */
-  public static fromRoster(ship: Ship, ships: readonly Ship[]): FireControlQueryBatch {
-    return new FireControlQueryBatch(ship, ships);
+  public static fromRoster(ship: Ship, ships: readonly Ship[], workerOwned = false): FireControlQueryBatch {
+    return new FireControlQueryBatch(ship, ships, workerOwned);
   }
 
   public forShip(ship: Ship, ships: readonly Ship[]): FireControlQueryBatch | undefined {
@@ -63,9 +75,21 @@ export class FireControlQueryBatch {
       for (const other of this.ships) {
         if (this.readTarget(other, true)) this.targetList.push(other);
       }
-
+      this.targetQualification?.register(this.targetList);
     }
     return this.targetList;
+  }
+
+  /** Broader than every valid old preAim candidate; final role/range/arc/trace
+   * checks and original roster ordering are still performed by the controller. */
+  public preAimTargets(query: { origin: Vector2; range: number; speed: number; delay: number }, mount: WeaponMount): readonly Ship[] {
+    if (!this.active) return this.ships;
+    const targets = this.targets();
+    if (!this.workerOwned || targets.length < 16 || ++this.preAimQueries <= 1) return targets;
+    this.preAimIndex ??= new PreAimRangeIndex(targets);
+    const targetsInRange = this.preAimIndex.query(query.origin, this.shooter.vel, query.range, query.speed, query.delay, !!mount.spec.isBeam);
+    this.targetQualification?.register(targetsInRange);
+    return targetsInRange;
   }
 
   public canTarget(ship: Ship): boolean {
@@ -114,6 +138,7 @@ export class FireControlQueryBatch {
 
   public close(): void {
     this.active = false;
+    this.targetQualification?.close();
     this.targetList = undefined;
     this.targetStatus.clear();
     this.blockerList = undefined;
@@ -121,6 +146,7 @@ export class FireControlQueryBatch {
     this.flightBlockerList = undefined;
     this.flightRoster = undefined;
     this.flightBlockerIndex = undefined;
+    this.preAimIndex = undefined;
   }
 }
 
@@ -131,18 +157,31 @@ export class FireControlQueryBatch {
 export class FireControlQueryRoster {
   private active = true;
   private readonly rows;
-  private constructor(private readonly ships: readonly Ship[]) {
-    this.rows = ships.map(ship => ({ ship, spec: ship.spec, shield: ship.shield, flux: ship.flux,
+  private readonly ownedRows: OwnedFireControlReadGuard[];
+  private readonly length: number;
+  private constructor(private readonly ships: readonly Ship[], private readonly workerOwned = false) {
+    this.length = ships.length;
+    this.ownedRows = workerOwned ? ships.map(ship => new OwnedFireControlReadGuard(ship)) : [];
+    this.rows = workerOwned ? [] : ships.map(ship => ({ ship, spec: ship.spec, shield: ship.shield, flux: ship.flux,
       system: ship.system, defense: ship.defenseSystem, armor: ship.armor,
       control: ship.weaponControl, damage: ship.armor.damageTakenModifiers, effective: ship.armor.dynamicEffectiveArmorMultiplier,
       cell: ship.armor.onCellDamage, overload: ship.flux.onOverloadStarted }));
   }
-  public static create(ships: readonly Ship[]): FireControlQueryRoster | undefined {
-    if (ships.length < FIRE_CONTROL_QUERY_MIN_SHIPS || !nativeFireControlPrototypes() || !ships.every(hasNativeFireControlReaders)) return;
+  /** Internal ownership contract, not a sandbox against same-realm monkeypatches.
+   * Call ONLY where structured-clone commands are the sole input and no mutable
+   * engine/ship/component references escape. Revisit before adding Worker plugins. */
+  public static ownForWorker(engine: CombatEngine): void { workerOwnedEngines.add(engine); }
+  /** Same closed Worker boundary may admit other native phase-local read indexes. */
+  public static isWorkerOwned(engine: CombatEngine): boolean { return workerOwnedEngines.has(engine); }
+
+  public static create(ships: readonly Ship[], engine?: CombatEngine): FireControlQueryRoster | undefined {
+    if (ships.length < FIRE_CONTROL_QUERY_MIN_SHIPS) return;
+    if (engine && workerOwnedEngines.has(engine)) return new FireControlQueryRoster(ships, true);
+    if (!nativeFireControlPrototypes() || !ships.every(hasNativeFireControlReaders)) return;
     return new FireControlQueryRoster(ships);
   }
   public matches(ships: readonly Ship[]): boolean {
-    return this.active && ships === this.ships && ships.length === this.rows.length;
+    return this.active && ships === this.ships && ships.length === this.length;
   }
   public begin(ship: Ship, world: FireControlWorld): FireControlQueryBatch | undefined {
     // Native updates can install external effects or replace a component/definition.
@@ -151,6 +190,19 @@ export class FireControlQueryRoster {
     const budget = world.fireBudget;
     if (budget && (Object.getPrototypeOf(budget) !== InFlightFireBudget.prototype
       || budget.estimate !== budgetEstimate || budget.penalty !== budgetPenalty)) return;
+    if (this.workerOwned) {
+      // Refresh AFTER this ship's motion/systems/repairs, not at tick start.
+      // Native fields/specs have no caller getters in the private Worker. Live
+      // extension/effect gates still run; no dynamic target state survives close.
+      for (let i = 0; i < this.ships.length; i++) {
+        let guard = this.ownedRows[i];
+        // Same-length roster replacement/reordering must not reuse another ship's
+        // constructor callbacks. All dynamic invalidators remain live on the row.
+        if (guard.ship !== this.ships[i]) this.ownedRows[i] = guard = new OwnedFireControlReadGuard(this.ships[i]);
+        if (!guard.allows()) return;
+      }
+      return FireControlQueryBatch.fromRoster(ship, this.ships, true);
+    }
     for (let i = 0; i < this.rows.length; i++) {
       const row = this.rows[i], s = this.ships[i];
       if (s !== row.ship || s.spec !== row.spec || s.shield !== row.shield || s.flux !== row.flux

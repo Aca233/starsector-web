@@ -1,3 +1,4 @@
+import {immutableCopy} from '../src/engine/extensions/Immutable';
 import assert from 'node:assert/strict';import {test} from 'node:test';import fs from 'node:fs';import path from 'node:path';
 import {captureCombat as reference} from 'capture-plans-off';
 import {applyCombatSnapshots} from '../src/network/AuthorityCombatSnapshot';
@@ -96,4 +97,18 @@ if(process.argv.includes('--bench'))test('paired exact-state native weapon proje
  const stats=(v:number[])=>{v.sort((a,b)=>a-b);return{mean:v.reduce((a,b)=>a+b,0)/v.length,p50:v[Math.floor((v.length-1)*.5)],p95:v[Math.floor((v.length-1)*.95)]};};
  const arm=(full:boolean)=>Object.fromEntries(['capture','encode','decode','apply','total','bytes'].map(key=>[key,stats(samples.filter(s=>s.full===full).map(s=>s[key]))]));
  console.log('WEAPON_PROJECTION_BENCH',JSON.stringify({scope:'Paired ABBA same authority state, 32 native ships, one headless replica. Not WAN/RTT/GPU/FPS.',samplesPerArm:samples.length/2,baseline:arm(true),candidate:arm(false)}));
+});
+
+baseTest('frame-local immutable metadata reuse keeps exact wire bytes, projection context and packet ownership',()=>{
+ const e=world(),ship=e.playerShip as any;
+ const leaf=immutableCopy({a:1,b:2,c:3,d:4,e:5,f:6,scalars:[1,undefined,Infinity,-0],nested:{color:[1,2,3]}});
+ ship.fixture={first:leaf,second:leaf,list:[leaf,leaf],mutable:{a:1,b:2,c:3,d:4,e:5,f:6}};
+ const old=check(e),held=wire(old).slice();
+ ship.fixture.mutable.a=99;
+ ship.fixture.first=immutableCopy({...leaf,a:20});
+ check(e);assert.deepEqual(wire(old),held,'retained packet must not change');
+ // Same authored metadata can occur under a projected and an unprojected path.
+ ship.fixture.second=ship.spec;ship.fixture.third=ship.spec;check(e);
+ const poisoned=check(e);poisoned.layouts[0][0]='poison';check(e);
+ delete ship.fixture;check(e);
 });

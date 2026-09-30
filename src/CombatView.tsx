@@ -1,3 +1,5 @@
+import { ADUN_ARK_ID } from './engine/content/AdunArkIds';
+import { assemblySpriteLayout } from './engine/content/ModuleGeometry';
 import { MotionPresence } from './ui/core/MotionPresence';
 import { DEFAULT_PLAYER_HULL } from "./engine/data/SandboxDefaults";
 import { readBattleSize } from "./engine/runtime/BattleSizeSettings";
@@ -79,7 +81,14 @@ export const CombatView: React.FC<{
   const stableSessionRef = useRef(session);
 
   const cameraPosRef = useRef<Vector2>(game.combat.read.playerShip.pos.clone());
-  const zoomRef = useRef<number>(0.65);
+  const [initialZoom] = useState(() => {
+    const spec=game.combat.read.playerShip.spec;
+    if((spec.sourceHullId??spec.id)!==ADUN_ARK_ID)return .65;
+    const layout=assemblySpriteLayout(spec),height=typeof window==='undefined'?1000:window.innerHeight;
+    // This authored giant enters at a readable whole-ship scale; wheel control remains unchanged.
+    return Math.min(.65,Math.max(.18,height*.68/Math.max(layout.height,layout.width)));
+  });
+  const zoomRef = useRef<number>(initialZoom);
   const keysPressed = useRef<{ [key: string]: boolean }>({});
   const mouseScreenPos = useRef<Vector2>(
     new Vector2(
@@ -200,12 +209,13 @@ export const CombatView: React.FC<{
       if (target?.closest('input,textarea,select,[contenteditable="true"]'))
         return;
       event.preventDefault();
+      if (session.jumpTargeting.active) { session.jumpTargeting.cancel(); return; }
       inputBlockedRef.current = true;
       setIsPauseMenuOpen(true);
     };
     window.addEventListener("keydown", openMenu);
     return () => window.removeEventListener("keydown", openMenu);
-  }, []);
+  }, [session]);
 
   React.useEffect(() => {
     const timer = window.setInterval(() => {
@@ -437,6 +447,10 @@ export const CombatView: React.FC<{
           }
         />
       )}
+      {combatInput.targetingMessage && <div role="status" data-jump-targeting={session.jumpTargeting.active ? 'active' : 'notice'}
+        style={{position:'absolute',top:76,left:'50%',transform:'translateX(-50%)',pointerEvents:'none',zIndex:45,
+          color:session.jumpTargeting.preview?.valid === false ? '#ff9d87' : '#8ee4ff',background:'rgba(6,17,27,.88)',
+          border:'1px solid #44788b',padding:'9px 18px',fontSize:14,whiteSpace:'nowrap'}}>{combatInput.targetingMessage}</div>}
       <CombatAvailabilityOverlay
         state={presentationState}
         onRecoverAuthority={session.canRecoverAuthority ? () => {

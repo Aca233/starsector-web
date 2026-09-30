@@ -89,7 +89,7 @@ export function useCombatLoop({
                 ? clientToCombatWorld(mouseScreenPos.current, canvas, cameraPosRef.current, zoomRef.current) : { x: 0, y: 0 };
               return session.fixedUpdateControlled(fixedDt, {
                 autopilot: isAutopilotRef.current, blocked, keys: keysPressed.current,
-                aim: [aim.x, aim.y], firing: isMouseDown.current,
+                aim: [aim.x, aim.y], firing: isMouseDown.current && !session.jumpTargeting.active,
                 mouseSteering: defaultMouseSteeringRef.current, pointerActive: mouseAimActiveRef.current
               });
             }
@@ -106,6 +106,9 @@ export function useCombatLoop({
                   !inputBlockedRef.current && !engine.isTacticalMap && document.visibilityState === 'visible', engine.playerShip);
               }
             }
+            if (inputBlockedRef.current || engine.isTacticalMap || isAutopilotRef.current || !hasCombatInputFocus()) session.jumpTargeting.cancel();
+            if (session.jumpTargeting.active) session.updateJumpTargeting(mouseAimActiveRef.current
+              ? clientToCombatWorld(mouseScreenPos.current, canvas, cameraPosRef.current, zoomRef.current) : undefined);
             session.render(renderAlpha, cameraPosRef.current, zoomRef.current);
           }
         );

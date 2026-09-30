@@ -215,9 +215,9 @@ async function partialChunkFixture(t,{pauseReceipts=false}={}){
  };
  t.after(()=>{peer.ws.send=original;resumeWrite?.();});
  const send=seq=>{const m=state(seq);m.frame.world.ballast=randomBytes(80000).toString('base64');clients[0].ws.send(Buffer.from(encodeBinaryState(room.match.id,seq,encodeProjectedBinaryFrame(m.frame))));return m;};
- send(2);await until(()=>resumeWrite&&room.bulkScheduler?.stats().packets===1&&(pauseReceipts||room.bulkScheduler.stats().receipts===1),'first real fragment write/receipt');
+ const expected=send(2);await until(()=>resumeWrite&&room.bulkScheduler?.stats().packets===1&&(pauseReceipts||room.bulkScheduler.stats().receipts===1),'first real fragment write/receipt');
  assert.equal(received.length,0);assert.equal(room.bulkScheduler.stats().completed,0);
- return {...fixture,peer,guest,received,send,oldReceipt,release(){peer.ws.send=original;resumeWrite();}};
+ return {...fixture,peer,guest,received,send,expected,oldReceipt,release(){peer.ws.send=original;resumeWrite();}};
 }
 for(const terminal of ['end','leave'])test('partial chunk job cannot forward a late world after '+terminal,async t=>{
  const {room,clients,guest,received,release}=await partialChunkFixture(t),scheduler=room.bulkScheduler;
@@ -303,4 +303,63 @@ test('late old-sync binary motion is inert after primary launch; corrupt current
  const corrupt=Buffer.from(lastBinary);corrupt[0]^=1;send(corrupt,{binary:true,compress:false});
  await until(()=>!p.controlLane.socket,'helper rejected corruption');assert.equal(p.controlLane.motionWire.stats().retainedBytes,0);assert.equal(guest.ws.readyState,WebSocket.OPEN);
  clients[0].ws.send(JSON.stringify(state(3)));await until(()=>guest.ws.rows.some(m=>m.type==='state'&&m.seq===3),'complete-state fallback');
+});
+
+test('duplicate LAN launch retains the live motion delta baseline and forwards the retry',async t=>{
+ const {room,clients,motion}=await roomFixture(t,2,{bridged:true}),p=room.peers[1],guest=clients[1];
+ const lane=p.controlLane.socket;
+ const consume=async tick=>{
+  const m=await until(()=>guest.ws.rows.find(r=>r.type==='motion'&&motionFromText(r.data).tick===tick),'motion '+tick);
+  assert.equal(m.data,data(tick));assert.equal(m.motionWire,undefined);
+  guest.ws.send(JSON.stringify({type:'motion-consumed',matchId:room.match.id,syncId:p.sync.id,tick}));
+  await until(()=>!p.motionWindow.pending.has(tick),'exact motion receipt '+tick);
+ };
+ motion(2);await consume(2);motion(3);await consume(3);
+ assert.equal(p.controlLane.motionWire.stats().full,1);assert.equal(p.controlLane.motionWire.stats().delta,1);
+ const launch={type:'launch',matchId:room.match.id,syncId:p.sync.id,minTick:p.sync.tick};
+ const before=guest.ws.rows.filter(r=>r.type==='launch').length;
+ for(let i=0;i<3;i++)p.ws.send(JSON.stringify(launch));
+ await until(()=>guest.ws.rows.filter(r=>r.type==='launch').length===before+3,'all repeated launches forwarded');
+ motion(4);await consume(4);
+ assert.equal(p.controlLane.socket,lane,'valid next delta must not close the low-latency lane');
+ assert.equal(p.controlLane.motionWire.stats().full,1,'no replacement full baseline was needed');
+ assert.equal(p.controlLane.motionWire.stats().delta,2);
+ assert.equal(p.stateCredits.stats().acked,0,'motion and duplicate launch cannot consume the full world');
+ assert.equal(guest.ws.readyState,WebSocket.OPEN);
+});
+
+test('duplicate LAN launch preserves an in-progress exact bulk reassembly without granting renderer credit',async t=>{
+ const {room,peer,guest,received,send,expected,release}=await partialChunkFixture(t);
+ const launches=guest.ws.rows.filter(r=>r.type==='launch').length;
+ peer.ws.send(JSON.stringify({type:'launch',matchId:room.match.id,syncId:peer.sync.id,minTick:peer.sync.tick}));
+ await until(()=>guest.ws.rows.filter(r=>r.type==='launch').length===launches+1,'duplicate between real chunks');
+ const consumed=peer.stateCredits.stats().acked;
+ release();await until(()=>received.length===1,'the original full world reassembled');
+ const restored=decodeBinaryState(new LanDeltaReceiver({motionReference:true}).decode(received[0]));
+ assert.deepEqual(restored,expected);
+ assert.equal(room.bulkScheduler.stats().completed,1);assert.equal(peer.stateCredits.stats().acked,consumed);
+ assert.equal(peer.stateCredits.stats().inflight,1,'transport reassembly is not renderer consumption');
+ guest.ws.send(JSON.stringify({type:'state-consumed',matchId:room.match.id,seq:2}));
+ await until(()=>peer.stateCredits.stats().inflight===0,'actual renderer receipt releases the world');
+ assert.equal(guest.ws.readyState,WebSocket.OPEN);assert.ok(peer.controlLane.socket);
+ // Still reusable after the interrupted publication: a fresh state can pass.
+ await wait(210);send(3);await until(()=>received.length===2,'next complete world');
+});
+
+for(const reset of ['new-sync','new-min-tick','invalid-min-tick','invalid-match','ended'])test('LAN launch still resets missing baselines for '+reset,async t=>{
+ const {room,clients,motion}=await roomFixture(t,2,{bridged:true}),p=room.peers[1],guest=clients[1];
+ motion(2);await until(()=>guest.ws.rows.some(r=>r.type==='motion'),'initial full motion');
+ guest.ws.send(JSON.stringify({type:'motion-consumed',matchId:room.match.id,syncId:p.sync.id,tick:2}));
+ await until(()=>p.motionWindow.active,'initial motion consumed');
+ const original={type:'launch',matchId:room.match.id,syncId:p.sync.id,minTick:p.sync.tick};
+ const changed={...original,...(reset==='new-sync'?{syncId:'different-sync'}:reset==='new-min-tick'?{minTick:p.sync.tick+1}:
+  reset==='invalid-min-tick'?{minTick:null}:reset==='invalid-match'?{matchId:null}:{type:'ended'})};
+ const before=guest.ws.rows.filter(r=>r.type==='launch').length;
+ p.ws.send(JSON.stringify(changed));p.ws.send(JSON.stringify(original));
+ await until(()=>guest.ws.rows.filter(r=>r.type==='launch').length===before+(reset==='ended'?1:2),'reset lifecycle forwarded');
+ // Deliberately send a real valid delta from the former encoder baseline.
+ // After an actual reset it must NOT be accepted as if its base still exists.
+ motion(3);await until(()=>!p.controlLane.socket,'missing baseline closes optional lane');
+ assert.ok(!guest.ws.rows.some(r=>r.type==='motion'&&motionFromText(r.data).tick===3));
+ assert.equal(guest.ws.readyState,WebSocket.OPEN,'primary fallback remains available');
 });

@@ -38,9 +38,9 @@ try{
  const page=await browser.newPage({viewport:{width:1440,height:900}});page.setDefaultTimeout(15000);page.on('pageerror',e=>{errors.push(e.message);console.error(e.message);});
  await page.route('**/game-assets/**',async route=>{const suffix=decodeURIComponent(new URL(route.request().url()).pathname.split('/game-assets/')[1]),assets=resolve(root,'public/game-assets'),path=resolve(assets,suffix);if(!path.startsWith(assets+sep))return route.abort();await route.fulfill({path});});
  await page.goto(server.resolvedUrls.local[0]+entry);
- const cap=page.getByRole('spinbutton',{name:'幅能容存器',exact:true}),vent=page.getByRole('spinbutton',{name:'耗散通道',exact:true});
- const plusCap=page.getByRole('button',{name:'增加幅能容存器',exact:true}),plusVent=page.getByRole('button',{name:'增加耗散通道',exact:true});
- const minusCap=page.getByRole('button',{name:'减少幅能容存器',exact:true});
+ const cap=page.getByRole('spinbutton',{name:'载荷容存器',exact:true}),vent=page.getByRole('spinbutton',{name:'耗散通道',exact:true});
+ const plusCap=page.getByRole('button',{name:'增加载荷容存器',exact:true}),plusVent=page.getByRole('button',{name:'增加耗散通道',exact:true});
+ const minusCap=page.getByRole('button',{name:'减少载荷容存器',exact:true});
  const state=()=>page.evaluate(()=>fixtureState);
  const load=async remaining=>{await page.evaluate(value=>fixtureApi.setDraft(fixtureApi.withBudget(value)),remaining);await page.waitForFunction(value=>fixtureState.op.remaining===value,remaining);};
  await cap.waitFor();assert.equal((await state()).op.remaining,1);assert.equal(await plusCap.isEnabled(),true);assert.equal(await plusVent.isEnabled(),true);
@@ -89,9 +89,27 @@ try{
  passed.push('mod inspection keyboard entry and close remain usable');
 
  const module=await page.evaluate(()=>fixtureApi.moduleCase());assert.ok(module.rootRemaining>0);assert.equal(module.childRemaining,0);
- await page.locator('.assembly-editor summary').click();await page.locator('.assembly-module-list button').first().click();
+ const moduleTarget=page.getByRole('button',{name:new RegExp('^改装模块 '+module.slot+' · ')});
+ await moduleTarget.waitFor();
+ assert.equal(await page.getByRole('region',{name:'模块改装导航'}).count(),0);
+ assert.equal(await page.locator('.assembly-editor').count(),0);
+ await moduleTarget.press('Enter');
+ assert.equal(await moduleTarget.getAttribute('aria-pressed'),'true');
  assert.equal(await plusCap.isDisabled(),true);assert.equal(await plusVent.isDisabled(),true);
+ await page.mouse.move(5,5);await page.screenshot({path:resolve(work,'module-without-navigation.png')});
+ await page.keyboard.press('Escape');
+ assert.equal(await page.getByRole('button',{name:'改装母舰',exact:true}).getAttribute('aria-pressed'),'true');
+ assert.equal(await plusCap.isEnabled(),true);
+ const stage=page.locator('.studio-ship'),vessel=await page.locator('.refit-vessel').boundingBox();
+ const beforeTransform=await stage.evaluate(element=>element.style.transform);
+ await page.mouse.move(vessel.x+vessel.width/2,vessel.y+vessel.height/2);await page.mouse.wheel(0,-100);
+ await page.waitForFunction(previous=>document.querySelector('.studio-ship').style.transform!==previous,beforeTransform);
+ const zoomedTransform=await stage.evaluate(element=>element.style.transform);
+ await page.keyboard.down('Shift');await page.mouse.down();await page.mouse.move(vessel.x+vessel.width/2+30,vessel.y+vessel.height/2+20);await page.mouse.up();await page.keyboard.up('Shift');
+ await page.waitForFunction(previous=>document.querySelector('.studio-ship').style.transform!==previous,zoomedTransform);
+ assert.equal(await page.getByRole('button',{name:'改装母舰',exact:true}).getAttribute('aria-pressed'),'true');
  assert.equal(await page.evaluate(()=>localStorage.getItem(fixtureApi.storageKey)),'fixture original bytes');
  passed.push('module zero-OP ceiling is independent of the parent ship budget; saved storage bytes never change');
+ passed.push('module navigation panel removed; hull selection, Escape to parent, zoom and Shift pan remain usable');
  assert.deepEqual(errors,[]);console.log(JSON.stringify({passed,errors},null,2));
 }finally{await browser?.close();await new Promise((res,rej)=>server.httpServer.close(e=>e?rej(e):res()));}

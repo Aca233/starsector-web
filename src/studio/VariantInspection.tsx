@@ -50,8 +50,8 @@ export function LoadoutSection({ draft, spec, onOpenCodex, moduleLabel, compact 
   return <section className="refit-loadout-section">
     {moduleLabel && <h4>{moduleLabel} · {data.ships[draft.hullId]?.name ?? draft.hullId}</h4>}
     <p className="refit-inspection-budget" data-invalid={op.remaining < 0}><RefitHoverTerm term="op">装配点</RefitHoverTerm> <strong>{op.used} / {op.total}</strong> · 剩余 {op.remaining}</p>
-    <p className="equipment-state">武器 {op.weaponOP} · 插件 {op.modOP} · 联队 {op.wingOP} · 幅能投资 {op.fluxOP} OP{spec.modules?.length ? '（仅本舰体；模块单独列出）' : ''}</p>
-    <p><RefitHoverTerm term="capacitors">幅能容存器</RefitHoverTerm> {draft.capacitors} · <RefitHoverTerm term="vents">耗散通道</RefitHoverTerm> {draft.vents}</p>
+    <p className="equipment-state">武器 {op.weaponOP} · 插件 {op.modOP} · 联队 {op.wingOP} · 载荷投资 {op.fluxOP} OP{spec.modules?.length ? '（仅本舰体；模块单独列出）' : ''}</p>
+    <p><RefitHoverTerm term="capacitors">载荷容存器</RefitHoverTerm> {draft.capacitors} · <RefitHoverTerm term="vents">耗散通道</RefitHoverTerm> {draft.vents}</p>
     <h4>武器 · {slots.length} 门</h4>
     {slots.length ? <ul className="refit-inspection-list">{[...batches.entries()].map(([key, members]) => {
       const slot = members[0];

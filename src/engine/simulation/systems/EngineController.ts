@@ -18,6 +18,7 @@ export interface EngineStatus extends ComponentHealthState {
 }
 
 export interface EngineControlContext {
+  maneuver?: [number, number, number];
   canRepair: boolean;
   repairTimeMultiplier: number;
   canRepairUnderFire: boolean;
@@ -61,12 +62,12 @@ export class EngineController {
         healthTracker: createComponentHealthTracker(repairDuration, random), contribution: 0,
         driftContribution: Math.max(-1, Math.min(1, slot.y / Math.max(.000001, spec.collisionRadius * .3))),
         systemActivated: slot.systemActivated ?? false, temporaryMalfunction: false, glowDisabled: false,
-        currentThrust: .4, prevThrust: .4, spread: 0, prevSpread: 0 };
+        currentThrust: slot.maneuver ? 0 : .4, prevThrust: slot.maneuver ? 0 : .4, spread: 0, prevSpread: 0 };
     });
-    let total = this.engines.filter(e => !e.systemActivated).reduce((sum, e) => sum + e.maxHealth, 0);
+    let total = this.engines.filter((e,i) => !e.systemActivated && !spec.engineSlots[i].maneuver).reduce((sum, e) => sum + e.maxHealth, 0);
     if (total <= 0) total = this.engines.reduce((sum, e) => sum + e.maxHealth, 0);
     if (total <= 0) total = 100;
-    for (const engine of this.engines) engine.contribution = engine.maxHealth / total;
+    this.engines.forEach((engine,i) => { engine.contribution = spec.engineSlots[i].maneuver ? 0 : engine.maxHealth / total; });
   }
 
   public get isFlamedOut(): boolean { return this.state !== 'READY'; }
@@ -201,7 +202,15 @@ export class EngineController {
     }
     this.sinceAcceleration += amount;
     this.sinceSpread += amount;
-    for (const engine of this.engines) {
+    for (const [index, engine] of this.engines.entries()) {
+      const jet = this.spec.engineSlots[index].maneuver;
+      if (jet) {
+        const force = context.maneuver ?? [0,0,0];
+        const target = engine.glowDisabled || engine.isDisabled || this.state !== 'READY' ? 0
+          : Math.min(1, Math.max(0, jet[0]*force[0], jet[1]*force[1], jet[2]*force[2]));
+        engine.currentThrust = target; engine.spread = 0;
+        continue;
+      }
       // Disabled/initial recovery take an early return, preserving spread and the
       // prior flame-shape mode while the engine fades or returns toward idle.
       if (engine.glowDisabled) { engine.currentThrust = Math.max(0, engine.currentThrust - amount); continue; }
@@ -221,10 +230,10 @@ export class EngineController {
     this.forcePending = false; this.suppressMessage = false;
     this.flameAccelerating = false; this.sinceAcceleration = this.sinceSpread = .05;
     this.clearEvents();
-    for (const engine of this.engines) {
+    for (const [index, engine] of this.engines.entries()) {
       engine.health = engine.maxHealth; engine.isDisabled = false; engine.isPermanentlyDisabled = false;
       engine.temporaryMalfunction = false; engine.glowDisabled = false;
-      engine.currentThrust = engine.prevThrust = .4; engine.spread = engine.prevSpread = 0;
+      engine.currentThrust = engine.prevThrust = this.spec.engineSlots[index].maneuver ? 0 : .4; engine.spread = engine.prevSpread = 0;
       engine.healthTracker.hitAgo = 0; engine.healthTracker.elapsed = 0; engine.healthTracker.intervalElapsed = false;
     }
   }

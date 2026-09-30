@@ -1,0 +1,16 @@
+/* Compatibility selectors for the shared transparent UI, not a second theme.
+ * Keep only the existing scene artwork and semantic legacy hooks. */
+.native-refit-app, .captain-skills-screen, .campaign-login, .native-loading {
+  background-image: linear-gradient(110deg,#080f18e6,#080f18b8),url('/game-assets/graphics/original-ui/observatory.png') !important;
+  background-position: center; background-size: cover;
+}
+.native-screen-tab { color: var(--ui-text); letter-spacing: 0; }
+.native-shortcut { color: var(--ui-highlight); }
+.native-green { color: var(--ui-success); }
+.native-numeric { color: var(--ui-highlight); }
+.native-refit-app :is(input,select,textarea), .campaign-login :is(input,select,textarea) {
+  color: var(--ui-text); background-color: var(--ds-surface-input); border-color: var(--ui-border); border-radius: var(--ui-radius-sm);
+}
+:where(.native-cargo-panel,.native-inventory-screen,.native-colony-panel,.campaign-inventory,.campaign-fleet-panel,.native-loot-panel) {
+  background-color: var(--ds-surface-floating); border-color: var(--ui-border);
+}

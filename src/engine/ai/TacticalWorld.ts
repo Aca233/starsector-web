@@ -1,3 +1,4 @@
+import type { NavigationObstacleIndex } from './NavigationObstacleIndex';
 import type { BeamThreatIndex } from './BeamThreatIndex';
 import type { FriendlyFireLaneIndex } from './FriendlyFireLaneIndex';
 import type { FleetPlan, FleetRole, FleetTask } from './FleetTactics';
@@ -5,7 +6,7 @@ import type { WeaponThreatEnvelope } from './WeaponThreatEnvelope';
 import type { ProjectileThreatIndex } from './ProjectileThreatIndex';
 import type { Ship } from '../simulation/Ship';
 import type { Projectile, Beam } from '../simulation/Weapon';
-import type { Asteroid } from '../simulation/CombatTypes';
+import type { Asteroid, HulkFragment } from '../simulation/CombatTypes';
 
 export interface TacticalWorld {
   fleetPlan?: FleetPlan;
@@ -17,11 +18,16 @@ export interface TacticalWorld {
   /** Exact authority-derived lifetime, supplied only by an immutable owner frame. */
   projectileLifetime?: (projectile: Projectile) => number;
   weaponThreatEnvelope?: WeaponThreatEnvelope;
+  /** Exact-only authored AI reuse; NEVER enables compactForecast cadence. */
+  exactWeaponThreatEnvelope?: WeaponThreatEnvelope;
   friendlyFireLaneIndex?: FriendlyFireLaneIndex;
+  /** Only supplied by a private Worker during the synchronous native AI phase. */
+  navigationObstacleIndex?: NavigationObstacleIndex;
   ships: readonly Ship[];
   projectiles: readonly Projectile[];
   beams: readonly Beam[];
   asteroids: readonly Asteroid[];
+  hulkFragments?: readonly HulkFragment[];
 }
 /** Explicit Web policy, NOT constants claimed to be a complete native BasicShipAI port. */
 export const tacticalPolicy = Object.freeze({

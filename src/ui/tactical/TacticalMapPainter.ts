@@ -1,3 +1,4 @@
+import { hullSpriteBounds } from '../../engine/runtime/HullPortraitView';
 import { sameTeam, combatTeamColor } from '../../engine/simulation/CombatTeams';
 import type { TacticalMapView, MapContact, MapPoint } from '../../engine/runtime/TacticalMapView';
 import { Vector2 } from '../../engine/math/Vector2';
@@ -33,7 +34,8 @@ export function zoomTacticalView(view: MapView, point: Vector2, size: number, fa
   view.center.add(anchor.sub(mapWorld(point, view, size, height)));
 }
 export function mapShipRadius(ship: MapContact, view: MapView, size: number): number {
-  return Math.max(8, Math.min(48, Math.max(ship.spec.spriteWidth, ship.spec.spriteHeight) * size / view.span / 2)) + 4;
+  const bounds = hullSpriteBounds(ship.hullSprites);
+  return Math.max(8, bounds.radius * Math.min(size/view.span, 88/Math.max(bounds.width,bounds.height))) + 4;
 }
 export function pickMapShip(map: TacticalMapView, point: Vector2, view: MapView, size: number, height = size): MapContact | undefined {
   return map.capitalShips
@@ -136,18 +138,22 @@ export class TacticalMapPainter {
       ctx.fillStyle = map.multiTeamBattle ? combatTeamColor(fighter.teamId) : sameTeam(fighter,map.playerShip) ? '#63bc45' : '#e94128';
       ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(-3, -2.5); ctx.lineTo(-2, 0); ctx.lineTo(-3, 2.5); ctx.closePath(); ctx.fill(); ctx.restore();
     }
+    let renderedModuleSprites = 0;
     for (const ship of living) {
       const p = mapPoint(ship.pos, view, size, height), r = mapShipRadius(ship, view, size);
       if (p.x < -r || p.y < -r || p.x > size + r || p.y > height + r) continue;
       const selected = map.selectedUnitId === ship.id || (map.selectedUnitId === 'fleet' && sameTeam(ship,map.playerShip));
       const color = map.multiTeamBattle ? combatTeamColor(ship.teamId) : sameTeam(ship,map.playerShip) ? '#98bc51' : '#bc641e';
-      const image = this.image(ship.spec.spriteUrl);
-      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(ship.facingRad + Math.PI / 2);
-      if (image) {
-        const hullScale = Math.min(scale, 88 / Math.max(ship.spec.spriteWidth, ship.spec.spriteHeight));
-        ctx.drawImage(image, -ship.spec.pivotX * hullScale, -ship.spec.pivotY * hullScale,
-          ship.spec.spriteWidth * hullScale, ship.spec.spriteHeight * hullScale);
-      } else { ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(0, -r / 2); ctx.lineTo(-r / 3, r / 2); ctx.lineTo(r / 3, r / 2); ctx.fill(); }
+      const bounds=hullSpriteBounds(ship.hullSprites),hullScale=Math.min(scale,88/Math.max(bounds.width,bounds.height));
+      ctx.save();ctx.translate(p.x,p.y);ctx.rotate(ship.facingRad+Math.PI/2);
+      let drawn=false;
+      for(const part of ship.hullSprites){
+        const image=this.image(part.spec.spriteUrl);if(!image)continue;
+        ctx.save();ctx.translate(part.y*hullScale,-part.x*hullScale);ctx.rotate(part.angle);ctx.globalAlpha=part.isDead?.18:1;
+        ctx.drawImage(image,-part.spec.pivotX*hullScale,-part.spec.pivotY*hullScale,part.spec.spriteWidth*hullScale,part.spec.spriteHeight*hullScale);
+        ctx.restore();drawn=true;if(part.id!==ship.id)renderedModuleSprites++;
+      }
+      if(!drawn){ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(0,-r/2);ctx.lineTo(-r/3,r/2);ctx.lineTo(r/3,r/2);ctx.fill();}
       ctx.restore();
       ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.globalAlpha = .85;
       if (sameTeam(ship,map.playerShip)) ctx.strokeRect(p.x - r, p.y - r, r * 2, r * 2);
@@ -162,6 +168,7 @@ export class TacticalMapPainter {
         ctx.fillStyle = map.multiTeamBattle ? color : '#62cbff'; ctx.beginPath(); ctx.moveTo(p.x, p.y - r - 15); ctx.lineTo(p.x - 3, p.y - r - 9); ctx.lineTo(p.x + 3, p.y - r - 9); ctx.fill();
       }
     }
+    ctx.canvas.dataset.renderedModuleSprites=String(renderedModuleSprites);
   }
   private brackets(ctx: CanvasRenderingContext2D, p: Vector2, rx: number, ry: number, color: string, length: number): void {
     ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.beginPath();

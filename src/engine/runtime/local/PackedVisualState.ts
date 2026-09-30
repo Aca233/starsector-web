@@ -11,8 +11,8 @@ const schema = (fields: readonly (readonly [string, FieldType])[]): Schema => {
 };
 const particle = schema([['pos','v'],['vel','v'],['life','n'],['maxLife','n'],['size','n'],['color','c3'],['alpha','n'],['material','s'],['startSize','n'],['endSize','n'],['peakAlpha','n'],['rampUpFraction','n'],['fadeOutFraction','n'],['drag','n'],['rotation','n'],['angularVel','n'],['stretch','n']]);
 const contrail = schema([['pos','v'],['vel','v'],['life','n'],['maxLife','n'],['size','n'],['maxSize','n'],['alpha','n'],['rotation','n'],['color','c3']]);
-const muzzle = schema([['pos','v'],['vel','v'],['size','n'],['life','n'],['maxLife','n'],['color','c4'],['blendMode','s']]);
-const glow = schema([['id','n'],['pos','v'],['vel','v'],['diameter','n'],['life','n'],['maxLife','n'],['peakAlpha','n'],['color','c3']]);
+const muzzle = schema([['pos','v'],['vel','v'],['size','n'],['life','n'],['maxLife','n'],['color','c4'],['blendMode','s'],['underHullShipId','s']]);
+const glow = schema([['id','n'],['pos','v'],['vel','v'],['diameter','n'],['life','n'],['maxLife','n'],['peakAlpha','n'],['color','c3'],['spriteUrl','s']]);
 const point = schema([['pos','v'],['age','n'],['duration','n'],['baseWidth','n'],['currentWidth','n'],['u','n'],['alpha','n']]);
 const strip = schema([['stripId','id'],['points',[point]],['color','c4'],['blendMode','s'],['widenMult','n'],['minSeg','n'],['isDetached','b'],['accumU','n']]);
 const puff = schema([['offset','v'],['velocity','v'],['startSize','n'],['endSize','n'],['texture','n'],['rotation','n']]);

@@ -1,6 +1,6 @@
 /** Read-only index for deeply frozen authored outlines. Mutable/extreme queries use the legacy path. */
 type Point = { x: number; y: number };
-type Polygon = [number, number][];
+type Polygon = readonly (readonly [number, number])[];
 interface Node { minX: number; maxX: number; minY: number; maxY: number; end: number; edge: number }
 interface Index { nodes: Node[]; scale: number }
 const compiled = new WeakMap<Polygon, Index>();

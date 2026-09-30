@@ -1,48 +1,16 @@
 {
   "schemaVersion": 1,
-  "contentVersion": "1.0.0",
+  "contentVersion": "custom-entities-retained-combat-media-2026-09-26",
   "ships": [
-    "onslaught",
-    "paragon",
-    "doom",
-    "broadsword",
-    "dagger"
+    "web_zhuyuan",
+    "web_gloriana",
+    "web_sc2_hyperion"
   ],
-  "weapons": [
-    "tpc",
-    "tachyonlance",
-    "autopulse",
-    "mark9",
-    "heavymauler",
-    "hveldriver",
-    "annihilatorpod",
-    "gravitonbeam",
-    "taclaser",
-    "heavyblaster",
-    "typhoon",
-    "sabot",
-    "lightmg",
-    "pdburst",
-    "atropos_single",
-    "flak",
-    "dualflak"
-  ],
-  "loadouts": [
-    { "id": "onslaught-default", "shipId": "onslaught", "source": "ship-defaults" },
-    { "id": "paragon-default", "shipId": "paragon", "source": "ship-defaults" },
-    { "id": "doom-default", "shipId": "doom", "source": "ship-defaults" },
-    { "id": "broadsword-default", "shipId": "broadsword", "source": "ship-defaults" },
-    { "id": "dagger-default", "shipId": "dagger", "source": "ship-defaults" }
-  ],
+  "weapons": [],
+  "loadouts": [],
   "locales": [
     "zh_CN",
     "en_US"
   ],
-  "visualProfiles": [
-    "lowTech",
-    "highTech",
-    "LOW_TECH",
-    "HIGH_TECH",
-    "MIDLINE"
-  ]
+  "visualProfiles": []
 }

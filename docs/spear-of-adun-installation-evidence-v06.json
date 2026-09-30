@@ -1,0 +1,2209 @@
+{
+  "source": {
+    "author": "Catholomew",
+    "url": "https://sketchfab.com/3d-models/spear-of-adun-protoss-starcraft-2-7582ff949a4844e4bbc32ea93de2b8ec",
+    "license": "CC BY-NC 4.0; underlying game IP permissions not resolved for distribution",
+    "gltfSha256": "64a6bc317fbab6bcfad4369be000dfaecf94fc8c0351bb0210bdb6914b468c40",
+    "bufferSha256": "b1785232c7c079f7ed8e66e35b8c9112253c1599c6591bbc6575acea95e021b4",
+    "sourceBlendSha256": "276f1da0218787a451a05409dcc3f07f687e0541ac26db8ca24210eb678ba95e",
+    "planSha256": "ed60045d2a49c8a43ac2ba94a440a371860ffa5946f94d9206aed4d38d41923e"
+  },
+  "calibration": {
+    "schemaVersion": 1,
+    "stage": "SAMPLED_GEOMETRY_NOT_FINAL_WEAPON_ACCEPTANCE",
+    "sourceImageSize": [
+      512,
+      1024
+    ],
+    "corePhaseCount": 72,
+    "foreStates": [
+      "closed",
+      "open"
+    ],
+    "sites": [
+      {
+        "id": "BOW_GUARD_PORT",
+        "role": "BOW_GUARD",
+        "owner": "FIXED_HULL",
+        "binding": "OPEN_SAME_SIZE",
+        "size": "SMALL",
+        "imageAnchorPx": [
+          232,
+          218
+        ],
+        "bearingRadiusPx": 4,
+        "weaponMotion": "TURRET",
+        "approvedFiringArcDeg": null,
+        "artFitAccepted": false,
+        "sourceSurface": {
+          "object": "Object_37",
+          "category": "FIXED_HULL",
+          "activeGroups": [
+            "Object8810_34"
+          ],
+          "parentChains": {
+            "Object8810_34": [
+              "Object8810_34",
+              "GLTF_created_0_rootJoint"
+            ]
+          }
+        },
+        "restWorldAnchor": [
+          0.20848123729228973,
+          -2.5538322925567627,
+          0.07152557373046875
+        ],
+        "restWorldNormal": [
+          -0.386575311422348,
+          0.17200952768325806,
+          0.906075119972229
+        ],
+        "maxAnchorDriftModelUnits": 0,
+        "testedPoses": 144,
+        "footprintProbeCount": 33,
+        "minimumFixedCoverage": 1,
+        "blockers": {},
+        "firstFailure": null,
+        "sampledSupportPassed": true
+      },
+      {
+        "id": "BOW_GUARD_STARBOARD",
+        "role": "BOW_GUARD",
+        "owner": "FIXED_HULL",
+        "binding": "OPEN_SAME_SIZE",
+        "size": "SMALL",
+        "imageAnchorPx": [
+          280,
+          218
+        ],
+        "bearingRadiusPx": 4,
+        "weaponMotion": "TURRET",
+        "approvedFiringArcDeg": null,
+        "artFitAccepted": false,
+        "sourceSurface": {
+          "object": "Object_37",
+          "category": "FIXED_HULL",
+          "activeGroups": [
+            "Object8810_34"
+          ],
+          "parentChains": {
+            "Object8810_34": [
+              "Object8810_34",
+              "GLTF_created_0_rootJoint"
+            ]
+          }
+        },
+        "restWorldAnchor": [
+          -0.20848925411701202,
+          -2.5538322925567627,
+          0.07152938842773438
+        ],
+        "restWorldNormal": [
+          0.3865757882595062,
+          0.17200951278209686,
+          0.9060750603675842
+        ],
+        "maxAnchorDriftModelUnits": 0,
+        "testedPoses": 144,
+        "footprintProbeCount": 33,
+        "minimumFixedCoverage": 1,
+        "blockers": {},
+        "firstFailure": null,
+        "sampledSupportPassed": true
+      },
+      {
+        "id": "FORE_SHOULDER_PORT",
+        "role": "FORE_SHOULDER",
+        "owner": "FIXED_HULL",
+        "binding": "OPEN_SAME_SIZE",
+        "size": "MEDIUM",
+        "imageAnchorPx": [
+          207,
+          298
+        ],
+        "bearingRadiusPx": 7,
+        "weaponMotion": "TURRET",
+        "approvedFiringArcDeg": null,
+        "artFitAccepted": false,
+        "sourceSurface": {
+          "object": "Object_19",
+          "category": "FIXED_HULL",
+          "activeGroups": [
+            "1_24"
+          ],
+          "parentChains": {
+            "1_24": [
+              "1_24",
+              "GLTF_created_0_rootJoint"
+            ]
+          }
+        },
+        "restWorldAnchor": [
+          0.4256533086299896,
+          -1.8588813543319702,
+          0.4011344909667969
+        ],
+        "restWorldNormal": [
+          0.6057705283164978,
+          -0.16231688857078552,
+          0.7789064049720764
+        ],
+        "maxAnchorDriftModelUnits": 0,
+        "testedPoses": 144,
+        "footprintProbeCount": 33,
+        "minimumFixedCoverage": 1,
+        "blockers": {},
+        "firstFailure": null,
+        "sampledSupportPassed": true
+      },
+      {
+        "id": "FORE_SHOULDER_STARBOARD",
+        "role": "FORE_SHOULDER",
+        "owner": "FIXED_HULL",
+        "binding": "OPEN_SAME_SIZE",
+        "size": "MEDIUM",
+        "imageAnchorPx": [
+          305,
+          298
+        ],
+        "bearingRadiusPx": 7,
+        "weaponMotion": "TURRET",
+        "approvedFiringArcDeg": null,
+        "artFitAccepted": false,
+        "sourceSurface": {
+          "object": "Object_19",
+          "category": "FIXED_HULL",
+          "activeGroups": [
+            "1_24"
+          ],
+          "parentChains": {
+            "1_24": [
+              "1_24",
+              "GLTF_created_0_rootJoint"
+            ]
+          }
+        },
+        "restWorldAnchor": [
+          -0.42566147446632385,
+          -1.8588813543319702,
+          0.4011268615722656
+        ],
+        "restWorldNormal": [
+          -0.6057705283164978,
+          -0.1623154580593109,
+          0.7789068818092346
+        ],
+        "maxAnchorDriftModelUnits": 0,
+        "testedPoses": 144,
+        "footprintProbeCount": 33,
+        "minimumFixedCoverage": 1,
+        "blockers": {},
+        "firstFailure": null,
+        "sampledSupportPassed": true
+      },
+      {
+        "id": "AFT_SHOULDER_PORT",
+        "role": "AFT_SHOULDER",
+        "owner": "FIXED_HULL",
+        "binding": "OPEN_SAME_SIZE",
+        "size": "MEDIUM",
+        "imageAnchorPx": [
+          205,
+          724
+        ],
+        "bearingRadiusPx": 7,
+        "weaponMotion": "TURRET",
+        "approvedFiringArcDeg": null,
+        "artFitAccepted": false,
+        "sourceSurface": {
+          "object": "Object_63",
+          "category": "FIXED_HULL",
+          "activeGroups": [
+            "lp_backwing05_48"
+          ],
+          "parentChains": {
+            "lp_backwing05_48": [
+              "lp_backwing05_48",
+              "GLTF_created_0_rootJoint"
+            ]
+          }
+        },
+        "restWorldAnchor": [
+          0.44302675127983093,
+          1.8417317867279053,
+          0.402862548828125
+        ],
+        "restWorldNormal": [
+          0.9069096446037292,
+          -0.14416369795799255,
+          0.3958934247493744
+        ],
+        "maxAnchorDriftModelUnits": 0,
+        "testedPoses": 144,
+        "footprintProbeCount": 33,
+        "minimumFixedCoverage": 1,
+        "blockers": {},
+        "firstFailure": null,
+        "sampledSupportPassed": true
+      },
+      {
+        "id": "AFT_SHOULDER_STARBOARD",
+        "role": "AFT_SHOULDER",
+        "owner": "FIXED_HULL",
+        "binding": "OPEN_SAME_SIZE",
+        "size": "MEDIUM",
+        "imageAnchorPx": [
+          307,
+          724
+        ],
+        "bearingRadiusPx": 7,
+        "weaponMotion": "TURRET",
+        "approvedFiringArcDeg": null,
+        "artFitAccepted": false,
+        "sourceSurface": {
+          "object": "Object_63",
+          "category": "FIXED_HULL",
+          "activeGroups": [
+            "lp_backwing05_48"
+          ],
+          "parentChains": {
+            "lp_backwing05_48": [
+              "lp_backwing05_48",
+              "GLTF_created_0_rootJoint"
+            ]
+          }
+        },
+        "restWorldAnchor": [
+          -0.4430355131626129,
+          1.8417317867279053,
+          0.40285491943359375
+        ],
+        "restWorldNormal": [
+          -0.9069095253944397,
+          -0.14416329562664032,
+          0.3958938419818878
+        ],
+        "maxAnchorDriftModelUnits": 0,
+        "testedPoses": 144,
+        "footprintProbeCount": 33,
+        "minimumFixedCoverage": 1,
+        "blockers": {},
+        "firstFailure": null,
+        "sampledSupportPassed": true
+      },
+      {
+        "id": "AFT_BATTERY_PORT",
+        "role": "AFT_BATTERY",
+        "owner": "FIXED_HULL",
+        "binding": "OPEN_SAME_SIZE",
+        "size": "LARGE",
+        "imageAnchorPx": [
+          161,
+          789
+        ],
+        "bearingRadiusPx": 10,
+        "weaponMotion": "TURRET",
+        "approvedFiringArcDeg": null,
+        "artFitAccepted": false,
+        "sourceSurface": {
+          "object": "Object_93",
+          "category": "FIXED_HULL",
+          "activeGroups": [
+            "Object8861_65"
+          ],
+          "parentChains": {
+            "Object8861_65": [
+              "Object8861_65",
+              "GLTF_created_0_rootJoint"
+            ]
+          }
+        },
+        "restWorldAnchor": [
+          0.8252496123313904,
+          2.406379222869873,
+          0.9118003845214844
+        ],
+        "restWorldNormal": [
+          0.5833687782287598,
+          -0.08152531087398529,
+          0.8081055283546448
+        ],
+        "maxAnchorDriftModelUnits": 0,
+        "testedPoses": 144,
+        "footprintProbeCount": 33,
+        "minimumFixedCoverage": 1,
+        "blockers": {},
+        "firstFailure": null,
+        "sampledSupportPassed": true
+      },
+      {
+        "id": "AFT_BATTERY_STARBOARD",
+        "role": "AFT_BATTERY",
+        "owner": "FIXED_HULL",
+        "binding": "OPEN_SAME_SIZE",
+        "size": "LARGE",
+        "imageAnchorPx": [
+          351,
+          789
+        ],
+        "bearingRadiusPx": 10,
+        "weaponMotion": "TURRET",
+        "approvedFiringArcDeg": null,
+        "artFitAccepted": false,
+        "sourceSurface": {
+          "object": "Object_93",
+          "category": "FIXED_HULL",
+          "activeGroups": [
+            "Object8861_65"
+          ],
+          "parentChains": {
+            "Object8861_65": [
+              "Object8861_65",
+              "GLTF_created_0_rootJoint"
+            ]
+          }
+        },
+        "restWorldAnchor": [
+          -0.8252585530281067,
+          2.406379222869873,
+          0.9117965698242188
+        ],
+        "restWorldNormal": [
+          -0.5833685398101807,
+          -0.08152803778648376,
+          0.8081054091453552
+        ],
+        "maxAnchorDriftModelUnits": 0,
+        "testedPoses": 144,
+        "footprintProbeCount": 33,
+        "minimumFixedCoverage": 1,
+        "blockers": {},
+        "firstFailure": null,
+        "sampledSupportPassed": true
+      },
+      {
+        "id": "AFT_OUTER_GUARD_PORT",
+        "role": "AFT_OUTER_GUARD",
+        "owner": "FIXED_HULL",
+        "binding": "OPEN_SAME_SIZE",
+        "size": "SMALL",
+        "imageAnchorPx": [
+          112,
+          802
+        ],
+        "bearingRadiusPx": 4,
+        "weaponMotion": "TURRET",
+        "approvedFiringArcDeg": null,
+        "artFitAccepted": false,
+        "sourceSurface": {
+          "object": "Object_93",
+          "category": "FIXED_HULL",
+          "activeGroups": [
+            "Object8861_65"
+          ],
+          "parentChains": {
+            "Object8861_65": [
+              "Object8861_65",
+              "GLTF_created_0_rootJoint"
+            ]
+          }
+        },
+        "restWorldAnchor": [
+          1.250907063484192,
+          2.5193088054656982,
+          0.5400199890136719
+        ],
+        "restWorldNormal": [
+          0.7244572639465332,
+          -0.1459950953722,
+          0.6736817359924316
+        ],
+        "maxAnchorDriftModelUnits": 0,
+        "testedPoses": 144,
+        "footprintProbeCount": 33,
+        "minimumFixedCoverage": 1,
+        "blockers": {},
+        "firstFailure": null,
+        "sampledSupportPassed": true
+      },
+      {
+        "id": "AFT_OUTER_GUARD_STARBOARD",
+        "role": "AFT_OUTER_GUARD",
+        "owner": "FIXED_HULL",
+        "binding": "OPEN_SAME_SIZE",
+        "size": "SMALL",
+        "imageAnchorPx": [
+          400,
+          802
+        ],
+        "bearingRadiusPx": 4,
+        "weaponMotion": "TURRET",
+        "approvedFiringArcDeg": null,
+        "artFitAccepted": false,
+        "sourceSurface": {
+          "object": "Object_93",
+          "category": "FIXED_HULL",
+          "activeGroups": [
+            "Object8861_65"
+          ],
+          "parentChains": {
+            "Object8861_65": [
+              "Object8861_65",
+              "GLTF_created_0_rootJoint"
+            ]
+          }
+        },
+        "restWorldAnchor": [
+          -1.2509158849716187,
+          2.5193088054656982,
+          0.5400199890136719
+        ],
+        "restWorldNormal": [
+          -0.724454939365387,
+          -0.14599521458148956,
+          0.6736841797828674
+        ],
+        "maxAnchorDriftModelUnits": 0,
+        "testedPoses": 144,
+        "footprintProbeCount": 33,
+        "minimumFixedCoverage": 1,
+        "blockers": {},
+        "firstFailure": null,
+        "sampledSupportPassed": true
+      },
+      {
+        "id": "STERN_GUARD_PORT",
+        "role": "STERN_GUARD",
+        "owner": "FIXED_HULL",
+        "binding": "OPEN_SAME_SIZE",
+        "size": "SMALL",
+        "imageAnchorPx": [
+          220,
+          828
+        ],
+        "bearingRadiusPx": 4,
+        "weaponMotion": "TURRET",
+        "approvedFiringArcDeg": null,
+        "artFitAccepted": false,
+        "sourceSurface": {
+          "object": "Object_93",
+          "category": "FIXED_HULL",
+          "activeGroups": [
+            "Object8861_65"
+          ],
+          "parentChains": {
+            "Object8861_65": [
+              "Object8861_65",
+              "GLTF_created_0_rootJoint"
+            ]
+          }
+        },
+        "restWorldAnchor": [
+          0.31272339820861816,
+          2.7451677322387695,
+          1.3535575866699219
+        ],
+        "restWorldNormal": [
+          0.19471627473831177,
+          -0.11971881240606308,
+          0.973526120185852
+        ],
+        "maxAnchorDriftModelUnits": 0,
+        "testedPoses": 144,
+        "footprintProbeCount": 33,
+        "minimumFixedCoverage": 1,
+        "blockers": {},
+        "firstFailure": null,
+        "sampledSupportPassed": true
+      },
+      {
+        "id": "STERN_GUARD_STARBOARD",
+        "role": "STERN_GUARD",
+        "owner": "FIXED_HULL",
+        "binding": "OPEN_SAME_SIZE",
+        "size": "SMALL",
+        "imageAnchorPx": [
+          292,
+          828
+        ],
+        "bearingRadiusPx": 4,
+        "weaponMotion": "TURRET",
+        "approvedFiringArcDeg": null,
+        "artFitAccepted": false,
+        "sourceSurface": {
+          "object": "Object_93",
+          "category": "FIXED_HULL",
+          "activeGroups": [
+            "Object8861_65"
+          ],
+          "parentChains": {
+            "Object8861_65": [
+              "Object8861_65",
+              "GLTF_created_0_rootJoint"
+            ]
+          }
+        },
+        "restWorldAnchor": [
+          -0.3127323389053345,
+          2.7451677322387695,
+          1.3535575866699219
+        ],
+        "restWorldNormal": [
+          -0.19471628963947296,
+          -0.11971889436244965,
+          0.9735260009765625
+        ],
+        "maxAnchorDriftModelUnits": 0,
+        "testedPoses": 144,
+        "footprintProbeCount": 33,
+        "minimumFixedCoverage": 1,
+        "blockers": {},
+        "firstFailure": null,
+        "sampledSupportPassed": true
+      }
+    ],
+    "runtimeRegistered": false,
+    "newWeaponArtComplete": false,
+    "firingClearanceTested": false,
+    "sampledOcclusionOnlyNotContinuousCollisionProof": true
+  },
+  "regions": {
+    "schemaVersion": 1,
+    "sourceBlend": "output/spear-of-adun-art/core-motion-v01/core-motion.blend",
+    "imageSize": [
+      512,
+      1024
+    ],
+    "cameraOrthoScale": 8.895370483398438,
+    "objects": [
+      {
+        "object": "Object_7",
+        "category": "ROTATING_CORE",
+        "activeGroups": [
+          "Object8549_0"
+        ],
+        "parentChains": {
+          "Object8549_0": [
+            "Object8549_0",
+            "Ctrl_Core_Outter_1",
+            "Ctrl_Root_Front_16",
+            "Ctrl_Root_18",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 23320,
+        "triangles": 29448,
+        "boundsPx": [
+          119.18189239501953,
+          361.2889404296875,
+          392.817138671875,
+          706.7703247070312
+        ],
+        "materials": [
+          "Material.001"
+        ]
+      },
+      {
+        "object": "Object_9",
+        "category": "ROTATING_CORE",
+        "activeGroups": [
+          "Ctrl_Core_Outter_1"
+        ],
+        "parentChains": {
+          "Ctrl_Core_Outter_1": [
+            "Ctrl_Core_Outter_1",
+            "Ctrl_Root_Front_16",
+            "Ctrl_Root_18",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 3784,
+        "triangles": 5304,
+        "boundsPx": [
+          141.92135620117188,
+          555.1541748046875,
+          370.0775451660156,
+          643.5181274414062
+        ],
+        "materials": [
+          "Material.020"
+        ]
+      },
+      {
+        "object": "Object_11",
+        "category": "ROTATING_CORE",
+        "activeGroups": [
+          "Ctrl_Core_Outter_1",
+          "Ctrl_Core_Inner_2"
+        ],
+        "parentChains": {
+          "Ctrl_Core_Outter_1": [
+            "Ctrl_Core_Outter_1",
+            "Ctrl_Root_Front_16",
+            "Ctrl_Root_18",
+            "GLTF_created_0_rootJoint"
+          ],
+          "Ctrl_Core_Inner_2": [
+            "Ctrl_Core_Inner_2",
+            "Ctrl_Root_Front_16",
+            "Ctrl_Root_18",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 13693,
+        "triangles": 20568,
+        "boundsPx": [
+          180.4580535888672,
+          281.4969482421875,
+          331.54119873046875,
+          564.4443054199219
+        ],
+        "materials": [
+          "Material.010"
+        ]
+      },
+      {
+        "object": "Object_13",
+        "category": "ROTATING_CORE",
+        "activeGroups": [
+          "Ctrl_Core_Outter_1",
+          "Ctrl_Core_Inner_2"
+        ],
+        "parentChains": {
+          "Ctrl_Core_Outter_1": [
+            "Ctrl_Core_Outter_1",
+            "Ctrl_Root_Front_16",
+            "Ctrl_Root_18",
+            "GLTF_created_0_rootJoint"
+          ],
+          "Ctrl_Core_Inner_2": [
+            "Ctrl_Core_Inner_2",
+            "Ctrl_Root_Front_16",
+            "Ctrl_Root_18",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 2326,
+        "triangles": 3400,
+        "boundsPx": [
+          165.233154296875,
+          376.644287109375,
+          346.7657165527344,
+          577.3025207519531
+        ],
+        "materials": [
+          "Material.027"
+        ]
+      },
+      {
+        "object": "Object_17",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8850_23"
+        ],
+        "parentChains": {
+          "Object8850_23": [
+            "Object8850_23",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 152,
+        "triangles": 200,
+        "boundsPx": [
+          219.86572265625,
+          210.70556640625,
+          292.1335144042969,
+          232.98992919921875
+        ],
+        "materials": [
+          "Material.009"
+        ]
+      },
+      {
+        "object": "Object_19",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "1_24"
+        ],
+        "parentChains": {
+          "1_24": [
+            "1_24",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 1736,
+        "triangles": 2272,
+        "boundsPx": [
+          183.52378845214844,
+          277.832763671875,
+          328.4752502441406,
+          316.22186279296875
+        ],
+        "materials": [
+          "Material.009"
+        ]
+      },
+      {
+        "object": "Object_21",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "002_25"
+        ],
+        "parentChains": {
+          "002_25": [
+            "002_25",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 2004,
+        "triangles": 2040,
+        "boundsPx": [
+          130.9720458984375,
+          802.30078125,
+          381.0269470214844,
+          823.4860382080078
+        ],
+        "materials": [
+          "Material.021"
+        ]
+      },
+      {
+        "object": "Object_23",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8848_26"
+        ],
+        "parentChains": {
+          "Object8848_26": [
+            "Object8848_26",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 68,
+        "triangles": 64,
+        "boundsPx": [
+          273.2251281738281,
+          307.47955322265625,
+          275.1744079589844,
+          309.25384521484375
+        ],
+        "materials": [
+          "material_0"
+        ]
+      },
+      {
+        "object": "Object_25",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8849_27"
+        ],
+        "parentChains": {
+          "Object8849_27": [
+            "Object8849_27",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 437,
+        "triangles": 582,
+        "boundsPx": [
+          258.9371643066406,
+          218.7298583984375,
+          275.58203125,
+          302.39410400390625
+        ],
+        "materials": [
+          "Material.009"
+        ]
+      },
+      {
+        "object": "Object_27",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8847_28"
+        ],
+        "parentChains": {
+          "Object8847_28": [
+            "Object8847_28",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 444,
+        "triangles": 538,
+        "boundsPx": [
+          259.0369873046875,
+          241.19219970703125,
+          277.9770202636719,
+          312.2156982421875
+        ],
+        "materials": [
+          "Material.009"
+        ]
+      },
+      {
+        "object": "Object_29",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8846_29"
+        ],
+        "parentChains": {
+          "Object8846_29": [
+            "Object8846_29",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 437,
+        "triangles": 582,
+        "boundsPx": [
+          236.41912841796875,
+          218.7298583984375,
+          253.06399536132812,
+          302.39404296875
+        ],
+        "materials": [
+          "Material.009"
+        ]
+      },
+      {
+        "object": "Object_31",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8775_30"
+        ],
+        "parentChains": {
+          "Object8775_30": [
+            "Object8775_30",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 1288,
+        "triangles": 1096,
+        "boundsPx": [
+          110.72129821777344,
+          769.5079803466797,
+          401.2776794433594,
+          822.8952331542969
+        ],
+        "materials": [
+          "Material.024"
+        ]
+      },
+      {
+        "object": "Object_33",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8769_31"
+        ],
+        "parentChains": {
+          "Object8769_31": [
+            "Object8769_31",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 392,
+        "triangles": 624,
+        "boundsPx": [
+          211.83502197265625,
+          640.537841796875,
+          300.1640319824219,
+          654.2743225097656
+        ],
+        "materials": [
+          "Material.026"
+        ]
+      },
+      {
+        "object": "Object_35",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8818_33"
+        ],
+        "parentChains": {
+          "Object8818_33": [
+            "Object8818_33",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 3562,
+        "triangles": 4448,
+        "boundsPx": [
+          222.26222229003906,
+          24.0,
+          289.73687744140625,
+          169.9598388671875
+        ],
+        "materials": [
+          "Material.008"
+        ]
+      },
+      {
+        "object": "Object_37",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8810_34"
+        ],
+        "parentChains": {
+          "Object8810_34": [
+            "Object8810_34",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 8669,
+        "triangles": 10609,
+        "boundsPx": [
+          182.49960327148438,
+          108.29425048828125,
+          329.4995422363281,
+          329.02081298828125
+        ],
+        "materials": [
+          "Material.007"
+        ]
+      },
+      {
+        "object": "Object_39",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8837_35"
+        ],
+        "parentChains": {
+          "Object8837_35": [
+            "Object8837_35",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 68,
+        "triangles": 64,
+        "boundsPx": [
+          272.53839111328125,
+          304.7218017578125,
+          274.4876708984375,
+          306.49609375
+        ],
+        "materials": [
+          "material_0"
+        ]
+      },
+      {
+        "object": "Object_41",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8836_36"
+        ],
+        "parentChains": {
+          "Object8836_36": [
+            "Object8836_36",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 68,
+        "triangles": 64,
+        "boundsPx": [
+          236.82469177246094,
+          307.47955322265625,
+          238.77395629882812,
+          309.25384521484375
+        ],
+        "materials": [
+          "material_0"
+        ]
+      },
+      {
+        "object": "Object_43",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8835_37"
+        ],
+        "parentChains": {
+          "Object8835_37": [
+            "Object8835_37",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 68,
+        "triangles": 64,
+        "boundsPx": [
+          237.51145935058594,
+          304.7218017578125,
+          239.46070861816406,
+          306.49609375
+        ],
+        "materials": [
+          "material_0"
+        ]
+      },
+      {
+        "object": "Object_45",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8843_38"
+        ],
+        "parentChains": {
+          "Object8843_38": [
+            "Object8843_38",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 102,
+        "triangles": 92,
+        "boundsPx": [
+          269.0018310546875,
+          280.79620361328125,
+          274.178466796875,
+          301.370361328125
+        ],
+        "materials": [
+          "material_0"
+        ]
+      },
+      {
+        "object": "Object_47",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8828_39"
+        ],
+        "parentChains": {
+          "Object8828_39": [
+            "Object8828_39",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 1228,
+        "triangles": 1684,
+        "boundsPx": [
+          245.3447265625,
+          232.4315185546875,
+          266.6566162109375,
+          338.746337890625
+        ],
+        "materials": [
+          "Material.019"
+        ]
+      },
+      {
+        "object": "Object_49",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8827_40"
+        ],
+        "parentChains": {
+          "Object8827_40": [
+            "Object8827_40",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 97,
+        "triangles": 124,
+        "boundsPx": [
+          266.95965576171875,
+          273.45703125,
+          272.99359130859375,
+          299.41802978515625
+        ],
+        "materials": [
+          "Material.009"
+        ]
+      },
+      {
+        "object": "Object_51",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8838_41"
+        ],
+        "parentChains": {
+          "Object8838_41": [
+            "Object8838_41",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 97,
+        "triangles": 124,
+        "boundsPx": [
+          239.0076446533203,
+          273.45703125,
+          245.04156494140625,
+          299.41802978515625
+        ],
+        "materials": [
+          "Material.009"
+        ]
+      },
+      {
+        "object": "Object_53",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8842_42"
+        ],
+        "parentChains": {
+          "Object8842_42": [
+            "Object8842_42",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 102,
+        "triangles": 92,
+        "boundsPx": [
+          237.82275390625,
+          280.79620361328125,
+          242.99940490722656,
+          301.370361328125
+        ],
+        "materials": [
+          "material_0"
+        ]
+      },
+      {
+        "object": "Object_55",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8830_44"
+        ],
+        "parentChains": {
+          "Object8830_44": [
+            "Object8830_44",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 444,
+        "triangles": 538,
+        "boundsPx": [
+          234.02415466308594,
+          241.192138671875,
+          252.96420288085938,
+          312.2156982421875
+        ],
+        "materials": [
+          "Material.009"
+        ]
+      },
+      {
+        "object": "Object_57",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8755_45"
+        ],
+        "parentChains": {
+          "Object8755_45": [
+            "Object8755_45",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 2457,
+        "triangles": 3710,
+        "boundsPx": [
+          233.68118286132812,
+          510.791015625,
+          278.3176574707031,
+          605.3170776367188
+        ],
+        "materials": [
+          "Material.004"
+        ]
+      },
+      {
+        "object": "Object_59",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "lp_backwing_08_46"
+        ],
+        "parentChains": {
+          "lp_backwing_08_46": [
+            "lp_backwing_08_46",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 2764,
+        "triangles": 3224,
+        "boundsPx": [
+          205.77218627929688,
+          721.8111572265625,
+          306.2268371582031,
+          1000.0000133514404
+        ],
+        "materials": [
+          "Material.013"
+        ]
+      },
+      {
+        "object": "Object_61",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "lp_backwing_07_47"
+        ],
+        "parentChains": {
+          "lp_backwing_07_47": [
+            "lp_backwing_07_47",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 3669,
+        "triangles": 5047,
+        "boundsPx": [
+          94.6879653930664,
+          643.7437438964844,
+          417.31109619140625,
+          835.0138244628906
+        ],
+        "materials": [
+          "Material.005"
+        ]
+      },
+      {
+        "object": "Object_63",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "lp_backwing05_48"
+        ],
+        "parentChains": {
+          "lp_backwing05_48": [
+            "lp_backwing05_48",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 2412,
+        "triangles": 3224,
+        "boundsPx": [
+          197.4285430908203,
+          644.4214782714844,
+          314.57110595703125,
+          852.7093505859375
+        ],
+        "materials": [
+          "Material.002"
+        ]
+      },
+      {
+        "object": "Object_65",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8750_49"
+        ],
+        "parentChains": {
+          "Object8750_49": [
+            "Object8750_49",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 684,
+        "triangles": 668,
+        "boundsPx": [
+          106.73307800292969,
+          792.7906951904297,
+          405.2658996582031,
+          825.2865905761719
+        ],
+        "materials": [
+          "Material.023"
+        ]
+      },
+      {
+        "object": "Object_67",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "lp_backwing06_50"
+        ],
+        "parentChains": {
+          "lp_backwing06_50": [
+            "lp_backwing06_50",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 6494,
+        "triangles": 8756,
+        "boundsPx": [
+          159.6085662841797,
+          642.7740173339844,
+          352.39044189453125,
+          836.2593994140625
+        ],
+        "materials": [
+          "Material.014"
+        ]
+      },
+      {
+        "object": "Object_69",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "lowpoly_51"
+        ],
+        "parentChains": {
+          "lowpoly_51": [
+            "lowpoly_51",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 172,
+        "triangles": 224,
+        "boundsPx": [
+          223.2261962890625,
+          642.7740173339844,
+          288.7728271484375,
+          656.9243469238281
+        ],
+        "materials": [
+          "Material.025"
+        ]
+      },
+      {
+        "object": "Object_71",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "lp_front_floaters4_52"
+        ],
+        "parentChains": {
+          "lp_front_floaters4_52": [
+            "lp_front_floaters4_52",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 8676,
+        "triangles": 10718,
+        "boundsPx": [
+          174.00552368164062,
+          258.50189208984375,
+          337.99365234375,
+          330.891357421875
+        ],
+        "materials": [
+          "Material.012"
+        ]
+      },
+      {
+        "object": "Object_73",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8553_53"
+        ],
+        "parentChains": {
+          "Object8553_53": [
+            "Object8553_53",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 1900,
+        "triangles": 3436,
+        "boundsPx": [
+          239.78515625,
+          153.0445556640625,
+          272.21380615234375,
+          244.72760009765625
+        ],
+        "materials": [
+          "Material.018"
+        ]
+      },
+      {
+        "object": "Object_75",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8552_54"
+        ],
+        "parentChains": {
+          "Object8552_54": [
+            "Object8552_54",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 28,
+        "triangles": 24,
+        "boundsPx": [
+          250.31399536132812,
+          242.96710205078125,
+          261.6849365234375,
+          244.72772216796875
+        ],
+        "materials": [
+          "material_0"
+        ]
+      },
+      {
+        "object": "Object_77",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8532_55"
+        ],
+        "parentChains": {
+          "Object8532_55": [
+            "Object8532_55",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 66,
+        "triangles": 52,
+        "boundsPx": [
+          263.3589172363281,
+          185.56597900390625,
+          266.0443420410156,
+          186.63153076171875
+        ],
+        "materials": [
+          "material_0"
+        ]
+      },
+      {
+        "object": "Object_79",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8531_56"
+        ],
+        "parentChains": {
+          "Object8531_56": [
+            "Object8531_56",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 608,
+        "triangles": 528,
+        "boundsPx": [
+          237.4629364013672,
+          194.3997802734375,
+          274.5361328125,
+          207.421630859375
+        ],
+        "materials": [
+          "Material.009"
+        ]
+      },
+      {
+        "object": "Object_81",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8528_57"
+        ],
+        "parentChains": {
+          "Object8528_57": [
+            "Object8528_57",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 1980,
+        "triangles": 1560,
+        "boundsPx": [
+          235.85577392578125,
+          146.71221923828125,
+          276.1776428222656,
+          214.8389892578125
+        ],
+        "materials": [
+          "Material.009"
+        ]
+      },
+      {
+        "object": "Object_83",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8526_58"
+        ],
+        "parentChains": {
+          "Object8526_58": [
+            "Object8526_58",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 1284,
+        "triangles": 2200,
+        "boundsPx": [
+          223.18394470214844,
+          137.24554443359375,
+          288.8153076171875,
+          195.21343994140625
+        ],
+        "materials": [
+          "Material.017"
+        ]
+      },
+      {
+        "object": "Object_85",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8768_59"
+        ],
+        "parentChains": {
+          "Object8768_59": [
+            "Object8768_59",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 1247,
+        "triangles": 1781,
+        "boundsPx": [
+          234.64462280273438,
+          93.9366455078125,
+          277.3545837402344,
+          160.77593994140625
+        ],
+        "materials": [
+          "Material.016"
+        ]
+      },
+      {
+        "object": "Object_87",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8757_60"
+        ],
+        "parentChains": {
+          "Object8757_60": [
+            "Object8757_60",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 7555,
+        "triangles": 9056,
+        "boundsPx": [
+          101.79727935791016,
+          653.1797485351562,
+          410.20172119140625,
+          912.3732070922852
+        ],
+        "materials": [
+          "Material.015"
+        ]
+      },
+      {
+        "object": "Object_89",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8823_61"
+        ],
+        "parentChains": {
+          "Object8823_61": [
+            "Object8823_61",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 848,
+        "triangles": 1172,
+        "boundsPx": [
+          111.59848022460938,
+          770.5934295654297,
+          400.4005126953125,
+          821.7342529296875
+        ],
+        "materials": [
+          "Material.027"
+        ]
+      },
+      {
+        "object": "Object_91",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8829_62"
+        ],
+        "parentChains": {
+          "Object8829_62": [
+            "Object8829_62",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 476,
+        "triangles": 672,
+        "boundsPx": [
+          191.037109375,
+          281.48321533203125,
+          320.9619445800781,
+          309.45281982421875
+        ],
+        "materials": [
+          "Material.027"
+        ]
+      },
+      {
+        "object": "Object_93",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8861_65"
+        ],
+        "parentChains": {
+          "Object8861_65": [
+            "Object8861_65",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 19256,
+        "triangles": 26692,
+        "boundsPx": [
+          49.88719940185547,
+          701.496337890625,
+          462.11273193359375,
+          921.5040435791016
+        ],
+        "materials": [
+          "Material.003"
+        ]
+      },
+      {
+        "object": "Object_95",
+        "category": "FIXED_HULL",
+        "activeGroups": [
+          "Object8862_66"
+        ],
+        "parentChains": {
+          "Object8862_66": [
+            "Object8862_66",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 285,
+        "triangles": 404,
+        "boundsPx": [
+          225.7542724609375,
+          142.979736328125,
+          286.24481201171875,
+          232.68316650390625
+        ],
+        "materials": [
+          "material_0"
+        ]
+      },
+      {
+        "object": "AdunFore_Ctrl_Gun_Lower_Extra_L_8",
+        "category": "FORE_MECHANISM",
+        "activeGroups": [
+          "Ctrl_Gun_Lower_Extra_L_8"
+        ],
+        "parentChains": {
+          "Ctrl_Gun_Lower_Extra_L_8": [
+            "Ctrl_Gun_Lower_Extra_L_8",
+            "Ctrl_Gun_Lower_L_12",
+            "Ctrl_Gun_Master_15",
+            "Ctrl_Root_Front_16",
+            "Ctrl_Root_18",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 102,
+        "triangles": 92,
+        "boundsPx": [
+          237.82273864746094,
+          280.79632568359375,
+          242.9993896484375,
+          301.37042236328125
+        ],
+        "materials": [
+          "Material.011"
+        ]
+      },
+      {
+        "object": "AdunFore_Ctrl_Gun_Lower_Extra_R_3",
+        "category": "FORE_MECHANISM",
+        "activeGroups": [
+          "Ctrl_Gun_Lower_Extra_R_3"
+        ],
+        "parentChains": {
+          "Ctrl_Gun_Lower_Extra_R_3": [
+            "Ctrl_Gun_Lower_Extra_R_3",
+            "Ctrl_Gun_Lower_R_7",
+            "Ctrl_Gun_Master_15",
+            "Ctrl_Root_Front_16",
+            "Ctrl_Root_18",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 102,
+        "triangles": 92,
+        "boundsPx": [
+          269.0018310546875,
+          280.7962646484375,
+          274.1784973144531,
+          301.37042236328125
+        ],
+        "materials": [
+          "Material.011"
+        ]
+      },
+      {
+        "object": "AdunFore_Ctrl_Gun_Lower_L_12",
+        "category": "FORE_MECHANISM",
+        "activeGroups": [
+          "Ctrl_Gun_Lower_L_12"
+        ],
+        "parentChains": {
+          "Ctrl_Gun_Lower_L_12": [
+            "Ctrl_Gun_Lower_L_12",
+            "Ctrl_Gun_Master_15",
+            "Ctrl_Root_Front_16",
+            "Ctrl_Root_18",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 437,
+        "triangles": 582,
+        "boundsPx": [
+          236.41912841796875,
+          218.72979736328125,
+          253.06399536132812,
+          302.39404296875
+        ],
+        "materials": [
+          "Material.011"
+        ]
+      },
+      {
+        "object": "AdunFore_Ctrl_Gun_Lower_R_7",
+        "category": "FORE_MECHANISM",
+        "activeGroups": [
+          "Ctrl_Gun_Lower_R_7"
+        ],
+        "parentChains": {
+          "Ctrl_Gun_Lower_R_7": [
+            "Ctrl_Gun_Lower_R_7",
+            "Ctrl_Gun_Master_15",
+            "Ctrl_Root_Front_16",
+            "Ctrl_Root_18",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 437,
+        "triangles": 582,
+        "boundsPx": [
+          258.9372253417969,
+          218.7298583984375,
+          275.5820617675781,
+          302.39404296875
+        ],
+        "materials": [
+          "Material.011"
+        ]
+      },
+      {
+        "object": "AdunFore_Ctrl_Gun_Lower_Wing_L_13",
+        "category": "FORE_MECHANISM",
+        "activeGroups": [
+          "Ctrl_Gun_Lower_Wing_L_13"
+        ],
+        "parentChains": {
+          "Ctrl_Gun_Lower_Wing_L_13": [
+            "Ctrl_Gun_Lower_Wing_L_13",
+            "Ctrl_Gun_Master_15",
+            "Ctrl_Root_Front_16",
+            "Ctrl_Root_18",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 97,
+        "triangles": 124,
+        "boundsPx": [
+          239.0076446533203,
+          273.45697021484375,
+          245.04156494140625,
+          299.41796875
+        ],
+        "materials": [
+          "Material.011"
+        ]
+      },
+      {
+        "object": "AdunFore_Ctrl_Gun_Lower_Wing_R_14",
+        "category": "FORE_MECHANISM",
+        "activeGroups": [
+          "Ctrl_Gun_Lower_Wing_R_14"
+        ],
+        "parentChains": {
+          "Ctrl_Gun_Lower_Wing_R_14": [
+            "Ctrl_Gun_Lower_Wing_R_14",
+            "Ctrl_Gun_Master_15",
+            "Ctrl_Root_Front_16",
+            "Ctrl_Root_18",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 97,
+        "triangles": 124,
+        "boundsPx": [
+          266.95965576171875,
+          273.45703125,
+          272.99359130859375,
+          299.41802978515625
+        ],
+        "materials": [
+          "Material.011"
+        ]
+      },
+      {
+        "object": "AdunFore_Ctrl_Gun_Upper_L_11",
+        "category": "FORE_MECHANISM",
+        "activeGroups": [
+          "Ctrl_Gun_Upper_L_11"
+        ],
+        "parentChains": {
+          "Ctrl_Gun_Upper_L_11": [
+            "Ctrl_Gun_Upper_L_11",
+            "Ctrl_Gun_Lower_L_12",
+            "Ctrl_Gun_Master_15",
+            "Ctrl_Root_Front_16",
+            "Ctrl_Root_18",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 444,
+        "triangles": 538,
+        "boundsPx": [
+          234.02415466308594,
+          241.192138671875,
+          252.96420288085938,
+          312.2156982421875
+        ],
+        "materials": [
+          "Material.011"
+        ]
+      },
+      {
+        "object": "AdunFore_Ctrl_Gun_Upper_R_6",
+        "category": "FORE_MECHANISM",
+        "activeGroups": [
+          "Ctrl_Gun_Upper_R_6"
+        ],
+        "parentChains": {
+          "Ctrl_Gun_Upper_R_6": [
+            "Ctrl_Gun_Upper_R_6",
+            "Ctrl_Gun_Lower_R_7",
+            "Ctrl_Gun_Master_15",
+            "Ctrl_Root_Front_16",
+            "Ctrl_Root_18",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 444,
+        "triangles": 538,
+        "boundsPx": [
+          259.03704833984375,
+          241.192138671875,
+          277.9770812988281,
+          312.2156982421875
+        ],
+        "materials": [
+          "Material.011"
+        ]
+      },
+      {
+        "object": "AdunFore_Ctrl_Gun_Upper_Tail_Back_L_10",
+        "category": "FORE_MECHANISM",
+        "activeGroups": [
+          "Ctrl_Gun_Upper_Tail_Back_L_10"
+        ],
+        "parentChains": {
+          "Ctrl_Gun_Upper_Tail_Back_L_10": [
+            "Ctrl_Gun_Upper_Tail_Back_L_10",
+            "Ctrl_Gun_Upper_L_11",
+            "Ctrl_Gun_Lower_L_12",
+            "Ctrl_Gun_Master_15",
+            "Ctrl_Root_Front_16",
+            "Ctrl_Root_18",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 68,
+        "triangles": 64,
+        "boundsPx": [
+          236.8246612548828,
+          307.47955322265625,
+          238.77392578125,
+          309.25384521484375
+        ],
+        "materials": [
+          "Material.011"
+        ]
+      },
+      {
+        "object": "AdunFore_Ctrl_Gun_Upper_Tail_Back_R_5",
+        "category": "FORE_MECHANISM",
+        "activeGroups": [
+          "Ctrl_Gun_Upper_Tail_Back_R_5"
+        ],
+        "parentChains": {
+          "Ctrl_Gun_Upper_Tail_Back_R_5": [
+            "Ctrl_Gun_Upper_Tail_Back_R_5",
+            "Ctrl_Gun_Upper_R_6",
+            "Ctrl_Gun_Lower_R_7",
+            "Ctrl_Gun_Master_15",
+            "Ctrl_Root_Front_16",
+            "Ctrl_Root_18",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 68,
+        "triangles": 64,
+        "boundsPx": [
+          273.22515869140625,
+          307.47955322265625,
+          275.1744079589844,
+          309.25384521484375
+        ],
+        "materials": [
+          "Material.011"
+        ]
+      },
+      {
+        "object": "AdunFore_Ctrl_Gun_Upper_Tail_Front_L_9",
+        "category": "FORE_MECHANISM",
+        "activeGroups": [
+          "Ctrl_Gun_Upper_Tail_Front_L_9"
+        ],
+        "parentChains": {
+          "Ctrl_Gun_Upper_Tail_Front_L_9": [
+            "Ctrl_Gun_Upper_Tail_Front_L_9",
+            "Ctrl_Gun_Upper_L_11",
+            "Ctrl_Gun_Lower_L_12",
+            "Ctrl_Gun_Master_15",
+            "Ctrl_Root_Front_16",
+            "Ctrl_Root_18",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 68,
+        "triangles": 64,
+        "boundsPx": [
+          237.51144409179688,
+          304.72174072265625,
+          239.46070861816406,
+          306.49603271484375
+        ],
+        "materials": [
+          "Material.011"
+        ]
+      },
+      {
+        "object": "AdunFore_Ctrl_Gun_Upper_Tail_Front_R_4",
+        "category": "FORE_MECHANISM",
+        "activeGroups": [
+          "Ctrl_Gun_Upper_Tail_Front_R_4"
+        ],
+        "parentChains": {
+          "Ctrl_Gun_Upper_Tail_Front_R_4": [
+            "Ctrl_Gun_Upper_Tail_Front_R_4",
+            "Ctrl_Gun_Upper_R_6",
+            "Ctrl_Gun_Lower_R_7",
+            "Ctrl_Gun_Master_15",
+            "Ctrl_Root_Front_16",
+            "Ctrl_Root_18",
+            "GLTF_created_0_rootJoint"
+          ]
+        },
+        "vertices": 68,
+        "triangles": 64,
+        "boundsPx": [
+          272.5383605957031,
+          304.72174072265625,
+          274.4876403808594,
+          306.49603271484375
+        ],
+        "materials": [
+          "Material.011"
+        ]
+      }
+    ],
+    "visiblePixelCounts": {
+      "FIXED_HULL": 74890,
+      "ROTATING_CORE": 37378,
+      "FORE_MECHANISM": 1080
+    },
+    "movingRoots": [
+      "Ctrl_Core_Inner_2",
+      "Ctrl_Core_Outter_1"
+    ],
+    "classificationUsesAncestorChain": true,
+    "webDesignNotCanonSlots": true,
+    "gameIntegrated": false
+  },
+  "editableAttachments": {
+    "authoringEmptiesNotWeaponSprites": true,
+    "gameRegistered": false,
+    "attachments": [
+      {
+        "id": "BOW_GUARD_PORT",
+        "empty": "MountCandidate_BOW_GUARD_PORT",
+        "parentBone": "Object8810_34",
+        "sourceSurfaceObject": "Object_37",
+        "worldAnchor": [
+          0.20848123729228973,
+          -2.5538322925567627,
+          0.07152557373046875
+        ],
+        "boneLocalAnchor": [
+          0.40175411105155945,
+          -0.6987186670303345,
+          0.07152581959962845
+        ]
+      },
+      {
+        "id": "BOW_GUARD_STARBOARD",
+        "empty": "MountCandidate_BOW_GUARD_STARBOARD",
+        "parentBone": "Object8810_34",
+        "sourceSurfaceObject": "Object_37",
+        "worldAnchor": [
+          -0.20848925411701202,
+          -2.5538322925567627,
+          0.07152938842773438
+        ],
+        "boneLocalAnchor": [
+          -0.015216393396258354,
+          -0.6987186074256897,
+          0.07152963429689407
+        ]
+      },
+      {
+        "id": "FORE_SHOULDER_PORT",
+        "empty": "MountCandidate_FORE_SHOULDER_PORT",
+        "parentBone": "1_24",
+        "sourceSurfaceObject": "Object_19",
+        "worldAnchor": [
+          0.4256533086299896,
+          -1.8588813543319702,
+          0.4011344909667969
+        ],
+        "boneLocalAnchor": [
+          0.8211836218833923,
+          0.008449859917163849,
+          0.021186692640185356
+        ]
+      },
+      {
+        "id": "FORE_SHOULDER_STARBOARD",
+        "empty": "MountCandidate_FORE_SHOULDER_STARBOARD",
+        "parentBone": "1_24",
+        "sourceSurfaceObject": "Object_19",
+        "worldAnchor": [
+          -0.42566147446632385,
+          -1.8588813543319702,
+          0.4011268615722656
+        ],
+        "boneLocalAnchor": [
+          -0.030131135135889053,
+          0.008449889719486237,
+          0.021179063245654106
+        ]
+      },
+      {
+        "id": "AFT_SHOULDER_PORT",
+        "empty": "MountCandidate_AFT_SHOULDER_PORT",
+        "parentBone": "lp_backwing05_48",
+        "sourceSurfaceObject": "Object_63",
+        "worldAnchor": [
+          0.44302675127983093,
+          1.8417317867279053,
+          0.402862548828125
+        ],
+        "boneLocalAnchor": [
+          0.44302964210510254,
+          -0.21339614689350128,
+          0.4028623700141907
+        ]
+      },
+      {
+        "id": "AFT_SHOULDER_STARBOARD",
+        "empty": "MountCandidate_AFT_SHOULDER_STARBOARD",
+        "parentBone": "lp_backwing05_48",
+        "sourceSurfaceObject": "Object_63",
+        "worldAnchor": [
+          -0.4430355131626129,
+          1.8417317867279053,
+          0.40285491943359375
+        ],
+        "boneLocalAnchor": [
+          -0.4430326223373413,
+          -0.2133961170911789,
+          0.4028547406196594
+        ]
+      },
+      {
+        "id": "AFT_BATTERY_PORT",
+        "empty": "MountCandidate_AFT_BATTERY_PORT",
+        "parentBone": "Object8861_65",
+        "sourceSurfaceObject": "Object_93",
+        "worldAnchor": [
+          0.8252496123313904,
+          2.406379222869873,
+          0.9118003845214844
+        ],
+        "boneLocalAnchor": [
+          0.8252537250518799,
+          -0.1954563707113266,
+          0.11275990307331085
+        ]
+      },
+      {
+        "id": "AFT_BATTERY_STARBOARD",
+        "empty": "MountCandidate_AFT_BATTERY_STARBOARD",
+        "parentBone": "Object8861_65",
+        "sourceSurfaceObject": "Object_93",
+        "worldAnchor": [
+          -0.8252585530281067,
+          2.406379222869873,
+          0.9117965698242188
+        ],
+        "boneLocalAnchor": [
+          -0.8252544403076172,
+          -0.19545629620552063,
+          0.11275608837604523
+        ]
+      },
+      {
+        "id": "AFT_OUTER_GUARD_PORT",
+        "empty": "MountCandidate_AFT_OUTER_GUARD_PORT",
+        "parentBone": "Object8861_65",
+        "sourceSurfaceObject": "Object_93",
+        "worldAnchor": [
+          1.250907063484192,
+          2.5193088054656982,
+          0.5400199890136719
+        ],
+        "boneLocalAnchor": [
+          1.2509112358093262,
+          -0.08252721279859543,
+          -0.2590204179286957
+        ]
+      },
+      {
+        "id": "AFT_OUTER_GUARD_STARBOARD",
+        "empty": "MountCandidate_AFT_OUTER_GUARD_STARBOARD",
+        "parentBone": "Object8861_65",
+        "sourceSurfaceObject": "Object_93",
+        "worldAnchor": [
+          -1.2509158849716187,
+          2.5193088054656982,
+          0.5400199890136719
+        ],
+        "boneLocalAnchor": [
+          -1.2509117126464844,
+          -0.08252710849046707,
+          -0.2590204179286957
+        ]
+      },
+      {
+        "id": "STERN_GUARD_PORT",
+        "empty": "MountCandidate_STERN_GUARD_PORT",
+        "parentBone": "Object8861_65",
+        "sourceSurfaceObject": "Object_93",
+        "worldAnchor": [
+          0.31272339820861816,
+          2.7451677322387695,
+          1.3535575866699219
+        ],
+        "boneLocalAnchor": [
+          0.31272751092910767,
+          0.1433321088552475,
+          0.5545168519020081
+        ]
+      },
+      {
+        "id": "STERN_GUARD_STARBOARD",
+        "empty": "MountCandidate_STERN_GUARD_STARBOARD",
+        "parentBone": "Object8861_65",
+        "sourceSurfaceObject": "Object_93",
+        "worldAnchor": [
+          -0.3127323389053345,
+          2.7451677322387695,
+          1.3535575866699219
+        ],
+        "boneLocalAnchor": [
+          -0.31272822618484497,
+          0.14333213865756989,
+          0.5545168519020081
+        ]
+      }
+    ],
+    "maxDrift": 4.805480091749757e-07,
+    "maxProjectionErrorPx": 4.57763671875e-05,
+    "savedMasterReopenedAndBindingsVerified": true
+  }
+}

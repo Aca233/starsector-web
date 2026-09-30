@@ -1,3 +1,4 @@
+import { validAIDecisionProfile } from '../shared/ai-decision-profile.mjs';
 import { setLanControlledRoster } from './LanRosterIdentity';
 import { aiLoadout, aiHullId } from "./ai-loadouts.mjs";
 import { battleTeamLimit } from "../shared/battle-size.mjs";
@@ -14,6 +15,7 @@ import type { Match, Seat, Team } from "./protocol";
 
 /** One roster path for every arrangement. Seat/host ownership is independent of team. */
 export function createLanWorld(match: Match) {
+  if (!validAIDecisionProfile(match.options.aiDecisionProfile)) throw Error('未知 AI 决策规则');
   const players = match.players.map(player => ({...player, hull: player.design ? registerLanDesign(player.design, player.seat) : player.hull}));
   // Compile each actual loadout once; equal hulls with different equipment must never share a spec.
   const aiTemplates = new Map<string,string>();
@@ -41,7 +43,7 @@ export function createLanWorld(match: Match) {
   const opponent = roster.find((entry) => entry.team !== hostTeam);
   if (!opponent) throw Error("另一队没有舰船，无法开始战斗");
   // Stable numeric teams drive combat; the boolean remains host-relative presentation metadata.
-  const engine = new CombatEngine(host.hull, opponent.hull, match.seed);
+  const engine = new CombatEngine(host.hull, opponent.hull, match.seed, match.options.aiDecisionProfile ?? 'standard');
   const controlled = new Map<Seat, Ship>();
   engine.multiTeamBattle = true;
   const teams = [...new Set(roster.map(entry=>entry.team))].sort((a,b)=>a-b);
@@ -96,6 +98,7 @@ export function createLanWorld(match: Match) {
   updateCombatVisibility(engine.ships, engine.openBattlefield);
   for (const ship of engine.capitalShips)
     ship.currentTargetShip = engine.findHostile(ship) ?? null;
+  for (const ship of controlled.values()) engine.fullRateAIShipIds.add(ship.id);
   setLanControlledRoster(engine,controlled);
   return { engine, controlled };
 }

@@ -1,3 +1,4 @@
+import { JumpTargeting } from './JumpTargeting';
 import { copyReplayCheckpoint, type CombatReplayCheckpoint } from './local/CombatReplayCheckpoint';
 import { LOCAL_COMBAT_PROTOCOL } from './local/LocalCombatProtocol';
 import { localCombatContentSignature } from './local/LocalCombatContent';
@@ -82,11 +83,18 @@ export class CombatSession {
   public readonly read: CombatHudView = liveCombatHudView(() => this.workerHost?.latest?.presentation.hud.read ?? combatHudView(this.authority.engine));
   private get renderView() { return this.workerHost?.latest?.presentation.view ?? combatRenderView(this.authority.engine); }
   public get controlEpoch(): number { return this.controlGeneration; }
+  public readonly jumpTargeting = new JumpTargeting();
+  public updateJumpTargeting(point?: Vector2): void {
+    const view = this.renderView;
+    this.jumpTargeting.update(this.read,this.controlEpoch,point,{
+      ships:view.ships.filter(ship=>ship.isVisibleTo(view.playerShip.teamId)),asteroids:view.asteroids
+    });
+  }
   public enableWorker(): void {
     if (this.authority.tick !== 0) throw new Error('Worker migration requires a new encounter, not a display checkpoint');
     this.workerEnabled = true;
   }
-  private closeWorker(): void { this.stagedRestore?.dispose(); this.stagedRestore = undefined; this.restorePending = false; this.controlGeneration++; this.pilotIntent = undefined; this.pilotRequest++; this.inputSerial++; this.pendingReleases.clear(); this.acceptedWorkerSequence = 0; this.telemetrySequence = 0; this.workerHost?.dispose(); this.workerHost = undefined; this.workerStep = undefined; }
+  private closeWorker(): void { this.jumpTargeting.cancel(); this.stagedRestore?.dispose(); this.stagedRestore = undefined; this.restorePending = false; this.controlGeneration++; this.pilotIntent = undefined; this.pilotRequest++; this.inputSerial++; this.pendingReleases.clear(); this.acceptedWorkerSequence = 0; this.telemetrySequence = 0; this.workerHost?.dispose(); this.workerHost = undefined; this.workerStep = undefined; }
   public loadEncounter(request: CombatRequest, handoff = new CombatHandoff(request)): void {
     this.encounter = structuredClone(handoff.request); this.simulationPointLimit = undefined;
     this.loadingEncounter = true;
@@ -580,7 +588,7 @@ export class CombatSession {
         if (previous?.serial === this.inputSerial) return previous.promise;
         if (host.status === 'ready' && host.latest && !host.pendingTransactions) {
           const ship = this.read.playerShip;
-          if (!ship.isFiringMain && (command.kind === 'stop-firing' || (ship.throttle === 0 && !ship.brakeInput && ship.strafeInput === 0 && ship.turnInput === 0))) return {accepted:true};
+          if (!ship.isFiringMain && !this.read.weaponShip.isFiringMain && (command.kind === 'stop-firing' || (ship.throttle === 0 && !ship.brakeInput && ship.strafeInput === 0 && ship.turnInput === 0))) return {accepted:true};
         }
       } else this.inputSerial++;
       const pilot = command.kind === 'pilot', previousPilot = this.pilotIntent, request = pilot ? ++this.pilotRequest : this.pilotRequest;
@@ -707,7 +715,7 @@ export class CombatSession {
     };
     this.performance.recordTiming('renderPreparationMs', performance.now() - prepStart);
     const submitStart = performance.now();
-    const rendered = this.renderer.render(this.renderView, alpha, cameraPos, zoom, { ...frame });
+    const rendered = this.renderer.render(this.renderView, alpha, cameraPos, zoom, { ...frame, jumpTarget: this.jumpTargeting.preview });
     if (!rendered) return;
     this.performance.recordTiming('drawSubmitMs', performance.now() - submitStart);
     const resourceStats = this.renderer.getResourceStats();

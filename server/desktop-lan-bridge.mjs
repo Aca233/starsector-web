@@ -131,8 +131,18 @@ export class DesktopLanBridge {
             const m = JSON.parse(data), offer = m.type === 'welcome' && m.controlLane;
             if (m.type === 'welcome') {combatEnabled=m.combatState===1;chunkEnabled = chunkOffered && m.bulkChunks === 1;motionWireEnabled=motionWireOffered&&m.motionWire===1;visualWireEnabled=visualWireOffered&&m.visualWire===1;}
             if (['welcome', 'launch', 'left', 'ended', 'roomClosed'].includes(m.type)) {
-              chunkReceiver.reset(); visualWire.reset(); motionWire.reset(); combatWire.reset(); replay.clear();
-              motionEpoch=m.type==='launch'?{matchId:m.matchId,syncId:m.syncId}:null;
+              const nextEpoch = m.type === 'launch' && typeof m.matchId === 'string' && m.matchId.length > 0 && m.matchId.length <= 128 &&
+                typeof m.syncId === 'string' && m.syncId.length > 0 && m.syncId.length <= 128 && Number.isSafeInteger(m.minTick) && m.minTick >= 0
+                ? { matchId: m.matchId, syncId: m.syncId, minTick: m.minTick } : null;
+              // Resync retries may repeat a launch on the primary TCP stream
+              // after this epoch's first control-lane delta has arrived. Only a
+              // NEW valid epoch (or an invalid/lifecycle message) resets bases.
+              // Keep pending real receipts too: losing the lane must still
+              // replay its final ACK through ordinary primary validation.
+              const repeated = nextEpoch !== null && motionEpoch !== null && nextEpoch.matchId === motionEpoch.matchId &&
+                nextEpoch.syncId === motionEpoch.syncId && nextEpoch.minTick === motionEpoch.minTick;
+              if (!repeated) { chunkReceiver.reset(); visualWire.reset(); motionWire.reset(); combatWire.reset(); replay.clear(); }
+              motionEpoch = nextEpoch;
             }
             if (offer?.version === 1 && /^[0-9a-f]{64}$/.test(offer.token) && !control) {
               // Derive only from the user-selected authority, never a server-supplied URL.

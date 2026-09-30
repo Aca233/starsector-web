@@ -1,12 +1,11 @@
+import { terrainPenetrationCost, spendTerrainPenetration } from './weapon/TerrainPenetration';
 import { advanceSourceMissile, hasSourceMissileLifecycle, initializeSourceMissile } from './weapon/SourceMissileLifecycle';
-import { sameTeam } from "../CombatTeams";
 import { combatAudio as sound } from '../../audio/CombatAudioEvents';
 import { ProjectileInterceptionIndex } from '../collision/ProjectileInterceptionIndex';
 import { requireWeaponEffect } from '../../extensions/weapon-effects/Registry';
 import { ProjectileExplosionSystem } from './weapon/ProjectileExplosionSystem';
 import { advanceSourceProjectile, hasSourceProjectileLifecycle, markSourceProjectileImpact } from './weapon/SourceProjectileLifecycle';
 import { Projectile, Beam } from '../Weapon';
-import { Ship } from '../Ship';
 import { WeaponSimContext } from './weapon/WeaponSimContext';
 import { MissileGuidanceHandler } from './weapon/MissileGuidanceHandler';
 import { ProjectileCollisionHandler } from './weapon/ProjectileCollisionHandler';
@@ -228,32 +227,50 @@ export class WeaponSimulationSystem {
       }
       if (intercepted) continue;
 
-      // 4. 舰船残骸阻挡弹道
-      if (this.collisionHandler.checkHulkCollision(p, ctx)) {
-        if (!markSourceProjectileImpact(p)) removeProjectileAt(i);
-        continue;
-      }
-
+      // Every continuation queries the remainder of the SAME swept segment.
+      // A pierced pebble cannot hide a second obstacle or ship crossed this frame.
       const canBatch = this.collisionHandler.canBatchShipCollision(p);
-
-      // 4.5 小行星阻挡：与舰船碰撞共用同一段位移，按归一化交点 t 取更早者。
-      // 修复前小行星检测在弹丸移动之前、舰船检测在移动之后，同一帧穿过两者时
-      // 舰船会先被扣血而小行星毫发无损。
-      const asteroidImpact = ctx.queryAsteroidImpact?.(p) ?? null;
-      if (asteroidImpact) {
-        const shipHitT = this.findShipHitParameter(p, allShips);
-        if (shipHitT === null || asteroidImpact.t <= shipHitT) {
-          const asteroidId = ctx.asteroids?.[asteroidImpact.asteroidIndex]?.id;
-          ctx.commitAsteroidImpact?.(p, asteroidImpact);
-          ctx.spawnProjectileExplosion?.(p, asteroidImpact.point, undefined, asteroidId);
-          if (canBatch) {
-            const batchIndex = batchedCollisionProjectiles.indexOf(p);
-            if (batchIndex >= 0) batchedCollisionProjectiles.splice(batchIndex, 1);
+      let solidConsumed = false;
+      while (true) {
+        let hulkImpact = this.collisionHandler.queryHulkCollision(p, ctx);
+        let asteroidImpact = ctx.queryAsteroidImpact?.(p) ?? null;
+        if (!hulkImpact && !asteroidImpact) break;
+        flushBatchedCollisions();
+        hulkImpact = this.collisionHandler.queryHulkCollision(p, ctx);
+        asteroidImpact = ctx.queryAsteroidImpact?.(p) ?? null;
+        const shipT = this.collisionHandler.findShipHitParameter(p, allShips) ?? Infinity;
+        const end = p.pos.clone();
+        let key: string | undefined, cost: number | undefined;
+        if (hulkImpact && hulkImpact.t <= Math.min(shipT, asteroidImpact?.t ?? Infinity)) {
+          key = 'terrain:wreck:' + hulkImpact.id;
+          cost = terrainPenetrationCost(p, 'wreck', hulkImpact.radius);
+          this.collisionHandler.applyEnvironmentImpact(p, hulkImpact.point, hulkImpact.velocity, ctx);
+          ctx.fx.spawnSparks(hulkImpact.point, 10, [255, 160, 60]);
+          ctx.fx.spawnDebris(hulkImpact.point, 1, [80, 75, 70], 50, 'small');
+        } else if (asteroidImpact && asteroidImpact.t <= shipT) {
+          const asteroid = ctx.asteroids?.[asteroidImpact.asteroidIndex];
+          const asteroidId = asteroid?.id, velocity = asteroid?.vel.clone();
+          if (asteroid) {
+            key = 'terrain:asteroid:' + asteroid.id;
+            cost = terrainPenetrationCost(p, 'asteroid', asteroid.radius, asteroid.hp);
           }
-          if (!markSourceProjectileImpact(p, asteroidImpact.point)) removeProjectileAt(i);
+          ctx.commitAsteroidImpact?.(p, asteroidImpact);
+          if (!asteroid || asteroid.hp > 0) cost = undefined; // Never pierce an intact rock.
+          this.collisionHandler.applyEnvironmentImpact(p, asteroidImpact.point, velocity ?? p.vel.clone().scale(0), ctx, asteroidId);
+        } else break; // A real ship/shield is closer; keep its normal collision semantics.
+        if (cost !== undefined && key) {
+          spendTerrainPenetration(p, key, cost);
+          p.prevPos.copy(p.pos); p.pos.copy(end);
           continue;
         }
+        // A blast can remove earlier missiles from this same array. Resolve the
+        // original shot again rather than deleting whatever moved into its old index.
+        i = this.projectiles.indexOf(p);
+        if (i >= 0 && !markSourceProjectileImpact(p)) removeProjectileAt(i);
+        solidConsumed = true;
+        break;
       }
+      if (solidConsumed) continue;
 
       // 5. 与敌对舰船碰撞判定 (护盾与装甲)
       if (canBatch) {
@@ -265,7 +282,8 @@ export class WeaponSimulationSystem {
       const hit = this.collisionHandler.checkShipCollision(p, allShips, ctx);
       if (hit) {
         if (p.isRocket) ctx.contrailEngine?.detach(p.id);
-        if (!markSourceProjectileImpact(p)) removeProjectileAt(i);
+        i = this.projectiles.indexOf(p);
+        if (i >= 0 && !markSourceProjectileImpact(p)) removeProjectileAt(i);
         continue;
       }
 
@@ -283,22 +301,6 @@ export class WeaponSimulationSystem {
     flushBatchedCollisions();
   }
 
-  /**
-   * 只查询、不结算的舰船交点参数 t ∈ [0, 1]，用于与小行星交点比较先后顺序。
-   * 候选筛选条件与 ProjectileCollisionHandler.createRuntimeQuery() 保持一致。
-   */
-  private findShipHitParameter(p: Projectile, allShips: Ship[]): number | null {
-    const candidates = allShips.filter(
-      (ship) =>
-        ship.id !== p.sourceShipId &&
-        (p.isPlayer === undefined || !sameTeam(ship, p)) &&
-        !ship.isDead &&
-        !ship.isPhased
-    );
-    if (candidates.length === 0) return null;
-    const hit = this.collisionHandler.runtimeCollisionKernel.findHits([{ projectile: p, candidates }])[0];
-    return hit ? hit.t : null;
-  }
 
   public updateBeams(dt: number, ctx: WeaponSimContext) {
     this.beamHandler.update(dt, { ...ctx, projectiles: this.projectiles }, this.beams);

@@ -1,8 +1,10 @@
+import {validateDisplayDefinition as controlDefinition} from 'display-definition-control';
+import {validateDisplayDefinition} from '../src/network/display/DisplayDefinition';
 import displayRestoreShapes from './lib/display-restore-shapes.json';
 import { displayRecordRestorer } from '../src/network/DisplayRecordRestore.generated';
 import { initializeLanDisplayWorld as controlDisplayWorld, applyLanDisplaySnapshot as controlDisplayApply } from 'display-snapshot-control';
-import { unpackDisplay as controlUnpackDisplay, unpackDisplayProjectiles as controlUnpackProjectiles } from 'display-codec-control';
-import { unpackDisplay, unpackDisplayProjectiles, displayLayouts } from '../src/network/DisplaySnapshotCodec';
+import { assertDataField as controlDataField, unpackDisplay as controlUnpackDisplay, unpackDisplayProjectiles as controlUnpackProjectiles } from 'display-codec-control';
+import { assertDataField, unpackDisplay, unpackDisplayProjectiles, displayLayouts } from '../src/network/DisplaySnapshotCodec';
 import { ExplosionPuffDecoder } from '../src/network/ExplosionPuffCodec';
 import { serialize } from 'node:v8';
 import { LanShipProjection } from '../src/network/display/LanShipProjection';
@@ -983,4 +985,376 @@ test('LAN display single-pass projection preserves v0.2.11 bytes without buildin
   const report={scope:'Same frozen 18-ship engine per paired capture, alternating order, ticks1201–1320. Exact full-wire equality. Offline capture CPU only; NOT WAN Hz/FPS.',before:summary(timings.map(x=>x.before)),after:summary(timings.map(x=>x.after))};
   if(process.env.LAN_PROJECTION_REPORT)fs.writeFileSync(process.env.LAN_PROJECTION_REPORT,JSON.stringify(report,null,2));
  }finally{LanShipProjection.prototype.project=productionProject;RenderShipProjection.prototype.project=renderProject;}
+});
+
+
+import { DisplayDefinitionCapture, CapturedDisplayDefinition, DisplayDefinitionRequest } from '../src/network/display/DisplayDefinitionCapture';
+import { DisplayDefinitionReceiver } from '../src/network/display/DisplayDefinitionReceiver';
+import { DISPLAY_DEFINITION_LIMITS } from '../src/network/display/DisplayDefinitionTable';
+import { immutableCopy } from '../src/engine/extensions/Immutable';
+import { encodeProjectedSnapshotTape } from '../src/network/BinarySnapshot.mjs';
+
+// Compare every own data value, typed buffer and collection without treating the
+// deliberate immutable definition sharing/property flags as a gameplay change.
+function definitionDisplayValues(world:LanDisplayWorld):unknown {
+ const ships=new Map<string,ProjectedRenderShip>();
+ const walk=(value:any,ancestors:object[]=[]):any=>{
+  if(typeof value==='number')return ['number',String(value)];
+  if(value===undefined)return ['undefined'];
+  if(value===null||typeof value!=='object')return value;
+  if(value instanceof ProjectedRenderShip){ships.set(value.id,value);return ['ship',value.id];}
+  if(ancestors.includes(value))return ['cycle',ancestors.indexOf(value)];
+  const next=[...ancestors,value];
+  if(ArrayBuffer.isView(value))return ['typed',value.constructor.name,Buffer.from(value.buffer,value.byteOffset,value.byteLength).toString('hex')];
+  if(value instanceof Map)return ['map',[...value].map(([k,v])=>[walk(k,next),walk(v,next)])];
+  if(value instanceof Set)return ['set',[...value].map(v=>walk(v,next))];
+  return [Object.getPrototypeOf(value)?.constructor?.name??null,Object.keys(value).sort().map(key=>[key,walk(value[key],next)])];
+ };
+ const root=walk(world),rows:any[]=[];
+ for(const [id,ship] of ships)rows.push([id,Object.keys(ship).sort().map(key=>[key,walk(Reflect.get(ship,key),[ship])])]);
+ return [root,rows];
+}
+
+test('display-v2 definitions retain all display/HUD values, mutable edits, skipped frames and cold reconnect',()=>{
+ const fixture=match(6,'drover'),host=createLanWorld(fixture).engine;
+ configureHostCosmetics(host,true,true);
+ for(const packed of [false,true]) {
+  const wire=(frame:any)=>packed?displayWire(frame):JSON.parse(JSON.stringify(frame));
+  const take=(tick:number,definitions:boolean)=>captureLanDisplayCombat(host,tick,{0:tick,1:tick},0,null,true,packed,definitions);
+  const initial=take(0,true),retained=encodeProjectedBinaryFrame(initial,true)!.slice();
+  assert.equal(initial.displayVersion,2);assert.ok(initial.displayDefinitions!.length>0);
+  const a=createLanDisplayWorld(fixture,0,wire(take(0,false))).world,b=createLanDisplayWorld(fixture,0,wire(initial)).world;
+  const hudA=new CombatHudProjector(),hudB=new CombatHudProjector();
+  const check=()=>{assert.deepEqual(definitionDisplayValues(b),definitionDisplayValues(a));assert.deepEqual(jsonData(hudB.capture(b)),jsonData(hudA.capture(a)));assert.deepEqual(collectCombatTextureUrls(b.renderView()),collectCombatTextureUrls(a.renderView()));};
+  check();const identity=b.playerShip,definition=b.playerShip.weapons[0].spec,source=host.playerShip.weapons[0].spec;
+  assert.ok(Object.isFrozen(definition));assert.notEqual(definition,source);assert.ok(!Object.isFrozen(source));
+  assert.equal(Reflect.set(definition,'range',-999),false);
+  for(let tick=1;tick<=360;tick++) {
+   host.fixedUpdate(1/60);
+   if(tick===60)source.range+=17;
+   if(tick===120)(source as any).definitionProbe={nested:[1,undefined,3]}; // Unsupported mutable subtree falls back.
+   if(tick===180)(source as any).definitionProbe.nested[0]=9;
+   if(tick===240)delete (source as any).definitionProbe; // Sender re-enters the table; receiver retains legacy local fields.
+   if(tick%30)continue;
+   const rng=JSON.stringify([host.random,host.visualRandom]),old=wire(take(tick,false)),next=wire(take(tick,true));
+   assert.equal(JSON.stringify([host.random,host.visualRandom]),rng);
+   applyLanDisplaySnapshot(a,old);applyLanDisplaySnapshot(b,next);check();assert.equal(b.playerShip,identity);
+   if(tick===150)assert.ok(!Object.isFrozen(b.playerShip.weapons[0].spec));
+   if(tick===270){assert.ok(!Object.isFrozen(b.playerShip.weapons[0].spec));assert.equal((b.playerShip.weapons[0].spec as any).definitionProbe.nested[0],9);}
+   if(tick===300)assert.deepEqual(definitionDisplayValues(createLanDisplayWorld(fixture,0,next).world),definitionDisplayValues(createLanDisplayWorld(fixture,0,old).world));
+  }
+  // Definition changes cannot alter old retained publications or other viewers.
+  assert.deepEqual(encodeProjectedBinaryFrame(initial,true),retained);
+  const fresh=createLanDisplayWorld(fixture,0,wire(initial)).world;
+  assert.equal(fresh.playerShip.weapons[0].spec.range,definition.range);
+  applyLanDisplaySnapshot(b,wire(take(361,false)),true);applyLanDisplaySnapshot(a,wire(take(361,false)),true);check();
+  applyLanDisplaySnapshot(b,wire(take(362,true)));applyLanDisplaySnapshot(a,wire(take(362,false)));check();
+ }
+});
+
+
+test('display-v2 equal definitions retain per-mount identity and dynamic range/speed reads',()=>{
+ const fixture=match(2),host=createLanWorld(fixture).engine;
+ // The public display contract permits identical metadata with distinct dynamic
+ // values. Inject that case at the projection boundary, without changing game rules.
+ const project=LanShipProjection.prototype.project;
+ const take=(tick:number,definitions:boolean)=>{
+  LanShipProjection.prototype.project=function(ship){
+   const row=project.call(this,ship);
+   if(ship===host.playerShip){
+    assert.ok(row.weapons.length>=2);
+    row.weapons[1].weaponSpec=row.weapons[0].weaponSpec;
+    row.weapons[0].displayRange=110+tick;row.weapons[1].displayRange=220+tick;
+    row.weapons[0].displaySpeed=330+tick;row.weapons[1].displaySpeed=440+tick;
+   }
+   return row;
+  };
+  try{return displayWire(captureLanDisplayCombat(host,tick,{0:tick,1:tick},0,null,false,true,definitions));}
+  finally{LanShipProjection.prototype.project=project;}
+ };
+ const a=createLanDisplayWorld(fixture,0,take(0,false)).world,b=createLanDisplayWorld(fixture,0,take(0,true)).world;
+ const check=(tick:number)=>{
+  const first=b.playerShip.weapons[0].spec,second=b.playerShip.weapons[1].spec;
+  assert.deepEqual(first,second);assert.notEqual(first,second,'equal definitions must not alias mount roots');
+  assert.ok(Object.isFrozen(first)&&Object.isFrozen(second));
+  for(let i=0;i<2;i++){
+   const spec=b.playerShip.weapons[i].spec,old=a.playerShip.weapons[i].spec;
+   assert.equal(b.playerShip.getWeaponDisplayRange(spec),110*(i+1)+tick);
+   assert.equal(b.playerShip.getWeaponDisplaySpeed(spec),330+110*i+tick);
+   assert.equal(b.playerShip.getWeaponDisplayRange(spec),a.playerShip.getWeaponDisplayRange(old));
+   assert.equal(b.playerShip.getWeaponDisplaySpeed(spec),a.playerShip.getWeaponDisplaySpeed(old));
+  }
+ };
+ check(0);const roots=b.playerShip.weapons.slice(0,2).map(m=>m.spec);
+ applyLanDisplaySnapshot(a,take(1,false));applyLanDisplaySnapshot(b,take(1,true));check(1);
+ for(let i=0;i<2;i++)assert.equal(b.playerShip.weapons[i].spec,roots[i],'unchanged binding is stable');
+ const source=host.playerShip.weapons[0].spec;source.range+=17;
+ applyLanDisplaySnapshot(a,take(2,false));applyLanDisplaySnapshot(b,take(2,true));check(2);
+ assert.notEqual(b.playerShip.weapons[0].spec,roots[0]);assert.notEqual(b.playerShip.weapons[1].spec,roots[1]);
+ assert.notEqual(roots[0].range,source.range,'retained immutable binding was not mutated');
+ // Only the immutable children, never binding roots, may be shared.
+ const capture=new DisplayDefinitionCapture();capture.reference({range:1,child:immutableCopy({colors:[1,2],optional:undefined})});
+ const owner=new DisplayDefinitionReceiver(),definition=owner.prepare(capture.entries)[0];
+ const one:any=owner.bind(definition),two:any=owner.bind(definition);
+ assert.notEqual(one,two);assert.equal(one.child,two.child);assert.ok(Object.isFrozen(one.child.colors));
+ assert.equal(owner.sourceOf(one),definition);assert.ok(owner.owns(one));
+ assert.throws(()=>new DisplayDefinitionReceiver().bind(definition),/Unowned/);
+});
+
+test('display-v2 definition qualification does not hide mutations or execute accessors',()=>{
+ const frozenChild=immutableCopy({colors:[1,2,3],optional:undefined});
+ const source={range:10,child:frozenChild};
+ const capture=new DisplayDefinitionCapture(),first=capture.reference(source) as CapturedDisplayDefinition;
+ assert.ok(first instanceof CapturedDisplayDefinition);assert.equal((capture.reference(source) as CapturedDisplayDefinition).index,first.index);
+ const receiver=new DisplayDefinitionReceiver(),before=receiver.prepare(capture.entries)[first.index] as any;
+ source.range=11;const changed=capture.reference(source) as CapturedDisplayDefinition;
+ assert.notEqual(changed.index,first.index);assert.equal(before.range,10);
+ const decoded=receiver.prepare(capture.entries)[changed.index] as any;assert.equal(decoded.range,11);assert.equal(decoded.child.optional,undefined);assert.ok(Object.hasOwn(decoded.child,'optional'));assert.ok(Object.isFrozen(decoded.child.colors));
+ let reads=0;const custom=Object.defineProperty({},'range',{enumerable:true,get(){reads++;return 99;}});
+ assert.equal(capture.reference(custom),custom);assert.equal(reads,0);
+ const mutableChild={nested:[1]},fallback={child:mutableChild};assert.equal(capture.reference(fallback),fallback);assert.ok(!Object.isFrozen(mutableChild));
+ const deferred=new DisplayDefinitionRequest(source,capture);source.range=12;
+ const marker=deferred.owner.reference(deferred.value) as CapturedDisplayDefinition;
+ assert.equal((receiver.prepare(capture.entries)[marker.index] as any).range,12);
+ const wide={huge:'x'.repeat(DISPLAY_DEFINITION_LIMITS.string+1)};assert.equal(capture.reference(wide),wide);
+});
+
+test('display-v2 warm qualification still samples shape, descriptors and every changed value',()=>{
+ const child=immutableCopy({colors:[1,undefined,3]}),source:any={first:1,middle:2,child,last:4};
+ let capture=new DisplayDefinitionCapture();const receiver=new DisplayDefinitionReceiver();
+ const grammar=(value:any):any=>value===undefined?[2]:Array.isArray(value)?[1,value.map(grammar)]:value&&typeof value==='object'?[0,Object.keys(value).map(key=>[key,grammar(value[key])])]:value;
+ const check=()=>{
+  const marker=capture.reference(source);assert.ok(marker instanceof CapturedDisplayDefinition);
+  assert.equal(capture.entries[marker.index],JSON.stringify(grammar(source)));
+  assert.deepEqual(receiver.prepare(capture.entries)[marker.index],Object.fromEntries(Object.keys(source).map(key=>[key,source[key]])));
+  return marker.index;
+ };
+ const first=check();assert.equal(check(),first);
+ for(const key of ['first','middle','last']){source[key]+=10;assert.notEqual(check(),first);}
+ source.child=immutableCopy({colors:[3,undefined,1]});check();
+ // Replacing with an equal but independently frozen subtree is still observed;
+ // exact content dedup is allowed only AFTER the live value has been sampled.
+ source.child=immutableCopy({colors:[3,undefined,1]});check();
+ source.extra=undefined;check();delete source.extra;check();
+ const saved=source.first;delete source.first;source.first=saved;check();
+ Object.defineProperty(source,'middle',{enumerable:false});check();
+ Object.defineProperty(source,'middle',{enumerable:true});check();
+ let reads=0;const last=source.last;
+ source.first+=1; // Abort after a changed prefix; do not corrupt the cached shape.
+ Object.defineProperty(source,'last',{configurable:true,enumerable:true,get(){reads++;return last;}});
+ assert.equal(capture.reference(source),source);assert.equal(reads,0);
+ Object.defineProperty(source,'last',{configurable:true,enumerable:true,writable:true,value:last});check();
+ source.child={colors:[3,undefined,1]};assert.equal(capture.reference(source),source);
+ source.child=Object.freeze({colors:Object.freeze([3,undefined,1])});assert.equal(capture.reference(source),source,'unregistered frozen child is not trusted');
+ source.child=child;check();
+ Object.setPrototypeOf(source,{custom:true});assert.equal(capture.reference(source),source);
+ Object.setPrototypeOf(source,null);check();Object.setPrototypeOf(source,Object.prototype);check();
+ Object.defineProperty(source,'__proto__',{configurable:true,enumerable:true,value:undefined});assert.equal(capture.reference(source),source);delete source.__proto__;check();
+ source.last=Infinity;assert.equal(capture.reference(source),source);source.last=last;check();
+ source['x'.repeat(DISPLAY_DEFINITION_LIMITS.key+1)]=1;assert.equal(capture.reference(source),source);delete source['x'.repeat(DISPLAY_DEFINITION_LIMITS.key+1)];check();
+ // The global weak shape cache may survive, but admission/indexes are per frame.
+ const retained=capture.entries.slice();capture=new DisplayDefinitionCapture();check();assert.equal(capture.entries.length,1);
+ source.middle+=1;check();assert.equal(capture.entries.length,2);assert.notDeepEqual(capture.entries,retained);
+ const full=new DisplayDefinitionCapture();for(let i=0;i<DISPLAY_DEFINITION_LIMITS.entries;i++)assert.ok(full.reference({i}) instanceof CapturedDisplayDefinition);
+ const overflow={i:DISPLAY_DEFINITION_LIMITS.entries};assert.equal(full.reference(overflow),overflow);
+ assert.ok(new DisplayDefinitionCapture().reference(overflow) instanceof CapturedDisplayDefinition,'previously inspected data can enter a fresh table');
+ assert.ok(!Object.isFrozen(source));assert.equal(reads,0);
+});
+
+test('display-v2 tables reject unsafe content and bad references before changing the display',()=>{
+ const fixture=match(2),host=createLanWorld(fixture).engine;
+ const frame=displayWire(captureLanDisplayCombat(host,0,{0:0,1:0},0,null,false,true,true));
+ const viewer=createLanDisplayWorld(fixture,0,frame).world,baseline=serialize(viewer);
+ for(const mutate of [
+  (p:any)=>{p.displayDefinitions=['not json'];},
+  (p:any)=>{p.displayDefinitions=['[0,[["__proto__",[0,[]]]]]'];},
+  (p:any)=>{p.displayDefinitions=['[0,[["x",1],["x",2]]]'];},
+  (p:any)=>{p.displayDefinitions=['[0,[["spriteUrl","https://untrusted.invalid/image.png"]]]'];},
+  (p:any)=>{p.displayDefinitions=['[0,[["x",1e999]]]'];},
+  (p:any)=>{p.displayDefinitions=['[1,[]]'];},
+  (p:any)=>{p.displayDefinitions=Array(DISPLAY_DEFINITION_LIMITS.entries+1).fill('[0,[]]');},
+  (p:any)=>{p.ships[0].state.hullHp=-9;p.ships[1].state.extra={$displayDefinition:p.displayDefinitions.length};},
+  (p:any)=>{p.ships[0].state.extra={$displayDefinition:0,extra:1};},
+  (p:any)=>{p.ships[0].state.extra={$displayDefinition:-1};},
+  (p:any)=>{p.displayVersion=1;},
+ ]){const bad=structuredClone(frame);mutate(bad);assert.throws(()=>applyLanDisplaySnapshot(viewer,bad));assert.deepEqual(serialize(viewer),baseline);}
+ // Cached references may not bypass an accessor installed on a mutable fallback.
+ const ordinary=displayWire(captureLanDisplayCombat(host,1,{0:1,1:1},0,null,false,true,false));
+ const mutableViewer=createLanDisplayWorld(fixture,0,ordinary).world;let invoked=0;
+ Object.defineProperty(mutableViewer.playerShip.weapons[0].weaponSpec,'range',{configurable:true,enumerable:true,get(){invoked++;return 9;}});
+ assert.throws(()=>applyLanDisplaySnapshot(mutableViewer,frame),/read capability/);assert.equal(invoked,0);
+ const bounds=new DisplayDefinitionReceiver();
+ assert.throws(()=>bounds.prepare([' '.repeat(DISPLAY_DEFINITION_LIMITS.characters+1)]),/budget/);
+ let nested:any=0;for(let i=0;i<34;i++)nested=[0,[['child',nested]]];
+ assert.throws(()=>bounds.prepare([JSON.stringify(nested)]),/budget/);
+ assert.throws(()=>bounds.prepare([JSON.stringify([0,[['wide',[1,Array(DISPLAY_DEFINITION_LIMITS.nodes).fill(0)]]]])]),/budget/);
+ const capture=new DisplayDefinitionCapture();capture.reference({range:1});const receiver=new DisplayDefinitionReceiver();
+ const first=receiver.prepare(capture.entries)[0];assert.equal(receiver.prepare(capture.entries)[0],first);
+ assert.notEqual(new DisplayDefinitionReceiver().prepare(capture.entries)[0],first,'cache belongs to one receiver');
+ for(let i=2;i<300;i++){const next=new DisplayDefinitionCapture();next.reference({range:i});receiver.prepare(next.entries);}
+ assert.deepEqual(receiver.prepare(capture.entries)[0],first,'eviction needs no old definition baseline');
+ assert.ok(Object.isFrozen(first));
+});
+
+test('display-v2 definition frames traverse production binary, tape, relay and delta codecs',()=>{
+ const fixture=match(4),host=createLanWorld(fixture).engine;
+ const sender=new LanDeltaSender({ordered:true,motionReference:true}),receiver=new LanDeltaReceiver({motionReference:true});
+ let viewer:LanDisplayWorld|undefined;
+ for(let tick=0;tick<4;tick++){
+  host.fixedUpdate(1/60);host.playerShip.weapons[0].spec.range+=tick;
+  const frame=captureLanDisplayCombat(host,tick,{0:tick,1:tick},0,null,false,true,true);
+  const bytes=encodeProjectedBinaryFrame(frame,true)!,tape=new SnapshotTapeWriter().encode(frame);
+  assert.ok(tape);
+  // The existing helper deliberately expands packed numbers into SWF2 scalar
+  // arrays. Compare complete receiver values, not SWF2 vs SWF3 byte identity.
+  const tapeFrame=decodeBinaryFrame(encodeProjectedSnapshotTape(tape!)!.bytes);
+  assert.deepEqual(definitionDisplayValues(createLanDisplayWorld(fixture,0,tapeFrame).world),definitionDisplayValues(createLanDisplayWorld(fixture,0,decodeBinaryFrame(bytes)).world));
+  const packet=encodeBinaryState('definitions',tick,bytes);
+  assert.deepEqual(summarizeCombatFrame(decodeBinaryStateForRelay(packet).frame,4,tick-1),summarizeCombatFrame(frame,4,tick-1));
+  const choice=sender.prepare(lanDeltaTarget(packet,tick,tick));assert.ok(choice);sender.commit(choice!);
+  const decoded=decodeBinaryState(receiver.decode(choice!.packet)).frame;
+  if(viewer)applyLanDisplaySnapshot(viewer,decoded);else viewer=createLanDisplayWorld(fixture,0,decoded).world;
+  assert.equal(viewer.playerShip.weapons[0].spec.range,host.playerShip.weapons[0].spec.range);
+ }
+});
+
+// Compare against the unmodified validator when DISPLAY_DEFINITION_BASELINE is
+// set. Keep actual AssetManager shared; no permissive fake validation path.
+test('display definition scalar traversal preserves data, assets and rejection rules',()=>{
+ const outcome=(check:(v:unknown)=>void,value:unknown)=>{try{check(value);return 'ok';}catch(error){return (error as Error).name+':'+(error as Error).message;}};
+ const asset='/game-assets/graphics/damage/damage_cracks48_0_glow.png';
+ assert.ok(assetManager.hasPath(asset));
+ const values:unknown[]=[undefined,null,true,false,0,-0,1.25,'',asset,'x'.repeat(65536),NaN,Infinity,-Infinity,Symbol('s'),2n,()=>1,new Date(),new Map(),new Set(),new Float32Array(2),/x/,
+  {},Object.create(null),[],{spriteUrl:asset},{spriteUrl:''},{spriteUrl:'/not-bundled.png'},{spriteURL:'/not-bundled.png'},
+  {spriteUrl:{ordinary:'not a path'}},{nested:{imageUrl:asset}},{imageUrl:asset+'?unbundled'},
+  {'xUrl':'x'.repeat(65537)},{x:'x'.repeat(65537)},Array(5),{a:[null,undefined,true,-0,'字😀']},Object.assign(Object.create({inherited:()=>1}),{x:1})];
+ for(const name of ['__proto__','prototype','constructor'])values.push(Object.defineProperty({},name,{enumerable:true,value:1}));
+ let getterReads=0;
+ values.push(Object.defineProperty({},'x',{enumerable:true,get(){getterReads++;return 1;}}));
+ values.push(Object.defineProperty({},'ignored',{get(){getterReads++;return 1;}}));
+ const array:any[]=[1];Object.setPrototypeOf(array,{inherited:()=>1});values.push(array);
+ const cycle:any={};cycle.self=cycle;values.push(cycle);
+ // Exercise mixed containers, including nonfinite/bigint/function values deep
+ // inside otherwise valid definitions, not just handpicked root failures.
+ let seed=917;
+ const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed;};
+ const leaf=()=>[undefined,null,true,false,0,-0,4.5,'字😀',asset,NaN,Infinity,2n,()=>1][random()%13];
+ const make=(depth:number):unknown=>{
+  if(depth===0||random()%4===0)return leaf();
+  const result:any=random()%2?[]:{};
+  for(let i=0;i<3;i++)result[Array.isArray(result)?i:'field'+i]=make(depth-1);
+  return result;
+ };
+ for(let i=0;i<250;i++)values.push(make(5));
+ for(const [i,value] of values.entries())assert.equal(outcome(validateDisplayDefinition,value),outcome(controlDefinition,value),'fixture '+i);
+ assert.equal(getterReads,0,'accessors must never execute');
+ for(const value of [NaN,Infinity,-Infinity])assert.throws(()=>validateDisplayDefinition(value),/Invalid display definition number/);
+ for(const value of [Symbol('x'),2n,()=>1,new Date(),new Map(),new Set(),new Float32Array(2)])assert.throws(()=>validateDisplayDefinition(value),/Non-data display definition/);
+ assert.throws(()=>validateDisplayDefinition({spriteUrl:'/unbundled'}),/Unbundled display asset/);
+ assert.throws(()=>validateDisplayDefinition('x'.repeat(65537)),/Invalid display definition string/);
+ assert.throws(()=>validateDisplayDefinition(Object.defineProperty({},'x',{enumerable:true,get(){throw Error('must not run');}})),/Display definition accessor/);
+ for(const value of [null,undefined,false,0,-0,'',[],{},Object.create(null)])assert.doesNotThrow(()=>validateDisplayDefinition(value));
+ const mutable:any={range:100,visuals:{spriteUrl:asset}};
+ for(const check of [controlDefinition,validateDisplayDefinition]){
+  check(mutable);mutable.range=NaN;assert.throws(()=>check(mutable),/number/);mutable.range=100;
+  mutable.visuals.spriteUrl='/unbundled';assert.throws(()=>check(mutable),/Unbundled/);mutable.visuals.spriteUrl=asset;
+  const before=serialize(mutable);check(mutable);assert.deepEqual(serialize(mutable),before);
+ }
+});
+
+test('display definition scalar traversal keeps depth/node budgets and failure precedence',()=>{
+ const outcome=(check:(v:unknown)=>void,value:unknown)=>{try{check(value);return 'ok';}catch(error){return (error as Error).name+':'+(error as Error).message;}};
+ const wrap=(depth:number,leaf:unknown)=>{let node=leaf;for(let i=0;i<depth;i++)node={child:node};return node;};
+ for(const leaf of [null,undefined,NaN,Infinity,'x'.repeat(65537),1,{},[],()=>1])for(const depth of [31,32,33,34]){
+  const value=wrap(depth,leaf);assert.equal(outcome(validateDisplayDefinition,value),outcome(controlDefinition,value),'depth '+depth);
+  if(depth>32)assert.equal(outcome(validateDisplayDefinition,value),'Error:Display definition budget exceeded');
+ }
+ for(const length of [199998,199999,200000]){
+  const value=Array(length).fill(0);
+  assert.equal(outcome(validateDisplayDefinition,value),outcome(controlDefinition,value),'width '+length);
+  assert.equal(outcome(validateDisplayDefinition,value),length<200000?'ok':'Error:Display definition budget exceeded');
+  value[length-1]=NaN;assert.equal(outcome(validateDisplayDefinition,value),outcome(controlDefinition,value),'width before type failure');
+ }
+ const poison:any[]=Array(199999).fill(0);
+ Object.defineProperty(poison,'constructor',{value:1,enumerable:true});
+ assert.equal(outcome(validateDisplayDefinition,poison),'Error:Invalid display definition key');
+ assert.equal(outcome(validateDisplayDefinition,poison),outcome(controlDefinition,poison));
+});
+
+test('display definition scalar traversal retains descriptor trap order, mutation and reentry',()=>{
+ const exercise=(check:(v:unknown)=>void,mutate:boolean)=>{
+  const trace:string[]=[];let reentered=false;
+  const child:any={range:10,spriteUrl:'/game-assets/graphics/damage/damage_cracks48_0_glow.png'};
+  const tracked=(object:any,label:string)=>new Proxy(object,{
+   getPrototypeOf(target){trace.push(label+':prototype');return Reflect.getPrototypeOf(target);},
+   ownKeys(target){trace.push(label+':keys');return Reflect.ownKeys(target);},
+   getOwnPropertyDescriptor(target,key){
+    trace.push(label+':descriptor:'+String(key));
+    if(label==='child'&&key==='range'&&!reentered){
+     reentered=true;trace.push('reenter');check(Array(199999).fill(1));trace.push('reentered');
+     if(mutate)target.spriteUrl='/unbundled';
+    }
+    return Reflect.getOwnPropertyDescriptor(target,key);
+   },
+   get(target,key,receiver){trace.push(label+':GET:'+String(key));return Reflect.get(target,key,receiver);},
+  });
+  const root=tracked({first:1,child:tracked(child,'child'),last:2},'root');
+  let error='';try{check(root);}catch(e){error=(e as Error).name+':'+(e as Error).message;}
+  return {trace,error,child};
+ };
+ for(const mutate of [false,true]){
+  const old=exercise(controlDefinition,mutate),current=exercise(validateDisplayDefinition,mutate);
+  assert.deepEqual(current,old);assert.ok(current.trace.includes('reentered'));
+  assert.ok(!current.trace.some(s=>s.includes(':GET:')),'only data descriptors, not ordinary property access');
+  assert.equal(current.error,mutate?'Error:Unbundled display asset':'');
+ }
+});
+
+test('LAN display data field guard preserves own/inherited descriptor order and live capability rejection',()=>{
+ const exercise=(guard:(object:object,key:string)=>void,kind:string)=>{
+  const trace:string[]=[];let getterReads=0;
+  const base:any=Object.create(null),middle:any=Object.create(base),own:any=Object.create(middle);
+  base.value=()=>1;
+  if(kind==='inherited-data')middle.value=3;
+  if(kind==='own-data'||kind==='mutate'||kind==='reenter')own.value=4;
+  if(kind==='own-function')own.value=()=>2;
+  if(kind==='inherited-getter')Object.defineProperty(middle,'value',{get(){getterReads++;return 1;}});
+  if(kind==='own-getter')Object.defineProperty(own,'value',{get(){getterReads++;return 1;}});
+  if(kind==='own-setter')Object.defineProperty(own,'value',{set(){getterReads++;}});
+  const tracked=(object:any,label:string,parent:object|null)=>new Proxy(object,{
+   getOwnPropertyDescriptor(target,key){
+    trace.push(label+':descriptor:'+String(key));
+    if(kind==='reenter'&&label==='own'){guard({child:1},'child');trace.push('reentered');}
+    return Reflect.getOwnPropertyDescriptor(target,key);
+   },
+   getPrototypeOf(){trace.push(label+':prototype');return parent;},
+   get(target,key,receiver){trace.push(label+':GET:'+String(key));return Reflect.get(target,key,receiver);},
+  });
+  const trackedBase=tracked(base,'base',null),trackedMiddle=tracked(middle,'middle',trackedBase),trackedOwn=tracked(own,'own',trackedMiddle);
+  const outcomes:string[]=[];
+  const check=(key:string)=>{try{guard(trackedOwn,key);outcomes.push('ok');}catch(e){outcomes.push((e as Error).name+':'+(e as Error).message);}};
+  check('value');check('missing');
+  if(kind==='mutate'){
+   own.value=()=>1;check('value');delete own.value;check('value');
+   middle.value=2;check('value');Object.defineProperty(middle,'value',{get(){getterReads++;return 1;},configurable:true});check('value');
+  }
+  for(const key of ['__proto__','prototype','constructor'])check(key);
+  return {trace,outcomes,getterReads};
+ };
+ for(const kind of ['own-data','own-function','own-getter','own-setter','inherited-getter','inherited-data','missing','mutate','reenter']){
+  const old=exercise(controlDataField,kind),current=exercise(assertDataField,kind);
+  assert.deepEqual(current,old,kind);assert.equal(current.getterReads,0);
+  const denied='Error:Display data shadows a read capability: value';
+  assert.equal(current.outcomes[0],['own-data','inherited-data','mutate','reenter'].includes(kind)?'ok':denied);
+  assert.equal(current.outcomes[1],'ok');
+  assert.deepEqual(current.outcomes.slice(-3),Array(3).fill('Error:Invalid display property'));
+  if(kind==='mutate')assert.deepEqual(current.outcomes.slice(2,6),[denied,denied,'ok',denied]);
+  assert.ok(!current.trace.some(s=>s.includes(':GET:')),'guard must never execute a normal property read');
+ }
+ // Preserve the previous guard's falsy-target behavior; the decoder itself
+ // never uses these as an output record, but this is an exported helper.
+ for(const target of [null,undefined,false,0,''])for(const key of ['x','constructor']){
+  const check=(guard:typeof assertDataField)=>{try{guard(target as any,key);return 'ok';}catch(e){return (e as Error).name+':'+(e as Error).message;}};
+  assert.equal(check(assertDataField),check(controlDataField));
+ }
 });

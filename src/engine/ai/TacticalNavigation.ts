@@ -29,7 +29,10 @@ export function velocityToPosition(ship: Ship, point: Vector2, targetVelocity=ne
 }
 const nativeDistanceTo = Vector2.prototype.distanceTo;
 const nativeVectorLength = Vector2.prototype.length;
-interface Obstacle { x:number;y:number;vx:number;vy:number;radius:number }
+const collisionMax = Math.max, collisionMin = Math.min, collisionAbs = Math.abs, collisionHypot = Math.hypot;
+const nativeCollisionMath = [[collisionMax, 'max'], [collisionMin, 'min'], [collisionAbs, 'abs'], [collisionHypot, 'hypot']]
+  .every(([fn, name]) => typeof fn === 'function' && Function.prototype.toString.call(fn) === `function ${name}() { [native code] }`);
+interface Obstacle { x:number;y:number;vx:number;vy:number;radius:number;rejectRadius:number }
 function obstacles(ship: Ship,world: TacticalWorld,horizon:number): Obstacle[] {
   const result:Obstacle[]=[];
   const ownRadius=Math.max(ship.spec.collisionRadius,ship.shield.isActive && ship.shield.type!=='PHASE'?ship.shield.radius:0);
@@ -52,14 +55,24 @@ function obstacles(ship: Ship,world: TacticalWorld,horizon:number): Obstacle[] {
       if (gap > reach + 1e-12 * Math.max(1, Math.abs(reach))) return;
     }
     if(ship.pos.distanceTo(pos)>combined+((own?.maxSpeed ?? ship.getMotionStats().maxSpeed)+(own?.speed ?? ship.vel.length())+vel.length())*horizon)return;
-    result.push({x:pos.x,y:pos.y,vx:vel.x,vy:vel.y,radius:combined});
+    result.push({x:pos.x,y:pos.y,vx:vel.x,vy:vel.y,radius:combined,rejectRadius:combined+1e-12*Math.max(1,Math.abs(combined))});
   };
-  for(const other of world.ships){
-    if(other===ship||other.isDead||other.isPhased||other.spec.hullSize==='FIGHTER')continue;
+  // The owner supplies a conservative phase index only when no mutable engine
+  // references escape. Observer callbacks / replaced math retain the old scan.
+  const supplied = reuseMotion ? world.navigationObstacleIndex : undefined;
+  const index = supplied && ship.pos.distanceTo === nativeDistanceTo && ship.vel.length === nativeVectorLength
+    ? supplied : undefined;
+  if (index) motion ??= { maxSpeed: ship.getMotionStats().maxSpeed, speed: ship.vel.length() };
+  const candidates = index?.select(world.ships, ship.pos.x, ship.pos.y, ownRadius + policy.collisionMargin, motion!.maxSpeed, motion!.speed, horizon);
+  for(const other of candidates ?? world.ships){
+    // Attached parts cannot collide with their own assembly (same rule as ShipCollisionSystem).
+    // Treating them as obstacles permanently blocks system AI behind a false avoidance flag.
+    if(other.assemblyRoot===ship.assemblyRoot||other.isDead||other.isPhased||other.spec.hullSize==='FIGHTER')continue;
     world.noteNavigationObstacle?.(ship, other, horizon);
-    add(other.pos,other.vel,Math.max(other.spec.collisionRadius,other.shield.isActive&&other.shield.type!=='PHASE'?other.shield.radius:0));
+    add(other.pos,other.vel,Math.max(other.spec.collisionRadius,other.shield.isActive&&other.shield.type!=='PHASE'&&!(other.shield.voidShield&&sameTeam(ship,other))?other.shield.radius:0));
   }
   for(const asteroid of world.asteroids)if(asteroid.hp>0)add(asteroid.pos,asteroid.vel,asteroid.radius);
+  for(const hulk of world.hulkFragments??[])if(hulk.gravityManaged || hulk.gravityFixed)add(hulk.pos,hulk.vel,hulk.collisionRadius);
   return result;
 }
 
@@ -78,11 +91,27 @@ function collisionRisk(ship: Ship,desired: Vector2,nearby:Obstacle[],horizon:num
       vx+=(ax*c-ay*s)*step;vy+=(ax*s+ay*c)*step;
     }
     x+=vx*step;y+=vy*step;
+    // Recheck after the desired/stat readers on EVERY step. A replaced math
+    // function keeps the old sequence; no callbacks occur in a native sweep.
+    const sweptBounds = nativeCollisionMath && Math.max === collisionMax && Math.min === collisionMin
+      && Math.abs === collisionAbs && Math.hypot === collisionHypot;
     for(const o of nearby){
       const rx=beforeX-o.x-o.vx*time,ry=beforeY-o.y-o.vy*time;
       const dx=x-beforeX-o.vx*step,dy=y-beforeY-o.vy*step;
+      // For t in [0,1], rounded rx+dx*t lies between rx and rx+dx.
+      // Strict same-side endpoints therefore imply the EXISTING coordinate
+      // rejection below. Keep the exact closest-point formula for all others.
+      if(sweptBounds && ((rx>o.rejectRadius && rx+dx>o.rejectRadius)
+        || (rx < -o.rejectRadius && rx+dx < -o.rejectRadius)
+        || (ry>o.rejectRadius && ry+dy>o.rejectRadius)
+        || (ry < -o.rejectRadius && ry+dy < -o.rejectRadius)))continue;
       const t=Math.max(0,Math.min(1,-(rx*dx+ry*dy)/Math.max(1e-10,dx*dx+dy*dy)));
-      const separation=Math.hypot(rx+dx*t,ry+dy*t);
+      const sx=rx+dx*t,sy=ry+dy*t;
+      // A coordinate is a lower bound on Euclidean distance. Definite misses
+      // need no hypot; retain the original score/arithmetic near the boundary.
+      // Infinite/NaN obstacle bounds retain the original arithmetic.
+      if(Math.abs(sx)>o.rejectRadius||Math.abs(sy)>o.rejectRadius)continue;
+      const separation=Math.hypot(sx,sy);
       if(separation<o.radius)risk+=(o.radius-separation)/o.radius*step/(1+time);
     }
   }

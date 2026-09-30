@@ -4,7 +4,7 @@ import type { ShipSystemDefinition } from './Types';
 export const mineStrike: ShipSystemDefinition = {
   id: 'MINE_STRIKE',
   resources:{textures:['/game-assets/graphics/missiles/heavy_mine3.png','/game-assets/graphics/missiles/heavy_mine3_glow.png'],sounds:['mine_teleport','mine_ping','mine_windup_heavy','mine_explosion']}, sourceIds: ['mine_strike', 'minestrike'], name: '空雷突袭',
-  description: '向目标区域传送一颗重型感应空雷，基础部署距离1000；空雷会追踪附近敌舰，近距离引爆并造成范围高爆伤害。储存5次，每5秒恢复1次；每次消耗基础幅能容量的10%。',
+  description: '向目标区域传送一颗重型感应空雷，基础部署距离1000；空雷会追踪附近敌舰，近距离引爆并造成范围高爆伤害。储存5次，每5秒恢复1次；每次消耗基础载荷容量的10%。',
   chargeUp: .25, active: 0, chargeDown: .25, cooldown: 0,
   charges: 5, chargeRegen: .2, fluxPerUseFraction: .1,
   onActive: (ship, world, system) => {

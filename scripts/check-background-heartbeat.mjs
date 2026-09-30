@@ -12,16 +12,18 @@ import { webcrypto } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { build } from 'esbuild';
 import { WebSocket } from 'ws';
+import { Worker } from 'node:worker_threads';
+import { LanStateCredits } from '../server/LanStateCredits.mjs';
 import { createLanServer } from '../server/lan-server.mjs';
 import config from '../src/network/protocol.json' with { type: 'json' };
 
 const bundle = (await build({
-  stdin: { contents: 'export { LanConnection } from "./src/network/protocol.ts"; export { HostRecoveryBudget } from "./src/network/SnapshotPolicy.ts";', resolveDir: process.cwd() },
+  stdin: { contents: 'export { LanConnection } from "./src/network/protocol.ts"; export { PresentationReceipts } from "./src/network/PresentationReceipts.ts"; export { HostRecoveryBudget } from "./src/network/SnapshotPolicy.ts";', resolveDir: process.cwd() },
   bundle: true, write: false, format: 'iife', globalName: 'LanTest', platform: 'browser',
   define: { __LAN_BUILD_ID__: JSON.stringify('background-test') },
 })).outputFiles[0].text;
 
-function client(hidden = false) {
+function client(hidden = false, negotiated = {}) {
   let now = 100, nextTimer = 0;
   const timers = new Map(), listeners = new Set(), sockets = [], events = [];
   const document = {
@@ -40,7 +42,7 @@ function client(hidden = false) {
     receive(message) { this.onmessage({ data: JSON.stringify(message) }); }
   }
   const context = vm.createContext({
-    console, URL, DOMException, EventTarget, ArrayBuffer, Uint8Array, TextEncoder, TextDecoder, crypto: webcrypto, document, WebSocket: Socket,
+    console, URL, DOMException, EventTarget, ArrayBuffer, Uint8Array, TextEncoder, TextDecoder, atob, btoa, crypto: webcrypto, document, WebSocket: Socket,
     sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} },
     performance: { now: () => now }, Date: class extends Date { static now() { return now; } },
     setInterval(fn, ms) { const id = ++nextTimer; timers.set(id, { fn, ms, interval: true }); return id; },
@@ -50,16 +52,16 @@ function client(hidden = false) {
   vm.runInContext(bundle, context);
   const connection = new context.LanTest.LanConnection();
   connection.subscribe(m => events.push(m));
-  function welcome() {
+  function welcome(extra = {}) {
     const socket = sockets.at(-1);
     socket.onopen();
-    socket.receive({ type: 'welcome', resumeToken: 'a'.repeat(64) });
+    socket.receive({ type: 'welcome', resumeToken: 'a'.repeat(64), ...extra });
     return socket;
   }
   connection.connect('ws://localhost/lan/ws', 'test');
-  const socket = welcome();
+  const socket = welcome(negotiated);
   return {
-    connection, socket, sockets, events, listeners, timers, welcome, policy: context.LanTest.HostRecoveryBudget,
+    connection, socket, sockets, events, listeners, timers, welcome, Receipts: context.LanTest.PresentationReceipts, policy: context.LanTest.HostRecoveryBudget,
     advance(ms) { now += ms; },
     heartbeat() { for (const t of [...timers.values()]) if (t.interval && t.ms === 1000) t.fn(); },
     visibility(value, dispatch = true) {
@@ -423,4 +425,226 @@ if (process.argv.includes('--browser')) test('real Chromium: freeze a hidden pag
     assert.equal(result.sameSocket, true); assert.equal(result.ready, true); assert.equal(result.retried, false);
     assert(result.rtt < 10000);
   } finally { await browser.close(); await f.close(); }
+});
+
+// Explicit consumption contracts for the actual LanConnection. These scoped
+// tests never run the older authority/input fixtures above.
+const receiptState = (seq, extra = {}) => ({ type: 'state', matchId: 'receipt-match', seq,
+  frame: { tick: seq, ships: [], world: { combatTime: seq / 60 } }, ...extra });
+const stateAcks = c => c.socket.messages.filter(m => m.type === 'state-consumed').map(m => m.seq);
+function receiptTimeout(c, ms) {
+  const entry = [...c.timers].find(([, value]) => !value.interval && value.ms === ms);
+  assert.ok(entry, 'Expected receipt timer ' + ms); c.timers.delete(entry[0]); entry[1].fn();
+}
+
+test('presentation receipt: synchronous retention is explicit, after all listeners, with no timer', () => {
+  const c = client(false, { stateCredits: 1 }), timers = c.timers.size, stages = [];
+  const unsubscribe = c.connection.subscribe((m, receipt) => {
+    if (m.type !== 'state') return;
+    assert.equal(receipt.complete('consumed'), true); stages.push('retained');
+    assert.deepEqual(stateAcks(c), []);
+    assert.equal(receipt.complete('consumed'), false);
+  });
+  c.connection.subscribe(m => { if (m.type === 'state') { stages.push('observer'); assert.deepEqual(stateAcks(c), m.seq === 10 ? [] : [10]); } });
+  c.socket.receive(receiptState(10));
+  assert.deepEqual(stages, ['retained', 'observer']); assert.deepEqual(stateAcks(c), [10]);
+  assert.equal(c.timers.size, timers); assert.equal(c.connection.presentationConsumption.pending, 0);
+  unsubscribe(); c.socket.receive(receiptState(11)); // No display owner discards, it does not deadlock loading.
+  assert.deepEqual(stateAcks(c), [10, 11]); c.connection.close(false);
+});
+
+test('presentation receipt: out-of-order completion cannot cumulatively release unfinished states', () => {
+  const c = client(false, { stateCredits: 1 }), tokens = [], remote = new LanStateCredits();
+  remote.recordNetworkRtt(100);
+  c.connection.subscribe((m, receipt) => { if (m.type === 'state') tokens.push(receipt.defer(() => {})); });
+  for (let seq = 10; seq < 13; seq++) { assert.equal(remote.reserve(seq, 100), true); c.socket.receive(receiptState(seq)); }
+  assert.deepEqual(stateAcks(c), []); assert.equal(c.connection.presentationConsumption.pending, 3);
+  assert.equal(c.connection.completePresentation({ ...tokens[0], id: tokens[2].id + 1 }, 'consumed'), false);
+  assert.equal(c.connection.completePresentation(tokens[0], 'fragment'), false);
+  assert.equal(c.connection.completePresentation(tokens[2], 'consumed'), true);
+  assert.deepEqual(stateAcks(c), []); assert.equal(remote.stats().inflight, 3);
+  assert.equal(c.connection.completePresentation({ ...tokens[0], seq: 999999 }, 'discarded'), true);
+  assert.deepEqual(stateAcks(c), [10]); remote.ack(10); assert.equal(remote.stats().inflight, 2);
+  assert.equal(c.connection.completePresentation(tokens[1], 'consumed'), true);
+  assert.deepEqual(stateAcks(c), [10, 11, 12]); remote.ack(11); remote.ack(12); assert.equal(remote.stats().inflight, 0);
+  assert.equal(c.connection.completePresentation(tokens[2], 'consumed'), false);
+  assert.equal(c.connection.presentationConsumption.pending, 0); c.connection.close(false);
+});
+
+test('presentation receipt: every connection epoch revokes late replies and cancels work exactly once', () => {
+  const transitions = [c => c.connection.resetPresentationConsumption(),
+    c => c.socket.receive({ type: 'launch', matchId: 'receipt-match', syncId: 'new' }),
+    c => c.socket.receive({ type: 'match', match: { id: 'next-match' } }),
+    c => c.visibility(true), c => c.connection.close(false),
+    c => c.socket.onclose({ code: 1006, reason: '' }), c => c.socket.receive({ type: 'left' }),
+    c => c.socket.receive({ type: 'roomClosed' })];
+  for (const transition of transitions) {
+    const c = client(false, { stateCredits: 1 }); let token, cancelled = 0;
+    c.socket.receive({ type: 'launch', matchId: 'receipt-match', syncId: 'same' });
+    c.connection.subscribe((m, receipt) => { if (m.type === 'state') token = receipt.defer(() => {
+      cancelled++; assert.equal(c.connection.completePresentation(token, 'consumed'), false);
+      c.connection.resetPresentationConsumption(); // Reentrant teardown cannot resurrect the old receipt.
+    }); });
+    c.socket.receive(receiptState(10)); c.socket.receive({ type: 'launch', matchId: 'receipt-match', syncId: 'same' });
+    assert.equal(cancelled, 0, 'Repeated launch is not a new connection epoch');
+    transition(c); assert.equal(cancelled, 1); assert.equal(c.connection.completePresentation(token, 'consumed'), false);
+    assert.equal(c.connection.presentationConsumption.pending, 0); assert.deepEqual(stateAcks(c), []); c.connection.close(false);
+    assert.equal(cancelled, 1);
+  }
+});
+
+test('presentation receipt: subscriber failure, async listener misuse and rejected consumption grant no credit', async () => {
+  for (const mode of ['throw-after-complete', 'promise', 'reject']) {
+    const c = client(false, { stateCredits: 1 });
+    c.connection.subscribe((m, receipt) => {
+      if (m.type !== 'state') return;
+      if (mode === 'throw-after-complete') { receipt.complete('consumed'); throw Error('failed consumer'); }
+      if (mode === 'promise') return Promise.reject(Error('forgot explicit defer'));
+      receipt.reject(Error('bad data'));
+    });
+    c.socket.receive(receiptState(10)); await Promise.resolve();
+    assert.deepEqual(stateAcks(c), []); assert.equal(c.events.filter(m => m.code === 'PRESENTATION_CONSUMPTION').length, 1);
+    assert.equal(c.connection.presentationConsumption.pending, 0); c.connection.close(false);
+  }
+});
+
+test('presentation receipt: frame and encoded-unit admission stay bounded without payload queues', () => {
+  const c = client(false, { stateCredits: 1 }); let cancelled = 0;
+  c.connection.subscribe((m, receipt) => { if (m.type === 'state') receipt.defer(() => cancelled++); });
+  for (let seq = 0; seq < 64; seq++) c.socket.receive(receiptState(seq));
+  assert.equal(c.connection.presentationConsumption.pending, 64);
+  c.socket.receive(receiptState(64));
+  assert.equal(cancelled, 64); assert.equal(c.connection.presentationConsumption.pending, 0);
+  assert.deepEqual(stateAcks(c), []); assert.equal(c.events.filter(m => m.code === 'PRESENTATION_CONSUMPTION').length, 1);
+  const errors = [], ledger = new c.Receipts(error => errors.push(String(error)), { state: { count: 2, units: 10 }, visual: { count: 1, units: 5 } });
+  ledger.deliver('state', 6, () => true, receipt => receipt.defer(() => {}));
+  ledger.deliver('state', 5, () => true, () => { throw Error('Overflow must not dispatch'); });
+  assert.equal(errors.length, 1); assert.equal(ledger.stats.pending, 0); assert.equal(ledger.stats.units, 0);
+  ledger.reset(); c.connection.close(false);
+});
+
+test('presentation receipt: unsent ACK retries are bounded and hung consumers time out', () => {
+  const c = client(false, { stateCredits: 1 });
+  c.connection.subscribe((m, receipt) => { if (m.type === 'state') receipt.complete('consumed'); });
+  c.socket.bufferedAmount = config.maxSnapshotBytes * 2 + 1; c.socket.receive(receiptState(10));
+  assert.deepEqual(stateAcks(c), []); assert.equal(c.connection.presentationConsumption.pending, 1);
+  c.socket.bufferedAmount = 0; c.advance(50); receiptTimeout(c, 50);
+  assert.deepEqual(stateAcks(c), [10]); assert.equal(c.connection.presentationConsumption.pending, 0); c.connection.close(false);
+  const hung = client(false, { stateCredits: 1 }); let cancelled = 0, token;
+  hung.connection.subscribe((m, receipt) => { if (m.type === 'state') token = receipt.defer(() => cancelled++); });
+  hung.socket.receive(receiptState(10)); hung.advance(5000); receiptTimeout(hung, 5000);
+  assert.equal(cancelled, 1); assert.equal(hung.connection.completePresentation(token, 'consumed'), false);
+  assert.equal(hung.connection.presentationConsumption.pending, 0); assert.deepEqual(stateAcks(hung), []);
+  assert.equal(hung.events.filter(m => m.code === 'PRESENTATION_CONSUMPTION').length, 1); hung.connection.close(false);
+});
+
+test('presentation receipt: terminal report waits for retention, coalesces retransmits, and cancels on resync', () => {
+  for (const mode of ['normal', 'reset', 'blocked-ack']) {
+    const c = client(false, { stateCredits: 1 }), tokens = [];
+    c.connection.subscribe((m, receipt) => { if (m.type === 'state') tokens.push(receipt.defer(() => {})); });
+    c.socket.receive(receiptState(10)); c.socket.receive(receiptState(11));
+    const ended = { type: 'ended', matchId: 'receipt-match', winner: 'draw' };
+    c.socket.receive(ended); c.socket.receive(ended);
+    assert.equal(c.events.filter(m => m.type === 'ended').length, 0);
+    assert.equal(c.connection.presentationConsumption.terminalPending, true);
+    c.socket.receive({ type: 'room', room: { status: 'ended' } }); // Small controls are not parked in the ledger.
+    assert.equal(c.events.at(-1).type, 'room');
+    if (mode === 'reset') c.connection.resetPresentationConsumption();
+    if (mode === 'blocked-ack') c.socket.bufferedAmount = config.maxSnapshotBytes * 2 + 1;
+    c.connection.completePresentation(tokens[1], 'consumed'); assert.equal(c.events.filter(m => m.type === 'ended').length, 0);
+    c.connection.completePresentation(tokens[0], 'consumed');
+    assert.equal(c.events.filter(m => m.type === 'ended').length, mode === 'reset' ? 0 : 1);
+    assert.deepEqual(stateAcks(c), mode === 'normal' ? [10, 11] : []);
+    assert.equal(c.connection.presentationConsumption.pending, 0); c.connection.close(false);
+  }
+});
+
+test('presentation receipt: visual ownership is explicit and independent, fragments never grant baseline-ready', async () => {
+  const { AnchoredProjectilePublisher } = await import('../src/network/AnchoredProjectileVisual.mjs');
+  const publisher = new AnchoredProjectilePublisher('receipt-visual');
+  const frame = publisher.publish({ tick: 1, time: 0, rows: [] });
+  const packet = { type: 'projectile-visual', matchId: 'receipt-match', syncId: 'same', key: frame.key, tick: 1,
+    kind: 'baseline', data: Buffer.from(frame.baseline).toString('base64'), visualHandled: true };
+  const c = client(false, { stateCredits: 1 }); c.connection.visualState = true;
+  c.socket.receive(packet);
+  assert.equal(c.socket.messages.at(-1).status, 'discarded', 'Server-supplied visualHandled cannot grant readiness');
+  let stateToken, visualToken, cancelled = 0;
+  c.connection.subscribe((m, receipt) => {
+    if (m.type === 'state') stateToken = receipt.defer(() => {});
+    if (m.type === 'projectile-visual') visualToken = receipt.defer(() => cancelled++);
+  });
+  c.socket.receive(receiptState(10)); c.socket.receive(packet);
+  assert.equal(c.connection.completePresentation(visualToken, 'consumed'), true);
+  assert.equal(c.socket.messages.at(-1).status, 'consumed'); assert.deepEqual(stateAcks(c), []);
+  c.socket.receive(packet); c.socket.receive({ type: 'layered-unavailable' });
+  assert.equal(cancelled, 1); assert.equal(c.connection.completePresentation(visualToken, 'consumed'), false);
+  assert.equal(c.socket.messages.filter(m => m.type === 'visual-consumed').at(-1).status, 'discarded');
+  assert.equal(c.connection.presentationConsumption.state, 1);
+  c.connection.completePresentation(stateToken, 'consumed'); assert.deepEqual(stateAcks(c), [10]);
+  c.connection.visualState = true;
+  c.socket.receive({ ...packet, data: Buffer.alloc(6144).toString('base64'), offset: 0, total: 6145 });
+  assert.equal(c.socket.messages.at(-1).status, 'fragment'); assert.equal(c.connection.presentationConsumption.pending, 0);
+  c.socket.receive({ ...packet, data: Buffer.alloc(1).toString('base64'), offset: 6144, total: 6145 });
+  assert.equal(c.connection.presentationConsumption.visual, 1);
+  c.connection.completePresentation(visualToken, 'discarded');
+  assert.equal(c.socket.messages.at(-1).status, 'discarded'); c.connection.close(false);
+});
+
+test('presentation receipt: real Worker transfer and stale reply use only local correlation', async t => {
+  const { encodeBinaryFrame } = await import('../src/network/BinarySnapshot.mjs');
+  const c = client(false, { stateCredits: 1 }), messages = [], replies = [], tokens = [], detached = [];
+  const decoderUrl = new URL('../src/network/BinarySnapshot.mjs', import.meta.url).href;
+  const worker = new Worker(`
+    const { parentPort } = require('node:worker_threads');
+    (async () => {
+      const { decodeBinaryFrame } = await import(${JSON.stringify(decoderUrl)});
+      const held = new Map();
+      parentPort.on('message', m => {
+        if (m.type === 'retain') { const frame = decodeBinaryFrame(m.wire); held.set(m.token.id, { token: m.token, frame }); parentPort.postMessage({ retained: m.token.id, tick: frame.tick }); }
+        if (m.type === 'release') { const entry = held.get(m.id); if (entry) { held.delete(m.id); parentPort.postMessage({ token: entry.token, status: 'consumed' }); } }
+        if (m.type === 'cancel') { for (const [id, entry] of held) if (entry.token.owner === m.owner && entry.token.epoch === m.epoch) held.delete(id); parentPort.postMessage({ cancelled: m.epoch, retainedCount: held.size }); }
+        if (m.type === 'late') parentPort.postMessage({ token: m.token, status: 'consumed' });
+      });
+      parentPort.postMessage({ ready: true });
+    })().catch(error => { throw error; });`, { eval: true });
+  t.after(async () => { c.connection.close(false); await worker.terminate(); });
+  worker.on('message', message => {
+    messages.push(message);
+    if (message.token) replies.push({ token: message.token, accepted: c.connection.completePresentation(message.token, message.status) });
+  });
+  await until(() => messages.some(m => m.ready));
+  c.connection.subscribe((m, receipt) => {
+    if (m.type !== 'state') return;
+    let token;
+    token = receipt.defer(() => worker.postMessage({ type: 'cancel', owner: token.owner, epoch: token.epoch }));
+    tokens.push(token);
+    const wire = encodeBinaryFrame(m.frame).slice().buffer;
+    worker.postMessage({ type: 'retain', token, wire }, [wire]); detached.push(wire.byteLength === 0);
+  });
+  c.socket.receive(receiptState(10)); c.socket.receive(receiptState(11));
+  assert.deepEqual(stateAcks(c), []); await until(() => messages.filter(m => m.retained).length === 2);
+  assert.deepEqual(detached, [true, true]); assert.deepEqual(stateAcks(c), [], 'Worker post/receipt of bytes is not application completion');
+  worker.postMessage({ type: 'release', id: tokens[1].id }); await until(() => replies.length === 1);
+  assert.deepEqual(stateAcks(c), []);
+  worker.postMessage({ type: 'release', id: tokens[0].id }); await until(() => replies.length === 2);
+  assert.deepEqual(stateAcks(c), [10, 11]); assert.equal(replies.every(r => r.accepted), true);
+  c.socket.receive(receiptState(12)); await until(() => messages.filter(m => m.retained).length === 3);
+  c.connection.resetPresentationConsumption(); await until(() => messages.some(m => m.cancelled !== undefined));
+  assert.equal(messages.find(m => m.cancelled !== undefined).retainedCount, 0);
+  worker.postMessage({ type: 'late', token: tokens[2] }); await until(() => replies.length === 3);
+  assert.equal(replies[2].accepted, false); assert.deepEqual(stateAcks(c), [10, 11]);
+  assert.equal(c.connection.presentationConsumption.pending, 0);
+});
+
+test('presentation receipt: equal epoch/id from a different owner cannot finish this connection', () => {
+  const c = client(), limits = { state: { count: 2, units: 100 }, visual: { count: 1, units: 100 } }, sent = [];
+  const first = new c.Receipts(error => { throw error; }, limits), second = new c.Receipts(error => { throw error; }, limits);
+  let oldToken, newToken;
+  try {
+    first.deliver('state', 1, () => true, receipt => { oldToken = receipt.defer(() => {}); });
+    second.deliver('state', 1, () => { sent.push('new'); return true; }, receipt => { newToken = receipt.defer(() => {}); });
+    assert.equal(oldToken.epoch, newToken.epoch); assert.equal(oldToken.id, newToken.id);
+    assert.equal(second.complete(oldToken, 'consumed'), false);
+    assert.deepEqual(sent, []); assert.equal(second.complete(newToken, 'consumed'), true); assert.deepEqual(sent, ['new']);
+  } finally { first.reset(); second.reset(); c.connection.close(false); }
 });

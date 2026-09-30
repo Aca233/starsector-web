@@ -1,3 +1,4 @@
+import { SystemIcon } from '../ui/SystemIcon';
 import { useId, useRef, useState } from 'react';
 import { NativeButton } from '../ui/NativeChrome';
 import { NativeBitmapText } from '../ui/NativeBitmapText';
@@ -14,7 +15,7 @@ import './system-loadout.css';
 
 const controlLabels: Partial<Record<keyof NonNullable<ShipSystemDefinition['controls']>, string>> = {
   blockWeapons: '禁止开火', blockShields: '关闭护盾', lockTurning: '锁定转向', forceForward: '持续前进',
-  blockVenting: '无法排幅', blockStrafing: '无法横移', blockFluxDissipation: '暂停幅能耗散',
+  blockVenting: '无法排散', blockStrafing: '无法横移', blockFluxDissipation: '暂停载荷耗散',
 };
 const seconds = (n: number) => Number.isFinite(n) ? `${n} s` : '持续';
 function duration(definition: ShipSystemDefinition) {
@@ -105,7 +106,7 @@ export function SystemLoadoutEditor({ draft, spec, disabled, onChange }: { draft
       <div className="system-editor-tabs" role="tablist" aria-label="技能装配页面">
         <NativeButton id={`${tabId}-loadout`} aria-controls={`${tabId}-panel`} role="tab" aria-selected={page === 'loadout'} onClick={() => setPage('loadout')}>技能装配</NativeButton>
         <NativeButton id={`${tabId}-keys`} aria-controls={`${tabId}-panel`} role="tab" aria-selected={page === 'keys'} onClick={() => setPage('keys')}>快捷键</NativeButton>
-        <span>独立冷却 · 共享幅能</span>
+        <span>独立冷却 · 共享载荷</span>
       </div>
       <div id={`${tabId}-panel`} role="tabpanel" aria-labelledby={`${tabId}-${page}`} className={`system-editor-page system-editor-page--${page}`}>
         {page === 'keys' ? <div className="system-editor-keypage"><header><h3><NativeBitmapText font="button">舰船技能快捷键</NativeBitmapText></h3><p>按键跟随槽位，不绑定某一个技能。这里的修改在「应用更改」后保存。</p></header>
@@ -145,19 +146,19 @@ export function SystemLoadoutEditor({ draft, spec, disabled, onChange }: { draft
               const installed = ids.includes(definition.id) || defenseId === definition.id, requirement = reasonFor(definition);
               return <button type="button" key={definition.id} className="system-library-item" data-system-id={definition.id} aria-label={`查看技能：${definition.name}`} aria-pressed={selectedId === definition.id} onClick={() => setSelectedId(definition.id)}>
                 <span className={`system-fit-icon ${installed ? 'is-installed' : requirement ? 'is-locked' : ''}`}>{installed ? '●' : requirement ? '×' : '·'}</span>
-                <span><strong><NativeBitmapText font="body">{definition.name}</NativeBitmapText></strong><small>{installed ? defenseId === definition.id ? '已装配 · 右键' : '已装配 · 技能槽' : requirement ? '需要配套设备' : duration(definition)}</small></span><span className="system-row-arrow" aria-hidden="true">›</span>
+                <span><strong><SystemIcon systemId={definition.id} /><NativeBitmapText font="body">{definition.name}</NativeBitmapText></strong><small>{installed ? defenseId === definition.id ? '已装配 · 右键' : '已装配 · 技能槽' : requirement ? '需要配套设备' : duration(definition)}</small></span><span className="system-row-arrow" aria-hidden="true">›</span>
               </button>;
             })}{!results.length && <div className="system-library-empty"><p>没有匹配的技能</p><button type="button" className="system-reset" onClick={() => { setFilter(''); setScope('all'); }}>清除筛选，查看全部</button></div>}</div>
           </section>
           <section className="system-detail" aria-label="技能详情">
             {selection ? <>
-              <div className="system-detail-scroll" key={selection.id}><span className="system-section-kicker">技能详情</span><h3><NativeBitmapText font="button">{selection.name}</NativeBitmapText></h3><span className={`system-detail-state ${installedIndex >= 0 || installedRight ? 'is-installed' : reason ? 'is-locked' : ''}`}>{installedRight ? '已装配 · 右键' : installedIndex >= 0 ? `已装配 · 技能槽 ${installedIndex + 1}` : reason ? '装配条件未满足' : '可装配到当前舰船'}</span>
+              <div className="system-detail-scroll" key={selection.id}><span className="system-section-kicker">技能详情</span><h3><SystemIcon systemId={selection.id} large /><NativeBitmapText font="button">{selection.name}</NativeBitmapText></h3><span className={`system-detail-state ${installedIndex >= 0 || installedRight ? 'is-installed' : reason ? 'is-locked' : ''}`}>{installedRight ? '已装配 · 右键' : installedIndex >= 0 ? `已装配 · 技能槽 ${installedIndex + 1}` : reason ? '装配条件未满足' : '可装配到当前舰船'}</span>
                 <p className="system-detail-description">{selection.description?.trim() || `尚未提供“${selection.name}”（${selection.id}）的效果说明。`}</p>
                 <dl className="system-detail-stats"><div><dt>启动时间</dt><dd>{seconds(selection.chargeUp)}</dd></div><div><dt>持续方式</dt><dd>{duration(selection)}</dd></div><div><dt>冷却时间</dt><dd>{seconds(selection.cooldown)}</dd></div><div><dt>充能上限</dt><dd>{selection.charges !== undefined ? `${selection.charges} 次` : '不限次数'}</dd></div></dl>
                 {selection.controls && Object.entries(controlLabels).some(([key]) => selection.controls?.[key as keyof typeof controlLabels]) && <div className="system-detail-controls"><h4>生效期间</h4><ul>{Object.entries(controlLabels).filter(([key]) => selection.controls?.[key as keyof typeof controlLabels]).map(([key, label]) => <li key={key}>{label}</li>)}</ul></div>}
                 {selection.implementationDetails && <details className="system-detail-more"><summary>实现说明</summary><p>{selection.implementationDetails}</p></details>}
                 {reason && <div className="system-requirement"><span>{reason}</span></div>}
-                <div className="system-detail-tip"><span>技能共享幅能，冷却和充能独立。每种技能只能装一份，换槽会移动而不是复制。右键装技能后，Shift + 右键仍控制舰体护盾或相位。</span></div>
+                <div className="system-detail-tip"><span>技能共享载荷，冷却和充能独立。每种技能只能装一份，换槽会移动而不是复制。右键装技能后，Shift + 右键仍控制舰体护盾或相位。</span></div>
               </div>
               <div className="system-detail-action">
                 {installedIndex >= 0 ? <NativeButton className="system-button" disabled={disabled} onClick={() => remove(selection.id)}>卸下技能槽技能</NativeButton> : <NativeButton className="system-button" disabled={disabled || !!reason || ids.length >= 64} onClick={() => equip(false)}>{ids.length >= 64 ? '技能槽已达上限' : installedRight ? '移至键盘技能槽' : '装配到技能槽'}</NativeButton>}

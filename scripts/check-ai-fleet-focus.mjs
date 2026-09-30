@@ -1,3 +1,4 @@
+import { checkOwnedFleetDistances } from './lib/owned-fleet-distance-contracts.mjs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -5,6 +6,7 @@ const args=process.argv.slice(2);
 if(args.length!==2||args[0]!=='--bundle')throw Error('Usage: node scripts/check-ai-fleet-focus.mjs --bundle candidate.mjs (explicit experimental bundle required)');
 const l=await import(pathToFileURL(path.resolve(args[1])).href);
 const {Ship,Vector2,modManager,planFleetTactics}=l;
+if(process.env.OWNED_FLEET_ONLY==='true'){console.log(JSON.stringify(checkOwnedFleetDistances(l)));process.exit(0);}
 let passed=0;function test(name,fn){fn();console.log(`ok ${++passed} - ${name}`);}
 function make(id,team,x,y,dps=200){
  const s=new Ship(id,modManager.requireShip('hammerhead'),team===0,new Vector2(x,y),team?Math.PI:0);s.fireControlMode='AI';s.visibilityMask=3;

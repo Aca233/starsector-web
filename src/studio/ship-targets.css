@@ -16,3 +16,6 @@
 .assembly-hit-regions [data-module-path][data-module-hovered="true"] { fill: #6ce8ea40; stroke: #ecda6d; }
 
 .studio-ship .studio-mount:is(:hover, :focus-visible, .is-selected, .is-grouped, :not(.is-equipped)) { border: 0; background: transparent; box-shadow: none; }
+
+/* Web fourth weapon size; existing native sizes unchanged. */
+.studio-ship .studio-mount--extra_large { --mount-visual-size: 36px; }

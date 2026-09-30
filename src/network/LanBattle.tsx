@@ -1,13 +1,9 @@
+import { flushSync } from 'react-dom';
+import { LanPresentationWorkerClient } from './LanPresentationWorkerClient';
+import type { LanWorkerAuxiliary } from './LanPresentationWorkerProtocol';
+import { LAN_PRESENTATION_LAYERS as LAYERS, LAN_PRESENTATION_CONTEXT } from './LanPresentationDefaults';
+import { guardLanViewCommand } from './LanPresentationCommands';
 import { summarizeNetworkFailure } from '../../desktop/network-diagnostic-record.mjs';
-import { combatHudView } from '../engine/runtime/CombatHudView';
-import { engineTacticalMapSource } from '../engine/runtime/TacticalMapView';
-import { engineDeploymentView } from '../engine/runtime/DeploymentView';
-import { LocalTurretPrediction } from './LocalTurretPrediction';
-import { LocalParticleEffects } from './LocalParticleEffects';
-import { LocalFirePrediction } from './LocalFirePrediction';
-import { CriticalCombatReplica } from "./CriticalCombatReplica";
-import { combatStateFromText } from "./CriticalCombatState.mjs";
-import { ProjectileVisualReplica } from './ProjectileVisualReplica';
 import { downloadNetworkDiagnostics, nextDiagnosticBattle, recordNetworkDiagnostic } from "./NetworkDiagnosticLog";
 import { NetworkRuntimeDiagnostics } from "./NetworkRuntimeDiagnostics";
 import { SnapshotPipelineDiagnostics } from "./SnapshotPipelineDiagnostics";
@@ -19,38 +15,25 @@ import { getGraphicsSettings } from '../engine/runtime/GraphicsSettings';
 import { PresentationSettingsPanel } from '../ui/PresentationSettingsPanel';
 import { readSystemBindings, selectNextSystem } from '../engine/runtime/SystemBindings';
 import { SystemBindingSettings } from '../ui/SystemBindingSettings';
-import { LocalMuzzleEffects } from './LocalMuzzleEffects';
 import { MotionPresence } from '../ui/core/MotionPresence';
-import { lanTeamPresence } from "./LanBattleRoster";
 import { FullscreenButton } from '../ui/FullscreenButton';
 import { LanBattleReport } from "./LanBattleReport";
 import { MAX_BATTLE_REPORT_BYTES } from "./battle-report.mjs";
 import type { BattleEnded, BattleReport } from "./battle-report.mjs";
-import { LocalContrails } from "./LocalContrails";
-import { SnapshotPlayback } from "./SnapshotPlayback";
 import { LanSnapshotDecoder } from "./LanSnapshotDecoder";
 import type { SnapshotDecodeStats } from "./LanSnapshotDecoder";
-import { MotionReplica, motionAuthority } from "./MotionReplica";
-import { motionFromText } from "./MotionFrame.mjs";
-import { ProjectileFlightPrediction } from "./ProjectileFlightPrediction";
-import { MotionPrediction } from "./MotionPrediction";
 import { submitRealtimeInput } from "./RealtimeSendPolicy.mjs";
 import { InputSendBudget, LAN_INPUT_INTERVAL_MS } from "./InputSendBudget";
 import { LAN_SNAPSHOT_HZ, SnapshotReceiveRate } from "./SnapshotPolicy";
 import type { HostPerformance } from "./SnapshotPolicy";
 import { FleetDeployment } from '../ui/tactical/FleetDeployment';
-import { applyTacticalViewCommand } from '../engine/runtime/TacticalControl';
 import { TacticalMap } from '../ui/tactical/TacticalMap';
-import { sameTeam } from "../engine/simulation/CombatTeams";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createLanDisplayWorld } from "./LanDisplayBootstrap";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { LanDisplayWorld } from "./LanDisplayWorld";
-import { WebGLCombatRenderer } from "../engine/render/webgl/WebGLCombatRenderer";
 import { Vector2 } from "../engine/math/Vector2";
 import { sound } from "../engine/audio/SoundManager";
-import { VisualRandom } from "../engine/runtime/VisualRandom";
-import { CameraController } from "../engine/runtime/CameraController";
-import { clientToCombatWorld, zoomCombatView } from "../engine/runtime/PlayerControls";
+import { LanPresentationControls } from "./LanPresentationControls";
+import { readCombatViewport } from "../engine/runtime/CombatViewport";
 import { isCombatTextEntry, hasCombatModal, hasCombatInputFocus } from '../engine/runtime/CombatInputFocus';
 import { flightKey, shipCommandForKey } from "../engine/runtime/CombatCommands";
 import { assetManager } from "../engine/assets/AssetResolver";
@@ -64,24 +47,12 @@ import { CombatRadar } from "../ui/hud/CombatRadar";
 import { CombatContacts } from "../ui/hud/CombatContacts";
 import { getHudDensity } from "../ui/hud/HudLayout";
 import "../ui/combat-pause-menu.css";
-import { applyLanDisplaySnapshots, projectileSnapshotTick } from "./LanDisplaySnapshot";
+import type { LanPresentationViews } from "./LanPresentationViews";
+import { LanPresentationRuntime } from "./LanPresentationRuntime";
 import type { CombatSnapshot } from "./CombatSnapshot";
 import { KEY_CODES, teamName, teamColor, LAN_BUILD } from "./protocol";
 import type { Action, LanConnection, Match, Seat, PlayerInput } from "./protocol";
 
-// Visual Lab geometry probes are opt-in, not part of normal multiplayer combat.
-const LAYERS = new Set([
-  "background",
-  "nebula",
-  "asteroid",
-  "trail",
-  "hull",
-  "weapon",
-  "beam",
-  "shield",
-  "explosion",
-  "identification",
-]);
 interface AuthorityMulticore { mode: string; reason: string | null }
 function readAuthorityMulticore(value: unknown): AuthorityMulticore | null {
   if (!value || typeof value !== "object") return null;
@@ -159,6 +130,10 @@ export function LanBattle({
   const computesAuthority = seat === 0 && !serverAuthority;
   const canEndBattle = serverAuthority ? roomHost === true : seat === 0;
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // A transferred canvas cannot be reclaimed. React owns the replacement on
+  // startup fallback; never mutate its DOM behind React or switch a live owner.
+  const [mainFallback, setMainFallback] = useState(false);
+  const usePresentationWorker = !computesAuthority && !mainFallback && import.meta.env.VITE_LAN_PRESENTATION_WORKER === 'true';
   const [networkStatus, setNetworkStatus] = useState("");
   const [controlsReady, setControlsReady] = useState(false);
   const [peerAway, setPeerAway] = useState("");
@@ -193,9 +168,7 @@ export function LanBattle({
     const timer = setInterval(() => write('sample'), 1000);
     return () => { clearInterval(timer); try { write('battle-stop'); } finally { runtime.dispose(); } };
   }, [connection, match.id, seat]);
-  const [displayWorld, setDisplayWorld] = useState<LanDisplayWorld | null>(null);
-  const mapSource = useMemo(() => displayWorld ? engineTacticalMapSource(displayWorld) : null, [displayWorld]);
-  const deploymentView = useMemo(() => displayWorld ? engineDeploymentView(displayWorld) : null, [displayWorld]);
+  const [presentationViews, setPresentationViews] = useState<LanPresentationViews | null>(null);
   const [menu, setMenu] = useState<"menu" | "help" | "settings" | "leave" | null>(null);
   const [density, setDensity] = useState(() =>
     getHudDensity(window.innerWidth, window.innerHeight),
@@ -207,6 +180,8 @@ export function LanBattle({
   const cameraRef = useRef(new Vector2());
   const hudZoomRef = useRef(0.65);
   const inputBlockedRef = useRef(false);
+  const mapRequestRef = useRef<object | null>(null);
+  const overlayBlockedRef = useRef(false);
   const clearInputRef = useRef<() => void>(() => {});
   const actionRef = useRef<(kind: Action["kind"], value?: number) => void>(
     () => {},
@@ -217,7 +192,7 @@ export function LanBattle({
     setMenu(view);
   }, []);
   const closeMenu = () => {
-    inputBlockedRef.current = mapOpen || deploymentOpen;
+    inputBlockedRef.current = !!mapRequestRef.current || mapOpen || deploymentOpen;
     setMenu(null);
   };
   useEffect(() => {
@@ -226,7 +201,7 @@ export function LanBattle({
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
   }, []);
-  useEffect(()=>{inputBlockedRef.current=!!menu||mapOpen||deploymentOpen;if(inputBlockedRef.current)clearInputRef.current();},[menu,mapOpen,deploymentOpen]);
+  useEffect(()=>{overlayBlockedRef.current=!!menu||mapOpen||deploymentOpen;inputBlockedRef.current=!!mapRequestRef.current||overlayBlockedRef.current;if(inputBlockedRef.current)clearInputRef.current();},[menu,mapOpen,deploymentOpen]);
   const endedRef = useRef(ended);
   const stopRef = useRef<() => void>(() => {});
   useEffect(() => {
@@ -242,10 +217,12 @@ export function LanBattle({
       launched = false,
       workerReady = !computesAuthority,
       worker: Worker | null = null,
-      renderer: WebGLCombatRenderer | null = null;
+      presentation: LanPresentationRuntime | null = null;
+    let remote: LanPresentationWorkerClient | null = null, remoteAttached = false;
+    let pointer: [number, number] | null = null;
+    // Drop the previous presentation when this external connection session binds.
+    queueMicrotask(() => { if (!disposed) setPresentationViews(null); });
     let engine: LanDisplayWorld,
-      latest: CombatSnapshot | null = null,
-      appliedTick = -1,
       receivedAt = 0,
       bytes = 0,
       frameId = 0,
@@ -268,46 +245,32 @@ export function LanBattle({
     const receiveRate = new SnapshotReceiveRate();
     const applyRate = new SnapshotReceiveRate();
     const motionRate = new SnapshotReceiveRate();
-    const motion = new MotionReplica();
-    const combat = new CriticalCombatReplica();
     const combatRate = new SnapshotReceiveRate();
-    const projectileVisuals = new ProjectileVisualReplica(match.id);
     const localFlow = new FlowCounters(["uploaded", "uploadSkipped"]);
     let acknowledgementMs: number | null = null;
     const sentInputs = new Map<number, number>();
-    const prediction = new MotionPrediction();
-    const projectileFlight = new ProjectileFlightPrediction();
-    const firePrediction = new LocalFirePrediction();
-    const turretPrediction = new LocalTurretPrediction();
     const inputBudget = new InputSendBudget();
-    let playback = new SnapshotPlayback();
-    const localContrails = new LocalContrails();
-    const localMuzzles = new LocalMuzzleEffects();
-    const localParticles = new LocalParticleEffects();
     let finishedResult: {winner:number|"draw";report:BattleReport} | null = null;
     let lastFinish = 0;
     let failureReason = "";
     let keys = 0,
       firing = false,
-      pointerActive = false,
-      actions: Action[] = [],
-      pointer = { x: 0, y: 0 },
-      zoom = 0.65;
+      actions: Action[] = [];
     // Read only on the existing diagnostic timer, not each RAF/HUD refresh.
     diagnosticInput.current = now => ({ sentSequence: seq, acknowledgedSequence: acknowledged >= 0 ? acknowledged : null,
-      projectileVisuals: projectileVisuals.stats(),
-      projectileFlight: projectileFlight.stats(),
-      firePrediction: firePrediction.stats(),
-      motionPrediction: prediction.stats(),
-      turretPrediction: turretPrediction.stats(),
-      localParticles: localParticles.stats(),
-      criticalCombat: { tick: combat.tick, ageMs: combat.age(now), weaponTick: combat.weaponTick, weaponAgeMs: combat.weaponAge(now), hz: combatRate.sample(now) },
+      ...(presentation ? { projectileVisuals: presentation.pipeline.projectileVisuals.stats(),
+      projectileFlight: presentation.pipeline.projectileFlight.stats(),
+      firePrediction: presentation.pipeline.firePrediction.stats(),
+      motionPrediction: presentation.pipeline.prediction.stats(),
+      turretPrediction: presentation.pipeline.turretPrediction.stats(),
+      localParticles: presentation.pipeline.localParticles.stats(),
+      criticalCombat: { tick: presentation.pipeline.combat.tick, ageMs: presentation.pipeline.combat.age(now), weaponTick: presentation.pipeline.combat.weaponTick, weaponAgeMs: presentation.pipeline.combat.weaponAge(now), hz: combatRate.sample(now) } } : {}),
       trackedPending: sentInputs.size,
       oldestTrackedPendingMs: sentInputs.size ? Math.max(0, now - sentInputs.values().next().value!) : null,
       pendingActions: actions.length });
     const camera = cameraRef.current,
-      cameraController = new CameraController(),
-      random = new VisualRandom(match.seed);
+      controls = new LanPresentationControls(camera),
+      cameraController = controls.controller;
     const send = (message: Record<string, unknown>) =>
       connection.send({ ...message, matchId: match.id, syncId });
     const sendFinish = () => {
@@ -324,20 +287,20 @@ export function LanBattle({
       if(!send({type:'deployment',requestId,operation,ids})){clearTimeout(timer);fleetRequests.delete(requestId);reject(Error('连接不可用，增援请求未发送。'));}
     });
     const stop = () => {
+      mapRequestRef.current = null;
+      inputBlockedRef.current = overlayBlockedRef.current;
       stopped = true;
-      motion.clear(); combat.clear(); combatRate.reset(); projectileVisuals.clear();
+      connection.resetPresentationConsumption();
+      presentation?.stop(!disposed && !failureReason);
+      if (!disposed && remote?.stats.phase === 'ready') void remote.stop().catch(() => {});
+      combatRate.reset();
       decoder?.close();
+      firstFrame = undefined;
       connection.clearAuthorityPerformance(match.id);
       if (!disposed) setStatus("本局已停止");
       launched = false;
       synced = false;
       if (!disposed) setControlsReady(false);
-      if (engine) {
-        prediction.clear(engine.playerShip); firePrediction.reset(engine); turretPrediction.reset(); projectileFlight.reset(); localContrails.reset(engine);
-        // A successful terminal flush may not have reached RAF yet. Keep its
-        // confirmed muzzle window for that last world; disposal/failure clears it.
-        if (disposed || failureReason) { localMuzzles.reset(engine); localParticles.reset(engine); }
-      }
       for(const request of fleetRequests.values()){clearTimeout(request.timer);request.reject(Error('战斗已停止。'));}fleetRequests.clear();
       keys = 0;
       firing = false;
@@ -351,6 +314,7 @@ export function LanBattle({
       recordNetworkDiagnostic({ event: "battle-failed", battle: diagnosticBattle.current, failureStage, failure, transport: connection.transport, seat, role: seat === 0 ? "host" : "guest" });
       failureReason = reason;
       setError(reason);
+      setPresentationViews(null); // Failed owners close their capabilities before reporting.
       stop();
       if (connection.ready) send({ type: "fail", reason });
     };
@@ -371,46 +335,37 @@ export function LanBattle({
       if (sent !== undefined) acknowledgementMs = acknowledgementMs === null ? now - sent : acknowledgementMs * .7 + (now - sent) * .3;
       for (const sequence of sentInputs.keys()) if (sequence <= ack) sentInputs.delete(sequence);
     };
-    const acceptMotion = (data: unknown, remote: boolean) => {
-      if (disposed || stopped || !launched || !synced || !ready || document.visibilityState === "hidden") return;
-      const frame = motionFromText(data), now = performance.now();
-      // A valid received packet may be older than a just-applied full world. It
-      // is still consumed, but cannot rewind the render pose or increment Hz.
-      if (remote) send({ type: "motion-consumed", tick: frame.tick });
-      if (!motion.receive(frame, now, appliedTick)) return;
-      motionRate.receive(now); acknowledgeInput(frame.acknowledged[seat], now);
-      const row = motion.row(engine.playerShip.id, now, appliedTick);
-      if (row && !row[8]) prediction.receive(motionAuthority(engine.playerShip, row), frame.acknowledged[seat], now);
+    const acceptMotion = (data: unknown) => {
+      if (!presentation) return 'discarded' as const;
+      const now = performance.now();
+      const active = !disposed && !stopped && launched && synced && ready && !!engine && document.visibilityState !== 'hidden';
+      return presentation.receiveMotion(data, now, active, ack => {
+        motionRate.receive(now); acknowledgeInput(ack, now);
+      }).status;
     };
     let firstFrame: CombatSnapshot | undefined;
     let initializingDisplay = false;
     const initializeDisplay = async () => {
-      if (!ready || !renderer || engine || initializingDisplay || !firstFrame || disposed || stopped) return;
+      if (!ready || !presentation || engine || initializingDisplay || !firstFrame || disposed || stopped) return;
       initializingDisplay = true;
       try {
-        const replica = createLanDisplayWorld(match, seat, firstFrame);
-        await renderer.prepareAssets(replica.world.renderView());
+        presentation.initialize(firstFrame);
+        await presentation.prepareAssets();
         if (disposed || stopped) return;
-        engine = replica.world;
-        controlledIdsRef.current = new Set([...replica.controlled.values()].map(ship => ship.id));
+        engine = presentation.world;
+        firstFrame = undefined; // Do not pin a decoded bootstrap world for the whole match.
+        controlledIdsRef.current = new Set(presentation.controlledIds);
         camera.copy(engine.playerShip.pos);
-        setDisplayWorld(engine);
+        setPresentationViews(presentation.views);
       } catch (error) { fail(error instanceof Error ? error.message : String(error), "display-initialization"); }
       finally { initializingDisplay = false; }
     };
-    const accept = (frame: CombatSnapshot) => {
-      if (disposed || stopped || (syncId && frame.tick < minSyncTick)) return;
-      if (!playback.push(frame)) return;
-      if (!engine) { firstFrame = frame; void initializeDisplay(); }
-      // Discrete events are independent of the replaceable world endpoints.
-      // Playback may evict 8+ queued worlds or sample only the final pair; every
-      // decoded muzzle window must nevertheless be received in authority order.
-      localMuzzles.receive(frame.muzzleEvents);
+    const retainAuxiliary = (frame: LanWorkerAuxiliary) => {
       const now = performance.now();
       receiveRate.receive(now);
       receivedAt = now;
-      acknowledgeInput(frame.acknowledged[seat], now);
-      if (launched && synced && ready && engine)
+      acknowledgeInput(frame.acknowledged ?? -1, now);
+      if (launched && synced && ready && (engine || remote?.views))
         for (const event of (frame.sounds ?? []).slice(0, 64)) {
           if (!Number.isSafeInteger(event.id) || event.id <= lastSound)
             continue;
@@ -428,26 +383,34 @@ export function LanBattle({
             sound.playAtPos(
               event.key,
               { x: event.pos[0], y: event.pos[1] },
-              engine.playerShip.pos,
+              { x: frame.listener[0], y: frame.listener[1] },
               volume,
               rate,
             );
           else sound.play(event.key, volume, rate);
         }
     };
+    const accept = (frame: CombatSnapshot) => {
+      if (disposed || stopped || (syncId && frame.tick < minSyncTick)) return false;
+      if (!presentation || !presentation.receive(frame)) return false;
+      if (!engine) { firstFrame = frame; void initializeDisplay(); }
+      retainAuxiliary({ tick: frame.tick, acknowledged: frame.acknowledged[seat], sounds: frame.sounds ?? [],
+        listener: engine ? [engine.playerShip.pos.x, engine.playerShip.pos.y] : [0, 0] });
+      return true;
+    };
     if (computesAuthority) decoder = new LanSnapshotDecoder({
       acknowledge: tick => worker?.postMessage({ type: "snapshot-consumed", tick }),
       consume: (frame, elapsed) => { parseMs = parseMs * .7 + elapsed * .3; accept(frame); },
       error: error => fail(error instanceof Error ? error.message : "无法解析主机快照", "snapshot-decode"),
     });
-    const unsubscribe = connection.subscribe((m) => {
+    const unsubscribe = connection.subscribe((m, receipt) => {
       if (disposed) return;
       if (m.type === "page-visibility") {
         worker?.postMessage({ type: "visibility", hidden: m.hidden });
         // Hidden tabs do not consume display tasks; release any retained credit
         // now, rather than waiting for a throttled timer and blocking peer state.
         if (m.hidden) decoder?.reset();
-        clear();
+        clear(); pushControls();
         if (!m.hidden && launched && !endedRef.current) {
           freeze("② 同步战场：已回到前台，等待最新状态后恢复操控…");
           syncId = "";
@@ -526,39 +489,44 @@ export function LanBattle({
       if (m.type === "presence" && computesAuthority && !directAuthority) worker?.postMessage(m);
       if (m.type === "input" && computesAuthority && !directAuthority)
         worker?.postMessage({ type: "input", seat: m.seat, input: m.input });
-      if (m.type === 'projectile-visual' && connection.visualState && !computesAuthority && m.syncId === syncId && launched && synced && ready && !stopped && !disposed && document.visibilityState !== 'hidden') {
+      if (presentation && m.type === 'projectile-visual' && connection.visualState && !computesAuthority && m.syncId === syncId && launched && synced && ready && !stopped && !disposed && document.visibilityState !== 'hidden') {
         try {
-          projectileVisuals.receive(m.key,m.kind,m.visualBytes,performance.now(),minSyncTick);
+          presentation.pipeline.projectileVisuals.receive(m.key,m.kind,m.visualBytes,performance.now(),minSyncTick);
           // Even a retained base older than minSyncTick is needed to decode the
           // next update; it grants base-ready, not a displayed authority tick.
-          m.visualHandled = true;
-        } catch { /* Atomic decoder keeps the last valid view; do not resurrect an older bulk world on corruption. */ }
+          receipt?.complete('consumed');
+        } catch { receipt?.complete('discarded'); /* Atomic decoder keeps its last valid view. */ }
       }
-      if (m.type === "combat-state" && connection.combatState && !computesAuthority && m.syncId === syncId) {
+      if (presentation && m.type === "combat-state" && connection.combatState && !computesAuthority && m.syncId === syncId) {
         try {
-          const frame = combatStateFromText(m.data), now = performance.now();
-          if (frame.tick !== m.tick) throw Error("Critical combat tick mismatch");
-          if (disposed || stopped || !launched || !synced || !ready || document.visibilityState === "hidden" || frame.tick < minSyncTick) { send({ type: "combat-consumed", tick: frame.tick, status: "discarded" }); return; }
-          // Retained component ownership, never helper/TCP arrival, grants credit.
-          if (combat.receive(frame, now, appliedTick)) combatRate.receive(now);
-          send({ type: "combat-consumed", tick: frame.tick, status: "consumed" });
-        } catch { fail("关键战斗状态校验失败", "snapshot-decode"); }
+          const now = performance.now();
+          const active = !disposed && !stopped && launched && synced && ready && document.visibilityState !== 'hidden';
+          const result = presentation.receiveCombat(m.data, m.tick, now, active, minSyncTick);
+          if (result.advanced) combatRate.receive(now);
+          receipt?.complete(result.status);
+        } catch (error) { receipt?.reject(error); fail("关键战斗状态校验失败", "snapshot-decode"); }
         return;
       }
       if (m.type === "motion" && connection.motionState && !computesAuthority && m.syncId === syncId) {
-        try { acceptMotion(m.data, true); } catch { fail("关键状态校验失败", "snapshot-decode"); }
+        try { const status = acceptMotion(m.data); receipt?.complete(status); } catch (error) { receipt?.reject(error); fail("关键状态校验失败", "snapshot-decode"); }
       }
       if (m.type === "state" && !computesAuthority) {
         try {
           bytes = connection.snapshotBytes;
-          parseMs = parseMs * .7 + connection.snapshotParseMs * .3;
-          accept(m.frame);
+          if (remote) {
+            if (!receipt) throw Error('JSON state arrived without a consumption receipt');
+            remote.receiveFallback(m.frame, receipt, connection.snapshotParseMs);
+          } else {
+            parseMs = parseMs * .7 + connection.snapshotParseMs * .3;
+            const retained = accept(m.frame);
+            receipt?.complete(retained ? 'consumed' : 'discarded');
+          }
         } catch (error) {
           fail(error instanceof Error ? error.message : "无法接收战斗快照事件", "snapshot-apply");
         }
       }
-      if (m.type === "controls-ready" && m.syncId === syncId && !synced) {
-        if (performance.now() - receivedAt > 1500 || appliedTick < minSyncTick) return;
+      if ((presentation || remote) && m.type === "controls-ready" && m.syncId === syncId && !synced) {
+        if (performance.now() - receivedAt > 1500 || (remote ? remote.readRealtime()?.tick ?? -1 : presentation!.appliedTick) < minSyncTick) return;
         resetInput();
         synced = true;
         lastAckAt = performance.now();
@@ -566,6 +534,7 @@ export function LanBattle({
         setControlsReady(true);
         setNetworkStatus("");
         setStatus("战斗进行中");
+        pushControls();
       }
       if (m.type === "launch") {
         if (failureReason || endedRef.current) return;
@@ -582,21 +551,20 @@ export function LanBattle({
         }
         launched = true;
         lastInput = 0;
+        pushControls();
         worker?.postMessage({ type: "start" });
       }
       if (m.type === "ended") stop();
     });
     try {
-      const gl = canvas.getContext("webgl2", {
-        alpha: false,
-        antialias: true,
-        powerPreference: "high-performance",
-      });
+      if (!usePresentationWorker) {
+      const gl = canvas.getContext("webgl2", LAN_PRESENTATION_CONTEXT);
       if (!gl) throw Error("当前浏览器无法创建 WebGL2 战斗画面");
-      renderer = new WebGLCombatRenderer(canvas, gl, {
+      presentation = new LanPresentationRuntime(match, seat, undefined, canvas, gl, {
         onContextLost: () => fail("显卡上下文丢失，请返回房间重试。", "graphics-context"),
         onContextRestoreFailed: () => fail("显卡恢复失败", "graphics-context"),
-      });
+      }, controls);
+      }
       if (computesAuthority) {
         worker = new Worker(new URL("./host.worker.ts", import.meta.url), {
           type: "module",
@@ -638,7 +606,7 @@ export function LanBattle({
           if (m.type === "motion") {
             try {
               if (launched && connection.ready && connection.motionState) send({ type: "motion", data: m.data });
-              acceptMotion(m.data, false);
+              acceptMotion(m.data);
             } catch (error) { fail(error instanceof Error ? error.message : "关键状态失败", "snapshot-decode"); }
             finally { worker?.postMessage({ type: "motion-consumed", tick: m.tick }); }
           }
@@ -689,6 +657,45 @@ export function LanBattle({
       }
       void (async () => {
         try {
+          if (usePresentationWorker) {
+            const client = await LanPresentationWorkerClient.create(canvas, match, seat, {
+              onState: (value, elapsed) => {
+                if (disposed || stopped) return;
+                bytes = connection.snapshotBytes; parseMs = parseMs * .7 + elapsed * .3;
+                retainAuxiliary(value);
+              },
+              onMotionAcknowledged: ack => acknowledgeInput(ack, performance.now()),
+              onViewsInvalidated: () => {
+                if (disposed) return;
+                controlledIdsRef.current.clear(); diagnosticHud.current = null;
+                // External network callbacks revoke the old facade immediately.
+                // Unmount RAF/timer readers before closing it, not on React's
+                // later concurrent commit. During effect/stop cleanup the page
+                // is already leaving; never flush from that React lifecycle.
+                if (stopped) setPresentationViews(null);
+                else flushSync(() => setPresentationViews(null));
+              },
+              onViews: (views, state) => {
+                if (disposed || stopped) return;
+                controlledIdsRef.current = new Set(state.controlledIds);
+                setPresentationViews(views);
+                const now = performance.now();
+                const nextHud: HUD = { ...state.telemetry, bytes, rtt: connection.rttMs, jitter: connection.jitterMs,
+                  acknowledgementMs, age: Math.max(0, now - receivedAt), hz: receiveRate.sample(now),
+                  localFlow: localFlow.sample(now), pipeline: connection.snapshotPipeline,
+                  pipelineAgeMs: connection.snapshotPipelineAt === null ? null : Math.max(0, now - connection.snapshotPipelineAt) + connection.snapshotPipelineRoundTripMs,
+                  parse: parseMs, decodeQueue: null, authority: authorityPerformance ? { ...authorityPerformance, ageMs: Math.max(0, now - authorityPerformanceAt) } : null,
+                  multicore: authorityMulticore };
+                diagnosticHud.current = { value: nextHud, at: now }; setHud(nextHud);
+                canvas.dataset.gpuVendor = state.gpuInfo.vendor; canvas.dataset.gpuRenderer = state.gpuInfo.renderer;
+              },
+              playViewSound: effect => sound.play(effect.key, effect.volume, effect.rate),
+              onError: error => { if (remoteAttached) fail(String(error), 'presentation-worker'); },
+            });
+            if (disposed || stopped) { void client.dispose().catch(() => {}); return; }
+            remote = client; client.attach(connection); remoteAttached = true;
+            pushControls();
+          }
           await assetManager.ensureManifestLoaded();
           await contentManifestManager.ensureLoaded();
           if (disposed) return;
@@ -698,27 +705,51 @@ export function LanBattle({
           loaded();
           void initializeDisplay();
         } catch (e) {
-          fail(e instanceof Error ? e.message : String(e), "resource-load");
+          if (usePresentationWorker && !remoteAttached && !disposed && !stopped) {
+            recordNetworkDiagnostic({ event: 'presentation-worker-fallback', reason: String(e), seat, battle: diagnosticBattle.current });
+            setMainFallback(true); // Effect cleanup releases any partial claim, React supplies a fresh canvas.
+          } else fail(e instanceof Error ? e.message : String(e), "resource-load");
         }
       })();
     } catch (e) {
       fail(e instanceof Error ? e.message : String(e), "initialization");
     }
-    openMapRef.current=()=>{if(!engine||!launched||!synced||endedRef.current)return;clearInputRef.current();inputBlockedRef.current=true;engine.isTacticalMap=true;setMapOpen(true);};
-    const active = () =>
-      launched &&
+    openMapRef.current = () => {
+      const view = remote ? remote.views : engine ? presentation?.views : null;
+      if (!view || !launched || !synced || endedRef.current || mapRequestRef.current) return;
+      const token = {};
+      mapRequestRef.current = token; clearInputRef.current(); inputBlockedRef.current = true;
+      const current = () => !disposed && !stopped && launched && synced && !endedRef.current && (remote ? remote.views : presentation?.views) === view;
+      const finish = (result: { accepted: boolean; reason?: string }) => {
+        if (mapRequestRef.current !== token) return;
+        mapRequestRef.current = null;
+        if (!current()) { inputBlockedRef.current = overlayBlockedRef.current; return; }
+        if (result.accepted) { inputBlockedRef.current = true; setMapOpen(true); }
+        else { inputBlockedRef.current = overlayBlockedRef.current; setNetworkStatus(result.reason || '地图操作未获确认。'); }
+      };
+      try {
+        const result = guardLanViewCommand(view, () => view.setMapOpen(true), current);
+        if (result instanceof Promise) void result.then(finish, error => finish({ accepted: false, reason: String(error) }));
+        else finish(result); // Default same-thread open remains synchronous.
+      } catch (error) { finish({ accepted: false, reason: String(error) }); }
+    };
+    const hasControlPermission = () =>
+      !disposed && !stopped && launched &&
       synced &&
       connection.ready &&
       !endedRef.current &&
       !inputBlockedRef.current &&
       hasCombatInputFocus();
+    const active = () => hasControlPermission() && (remote ? !!remote.views && !!remote.readRealtime() : !!engine);
     const action = (kind: Action["kind"], value?: number) => {
       if (active() && actions.length < 16)
         {
-          const aim = clientToCombatWorld(pointer, canvas, camera, zoom);
+          const remoteInput = remote?.readInput(controls.pointerActive ? pointer : null, canvas.getBoundingClientRect(), seq, keys, firing, []);
+          if (remote && !remoteInput) return;
+          const aim = remoteInput ? new Vector2(...remoteInput.aim) : controls.pointerAim(readCombatViewport(canvas));
           actions.push({
             id: (actionId = Math.max(actionId, connection.actionSequence) + 1),
-            kind, value, ...(pointerActive ? { aim: [aim.x, aim.y] as [number, number] } : {}),
+            kind, value, ...(controls.pointerActive ? { aim: [aim.x, aim.y] as [number, number] } : {}),
           });
           sendInput();
         }
@@ -736,7 +767,8 @@ export function LanBattle({
       heldFlightKeys.clear();
       keys = 0;
       firing = false;
-      pointerActive = false;
+      controls.pointerActive = false;
+      pointer = null;
       actions = [];
     };
     const freeze = (message: string) => {
@@ -744,41 +776,49 @@ export function LanBattle({
       // A new sync epoch must not apply queued old worlds or inherit their tick
       // as evidence for sync-ready. Cancel tasks before releasing held credits.
       decoder?.reset();
-      playback = new SnapshotPlayback(); motion.clear(); combat.clear(); combatRate.reset(); projectileVisuals.clear(); motionRate.reset();
-      latest = null; appliedTick = -1; receivedAt = 0; receiveRate.reset(); applyRate.reset(); localFlow.reset();
+      connection.resetPresentationConsumption();
+      mapRequestRef.current = null;
+      inputBlockedRef.current = overlayBlockedRef.current;
+      presentation?.resetPlayback(); firstFrame = undefined; combatRate.reset(); motionRate.reset();
+      receivedAt = 0; receiveRate.reset(); applyRate.reset(); localFlow.reset();
       synced = false;
       setControlsReady(false);
       resetInput();
       sentInputs.clear();
-      if (engine) { prediction.clear(engine.playerShip); firePrediction.reset(engine); turretPrediction.reset(); projectileFlight.reset(); localContrails.reset(engine); localMuzzles.reset(engine); localParticles.reset(engine); }
       for (const request of fleetRequests.values()) { clearTimeout(request.timer); request.reject(Error("同步中断，请检查最新部署状态后再操作。")); }
       fleetRequests.clear();
       setNetworkStatus(message);
     };
-    const clear = () => { resetInput(); if (engine) firePrediction.reset(engine); if (launched) sendInput(); };
+    const clear = () => { resetInput(); if (engine) presentation?.pipeline.firePrediction.reset(engine); pushControls(); if (launched) sendInput(); };
     clearInputRef.current = clear;
     const sendInput = () => {
-      if (!engine || !launched || !synced || !connection.ready) return;
+      if ((!engine && !remote) || !launched || !synced || !connection.ready) return;
       const now = performance.now();
-      submitRealtimeInput<PlayerInput>({
+      submitRealtimeInput<PlayerInput | null>({
         canSend: () => connection.canSendInput(),
         takeBudget: () => inputBudget.take(now),
         createInput: () => {
           // Resample held controls/aim after backpressure; never queue old inputs.
           // Explicit focus/reset transitions still discard actions as before.
-          if (!active()) resetInput();
-          const aim = pointerActive ? clientToCombatWorld(pointer, canvas, camera, zoom) : engine.playerShip.aimTargetWorld;
-          return { seq: Math.max(seq, connection.inputSequence) + 1, keys,
-            aim: [aim.x, aim.y], firing, pointerActive, actions };
+          // A missing realtime sample is temporary read unavailability, not a
+          // focus/permission revocation. Keep queued action edges until a fresh
+          // sample can be sent; only explicit gate loss discards them.
+          if (!hasControlPermission()) resetInput();
+          if (remote) return remote.readInput(controls.pointerActive ? pointer : null, canvas.getBoundingClientRect(), Math.max(seq, connection.inputSequence) + 1, keys, firing, actions);
+          return controls.readInput(engine, controls.pointerActive ? readCombatViewport(canvas) : undefined, Math.max(seq, connection.inputSequence) + 1, keys, firing, actions);
         },
-        send: input => send({ type: "input", input }),
+        send: input => !!input && send({ type: "input", input }),
         accepted: input => {
+          if (!input) return;
           seq = input.seq;
           sentInputs.set(input.seq, now);
           while (sentInputs.size > 120) sentInputs.delete(sentInputs.keys().next().value!);
-          prediction.record(input, now);
-          turretPrediction.record(input, now);
-          firePrediction.record(engine, input, now, active());
+          if (remote) {
+            const client = remote, generation = client.generation;
+            void client.recordAcceptedInput(input, now, active()).catch(error => {
+              if (!disposed && !stopped && client === remote && client.generation === generation) fail(String(error), 'presentation-input');
+            });
+          } else presentation!.recordAcceptedInput(input, now, active());
           actions = [];
         },
       });
@@ -787,7 +827,8 @@ export function LanBattle({
       if (event.defaultPrevented || event.isComposing) return;
       if (isCombatTextEntry(event.target) || hasCombatModal()) return;
       if(event.code==='Tab'&&!event.repeat&&!event.ctrlKey&&!event.altKey&&!event.metaKey&&!inputBlockedRef.current){event.preventDefault();openMapRef.current();return;}
-      const command = shipCommandForKey(event, engine.playerShip);
+      const player = remote?.views?.hud.playerShip ?? engine?.playerShip;
+      const command = player ? shipCommandForKey(event, player) : null;
       if (event.ctrlKey || event.altKey || event.metaKey) {
         if (command && active()) {
           event.preventDefault();
@@ -800,7 +841,13 @@ export function LanBattle({
         openMenu(event.code === 'F1' ? 'help' : 'menu');
         return;
       }
-      if (!active()) return;
+      // A coherent realtime coordinate sample is needed to SEND an input, not
+      // to remember a held flight key. A bounded shared read may transiently
+      // fail while permission is intact; dropping this edge loses the key until
+      // another keydown. Explicit focus/sync/overlay revocation still clears it.
+      const retainFlightKey = !command && !!flightKey(event.code) && hasControlPermission()
+        && (remote ? !!remote.views : !!engine);
+      if (!retainFlightKey && !active()) return;
       if (command) {
         event.preventDefault();
         if (!event.repeat) action(command.kind, 'value' in command ? command.value : undefined);
@@ -811,42 +858,43 @@ export function LanBattle({
         heldFlightKeys.add(event.code);
         refreshKeys();
         event.preventDefault();
-        if (keys !== previousKeys) sendInput();
+        if (keys !== previousKeys) { sendInput(); pushControls(); }
       }
     };
     const up = (event: KeyboardEvent) => {
       const previousKeys = keys;
       heldFlightKeys.delete(event.code);
       refreshKeys();
-      if (keys !== previousKeys) sendInput();
+      if (keys !== previousKeys) { sendInput(); pushControls(); }
     };
     const move = (event: MouseEvent) => {
-      if (!active()) { pointerActive = false; cameraController.suspendPointer(); return; }
-      pointer = { x: event.clientX, y: event.clientY };
-      pointerActive = true;
-      cameraController.samplePointer(event.clientX, event.clientY);
+      if (!active()) { controls.pointerActive = false; cameraController.suspendPointer(); return; }
+      pointer = [event.clientX, event.clientY];
+      controls.samplePointer(event.clientX, event.clientY);
+      pushControls();
     };
     const mouseDown = (event: MouseEvent) => {
       if (!active() || event.ctrlKey || event.altKey || event.metaKey) return;
       sound.play("ui_button_press", 0);
-      pointer = { x: event.clientX, y: event.clientY };
-      pointerActive = true;
-      cameraController.samplePointer(event.clientX, event.clientY);
+      pointer = [event.clientX, event.clientY];
+      controls.samplePointer(event.clientX, event.clientY);
       if (event.button === 0 && !firing) { firing = true; sendInput(); }
       if (event.button === 2) action(event.shiftKey ? "hullShield" : "shield");
+      pushControls();
     };
     const mouseUp = (event: MouseEvent) => {
-      if (event.button === 0 && firing) { firing = false; sendInput(); }
+      if (event.button === 0 && firing) { firing = false; sendInput(); pushControls(); }
     };
     const loseFocus = () => { cameraController.suspendPointer(); clear(); };
     const onFocus = (event: FocusEvent) => { if (isCombatTextEntry(event.target) || hasCombatModal()) loseFocus(); };
-    const leaveCanvas = () => { pointerActive = false; cameraController.suspendPointer(); firing = false; if (launched) sendInput(); };
+    const leaveCanvas = () => { controls.pointerActive = false; cameraController.suspendPointer(); firing = false; pushControls(); if (launched) sendInput(); };
     const context = (event: MouseEvent) => event.preventDefault();
     const wheel = (event: WheelEvent) => {
       if (inputBlockedRef.current || event.ctrlKey || event.altKey || event.metaKey) return;
       event.preventDefault();
-      if (event.shiftKey && readSystemBindings().wheelSelect) { selectNextSystem(engine.playerShip, event.deltaY); return; }
-      zoom = zoomCombatView(zoom, event.deltaY);
+      if (event.shiftKey && readSystemBindings().wheelSelect) { const player = remote?.views?.hud.playerShip ?? engine?.playerShip; if (player) selectNextSystem(player, event.deltaY); return; }
+      controls.wheel(event.deltaY);
+      pushControls();
     };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
@@ -866,12 +914,51 @@ export function LanBattle({
         lastInput = performance.now();
       }
     }, LAN_INPUT_INTERVAL_MS);
+    const synchronize = (now: number, appliedTick: number) => {
+        if (launched && synced && (now - receivedAt > 1500 || now - lastAckAt > 2000 || (acknowledgementMs ?? 0) > 2000)) {
+          freeze("② 同步战场：更新或输入确认中断，已停止操控，等待最新状态…");
+          syncId = "";
+          send({ type: "resync" });
+          lastSyncRequest = now;
+        }
+        if (launched && !synced && connection.ready && now - lastSyncRequest > 500) {
+          if (syncId && appliedTick >= minSyncTick && now - receivedAt < 1500) {
+            setNetworkStatus("③ 恢复操控：战场已同步，等待房主确认…");
+            send({ type: "sync-ready", tick: appliedTick });
+          } else if (now - lastSyncRequest > 1000) send({ type: "resync" });
+          if ((syncId && appliedTick >= minSyncTick) || now - lastSyncRequest > 1000) lastSyncRequest = now;
+        }
+    };
+    // DOM edges publish immediately as well as RAF sampling: a main-thread task
+    // after the event must not delay a Worker until the next main RAF. The client
+    // still owns exactly one in-flight packet plus one replaceable latest sample.
+    const pushControls = () => {
+      if (!remote || stopped || disposed) return;
+      const rect = canvas.getBoundingClientRect(), ratio = Math.min(window.devicePixelRatio || 1, 1.5);
+      remote.configure({ viewport: rect.width > 0 && rect.height > 0 ? {
+        width: Math.max(1, Math.round(rect.width * ratio)), height: Math.max(1, Math.round(rect.height * ratio)),
+        rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+      } : null, pointer: controls.pointerActive ? pointer : null, zoom: controls.zoom, seq, keys, firing,
+        visible: document.visibilityState !== 'hidden', launched, synced, focused: hasCombatInputFocus(),
+        blocked: inputBlockedRef.current || !connection.ready || !!endedRef.current,
+        syncId: remote.syncId, minTick: Number.isFinite(minSyncTick) ? minSyncTick : 0 });
+    };
     const frame = (now: number) => {
       if (disposed) return;
       frameId = requestAnimationFrame(frame);
+      if (remote) {
+        try {
+          pushControls();
+          if (stopped || document.visibilityState === 'hidden') return;
+          const realtime = remote.readRealtime();
+          if (realtime) { camera.set(realtime.cameraX, realtime.cameraY); hudZoomRef.current = realtime.hudZoom; }
+          synchronize(now, realtime?.tick ?? -1);
+        } catch (e) { fail(String(e), 'presentation-controls'); }
+        return;
+      }
       // Some browsers still schedule background RAFs; never restore/render an
       // invisible world or repeatedly request resync because its display is stale.
-      if (document.visibilityState === "hidden" || !ready || !renderer || !engine) return;
+      if (document.visibilityState === "hidden" || !ready || !presentation || !engine) return;
       const gap = Math.max(0, now - lastFrame);
       const dt = Math.min(0.05, gap / 1000);
       frameMs = frameMs * .9 + gap * .1;
@@ -887,95 +974,33 @@ export function LanBattle({
           canvas.height = height;
         }
         // Renderer zoom is in backing pixels; DOM HUD positions are CSS pixels.
-        hudZoomRef.current = zoom / (canvas.width / Math.max(1, rect.width));
-        const presentation = playback.sample(now, !launched || !synced);
-        if (presentation.frames.length) {
-          if (presentation.reset) cameraController.reset(); // Reconnect baselines must not replay historical jumps.
-          const started = performance.now();
-          if (presentation.reset) { firePrediction.reset(engine); turretPrediction.reset(); projectileFlight.reset(); }
-          applyLanDisplaySnapshots(engine, presentation.frames, presentation.reset, snapshot => {
-            // Prediction needs the player pose at EACH restored endpoint, not
-            // all acknowledgements against the final world's pose.
-            applyRate.receive(performance.now());
-            appliedTick = snapshot.tick;
-            latest = snapshot;
-            if (snapshot.projectileVisuals !== 1) projectileFlight.receive(engine, snapshot.tick, now);
-            else projectileFlight.reset();
-            localParticles.receive(snapshot.particleEvents, snapshot.world.combatTime);
-            firePrediction.receive(engine, snapshot.tick, snapshot.acknowledged[seat], now,
-              (presentation.confirmedTime - snapshot.world.combatTime) * 1000);
-            turretPrediction.receive(engine, snapshot.tick, snapshot.acknowledged[seat], now);
-            combat.apply(engine, snapshot.tick);
-            if (!motion.fresh(now, snapshot.tick)) prediction.receive(engine.playerShip, snapshot.acknowledged[seat], now);
-          }); // Explicit display records; no simulation restoration.
-          applyMs = applyMs * .7 + (performance.now() - started) * .3;
-        }
-        if (launched && synced && (now - receivedAt > 1500 || now - lastAckAt > 2000 || (acknowledgementMs ?? 0) > 2000)) {
-          freeze("② 同步战场：更新或输入确认中断，已停止操控，等待最新状态…");
-          syncId = "";
-          send({ type: "resync" });
-          lastSyncRequest = now;
-        }
-        if (launched && !synced && connection.ready && now - lastSyncRequest > 500) {
-          if (syncId && appliedTick >= minSyncTick && now - receivedAt < 1500) {
-            setNetworkStatus("③ 恢复操控：战场已同步，等待房主确认…");
-            send({ type: "sync-ready", tick: appliedTick });
-          } else if (now - lastSyncRequest > 1000) send({ type: "resync" });
-          if ((syncId && appliedTick >= minSyncTick) || now - lastSyncRequest > 1000) lastSyncRequest = now;
-        }
-        combat.apply(engine, appliedTick, true); // No repeated per-weapon writes between component arrivals/restores.
-        motion.render(engine, now, appliedTick);
-        projectileVisuals.render(engine, now, projectileSnapshotTick(engine));
-        // The host also renders a snapshot replica; its authority lives in the
-        // Worker. Predict only this display pose for every local pilot.
-        {
-          const p = engine.playerShip;
-          const aim = pointerActive ? clientToCombatWorld(pointer, canvas, camera, zoom) : p.aimTargetWorld;
-          const nearCollision = engine.capitalShips.some(other => other !== p && !other.isDead && other.pos.distanceTo(p.pos) < p.spec.collisionRadius + other.spec.collisionRadius + 60);
-          const row = motion.row(p.id, now, appliedTick);
-          // Reset suspended prediction internals without erasing a fresh motion
-          // lane pose. Otherwise re-entry reconciles against a pre-collision frame.
-          const predict = active() && !nearCollision && !row?.[8];
-          if (predict) prediction.render(p,
-            { seq, keys, aim: [aim.x, aim.y], firing: false, pointerActive, actions: [] }, now,
-            true, row ? motionAuthority(p, row) : p, !!row);
-          else prediction.suspend(p, !active() ? 'inactive' : nearCollision ? 'collision' : 'unavailable', !!row && !row[8]);
-          turretPrediction.render(engine, { seq, keys, aim: [aim.x, aim.y], firing, pointerActive, actions: [] }, now, active());
-        }
-        const alpha = presentation.alpha;
-        const focusShip = engine.playerShip.isDead
-          ? (engine.capitalShips.find(
-              (ship) =>
-                !ship.isDead && sameTeam(ship, engine.playerShip),
-            ) ?? engine.playerShip)
-          : engine.playerShip;
-        const focus = focusShip.interpolatedPos(alpha);
-        cameraController.follow(camera, focus, canvas, zoom, dt, active() && !engine.isTacticalMap, focusShip);
-        const frameContext = {
-          visualTime: presentation.visualTime,
-          random,
-          layers: LAYERS,
-          damageEnabled: true,
-        };
+        const viewport = readCombatViewport(canvas, rect);
+        hudZoomRef.current = controls.hudZoom(viewport);
+        let applyStarted = 0;
+        const sample = presentation.applyPlayback(now, !launched || !synced,
+          () => applyRate.receive(performance.now()), () => { applyStarted = performance.now(); });
+        if (sample.frames.length) applyMs = applyMs * .7 + (performance.now() - applyStarted) * .3;
+        synchronize(now, presentation.appliedTick);
+        presentation.renderPose(now,
+          () => controls.readInput(engine, viewport, seq, keys, firing, []), active());
+        const alpha = sample.alpha;
+        controls.follow(engine, alpha, viewport, dt, active());
         const renderStarted = performance.now();
-        if (launched && synced) localContrails.update(engine, presentation.visualTime, alpha, presentation.reset);
-        else localContrails.reset(engine);
-        if (launched && synced) localMuzzles.update(engine, presentation.visualTime, presentation.reset);
-        else localMuzzles.reset(engine);
-        localParticles.update(engine, presentation.visualTime, presentation.reset);
-        projectileFlight.render(engine, now, launched && synced && hasCombatInputFocus());
-        firePrediction.render(engine, now, active() && now - receivedAt <= 250);
-        const renderView = engine.renderView();
-        renderer.updateVisual(renderView, launched ? dt : 0, frameContext);
-        if (renderer.render(renderView, alpha, camera, zoom, frameContext)) frameCount++;
+        if (presentation.drawPlayback(sample, now, {
+          dt: launched ? dt : 0, camera, zoom: controls.zoom, layers: LAYERS, damageEnabled: true,
+        }, {
+          running: launched && synced,
+          projectilesActive: launched && synced && hasCombatInputFocus(),
+          fireActive: active() && now - receivedAt <= 250,
+        })) frameCount++;
         renderMs = renderMs * .9 + (performance.now() - renderStarted) * .1;
         if (now - lastHUD > 100) {
           const p = engine.playerShip,
             e = engine.enemyShip;
-          const metrics = authorityPerformance && authorityPerformance.tick >= (latest?.tick ?? -1)
-            ? authorityPerformance : latest;
+          const metrics = authorityPerformance && authorityPerformance.tick >= (presentation?.latest?.tick ?? -1)
+            ? authorityPerformance : presentation?.latest;
           const metricsFresh = now - Math.max(receivedAt, authorityPerformanceAt) < 2500;
-          const renderStats = renderer.getResourceStats();
+          const renderer = presentation.renderer, renderStats = renderer.getResourceStats();
           const nextHud: HUD = {
             ships: engine.ships.length, projectiles: engine.projectiles.length, explosions: engine.explosions.length,
             hp: p.hullHp,
@@ -985,7 +1010,7 @@ export function LanBattle({
             flux: p.flux.totalFlux,
             capacity: p.flux.maxFlux,
             group: p.selectedGroupIndex + 1,
-            tick: appliedTick,
+            tick: presentation!.appliedTick,
             sim: metrics?.simulationMs ?? 0,
             bytes,
             rtt: connection.rttMs,
@@ -994,12 +1019,12 @@ export function LanBattle({
             age: Math.max(0, now - receivedAt),
             hz: receiveRate.sample(now),
             appliedHz: applyRate.sample(now),
-            motionHz: motionRate.sample(now), motionAgeMs: motion.age(now), motionTick: motion.tick < 0 ? null : motion.tick,
+            motionHz: motionRate.sample(now), motionAgeMs: presentation.pipeline.motion.age(now), motionTick: presentation.pipeline.motion.tick < 0 ? null : presentation.pipeline.motion.tick,
             localFlow: authorityPerformance?.io?.enabled && now - authorityPerformanceAt < 2500 ? authorityPerformance.io.flow : localFlow.sample(now),
             pipeline: connection.snapshotPipeline,
             pipelineAgeMs: connection.snapshotPipelineAt === null ? null : Math.max(0, now - connection.snapshotPipelineAt) + connection.snapshotPipelineRoundTripMs,
             capture: metrics?.captureMs ?? 0,
-            encode: computesAuthority ? encodeMs : latest?.encodeMs ?? 0,
+            encode: computesAuthority ? encodeMs : presentation?.latest?.encodeMs ?? 0,
             parse: parseMs, decodeQueue: decoder?.stats ?? null, apply: applyMs, render: renderMs,
             renderDrawCalls: renderStats.drawCalls, spriteDrawCalls: renderer.batcher.drawCalls, spriteTextureSlots: renderer.batcher.textureCapacity,
             renderCulling: {
@@ -1013,7 +1038,7 @@ export function LanBattle({
             combatRate: metricsFresh ? metrics?.combatRate ?? null : null,
             authority: authorityPerformance ? { ...authorityPerformance, ageMs: Math.max(0, now - authorityPerformanceAt) } : null,
             multicore: authorityMulticore,
-            playbackDelay: presentation.delayMs,
+            playbackDelay: sample.delayMs,
             px: p.pos.x,
             py: p.pos.y,
           };
@@ -1038,7 +1063,8 @@ export function LanBattle({
       cancelAnimationFrame(frameId);
       unsubscribe();
       worker?.terminate();
-      renderer?.dispose();
+      presentation?.dispose();
+      if (remote) void remote.dispose().catch(() => {});
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", loseFocus);
@@ -1051,7 +1077,7 @@ export function LanBattle({
       canvas.removeEventListener("contextmenu", context);
       canvas.removeEventListener("wheel", wheel);
     };
-  }, [connection, match, seat, openMenu, computesAuthority, serverAuthority]);
+  }, [connection, match, seat, openMenu, computesAuthority, serverAuthority, usePresentationWorker]);
   const returnToRoom = () => {
     if (connection.ready && !ended && !canEndBattle) connection.send({ type: "leave" });
     else if (connection.ready && !ended)
@@ -1064,20 +1090,27 @@ export function LanBattle({
     onReturn();
   };
   const finished = !!(error || ended);
-  const teamPresence = displayWorld ? lanTeamPresence(match, displayWorld) : [];
+  const teamPresence = presentationViews?.presence() ?? [];
+  const displayHud = presentationViews?.hud;
   return (
     <main className="lan-battle">
-      <canvas ref={canvasRef} className="lan-canvas" aria-label="局域网战场" />
-      {mapOpen && displayWorld && mapSource && !finished && <TacticalMap onControl={command => command.kind === 'tactical' ? applyTacticalViewCommand(displayWorld, command.command) : { accepted: false, reason: '联机地图不支持此命令。' }} source={mapSource} paused={false} onPausedChange={()=>{}} autopilot={false} onAutopilotChange={()=>{}} readOnlyCommands
+      <canvas key={usePresentationWorker ? 'worker' : 'main'} ref={canvasRef} data-presentation={usePresentationWorker ? 'worker' : 'main'} className="lan-canvas" aria-label="局域网战场" />
+      {mapOpen && presentationViews && displayHud && !finished && <TacticalMap onControl={command => command.kind === 'tactical' ? presentationViews.tactical(command.command) : { accepted: false, reason: '联机地图不支持此命令。' }} source={presentationViews.map} paused={false} onPausedChange={()=>{}} autopilot={false} onAutopilotChange={()=>{}} readOnlyCommands
         inputBlocked={!!menu||deploymentOpen} cameraPosRef={cameraRef} canvasRef={canvasRef}
-        onClosed={()=>{setMapOpen(false);inputBlockedRef.current=!!menu||deploymentOpen;}}
+        onClosed={()=>{setMapOpen(false);inputBlockedRef.current=!!mapRequestRef.current||!!menu||deploymentOpen;}}
         onOpenDeployment={()=>{clearInputRef.current();inputBlockedRef.current=true;setDeploymentOpen(true);}}
-        onRetreat={(ids,full)=>fleetRequestRef.current(full?ids.filter(id=>!controlledIdsRef.current.has(id)||id===displayWorld.playerShip.id):ids,full?'withdraw':'retreat')} />}
-      {deploymentOpen && displayWorld && deploymentView && !finished && <FleetDeployment source={deploymentView} team={displayWorld.playerShip.teamId}
-        onDeploy={ids=>fleetRequestRef.current(ids,'deploy')}
-        onClose={()=>{setDeploymentOpen(false);inputBlockedRef.current=mapOpen||!!menu;}}
-        onDeployed={()=>{if(displayWorld.isTacticalMap)displayWorld.toggleTacticalMap();setDeploymentOpen(false);setMapOpen(false);inputBlockedRef.current=!!menu;canvasRef.current?.focus();}} />}
-      {hud && displayWorld && (
+        onRetreat={(ids,full)=>fleetRequestRef.current(full?ids.filter(id=>!controlledIdsRef.current.has(id)||id===displayHud.playerShip.id):ids,full?'withdraw':'retreat')} />}
+      {deploymentOpen && presentationViews && displayHud && !finished && <FleetDeployment source={presentationViews.deployment} team={displayHud.playerShip.teamId}
+        onDeploy={async ids => {
+          const view = presentationViews, epoch = view.commandEpoch;
+          await fleetRequestRef.current(ids, 'deploy');
+          if (view.commandEpoch !== epoch) throw Error('战场呈现已更新，请查看最新部署状态。');
+          const result = await guardLanViewCommand(view, () => view.setMapOpen(false), () => view.commandEpoch === epoch);
+          if (!result.accepted) throw Error(result.reason || '部署已确认，但地图关闭尚未确认。');
+        }}
+        onClose={()=>{setDeploymentOpen(false);inputBlockedRef.current=!!mapRequestRef.current||mapOpen||!!menu;}}
+        onDeployed={()=>{setDeploymentOpen(false);setMapOpen(false);inputBlockedRef.current=!!mapRequestRef.current||!!menu;canvasRef.current?.focus();}} />}
+      {hud && displayHud && (
         <div
           className="lan-hud hud-overlay ui-font select-none"
           data-hud-density={density}
@@ -1090,12 +1123,12 @@ export function LanBattle({
           data-enemy-hp={hud.enemy.toFixed(1)}
           data-group={hud.group}
         >
-          <CombatContacts engine={combatHudView(displayWorld)} cameraPosRef={cameraRef} zoomRef={hudZoomRef} canvasRef={canvasRef}
+          <CombatContacts engine={displayHud} cameraPosRef={cameraRef} zoomRef={hudZoomRef} canvasRef={canvasRef}
             blocked={!controlsReady || !!menu || finished || mapOpen || deploymentOpen} />
           <div className="hud-console-anchor pointer-events-auto absolute z-20">
-            <AuthenticTacticalConsole onActivateSystem={value => actionRef.current('system', value)} onToggleRecall={() => actionRef.current('recall')}
-              player={combatHudView(displayWorld).playerShip}
-              engine={combatHudView(displayWorld)}
+            <AuthenticTacticalConsole onSelectModule={value => actionRef.current('module', value)} onActivateSystem={value => actionRef.current('system', value)} onToggleRecall={() => actionRef.current('recall')}
+              player={displayHud.playerShip}
+              engine={displayHud}
               weaponControls={{
                 onSelectGroup: (index) => actionRef.current("group", index),
                 onToggleMode: (index) => actionRef.current("mode", index),
@@ -1105,7 +1138,7 @@ export function LanBattle({
             />
           </div>
           <div className="hud-radar-anchor pointer-events-none absolute z-20">
-            <CombatRadar engine={combatHudView(displayWorld)} />
+            <CombatRadar engine={displayHud} />
           </div>
         </div>
       )}
@@ -1121,8 +1154,8 @@ export function LanBattle({
           <span className="lan-battle-teams" aria-label="阵营与舰船数量">{teamPresence.map(row=><span key={row.team} style={{color:teamColor(row.team)}}
             data-team={row.team} data-deployed={row.deployed} data-reserve={row.reserve} data-visible={row.visible}
             title={teamName(row.team)+"：编成 "+row.total+" · 在场 "+row.deployed+" · 可见 "+row.visible+" · 后备 "+row.reserve+" · 损失 "+row.destroyed+" · 撤离 "+row.retreated+"。在场不等于当前镜头内；后备需部署后才显示。"}>
-            {teamName(row.team)}{row.team===displayWorld?.playerShip.teamId?"（己方）":""} · 场{row.deployed}/总{row.total}{row.reserve>0?" 待命"+row.reserve:""}
-            {(row.missing>0||row.invalidPosition>0||(displayWorld?.openBattlefield&&row.visible<row.deployed))&&" ⚠显示异常"}
+            {teamName(row.team)}{row.team===displayHud?.playerShip.teamId?"（己方）":""} · 场{row.deployed}/总{row.total}{row.reserve>0?" 待命"+row.reserve:""}
+            {(row.missing>0||row.invalidPosition>0||(displayHud?.openBattlefield&&row.visible<row.deployed))&&" ⚠显示异常"}
           </span>)}</span>
           {hud && <span className="lan-network-quality" data-quality={!controlsReady || hud.age > 1500 ? "syncing" : (hud.rtt ?? 0) > 180 || (hud.acknowledgementMs ?? 0) > 350 || (hud.fps > 0 && hud.fps < Math.min(40, (getGraphicsSettings().maxFrameRate || 60) * .75)) || (hud.realtimeRatio !== null && hud.realtimeRatio < .9) ? "slow" : "good"}
             title={"服务器往返延迟，不含房主计算；输入确认包含服务器转发、主机处理及权威回执返回（关键或完整状态）。低延迟不代表高帧率；打开菜单中的性能与网络诊断查看详情。"}>
@@ -1153,15 +1186,15 @@ export function LanBattle({
           </p>
           <div className="combat-pause-layout">
             <section className="combat-pause-ship" aria-label="当前舰船">
-              {displayWorld && (
+              {displayHud && (
                 <>
                   <div className="combat-pause-ship-name">
                     <NativeBitmapText font="caption">
-                      {displayWorld.playerShip.shipName}
+                      {displayHud.playerShip.shipName}
                     </NativeBitmapText>
                   </div>
                   <div className="combat-pause-portrait">
-                    <ShipStage spec={displayWorld.playerShip.spec} home />
+                    <ShipStage spec={displayHud.playerShip.spec} home />
                   </div>
                 </>
               )}
@@ -1242,7 +1275,7 @@ export function LanBattle({
               <dt>
                 <kbd>V / F</kbd>
               </dt>
-              <dd>排幅 / 技能槽 1（默认）；G / H 为技能槽 2 / 3，可改键或点击 HUD</dd>
+              <dd>排散 / 技能槽 1（默认）；G / H 为技能槽 2 / 3，可改键或点击 HUD</dd>
               <dt><kbd>R / Z</kbd></dt>
               <dd>锁定鼠标下敌舰（再次按下取消）/ 当前舰船联队召回</dd>
               <dt>
@@ -1275,7 +1308,7 @@ export function LanBattle({
                 receivedHz={hud?.hz ?? null} appliedHz={hud?.appliedHz ?? null} local={computesAuthority ? hud?.localFlow : undefined} />
               <LanNetworkDiagnostics transport={connection.lanTransport} />
               <SteamNetworkDiagnostics transport={steamTransport} />
-              <p>页面构建：<code>{LAN_BUILD}</code><br />当前地址：{window.location.host} · {displayWorld?.openBattlefield?"联机公开战场":"传感器视野"}</p>
+              <p>页面构建：<code>{LAN_BUILD}</code><br />当前地址：{window.location.host} · {displayHud?.openBattlefield?"联机公开战场":"传感器视野"}</p>
               {teamPresence.map(row=><p key={row.team}>{teamName(row.team)}：编成 {row.total} · 已同步 {row.known} · 在场 {row.deployed} · 可见 {row.visible} · 后备 {row.reserve} · 损失 {row.destroyed} · 撤离 {row.retreated}{row.missing>0?" · 缺少身份 "+row.missing:""}{row.invalidPosition>0?" · 坐标异常 "+row.invalidPosition:""}</p>)}
               {hud && (
                 <p>

@@ -127,7 +127,7 @@ export function weaponMuzzleExtent(mount: WeaponMount): number {
 
 /** First hull/deployed-shield contact along a segment in the target's current frame.
  * Translation prediction belongs to the caller. Rotation during flight is not predicted. */
-export function shipSegmentEntry(ship: Ship, start: Vector2, end: Vector2): number | null {
+export function shipSegmentEntry(ship: Ship, start: Vector2, end: Vector2, ignoreShield = false): number | null {
   let first = Infinity;
   if (ship.spec.bounds && ship.spec.bounds.length >= 3) {
     const bounds = hullBounds(ship.spec.bounds);
@@ -142,7 +142,7 @@ export function shipSegmentEntry(ship: Ship, start: Vector2, end: Vector2): numb
   } else {
     first = segmentCircleEntry(start, end, ship.pos, ship.spec.collisionRadius) ?? Infinity;
   }
-  if (ship.shield.isActive && ship.shield.currentArcDeg > 0 && ship.shield.type !== 'NONE' && ship.shield.type !== 'PHASE') {
+  if (!ignoreShield && ship.shield.isActive && ship.shield.currentArcDeg > 0 && ship.shield.type !== 'NONE' && ship.shield.type !== 'PHASE') {
     const t = segmentCircleEntry(start, end, ship.getShieldCenter(), ship.shield.radius);
     if (t !== null && ship.isShieldPointBlocked(start.clone().addScaled(end.clone().sub(start), t))) first = Math.min(first, t);
   }

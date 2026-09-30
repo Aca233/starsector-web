@@ -27,7 +27,7 @@ export const VISUAL_SCENARIOS: VisualScenarioDefinition[] = [
   { id: 'VIS-06', title: '实弹炮连续开火', description: '合成分层场景：Mark IX 连续发射，固定发射间隔与弹道。', duration: 4.2, shipId: 'onslaught', checkpoints: [0.7, 1.4, 2.45, 3.4], mode: 'SYNTHETIC' },
   { id: 'VIS-07', title: '光束充能、照射、停止', description: '典范主炮固定充能、持续照射和停止消退。', duration: 4.6, shipId: 'paragon', checkpoints: [0.8, 1.3, 2.2, 3.3, 3.55] },
   { id: 'VIS-08', title: '导弹视觉层：直飞与命中', description: '合成分层场景：仅检查直飞导弹本体、尾迹与命中爆光；不作为制导转弯证据。', duration: 4.6, shipId: 'onslaught', checkpoints: [0.8, 1.5, 2.55, 3.5], mode: 'SYNTHETIC' },
-  { id: 'VIS-09', title: '排散完整过程', description: '固定初始幅能，调用真实排幅状态机直到完成；渐入、粒子与 HUD 倒计时共享同一状态。', duration: 14, shipId: 'onslaught', checkpoints: [0.5, 0.8, 2.0, 6.0, 13.0], mode: 'REAL_SYSTEM' },
+  { id: 'VIS-09', title: '排散完整过程', description: '固定初始载荷，调用真实排散状态机直到完成；渐入、粒子与 HUD 倒计时共享同一状态。', duration: 14, shipId: 'onslaught', checkpoints: [0.5, 0.8, 2.0, 6.0, 13.0], mode: 'REAL_SYSTEM' },
   { id: 'VIS-10', title: '小命中与舰船爆炸', description: '先展示局部小命中，再展示完整舰船毁灭爆炸层。', duration: 4.8, shipId: 'onslaught', checkpoints: [0.9, 2.4, 2.65, 3.05] },
   { id: 'VIS-11', title: '固定状态 HUD', description: '冻结战斗状态，用于 HUD 布局与多分辨率截图。', duration: 10, shipId: 'onslaught', checkpoints: [2.0] },
   { id: 'VIS-12', title: '双舰加舰载机实战', description: '受控双舰、战机和轰炸机综合图层场景。', duration: 8, shipId: 'onslaught', checkpoints: [1.5, 4.6, 6.2] },

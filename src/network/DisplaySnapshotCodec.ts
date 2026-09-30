@@ -1,21 +1,24 @@
+import { resolveDisplayDefinition, type DisplayDefinitionReceiver } from './display/DisplayDefinitionReceiver';
 import { Vector2 } from '../engine/math/Vector2';
 import { PackedSnapshotNumbers } from './PackedSnapshotNumbers.mjs';
 import { DynamicParticleDecoder, PARTICLE_RECIPE_LIMITS, particleRecipeBudget, type ParticleRecipeBudget } from '../engine/visual/DynamicParticleRecipe';
 import { ExplosionPuffDecoder, EXPLOSION_PUFF_KEYS, puffRecipeBudget, type PuffRecipeBudget } from './ExplosionPuffCodec';
 import { projectileColumnPlan } from './ProjectileColumns';
 import { displayRecordRestorer, type DisplayRecordRestore } from './DisplayRecordRestore.generated';
+import { extraDisplayRecordRestorer } from './DisplayRecordRestoreExtra.generated';
+const extraLayoutsEnabled = import.meta.env.VITE_LAN_EXTRA_DISPLAY_LAYOUTS === 'true';
 type Wire=any;
 const SKIP=new Set(['__proto__','prototype','constructor']);
 export interface DisplayDecodeLayouts {
  keys:string[][]; records:Map<readonly string[],DisplayRecordRestore>; puffDecoder:ExplosionPuffDecoder;puffBudget:PuffRecipeBudget;
- particleDecoder:DynamicParticleDecoder;particleBudget:ParticleRecipeBudget; }
+ particleDecoder:DynamicParticleDecoder;particleBudget:ParticleRecipeBudget; definitions?:readonly object[]; definitionOwner?:DisplayDefinitionReceiver; }
 type DecodeLayouts=DisplayDecodeLayouts;
 export function displayLayouts(value:unknown,puffDecoder:ExplosionPuffDecoder,particleDecoder:DynamicParticleDecoder):DisplayDecodeLayouts {
  if(value===undefined)value=[];
  if(!Array.isArray(value)||value.length>1024)throw Error('Invalid display layouts');
  for(const keys of value)if(!Array.isArray(keys)||keys.length>2048||keys.some(key=>typeof key!=='string'||key.length>256||SKIP.has(key))||new Set(keys).size!==keys.length)throw Error('Invalid display layout keys');
  const records=new Map<readonly string[],DisplayRecordRestore>();
- for(const keys of value){const restore=displayRecordRestorer(keys);if(restore)records.set(keys,restore);}
+ for(const keys of value){const restore=displayRecordRestorer(keys) ?? (extraLayoutsEnabled ? extraDisplayRecordRestorer(keys) : undefined);if(restore)records.set(keys,restore);}
  return {keys:value,records,puffDecoder,puffBudget:puffRecipeBudget(),particleDecoder,particleBudget:particleRecipeBudget()};
 }
 export function assertDataField(target:object,key:string):void {
@@ -26,6 +29,26 @@ export function assertDataField(target:object,key:string):void {
   if(typeof property.value==='function'||property.get||property.set)throw Error('Display data shadows a read capability: '+key);
   break;
  }
+}
+// Definitions formerly used the generic merge semantics: omitted fields and
+// local extensions survive. Preserve that contract on shape changes/fallbacks,
+// rather than silently deleting old display fields when installing a new table.
+function definitionCovers(previous:any,next:any):boolean {
+ if(!previous||typeof previous!=='object'||!next||typeof next!=='object')return true;
+ if(Array.isArray(next))return !Array.isArray(previous)||next.every((value:any,i:number)=>definitionCovers(previous[i],value));
+ if(Array.isArray(previous))return true;
+ return Object.keys(previous).every(key=>Object.hasOwn(next,key)&&definitionCovers(previous[key],next[key]));
+}
+function mergeDisplayDefinition(value:any,target:any):any {
+ if(value===null||typeof value!=='object')return value;
+ if(Array.isArray(value)){
+  const output=Array.isArray(target)?target:[];
+  for(let i=0;i<value.length;i++)output[i]=mergeDisplayDefinition(value[i],output[i]);
+  output.length=value.length;return output;
+ }
+ const output=target&&typeof target==='object'&&!Array.isArray(target)?target:{};
+ for(const key of Object.keys(value)){assertDataField(output,key);output[key]=mergeDisplayDefinition(value[key],output[key]);}
+ return output;
 }
 const typed: Record<string, any> = {
   Float32Array,
@@ -61,6 +84,24 @@ export function unpackDisplay(
 ): any {
   if (depth > 64) throw Error("Snapshot nesting exceeds limit");
   if (value === null || typeof value !== "object") return value;
+  if(Object.hasOwn(value,'$displayDefinition')) {
+    if(Object.keys(value).length!==1)throw Error('Invalid display definition envelope');
+    const definition=resolveDisplayDefinition(layouts.definitions,value.$displayDefinition);
+    const owner=layouts.definitionOwner;
+    if(!owner)throw Error('Missing display definition owner');
+    if(owner.sourceOf(target)===definition)return target;
+    if(!target||typeof target!=='object')return owner.bind(definition);
+    if(owner.owns(target)) {
+      if(definitionCovers(target,definition))return owner.bind(definition);
+      target=mergeDisplayDefinition(target,undefined);
+    }
+    // Mutable/custom records retain descriptor guards and local fields. They do
+    // not become trusted merely because the incoming payload was validated.
+    return mergeDisplayDefinition(definition,target);
+  }
+  // An opt-in immutable definition may later return to the mutable/generic path.
+  // Never unpack into frozen storage or mutate a prior endpoint's definition.
+  if(layouts.definitionOwner?.owns(target))target=mergeDisplayDefinition(target,undefined);
   if(Object.hasOwn(value,'$component'))throw Error('Simulation component envelopes are not a display protocol');
   if (Object.hasOwn(value, '$record')) {
     const keys = Number.isInteger(value.$record) && value.$record >= 0 ? layouts.keys[value.$record] : undefined;

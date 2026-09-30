@@ -1,0 +1,393 @@
+{
+  "schemaVersion": 1,
+  "stage": "AUTHORING_REASSEMBLY_CHECKED_NOT_RUNTIME",
+  "runtimeRegistered": false,
+  "sourceImageSize": [
+    512,
+    1024
+  ],
+  "coordinateConvention": "Source pixels only: x right, y down. Module local = [anchorY - y, x - anchorX], i.e. forward/right. Not final world units or approved runtime pivots.",
+  "modules": [
+    {
+      "id": "CORE",
+      "authoringImageAnchorPx": [
+        256,
+        500
+      ],
+      "imageSpaceOffsetForwardRightPx": [
+        0,
+        0
+      ],
+      "runtimePivotApproved": false,
+      "mountIds": [],
+      "sourceHullImage": "output/spear-of-adun-art/modules-v01/hull-CORE.png"
+    },
+    {
+      "id": "FORE",
+      "authoringImageAnchorPx": [
+        256,
+        230
+      ],
+      "imageSpaceOffsetForwardRightPx": [
+        270,
+        0
+      ],
+      "runtimePivotApproved": false,
+      "mountIds": [
+        "BOW_GUARD_PORT",
+        "BOW_GUARD_STARBOARD",
+        "FORE_SHOULDER_PORT",
+        "FORE_SHOULDER_STARBOARD",
+        "FORE_PROJECTOR"
+      ],
+      "sourceHullImage": "output/spear-of-adun-art/modules-v01/hull-FORE.png"
+    },
+    {
+      "id": "PORT",
+      "authoringImageAnchorPx": [
+        156,
+        785
+      ],
+      "imageSpaceOffsetForwardRightPx": [
+        -285,
+        -100
+      ],
+      "runtimePivotApproved": false,
+      "mountIds": [
+        "AFT_BATTERY_PORT",
+        "AFT_OUTER_GUARD_PORT"
+      ],
+      "sourceHullImage": "output/spear-of-adun-art/modules-v01/hull-PORT.png"
+    },
+    {
+      "id": "STARBOARD",
+      "authoringImageAnchorPx": [
+        356,
+        785
+      ],
+      "imageSpaceOffsetForwardRightPx": [
+        -285,
+        100
+      ],
+      "runtimePivotApproved": false,
+      "mountIds": [
+        "AFT_BATTERY_STARBOARD",
+        "AFT_OUTER_GUARD_STARBOARD"
+      ],
+      "sourceHullImage": "output/spear-of-adun-art/modules-v01/hull-STARBOARD.png"
+    },
+    {
+      "id": "AFT",
+      "authoringImageAnchorPx": [
+        256,
+        800
+      ],
+      "imageSpaceOffsetForwardRightPx": [
+        -300,
+        0
+      ],
+      "runtimePivotApproved": false,
+      "mountIds": [
+        "AFT_SHOULDER_PORT",
+        "AFT_SHOULDER_STARBOARD",
+        "STERN_GUARD_PORT",
+        "STERN_GUARD_STARBOARD"
+      ],
+      "sourceHullImage": "output/spear-of-adun-art/modules-v01/hull-AFT.png"
+    }
+  ],
+  "mounts": [
+    {
+      "id": "BOW_GUARD_PORT",
+      "owner": "FORE",
+      "size": "SMALL",
+      "imageAnchorPx": [
+        232,
+        218
+      ],
+      "sourceCandidateImageAnchorPx": [
+        232,
+        218
+      ],
+      "bearingRadiusPx": 4,
+      "moduleLocalForwardRightSourcePx": [
+        12,
+        -24
+      ],
+      "supportObject": "Object_37",
+      "sourceSurface": "Object_37"
+    },
+    {
+      "id": "BOW_GUARD_STARBOARD",
+      "owner": "FORE",
+      "size": "SMALL",
+      "imageAnchorPx": [
+        280,
+        218
+      ],
+      "sourceCandidateImageAnchorPx": [
+        280,
+        218
+      ],
+      "bearingRadiusPx": 4,
+      "moduleLocalForwardRightSourcePx": [
+        12,
+        24
+      ],
+      "supportObject": "Object_37",
+      "sourceSurface": "Object_37"
+    },
+    {
+      "id": "FORE_SHOULDER_PORT",
+      "owner": "FORE",
+      "size": "MEDIUM",
+      "imageAnchorPx": [
+        207,
+        298
+      ],
+      "sourceCandidateImageAnchorPx": [
+        207,
+        298
+      ],
+      "bearingRadiusPx": 7,
+      "moduleLocalForwardRightSourcePx": [
+        -68,
+        -49
+      ],
+      "supportObject": "Object_19",
+      "sourceSurface": "Object_19"
+    },
+    {
+      "id": "FORE_SHOULDER_STARBOARD",
+      "owner": "FORE",
+      "size": "MEDIUM",
+      "imageAnchorPx": [
+        305,
+        298
+      ],
+      "sourceCandidateImageAnchorPx": [
+        305,
+        298
+      ],
+      "bearingRadiusPx": 7,
+      "moduleLocalForwardRightSourcePx": [
+        -68,
+        49
+      ],
+      "supportObject": "Object_19",
+      "sourceSurface": "Object_19"
+    },
+    {
+      "id": "AFT_SHOULDER_PORT",
+      "owner": "AFT",
+      "size": "MEDIUM",
+      "imageAnchorPx": [
+        206,
+        724
+      ],
+      "sourceCandidateImageAnchorPx": [
+        205,
+        724
+      ],
+      "bearingRadiusPx": 7,
+      "moduleLocalForwardRightSourcePx": [
+        76,
+        -50
+      ],
+      "supportObject": "Object_63",
+      "sourceSurface": "Object_63"
+    },
+    {
+      "id": "AFT_SHOULDER_STARBOARD",
+      "owner": "AFT",
+      "size": "MEDIUM",
+      "imageAnchorPx": [
+        306,
+        724
+      ],
+      "sourceCandidateImageAnchorPx": [
+        307,
+        724
+      ],
+      "bearingRadiusPx": 7,
+      "moduleLocalForwardRightSourcePx": [
+        76,
+        50
+      ],
+      "supportObject": "Object_63",
+      "sourceSurface": "Object_63"
+    },
+    {
+      "id": "AFT_BATTERY_PORT",
+      "owner": "PORT",
+      "size": "LARGE",
+      "imageAnchorPx": [
+        161,
+        789
+      ],
+      "sourceCandidateImageAnchorPx": [
+        161,
+        789
+      ],
+      "bearingRadiusPx": 10,
+      "moduleLocalForwardRightSourcePx": [
+        -4,
+        5
+      ],
+      "supportObject": "PORT_Object_93",
+      "sourceSurface": "Object_93"
+    },
+    {
+      "id": "AFT_BATTERY_STARBOARD",
+      "owner": "STARBOARD",
+      "size": "LARGE",
+      "imageAnchorPx": [
+        351,
+        789
+      ],
+      "sourceCandidateImageAnchorPx": [
+        351,
+        789
+      ],
+      "bearingRadiusPx": 10,
+      "moduleLocalForwardRightSourcePx": [
+        -4,
+        -5
+      ],
+      "supportObject": "STARBOARD_Object_93",
+      "sourceSurface": "Object_93"
+    },
+    {
+      "id": "AFT_OUTER_GUARD_PORT",
+      "owner": "PORT",
+      "size": "SMALL",
+      "imageAnchorPx": [
+        112,
+        802
+      ],
+      "sourceCandidateImageAnchorPx": [
+        112,
+        802
+      ],
+      "bearingRadiusPx": 4,
+      "moduleLocalForwardRightSourcePx": [
+        -17,
+        -44
+      ],
+      "supportObject": "PORT_Object_93",
+      "sourceSurface": "Object_93"
+    },
+    {
+      "id": "AFT_OUTER_GUARD_STARBOARD",
+      "owner": "STARBOARD",
+      "size": "SMALL",
+      "imageAnchorPx": [
+        400,
+        802
+      ],
+      "sourceCandidateImageAnchorPx": [
+        400,
+        802
+      ],
+      "bearingRadiusPx": 4,
+      "moduleLocalForwardRightSourcePx": [
+        -17,
+        44
+      ],
+      "supportObject": "STARBOARD_Object_93",
+      "sourceSurface": "Object_93"
+    },
+    {
+      "id": "STERN_GUARD_PORT",
+      "owner": "AFT",
+      "size": "SMALL",
+      "imageAnchorPx": [
+        219,
+        830
+      ],
+      "sourceCandidateImageAnchorPx": [
+        220,
+        828
+      ],
+      "bearingRadiusPx": 4,
+      "moduleLocalForwardRightSourcePx": [
+        -30,
+        -37
+      ],
+      "supportObject": "AFT_Object_93",
+      "sourceSurface": "Object_93"
+    },
+    {
+      "id": "STERN_GUARD_STARBOARD",
+      "owner": "AFT",
+      "size": "SMALL",
+      "imageAnchorPx": [
+        293,
+        830
+      ],
+      "sourceCandidateImageAnchorPx": [
+        292,
+        828
+      ],
+      "bearingRadiusPx": 4,
+      "moduleLocalForwardRightSourcePx": [
+        -30,
+        37
+      ],
+      "supportObject": "AFT_Object_93",
+      "sourceSurface": "Object_93"
+    },
+    {
+      "id": "FORE_PROJECTOR",
+      "owner": "FORE",
+      "size": "EXTRA_LARGE",
+      "imageAnchorPx": [
+        256,
+        262
+      ],
+      "moduleLocalForwardRightSourcePx": [
+        -32,
+        0
+      ],
+      "supportObject": "Object_47",
+      "sourceSurface": "Object_47",
+      "binding": "BUILT_IN_UNIQUE_WEAPON"
+    }
+  ],
+  "mountCounts": {
+    "SMALL": 6,
+    "MEDIUM": 4,
+    "LARGE": 2,
+    "EXTRA_LARGE": 1
+  },
+  "ringOwner": "CORE",
+  "sourceFaces": 170697,
+  "partitionedSourceFaces": 170697,
+  "evidence": [
+    {
+      "path": "output/spear-of-adun-art/modules-v01/module-master.json",
+      "sha256": "0ef315a1b67b612dcf0d5dc9a669a289a5fd62e9db9dc4705bcd2a22d6be6ec9"
+    },
+    {
+      "path": "output/spear-of-adun-art/modules-v01/module-face-map.json",
+      "sha256": "a99c829a5fd944b954e3f9d1791575476a2ebb5dc4835481fa20ff885576a217"
+    },
+    {
+      "path": "output/spear-of-adun-art/modules-v01/verification.json",
+      "sha256": "44b929b1124ba5a013e6fe99929cec8c8077bd6800d9299dc987570b27dac032"
+    },
+    {
+      "path": "output/spear-of-adun-art/modules-v01/image-verification.json",
+      "sha256": "ac5756d95c79d4781039170f7d4ecb8a229947a316007e2b3b5aa1f3ae48e302"
+    }
+  ],
+  "singleLayerPerModuleReady": false,
+  "damageArtReady": false,
+  "pending": [
+    "interleaved visual sublayers",
+    "damage interfaces",
+    "animated layer composition",
+    "runtime collision contours and pivots",
+    "module controls and damage propagation"
+  ]
+}

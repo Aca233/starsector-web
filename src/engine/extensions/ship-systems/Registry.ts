@@ -1,35 +1,26 @@
-import { withNativeSystemVisuals, validateSystemVisuals } from './NativeSystemVisuals';
+import { gravitySystems } from './GravitySystems';
+import { validateGravityField, validateGravityCollapse } from '../../simulation/GravityFieldState';
+import { validateGravityManeuver } from '../../simulation/GravityManeuverState';
+import { zhefengSystem } from './ZhefengSystem';
+import { rocinanteSystems } from './RocinanteSystems';
+import { adunArkSystems } from './AdunArkSystems';
+import { createHyperionYamato, createHyperionJump } from './HyperionSystems';
+import { eclipseProtocol } from './EclipseProtocol';
+import { glorianaEdict } from './GlorianaEdict';
+import { validateSystemVisuals } from './NativeSystemVisuals';
 import { validateResources, validateHooks } from '../Dependencies';
 import { requireSound } from '../../audio/SoundBank';
 import { DefinitionRegistry } from '../DefinitionRegistry';
 import type { ShipSystemDefinition } from './Types';
-import { nativeCombatSystems } from './NativeCombatSystems';
-import { canisterFlak } from './NativeWeaponSystems';
-import { flareSystems } from './FlareSystems';
-import { lidarArray } from './LidarArray';
-import { recallDevice } from './RecallDevice';
-import { droneLaunchers } from './DroneLaunchers';
-import { energyLashSystems } from './EnergyLashSystems';
-import { pulseDrives } from './PulseDrive';
-import { empEmitter } from './EmpEmitter';
-import { chiralFigment } from './ChiralFigment';
-import { droneStrike } from './DroneStrike';
-import { moteControl } from './MoteControl';
-import { convulsiveLunge } from './ConvulsiveLunge';
-import { targetingFeed, reserveWing } from './CarrierSupportSystems';
-import { burnDrive } from './BurnDrive';
-import { fortressShield } from './FortressShield';
-import { mineStrike } from './MineStrike';
-import { maneuveringJets } from './ManeuveringJets';
-import { plasmaJets } from './PlasmaJets';
-import { highEnergyFocus } from './HighEnergyFocus';
-import { ammoFeed } from './AmmoFeed';
-import { displacer, displacerDegraded, phaseTeleporter, droneSkimmer } from './PhaseTeleporter';
 export const shipSystemDefinitions = new DefinitionRegistry<ShipSystemDefinition>('ship system', d => {
   if (typeof d.name !== 'string' || !d.name.trim() || !Array.isArray(d.sourceIds) || d.sourceIds.some(id=>typeof id !== 'string' || !id.trim()) || new Set(d.sourceIds).size !== d.sourceIds.length) throw new Error(d.id + ': invalid name/source IDs');
   for (const value of [d.description, d.implementationDetails]) if (value !== undefined && typeof value !== 'string') throw new Error(d.id + ': invalid description');
+  if (d.iconUrl !== undefined && (typeof d.iconUrl !== 'string' || !d.iconUrl.trim() || !d.resources?.textures?.includes(d.iconUrl))) throw new Error(d.id + ': icon must declare a texture resource');
+  validateGravityField(d.gravityField);
+  validateGravityCollapse(d.gravityCollapse);
+  validateGravityManeuver(d.gravityManeuver);
   validateSystemVisuals(d.visuals);
-  validateResources(d.resources); validateHooks(d, ['activationReason','targetFailureReason','installReason','statusText','passiveModifiers','weaponEnabled','modifiers','onActivate','onActive','onAdvance','advanceAI','canActivate','initialize','onReset','selectTarget','isExecuting','onEnergyLash','canVent','preventAIVenting','motionControl']);
+  validateResources(d.resources); validateHooks(d, ['activationReason','targetFailureReason','installReason','statusText','passiveStatusText','passiveModifiers','weaponEnabled','defenseEnabled','modifiers','moduleModifiers','onActivate','onActive','onAdvance','advanceAI','canActivate','initialize','onReset','onInterrupt','selectTarget','isExecuting','onEnergyLash','canVent','preventAIVenting','motionControl','autofirePolicy','deactivationReason']);
   for (const group of [d.controls,d.phase]) if (group) for (const value of Object.values(group)) if (typeof value !== 'boolean') throw new Error(d.id + ': invalid capability flag');
   for (const value of [d.toggle,d.hardFlux,d.unavailable,d.usesChargesForActivation]) if (value !== undefined && typeof value !== 'boolean') throw new Error(d.id + ': invalid boolean');
   for (const key of [d.audio?.activate,d.audio?.loop,d.audio?.deactivate]) if (key !== undefined) requireSound(key,false);
@@ -42,17 +33,45 @@ export const shipSystemDefinitions = new DefinitionRegistry<ShipSystemDefinition
   for (const alias of d.sourceIds) if (shipSystemDefinitions.all().some(other => other.sourceIds.includes(alias))) throw new Error(`Duplicate source system ${alias}`);
 });
 shipSystemDefinitions.register({id:'NONE', sourceIds:[], name:'无', description:'不装配舰船技能。', chargeUp:0, active:0, chargeDown:0, cooldown:0});
-for (const definition of [burnDrive, fortressShield, mineStrike, maneuveringJets, plasmaJets, highEnergyFocus, ammoFeed, displacer, displacerDegraded, phaseTeleporter, droneSkimmer, canisterFlak, targetingFeed, reserveWing, lidarArray, recallDevice, ...droneLaunchers, ...energyLashSystems, ...pulseDrives, empEmitter, chiralFigment, droneStrike, moteControl, convulsiveLunge, ...flareSystems, ...nativeCombatSystems]) shipSystemDefinitions.register(withNativeSystemVisuals(definition));
+
 // Only this audited set has side-effect-free modifiers/passiveModifiers/isExecuting.
 // Registration by external extensions does not confer this property.
 const nativeStatDefinitions = new WeakSet(shipSystemDefinitions.all());
+shipSystemDefinitions.register(eclipseProtocol);
+shipSystemDefinitions.register(glorianaEdict);
+export const hyperionYamato = createHyperionYamato();
+export const hyperionJump = createHyperionJump();
+shipSystemDefinitions.register(hyperionYamato);
+shipSystemDefinitions.register(hyperionJump);
+for (const definition of adunArkSystems) shipSystemDefinitions.register(definition);
+for (const definition of rocinanteSystems) shipSystemDefinitions.register(definition);
+shipSystemDefinitions.register(zhefengSystem);
+for (const definition of gravitySystems) shipSystemDefinitions.register(definition);
+// Gravity modifiers read lifecycle only; world-scanning AI is not a native threat reader.
+const gravityStatDefinitions = new WeakSet(gravitySystems.map(d => shipSystemDefinitions.require(d.id)));
+const zhefengStatDefinition = shipSystemDefinitions.require(zhefengSystem.id);
+// Pure lifecycle/owner readers, but world-scanning AI is NOT admitted to exact threat reuse.
+const rocinanteStatDefinitions = new WeakSet(rocinanteSystems.map(d => shipSystemDefinitions.require(d.id)));
+// Audited original readers: Eclipse reads flux; Edict reads accepted aim, lifecycle
+// and live attached-module readiness. Both return scalars without mutation/private state.
+// Admit it to authority-side render projection, NOT the native AI set above.
+// OwnedNativeSystemModifiers also keeps its separate lifecycle-only allowlist:
+// Eclipse depends on live flux and MUST NOT be cached solely by effectLevel.
+const originalStatDefinitions = new WeakSet([shipSystemDefinitions.require(eclipseProtocol.id), shipSystemDefinitions.require(glorianaEdict.id), shipSystemDefinitions.require(hyperionYamato.id), shipSystemDefinitions.require(hyperionJump.id), ...adunArkSystems.map(d=>shipSystemDefinitions.require(d.id))]);
 // Native advanceAI/canActivate/selectTarget only change ships/system state here;
 // projectile effects are deferred to dispatchEvents, outside the AI phase.
 export function hasNativeThreatPhaseAI(definition: ShipSystemDefinition): boolean {
   return nativeStatDefinitions.has(definition);
 }
+/** Exact reuse during synchronous AI only. Unlike the legacy native gate, this
+ * does NOT authorize compact forecasting or reuse across dispatchEvents/update.
+ * These authored AI callbacks only queue owner activations and restore temporary
+ * aim writes; parent/module/carrier statistics require family invalidation. */
+export function hasExactThreatPhaseAI(definition: ShipSystemDefinition): boolean {
+  return nativeStatDefinitions.has(definition) || originalStatDefinitions.has(definition);
+}
 export function hasNativeSystemStats(definition: ShipSystemDefinition): boolean {
-  return nativeStatDefinitions.has(definition);
+  return gravityStatDefinitions.has(definition) || nativeStatDefinitions.has(definition) || originalStatDefinitions.has(definition) || rocinanteStatDefinitions.has(definition) || definition === zhefengStatDefinition;
 }
 export function systemFromSource(id: string, owner: string): string {
   if (!id) return 'NONE';
@@ -83,7 +102,7 @@ export function registerUnavailableSourceSystem(sourceId: string, row: Record<st
   const definition: ShipSystemDefinition = {
     id, sourceIds: [], name: '未适配: ' + (row.name || sourceId), unavailable: true,
     description: '尚未实现原版战斗效果，当前不可启用。',
-    implementationDetails: '仅保留原版系统名称和时序元数据；未模拟效果、消耗、控制限制或 AI。不会消耗使用次数或产生幅能。',
+    implementationDetails: '仅保留原版系统名称和时序元数据；未模拟效果、消耗、控制限制或 AI。不会消耗使用次数或产生载荷。',
     chargeUp: number('charge up'), active: number('active'), chargeDown: number('down'), cooldown: number('cooldown'),
     toggle: row.toggle?.toLowerCase() === 'true',
     ...(number('max uses') > 0 ? { charges: number('max uses'), chargeRegen: number('regen') } : {})

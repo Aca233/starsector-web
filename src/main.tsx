@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import './ui/core/motion.css'
+import './ui/outside-interface.css'
 import { RuntimeErrorBoundary } from './ui/RuntimeErrorBoundary'
 import { installBrowserGestureGuard } from './ui/browserGestureGuard'
 

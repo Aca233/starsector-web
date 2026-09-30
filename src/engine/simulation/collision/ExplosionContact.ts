@@ -19,7 +19,7 @@ function hasDataPose(ship: Ship): boolean {
 }
 
 /** Actual boundary points, not bounding-circle armor or an undeployed full shield. */
-export function getShipExplosionContact(ship: Ship, origin: Vector2): { point: Vector2; distance: number; shield: boolean } {
+export function getShipExplosionContact(ship: Ship, origin: Vector2, ignoreShield = false): { point: Vector2; distance: number; shield: boolean } {
   let point = origin.clone();
   if (!isPointInsideShipHull(ship, origin)) {
     const bounds = ship.spec.bounds;
@@ -43,7 +43,7 @@ export function getShipExplosionContact(ship: Ship, origin: Vector2): { point: V
     } else point = ship.pos.clone().addScaled(origin.clone().sub(ship.pos).normalize(), ship.spec.collisionRadius);
   }
   const hullDistance = point.distanceTo(origin), shieldDistance = distanceToDeployedShield(ship, origin);
-  if (shieldDistance > hullDistance || !Number.isFinite(shieldDistance)) return { point, distance: hullDistance, shield: false };
+  if (ignoreShield || shieldDistance > hullDistance || !Number.isFinite(shieldDistance)) return { point, distance: hullDistance, shield: false };
   const center = ship.getShieldCenter(), radial = origin.clone().sub(center);
   const facing = ship.shield.type === 'FRONT' ? ship.facingRad : ship.shield.facingAngleRad;
   const half = Math.min(360, ship.shield.currentArcDeg) * Math.PI / 360;

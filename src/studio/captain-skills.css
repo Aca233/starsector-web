@@ -1,7 +1,7 @@
 .captain-skills-screen {
   --cs: clamp(.82px, min(.0897vw, .133dvh), 1.4px);
   display: flex; flex-direction: column; gap: 7px; height: 100dvh; padding: 6px;
-  color: #d9d9d9; background: #000 url('/game-assets/graphics/backgrounds/background4.jpg') center/cover;
+  color: #d9d9d9; background: #000 url('/game-assets/graphics/original-ui/observatory.png') center/cover;
   font: calc(15 * var(--cs))/1.35 var(--ui-font);
 }
 .captain-skills-screen *, .captain-skills-screen *::before, .captain-skills-screen *::after { box-sizing: border-box; }
@@ -22,7 +22,7 @@
 .captain-points { padding-right: calc(36 * var(--cs)); text-align: center; }
 .captain-points div + div { margin-top: calc(9 * var(--cs)); }
 .captain-points dt { color: #aadeff; white-space: nowrap; }
-.captain-points dd { font: calc(21 * var(--cs))/1.1 StarsectorNumber, monospace; }
+.captain-points dd { font: calc(21 * var(--cs))/1.1 "Cascadia Code", monospace; }
 .captain-points small { display: block; font-size: calc(10 * var(--cs)); color: #617980; margin-top: 2px; white-space: nowrap; }
 .captain-yellow { color: #ffd200; }
 .captain-muted { color: #777; }
@@ -70,7 +70,7 @@
 .captain-skill-icon:hover > img, .captain-skill-icon[aria-pressed='true'] > img, .captain-skill-icon:focus-visible > img { opacity: .95; }
 .captain-skill-icon.is-unimplemented:hover > img, .captain-skill-icon.is-unimplemented[aria-pressed='true'] > img { opacity: .48; }
 .captain-skill-icon img.captain-elite-overlay { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 1; pointer-events: none; }
-.captain-configured-badge { position: absolute; right: 2px; bottom: 1px; color: #ffe266; font: calc(15 * var(--cs))/1 StarsectorNumber, monospace; text-shadow: 0 1px 3px #000, 1px 0 2px #000; }
+.captain-configured-badge { position: absolute; right: 2px; bottom: 1px; color: #ffe266; font: calc(15 * var(--cs))/1 "Cascadia Code", monospace; text-shadow: 0 1px 3px #000, 1px 0 2px #000; }
 .captain-unimplemented-mark { position: absolute; bottom: 0; right: 3px; color: var(--aptitude-color); opacity: .4; font-size: calc(10 * var(--cs)); }
 .captain-empty-row { color: #61797e; font-size: calc(13 * var(--cs)); }
 .captain-web-tools { flex-shrink: 0; padding: 0 7px 3px; font-size: 12px; background: #000d; }

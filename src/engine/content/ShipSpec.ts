@@ -13,12 +13,23 @@ export interface WeaponMountSlotConfig {
   y: number;
   baseAngleDeg: number;
   arcDeg: number;
+  /** v1 fixed hull-side bearing. Never follows turret aim; empty slots retain it. */
+  installation?: import('./WeaponInstallation').WeaponInstallation;
+  /** Opt-in hull-relative depth. Below-hull v1 is limited to built-in ballistic guns. */
+  renderLayer?: 'ABOVE_HULL' | 'BELOW_HULL';
+  /** Explicit opt-in for local system fire control; never inferred from a weapon ID. */
+  controlRole?: 'POINT_DEFENSE' | 'AXIAL';
   defaultWeaponId?: string;
   /** Authored free weapon, independent of the mount category (some are BALLISTIC/ENERGY). */
   builtIn?: boolean;
 }
 
 export interface EngineSlotConfig {
+  /** Optional Web-art presentation; never changes thrust, engine HP, or command channels. */
+  exhaust?: { mode: 'NATIVE'; /** Native texture envelope, not engine health/thrust width. */ envelopeWidth?: number } | { mode: 'HIDDEN' };
+  /** Opt-in reaction jet: forward/right/turn force signs, not extra propulsion.
+   * Authority measures actual motion; these auxiliary nozzles add no drive HP. */
+  maneuver?: [number, number, number];
   /** Native engineSlot systemActivated; omitted for ordinary engines. */
   systemActivated?: boolean;
   x: number;
@@ -88,6 +99,8 @@ export interface ShipSpec {
   peakCRSec?: number;
   crLossPerSec?: number;
   designation?: string;
+  /** Custom layered screen; ordinary hulls omit it. */
+  voidShield?: import('../simulation/VoidShield').VoidShieldSpec;
   shieldType: ShieldType;
   shieldArcDeg: number;
   shieldRadius: number;
@@ -118,6 +131,16 @@ export interface ShipSpec {
   /** Non-firing artwork stays outside the editable/targetable weapon collection. */
   decorativeWeapons?: { id: string; x: number; y: number; angleDeg: number; spriteUrl: string; tags?: string[] }[];
   engineSlots: EngineSlotConfig[];
+  /** Custom fixed propulsion modules: inherit commands, not independent movement. */
+  inheritParentEngineCommands?: boolean;
+  /** Opt-in rigid-assembly drive dependency; missing/offline slots supply no thrust.
+   * Fractions are the hull's emergency reserve with all listed drives unavailable. */
+  modulePropulsion?: {
+    slotIds: string[];
+    reserveSpeed: number;
+    reserveAcceleration: number;
+    reserveTurn: number;
+  };
   /** Explicit custom multiplier; native hullmods are applied separately. */
   weaponRangeMult?: number;
   /** Native identity traits survive capability filtering; not executable hullmods. */

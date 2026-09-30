@@ -23,7 +23,7 @@ import { ProjectedRenderShip, renderWeaponRange, renderWeaponAngle, renderPulseO
 
 // Deliberately audited against ShipRenderState.ts, not the transport schema.
 const fields = {
-  ship: ['id','spec','pos','prevPos','vel','facingRad','prevFacingRad','angularVelRad','hullHp','isDead','isDocked','isRetreated','isAttachedModule','teamId','playerTargetId','visibilityMask','visibilityOverflow','phaseGhosts','phaseVisualAlpha','engineBoostLevel','prevEngineBoostLevel','scorchMarks','scorchMarkVersion','selectedGroupIndex'],
+  ship: ['id','spec','pos','prevPos','vel','facingRad','prevFacingRad','angularVelRad','hullHp','maxHullHp','isDead','isDocked','isRetreated','isAttachedModule','teamId','playerTargetId','visibilityMask','visibilityOverflow','phaseGhosts','phaseVisualAlpha','engineBoostLevel','prevEngineBoostLevel','scorchMarks','scorchMarkVersion','selectedGroupIndex'],
   shield: ['facingAngleRad','hitSegmentLevels','isPhaseEngaged','isVisuallyDeployed','phaseCooldownLevel','phaseEffectLevel','phaseState','radius','renderArcRad','type','visualAlpha'],
   flux: ['fluxPercent','hardFlux','hullSize','isOverloaded','isVenting','maxFlux','overloadTimer'],
   system: ['activationSerial','available','disabled','effectLevel','fortressVisualLevel','isActive','state','teleportVisual','type'],

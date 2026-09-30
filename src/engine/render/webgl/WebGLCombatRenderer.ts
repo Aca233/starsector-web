@@ -1,3 +1,7 @@
+import { WeaponDepthComposer } from '../WeaponDepthFrame';
+import { renderJumpTarget } from './JumpTargetingRenderer';
+import { manualWeaponShip } from '../../runtime/ModuleFireControl';
+import { renderContextWebGL2, type RenderCanvas } from '../RenderSurface';
 import { getGraphicsSettings, RenderFrameLimiter } from '../../runtime/GraphicsSettings';
 import { RenderResolutionTarget } from './RenderResolutionTarget';
 import { beginRenderFrame, endRenderFrame, visualRandom, visualNowMs } from '../RenderDeterminism';
@@ -16,6 +20,7 @@ import { WebGLFXPass } from './passes/WebGLFXPass';
 import { WebGLTacticalOverlayPass } from './passes/WebGLTacticalOverlayPass';
 import { renderIdentificationIndicators } from './passes/WebGLIdentificationPass';
 import { renderShipPhase } from './ShipPhaseRenderer';
+import { GravityLensPass } from './GravityLensPass';
 import { ESSENTIAL_TEXTURE_URLS } from '../TextureCache';
 import { collectCombatTextureUrls } from '../../assets/CombatAssetClosure';
 import type { ICombatRenderer, RendererResourceStats } from '../ICombatRenderer';
@@ -37,7 +42,7 @@ export interface WebGLRendererLifecycle {
  * 保持通道与透明混合顺序；按纹理、容量与混合边界批量提交，绘制次数由实际场景决定。
  */
 export class WebGLCombatRenderer implements ICombatRenderer {
-  public readonly canvas: HTMLCanvasElement;
+  public readonly canvas: RenderCanvas;
   public gl: WebGL2RenderingContext;
   public textures: WebGLTextureManager;
   public batcher: SpriteBatcher;
@@ -53,6 +58,8 @@ export class WebGLCombatRenderer implements ICombatRenderer {
   public readonly tacticalOverlayPass: WebGLTacticalOverlayPass;
 
   // 官方原版战术武器射界状态机 (1:1 _super.java: 选定编组展开并常驻显示，切换编组平滑淡出淡入，绝不自动超时消隐)
+  private readonly weaponDepth = new WeaponDepthComposer();
+  private arcWeaponShipId: string | null = null;
   private arcActiveGroupIndex = 0;
   private arcTargetGroupIndex = 0;
   private arcFadeState: 'FADING_IN' | 'FADING_OUT' | 'VISIBLE' | 'HIDDEN' = 'FADING_IN';
@@ -65,6 +72,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
   private restoreGeneration = 0;
   private disposed = false;
   private resolutionTarget: RenderResolutionTarget;
+  private gravityLens?: GravityLensPass;
   private frameLimiter = new RenderFrameLimiter();
   private graphicsSettings = getGraphicsSettings();
   private requiredTextures: readonly string[] = ESSENTIAL_TEXTURE_URLS;
@@ -74,6 +82,8 @@ export class WebGLCombatRenderer implements ICombatRenderer {
     event.preventDefault();
     if (this.disposed) return;
     this.contextLost = true;
+    this.gravityLens = undefined;
+    this.shipPass.disposeArkMaterial();
     this.restoreGeneration++;
     this.textures.invalidateGPU();
     this.lifecycle.onContextLost?.();
@@ -85,7 +95,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
     void this.restoreContext(generation);
   };
 
-  constructor(canvas: HTMLCanvasElement, gl: WebGL2RenderingContext, lifecycle: WebGLRendererLifecycle = {}) {
+  constructor(canvas: RenderCanvas, gl: WebGL2RenderingContext, lifecycle: WebGLRendererLifecycle = {}) {
     this.canvas = canvas;
     this.gl = gl;
     this.resolutionTarget = new RenderResolutionTarget(gl);
@@ -140,7 +150,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
     let nextGl: WebGL2RenderingContext | null = null;
 
     try {
-      nextGl = this.canvas.getContext('webgl2', {
+      nextGl = renderContextWebGL2(this.canvas, {
         alpha: false,
         antialias: true,
         powerPreference: 'high-performance',
@@ -206,7 +216,16 @@ export class WebGLCombatRenderer implements ICombatRenderer {
   }
 
   private updateTacticalArc(engine: CombatRenderView, dt: number): void {
-    const pShip = engine.playerShip;
+    const pShip = manualWeaponShip(engine.playerShip, engine.ships);
+    // A different owner is not another group on the same hull. Never fade old
+    // core indices on the newly selected module. Module group edges also snap
+    // while paused; the original core-group fade remains unchanged.
+    if (this.arcWeaponShipId !== pShip.id || (pShip.id !== engine.playerShip.id && this.arcTargetGroupIndex !== pShip.selectedGroupIndex)) {
+      this.arcWeaponShipId = pShip.id;
+      this.arcActiveGroupIndex = this.arcTargetGroupIndex = pShip.selectedGroupIndex;
+      this.arcFadeState = pShip.weaponGroups[this.arcActiveGroupIndex]?.weaponSlotIds.length ? 'VISIBLE' : 'HIDDEN';
+      this.arcAnimProgress = this.arcFadeState === 'VISIBLE' ? 1 : 0;
+    }
     const targetGroup = pShip?.weaponGroups?.[pShip.selectedGroupIndex] ?? null;
     const targetHasWeapons = !!(targetGroup?.weaponSlotIds?.length);
 
@@ -243,8 +262,10 @@ export class WebGLCombatRenderer implements ICombatRenderer {
   }
 
   public resetVisualState(): void {
+    this.weaponDepth.reset();
     this.textures.retainCanvasTextures(new Set());
     this.shipPass.resetVisualState();
+    this.arcWeaponShipId = null;
     this.arcActiveGroupIndex = 0;
     this.arcTargetGroupIndex = 0;
     this.arcFadeState = 'FADING_IN';
@@ -256,6 +277,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
     const graphics = getGraphicsSettings();
     if (graphics !== this.graphicsSettings) { this.graphicsSettings = graphics; this.frameLimiter.reset(); }
     if (!this.frameLimiter.shouldRender(performance.now(), graphics.maxFrameRate)) return false;
+    this.updateTacticalArc(engine, 0); // Edge commands also publish while simulation time is paused.
     beginRenderFrame(frame);
     const gpuQuery = this.beginGpuTimer();
     try {
@@ -297,6 +319,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
       cameraPos: actualCam,
       zoom,
       alpha,
+      gravityEffects: frame.layers.has('beam') || frame.layers.has('explosion'),
       viewport,
       whiteTex: this.textures.getWhiteTexture(),
       hitGlowTex: this.textures.getTexture('/game-assets/graphics/fx/hit_glow.png'),
@@ -324,10 +347,19 @@ export class WebGLCombatRenderer implements ICombatRenderer {
     const playerFacing = engine.playerShip.interpolatedFacing(alpha);
 
     // 4.3 通道 3: 相位潜航、舰体战损焦痕、推进尾焰与炮塔挂点 (LAYER_SHIPS)
-    if (frame.layers.has('hull')) this.shipPass.render(engine, ctx, nowSec);
+    const weaponDepth = frame.layers.has('hull') && frame.layers.has('weapon')
+      ? this.weaponDepth.partition(engine, alpha, p => {
+        if (!p.projSpriteUrl) return 0;
+        const info = this.textures.getTextureInfo(p.projSpriteUrl);
+        return info.width > 0 ? info.height / info.width * (p.projWidth ?? 8) : 0;
+      }) : undefined;
+    if (frame.layers.has('hull')) this.shipPass.render(engine, ctx, nowSec, ship => {
+      const lower = weaponDepth?.below.get(ship.id);
+      if (lower) this.projectilePass.renderProjectilesAndMuzzle(lower, ctx);
+    });
 
     // 4.4 通道 4: 枪口火光、等离子弹丸、动能弹实弹、高能光束死光 (严格对齐 Starsector: LAYER_ABOVE_SHIPS_AND_ASTEROIDS 位于战舰上方)
-    if (frame.layers.has('weapon')) this.projectilePass.renderProjectilesAndMuzzle(engine, ctx);
+    if (frame.layers.has('weapon')) this.projectilePass.renderProjectilesAndMuzzle(weaponDepth?.above ?? engine, ctx);
     if (frame.layers.has('beam')) this.projectilePass.renderBeams(engine, ctx);
 
     if (frame.layers.has('hull')) {
@@ -351,7 +383,13 @@ export class WebGLCombatRenderer implements ICombatRenderer {
     }
 
     // Default combat nebula is drawn once in CLOUD_LAYER, below ships.
+    if (this.gravityLens) this.gravityLens.drawCalls = 0;
+    if (frame.layers.has('hull') && (frame.layers.has('beam') || frame.layers.has('explosion'))) {
+      this.gravityLens ??= new GravityLensPass(gl);
+      this.gravityLens.render(engine, ctx);
+    }
 
+    if (frame.jumpTarget && frame.layers.has('hull')) renderJumpTarget(ctx,engine.playerShip,frame.jumpTarget);
     renderIdentificationIndicators(engine, ctx, frame.layers);
 
     // 4.6 通道 6: 战术锁定方括号、前置瞄准点、武器射界与测距弧 (1:1 原版 _super.java & E.java)
@@ -409,7 +447,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
     return {
       ...this.textures.getStats(),
       resourceRecreations: this.resourceRecreations,
-      drawCalls: this.batcher.drawCalls + this.effectBatcher.drawCalls + this.ribbonBatcher.drawCalls + this.shieldShader.drawCalls + this.resolutionTarget.drawCalls,
+      drawCalls: this.batcher.drawCalls + this.effectBatcher.drawCalls + this.ribbonBatcher.drawCalls + this.shieldShader.drawCalls + this.shipPass.arkMaterialDrawCalls + this.resolutionTarget.drawCalls + (this.gravityLens?.drawCalls ?? 0),
       gpuTimerAvailable: !!this.gpuTimerExt,
       gpuTimeMs: this.lastGpuTimeMs
     };
@@ -418,6 +456,8 @@ export class WebGLCombatRenderer implements ICombatRenderer {
   public dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.weaponDepth.reset();
+    this.shipPass.disposeArkMaterial();
     this.restoreGeneration++;
     this.canvas.removeEventListener('webglcontextlost', this.onContextLost);
     this.canvas.removeEventListener('webglcontextrestored', this.onContextRestored);
@@ -425,6 +465,7 @@ export class WebGLCombatRenderer implements ICombatRenderer {
       for (const query of this.pendingGpuQueries) this.gl.deleteQuery(query);
       this.pendingGpuQueries = [];
       this.resolutionTarget.dispose();
+      this.gravityLens?.dispose();
       this.textures.dispose();
       this.batcher.dispose();
       this.effectBatcher.dispose();

@@ -1,0 +1,71 @@
+/* Compact transparent UI contract. See docs/ui-design-system-2026-09-26.md.
+ * Single palette for shared controls, page themes and portaled dialogs.
+ * Component files own geometry; no theme-specific bitmap panels. */
+:root {
+  --ds-font-body: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+  --ds-font-mono: "Cascadia Code", Consolas, "Microsoft YaHei UI", monospace;
+  --ds-type-meta: 11px;
+  --ds-type-caption: 12px;
+  --ds-type-body: 13px;
+  --ds-type-heading: 16px;
+  --ds-type-title: 24px;
+  --ds-line-body: 1.5;
+  --ds-weight-body: 400;
+  --ds-weight-emphasis: 500;
+
+  --ds-space-1: 4px;
+  --ds-space-2: 8px;
+  --ds-space-3: 12px;
+  --ds-space-4: 16px;
+  --ds-space-6: 24px;
+  --ds-control-compact: 28px;
+  --ds-control-default: 32px;
+  --ds-control-touch: 44px;
+  --ds-icon: 16px;
+  --ds-radius-control: 2px;
+  --ds-radius-overlay: 4px;
+  --ds-border-width: 1px;
+  --ds-focus-width: 2px;
+  --ds-focus-offset: 3px;
+  --ds-motion-feedback: 140ms;
+  --ds-motion-panel: 180ms;
+  --ds-motion-ease: ease-out;
+  --ds-z-tooltip: 90;
+  --ds-z-dialog: 100;
+  --ds-z-toast: 120;
+
+  --ds-surface-none: transparent;
+  --ds-surface-hover: #b4cad00c;
+  --ds-control-border: #b8cbd642;
+  --ds-control-hover: #c6dde022;
+  --ds-control-pressed: #b7cdd536;
+  --ds-control-selected: #adc9ce1f;
+  --ds-control-focus: #d0e5e6;
+  --ds-control-highlight: #b7cdd580;
+  --ds-control-sheen: none;
+  --ds-surface-tooltip: #101b25f2;
+  --ds-surface-floating: #101b25e8;
+  --ds-surface-input: #a9c2ce08;
+  --ds-surface-track: #a9c2ce24;
+  --ds-shadow-floating: 0 8px 28px #0004;
+  --ds-surface-dialog: transparent;
+  --ds-scrim: #080f18d9;
+  --ds-menu-text: #dbe3e7;
+  --ds-menu-muted: #9cabb5;
+  --ds-menu-dim: #8c9da7;
+  --ds-menu-accent: #b7cdd5;
+  --ds-menu-highlight: #dfc394;
+  --ds-menu-success: #89b8a8;
+  --ds-menu-warning: #dbb77d;
+  --ds-menu-danger: #ed998f;
+  --ds-menu-border: #b1c5ce30;
+  --ds-menu-divider: #b1c5ce20;
+  --ds-menu-button-text: var(--ds-menu-text);
+  --ds-hud-text: var(--ds-menu-text);
+  --ds-hud-muted: var(--ds-menu-muted);
+  --ds-hud-divider: #8197a833;
+  --ds-hud-accent: var(--ds-menu-highlight);
+  --ds-hud-flux: #7dbacc;
+  --ds-hud-hull: #95baa8;
+  --ds-hud-danger: #efa48c;
+}

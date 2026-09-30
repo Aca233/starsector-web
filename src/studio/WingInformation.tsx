@@ -15,5 +15,5 @@ export function WingInformation({ wing, current, comparing = false }: { wing: Re
   return <><table><thead><tr><th>基础参数</th>{comparing && <th>当前</th>}<th>{comparing ? '预览' : '数值'}</th></tr></thead><tbody>
     {rows.map(([term, label, a, b]) => <tr key={term}><th><RefitHoverTerm term={term}>{label}</RefitHoverTerm></th>
       {comparing && <td>{a}</td>}<td data-changed={comparing && a !== b}>{b}</td></tr>)}
-  </tbody></table><p className="equipment-state">基础值不含母舰插件；特殊系统、轰炸与补充机制尚非原版完整复现。</p></>;
+  </tbody></table>{wing.description && <p className="equipment-state">{wing.description}</p>}<p className="equipment-state">基础值不含母舰插件；特殊系统、轰炸与补充机制尚非原版完整复现。</p></>;
 }

@@ -1,0 +1,4 @@
+.hud-void-shield { color: #b6d8ff; border-bottom: 1px solid #728dba; padding: 3px 0 5px; margin-bottom: 4px; font-size: 10px; line-height: 1.35; }
+.hud-void-layers { display: flex; gap: 4px; height: 6px; margin: 3px 0; }
+.hud-void-layers > span { flex: 1; border: 1px solid #6984ad; background: #17213a; }
+.hud-void-layers i { display: block; height: 100%; background: #a6c8ff; }

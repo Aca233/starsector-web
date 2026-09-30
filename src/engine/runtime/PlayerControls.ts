@@ -1,3 +1,4 @@
+import type { CombatCanvas, CombatViewport } from './CombatViewport';
 import type { CombatDisplayShip as Ship } from './CombatDisplayReads';
 import { Vector2 } from '../math/Vector2';
 import { signedAngle } from '../math/Angles';
@@ -14,8 +15,15 @@ export function cursorTurnCommand(facing: number, angularVelocity: number, targe
   return direction === Math.sign(angularVelocity) && Math.abs(stoppingAngle) > Math.abs(error) ? -direction : direction;
 }
 /** CSS client coordinates -> render pixels -> world. Works with offset/scaled/high-DPI canvases. */
-export function clientToCombatWorld(client: {x:number;y:number}, canvas: Pick<HTMLCanvasElement,'width'|'height'|'getBoundingClientRect'>, camera: Vector2, zoom: number): Vector2 {
-  const rect = canvas.getBoundingClientRect();
+export function clientToCombatWorld(client: {x:number;y:number}, canvas: CombatCanvas, camera: Vector2, zoom: number): Vector2 {
+  return clientToCombatWorldAtRect(client, canvas, canvas.getBoundingClientRect(), camera, zoom);
+}
+/** Same arithmetic in a Worker or an already-sampled RAF: no DOM method call. */
+export function clientToCombatWorldInViewport(client: {x:number;y:number}, viewport: CombatViewport, camera: Vector2, zoom: number): Vector2 {
+  return clientToCombatWorldAtRect(client, viewport, viewport.rect, camera, zoom);
+}
+function clientToCombatWorldAtRect(client: {x:number;y:number}, canvas: Pick<CombatCanvas, 'width'|'height'>,
+  rect: CombatViewport['rect'], camera: Vector2, zoom: number): Vector2 {
   if (!(rect.width > 0 && rect.height > 0 && zoom > 0)) return camera.clone();
   return new Vector2(((client.x - rect.left) * canvas.width / rect.width - canvas.width / 2) / zoom + camera.x,
     ((client.y - rect.top) * canvas.height / rect.height - canvas.height / 2) / zoom + camera.y);

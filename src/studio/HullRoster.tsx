@@ -2,7 +2,7 @@ import { HullInspection } from './HullInspection';
 import { RefitHint } from './RefitHint';
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import { NativeButton } from '../ui/NativeChrome';
-import { runtimeAssetUrl } from '../engine/runtime/RuntimePaths';
+import { AssemblyThumbnail } from '../ui/core/AssemblyThumbnail';
 import type { ShipSpec } from '../engine/content/ShipSpec';
 import { data, hulls, nativeRefit } from './DesignModel';
 import type { Design } from './DesignModel';
@@ -77,8 +77,8 @@ export function HullRoster({ draft, spec, filter, onFilter, readScrollPosition, 
         return <HullInspection key={h.id} spec={h} enabled={!inert} unavailable={unavailable}><button type="button" data-hull-id={h.id} className={'refit-roster-ship ' + (active ? 'is-current' : '')}
           disabled={!!unavailable}
           aria-pressed={active} aria-label={'改装' + data.ships[h.id].name + '级'} onClick={() => {if (!active) onHull(h.id);}}>
-          {/* Keep one image and sizing rule across selection; the detailed fitted ship belongs to the central stage. */}
-          <img loading="lazy" draggable={false} className="refit-roster-thumbnail" src={runtimeAssetUrl(h.spriteUrl)} alt="" />
+          {/* Keep one assembly viewport and sizing rule across selection; equipment stays on the central stage. */}
+          <AssemblyThumbnail spec={h} className="refit-roster-thumbnail" />
           <span><strong>{data.ships[h.id].name}</strong><small>{data.ships[h.id].designation}{active ? ' · 改装中' : ''}</small>
             {!!h.modules?.length && <small className="refit-assembly-label">{hullAssemblyLabel(h)} · {h.modules.length} 模块</small>}
             {unavailable && <small className="refit-approx-label">{unavailable}</small>}

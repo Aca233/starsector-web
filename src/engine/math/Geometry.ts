@@ -11,7 +11,7 @@ export interface PolygonHitResult {
 /**
  * 点在多边形内判定 (Point in Polygon - 射线法)
  */
-export function isPointInPolygon(p: { x: number; y: number }, polygon: [number, number][]): boolean {
+export function isPointInPolygon(p: { x: number; y: number }, polygon: readonly (readonly [number, number])[]): boolean {
   if (!polygon || polygon.length < 3) return false;
   const indexed = indexedPointContains(p, polygon);
   if (indexed !== undefined) return indexed;

@@ -170,6 +170,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
           } : undefined}
           onActivateSystem={onShipCommand ? value => onShipCommand({ kind: 'system', value }) : undefined}
           onToggleRecall={onShipCommand ? () => onShipCommand({ kind: 'recall' }) : undefined}
+          onSelectModule={onShipCommand ? value => onShipCommand({kind:'module',value}) : undefined}
         />
       </div>
 
@@ -196,7 +197,8 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
           defaultMouseSteering={defaultMouseSteering}
           onDefaultMouseSteeringChange={onDefaultMouseSteeringChange}
           hasSystem={player.systems.some(system => system.available)}
-          hasShield={player.shield.type !== "NONE" || player.defenseSystem.type !== "NONE"}
+          hasShield={player.shield.type !== "NONE"}
+          hasRightClickSystem={player.defenseSystem.type !== "NONE"}
           hasFighters={[...engine.playerWings, ...engine.enemyWings].some(wing => wing.carrierId === player.id)}
           canRestart={canRestart}
           onClose={() => setShowHelpDrawer(false)}

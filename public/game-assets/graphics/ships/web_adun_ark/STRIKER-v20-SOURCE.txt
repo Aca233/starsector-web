@@ -1,0 +1,8 @@
+striker-v20.png: new AI-generated Web-adaptation strike drone, not a Blizzard canonical model.
+Generated 2026-09-28 using the user's configured local gpt-image-2.5 endpoint.
+Source prompt and original PNG: output/imagegen/ark-striker-v20/.
+Actual output: 1254 x 1254 RGBA. Runtime pack: 256 x 224 RGBA; alpha retained.
+Pixel registration and packing recipe: scripts/pack-adun-aircraft.py.
+This provenance applies only to striker-v20.png, not the other files in this directory.
+Native torpedoray32.png / engineglow32.png / beam textures remain original Starsector assets;
+this work does not relicense the game's assets or the separate CC-BY-NC model.

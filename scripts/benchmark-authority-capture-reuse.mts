@@ -1,3 +1,4 @@
+import {isAuthoritySnapshotBlocked} from '../src/network/AuthorityIoAdmission.mjs';
 // Same-world paired measurement of the actual pre-change/current host snapshot().
 // Forces asynchronous credit returns; this is dispatch CPU cost, NOT network Hz.
 import fs from 'node:fs';
@@ -9,7 +10,7 @@ import ts from 'typescript';
 import {transform} from 'esbuild';
 import {createLanWorld} from '../src/network/LanWorld';
 import {assetManager} from '../src/engine/assets/AssetResolver';
-import {captureAuthorityCombat, configureHostCosmetics} from '../src/network/HostSnapshot';
+import {captureAuthorityCombat, captureLanDisplayCombat, configureHostCosmetics} from '../src/network/HostSnapshot';
 import {encodeProjectedBinaryFrame, decodeBinaryFrame, ProjectionEncodingCache} from '../src/network/BinarySnapshot.mjs';
 const root=path.resolve('public');
 globalThis.fetch=async(input:any)=>{const p=path.resolve(root,String(input).replace(/^\//,''));if(!p.startsWith(root+path.sep))throw Error('Outside assets');return new Response(fs.readFileSync(p));};
@@ -28,8 +29,9 @@ async function fixture(file:string){
  const code=(await transform(ast.statements.filter(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='snapshot').map(n=>n.getText(ast)).join('\n'),{loader:'ts',target:'es2022',define:{'import.meta.env':'{}'}})).code;
  const received:any[]=[];let captureCount=0;
  const receive=(m:any,transfer:any[]=[])=>received.push(structuredClone(m,{transfer}));
- const c:any={running:true,snapshotEncoderWorker:null,flushSnapshotEncoding(){},cancelSnapshotEncoding(){},consumeSnapshotSounds(queue:any[],through:number){while(queue.length&&queue[0].id<=through)queue.shift();},ProjectionEncodingCache,encodedFragmentReuses:0,pollIoCompletion(){},tick:600,lastSnapshotTick:599,directLastTick:599,snapshotInFlight:599,directInFlight:null,directIo:{postMessage:receive},directReady:true,directLaunched:true,directSequence:0,directAttempt:0,directRetryAt:0,engine,muzzleEvents:muzzle,compactParticles:true,capturedFrame:null,captures:0,captureReuses:0,elapsedCost:0,samples:0,captureMs:0,encodeMs:0,
+ const c:any={directAdmission:null,isAuthoritySnapshotBlocked,ioStats:{preflightSkips:0},running:true,snapshotEncoderWorker:null,flushSnapshotEncoding(){},cancelSnapshotEncoding(){},consumeSnapshotSounds(queue:any[],through:number){while(queue.length&&queue[0].id<=through)queue.shift();},ProjectionEncodingCache,encodedFragmentReuses:0,pollIoCompletion(){},tick:600,lastSnapshotTick:599,directLastTick:599,snapshotInFlight:599,directInFlight:null,directIo:{postMessage:receive},directReady:true,directLaunched:true,directSequence:0,directAttempt:0,directRetryAt:0,engine,muzzleEvents:muzzle,compactParticles:true,capturedFrame:null,captures:0,captureReuses:0,elapsedCost:0,samples:0,captureMs:0,encodeMs:0,
  controls:new Map(Array.from({length:5},(_,i)=>[i,{acknowledged:0}])),performance:{now:()=>0},LAN_SNAPSHOT_HZ:60,measureClock(){},realtimeRatio:1,combatRate:1,sounds:[],networkSounds:[],authoritySummaryShips:null,binarySnapshots:true,visualEnabled:false,snapshotEncoder:new TextEncoder(),encodeProjectedBinaryFrame,snapshotFlow:{count(){}},send:receive,
+ captureLanDisplayCombat:(...a:any[])=>{captureCount++;return (captureLanDisplayCombat as any)(...a);},
  captureAuthorityCombat:(...a:any[])=>{captureCount++;return (captureAuthorityCombat as any)(...a);}};
  vm.createContext(c);vm.runInContext(code,c);
  return {file,sourceHash:sha(source),c,received,get captures(){return captureCount;},run(order:number){

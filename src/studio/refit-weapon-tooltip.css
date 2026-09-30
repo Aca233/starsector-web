@@ -57,3 +57,10 @@
 .refit-vessel .studio-ship--assembly .studio-mount { --mount-size:12px; }
 .refit-vessel .studio-ship--assembly .studio-mount--medium { --mount-size:18px; }
 .refit-vessel .studio-ship--assembly .studio-mount--large { --mount-size:24px; }
+
+/* Web fourth weapon size; existing native sizes unchanged. */
+.refit-vessel .studio-ship .studio-mount--extra_large { --mount-size: 50px; }
+.refit-vessel .studio-ship--assembly .studio-mount--extra_large { --mount-size: 30px; }
+
+.refit-weapon-size-filter { display: flex; align-items: center; gap: 8px; color: #abc6cf; }
+.refit-weapon-size-filter select { min-width: 0; flex: 1; background: #07131a; color: #c9e4ed; border: 1px solid #365766; padding: 4px 6px; font: inherit; }

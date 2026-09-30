@@ -6,8 +6,13 @@ import {prepareAuthoritySnapshot} from '../server/authority-snapshot.mjs';
 import {decodeBinaryState} from '../src/network/BinarySnapshot.mjs';
 import {summarizeCombatFrame} from '../server/lan-state.mjs';
 
-const base=path.resolve('artifacts/server-authority-20260920');
-const factory=createAuthorityFactory({workerFile:path.join(base,'runtime/authority-worker.mjs'),assets:path.resolve('public'),maxBattles:1});
+const args=process.argv.slice(2),option=(name,fallback)=>{const i=args.indexOf(name);return i<0?fallback:args[i+1];};
+const base=path.resolve(option('--out','artifacts/server-authority-20260920'));
+const runtime=path.resolve(option('--runtime',path.join(base,'runtime')));
+const displayVersion=Number(option('--display-version','1'));
+assert.ok([1,2].includes(displayVersion),'Expected display version 1 or 2');
+await fs.mkdir(base,{recursive:true});
+const factory=createAuthorityFactory({workerFile:path.join(runtime,'authority-worker.mjs'),assets:path.resolve('public'),maxBattles:1});
 const match={id:'summary-differential',hostId:'a',authority:'server',seed:1511506142,snapshotHz:60,
   players:[{id:'a',name:'a',seat:0,team:0,hull:'onslaught'},{id:'b',name:'b',seat:1,team:1,hull:'onslaught'}],
   options:{assignment:'teams',battleSize:3200,aiHulls:[Array(7).fill('hammerhead'),Array(7).fill('hammerhead')]}};
@@ -24,6 +29,8 @@ try{
       const fast=prepareAuthoritySnapshot(m,match.id,checked,16,lastTick);
       assert.equal(fast.frame,undefined);
       const frame=decodeBinaryState(fast.bytes).frame;
+      assert.equal(frame.displayVersion,displayVersion);
+      if(displayVersion===2)assert.ok(frame.displayDefinitions?.length);
       assert.deepEqual(fast.summary,summarizeCombatFrame(frame,16,lastTick));
       if(frame.muzzleEvents?.events.length)muzzleFrames++;
       checked++;lastTick=m.tick;
@@ -31,6 +38,6 @@ try{
       if(m.tick>=1200){assert.ok(checked>200);assert.ok(muzzleFrames>0,'AI weapon event windows must be covered');resolve();}
     }catch(error){reject(error);}});
   });
-  const result={passed:true,ships:16,checked,lastTick,muzzleFrames,scope:'Real authority Worker differential validation; not a performance benchmark.'};
+  const result={passed:true,displayVersion,ships:16,checked,lastTick,muzzleFrames,scope:'Real authority Worker differential validation; not a performance benchmark.'};
   await fs.writeFile(path.join(base,'summary-worker-results.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
 }finally{clearTimeout(timer);await factory.close();assert.equal(factory.activeCount(),0);}

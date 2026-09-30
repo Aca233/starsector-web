@@ -79,13 +79,16 @@ export function dischargeEmpEmitter(source: Ship, world: SystemWorld, state: Sta
     if (p.hitpoints<=0) {const i=world.projectiles?.indexOf(p) ?? -1;if(i>=0)world.projectiles!.splice(i,1);}
   } else if (target.ship && !target.ship.isPhased) {
     const ship=target.ship;
+    let remainder=1;
     if (target.shield) {
-      const flux=ship.shield.absorbDamage(damage*ship.crDamageTakenMultiplier*ship.system.getShieldDamageMultiplier(),'ENERGY',point.clone().sub(ship.getShieldCenter()).heading());
-      ship.flux.increaseShieldFlux(flux,true);
-    } else if (target.local) {
-      const result=ship.armor.takeDamage(target.local,damage*ship.crDamageTakenMultiplier,'ENERGY');
+      const impact=ship.shield.absorbImpact(damage*ship.crDamageTakenMultiplier*ship.system.getShieldDamageMultiplier(),'ENERGY',point.clone().sub(ship.getShieldCenter()).heading());
+      ship.flux.increaseShieldFlux(impact.flux,true); remainder=impact.remainingFraction;
+    }
+    const local=target.local??point.clone().sub(ship.pos).rotate(-ship.facingRad);
+    if(remainder>0) {
+      const result=ship.armor.takeDamage(local,damage*remainder*ship.crDamageTakenMultiplier,'ENERGY');
       ship.applyHullDamage(result.hullDamage);
-      applyComponentDamage(ship,target.local,result,500,source);
+      applyComponentDamage(ship,local,result,500*remainder,source);
     }
   }
 }

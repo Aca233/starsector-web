@@ -1,3 +1,4 @@
+import { WEAPON_SIZES, weaponFitsSlotSize } from '../content/WeaponSizes';
 import { defenseSystemId, tacticalSystemIds, systemLoadoutErrors } from '../extensions/ship-systems/Loadout';
 import { weaponFitsSlotType } from '../content/WeaponCompatibility';
 import { validateResources } from '../extensions/Dependencies';
@@ -22,7 +23,7 @@ const SHIELD_TYPES = new Set(['NONE', 'FRONT', 'OMNI', 'PHASE']);
 const MOUNT_TYPES = new Set(['TURRET', 'HARDPOINT', 'HIDDEN']);
 const WEAPON_TYPES = new Set(['BALLISTIC', 'ENERGY', 'MISSILE']);
 const SLOT_WEAPON_TYPES = new Set([...WEAPON_TYPES, 'HYBRID', 'COMPOSITE', 'SYNERGY', 'UNIVERSAL', 'BUILT_IN']);
-const SLOT_SIZES = new Set(['SMALL', 'MEDIUM', 'LARGE']);
+const SLOT_SIZES: ReadonlySet<string> = new Set(WEAPON_SIZES);
 const ENGINE_STYLES = new Set(['LOW_TECH', 'HIGH_TECH', 'MIDLINE']);
 
 function object(value: unknown, label: string): Record<string, unknown> {
@@ -87,7 +88,7 @@ function validateWeaponVisual(input: unknown, id: string): void {
 function validateShipVisual(input: unknown, id: string): void {
   const p = object(input, id + '.visualProfile');
   for (const key of ['hullTint','phaseColor','overloadColor']) { colorTuple(p[key], id + '.' + key, 3); for (const c of p[key] as number[]) finite(c, id + '.' + key, 0, 1); }
-  const shields = new Set(['lowTech','highTech','fortress']);
+  const shields = new Set(['lowTech','highTech','fortress','void','arkFighter']);
   enumValue(p.shieldProfile, id + '.shieldProfile', shields);
   if (p.fortressShieldProfile !== undefined) enumValue(p.fortressShieldProfile, id + '.fortressShieldProfile', shields);
   const vent = object(p.vent, id + '.vent');
@@ -103,6 +104,7 @@ export function validateWeaponSpec(input: unknown, requireBundledAssets = assetM
   if (spec.impactFamily !== undefined) enumValue(spec.impactFamily, id + '.impactFamily', new Set(['ENERGY','BALLISTIC','FRAGMENTATION','ROCKET','HEAVY_TORPEDO']));
   enumValue(spec.type, `${id}.type`, new Set(['KINETIC', 'HIGH_EXPLOSIVE', 'ENERGY', 'FRAGMENTATION']));
   enumValue(spec.mountSize, `${id}.mountSize`, SLOT_SIZES);
+  if (spec.mountSize === 'EXTRA_LARGE' && spec.systemOnly !== true) finite(spec.ordnancePointCost, `${id}.ordnancePointCost (XL requires authored OP)`, 1);
   if (spec.weaponType !== undefined) enumValue(spec.weaponType, `${id}.weaponType`, WEAPON_TYPES);
   if (spec.mountTypeOverride !== undefined) enumValue(spec.mountTypeOverride, `${id}.mountTypeOverride`, new Set([...SLOT_WEAPON_TYPES].filter(type => type !== "BUILT_IN")));
   if (spec.aiHints !== undefined && (!Array.isArray(spec.aiHints) || spec.aiHints.some(hint => typeof hint !== 'string' || !/^[A-Z][A-Z0-9_]*$/.test(hint)))) throw new Error(`${id}.aiHints 必须为原版提示名称数组`);
@@ -118,6 +120,10 @@ export function validateWeaponSpec(input: unknown, requireBundledAssets = assetM
   }
   for (const key of ['launchSpeed', 'flightTime', 'armingTime', 'missileDeceleration', 'maxTurnAcceleration', 'autofireAccuracyBonus', 'eccmChanceBonus', 'missileGuidanceBonus', 'projectileSpeedBonusPercent'] as const) {
     if (spec[key] !== undefined) finite(spec[key], `${id}.${key}`, 0);
+  }
+  if (spec.fireRecoilSpeed !== undefined) {
+    finite(spec.fireRecoilSpeed, id + '.fireRecoilSpeed', 0, 100);
+    if (spec.isBeam || spec.spawnType === 'BEAM') throw new Error(id + ': firing recoil requires a solid projectile');
   }
   // Native hit-glow radii may be negative (projectile disable / beam auto).
   if (spec.hitGlowRadius !== undefined) finite(spec.hitGlowRadius, `${id}.hitGlowRadius`);
@@ -141,6 +147,17 @@ export function validateWeaponSpec(input: unknown, requireBundledAssets = assetM
     if (spec[key] !== undefined && typeof spec[key] !== 'boolean') throw new Error(`${id}.${key} 必须是布尔值`);
   }
   if (spec.spawnType !== undefined) enumValue(spec.spawnType, `${id}.spawnType`, new Set(['BALLISTIC', 'BALLISTIC_AS_BEAM', 'PLASMA', 'MISSILE', 'BEAM']));
+  if (spec.gravityTractor !== undefined || spec.gravityDeflector !== undefined) {
+    if (spec.gravityTractor && spec.gravityDeflector) throw new Error(id+': mutually exclusive gravity controllers');
+    if (spec.isBeam || spec.isRocket || Number(spec.damagePerShot)!==0 || Number(spec.damagePerSecond)!==0) throw new Error(id+': gravity controller cannot emit damage');
+    const controller=object(spec.gravityTractor ?? spec.gravityDeflector,id+'.gravityController');
+    const keys=spec.gravityTractor?['captureTime','projectileCaptureTime','holdTime','recovery','anchorSpeed','strength','damping','fluxPerSecond']:['impulse','budgetPerSecond','fluxPerUse','interval'];
+    for (const key of keys) finite(controller[key],id+'.gravityController.'+key,.001,10000);
+    if (spec.gravityTractor) finite(controller.holdTime,id+'.gravityTractor.holdTime',.01,10);
+    if (spec.gravityTractor) for (const key of ['tidalDamagePerSecond','tidalFluxPerSecond']) {
+      if (controller[key] !== undefined) finite(controller[key],id+'.gravityController.'+key,.001,10000);
+    }
+  }
   if (spec.visualSpawnType !== undefined) enumValue(spec.visualSpawnType, `${id}.visualSpawnType`, new Set(['BALLISTIC', 'BALLISTIC_AS_BEAM', 'PLASMA', 'MISSILE', 'BEAM']));
   if (spec.beamVisualMode !== undefined) enumValue(spec.beamVisualMode, `${id}.beamVisualMode`, new Set(['BURST', 'SUSTAINED']));
   if (spec.textureType !== undefined) enumValue(spec.textureType, `${id}.textureType`, new Set(['ROUGH', 'SMOOTH']));
@@ -229,6 +246,12 @@ export function validateWeaponSpec(input: unknown, requireBundledAssets = assetM
     }
   }
 
+  if ([spec.spriteWidth, spec.spriteHeight, spec.spritePivotX, spec.spritePivotY].some(v => v !== undefined)) {
+    finite(spec.spriteWidth, id + '.spriteWidth', .01, 8192);
+    finite(spec.spriteHeight, id + '.spriteHeight', .01, 8192);
+    finite(spec.spritePivotX, id + '.spritePivotX', 0, 1);
+    finite(spec.spritePivotY, id + '.spritePivotY', 0, 1);
+  }
   const assetFields = ['turretSpriteUrl', 'turretGunSpriteUrl', 'hardpointSpriteUrl', 'hardpointGunSpriteUrl', 'glowSpriteUrl', 'hardpointGlowSpriteUrl', 'projSpriteUrl'] as const;
   for (const field of assetFields) {
     const value = spec[field];
@@ -236,7 +259,7 @@ export function validateWeaponSpec(input: unknown, requireBundledAssets = assetM
   }
 }
 
-function validateWeaponSlot(slotInput: unknown, shipId: string, index: number): WeaponMountSlotConfig {
+function validateWeaponSlot(slotInput: unknown, shipId: string, index: number, requireAssets = false): WeaponMountSlotConfig {
   const slot = object(slotInput, `${shipId}.weaponSlots[${index}]`);
   const prefix = `${shipId}.weaponSlots[${index}]`;
   text(slot.slotId, `${prefix}.slotId`);
@@ -249,12 +272,48 @@ function validateWeaponSlot(slotInput: unknown, shipId: string, index: number): 
   finite(slot.arcDeg, `${prefix}.arcDeg`, 0, 360);
   if (slot.defaultWeaponId !== undefined) text(slot.defaultWeaponId, `${prefix}.defaultWeaponId`);
   if (slot.builtIn !== undefined && typeof slot.builtIn !== "boolean") throw new Error(`${prefix}.builtIn 必须是布尔值`);
+  if (slot.controlRole !== undefined) enumValue(slot.controlRole, prefix + '.controlRole', new Set(['POINT_DEFENSE', 'AXIAL']));
+  if (slot.controlRole !== undefined && (slot.builtIn !== true || !slot.defaultWeaponId)) throw new Error(prefix + ': controlRole requires a built-in binding');
+  if (slot.controlRole === 'AXIAL' && slot.mountType !== 'HARDPOINT') throw new Error(prefix + ': axial control requires a fixed hardpoint');
+  if (slot.renderLayer !== undefined) enumValue(slot.renderLayer, prefix + '.renderLayer', new Set(['ABOVE_HULL', 'BELOW_HULL']));
+  if (slot.renderLayer === 'BELOW_HULL' && (slot.mountType === 'HIDDEN' || slot.builtIn !== true || !slot.defaultWeaponId)) {
+    throw new Error(prefix + ': below-hull v1 requires a visible built-in weapon binding');
+  }
+  if (slot.installation !== undefined) {
+    const art = object(slot.installation, prefix + '.installation');
+    if (art.version !== 1) throw new Error(prefix + ': unsupported installation version');
+    if (slot.mountType === 'HIDDEN') throw new Error(prefix + ': hidden mounts cannot have visible bearings');
+    requireAsset(text(art.spriteUrl, prefix + '.installation.spriteUrl'), prefix + '.installation.spriteUrl', requireAssets);
+    finite(art.width, prefix + '.installation.width', .01, 8192);
+    finite(art.height, prefix + '.installation.height', .01, 8192);
+    finite(art.pivotX, prefix + '.installation.pivotX', 0, 1);
+    finite(art.pivotY, prefix + '.installation.pivotY', 0, 1);
+    finite(art.angleDeg, prefix + '.installation.angleDeg', -360, 360);
+    if (art.foreground !== undefined) {
+      const front = object(art.foreground, prefix + '.installation.foreground');
+      const field = prefix + '.installation.foreground.';
+      requireAsset(text(front.spriteUrl, field + 'spriteUrl'), field + 'spriteUrl', requireAssets);
+      finite(front.width, field + 'width', .01, 8192);
+      finite(front.height, field + 'height', .01, 8192);
+      finite(front.pivotX, field + 'pivotX', 0, 1);
+      finite(front.pivotY, field + 'pivotY', 0, 1);
+    }
+  }
   return slot as unknown as WeaponMountSlotConfig;
 }
 
 function validateEngineSlot(slotInput: unknown, shipId: string, index: number): EngineSlotConfig {
   const slot = object(slotInput, `${shipId}.engineSlots[${index}]`);
   const prefix = `${shipId}.engineSlots[${index}]`;
+  if (slot.exhaust !== undefined) {
+    const exhaust = object(slot.exhaust, prefix + '.exhaust');
+    enumValue(exhaust.mode, prefix + '.exhaust.mode', new Set(['NATIVE', 'HIDDEN']));
+    if (exhaust.mode === 'NATIVE' && exhaust.envelopeWidth !== undefined) finite(exhaust.envelopeWidth, prefix + '.exhaust.envelopeWidth', .01, 1000);
+  }
+  if (slot.maneuver !== undefined) {
+    if (!Array.isArray(slot.maneuver) || slot.maneuver.length !== 3 || slot.systemActivated) throw new Error(prefix + ': invalid reaction jet');
+    slot.maneuver.forEach((v, i) => finite(v, prefix + '.maneuver[' + i + ']', -1, 1));
+  }
   finite(slot.x, `${prefix}.x`);
   finite(slot.y, `${prefix}.y`);
   finite(slot.angleDeg, `${prefix}.angleDeg`, -360, 360);
@@ -269,6 +328,7 @@ export function validateShipSpec(input: unknown, options: ShipValidationOptions 
   if (graph.depth > 8 || ++graph.count > 128) throw new Error('Module graph exceeds 8 levels / 128 entities');
   const registry = options.registry ?? contentRegistry;
   const spec = object(input, '舰船规格');
+  if (spec.inheritParentEngineCommands !== undefined && typeof spec.inheritParentEngineCommands !== 'boolean') throw new Error('Invalid parent engine command flag');
   if (spec.moduleCombat !== undefined && typeof spec.moduleCombat !== 'boolean') throw new Error('Invalid active module flag');
   if (spec.isModuleHull !== undefined && typeof spec.isModuleHull !== 'boolean') throw new Error('Invalid module hull flag');
   if (spec.moduleAnchor !== undefined) {
@@ -297,6 +357,17 @@ export function validateShipSpec(input: unknown, options: ShipValidationOptions 
       try { validateShipSpec(module.spec, { ...options, allowExistingId: true }, graph); } finally { graph.depth--; }
     }
   }
+  if (spec.modulePropulsion !== undefined) {
+    const drive = object(spec.modulePropulsion, 'modulePropulsion');
+    if (!Array.isArray(drive.slotIds) || !drive.slotIds.length || drive.slotIds.length > 64) throw new Error('Invalid propulsion module slots');
+    const seen = new Set<string>();
+    for (const value of drive.slotIds) {
+      const slotId = text(value, 'modulePropulsion.slotId');
+      if (!moduleSlots.has(slotId) || seen.has(slotId)) throw new Error('Missing/duplicate propulsion module slot: ' + slotId);
+      seen.add(slotId);
+    }
+    for (const key of ['reserveSpeed', 'reserveAcceleration', 'reserveTurn']) finite(drive[key], 'modulePropulsion.' + key, 0, 1);
+  }
   if (spec.overloadColor !== undefined) colorTuple(spec.overloadColor, '舰船规格.overloadColor', 3);
   const id = text(spec.id, 'ship.id');
   if (spec.sourceHullId !== undefined && !/^[A-Za-z0-9._-]+$/.test(text(spec.sourceHullId, 'ship.sourceHullId'))) throw new Error('Invalid source hull identity');
@@ -318,6 +389,13 @@ export function validateShipSpec(input: unknown, options: ShipValidationOptions 
   integer(spec.armorRows, `${id}.armorRows`, 1, 256);
   finite(spec.shieldArcDeg, `${id}.shieldArcDeg`, 0, 360);
   enumValue(spec.shieldType, `${id}.shieldType`, SHIELD_TYPES);
+  if (spec.voidShield !== undefined) {
+    const screen = object(spec.voidShield, id + '.voidShield');
+    integer(screen.layers, id + '.voidShield.layers', 1, 8);
+    for(const key of ['integrityPerLayer','rechargePerSecond']) finite(screen[key], id + '.voidShield.' + key, .001, 1000000);
+    for(const key of ['hitDelay','restartDelay']) finite(screen[key], id + '.voidShield.' + key, 0, 3600);
+    if(spec.isModuleHull || spec.shieldType !== 'OMNI' || spec.shieldArcDeg !== 360) throw new Error(id + ': virtual screen requires a full-circle root shield');
+  }
   validateStrings(spec.i18n);
   if (spec.visualProfile !== undefined) validateShipVisual(spec.visualProfile, id);
   if (spec.debrisColor !== undefined) colorTuple(spec.debrisColor, id + '.debrisColor', 3);
@@ -380,7 +458,7 @@ export function validateShipSpec(input: unknown, options: ShipValidationOptions 
   if (!Array.isArray(spec.weaponSlots)) throw new Error(`${id}.weaponSlots 必须是数组`);
   if (!Array.isArray(spec.engineSlots)) throw new Error(`${id}.engineSlots 必须是数组`);
   if (!Array.isArray(spec.bounds) || spec.bounds.length < 3) throw new Error(`${id}.bounds 至少需要 3 个顶点`);
-  const slots = spec.weaponSlots.map((slot, index) => validateWeaponSlot(slot, id, index));
+  const slots = spec.weaponSlots.map((slot, index) => validateWeaponSlot(slot, id, index, requireAssets));
   if (spec.deploymentPoints !== undefined && finite(spec.deploymentPoints, id + '.deploymentPoints', 0) <= 0) throw new Error(id + ': deployment points must be positive');
   if (spec.deploymentCRCost !== undefined && (typeof spec.deploymentCRCost !== 'number' || !Number.isFinite(spec.deploymentCRCost) || spec.deploymentCRCost < 0 || spec.deploymentCRCost > 1)) throw new Error(id + ': invalid deployment CR cost');
   if (spec.decorativeWeapons !== undefined) {
@@ -396,7 +474,7 @@ export function validateShipSpec(input: unknown, options: ShipValidationOptions 
     // Native hulls such as heron reuse an ordinary ID in the independent SYSTEM slot list.
     const ids = new Set<string>();
     for (const [index, value] of spec.systemWeaponSlots.entries()) {
-      const slot = validateWeaponSlot(value, id + ' system', index);
+      const slot = validateWeaponSlot(value, id + ' system', index, requireAssets);
       if (ids.has(slot.slotId) || slot.defaultWeaponId) throw new Error(`${id}: invalid system slot ${slot.slotId}`);
       ids.add(slot.slotId);
     }
@@ -415,12 +493,17 @@ export function validateShipSpec(input: unknown, options: ShipValidationOptions 
     if (!slot.defaultWeaponId) continue;
     const weapon = options.additionalWeapons?.get(slot.defaultWeaponId) ?? registry.getWeapon(slot.defaultWeaponId);
     if (!weapon) throw new Error(`${id}.${slot.slotId} 引用了不存在的武器: ${slot.defaultWeaponId}`);
+    if (slot.controlRole !== undefined && (weapon.spawnType !== 'BALLISTIC' || weapon.isBeam || weapon.isRocket || weapon.weaponType !== 'BALLISTIC')) throw new Error(`${id}.${slot.slotId}: control roles v1 require ordinary ballistic weapons`);
+    if (slot.controlRole === 'POINT_DEFENSE' && (!weapon.isPointDefense && !weapon.aiHints?.includes('PD')) ) throw new Error(`${id}.${slot.slotId}: local PDC needs point-defense capability`);
+    if (slot.controlRole === 'POINT_DEFENSE' && weapon.aiHints?.includes('PD_ONLY')) throw new Error(`${id}.${slot.slotId}: local PDC must also be able to suppress hulls`);
+    if (slot.renderLayer === 'BELOW_HULL' && (weapon.spawnType !== 'BALLISTIC' || (weapon.visualSpawnType !== undefined && weapon.visualSpawnType !== 'BALLISTIC') || weapon.isBeam || weapon.isRocket || weapon.weaponType !== 'BALLISTIC')) {
+      throw new Error(`${id}.${slot.slotId}: below-hull v1 supports ordinary ballistic guns, not beams, missiles or special rays`);
+    }
     if (!weaponFitsSlotType(slot.weaponType, weapon)) {
       throw new Error(`${id}.${slot.slotId} 不能装配 ${weapon.weaponType} 武器`);
     }
-    const sizeRank: Record<string, number> = { SMALL: 1, MEDIUM: 2, LARGE: 3 };
-    if (sizeRank[weapon.mountSize] > sizeRank[slot.slotSize]) {
-      throw new Error(`${id}.${slot.slotId} 挂点尺寸 ${slot.slotSize} 无法容纳武器 ${weapon.id} (${weapon.mountSize})`);
+    if (!weaponFitsSlotSize(slot.slotSize, weapon.mountSize)) {
+      throw new Error(`${id}.${slot.slotId} 挂点尺寸 ${slot.slotSize} 无法容纳武器 ${weapon.id} (${weapon.mountSize})：挂点与武器尺寸必须一致`);
     }
   }
 

@@ -1,3 +1,4 @@
+import { WEAPON_SIZES, isWeaponSize, weaponFitsSlotSize, type WeaponSize } from '../engine/content/WeaponSizes';
 import { RefitHint } from './RefitHint';
 import { useDwellHover } from './useDwellHover';
 import { DwellScope, DwellStatus } from './DwellTooltip';
@@ -60,6 +61,7 @@ export function SourceWeaponPicker({
   const [advanced, setAdvanced] = useState(false);
   const [messageLibrary, setMessageLibrary] = useState(false);
   const [enabledType, setEnabledType] = useState("ALL");
+  const [enabledSize, setEnabledSize] = useState<WeaponSize | "ALL">("ALL");
   const [affordableOnly, setAffordableOnly] = useState(false);
   const [faction, setFaction] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
@@ -75,7 +77,7 @@ export function SourceWeaponPicker({
   const canAfford = (w: WeaponSpec) => costOf(w) <= budgetHere;
   const relevantTypes = weaponTypes.filter(type => compatible.some(w => w.weaponType === type));
   const matchingWeapons = compatible
-    .filter(w => (enabledType === "ALL" || w.weaponType === enabledType) && (!affordableOnly || canAfford(w)) && matchesRefitSearch(search, weaponName(w.id), w.id, metadata[w.id]?.role ?? ""));
+    .filter(w => (enabledSize === "ALL" || w.mountSize === enabledSize) && (enabledType === "ALL" || w.weaponType === enabledType) && (!affordableOnly || canAfford(w)) && matchesRefitSearch(search, weaponName(w.id), w.id, metadata[w.id]?.role ?? ""));
   const available = matchingWeapons.filter(w => matchesFaction(faction, factionIndex.weaponFactions[w.id]))
     .sort((a, b) => refitSearchRank(search, weaponName(a.id), a.id) - refitSearchRank(search, weaponName(b.id), b.id)
       || Number(canAfford(b)) - Number(canAfford(a))
@@ -92,7 +94,7 @@ export function SourceWeaponPicker({
     setEnabledType(type === enabledType ? "ALL" : type);
     hidePreview();
   };
-  const resetFilters = () => { setSearch(""); setEnabledType("ALL"); setAffordableOnly(false); setFaction(""); hidePreview(); searchRef.current?.focus(); };
+  const resetFilters = () => { setSearch(""); setEnabledSize("ALL"); setEnabledType("ALL"); setAffordableOnly(false); setFaction(""); hidePreview(); searchRef.current?.focus(); };
   useEffect(() => { if (advanced) searchRef.current?.focus({preventScroll: true}); }, [advanced]);
   useEffect(() => {
     const panel = ref.current?.closest<HTMLElement>(".ui-modal");
@@ -247,7 +249,7 @@ export function SourceWeaponPicker({
         <span className="source-weapon-row-info">
           <strong><NativeBitmapText font="body" color="currentColor">{weaponName(w.id)}</NativeBitmapText></strong>
           <span>
-            {metadata[w.id]?.role || damageNames[w.type]}，射程 {number(rangeOf(w))}
+            {sizes[w.mountSize]} · {metadata[w.id]?.role || damageNames[w.type]}，射程 {number(rangeOf(w))}
           </span>
           <span className="source-weapon-stock">
             {current
@@ -319,13 +321,22 @@ export function SourceWeaponPicker({
                 onKeyDown={e => {if (e.key === "ArrowDown") {e.preventDefault(); ref.current?.querySelector<HTMLButtonElement>('[data-weapon-choice]')?.focus();}}} />
               {search && <button type="button" className="refit-search-clear" aria-label="清空武器搜索" onClick={() => {setSearch("");hidePreview();searchRef.current?.focus();}}>×</button>}
             </div>
+            <label className="refit-weapon-size-filter">尺寸
+              <select aria-label="武器尺寸筛选" value={enabledSize} onChange={e => {
+                const value = e.target.value;
+                if (value === "ALL" || isWeaponSize(value)) { setEnabledSize(value); hidePreview(); }
+              }}>
+                <option value="ALL">{sizes[selected.slotSize]}（仅限同尺寸）</option>
+                {WEAPON_SIZES.map(size => <option key={size} value={size} disabled={!weaponFitsSlotSize(selected.slotSize, size)}>{sizes[size]}</option>)}
+              </select>
+            </label>
             <FactionFilter label="武器势力筛选" value={faction} onChange={value => {setFaction(value); hidePreview();}}
               memberships={matchingWeapons.map(w => factionIndex.weaponFactions[w.id] ?? [])} />
             <div className="refit-weapon-filter-meta"><label><input type="checkbox" checked={affordableOnly} onChange={e => {setAffordableOnly(e.target.checked); hidePreview();}} />只看 OP 够用</label>
-              {(search || enabledType !== "ALL" || affordableOnly || faction) && <button type="button" onClick={resetFilters}>重置</button>}
+              {(search || enabledSize !== "ALL" || enabledType !== "ALL" || affordableOnly || faction) && <button type="button" onClick={resetFilters}>重置</button>}
             </div>
-            <p className="refit-weapon-result-count" role="status">{available.length} 种兼容武器 · 当前可用 {budgetHere} OP</p>
           </div>}
+          {!locked && <p className="refit-weapon-result-count" role="status">仅接受{sizes[selected.slotSize]}武器 · {available.length} 种兼容武器 · 当前可用 {budgetHere} OP</p>}
           <div className="source-weapon-list">
             {!locked && available.map((w) => row(w))}
             {(locked || !available.length) && (
@@ -335,10 +346,10 @@ export function SourceWeaponPicker({
                   : "没有符合筛选条件的武器。"}
               </p>
             )}
-            {!locked && !available.length && (search || enabledType !== "ALL" || affordableOnly || faction) && <NativeButton font="caption" className="refit-weapon-empty-reset" onClick={resetFilters}>清除筛选，显示兼容武器</NativeButton>}
+            {!locked && !available.length && (search || enabledSize !== "ALL" || enabledType !== "ALL" || affordableOnly || faction) && <NativeButton font="caption" className="refit-weapon-empty-reset" onClick={resetFilters}>清除筛选，显示兼容武器</NativeButton>}
           </div>
           {!locked && <div className="source-weapon-search-toggle">
-            <button onClick={() => setAdvanced(value => !value)} aria-expanded={advanced}>搜索 / 势力筛选 [F]{(search || faction || affordableOnly) ? " · 已筛选" : ""}</button>
+            <button onClick={() => setAdvanced(value => !value)} aria-expanded={advanced}>搜索 / 势力筛选 [F]{(search || faction || affordableOnly || enabledSize !== "ALL") ? " · 已筛选" : ""}</button>
             <span>{available.length} 种 · {budgetHere} OP</span>
           </div>}
           {messageLibrary && <p className="source-library-note" role="status">模拟装备库：无限库存，不涉及交易。<button onClick={() => setMessageLibrary(false)} aria-label="关闭装备库说明">×</button></p>}

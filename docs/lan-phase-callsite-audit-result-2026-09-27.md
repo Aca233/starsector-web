@@ -1,0 +1,11 @@
+# 相位调用点诊断结果（2026-09-27）
+
+现行726模块逐SHA匹配上一轮精确恢复基底。20初始完整fixedUpdate的AST调用点计数，176实体734挂点，四个已保留实验均开启。
+
+主要外部调用点：TacticalNavigation.obstacles读取other.isPhased 345800次；AutofireController.canTarget读取other.isCollisionless 207375次；ThreatAssessment读取enemy.isPhased 132000次；AsteroidSystem 63360次；ShipCollisionSystem两端各55020次；FighterTactics 55720次；TacticalPositioning 50634次；shotObstruction友方挡线仅14700次。
+
+内部级联：Ship.isCollisionless→this.isPhased 386376次；Ship.isPhased→system.isPhased 2692005次。parentShip?.isPhased语法读取计数1327052包含optional-chain短路，不能把它当成父舰getter实际调用数。不同层级计数互相包含，不能相加为总成本或CPU占比。
+
+完整authority+隐藏tracker/RNG终态仍为bc891a0f1c7b8da97559620bf2b36b6c7c35bbe3adde8467c4b6ec1b9b3ad224。只做调用计数，不测速，不改生产。预瞄和aim循环实际上已经先过滤友军，不再重复提出同一优化。
+
+下一候选改为已有WeaponThreatEnvelope命中路径的重复资格证明：避免额外Map，保持当前写依赖组和普通路径实时审核。来源见系统列表诊断中147200次exact getter及现行get()每次先permitsExactObserver后查已有缓存。是否提速由新候选独立ABBA裁定。

@@ -1,3 +1,4 @@
+import { validAIDecisionProfile } from '../src/shared/ai-decision-profile.mjs';
 import { AuthorityComponentReceiver } from '../src/network/AuthorityComponents.mjs';
 import { AutoMotionAdmission } from './AutoMotionAdmission.mjs';
 import { LanCriticalCombat } from "./LanCriticalCombat.mjs";
@@ -32,8 +33,8 @@ import protocol from "../src/network/protocol.json" with { type: "json" };
 import { aiHullId, aiLoadout, pruneAiLoadouts, aiDesignSignature } from "../src/network/ai-loadouts.mjs";
 import { wireDesign, MAX_DESIGN_BYTES } from "../src/network/design-wire.mjs";
 import { roomStartBlockReason } from "../src/network/room-start.mjs";
-import hullCatalog from "../src/engine/data/generated/ships.json" with { type: "json" };
-const aiHullIds = new Set(Object.values(hullCatalog).filter(hull => hull.hullSize !== "FIGHTER").map(hull => hull.id));
+// Room presets and AI share the selected, independently deployable root hulls.
+const aiHullIds = new Set(protocol.ships.map(hull => hull.id));
 const project = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
@@ -588,6 +589,7 @@ export async function createLanServer({
     o.aiHulls.length >= 2 &&
     ["teams", "solo"].includes(o.assignment) &&
     validBattleSize(o.battleSize) &&
+    validAIDecisionProfile(o.aiDecisionProfile) &&
     (o.initialDeploymentLimit == null || (Number.isInteger(o.initialDeploymentLimit) && o.initialDeploymentLimit >= 0 && o.initialDeploymentLimit <= MAX_BATTLE_SIZE)) &&
     o.aiHulls.every(
       (hulls) =>
@@ -598,6 +600,7 @@ export async function createLanServer({
     assignment: o.assignment,
     aiLoadouts: structuredClone(o.aiLoadouts ?? {}), aiNextId:o.aiNextId ?? 1, aiRevision:o.aiRevision ?? 0,
     battleSize: o.battleSize,
+    aiDecisionProfile: o.aiDecisionProfile ?? 'standard',
     deploymentLimit: o.deploymentLimit,
     initialDeploymentLimit: o.initialDeploymentLimit ?? null,
     aiHulls: o.aiHulls.map((hulls) => [...hulls]),
@@ -1063,7 +1066,7 @@ export async function createLanServer({
             salt,
             passwordHash: password ? passwordHash(password, salt) : "",
             chat: [],
-            options: { aiHulls: [[], []], assignment: "teams", battleSize, deploymentLimit: battleTeamLimit(battleSize), initialDeploymentLimit: null },
+            options: { aiHulls: [[], []], assignment: "teams", battleSize, deploymentLimit: battleTeamLimit(battleSize), initialDeploymentLimit: null, aiDecisionProfile: 'standard' },
           };
           p.seat = 0;
           p.team = 0;
@@ -1411,6 +1414,7 @@ export async function createLanServer({
                 "hullShield",
                 "target",
                 "recall",
+                "module",
                 "vent",
                 "system",
                 "group",
@@ -1418,6 +1422,7 @@ export async function createLanServer({
                 "autofire",
               ].includes(a.kind) ||
               (a.aim !== undefined && (!Array.isArray(a.aim) || a.aim.length !== 2 || !a.aim.every((n) => Number.isFinite(n) && Math.abs(n) <= 100000))) ||
+              (a.kind === "module" && (!Number.isInteger(a.value) || a.value < 0 || a.value >= 128)) ||
               (a.kind === "system" && a.value !== undefined && (!Number.isInteger(a.value) || a.value < 0 || a.value >= 64)) ||
               (["group", "mode", "autofire"].includes(a.kind) &&
                 (!Number.isInteger(a.value) || a.value < 0 || a.value > 6))

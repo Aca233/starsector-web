@@ -1,0 +1,10 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {normalizeSprite,components} from './prepare-rocinante-sprites.mjs';
+const image=()=>{const width=30,height=30,data=Buffer.alloc(width*height*4);const pixel=(x,y,a)=>{const n=(y*width+x)*4;data[n]=91;data[n+1]=77;data[n+2]=65;data[n+3]=a;};for(let y=8;y<23;y++)for(let x=8;x<23;x++)pixel(x,y,253);return{width,height,data,pixel};};
+test('connected solid body becomes opaque with unchanged RGB and source bytes',()=>{const f=image(),before=Buffer.from(f.data),r=normalizeSprite(f.data,f.width,f.height);assert.deepEqual(f.data,before);assert.equal(r.rgba[(15*30+15)*4+3],255);assert.deepEqual(r.rgba.subarray((15*30+15)*4,(15*30+15)*4+3),Buffer.from([91,77,65]));});
+test('detached dust removed; narrow antialias retained; no opaque black matte',()=>{const f=image();f.pixel(1,1,20);f.pixel(7,15,90);f.pixel(6,15,5);const r=normalizeSprite(f.data,30,30);assert.equal(r.rgba[(1*30+1)*4+3],0);assert.equal(r.rgba[(15*30+7)*4+3],90);assert.equal(r.rgba[(15*30+6)*4+3],0);assert.equal(r.rgba[3],0);});
+test('transparent openings remain open',()=>{const f=image();for(let y=13;y<18;y++)for(let x=13;x<18;x++)f.pixel(x,y,0);const r=normalizeSprite(f.data,30,30);assert.equal(r.rgba[(15*30+15)*4+3],0);});
+test('connected one-pixel antenna retained',()=>{const f=image();for(let y=2;y<8;y++)f.pixel(15,y,253);const r=normalizeSprite(f.data,30,30);assert.equal(r.rgba[(2*30+15)*4+3],255);});
+test('multiple substantial pieces fail closed, no silent part deletion',()=>{const f=image();for(let y=0;y<8;y++)for(let x=0;x<8;x++)f.pixel(x,y,253);f.pixel(8,8,0);f.pixel(8,9,0);f.pixel(9,8,0);assert.throws(()=>normalizeSprite(f.data,30,30),/Multiple substantial components/);});
+test('blank image rejected; eight-neighbor components recognized',()=>{assert.throws(()=>normalizeSprite(Buffer.alloc(400),10,10),/Empty/);const f=image();assert.equal(components(f.data,30,30).parts.length,1);});

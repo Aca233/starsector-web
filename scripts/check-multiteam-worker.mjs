@@ -2,6 +2,9 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const { chromium } = createRequire(import.meta.url)('playwright');
+if (process.argv.includes('--fire-query-pair')) {
+  await import('./lib/host-fire-query-pair.mjs');
+} else {
 const browser = await chromium.launch({headless: true, ...(process.env.BROWSER_PATH ? {executablePath: process.env.BROWSER_PATH} : {})});
 try {
   const page = await browser.newPage();
@@ -10,8 +13,9 @@ try {
   await page.goto(`${process.env.COMBAT_TEST_URL ?? 'http://127.0.0.1:5173'}/__multiteam_worker_check.html`);
   const result = await page.evaluate(async (workerUrl) => {
     window.__LAN_BUILD_ID__ = 'worker-visibility-check';
-    const {createLanWorld, setLanPerspective} = await import('/src/network/LanWorld.ts');
-    const {applyCombatSnapshot} = await import('/src/network/CombatSnapshot.ts');
+    const {createLanWorld} = await import('/src/network/LanWorld.ts');
+    const {applyLanDisplaySnapshot} = await import('/src/network/LanDisplaySnapshot.ts');
+    const {createLanDisplayWorld} = await import('/src/network/LanDisplayBootstrap.ts');
     const {lanTeamPresence} = await import('/src/network/LanBattleRoster.ts');
     const {SnapshotPlayback} = await import('/src/network/SnapshotPlayback.ts');
     const {assetManager} = await import('/src/engine/assets/AssetResolver.ts');
@@ -19,8 +23,8 @@ try {
     await assetManager.ensureManifestLoaded(); await contentManifestManager.ensureLoaded();
     const match = {id:'worker-check',seed:918,hostId:'p0',snapshotHz:10,players:[{id:'p0',name:'host',seat:0,team:0,hull:'onslaught',design:null}],
       options:{aiHulls:[[],['paragon'],['onslaught'],['paragon'],['onslaught']],assignment:'teams',battleSize:2000,initialDeploymentLimit:60}};
-    const world = createLanWorld(match), engine=world.engine, playback=new SnapshotPlayback();
-    setLanPerspective(engine,world.controlled,0);
+    let engine=null;
+    const playback=new SnapshotPlayback();
     const reserveMatch={...match,options:{...match.options,aiHulls:[['paragon'],...match.options.aiHulls.slice(1)]}};
     const reserveWorld=createLanWorld(reserveMatch).engine;
     const reserveRows=lanTeamPresence(reserveMatch,reserveWorld);
@@ -50,7 +54,10 @@ try {
             const frame=JSON.parse(m.json);
             playback.push(frame);
             const sample=playback.sample(frame.tick*1000/60,true);
-            for(const f of sample.frames)applyCombatSnapshot(engine,f,sample.reset);
+            for(const f of sample.frames){
+              if(!engine)engine=createLanDisplayWorld(match,0,f).world;
+              else applyLanDisplaySnapshot(engine,f,sample.reset);
+            }
             const active=frame.deployment.rows.filter(r=>r.status==='deployed'||r.status==='retreating');
             const capitals=engine.capitalShips.filter(s=>!s.isDead&&!s.isDocked&&!s.isRetreated);
             const visible=capitals.filter(s=>s.isVisibleTo(engine.playerShip.teamId));
@@ -71,3 +78,5 @@ try {
   assert.deepEqual(errors,[]); assert.ok(result.mode); assert.ok(result.snapshots.at(-1).tick>=180);
   console.log(JSON.stringify({...result,pageErrors:errors},null,2));
 }finally{await browser.close();}
+
+}

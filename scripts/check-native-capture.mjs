@@ -4,9 +4,14 @@ import {pathToFileURL} from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 const referenceRoot=process.env.DISPLAY_RESTORE_BASELINE;
+const definitionBaseline=process.env.DISPLAY_DEFINITION_BASELINE;
 // Optional frozen source comparison inside this existing scenario bundle. All
 // other classes stay shared, especially Vector2/PackedSnapshotNumbers identity.
 const displayControl={name:'display-restore-control',setup(build){
+ build.onResolve({filter:/^display-definition-control$/},()=>definitionBaseline
+  ?{path:path.resolve(definitionBaseline),namespace:'definition-control'}
+  :{path:path.resolve('src/network/display/DisplayDefinition.ts')});
+ build.onLoad({filter:/.*/,namespace:'definition-control'},async args=>({contents:await fs.readFile(args.path,'utf8'),loader:'ts',resolveDir:path.resolve('src/network/display')}));
  build.onResolve({filter:/^display-(snapshot|codec)-control$/},args=>{
   const file=args.path==='display-snapshot-control'?'LanDisplaySnapshot.ts':'DisplaySnapshotCodec.ts';
   return referenceRoot?{path:path.resolve(referenceRoot,file),namespace:'display-control'}:{path:path.resolve('src/network',file)};

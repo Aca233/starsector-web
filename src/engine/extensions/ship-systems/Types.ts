@@ -26,7 +26,13 @@ export interface SystemWorld {
   advanceDroneLauncher?: (carrier: Ship, system: ShipSystem, dt: number) => void;
   deployMine: (position: Vector2, source: Ship, range?: number) => void;
 }
+export interface SystemAutofirePolicy {
+  priority: 'ESCORT' | 'SUPPRESS';
+  suspended: boolean;
+}
 export interface SystemAIContext {
+  /** Live read-only tactical world, never retained by system callbacks. */
+  world?: import('../../ai/TacticalWorld').TacticalWorld;
   ship: Ship; system?: ShipSystem; target: Ship; distance: number; angleDiff: number;
   /** False when another movement owner (withdrawal/order) must not be overridden by an attack drive. */
   tactical?: { allowOffensiveManeuver?:boolean; desiredRange:number; withdrawing:boolean; waypoint:boolean; avoidingCollision:boolean; forwardClear:boolean; quietFor:number; threat:import('../../ai/ThreatAssessment').ThreatAssessment };
@@ -48,6 +54,8 @@ export interface SystemModifiers {
   hardFluxPerSecond?: number; softFluxPerSecond?: number;
   speedFlat?: number; speedPercent?: number; accelerationFlat?: number; decelerationFlat?: number;
   dissipationMultiplier?: number;
+  /** Numeric to compose additively; unlike flame styling, actually suppresses the +50 boost. */
+  zeroFluxBoostSuppressed?: number;
   /** Percent bonuses compose additively with hullmods; flats apply first. Angular flats are in degrees. */
   accelerationPercent?: number; decelerationPercent?: number;
   turnRateFlat?: number; turnRatePercent?: number;
@@ -68,6 +76,13 @@ export interface SystemVisuals {
   teleportCopy?: boolean;
 }
 export interface ShipSystemDefinition {
+  /** Capture the live well position on acceptance, before the event phase. */
+  gravityRemoteRelease?: boolean;
+  gravityCollapse?: import('../../simulation/GravityFieldState').GravityCollapseSpec;
+  /** Optional presentation-only artwork; omitted preserves the existing native UI. */
+  gravityField?: import('../../simulation/GravityFieldState').GravityFieldSpec;
+  gravityManeuver?: import('../../simulation/GravityManeuverState').GravityManeuverSpec;
+  iconUrl?: string;
   resources?: ExtensionResources;
   id: string;
   sourceIds: readonly string[];
@@ -86,14 +101,23 @@ export interface ShipSystemDefinition {
   /** Drone launchers spend stock on launch, never on an order change. */
   usesChargesForActivation?: boolean;
   statusText?: (system: ShipSystem) => string | undefined;
+  /** Passive combat status, shown independently of activation errors and cooldown. */
+  passiveStatusText?: (system: ShipSystem) => string | undefined;
   fluxPerUseFraction?: number; fluxPerUseFlat?: number; fluxPerUseDissipationFraction?: number; hardFlux?: boolean;
-  controls?: { blockWeapons?: boolean; blockShields?: boolean; lockTurning?: boolean; forceForward?: boolean; cancelOnFlameout?: boolean; suppressZeroFlux?: boolean; blockFluxDissipation?: boolean; blockVenting?: boolean; blockAcceleration?: boolean; blockStrafing?: boolean; forceAutofire?: boolean; releaseOnOut?: boolean };
+  controls?: { blockWeapons?: boolean; blockShields?: boolean; lockTurning?: boolean; forceForward?: boolean; cancelOnFlameout?: boolean; cancelOnBrake?: boolean; cancelOnRetreat?: boolean; cancelOnDeath?: boolean; suppressZeroFlux?: boolean; blockFluxDissipation?: boolean; blockVenting?: boolean; blockAcceleration?: boolean; blockStrafing?: boolean; forceAutofire?: boolean; releaseOnOut?: boolean };
   phase?: { vulnerableChargeUp?: boolean; vulnerableChargeDown?: boolean };
   visuals?: SystemVisuals;
   audio?: { activate?: string; loop?: string; loopVolume?: number; deactivate?: string };
   passiveModifiers?: (system: ShipSystem, owner?: Ship) => SystemModifiers;
+  /** Pure per-instance, per-mount automatic policy; manual groups bypass it. */
+  autofirePolicy?: (system: ShipSystem, mount: WeaponMount) => SystemAutofirePolicy | undefined;
+  deactivationReason?: (ship: Ship, system: ShipSystem) => string | undefined;
+  /** Pure lifecycle query; false blocks actual shield input and collision, not just visuals. */
+  defenseEnabled?: (system: ShipSystem) => boolean;
   weaponEnabled?: (system: ShipSystem, mount: WeaponMount) => boolean;
   modifiers?: (system: ShipSystem, baseCapacity: number, owner?: Ship) => SystemModifiers;
+  /** Pure, live query for directly attached modules; never persists buffs in child specs. */
+  moduleModifiers?: (system: ShipSystem, module: Ship) => SystemModifiers;
   /** Actual asynchronous execution, separate from CSV charge/cooldown timing (native weapon systems). */
   isExecuting?: (system: ShipSystem) => boolean;
   /** Declarative fit requirement; never inferred from a particular hull ID. */
@@ -111,6 +135,8 @@ export interface ShipSystemDefinition {
   selectTarget?: (ship: Ship) => Ship | undefined;
   initialize?: (system: ShipSystem, ship: Ship) => void;
   onReset?: (system: ShipSystem, owner?: Ship) => void;
+  /** Explicit deactivate() interruption, including removal from the combat roster; not natural expiry. */
+  onInterrupt?: (system: ShipSystem, owner?: Ship) => void;
   onActivate?: (ship: Ship, world: SystemWorld, system: ShipSystem) => void;
   onActive?: (ship: Ship, world: SystemWorld, system: ShipSystem) => void;
   onAdvance?: (ship: Ship, dt: number, world: SystemWorld, system: ShipSystem) => void;

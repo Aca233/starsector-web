@@ -1,4 +1,6 @@
+import { CapturedDisplayDefinition, DisplayDefinitionCapture, DisplayDefinitionRequest } from './display/DisplayDefinitionCapture';
 import type { CombatSnapshot } from "./CombatSnapshot";
+import { isImmutableMetadata } from "../engine/extensions/Immutable";
 export type { CombatSnapshot, CombatSound } from "./CombatSnapshot";
 import { lanControlledRoster } from './LanRosterIdentity';
 import { LanShipProjection } from './display/LanShipProjection';
@@ -61,6 +63,10 @@ type Wire = any;
 const captureArrayMap = Array.prototype.map;
 /** Each snapshot carries its own field dictionary: reconnect never needs a baseline. */
 class SnapshotLayouts {
+  // Frame-local only: dictionaries/record IDs and caller-owned packets never
+  // leak into the next capture. Only immutableCopy-authored acyclic data qualify.
+  readonly immutableRecords = new Map<object, Wire>();
+  displayDefinitions?: DisplayDefinitionCapture;
   journal?: MutationJournal;
   display?: FixedDisplayCapture;
   recordDeltas?: RecordDeltaCapture;
@@ -223,10 +229,23 @@ function nativeCaptureShape(value: object, raw: string[], projection: CapturePro
   return shape;
 }
 function pack(value: any, seen: object[], refs: Map<string, Ship>, layouts: SnapshotLayouts, plain = false, projection = CaptureProjection.None): Wire {
+  if(layouts.displayDefinitions&&value instanceof DisplayDefinitionRequest){
+    value=value.owner.reference(value.value);
+    if(value instanceof CapturedDisplayDefinition)return {$displayDefinition:value.index};
+  }
   if(value instanceof Ship&&!plain){layouts.journal?.reference(value);refs.set(value.id,value);return {$ship:value.id};}
   if(layouts.journal&&value&&typeof value==='object'&&seen.includes(value))layouts.journal.cycle();
   if(layouts.journal&&value&&typeof value==='object'&&!seen.includes(value)&&!(value instanceof Ship&&plain))
     return layouts.journal.memo(value,projection+':'+plain+':'+layouts.packedNumbers+':'+layouts.compactProjectiles,refs,(previous,changed)=>packIncremental(value,seen,refs,layouts,plain,projection,previous,changed));
+  if (capturePlansEnabled && layouts.nativeCapture && !plain && projection === CaptureProjection.None
+    && !layouts.journal && !layouts.display && !layouts.recordDeltas
+    && value && typeof value === 'object' && isImmutableMetadata(value)) {
+    const prior = layouts.immutableRecords.get(value);
+    if (prior !== undefined) return prior;
+    const result = packFresh(value,seen,refs,layouts,plain,projection);
+    layouts.immutableRecords.set(value,result);
+    return result;
+  }
   return packFresh(value,seen,refs,layouts,plain,projection);
 }
 /** A dirty native record updates only changed scalar slots. Re-enter object
@@ -794,12 +813,14 @@ export function captureCombat(
   // Exact authority-computed appearance only; never a simulation checkpoint.
   renderDamageMarks = false,
   displayOnly = false,
+  displayDefinitions = false,
 ): CombatSnapshot {
+  const definitions = displayOnly && displayDefinitions ? new DisplayDefinitionCapture() : undefined;
   let displayProjector: LanShipProjection | undefined;
   if (displayOnly) {
     displayProjector = lanDisplayProjectors.get(engine);
     if (!displayProjector) { displayProjector = new LanShipProjection(); lanDisplayProjectors.set(engine, displayProjector); }
-    displayProjector.begin();
+    displayProjector.begin(definitions);
   }
   let components:ComponentCapture|undefined;
   if(componentMode&&nativeCapture&&!displayOnly){components=componentCaptures.get(engine);if(!components){components=new ComponentCapture(componentOmit,componentReference);componentCaptures.set(engine,components);}components.begin();}
@@ -810,6 +831,7 @@ export function captureCombat(
   const capitals = new Set(engine.allCapitalShips);
   const refs = new Map(engine.ships.map(ship => [ship.id, ship]));
   const layouts = new SnapshotLayouts(compactPuffs, compactProjectiles, nativeCapture, compactParticles, packedNumbers,components?componentDictionaries.get(engine):undefined,!!components);
+  layouts.displayDefinitions = definitions;
   layouts.weaponPresentation = nativeCapture && weaponPresentation && !components;
   layouts.renderDamageMarks = nativeCapture && renderDamageMarks && !components;
   if(components)componentDictionaries.set(engine,layouts);
@@ -864,13 +886,16 @@ export function captureCombat(
   components?.finish();
   const frame:CombatSnapshot={...(components?{componentMode:1 as const,componentDefinitions:components.definitionFrame()}:{}),tick,acknowledged,simulationMs,ships,crafts,craftSpecs,layouts:components?layouts.keys.slice():layouts.keys,world:projectedWorld, ...(engine.deployment.enabled ? {deployment:engine.deployment.snapshot()} : {})};
   if(displayOnly) {
-    frame.displayVersion=1;
+    frame.displayVersion=definitions?2:1;
+    if(definitions)frame.displayDefinitions=definitions.entries;
     frame.deployment=engine.deployment.snapshot();
     frame.displayWorld=project({multiTeamBattle:engine.multiTeamBattle,openBattlefield:engine.openBattlefield,
       simulationPointLimit:engine.simulationPointLimit,commandPoints:engine.commandPoints,orders:engine.orders,
       shipLossNotifications:engine.shipLossNotifications});
     frame.controlled=Object.fromEntries(lanControlledRoster(engine));
-    frame.displayWings={player:engine.playerWings.map(wing=>({...wing})),enemy:engine.enemyWings.map(wing=>({...wing}))};
+    // v2 publications own nested rebuild queues too; a shallow wing copy can
+    // otherwise change while the encoder/helper still owns this completed tick.
+    frame.displayWings={player:engine.playerWings.map(wing=>definitions?{...wing,tags:wing.tags?.slice(),rebuildQueue:wing.rebuildQueue.map(row=>({...row}))}:({...wing})),enemy:engine.enemyWings.map(wing=>definitions?{...wing,tags:wing.tags?.slice(),rebuildQueue:wing.rebuildQueue.map(row=>({...row}))}:({...wing}))};
   }
   if (layouts.display) frame.fixedDisplay = layouts.display.finish();
   if (layouts.recordDeltas) frame.recordDefinitions = layouts.recordDeltas.finish();

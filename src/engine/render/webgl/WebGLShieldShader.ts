@@ -1,3 +1,5 @@
+import { arkBarrierLevel, arkMembraneAlpha } from '../../visual/ArkSystemFX';
+import { WebGLVoidShieldShader } from './WebGLVoidShieldShader';
 import { WebGLShaderUtil } from './WebGLShaderUtil';
 import type { Vector2 } from '../../math/Vector2';
 import type { ShipRenderState as Ship } from '../../render/ShipRenderState';
@@ -46,6 +48,7 @@ export class WebGLShieldShader {
   private readonly uColor: WebGLUniformLocation | null;
   private vertices = new Float32Array(0);
   public drawCalls = 0;
+  private voidShader?: WebGLVoidShieldShader;
 
   constructor(private readonly gl: WebGL2RenderingContext) {
     this.program = WebGLShaderUtil.createProgram(gl, SHIELD_VS, SHIELD_FS);
@@ -82,6 +85,11 @@ export class WebGLShieldShader {
     nowSec: number,
     texRim: WebGLTexture
   ): void {
+    if (ship.shield.voidShield) {
+      this.voidShader ??= new WebGLVoidShieldShader(this.gl);
+      if (this.voidShader.render(viewProjMatrix, ship, shipWorldPos, texShield, nowSec, shipFacingRad)) this.drawCalls++;
+      return;
+    }
     const shield = ship.shield;
     if (!shield.isVisuallyDeployed || shield.radius <= 0) return;
     const levels = shield.hitSegmentLevels;
@@ -170,7 +178,53 @@ export class WebGLShieldShader {
     gl.bindVertexArray(null);
   }
 
+  /** Artist-painted optical membrane, registered to the SAME combat radius and
+   * angular opening. No sine wobble, radial grow/shrink, noise or stock rim. */
+  public renderArkMembrane(view: Float32Array, ship: Ship, center: Vector2, facing: number,
+    frames: readonly { texture: WebGLTexture; weight: number }[]): void {
+    const shield = ship.shield;
+    if (!shield.isVisuallyDeployed || shield.radius <= 0 || ship.isDead) return;
+    const count = shield.hitSegmentLevels.length;
+    if (count < 2) return;
+    const barrier = arkBarrierLevel(ship), width = 68 + 20 * barrier;
+    const outer = shield.radius + width * (64 / 198), inner = outer - width;
+    // Native full-deployment data includes ten fringe degrees. Drawing them
+    // twice on a closed membrane would create an artificial bright seam.
+    const rawArc = shield.renderArcRad, arc = Math.min(Math.PI * 2, rawArc);
+    const trim = (rawArc - arc) / 2, start = shield.facingAngleRad - arc / 2;
+    const total = count * 2 * 5;
+    if (this.vertices.length < total) this.vertices = new Float32Array(2 ** Math.ceil(Math.log2(total)));
+    let cursor = 0;
+    for (let i = 0; i < count; i++) {
+      const angle = start + arc * i / (count - 1), c = Math.cos(angle), s = Math.sin(angle);
+      const hitIndex = (trim + arc * i / (count - 1)) / rawArc * (count - 1);
+      const alpha = arkMembraneAlpha(shield, hitIndex, barrier) * ship.phaseVisualAlpha;
+      // Authored strip repeats four times; texture orientation stays hull-bound.
+      const u = (angle - facing) / (Math.PI * 2) * 4 + .43;
+      for (let radial = 0; radial < 2; radial++) {
+        const radius = radial ? inner : outer;
+        this.vertices[cursor++] = center.x + c * radius;
+        this.vertices[cursor++] = center.y + s * radius;
+        this.vertices[cursor++] = u;
+        this.vertices[cursor++] = radial;
+        this.vertices[cursor++] = alpha;
+      }
+    }
+    const gl = this.gl;
+    gl.useProgram(this.program); gl.bindVertexArray(this.vao); gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, this.vertices.subarray(0, total), gl.DYNAMIC_DRAW);
+    gl.uniformMatrix3fv(this.uViewProj, false, view); gl.uniform1i(this.uTexture, 0);
+    gl.activeTexture(gl.TEXTURE0); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    for (const frame of frames) {
+      gl.bindTexture(gl.TEXTURE_2D, frame.texture);
+      gl.uniform4f(this.uColor, .77 + .12 * barrier, .91, 1, frame.weight);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, count * 2); this.drawCalls++;
+    }
+    gl.bindVertexArray(null);
+  }
+
   public dispose(): void {
+    this.voidShader?.dispose();
     this.gl.deleteBuffer(this.vbo);
     this.gl.deleteVertexArray(this.vao);
     this.gl.deleteProgram(this.program);

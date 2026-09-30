@@ -20,10 +20,11 @@ let ended = false;
 let connectStarted = false;
 let nativeBuffered = 0;
 const authority = new AuthorityIoBridge({
-  buffered: () => { accountNative(); return cells ? Atomics.load(cells, Cell.outbound) : Infinity; },
+  sharedAdmission: import.meta.env.VITE_LAN_IO_ADMISSION !== "false",
+  buffered: () => { accountNative(); pollOutbound(); return cells ? Atomics.load(cells, Cell.outbound) : Infinity; },
   send: data => {
     if (ended || !cells || Atomics.load(cells, Cell.closing) || socket?.readyState !== 1) throw Error("Authority socket closed");
-    socket.send(data); accountNative(); if (nativeBuffered > 0 && poll === undefined) poll = setTimeout(sample, 4);
+    socket.send(data); accountNative(); pollOutbound();
   },
 });
 const deltaReceiver = new LanDeltaReceiver();
@@ -56,11 +57,18 @@ function accountNative(consumed = 0): void {
   nativeBuffered = amount;
 }
 
+// Include not-yet-delivered main-thread reservations. A copy/post failure can
+// roll those back without a send event, so nativeBuffered alone cannot wake us.
+function pollOutbound(): void {
+  if (cells && Atomics.load(cells, Cell.outbound) > 0 && poll === undefined) poll = setTimeout(sample, 4);
+}
+
 function sample(): void {
   poll = undefined;
   if (ended) return;
   accountNative();
-  if (nativeBuffered > 0) poll = setTimeout(sample, 4);
+  authority.refreshAdmission(Atomics.load(cells!, Cell.outbound));
+  pollOutbound();
 }
 
 function fail(reason: string): void {
@@ -174,7 +182,7 @@ scope.onmessage = event => {
         }
         if (failure) fail("I/O send failed");
         else if (Atomics.load(cells, Cell.outbound) > LAN_SOCKET_QUEUE_BYTES) fail("I/O send queue full");
-        else if (nativeBuffered > 0 && poll === undefined) poll = setTimeout(sample, 4);
+        else { authority.refreshAdmission(); pollOutbound(); }
         break;
       }
       case "authority":

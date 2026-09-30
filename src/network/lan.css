@@ -257,7 +257,7 @@
 }
 .lan-code {
   font:
-    24px StarsectorNumber,
+    24px "Cascadia Code",
     monospace;
   color: var(--ui-highlight);
   letter-spacing: 2px;
@@ -282,7 +282,7 @@
 }
 .lan-specs dd {
   font:
-    19px StarsectorNumber,
+    19px "Cascadia Code",
     monospace;
   margin: 4px 0 0;
   color: var(--ui-highlight);

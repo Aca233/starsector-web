@@ -1,3 +1,4 @@
+import { decodeBase64Bytes } from './Base64Bytes.mjs';
 import { encodeWeaponState, decodeWeaponState } from './WeaponPresentationState.mjs';
 /** SCC1 (core) / SCC2 (core + optional complete weapon roster): independent authoritative capital-ship combat presentation component.
  * Exact float64 values, no predicted damage, rule execution or world replacement. */
@@ -68,5 +69,5 @@ export function decodeCombatState(bytes) {
 }
 export function combatStateFromText(value) {
   if (typeof value !== 'string' || !value.length || value.length > Math.ceil(COMBAT_STATE_MAX_BYTES / 3) * 4 || value.length % 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(value)) invalid();
-  return decodeCombatState(Uint8Array.from(atob(value), c => c.charCodeAt(0)));
+  return decodeCombatState(decodeBase64Bytes(value));
 }

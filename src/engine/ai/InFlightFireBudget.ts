@@ -1,6 +1,6 @@
 import type { FireControlQueryBatch } from './FireControlQueryBatch';
 import { segmentCircleEntry } from '../math/Geometry';
-import { combatTeam } from '../simulation/CombatTeams';
+import { combatTeam, sameTeam } from '../simulation/CombatTeams';
 import type { Ship } from '../simulation/Ship';
 import type { Projectile } from '../simulation/Weapon';
 import type { Asteroid } from '../simulation/CombatTypes';
@@ -79,7 +79,7 @@ export class InFlightFireBudget {
       const blockers = indexed ?? this.ships;
       const blocked = blockers.some(other => other !== target && other.id !== p.sourceShipId
         && (indexed || !other.isCollisionless && other.isVisibleTo(ship.teamId))
-        && shipSegmentEntry(other, p.pos, p.pos.clone().addScaled(p.vel.clone().sub(other.vel), eta)) !== null)
+        && shipSegmentEntry(other, p.pos, p.pos.clone().addScaled(p.vel.clone().sub(other.vel), eta), !!other.shield.voidShield && sameTeam(other,p)) !== null)
         || this.asteroids.some(a => a.hp > 0 && segmentCircleEntry(p.pos,
           p.pos.clone().addScaled(p.vel.clone().sub(a.vel), eta), a.pos, a.radius + p.radius) !== null);
       if (blocked) continue;

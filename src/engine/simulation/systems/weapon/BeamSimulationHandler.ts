@@ -185,6 +185,8 @@ export class BeamSimulationHandler {
       }
 
       advanceBeamGlow(b, dt, active);
+      let beamRemainder = 1;
+      const unobstructedEnd = b.endPos.clone();
       const sample = advanceBeamDamage(b, dt, ctx.random, sourceMount);
 
       // 2. 光束射线与目标物理相交检测 (优先按发射距离由近至远测试障碍物)
@@ -227,7 +229,8 @@ export class BeamSimulationHandler {
         }
       }
 
-      for (const ship of missileContact ? [] : targetShips) {
+      for (let targetIndex = 0; !missileContact && targetIndex < targetShips.length; targetIndex++) {
+        const ship = targetShips[targetIndex];
         const beamDir = b.endPos.clone().sub(b.startPos);
         const beamLen = beamDir.length();
         if (beamLen <= 0.001) break;
@@ -267,25 +270,36 @@ export class BeamSimulationHandler {
               b.isHitting = false;
               break;
             }
+            let shieldRemainder = 0;
             if (sample && sample.damage > 0) {
               if (!b.hasRecordedHit) {
                 ctx.statsTracker?.recordShotHit(b.isPlayer ?? false);
                 b.hasRecordedHit = true;
               }
               const outgoing = outgoingDamageMultiplier(srcShip, ship, sourceMount?.spec.weaponType, b.startPos, b.endPos);
-              const tickDmg = sample.damage * outgoing;
+              const tickDmg = sample.damage * outgoing * beamRemainder;
               const shieldMult = ship.system.getShieldDamageMultiplier();
               // 护盾吸收量同样按目标战备值修正 (CRPluginImpl.getDamageTakenChangePercent)
               const absorbedDmg = tickDmg * shieldMult * ship.crDamageTakenMultiplier;
               const hitAngle = Math.atan2(shieldHitPoint.y - sCenter.y, shieldHitPoint.x - sCenter.x);
-              const fluxGain = ship.shield.absorbDamage(absorbedDmg, b.damageType, hitAngle);
-              recordBeamGlowDamage(b, { shieldDamage: shieldHitGlowDamage(fluxGain,
+              const absorption = ship.shield.absorbImpact(absorbedDmg, b.damageType, hitAngle);
+              const fluxGain = absorption.flux;
+              shieldRemainder = absorption.remainingFraction;
+              recordBeamGlowDamage(b, { shieldDamage: ship.shield.voidShield ? absorption.absorbed : shieldHitGlowDamage(fluxGain,
                 ship.flux.maxFlux - ship.flux.totalFlux, ship.shield.efficiency) });
               ship.flux.increaseShieldFlux(fluxGain, sourceMount?.spec.beamDealsHardFlux === true);
               if (ctx.statsTracker) {
-                ctx.statsTracker.recordDamageDealt(b.isPlayer ?? false, b.damageType, absorbedDmg * ship.shield.damageTakenMultiplierFor(b.damageType), 'SHIELD');
+                ctx.statsTracker.recordDamageDealt(b.isPlayer ?? false, b.damageType, absorption.absorbed, 'SHIELD');
               }
             }
+              if (shieldRemainder > 0) {
+                beamRemainder *= shieldRemainder;
+                b.endPos.copy(unobstructedEnd);
+                // Re-sort with the fallen screen removed: a nearer gun deck may
+                // lie in front of the root hull. Do not charge that root twice.
+                targetShips.sort((a,c)=>getBeamTargetIntersectionDistance(b.startPos,b.endPos,a)-getBeamTargetIntersectionDistance(b.startPos,b.endPos,c));
+                targetIndex = -1; continue;
+              }
             // Contact audio remains an independent per-frame ACTIVE adapter.
             if (!active) break;
 
@@ -341,11 +355,11 @@ export class BeamSimulationHandler {
                 b.hasRecordedHit = true;
               }
               const outgoing = outgoingDamageMultiplier(srcShip, ship, sourceMount?.spec.weaponType, b.startPos, b.endPos);
-              const tickDmg = sample.damage * outgoing;
-              const tickEmp = sample.emp;
+              const tickDmg = sample.damage * outgoing * beamRemainder;
+              const tickEmp = sample.emp * beamRemainder;
               // 装甲/结构承受伤害按目标战备值修正 (CRPluginImpl.getDamageTakenChangePercent)
               const takenDmg = tickDmg * ship.crDamageTakenMultiplier;
-              const result = ship.armor.takeDamage(localImpact, takenDmg, b.damageType, sample.effectiveDps * outgoing * ship.crDamageTakenMultiplier, true);
+              const result = ship.armor.takeDamage(localImpact, takenDmg, b.damageType, sample.effectiveDps * outgoing * ship.crDamageTakenMultiplier * beamRemainder, true);
               recordBeamGlowDamage(b, result);
               ctx.fx.spawnArmorDamageSparks(ship, localImpact, result.armorDamage);
               if (ctx.statsTracker) {

@@ -1,3 +1,4 @@
+import {isAuthoritySnapshotBlocked} from '../src/network/AuthorityIoAdmission.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import fs from 'node:fs';import vm from 'node:vm';import ts from 'typescript';import { build, transform } from 'esbuild';
@@ -52,13 +53,14 @@ test('actual host snapshot function splits display/network mailboxes and retains
  const soundStmt=ast.statements.find(n=>ts.isVariableStatement(n)&&n.declarationList.declarations.some(d=>d.name.getText(ast)==='queueSound'));
  const compiled=(await transform([snapshotFn, ...ast.statements.filter(n=>ts.isFunctionDeclaration(n)&&['consumeSnapshotSounds','cancelSnapshotEncoding','flushSnapshotEncoding'].includes(n.name?.text)), soundStmt].map(n=>n.getText(ast)).join('\n'),{loader:'ts',target:'es2022',define:{'import.meta.env':'{}'}})).code;
  const shown=[],published=[];
- const c={running:true,snapshotEncoderWorker:null,pendingEncoding:null,ProjectionEncodingCache,encodedFragmentReuses:0,pollIoCompletion(){},tick:1,lastSnapshotTick:-1,snapshotInFlight:null,directReady:true,directLaunched:true,directInFlight:null,directLastTick:-1,directSequence:0,directAttempt:0,directRetryAt:0,
+ const c={directAdmission:null,isAuthoritySnapshotBlocked,ioStats:{preflightSkips:0},running:true,snapshotEncoderWorker:null,pendingEncoding:null,ProjectionEncodingCache,encodedFragmentReuses:0,pollIoCompletion(){},tick:1,lastSnapshotTick:-1,snapshotInFlight:null,directReady:true,directLaunched:true,directInFlight:null,directLastTick:-1,directSequence:0,directAttempt:0,directRetryAt:0,
   directIo:{postMessage:(m,transfer=[])=>published.push(structuredClone(m,{transfer}))},send:(m,transfer=[])=>shown.push(structuredClone(m,{transfer})),
   engine:{projectiles:[]},controls:new Map([[0,{acknowledged:3}]]),elapsedCost:0,samples:0,captureMs:0,encodeMs:0,muzzleEvents:null,compactParticles:true,
   captureAuthorityCombat:(_engine,tick,acknowledged)=>({tick,acknowledged,ships:[],world:{combatTime:tick/60}}),performance:{now:()=>0},LAN_SNAPSHOT_HZ:60,
   measureClock(){},realtimeRatio:1,combatRate:1,sounds:[],networkSounds:[],soundId:0,authoritySummaryShips:null,binarySnapshots:true,visualEnabled:false,
   capturedFrame:null,captures:0,captureReuses:0,snapshotEncoder:new TextEncoder(),encodeProjectedBinaryFrame,snapshotFlow:{count(){}},
  };
+ c.captureLanDisplayCombat=(...args)=>c.captureAuthorityCombat(...args);
  vm.createContext(c);vm.runInContext(compiled,c);
  const sound=()=>vm.runInContext("queueSound('test',1,1)",c);
  for(let tick=1;tick<=80;tick++){c.tick=tick;c.directInFlight=null;sound();c.snapshot();}

@@ -1,3 +1,4 @@
+import { weaponSizeBaseline } from '../../../content/WeaponSizes';
 import type { ComponentMalfunctionPolicy } from '../ComponentHealth';
 import type { WeaponMount, WeaponMountType, WeaponSlotSize } from '../../Weapon';
 import type { SimulationRandom } from '../../SimulationRandom';
@@ -9,6 +10,7 @@ export const createWeaponHealthTracker = createComponentHealthTracker;
 /** ship/super: size refers to the installed weapon, not the size of its slot.
  * nullsuper.isHardpoint confirms the second HP doubling and extra five seconds. */
 export function weaponHealthProfile(size: WeaponSlotSize, mountType: WeaponMountType, healthMultiplier = 1) {
+  size = weaponSizeBaseline(size); // XL explicitly inherits the heavy component baseline, never SMALL.
   const hardpoint = mountType === 'HARDPOINT';
   const health = (size === 'LARGE' ? 800 : size === 'MEDIUM' ? 500 : 250) * (hardpoint ? 2 : 1) * healthMultiplier;
   const repairDuration = (size === 'LARGE' ? 20 : size === 'MEDIUM' ? 15 : 10) + (hardpoint ? 5 : 0);

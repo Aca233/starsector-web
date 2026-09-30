@@ -1,8 +1,10 @@
+import { advanceGlorianaTorpedoLoad, clearGlorianaTorpedoRail } from '../../visual/GlorianaTorpedoVisuals';
+import { updateGravityTractorInput, releaseGravityTractor } from './GravityTractor';
 import { isImmutableMetadata } from '../../extensions/Immutable';
 import { FireControlQueryBatch } from '../../ai/FireControlQueryBatch';
 import { initializeSourceMissile } from './weapon/SourceMissileLifecycle';
-import { effectiveHullModWeaponSpec } from '../../extensions/HullMods';
-import { AutofireController, type FireControlWorld } from '../../ai/AutofireController';
+import { effectiveHullModWeaponSpec, installedHullMods } from '../../extensions/HullMods';
+import { AutofireController, nativeAutofireReaders, nativeSampledAutofireReaders, type FireControlWorld } from '../../ai/AutofireController';
 import { signedAngle } from '../../math/Angles';
 import { manualFireSlots, advanceTurretAim } from './weapon/WeaponAim';
 import { combatWeaponRange, combatProjectileSpeed } from '../WeaponRange';
@@ -100,6 +102,8 @@ export class ShipWeaponControlSystem {
       }
     }
 
+    for (const mount of this.weapons) advanceGlorianaTorpedoLoad(mount);
+
     // 初始化武器编组 (Groups 1 - 5)
     if (spec.defaultWeaponGroups && spec.defaultWeaponGroups.length > 0) {
       this.weaponGroups = spec.defaultWeaponGroups.map((g) => ({
@@ -187,7 +191,7 @@ export class ShipWeaponControlSystem {
     targetShip: Ship | null,
     spawnProjectile: (p: Projectile) => void,
     spawnBeam: (b: Beam) => void,
-    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void,
+    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec, underHullShipId?: string) => void,
     fireControlWorld?: FireControlWorld
   ) {
     const world: FireControlWorld = fireControlWorld ?? { ships: targetShip ? [ship, targetShip] : [ship], missiles: [], asteroids: [] };
@@ -223,6 +227,7 @@ export class ShipWeaponControlSystem {
         }
         if (mount.ammo >= mount.spec.maxAmmo) mount.ammoRechargeProgress = 0;
       }
+      advanceGlorianaTorpedoLoad(mount, !ship.isDead);
       // 官方真实后坐力恢复时间: refireDelay * 0.8
       if (mount.recoil > 0) {
         const recoveryTime = Math.max(0.12, mount.spec.refireDelay * 0.8);
@@ -288,12 +293,20 @@ export class ShipWeaponControlSystem {
 
     const manualSlots = manualFireSlots(ship, this.weapons, activeSlotSet, alternatingSlotId);
     const fireRequests = new Set<string>();
+    const suspendedAutofire = new Set<string>();
     const queryBatch = FireControlQueryBatch.create(ship, world);
     const aimWorld = queryBatch ? { ...world, queryBatch } : world;
+    const sampleRule = world.sampledAutofire;
+    const root = sampleRule ? ship.assemblyRoot : undefined;
+    const sampleShip = sampleRule && dt > 0 && Number.isFinite(dt) && !manualControl && ship.fireControlMode === 'AI'
+      && root !== sampleRule.playerShip && !sampleRule.fullRateShipIds.has(root!.id) && ship.spec.hullSize !== 'FIGHTER'
+      && ShipWeaponControlSystem.hasNativeQueryLoop(this)
+      && nativeSampledAutofireReaders.every(([key, value]) => this.autofire[key] === value);
     try {
       for (const mount of this.weapons) {
         mount.triggerHeld = false;
         if (mount.isDisabled) {
+          if (mount.spec.gravityTractor) releaseGravityTractor(mount, '发射器离线');
           this.autofire.clear(mount);
           // 故障挂点电机失灵无法旋转瞄准，射控电路短路无法击发
           mount.burstRemaining = 0;
@@ -351,6 +364,20 @@ export class ShipWeaponControlSystem {
 
         };
 
+        if (mount.spec.gravityTractor) {
+          const tractorAim = !manualControl && ship.currentTargetShip ? ship.currentTargetShip.pos : ship.aimTargetWorld;
+          const held = mount.gravityTractor;
+          aimTurret(held?.phase === 'HOLD' ? new Vector2(held.contactX, held.contactY) : tractorAim);
+          updateGravityTractorInput(dt, ship, mount, world, canShipFire && (manualControl
+            ? isInActiveGroup && ship.isFiringMain
+            : !!ship.currentTargetShip && ship.flux.fluxPercent < .65));
+          continue;
+        }
+        if (mount.spec.gravityDeflector) {
+          // Authority resolves a real threat and applies its budget in the shared force pass.
+          continue;
+        }
+
         // 1. 当前选中的主力武器编组 (Active Group - 玩家手动瞄准与击发，绝对优先级)
         if (manualControl && isInActiveGroup) {
           this.autofire.clear(mount);
@@ -378,9 +405,22 @@ export class ShipWeaponControlSystem {
         // Aim/safety are per mount; the group scheduler gates new automatic firing cycles below.
         // AI owns all mounts; a manual pilot owns the selected group and opts others into autofire.
         else if (!manualControl || isAutofireSlot) {
-          const solution = this.autofire.aim(dt, ship, mount, aimWorld);
-          aimTurret(solution?.point ?? this.autofire.preAim(ship, mount, aimWorld));
-          if (this.autofire.decide(ship, mount, solution, aimWorld, dt) === 'FIRE' && canShipFire && mount.cooldownTimer <= 0) {
+          const spec = sampleShip ? mount.spec : undefined;
+          const sampleMount = spec && mount.mountType === 'TURRET' && (spec.mountSize === 'SMALL' || spec.mountSize === 'MEDIUM')
+            && !spec.isGuided && !spec.isRocket && spec.weaponType !== 'MISSILE' && spec.spawnType !== 'MISSILE'
+            && !ship.system.autofirePolicy(mount);
+          if (sampleRule && !sampleMount) this.autofire.dropAimSample(mount);
+          const sample = sampleMount ? this.autofire.sampledAim(dt, ship, mount, aimWorld) : undefined;
+          const solution = sample ? null : this.autofire.aim(dt, ship, mount, aimWorld);
+          if (ship.system.autofirePolicy(mount)?.suspended) {
+            suspendedAutofire.add(mount.slotId);
+            aimTurret(null);
+            continue;
+          }
+          aimTurret(sample ? sample.point : solution?.point ?? this.autofire.preAim(ship, mount, aimWorld));
+          const decision = sample ? this.autofire.decideSampled(ship, mount, sample.intent, aimWorld, dt)
+            : this.autofire.decide(ship, mount, solution, aimWorld, dt);
+          if (decision === 'FIRE' && canShipFire && mount.cooldownTimer <= 0) {
             fireRequests.add(mount.slotId);
           }
         }
@@ -420,6 +460,7 @@ export class ShipWeaponControlSystem {
     // Keep emission/lifecycle in authored mount order for flux and deterministic replays.
     for (const mount of this.weapons) {
       if (mount.isDisabled) continue;
+      if (mount.spec.gravityTractor || mount.spec.gravityDeflector) continue;
       if (fireRequests.has(mount.slotId) && (!manualControl || !activeSlotSet.has(mount.slotId))
         && !this.autofire.hasFluxBudget(ship, mount, dt)) {
         fireRequests.delete(mount.slotId);
@@ -434,6 +475,9 @@ export class ShipWeaponControlSystem {
           group.alternatingJustSwitched = true;
         }
       }
+      // Reassignment holds an in-flight firing cycle, not its cooldown/ammo clock.
+      // Only opted-in ordinary PDCs use this path; no new round or refund is emitted.
+      if (suspendedAutofire.has(mount.slotId) && canShipFire && ship.system.canFireWeapon(mount)) continue;
       this.advanceWeaponLifecycle(mount.lifecycleDt ?? dt, mount, ship, canShipFire && ship.system.canFireWeapon(mount), spawnProjectile, spawnBeam, spawnMuzzleFlash);
     }
   }
@@ -607,8 +651,9 @@ export class ShipWeaponControlSystem {
     ship: Ship,
     spawnProjectile: (p: Projectile) => void,
     spawnBeam: (b: Beam) => void,
-    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void
+    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec, underHullShipId?: string) => void
   ): boolean {
+    if (mount.spec.gravityTractor || mount.spec.gravityDeflector) return false;
     if ((mount.reloadDelayRemaining ?? 0) > 0 || !ship.system.canFireWeapon(mount)) return false;
     mount.triggerHeld = true;
 
@@ -647,7 +692,7 @@ export class ShipWeaponControlSystem {
     ship: Ship,
     spawnProjectile: (p: Projectile) => void,
     spawnBeam: (b: Beam) => void,
-    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void
+    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec, underHullShipId?: string) => void
   ): void {
     mount.firingState = 'ACTIVE';
     mount.firingStateTimer = mount.spec.beamVisualMode === 'BURST'
@@ -730,7 +775,7 @@ export class ShipWeaponControlSystem {
     canShipFire: boolean,
     spawnProjectile: (p: Projectile) => void,
     spawnBeam: (b: Beam) => void,
-    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void
+    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec, underHullShipId?: string) => void
   ): void {
     if (!mount.spec.isBeam && mount.firingState === 'CHARGING') {
       if (!canShipFire || (!mount.triggerHeld && !mount.spec.autoCharge)) {
@@ -845,8 +890,9 @@ export class ShipWeaponControlSystem {
     ship: Ship,
     spawnProjectile: (p: Projectile) => void,
     spawnBeam: (b: Beam) => void,
-    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void
+    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec, underHullShipId?: string) => void
   ): boolean {
+    if (mount.spec.gravityTractor || mount.spec.gravityDeflector) return false;
     if ((mount.reloadDelayRemaining ?? 0) > 0 || !ship.system.canFireWeapon(mount)) return false;
     // 开火必须校验剩余幅能容量 (vanilla com/fs/starfarer/combat/entities/ship/A/if.java:346
     // startedChargeup(): `getFluxAvailable() >= getFluxCostToFire()`，与弹药、过载/排散判定并列)。
@@ -890,6 +936,7 @@ export class ShipWeaponControlSystem {
     if (offsets && offsets.length >= 2) {
       const barrelCount = Math.floor(offsets.length / 2);
       const bIdx = mount.barrelIndex % barrelCount;
+      clearGlorianaTorpedoRail(mount, bIdx);
       offX = offsets[bIdx * 2];
       offY = offsets[bIdx * 2 + 1];
       barrelOffsetWorld = new Vector2(offX, offY).rotate(mount.currentAngleRad);
@@ -910,6 +957,7 @@ export class ShipWeaponControlSystem {
 
     // 激发枪口火焰 (1:1 官方原版粒子暴风 _class.o00000 & SmoothParticle.java)
     if (spawnMuzzleFlash) {
+      const underHullShipId = ship.spec.weaponSlots.find(slot => slot.slotId === mount.slotId)?.renderLayer === 'BELOW_HULL' ? ship.id : undefined;
       if (mount.spec.launcherSmokeSpec) {
         spawnMuzzleFlash(
           firePos,
@@ -918,7 +966,8 @@ export class ShipWeaponControlSystem {
           [mount.spec.launcherSmokeSpec.particleColor[0], mount.spec.launcherSmokeSpec.particleColor[1], mount.spec.launcherSmokeSpec.particleColor[2]],
           undefined,
           ship.vel,
-          mount.spec.launcherSmokeSpec
+          mount.spec.launcherSmokeSpec,
+          underHullShipId
         );
       } else if (mount.spec.muzzleFlashSpec) {
         spawnMuzzleFlash(
@@ -927,14 +976,17 @@ export class ShipWeaponControlSystem {
           mount.spec.muzzleFlashSize || 25,
           [mount.spec.muzzleFlashSpec.particleColor[0], mount.spec.muzzleFlashSpec.particleColor[1], mount.spec.muzzleFlashSpec.particleColor[2]],
           mount.spec.muzzleFlashSpec,
-          ship.vel
+          ship.vel,
+          undefined,
+          underHullShipId
         );
       } else if (mount.spec.muzzleFlashColor && !mount.spec.isBeam) {
         spawnMuzzleFlash(
           firePos,
           fireAngleRad,
           mount.spec.muzzleFlashSize || 25,
-          mount.spec.muzzleFlashColor
+          mount.spec.muzzleFlashColor,
+          undefined, undefined, undefined, underHullShipId
         );
       }
     }
@@ -1010,6 +1062,7 @@ export class ShipWeaponControlSystem {
         baseDamage: mount.spec.damagePerShot,
         sourceDamageMultiplier: ship.crDamageDealtMultiplier * ship.getWeaponDamageMultiplier(mount.spec.weaponType),
         sourceWeaponType: mount.spec.weaponType,
+        ...(mount.spec.gravityCoupling ? { gravityCoupling: mount.spec.gravityCoupling } : {}),
         spawnLocation: firePos.clone(),
         empDamage: mount.spec.empPerShot ?? 0,
         damage: mount.spec.damagePerShot * ship.crDamageDealtMultiplier * ship.getWeaponDamageMultiplier(mount.spec.weaponType),
@@ -1072,10 +1125,15 @@ export class ShipWeaponControlSystem {
       initializeSourceProjectile(projectile, combatProjectileSpeed(ship, mount.spec), ship.vel);
       initializeSourceMissile(projectile, this.random);
       spawnProjectile(bindProjectileSource(projectile, ship));
+      // A successful shot, not a trigger/charge animation, owns physical recoil.
+      // The projectile and muzzle effects already inherited the pre-shot velocity.
+      const recoilSpeed = mount.spec.fireRecoilSpeed ?? 0;
+      if (Number.isFinite(recoilSpeed) && recoilSpeed > 0) {
+        const dx = -Math.cos(fireAngleRad) * recoilSpeed, dy = -Math.sin(fireAngleRad) * recoilSpeed;
+        ship.vel.x += dx; ship.vel.y += dy;
+        for (const mod of installedHullMods(ship.spec)) mod.onWeaponRecoil?.(ship, mount, dx, dy);
+      }
     }
     return true;
   }
 }
-
-const nativeAutofireReaders = (['aim', 'preAim', 'decide', 'hasFluxBudget'] as const)
-  .map(key => [key, AutofireController.prototype[key]] as const);

@@ -303,7 +303,7 @@ export function StudioApp({ homeNavigation }: { homeNavigation: HomeNavigation }
   const clear = () =>
     setConfirmation({
       title: "清空装配？",
-      body: "卸下所有非内置武器与可编辑插件，幅能容存器和耗散通道归零。保留内置装备；可以使用撤消恢复。",
+      body: "卸下所有非内置武器与可编辑插件，载荷容存器和耗散通道归零。保留内置装备；可以使用撤消恢复。",
       action: "清空装配",
       run: () => {
         let next = structuredClone(draft);

@@ -1,3 +1,8 @@
+import { arkOwner } from '../content/AdunArkIds';
+import { gravityTextures } from '../visual/GravityVisuals';
+import { arkArtTextures } from '../visual/AdunArkArt';
+import { adunFXTextures, adunWeaponFxScale } from '../visual/AdunFXAssets';
+import { GLORIANA_TORPEDO_ID, glorianaTorpedoTextures } from '../visual/GlorianaTorpedoVisuals';
 import type { RenderWeaponSpec } from '../render/ShipRenderState';
 import { defenseSystemId, tacticalSystemIds } from '../extensions/ship-systems/Loadout';
 import { systemWeaponSpec } from '../extensions/ship-systems/SystemWeaponCatalog';
@@ -13,6 +18,7 @@ import { contentRegistry } from '../content/ContentRegistry';
 import { ESSENTIAL_TEXTURE_URLS } from '../render/TextureCache';
 
 const WEAPON_TEXTURE_FIELDS = [
+  'displayIconUrl',
   'turretSpriteUrl', 'turretGunSpriteUrl', 'hardpointSpriteUrl', 'hardpointGunSpriteUrl',
   'glowSpriteUrl', 'hardpointGlowSpriteUrl', 'projSpriteUrl'
 ] as const satisfies readonly (keyof WeaponSpec)[];
@@ -45,15 +51,23 @@ export function collectCombatTextureUrls(engine: CombatRenderView): string[] {
     }
   };
   const addWeapon = (spec: RenderWeaponSpec) => {
+    if(spec.id.startsWith('web_gravity_'))for(const url of gravityTextures)urls.add(url);
     if (visitedWeapons.has(spec.id)) return;
     visitedWeapons.add(spec.id);
+    if (adunWeaponFxScale(spec.id)) for (const url of adunFXTextures) urls.add(url);
+    if (spec.id === GLORIANA_TORPEDO_ID) for (const url of glorianaTorpedoTextures) urls.add(url);
     for (const field of WEAPON_TEXTURE_FIELDS) if (spec[field]) urls.add(spec[field]);
     for (const id of [spec.beamEffect,spec.onHitEffect,spec.everyFrameEffect,spec.mirv?.childProjectile?.onHitEffect]) if (id) addResources(weaponEffects.require(id).resources);
     const child = spec.mirv?.childProjectile;
     if (child) for (const field of WEAPON_TEXTURE_FIELDS) if (child[field]) urls.add(child[field]);
   };
   const addHull = (spec: ShipSpec) => {
+    if(arkOwner(spec.sourceHullId??spec.id)){for(const url of [...arkArtTextures,...adunFXTextures])urls.add(url);}
     // Runtime refits can share an id but differ in systems; visit their resources before deduping artwork.
+    for (const slot of spec.weaponSlots) if (slot.installation) {
+      urls.add(slot.installation.spriteUrl);
+      if (slot.installation.foreground) urls.add(slot.installation.foreground.spriteUrl);
+    }
     for (const decoration of spec.decorativeWeapons ?? []) urls.add(decoration.spriteUrl);
     for (const id of [...tacticalSystemIds(spec), defenseSystemId(spec)]) addResources(shipSystemDefinitions.require(resolveSystemId(id)).resources);
     for (const mod of installedHullMods(spec)) addResources(mod.resources);

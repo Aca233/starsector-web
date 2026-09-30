@@ -1,11 +1,13 @@
 import { needsLaunchers } from './Requirements';
-import data from './native-drone-launchers.json';
+import rawData from './native-drone-launchers.json';
+import type { DroneLauncherData } from './LegacySystemData';
+export type { DroneLauncherData } from './LegacySystemData';
+const data: Readonly<Record<string, DroneLauncherData>> = rawData;
 import { nativeSystem } from './NativeSystemFactory';
 import type { Ship } from '../../simulation/Ship';
 import type { ShipSystem } from '../../simulation/ShipSystem';
 
 export type DroneOrder = 'RECALL' | 'DEPLOY' | 'ATTACK';
-export type DroneLauncherData = (typeof data)[keyof typeof data];
 export interface DroneDeployment {
   order: DroneOrder;
   drones: Ship[];

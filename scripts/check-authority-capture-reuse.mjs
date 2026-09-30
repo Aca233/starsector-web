@@ -1,7 +1,8 @@
+import {attachAuthorityAdmission, createAuthorityAdmission, writeAuthorityAdmission, closeAuthorityAdmission, isAuthoritySnapshotBlocked} from '../src/network/AuthorityIoAdmission.mjs';
 import {attachAuthorityCompletion, readAuthorityCompletion, createAuthorityCompletion, writeAuthorityCompletion, closeAuthorityCompletion} from '../src/network/AuthorityLocalCompletion.mjs';
 import assert from 'node:assert/strict';import {test} from 'node:test';import fs from 'node:fs';import vm from 'node:vm';import ts from 'typescript';import {transform} from 'esbuild';
 import {encodeProjectedBinaryFrame,decodeBinaryFrame,ProjectionEncodingCache} from '../src/network/BinarySnapshot.mjs';
-import {normalizeNetworkRecord} from '../desktop/network-diagnostic-record.mjs';
+import {normalizeNetworkRecord,summarizeNetworkFailure} from '../desktop/network-diagnostic-record.mjs';
 // Function extraction must supply the real authority facade used by the worker.
 const authorityCode=(await transform(fs.readFileSync('src/engine/runtime/CombatAuthority.ts','utf8'),{loader:'ts',format:'esm',target:'es2022'})).code;
 const {CombatAuthority}=await import('data:text/javascript;base64,'+Buffer.from(authorityCode).toString('base64'));
@@ -11,12 +12,13 @@ const compiled=await compile(source);
 function fixture(code=compiled){
  const shown=[],published=[],events=[],captures=[];let clock=0;const port={postMessage:(m,transfer=[])=>published.push(structuredClone(m,{transfer})),start(){},close(){}};
  const ship={id:'player',clearInput(){c.engine.value=-1;}};
- const c={serializerStartupFailed:false,snapshotEncoderWorker:null,pendingEncoding:null,ProjectionEncodingCache,encodedFragmentReuses:0,attachAuthorityCompletion,readAuthorityCompletion,directCompletion:null,motionInFlight:null,CombatAuthority,authorityRuntime:null,tick:1,lastSnapshotTick:0,snapshotInFlight:0,directReady:true,directLaunched:true,directInFlight:null,directLastTick:0,directSequence:0,directAttempt:0,directRetryAt:0,directIo:port,directFinish:null,
+ const c={summarizeNetworkFailure,serializerStartupFailed:false,snapshotEncoderWorker:null,pendingEncoding:null,ProjectionEncodingCache,encodedFragmentReuses:0,attachAuthorityAdmission,isAuthoritySnapshotBlocked,directAdmission:null,attachAuthorityCompletion,readAuthorityCompletion,directCompletion:null,motionInFlight:null,CombatAuthority,authorityRuntime:null,tick:1,lastSnapshotTick:0,snapshotInFlight:0,directReady:true,directLaunched:true,directInFlight:null,directLastTick:0,directSequence:0,directAttempt:0,directRetryAt:0,directIo:port,directFinish:null,
  capturedFrame:null,captures:0,captureReuses:0,running:true,steppingLifecycle:null,lifecycle:1,engine:{projectiles:[],value:1,externallyControlledShipIds:new Set(),combatTime:0,isBattleResultReady:false,fixedUpdate(dt){this.value++;this.combatTime+=dt;},deployment:{deploy(){c.engine.value=7;},requestRetreat(){c.engine.value=8;}}},
  controls:new Map([[0,{acknowledged:3,input:{seq:0,aim:[0,0]},queued:[],lastAction:-1,connected:true,online:true}]]),controlled:new Map([[0,ship]]),elapsedCost:0,samples:0,captureMs:0,encodeMs:0,muzzleEvents:null,compactParticles:true,localParticles:true,
  captureAuthorityCombat:(engine,tick,acknowledged,simulationMs)=>{captures.push(tick);return{tick,acknowledged,simulationMs,ships:[],world:{value:engine.value,combatTime:tick/60}};},performance:{now:()=>clock},LAN_SNAPSHOT_HZ:60,measureClock(){},realtimeRatio:1,combatRate:1,sounds:[],networkSounds:[],soundId:0,authoritySummaryShips:null,binarySnapshots:true,visualEnabled:false,
- snapshotEncoder:new TextEncoder(),encodeProjectedBinaryFrame,snapshotFlow:{count(){},reset(){}},ioFlow:{count(){}},ioStats:{sent:0,skipped:0,inputs:0,sharedCompletions:0},send:(m,transfer=[])=>{if(m.type==='snapshot')shown.push(structuredClone(m,{transfer}));else events.push(structuredClone(m));},diagnostics(){return{};},multicore:null,timer:undefined,clearInterval(){},setInterval(){return 1;},aiBudget:{reset(){}},background:false,foregroundPending:false,backgroundThrottled:false,last:0,lastCallbackFinishedAt:0,accumulator:0,telemetryAt:0,lastStepMs:0,maxStepMs:0,config:{backgroundGraceMs:300000},recoveryBudget:{allow:()=>true},motionSnapshot(){},combatSnapshot(){},visualSnapshot(){},yieldHostTask:async()=>{},applyPlayerControls(){},Vector2:class{},DEFAULT_MOUSE_STEERING:false,deploymentReplies:new Map(),
+ snapshotEncoder:new TextEncoder(),encodeProjectedBinaryFrame,snapshotFlow:{count(){},reset(){}},ioFlow:{count(){}},ioStats:{sent:0,skipped:0,inputs:0,sharedCompletions:0,preflightSkips:0},send:(m,transfer=[])=>{if(m.type==='snapshot')shown.push(structuredClone(m,{transfer}));else events.push(structuredClone(m));},diagnostics(){return{};},multicore:null,timer:undefined,clearInterval(){},setInterval(){return 1;},aiBudget:{reset(){}},background:false,foregroundPending:false,backgroundThrottled:false,last:0,lastCallbackFinishedAt:0,accumulator:0,telemetryAt:0,lastStepMs:0,maxStepMs:0,config:{backgroundGraceMs:300000},recoveryBudget:{allow:()=>true},motionSnapshot(){},combatSnapshot(){},visualSnapshot(){},yieldHostTask:async()=>{},applyPlayerControls(){},Vector2:class{},DEFAULT_MOUSE_STEERING:false,deploymentReplies:new Map(),
  };
+ c.captureLanDisplayCombat=(...args)=>c.captureAuthorityCombat(...args);
  c.authorityRuntime=new CombatAuthority(c.engine);
  vm.createContext(c);vm.runInContext(code,c);return{c,shown,published,events,captures,port,at:t=>clock=t};
 }
@@ -169,3 +171,44 @@ test('rejected snapshots retry latest completed world, not a queue of old ticks;
 test('async encoder same-tick local skips use a fresh attempt and retain cooldown',()=>{const f=fixture(),helper=asyncEncoder(f);f.c.snapshot();helper.finish();f.c.flushSnapshotEncoding();assert.equal(f.published.length,1);const old={tick:1,nextSequence:0,delivery:'skipped',attempt:f.c.directAttempt};assert.equal(f.c.acceptIoSnapshot(old),true);f.c.snapshot();assert.equal(f.published.length,1);f.at(20);f.c.snapshot();helper.finish();f.c.flushSnapshotEncoding();assert.equal(f.published.length,2);assert.equal(f.published[1].tick,1);assert.ok(f.published[1].attempt>old.attempt);assert.equal(f.c.acceptIoSnapshot(old),false);});
 
 test('repeated backpressure keeps one local flight with monotonic attempt IDs and no queued obsolete ticks',()=>{const f=fixture();for(let i=0;i<200;i++){f.at(i*20);f.c.tick=i+1;f.c.snapshot();assert.equal(f.published.length,i+1);const packet=f.published.at(-1);assert.equal(packet.tick,i+1);assert.equal(packet.attempt,i+1);assert.equal(f.c.acceptIoSnapshot({tick:packet.tick,attempt:packet.attempt,nextSequence:0,delivery:'skipped'}),true);f.c.snapshot();assert.equal(f.published.length,i+1);assert.equal(f.c.directInFlight,null);}assert.equal(f.c.directSequence,0);assert.equal(f.c.ioStats.skipped,200);assert.equal(f.c.ioStats.sent,0);});
+
+function blockNetwork(f){const view=createAuthorityAdmission(true);writeAuthorityAdmission(view,true);f.c.directAdmission=view;return view;}
+test('blocked network captures/encodes/transfers nothing while physics and bounded sound ownership continue',async()=>{
+ const f=fixture(),view=blockNetwork(f);let encodes=0;const encode=f.c.encodeProjectedBinaryFrame;f.c.encodeProjectedBinaryFrame=(...args)=>{encodes++;return encode(...args);};
+ f.c.networkSounds=[{id:1,key:'kept'}];f.c.controlled.clear();f.at(35);await f.c.step();
+ assert.ok(f.c.tick>1);assert.equal(f.c.captures,0);assert.equal(encodes,0);assert.equal(f.published.length,0);assert.equal(f.c.directInFlight,null);assert.equal(f.c.directAttempt,0);assert.equal(f.c.networkSounds.length,1);assert.ok(f.c.ioStats.preflightSkips>0);
+ writeAuthorityAdmission(view,false);f.c.snapshot();assert.equal(f.c.captures,1);assert.equal(encodes,1);assert.equal(f.published.length,1);assert.equal(frame(f.published[0]).tick,f.c.tick);assert.equal(frame(f.published[0]).world.value,f.c.engine.value);assert.equal(f.c.networkSounds.length,0);
+});
+test('blocked network leaves display cadence and same-tick capture reuse independent',()=>{
+ const f=fixture(),view=blockNetwork(f);let fragments=0;f.c.ProjectionEncodingCache=class extends ProjectionEncodingCache{constructor(...args){super(...args);fragments++;}};let encodes=0;const encode=f.c.encodeProjectedBinaryFrame;f.c.encodeProjectedBinaryFrame=(...args)=>{encodes++;return encode(...args);};
+ f.c.networkSounds=[{id:7,key:'network'}];
+ for(let tick=1;tick<=10;tick++){f.c.tick=tick;f.c.engine.value=tick;f.c.snapshotInFlight=null;f.c.sounds=[{id:tick,key:'display'}];f.c.snapshot();}
+ assert.equal(f.shown.length,10);assert.equal(f.published.length,0);assert.equal(f.c.captures,10);assert.equal(encodes,10);assert.equal(fragments,0,'do not build speculative encoding fragments for a blocked lane');assert.equal(f.c.networkSounds.length,1);
+ writeAuthorityAdmission(view,false);f.c.snapshot();assert.equal(f.c.captures,10);assert.equal(f.c.captureReuses,1);assert.equal(encodes,11);assert.equal(f.c.capturedFrame,null);assert.equal(f.published.length,1);
+ assert.deepEqual(frame(f.published[0]).world,frame(f.shown.at(-1)).world);assert.equal(frame(f.published[0]).sounds[0].id,7);
+});
+test('optional serializer does not speculatively encode blocked network or dispatch it after a mid-job rejection',()=>{
+ const f=fixture(),helper=asyncEncoder(f),view=blockNetwork(f);f.c.snapshot();assert.equal(helper.job,null);
+ f.c.snapshotInFlight=null;f.c.networkSounds=[{id:1,key:'kept'}];f.c.snapshot();assert.equal(helper.job.display,true);assert.equal(helper.job.network,false);
+ writeAuthorityAdmission(view,false);helper.finish();f.c.flushSnapshotEncoding();assert.equal(f.shown.length,1);assert.equal(f.published.length,0);
+ f.c.snapshot();assert.equal(helper.job.network,true);writeAuthorityAdmission(view,true);helper.finish();f.c.flushSnapshotEncoding();assert.equal(f.published.length,0);assert.equal(f.c.networkSounds.length,1);assert.equal(f.c.directInFlight,null);
+ f.c.tick=4;f.c.engine.value=4;writeAuthorityAdmission(view,false);f.c.snapshot();helper.finish();f.c.flushSnapshotEncoding();assert.equal(f.published.length,1);assert.equal(frame(f.published[0]).tick,4);assert.equal(frame(f.published[0]).sounds[0].id,1);
+});
+test('terminal bypasses admission; missing, revoked and rebound hints cannot suppress fallback',()=>{
+ const f=fixture(),view=blockNetwork(f);f.c.directInFlight=0;f.c.networkSounds=[{id:1,key:'final'}];f.c.snapshot(true);assert.equal(f.published.length,1);assert.equal(f.shown.length,1);assert.equal(frame(f.published[0]).sounds[0].id,1);
+ for(const action of ['authority-port','authority-fallback']){const g=fixture();blockNetwork(g);g.c.handleMessage({type:action,port:g.port});assert.equal(g.c.directAdmission,null);}
+ closeAuthorityAdmission(view);assert.equal(isAuthoritySnapshotBlocked(view),false);
+ for(const binary of [true,false]){const g=fixture();g.c.binarySnapshots=binary;const hint=blockNetwork(g);closeAuthorityAdmission(hint);g.c.snapshot();assert.equal(g.published.length,1);}
+});
+test('frozen-before versus current blocked snapshot workload has exact successful recovery', {skip:!process.env.AUTHORITY_ADMISSION_BASELINE}, async()=>{
+ const oldSource=fs.readFileSync(process.env.AUTHORITY_ADMISSION_BASELINE,'utf8');
+ function run(code){const f=fixture(code),view=blockNetwork(f);let encodes=0,bytes=0;const encode=f.c.encodeProjectedBinaryFrame;f.c.encodeProjectedBinaryFrame=(...args)=>{encodes++;return encode(...args);};f.c.networkSounds=[{id:1,key:'kept'}];
+  for(let i=1;i<=120;i++){f.at(i*20);f.c.tick=i;f.c.engine.value=i;f.c.snapshot();if(f.c.directInFlight!==null){const p=f.published.at(-1);bytes+=p.bytes;f.c.acceptIoSnapshot({tick:p.tick,attempt:p.attempt,nextSequence:0,delivery:'skipped'});}}
+  const blocked={captures:f.c.captures,encodes,transfers:f.published.length,bytes,sounds:f.c.networkSounds.length,preflightSkips:f.c.ioStats.preflightSkips};
+  f.at(2500);f.c.tick=121;f.c.engine.value=121;writeAuthorityAdmission(view,false);f.c.snapshot();const p=f.published.at(-1),recovery=frame(p);assert.equal(f.c.acceptIoSnapshot({tick:p.tick,attempt:p.attempt,nextSequence:1,delivery:'sent'}),true);
+  return{blocked,recovery,accepted:f.c.ioStats.sent,sequence:f.c.directSequence};
+ }
+ const before=run(await compile(oldSource)),after=run(compiled);assert.equal(before.blocked.captures,120);assert.equal(before.blocked.encodes,120);assert.equal(before.blocked.transfers,120);assert.ok(before.blocked.bytes>0);
+ assert.deepEqual(after.blocked,{captures:0,encodes:0,transfers:0,bytes:0,sounds:1,preflightSkips:120});assert.deepEqual(after.recovery.world,before.recovery.world);assert.equal(after.recovery.tick,121);assert.equal(after.accepted,1);assert.equal(before.accepted,1);assert.equal(after.sequence,1);assert.equal(before.sequence,1);
+ if(process.env.AUTHORITY_ADMISSION_OUT)fs.writeFileSync(process.env.AUTHORITY_ADMISSION_OUT,JSON.stringify({scope:'Extracted real host functions with controlled local I/O blockage; empty DTO world, not throughput/FPS/WAN measurement',blockedAttempts:120,before,after,successfulRecoveryWorldEqual:true},null,2));
+});

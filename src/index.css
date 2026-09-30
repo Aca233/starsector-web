@@ -1,4 +1,7 @@
-@import "tailwindcss";
+/* Scan application sources, not multi-gigabyte offline Blender bakes in output/. */
+@import "tailwindcss" source("./");
+@source "../index.html";
+@source "../campaign.html";
 @import "./ui/core/theme.css";
 
 @layer base {

@@ -45,7 +45,7 @@ function modalControls(panel: HTMLElement) {
   return Array.from(panel.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex="0"]'))
     .filter(element => element.getClientRects().length > 0 && !element.closest('[inert]'));
 }
-export function Modal({ title, eyebrow = '舰队指挥终端', description, onClose, children, footer, width = 'regular', onShortcut, role = 'dialog', initialFocus = 'first-control', surface = 'glass', titleFont = 'button', className = '' }: {
+export function Modal({ title, eyebrow = '', description, onClose, children, footer, width = 'regular', onShortcut, role = 'dialog', initialFocus = 'first-control', surface = 'glass', titleFont = 'button', className = '' }: {
   title: string; eyebrow?: string; description?: string; onClose?: () => void; children: React.ReactNode;
   footer?: React.ReactNode; width?: 'small' | 'regular' | 'wide' | 'console'; role?: 'dialog' | 'alertdialog';
   onShortcut?: (key: string) => void; initialFocus?: 'first-control' | 'panel'; surface?: NativeSurface; titleFont?: NativeFont; className?: string;
@@ -128,7 +128,7 @@ export function Modal({ title, eyebrow = '舰队指挥终端', description, onCl
     <div ref={panelRef} inert={exiting} role={role} aria-modal="true" aria-labelledby={`${id}-title`} aria-describedby={description ? `${id}-description` : undefined}
       tabIndex={-1} className={`ui-modal native-chrome ui-modal--${width} ${className}`} data-native-surface={surface}>
       <NativeBorder /><NativeMaterial />
-      <header className="ui-modal-header"><div><div className="ui-eyebrow">{eyebrow}</div><h2 id={`${id}-title`}><NativeBitmapText font={titleFont}>{title}</NativeBitmapText></h2>
+      <header className="ui-modal-header"><div>{eyebrow && <div className="ui-eyebrow">{eyebrow}</div>}<h2 id={`${id}-title`}><NativeBitmapText font={titleFont}>{title}</NativeBitmapText></h2>
         {description && <p id={`${id}-description`} className="ui-muted">{description}</p>}</div>
         {onClose && <Button size="sm" variant="ghost" aria-label={`关闭${title}`} onClick={onClose}><X size={19} /></Button>}
       </header>

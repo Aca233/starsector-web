@@ -1,10 +1,12 @@
 /** Isolated audio regression: no browser, audio hardware, or user storage required. */
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { build } from 'esbuild';
 const bundle = (await build({
-  stdin: { contents: `export * from './src/engine/audio/AudioSettings'; export { sound } from './src/engine/audio/SoundManager';`, resolveDir: process.cwd() },
+  stdin: { contents: `export * from './src/engine/audio/AudioSettings'; export { sound } from './src/engine/audio/SoundManager'; export { soundPaths, soundVariants, requireSound } from './src/engine/audio/SoundBank'; export { assetResolver } from './src/engine/assets/AssetResolver'; export { runtimeAssetUrl } from './src/engine/runtime/RuntimePaths'; export { retainedWeaponMedia, retainedWeaponMediaFields } from './src/engine/content/RetainedWeaponMedia'; export { starNeedle } from './src/engine/content/ZhuYuanPack'; export { hyperionYamatoProjectile } from './src/engine/content/HyperionPack'; export { hyperionWeapons } from './src/engine/content/HyperionArmory'; export { glorianaWeapons } from './src/engine/content/GlorianaArmory'; export { glorianaAirWeapons } from './src/engine/content/GlorianaAviation';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'iife', globalName: 'AudioTest', platform: 'browser',
   define: { 'import.meta.env.BASE_URL': '"./"' },
 })).outputFiles[0].text;
@@ -127,4 +129,51 @@ test('async sample loads cannot escape a later mute; previews respect zero level
   api.updateAudioSettings({ effectsVolume: 0 }); assert.equal(await api.sound.preview('effects'), false); assert.equal(requests(), 0);
   assert.equal(await api.sound.preview('interface'), true); assert.equal(contexts[0].sources.length, 1);
   const failed = create({ failFetch: true }); assert.equal(await failed.api.sound.preview('effects'), false);
+});
+
+
+test('retained effects and audio resolve to real preserved media, not procedural replacements', async () => {
+  const { api } = create();
+  const manifest = JSON.parse(await readFile('public/game-assets/asset-manifest.json', 'utf8'));
+  const entries = new Map(manifest.map(entry => [entry.path, entry]));
+  const retained = JSON.parse(await readFile('public/retained-combat-media.json', 'utf8'));
+  assert(retained.records.length > 0);
+  for (const record of retained.records) {
+    const bytes = await readFile('public/game-assets/' + record.path);
+    const hash = createHash('sha256').update(bytes).digest('hex');
+    assert.equal(hash, record.sha256, record.path);
+    assert.equal(entries.get(record.path)?.hash, hash, record.path);
+    assert.equal(api.assetResolver.normalize('/game-assets/' + record.path), record.path);
+    assert.equal(api.runtimeAssetUrl(record.path), './game-assets/' + record.path);
+  }
+  for (const [key, file] of Object.entries(api.soundPaths)) {
+    api.requireSound(key, false);
+    assert(entries.has(file), 'Missing audio: ' + key + ' -> ' + file);
+    assert(!file.startsWith('sounds/original/'), 'Unexpected synthesised replacement: ' + key);
+    for (const sample of api.soundVariants(key) ?? []) assert(entries.has(sample.file), sample.file);
+  }
+  const media = JSON.parse(await readFile('src/engine/content/retained-weapon-media.json', 'utf8'));
+  const allowed = new Set(api.retainedWeaponMediaFields);
+  for (const [id, preset] of Object.entries(media)) {
+    assert(id.startsWith('web_'));
+    for (const field of Object.keys(preset)) assert(allowed.has(field), 'Native gameplay/turret data leaked: ' + field);
+    if (preset.projSpriteUrl) assert(entries.has(api.assetResolver.normalize(preset.projSpriteUrl)), preset.projSpriteUrl);
+    for (const field of ['soundKey', 'soundIntroKey', 'soundLoopKey']) if (preset[field]) api.requireSound(preset[field], false);
+  }
+  const customWeapons = [api.starNeedle, api.hyperionYamatoProjectile, ...api.hyperionWeapons, ...api.glorianaWeapons, ...api.glorianaAirWeapons];
+  assert.equal(customWeapons.length, Object.keys(media).length);
+  for (const weapon of customWeapons) {
+    assert(media[weapon.id], 'Custom weapon media missing: ' + weapon.id);
+    for (const field of ['soundKey', 'soundIntroKey', 'soundLoopKey']) if (weapon[field]) api.requireSound(weapon[field], false);
+    for (const field of ['projSpriteUrl', 'turretSpriteUrl', 'hardpointSpriteUrl', 'glowSpriteUrl', 'hardpointGlowSpriteUrl']) {
+      if (weapon[field]) assert(entries.has(api.assetResolver.normalize(weapon[field])), weapon.id + ': ' + weapon[field]);
+    }
+  }
+  assert.equal(api.glorianaWeapons.find(weapon => weapon.id === 'web_gloriana_macro').projSpriteUrl, '/game-assets/graphics/missiles/shell_large_yellow.png');
+  assert.equal(api.hyperionYamatoProjectile.soundKey, 'plasma_cannon_fire');
+  // Media retention must not resurrect the deleted native entity catalogs.
+  for (const name of ['ships', 'weapons', 'loadouts']) {
+    const data = JSON.parse(await readFile('src/engine/data/generated/' + name + '.json', 'utf8'));
+    assert.equal(Object.keys(data).length, 0, name);
+  }
 });

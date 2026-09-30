@@ -11,7 +11,9 @@ export interface CombatSound {
   pos?: [number, number];
 }
 export interface CombatSnapshot {
-  displayVersion?: 1;
+  displayVersion?: 1 | 2;
+  /** v2 self-contained content revisions; indices have frame-local scope. */
+  displayDefinitions?: string[];
   controlled?: Record<number, string>;
   displayWings?: {player: unknown[]; enemy: unknown[]};
   displayWorld?: any;

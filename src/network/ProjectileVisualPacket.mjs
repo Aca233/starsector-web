@@ -1,3 +1,4 @@
+import { decodeBase64Bytes } from './Base64Bytes.mjs';
 import { ANCHORED_VISUAL_LIMITS as L } from './AnchoredProjectileVisual.mjs';
 // A multiple of three permits shared base64 slices without per-peer re-encode.
 export const VISUAL_FRAGMENT_BYTES=6144;
@@ -7,11 +8,11 @@ export function visualPacketBytes(m){
  if(m.encoding!==undefined&&(m.encoding!=='deflate-raw'||!Number.isSafeInteger(m.rawBytes)||m.rawBytes<=0||m.rawBytes>limit))throw Error('Invalid visual compression');
  if(m.receiptOffset!==undefined&&(!Number.isSafeInteger(m.receiptOffset)||!Number.isSafeInteger(m.receiptTotal)||m.kind!=='baseline'||m.receiptOffset<0||m.receiptOffset>=m.receiptTotal||m.receiptTotal>L.baselineBytes))throw Error('Invalid visual forwarded receipt');
  if(m.data.length>Math.ceil(limit/3)*4||!m.data.length||m.data.length%4||!/^[A-Za-z0-9+/]*={0,2}$/.test(m.data))throw Error('Invalid visual bytes');
- const text=atob(m.data);if(text.length>limit)throw Error('Visual packet limit');
+ const bytes=decodeBase64Bytes(m.data);if(bytes.length>limit)throw Error('Visual packet limit');
  if(m.offset!==undefined||m.total!==undefined){
-  if(m.kind!=='baseline'||!Number.isSafeInteger(m.total)||m.total<=0||m.total>L.baselineBytes||!Number.isSafeInteger(m.offset)||m.offset<0||m.offset>=m.total||m.offset%VISUAL_FRAGMENT_BYTES||text.length!==Math.min(VISUAL_FRAGMENT_BYTES,m.total-m.offset))throw Error('Invalid visual fragment');
+  if(m.kind!=='baseline'||!Number.isSafeInteger(m.total)||m.total<=0||m.total>L.baselineBytes||!Number.isSafeInteger(m.offset)||m.offset<0||m.offset>=m.total||m.offset%VISUAL_FRAGMENT_BYTES||bytes.length!==Math.min(VISUAL_FRAGMENT_BYTES,m.total-m.offset))throw Error('Invalid visual fragment');
  }
- return Uint8Array.from(text,c=>c.charCodeAt(0));
+ return bytes;
 }
 /** At most one bounded partial baseline. Fragment receipt is NOT a committed
  * visual revision: only the final complete CRC-checked baseline grants readiness. */

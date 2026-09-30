@@ -117,7 +117,7 @@ try {
 
   await rows.filter({hasText:'布局方案 5'}).getByRole('button',{name:'改装',exact:true}).click();
   await page.getByRole('textbox',{name:'AI 方案名称'}).fill('侧栏改装确认');
-  await page.getByRole('button',{name:'减少幅能容存器',exact:true}).click();
+  await page.getByRole('button',{name:'减少载荷容存器',exact:true}).click();
   // Use a different vent value too, so it cannot merge with an existing seeded design.
   await page.getByRole('button',{name:'减少耗散通道',exact:true}).click();
   await page.getByRole('button',{name:'应用修改',exact:true}).click();

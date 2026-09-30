@@ -1,0 +1,119 @@
+[
+  {
+    "id": "BOW_GUARD_PORT",
+    "owner": "FORE",
+    "size": "SMALL",
+    "point": [
+      232,
+      218
+    ]
+  },
+  {
+    "id": "BOW_GUARD_STARBOARD",
+    "owner": "FORE",
+    "size": "SMALL",
+    "point": [
+      280,
+      218
+    ]
+  },
+  {
+    "id": "FORE_SHOULDER_PORT",
+    "owner": "FORE",
+    "size": "MEDIUM",
+    "point": [
+      207,
+      298
+    ]
+  },
+  {
+    "id": "FORE_SHOULDER_STARBOARD",
+    "owner": "FORE",
+    "size": "MEDIUM",
+    "point": [
+      305,
+      298
+    ]
+  },
+  {
+    "id": "AFT_SHOULDER_PORT",
+    "owner": "AFT",
+    "size": "MEDIUM",
+    "point": [
+      206,
+      724
+    ]
+  },
+  {
+    "id": "AFT_SHOULDER_STARBOARD",
+    "owner": "AFT",
+    "size": "MEDIUM",
+    "point": [
+      306,
+      724
+    ]
+  },
+  {
+    "id": "AFT_BATTERY_PORT",
+    "owner": "PORT",
+    "size": "LARGE",
+    "point": [
+      161,
+      789
+    ]
+  },
+  {
+    "id": "AFT_BATTERY_STARBOARD",
+    "owner": "STARBOARD",
+    "size": "LARGE",
+    "point": [
+      351,
+      789
+    ]
+  },
+  {
+    "id": "AFT_OUTER_GUARD_PORT",
+    "owner": "PORT",
+    "size": "SMALL",
+    "point": [
+      112,
+      802
+    ]
+  },
+  {
+    "id": "AFT_OUTER_GUARD_STARBOARD",
+    "owner": "STARBOARD",
+    "size": "SMALL",
+    "point": [
+      400,
+      802
+    ]
+  },
+  {
+    "id": "STERN_GUARD_PORT",
+    "owner": "AFT",
+    "size": "SMALL",
+    "point": [
+      219,
+      830
+    ]
+  },
+  {
+    "id": "STERN_GUARD_STARBOARD",
+    "owner": "AFT",
+    "size": "SMALL",
+    "point": [
+      293,
+      830
+    ]
+  },
+  {
+    "id": "FORE_PROJECTOR",
+    "owner": "FORE",
+    "size": "EXTRA_LARGE",
+    "point": [
+      256,
+      262
+    ]
+  }
+]

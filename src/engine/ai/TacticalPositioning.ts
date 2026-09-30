@@ -78,7 +78,7 @@ export function chooseCombatVelocity(ship: Ship, target: Ship, desired: Vector2,
   // OUTSIDE the short collision corridor. Infinity deliberately records these reads.
   for (const other of [target, ...nearby]) world.noteNavigationObstacle?.(ship, other, Infinity);
   const bodies: Body[] = nearby.map(other => ({ ship: other, pos: other.pos.clone().addScaled(other.vel, HORIZON),
-    radius: Math.max(other.spec.collisionRadius, other.shield.isActive ? other.shield.radius : 0) + 8 }));
+    radius: Math.max(other.spec.collisionRadius, other.shield.isActive && !(other.shield.voidShield && sameTeam(ship,other)) ? other.shield.radius : 0) + 8 }));
   for (const a of world.asteroids.filter(a => a.hp > 0).sort((a, b) => ship.pos.distanceTo(a.pos) - ship.pos.distanceTo(b.pos)).slice(0, 8))
     bodies.push({ pos: a.pos.clone().addScaled(a.vel, HORIZON), radius: a.radius + 8 });
   const foes = nearby.filter(s => !sameTeam(ship, s) && !s.flux.isVenting && !s.flux.isOverloaded && !s.system.blocksWeapons)

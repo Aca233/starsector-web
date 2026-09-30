@@ -1,3 +1,4 @@
+import { imageWidth, imageHeight, type RenderCanvas, type RenderImage } from '../RenderSurface';
 import { textureCache } from '../TextureCache';
 import { assetManager, type AssetManifestEntry } from '../../assets/AssetResolver';
 
@@ -13,7 +14,7 @@ export class WebGLTextureManager {
   private gl: WebGL2RenderingContext;
   private textures: Map<string, WebGLTexture> = new Map();
   private canvasTextureRevisions: Map<string, string | number> = new Map();
-  private pending = new Map<string, { img: HTMLImageElement; onLoad: () => void; onError: () => void }>();
+  private pending = new Map<string, { unsubscribe: () => void }>();
   private whiteTexture: WebGLTexture;
   private transparentTexture: WebGLTexture;
   private uploads = 0;
@@ -36,7 +37,7 @@ export class WebGLTextureManager {
 
   public async preload(urls: readonly string[]): Promise<void> {
     const generation = this.generation;
-    await Promise.all(urls.map((url) => textureCache.waitForImage(url)));
+    await Promise.all(urls.map((url) => textureCache.waitForTextureImage(url)));
     if (this.disposed || generation !== this.generation) return;
     for (const url of urls) this.getTexture(url);
   }
@@ -62,8 +63,8 @@ export class WebGLTextureManager {
     const existing = this.textures.get(key);
     if (existing) return existing;
 
-    const img = textureCache.getImage(url);
-    if (img.complete && img.naturalWidth > 0) {
+    const img = textureCache.getTextureImage(url);
+    if (img) {
       const uploaded = this.uploadImage(img, sampler);
       this.textures.set(key, uploaded);
       return uploaded;
@@ -73,25 +74,24 @@ export class WebGLTextureManager {
       const generation = this.generation;
       const finish = () => {
         this.removePending(key);
-        if (this.disposed || generation !== this.generation || !img.complete || img.naturalWidth <= 0 || this.textures.has(key)) return;
-        const uploaded = this.uploadImage(img, sampler);
+        const ready = textureCache.getTextureImage(url);
+        if (this.disposed || generation !== this.generation || !ready || this.textures.has(key)) return;
+        const uploaded = this.uploadImage(ready, sampler);
         this.textures.set(key, uploaded);
       };
       const fail = () => this.removePending(key);
-      this.pending.set(key, { img, onLoad: finish, onError: fail });
-      img.addEventListener('load', finish, { once: true });
-      img.addEventListener('error', fail, { once: true });
+      this.pending.set(key, { unsubscribe: textureCache.onImageReady(url, finish, fail) });
     }
     return this.transparentTexture;
   }
 
   public getTextureInfo(url: string, forceRepeat = false): { texture: WebGLTexture; width: number; height: number } {
     const texture = this.getTexture(url, forceRepeat);
-    const img = textureCache.getImage(url);
+    const img = textureCache.getTextureImage(url);
     return {
       texture,
-      width: img.complete && img.naturalWidth > 0 ? img.naturalWidth : 0,
-      height: img.complete && img.naturalHeight > 0 ? img.naturalHeight : 0
+      width: img ? imageWidth(img) : 0,
+      height: img ? imageHeight(img) : 0
     };
   }
 
@@ -115,7 +115,7 @@ export class WebGLTextureManager {
   }
 
   /** Uploads/replaces a caller-owned canvas texture only when its semantic revision changes. */
-  public getCanvasTexture(cacheId: string, canvas: HTMLCanvasElement, revision: string | number): WebGLTexture {
+  public getCanvasTexture(cacheId: string, canvas: RenderCanvas, revision: string | number): WebGLTexture {
     if (this.disposed) return this.transparentTexture;
     const key = `@canvas:${cacheId}`;
     const existing = this.textures.get(key);
@@ -143,13 +143,13 @@ export class WebGLTextureManager {
     }
   }
 
-  private uploadCanvas(canvas: HTMLCanvasElement, sampler: Required<NonNullable<AssetManifestEntry['sampler']>>): WebGLTexture {
+  private uploadCanvas(canvas: RenderCanvas, sampler: Required<NonNullable<AssetManifestEntry['sampler']>>): WebGLTexture {
     const tex = this.createTexture(texture => this.bindAndConfigure(texture, sampler, () => this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, canvas)));
     this.uploads++;
     return tex;
   }
 
-  private uploadImage(img: HTMLImageElement, sampler: Required<NonNullable<AssetManifestEntry['sampler']>>): WebGLTexture {
+  private uploadImage(img: RenderImage, sampler: Required<NonNullable<AssetManifestEntry['sampler']>>): WebGLTexture {
     const tex = this.createTexture(texture => this.bindAndConfigure(texture, sampler, () => this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, img)));
     this.uploads++;
     return tex;
@@ -181,8 +181,7 @@ export class WebGLTextureManager {
   private removePending(key: string): void {
     const pending = this.pending.get(key);
     if (!pending) return;
-    pending.img.removeEventListener('load', pending.onLoad);
-    pending.img.removeEventListener('error', pending.onError);
+    pending.unsubscribe();
     this.pending.delete(key);
   }
 

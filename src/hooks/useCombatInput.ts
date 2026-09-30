@@ -1,3 +1,7 @@
+import { pickModuleFireControl } from '../engine/runtime/ModuleFireControl';
+import { HYPERION_JUMP_ID } from '../engine/content/HyperionIds';
+import { HYPERION_REACTOR, jumpTargetingEntryFailure } from '../engine/content/HyperionJumpTarget';
+import { effectiveHullStats } from '../engine/extensions/HullMods';
 import { readSystemBindings, selectNextSystem } from '../engine/runtime/SystemBindings';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Vector2 } from '../engine/math/Vector2';
@@ -23,6 +27,8 @@ export interface UseCombatInputParams {
   onTogglePause: () => void;
 }
 
+function releaseHeldFire(mouse: React.MutableRefObject<boolean>): void { mouse.current = false; }
+
 function resetHeldInput(keys: React.MutableRefObject<Record<string, boolean>>, mouse: React.MutableRefObject<boolean>): void {
   keys.current = {}; mouse.current = false;
 }
@@ -46,6 +52,19 @@ export function useCombatInput({
   setIsAutopilot,
   onTogglePause
 }: UseCombatInputParams) {
+  const [targetingMessage, setTargetingMessage] = useState('');
+  const [commandNotice, setCommandNotice] = useState('');
+  const jumpConfirmPending = useRef(false);
+  useEffect(() => {
+    const targeting = sessionRef.current.jumpTargeting;
+    const sync = () => setTargetingMessage(targeting.message);
+    sync(); return targeting.subscribe(sync);
+  }, [sessionRef]);
+  useEffect(() => {
+    if (!commandNotice) return;
+    const timer = window.setTimeout(() => setCommandNotice(''), 2600);
+    return () => window.clearTimeout(timer);
+  }, [commandNotice]);
   const ownershipRequest = useRef(0);
   const heldCodes = useRef(new Set<string>());
   const pointerHeld = useRef(false);
@@ -67,6 +86,7 @@ export function useCombatInput({
   const setAutopilot = useCallback(async (enabled: boolean): Promise<boolean> => {
     if (!canPilot()) return false;
     if (isAutopilotRef.current === enabled) return true;
+    sessionRef.current.jumpTargeting.cancel();
     const session = sessionRef.current, epoch = session.controlEpoch, ship = session.read.playerShip;
     const request = ++ownershipRequest.current;
     resetHeldInput(keysPressed, isMouseDown);
@@ -80,11 +100,32 @@ export function useCombatInput({
   const command = useCallback(async (action: ShipCommand) => {
     const session = sessionRef.current, canvas = canvasRef.current, epoch = session.controlEpoch, generation = inputGeneration.current;
     if (!canvas || inputBlockedRef.current || session.read.isTacticalMap || !session.isPresentationReady() || !hasCombatInputFocus()) return;
+    const jump = action.kind === 'system' && session.read.playerShip.systems[action.value ?? 0]?.type === HYPERION_JUMP_ID;
+    if (jump && session.jumpTargeting.active) { session.jumpTargeting.cancel(); return; }
+    if (jumpConfirmPending.current) return;
+    if (jump) {
+      const reason = jumpTargetingEntryFailure(session.read.playerShip.systems[action.value ?? 0]);
+      if (reason) { setCommandNotice(reason); return; }
+    }
     const aim = clientToCombatWorld(mouseScreenPos.current, canvas, cameraPosRef.current, zoomRef.current);
     const pointerActive = mouseAimActiveRef.current;
     if (!await takeManualControl() || session.controlEpoch !== epoch || generation !== inputGeneration.current || inputBlockedRef.current || !hasCombatInputFocus()) return;
-    await session.dispatchControl({kind:'ship',command:action,aim:pointerActive ? [aim.x,aim.y] : undefined});
-  }, [sessionRef, canvasRef, inputBlockedRef, takeManualControl, mouseScreenPos, cameraPosRef, zoomRef, mouseAimActiveRef]);
+    if (jump && action.kind === 'system') {
+      releaseHeldFire(isMouseDown); pointerHeld.current = false;
+      await session.dispatchControl({kind:'stop-firing'});
+      if (session.controlEpoch !== epoch || generation !== inputGeneration.current || inputBlockedRef.current || !hasCombatInputFocus()) return;
+      const ship = session.read.playerShip;
+      session.jumpTargeting.begin(ship.id,epoch,action.value ?? 0,HYPERION_REACTOR.jumpRange*effectiveHullStats(ship.spec).systemRangeMultiplier);
+      session.updateJumpTargeting(pointerActive ? aim : undefined);
+      return;
+    }
+    session.jumpTargeting.cancel();
+    const result = await session.dispatchControl({kind:'ship',command:action,aim:pointerActive ? [aim.x,aim.y] : undefined});
+    if (action.kind === 'module' && !result.accepted && session.controlEpoch === epoch
+      && generation === inputGeneration.current && sessionRef.current === session) {
+      setCommandNotice(result.reason ?? '模块接管未获准');
+    }
+  }, [sessionRef, canvasRef, inputBlockedRef, takeManualControl, mouseScreenPos, cameraPosRef, zoomRef, mouseAimActiveRef, isMouseDown]);
 
   const onTogglePauseRef = useRef(onTogglePause);
   useEffect(() => { onTogglePauseRef.current = onTogglePause; }, [onTogglePause]);
@@ -96,6 +137,7 @@ export function useCombatInput({
     if (!canvas) return;
 
     const clearTransientInput = () => {
+      sessionRef.current.jumpTargeting.cancel();
       inputGeneration.current++; heldCodes.current.clear(); pointerHeld.current = false;
       resetInputState(keysPressed, isMouseDown, sessionRef.current);
     };
@@ -147,8 +189,38 @@ export function useCombatInput({
       mouseAimActiveRef.current = true;
       sessionRef.current.cameraController.samplePointer(e.clientX, e.clientY);
 
+      const session = sessionRef.current;
+      if (session.jumpTargeting.active && (e.button === 0 || e.button === 2)) {
+        e.preventDefault(); isMouseDown.current = false; pointerHeld.current = false;
+        if (e.button === 2) { session.jumpTargeting.cancel(); return; }
+        session.updateJumpTargeting(clientToCombatWorld(mouseScreenPos.current, curCanvas, cameraPosRef.current, zoomRef.current));
+        const target = session.jumpTargeting.preview, selection = session.jumpTargeting.selection;
+        if (!target?.valid || !selection) return;
+        if (!session.jumpTargeting.choosingFacing) { session.jumpTargeting.lockPosition(); return; }
+        const aim: [number,number] = [target.position.x,target.position.y];
+        session.jumpTargeting.cancel(); jumpConfirmPending.current = true;
+        try {
+          const result = await session.dispatchControl({kind:'ship',command:{kind:'system',value:selection.slot},aim,facing:target.facing});
+          if (!result.accepted && session.controlEpoch === selection.epoch) setCommandNotice(result.reason ?? '跃迁未获准');
+        } finally { jumpConfirmPending.current = false; }
+        return;
+      }
+      if (jumpConfirmPending.current) { e.preventDefault(); return; }
       if (e.button === 0) {
-        if (!takeManualControl() || sessionRef.current.state !== 'running') return;
+        const point = clientToCombatWorld(mouseScreenPos.current, curCanvas, cameraPosRef.current, zoomRef.current);
+        const module = !engine.battleResult ? pickModuleFireControl(engine.playerShip, engine.ships, point,
+          session.state === 'running' ? session.scheduler.alpha : 1) : undefined;
+        if (module !== undefined) {
+          // This entire press selects, even when held/dragged off the hull. A new press fires.
+          e.preventDefault(); pointerHeld.current = false; releaseHeldFire(isMouseDown);
+          void session.dispatchControl({kind:'stop-firing'});
+          await command({kind:'module',value:module});
+          return;
+        }
+        pointerHeld.current = true;
+        const generation = inputGeneration.current, epoch = session.controlEpoch;
+        if (!await takeManualControl() || !pointerHeld.current || session.state !== 'running'
+          || session.controlEpoch !== epoch || generation !== inputGeneration.current || blocked(e.target, true)) return;
         isMouseDown.current = true;
       } else if (e.button === 2) {
         e.preventDefault();
@@ -163,7 +235,7 @@ export function useCombatInput({
 
     const onMouseUp = (e: MouseEvent) => {
       if (e.button !== 0) return;
-      isMouseDown.current = false;
+      pointerHeld.current = false; isMouseDown.current = false;
       sessionRef.current.dispatchControl({ kind: 'stop-firing' });
     };
 
@@ -180,6 +252,9 @@ export function useCombatInput({
 
     const onKeyDown = async (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.isComposing || blocked(e.target) || !hasCombatInputFocus()) return;
+      if (e.code === 'Escape' && sessionRef.current.jumpTargeting.active) {
+        e.preventDefault(); sessionRef.current.jumpTargeting.cancel(); return;
+      }
       // Focused HUD buttons own Space/Enter activation, not the pause shortcut.
       if ((e.code === 'Space' || e.code === 'Enter') && isCombatPointerUi(e.target)) return;
       const engine = sessionRef.current.read;
@@ -257,5 +332,5 @@ export function useCombatInput({
     };
   }, [sessionRef, canvasRef, cameraPosRef, zoomRef, isAutopilotRef, inputBlockedRef, keysPressed, mouseScreenPos, mouseAimActiveRef, isMouseDown, command, setAutopilot, takeManualControl]);
 
-  return { command, setAutopilot, controlNotice: takeoverNotice ?? undefined };
+  return { command, setAutopilot, targetingMessage: targetingMessage || commandNotice, controlNotice: takeoverNotice ?? undefined };
 }

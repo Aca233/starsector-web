@@ -6,7 +6,7 @@ import React, { useRef, useState } from 'react';
 import type { GameSession } from '../engine/game/GameSession';
 import { i18n } from '../engine/i18n/LocalizationManager';
 import { contentRegistry } from '../engine/content/ContentRegistry';
-import { runtimeAssetUrl } from '../engine/runtime/RuntimePaths';
+import { AssemblyThumbnail } from './core/AssemblyThumbnail';
 import { Button, ConfirmDialog, Modal, Notice, type Confirmation } from './core/UI';
 import { ConditionBar, Readout, ShipPreview } from './core/ShipPreview';
 
@@ -40,7 +40,7 @@ export function GameStatePanel({ game, onClose, onAction, actionError, onClearEr
         <nav className="native-roster" aria-label="长期舰队"><div className="native-roster-heading">舰队 · {state.fleet.length} 艘</div>{state.fleet.map(member => {
           const hull = contentRegistry.getShip(member.hullId);
           return <button className="native-roster-item" key={member.id} type="button" aria-pressed={member.id === selected?.id} onClick={() => setSelectedId(member.id)}>
-            {hull && <img src={runtimeAssetUrl(hull.spriteUrl)} alt="" />}<span><strong>{hull ? i18n.t(hull.nameKey).split(' (')[0] : member.hullId}</strong><small>{member.status === 'destroyed' ? '已战沉' : `结构 ${Math.round(member.hullFraction * 100)}%`}</small></span>
+            {hull && <AssemblyThumbnail spec={hull} />}<span><strong>{hull ? i18n.t(hull.nameKey).split(' (')[0] : member.hullId}</strong><small>{member.status === 'destroyed' ? '已战沉' : `结构 ${Math.round(member.hullFraction * 100)}%`}</small></span>
           </button>;
         })}</nav>
         {spec ? <ShipPreview spec={spec} /> : <div className="native-ship-stage">未加载舰体</div>}

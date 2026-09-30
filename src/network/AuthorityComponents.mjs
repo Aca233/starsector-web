@@ -1,8 +1,9 @@
+import { decodeBase64Bytes } from './Base64Bytes.mjs';
 import { AnchoredProjectileReceiver, ANCHORED_VISUAL_LIMITS as L } from './AnchoredProjectileVisual.mjs';
 import { decodeCombatState, COMBAT_STATE_MAX_BYTES } from './CriticalCombatState.mjs';
 const bytes = value => value instanceof Uint8Array ? value : value instanceof ArrayBuffer ? new Uint8Array(value) : null;
 const text = value => { const b = bytes(value); if (!b) throw Error('Invalid component bytes'); let s = ''; for (let i = 0; i < b.length; i += 8192) s += String.fromCharCode(...b.subarray(i, i + 8192)); return btoa(s); };
-const read = (s, limit) => { if (typeof s !== 'string' || !s.length || s.length > Math.ceil(limit / 3) * 4 || s.length % 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(s)) throw Error('Invalid component upload'); const b = Uint8Array.from(atob(s), c => c.charCodeAt(0)); if (b.length > limit) throw Error('Component upload budget'); return b; };
+const read = (s, limit) => { if (typeof s !== 'string' || !s.length || s.length > Math.ceil(limit / 3) * 4 || s.length % 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(s)) throw Error('Invalid component upload'); const b = decodeBase64Bytes(s); if (b.length > limit) throw Error('Component upload budget'); return b; };
 export class AuthorityComponentPublisher {
   constructor() { this.reset(); }
   reset() { this.matchId = null; this.key = null; }

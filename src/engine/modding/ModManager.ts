@@ -1,3 +1,10 @@
+import { zhefengShips } from '../content/ZhefengPack';
+import { gravityShips } from '../content/GravityPack';
+import { gravityWeapons } from '../content/GravityArmory';
+import { zhefengWeapons } from '../content/ZhefengArmory';
+import { rocinanteShips } from '../content/RocinantePack';
+import { rocinanteWeapons } from '../content/RocinanteArmory';
+import { adunArkPack } from '../content/AdunArkPack';
 import type { WeaponSpec } from '../simulation/Weapon';
 import type { ShipSpec } from '../content/ShipSpec';
 import { i18n } from '../i18n/LocalizationManager';
@@ -5,9 +12,12 @@ import { contentRegistry } from '../content/ContentRegistry';
 import { validateShipSpec, validateWeaponSpec } from './ContentValidation';
 import { validateStrings } from './ContentValidation';
 import { immutableCopy } from '../extensions/Immutable';
-import { builtInShips } from '../data/BuiltInShips';
-import runtimeImportReport from '../data/generated/runtime-import-report.json';
-import { registerUnavailableSourceSystem } from '../extensions/ship-systems/Registry';
+import { starNeedle, zhuYuanShips } from '../content/ZhuYuanPack';
+import { glorianaWeapons, glorianaArmoryStrings } from '../content/GlorianaArmory';
+import { glorianaAircraft, glorianaAirWeapons, glorianaAviationStrings } from '../content/GlorianaAviation';
+import { hyperionWeapons, hyperionArmoryStrings } from '../content/HyperionArmory';
+import { hyperionShips, hyperionYamatoProjectile } from '../content/HyperionPack';
+import { glorianaShips } from '../content/GlorianaPack';
 
 export type { ShipSpec, WeaponMountSlotConfig, EngineSlotConfig, FighterWingSpec } from '../content/ShipSpec';
 
@@ -22,17 +32,36 @@ export interface ModPackage {
   i18n?: ShipSpec['i18n'];
 }
 
+/** Only at bundled-content startup: never strip a saved/user-registered spec.
+ * Fighters keep intrinsic armament; structural modules are cleared recursively. */
+function withoutDefaultFit(input: ShipSpec): ShipSpec {
+  const ship = structuredClone(input);
+  if (ship.hullSize === 'FIGHTER') return ship;
+  ship.weaponSlots = ship.weaponSlots.map(slot => slot.builtIn ? slot : { ...slot, defaultWeaponId: undefined });
+  const equipped = new Set(ship.weaponSlots.filter(slot => slot.defaultWeaponId).map(slot => slot.slotId));
+  ship.defaultWeaponGroups = ship.defaultWeaponGroups?.map(group => ({ ...group,
+    weaponSlotIds: group.weaponSlotIds.filter(id => equipped.has(id)) }));
+  ship.hullMods = []; ship.sMods = []; ship.fighterWings = [];
+  ship.modules = ship.modules?.map(module => ({ ...module, spec: withoutDefaultFit(module.spec) }));
+  return ship;
+}
+
 /** Registration and validation only; source content and sandbox loadouts live in data/. */
 export class ModManager {
   private static instance: ModManager;
   private loadedMods = new Map<string, ModPackage>();
 
   private constructor() {
-    for (const [id, row] of Object.entries(runtimeImportReport.systems)) registerUnavailableSourceSystem(id, row);
-    const ships = builtInShips();
+    const originals = [...zhuYuanShips(), ...glorianaShips(), ...glorianaAircraft, ...hyperionShips(), ...adunArkPack.ships, ...rocinanteShips(), ...zhefengShips(), ...gravityShips()];
+    const ships = originals.map(withoutDefaultFit);
     for (const ship of ships) validateStrings(ship.i18n);
-    contentRegistry.registerPack(ships, [], false);
-    for (const ship of ships) this.registerStrings(ship.i18n, true);
+    contentRegistry.registerPack(ships, [starNeedle, ...glorianaWeapons, ...glorianaAirWeapons, ...hyperionWeapons, hyperionYamatoProjectile, ...adunArkPack.weapons, ...rocinanteWeapons(), ...zhefengWeapons, ...gravityWeapons()], false);
+    // Explicit original translations must not be shadowed by en_US fallback.
+    for (const ship of originals) this.registerStrings(ship.i18n);
+    this.registerStrings(glorianaArmoryStrings);
+    this.registerStrings(glorianaAviationStrings);
+    this.registerStrings(hyperionArmoryStrings);
+    this.registerStrings(adunArkPack.i18n);
   }
 
   public static getInstance(): ModManager {

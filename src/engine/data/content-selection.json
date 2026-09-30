@@ -1,40 +1,16 @@
 {
   "schemaVersion": 1,
   "hulls": [
-    "onslaught",
-    "paragon",
-    "doom",
-    "broadsword",
-    "dagger"
-  ],
-  "weapons": [
-    "tpc",
-    "tachyonlance",
-    "autopulse",
-    "mark9",
-    "heavymauler",
-    "hveldriver",
-    "annihilatorpod",
-    "gravitonbeam",
-    "taclaser",
-    "heavyblaster",
-    "typhoon",
-    "sabot",
-    "lightmg",
-    "pdburst",
-    "atropos_single",
-    "flak",
-    "dualflak"
+    "web_zhuyuan",
+    "web_gloriana",
+    "web_sc2_hyperion"
   ],
   "sandbox": {
-    "player": "onslaught",
+    "player": "web_zhuyuan",
     "opponents": [
-      "paragon",
-      "onslaught"
+      "web_sc2_hyperion",
+      "web_gloriana",
+      "web_zhuyuan"
     ]
-  },
-  "discovery": {
-    "allNative": true,
-    "allowApproximate": true
   }
 }

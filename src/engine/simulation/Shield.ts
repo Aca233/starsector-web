@@ -1,3 +1,4 @@
+import { createVoidShield, advanceVoidShield, absorbVoidShield, type VoidShieldSpec, type VoidShieldState } from './VoidShield';
 import { shieldUnfoldRate, shieldVisualAlpha, shieldRenderArc, phaseEngaged, shieldPhased, phaseCooldown, phaseSpeed } from '../render/ShieldDisplayMath';
 import { Vector2 } from '../math/Vector2';
 import { DamageType } from './ArmorGrid';
@@ -42,6 +43,11 @@ export class Shield {
   public efficiency: number; // 护盾受损转幅能效率 (越低越肉)
   public upkeepRate: number; // 维持每秒幅能消耗 (ship_data.csv shield upkeep × flux dissipation)
   
+  public voidShield?: VoidShieldState;
+  public configureVoidShield(spec: VoidShieldSpec): void {
+    this.voidShield = createVoidShield(spec); this.type = 'OMNI'; this.maxArcDeg = 360; this.upkeepRate = 0;
+    this.isActive = true; this.currentArcDeg = 360;
+  }
   public toggleLocked = false;
   public isActive = false;
   public currentArcDeg = 0; // 当前已展开弧度 (度)
@@ -175,10 +181,11 @@ export class Shield {
   }
 
   /** Requested state includes a raise queued behind the shield's physical close time. */
-  public get isRaiseRequested(): boolean { return this.isActive || this.pendingRaise; }
+  public get isRaiseRequested(): boolean { return this.voidShield?.armed ?? (this.isActive || this.pendingRaise); }
 
   public toggle(): boolean {
     if (this.toggleLocked) return this.isActive;
+    if (this.voidShield) { this.setActive(!this.voidShield.armed); return this.isActive; }
     if (this.type === 'NONE') return false;
     if (this.type === 'PHASE') return this.togglePhase();
     this.setActive(!(this.isActive || this.pendingRaise));
@@ -202,6 +209,19 @@ export class Shield {
   }
 
   public setActive(active: boolean) {
+    if (this.voidShield) {
+      const online = active && !this.voidShield.suppressed && this.voidShield.integrity > 0;
+      if (online && !this.isActive) {
+        this.voidShield.visualRestartRemaining = 1.4;
+        this.voidShield.visualShutdownRemaining = 0;
+      } else if (!online && this.isActive) {
+        this.voidShield.visualShutdownRemaining = .9;
+        this.voidShield.visualRestartRemaining = 0;
+      }
+      this.voidShield.armed = active;
+      this.isActive = online;
+      this.currentArcDeg = this.isActive ? 360 : 0; return;
+    }
     if (this.type === 'NONE') { this.isActive = false; return; }
     if (this.type !== 'PHASE') {
       this.pendingRaise = active && this.closeTimeRemaining > 0;
@@ -353,6 +373,15 @@ export class Shield {
    * 护盾吸收伤害结算
    * @returns 转化产生的硬幅能数值
    */
+  /** Remainder stays in incoming-damage units, before downstream armor modifiers. */
+  public absorbImpact(damage: number, damageType: DamageType, hitAngleRad: number): { flux: number; absorbed: number; remainingFraction: number } {
+    if (!this.voidShield) return { flux: this.absorbDamage(damage, damageType, hitAngleRad), absorbed: damage * this.damageTakenMultiplierFor(damageType), remainingFraction: 0 };
+    this.recordDamageContact(damage);
+    const result = absorbVoidShield(this.voidShield, damage * this.externalDamageTakenMultiplier(), hitAngleRad);
+    this.recordVisualHit(result.absorbed, hitAngleRad);
+    if (this.voidShield.integrity <= 0) { this.isActive = false; this.currentArcDeg = 0; }
+    return { ...result, flux: 0 };
+  }
   public absorbDamage(damage: number, damageType: DamageType, hitAngleRad: number): number {
     this.recordDamageContact(damage);
     // 伤害类型对护盾的倍率
@@ -384,6 +413,11 @@ export class Shield {
    * 60Hz 逻辑步长更新
    */
   public update(dt: number, shipFacing: number, aimFacing: number) {
+    if (this.voidShield) {
+      advanceVoidShield(this.voidShield, dt);
+      this.isActive = this.voidShield.armed && !this.voidShield.suppressed && this.voidShield.integrity > 0;
+      this.currentArcDeg = this.isActive ? 360 : 0;
+    }
     // 0. 相位线圈状态机 (IN 0.5s → ACTIVE → OUT 0.5s → COOLDOWN 2s) 与硬幅能成本
     if (this.type === 'PHASE') {
       if (this.forcedPhaseEffectLevel === undefined) this.updatePhase(dt);

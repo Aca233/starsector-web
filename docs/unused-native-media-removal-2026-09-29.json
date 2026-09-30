@@ -1,0 +1,3640 @@
+{
+  "date": "2026-09-29",
+  "scope": "User-authorized removal of currently unreferenced retained original media from public/game-assets; native install and user saves untouched. Presets retained; only automatic default equipment removed.",
+  "backupRoot": "C:\\Users\\Aca\\.codex\\backups\\starsector-web-unused-native-media-20260929-205034",
+  "removedFiles": 602,
+  "removedByExtension": {
+    ".png": 57,
+    ".ogg": 510,
+    ".jpg": 35
+  },
+  "removedBytes": 42656948,
+  "retainedOriginalImages": 10,
+  "retainedOriginalAudio": 247,
+  "unchangedGeneratedAssets": 171,
+  "manifestDanglingFiles": [],
+  "presetCatalogAndPickerRestoredExactly": true,
+  "dynamicAudit": [
+    "Damage uses damage_{kind}48_{variant}_{layer}, not the two unused decal sheets.",
+    "Debris selection lists generated small/medium/large files, not unused cargo/debris atlases.",
+    "NebulaSystem uses terrain/nebula.png; no other retained native terrain file is referenced.",
+    "Campaign JSON reference tables are currently empty; explicit BodyRenderer/JumpPointCanvas/Mining/ColonyManagement image paths retained. No custom future-mod closure claimed.",
+    "SoundBank and all sample variants preserve every referenced filename; unreferenced original OGG paths are not constructed by the loader.",
+    "Preload-only shields256ringd removed from ESSENTIAL_TEXTURE_URLS; no rendering consumer found.",
+    "Selectable and preset equipment paths are retained even when not equipped by default."
+  ],
+  "records": [
+    {
+      "path": "graphics/damage/damage_decal_sheet_base.png",
+      "sha256": "5f17eeace4a99548c0270b072f215849dd477a2cabe881b71be7f7e8abebbf25",
+      "bytes": 35228,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/damage/damage_decal_sheet_glow.png",
+      "sha256": "eacced467717cdddf10d31d915b7457cb7193693274922546cd3b04318ac1a16",
+      "bytes": 15021,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/debris/cargo_pod_sheet1.png",
+      "sha256": "8390cd9a422863be4a84a2b32c40ad4d76ddcd3f2680b26a94e5a2381abe9139",
+      "bytes": 37998,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/debris/debris_sheet0.png",
+      "sha256": "42ba26ea98b9a271dc44aafa96ba12fceca6e6e43939ee80b92b68aa4b573fcc",
+      "bytes": 25848,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/debris/debris_sheet0_glow.png",
+      "sha256": "efbace380f5a11276642b3c8818bd2dbf3fe30101e88e973505f9a99a957ecfa",
+      "bytes": 8382,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/beam_pulsar.png",
+      "sha256": "30a412cb3f34e023e201147835660166b09abe6da52e599dda9581af8aac96b6",
+      "bytes": 92735,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/circle_mask_hires.png",
+      "sha256": "cd7858098290f6f9f179f31dec2387b64a78a3350492fd80e4ef74fd043eaed3",
+      "bytes": 8701,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/empty.png",
+      "sha256": "9e7106fdd69a1e87c1ccf491e3425aa79b0b0cb63358c863ad0aced9e05d524b",
+      "bytes": 133,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/neutrino_detector.png",
+      "sha256": "29e13626d54a11381543e895c6c9c2c614561faa6cd745d80395d2a865611075",
+      "bytes": 22753,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/noise.png",
+      "sha256": "b5f9f25c68c71c7b51947f16a82f4256e036d3a3b5ea04f246def7476d7a2390",
+      "bytes": 75824,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/particleline32ln.png",
+      "sha256": "7ab1d61861604c7d83a4d34e32b0420a01caa8b41591b081a17773edc39cefc6",
+      "bytes": 189,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/question_mark.png",
+      "sha256": "4bcb54a73e49fdb465f08c468de80a4c7dcbdf0bab51e6b0eba6167dae63c049",
+      "bytes": 810,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/scandot22.png",
+      "sha256": "9da4d7f7ea82032ca036a1d5e2c04acf6cf38be96beb04e4f5d8d9075ea034d2",
+      "bytes": 127,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/scandot3.png",
+      "sha256": "7ee1b714bc0af2f06afc5a11f6f845da8ff9b2c19b2660824c2f6223ec80159a",
+      "bytes": 130,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/scandot4.png",
+      "sha256": "50db9353f6bcfc15f845c18d6725ebfa59efaf517cf6f7a9bd8a0095108bea00",
+      "bytes": 133,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/scandot44.png",
+      "sha256": "f568451421b7077c718b32ea70a4d4429b0f5def365da48134ee035b12afcc0c",
+      "bytes": 140,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/scanline11.png",
+      "sha256": "028236af640ae027b698a0eb8e87057926b97605dacc244298aac96cfd18d74f",
+      "bytes": 133,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/scanline1110.png",
+      "sha256": "c24d075af37f0add37e2a1b8c4e1b6d19b21e70b1b1e8d075c9f12fe6b371cc3",
+      "bytes": 141,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/scanline12.png",
+      "sha256": "75eab59ff2140a502307f99ac5addba6a4571bee26d10726830348bddede6bbc",
+      "bytes": 137,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/scanline21.png",
+      "sha256": "04454f65b5af78ca1713d7e5285a252a8c72196d472983a94eb5724d56d542ef",
+      "bytes": 137,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/scanline44.png",
+      "sha256": "a044b08455c7009f53ebbc0a4aa0c59827c2d02139324d9fee4e6ad88f4e0868",
+      "bytes": 138,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/scanline_large.png",
+      "sha256": "1e9962ee9fcb1360a18431d6abe4ce2eb498c6b899e0166cf0b54dd48b919beb",
+      "bytes": 160,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/shields256ringd.png",
+      "sha256": "d84400bfe46df387f8bce681fb9cebf86ecb0fba8d6ae7a6f8d8be2fad36b215",
+      "bytes": 9998,
+      "reason": "unused preload only; no draw consumer"
+    },
+    {
+      "path": "graphics/fx/ship_shadow_mask.png",
+      "sha256": "733a102fae4e83afa0b15f4f7a9523a7774e6c1f5ba17e2452ff9d2f1cb7bbb4",
+      "bytes": 809,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/slipstream_dark.png",
+      "sha256": "8c2c38f69f861f74203c1d951d63d19312e0a8b14e9205e2c73926ae6525a878",
+      "bytes": 559420,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/slipstream_edge3.png",
+      "sha256": "345c9de6de33029fc866ff92b397fece3d0a44f47f920d291298b57f317cd136",
+      "bytes": 199267,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/slipstream_layer1.png",
+      "sha256": "1a3ed5bdd2387cabfededfa775374d0d316d940ef9911abd2dc536953032709a",
+      "bytes": 851668,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/slipstream_layer2.png",
+      "sha256": "58d12be87b9ae8a4dd819c4249b58a7e800a792f661c7dac5a69bc9e079c4434",
+      "bytes": 973237,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/slipstream_map3.png",
+      "sha256": "bd19b6c364bc89a7167db208edbab02fc0e3b6e9d9cd03b244a71bd2ec8d1d18",
+      "bytes": 5287,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/fx/slipstream_map_edge2.png",
+      "sha256": "00787ae913b2de50b63ae41c4a20dd66ed84ef8df45939c658cb69315b577042",
+      "bytes": 2851,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-emergency_burn_01_start.ogg",
+      "sha256": "68c17ef553cd1804be6f3c48bc7d807c3a2c73ffe9156c2649eb126b23671eb2",
+      "bytes": 84419,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-emergency_burn_02_loop.ogg",
+      "sha256": "869bb1e5d5daaa9b5a80333a7d62e81a75053dbbf5b9f380bedce16628f65eed",
+      "bytes": 221644,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-emergency_burn_03_end.ogg",
+      "sha256": "576a8ca27ff7e3ea09017daa53ba4f56b9a3d81b7d9cb7f2446b0c037ecaa568",
+      "bytes": 215342,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-go_dark_01_enabled.ogg",
+      "sha256": "419377d05e0180ad33b6229ba88b91926bcc4f511ad77611766bc39b66090b56",
+      "bytes": 62338,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-go_dark_02_disabled.ogg",
+      "sha256": "d11b3c8d0f27f0ae11826499fbff0f5db44919327360dc385dc929cc0286a02d",
+      "bytes": 57254,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-interdiction_pulse_activate.ogg",
+      "sha256": "94288ec6aaef9d4fc2a0a78dc4392dba99fb61a3303e7d93a4840c8a84a63de0",
+      "bytes": 71559,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-interdiction_pulse_charge.ogg",
+      "sha256": "b38c48a1bd8dada8b04e938574785abc1a11e3d9c2c500ef81ff5db3b651b2e0",
+      "bytes": 109644,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-interdiction_pulse_detected.ogg",
+      "sha256": "445624b35ed966497c1a6dd373ef4ed835948050516f0de7327476e20fcfd514",
+      "bytes": 20988,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-interdiction_pulse_hit.ogg",
+      "sha256": "d37d1dfb151dd362b5c93fd1f150178ab8a591e59f39e4141878b6dbd3246e24",
+      "bytes": 31268,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-neutrino_detector_disabled.ogg",
+      "sha256": "7f574a19a48d3e3f7a8f20fa4cb9f6e66611d75a484c37305c66a48ccbf0293f",
+      "bytes": 29685,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-neutrino_detector_enabled.ogg",
+      "sha256": "b6f95f676d2ec81f069e476c8485dae3cde18afb340c158601da973031c89169",
+      "bytes": 31533,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-neutrino_detector_ping_01.ogg",
+      "sha256": "2a84d5332b2db1a97e7b25a062dbc30a55bfd2a0126af84a80f9ac3040a78fe1",
+      "bytes": 12346,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-neutrino_detector_ping_02.ogg",
+      "sha256": "fb2e3bdd63b9c4f2b8c6a5ba5f1ce8dedc5c7006322ebbdcc0c1ff5906e7b509",
+      "bytes": 13155,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-neutrino_detector_ping_03.ogg",
+      "sha256": "d5a9f72cfe5e495c248981f2d117a990f53e0cb69f72b8e0e3aebce9d5cdf942",
+      "bytes": 10972,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-neutrino_detector_ping_04.ogg",
+      "sha256": "9a79316a7be46bcb9753ced2aa5a59c8a47a51fc3f1fc2768f6e54cb0d68dbaf",
+      "bytes": 9104,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-neutrino_detector_ping_05.ogg",
+      "sha256": "2bb896186ec0f4d8045da96a12fdfe953294f7a716d86277dad86fb5ed6fa5d4",
+      "bytes": 11696,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-neutrino_detector_ping_06.ogg",
+      "sha256": "03f496b7bd42835ea98dedd4240c83c87ed4849000009d51ffeb1ddd7ec2d393",
+      "bytes": 9602,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-neutrino_detector_ping_07.ogg",
+      "sha256": "2e0f67b54ae48e0a11a5cd485f048e807b9de84665409cd960133d90c45c5281",
+      "bytes": 9470,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-neutrino_detector_ping_08.ogg",
+      "sha256": "08c77fe16bac90e7b1f1979d29ce5241e6fecfc4bc003a30f3f030ba9dd84431",
+      "bytes": 11784,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-neutrino_detector_ping_09.ogg",
+      "sha256": "3fa48eaab3cf3aac1f0badfac83354b042c56eeda7d4932798a5826c973ec7d0",
+      "bytes": 14913,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-neutrino_detector_ping_10.ogg",
+      "sha256": "ece2dcffac33f579e38f539a2712d1743cea474a0dc3cfba2199a31c6000ea08",
+      "bytes": 10331,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-sensor_burst_01.ogg",
+      "sha256": "0f43b814247f5d550b98d78e7093ce8600eb0eb3919ce25439acf66d147d4bf8",
+      "bytes": 242627,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-sensor_burst_02.ogg",
+      "sha256": "efc426ebe6241abd648453929676d26fa09f5a9501988a7ef0ea447f114196eb",
+      "bytes": 237609,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-sensor_burst_03.ogg",
+      "sha256": "741c0475d55749c9db3d79d2d69394b6385a17b141999a3e16d9fee6f3f8cbea",
+      "bytes": 226789,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-sensor_burst_04.ogg",
+      "sha256": "18c0043c1565790672c4e46e84ad00280370b8d95f357e1492a8672a5166aded",
+      "bytes": 236099,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-sensor_burst_05.ogg",
+      "sha256": "2adef6ff3b69e7b2a12ecda6f2f347f00171fdc3088a153da989fc837a1cca82",
+      "bytes": 231249,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-sensor_burst_06.ogg",
+      "sha256": "f1d85c91e78d66121689556af15c3e21e28a998e2599eeae76978787acbef11e",
+      "bytes": 229428,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-sensor_burst_07.ogg",
+      "sha256": "0f03ebb8087a492c86b3251846920c12081c9b833c9ed4b1b8771743f14bc512",
+      "bytes": 220352,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-sensor_burst_08.ogg",
+      "sha256": "d6776dcc73c84e48defcda9e44046c26eca419ccb597ebb4f53ee53c34274b17",
+      "bytes": 223436,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-slipstream_polarity_activate.ogg",
+      "sha256": "d6da437204e2289a7ea181e47781b4ec12de13a009ffe05cbe5b6d6f4bc4228b",
+      "bytes": 23102,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-slipstream_polarity_deactivate.ogg",
+      "sha256": "30df794eae69a5979c21f2aae734a02ea787e6b0e1ad29618e85ebdc7cfae381",
+      "bytes": 21270,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-slipstream_polarity_loop.ogg",
+      "sha256": "04292f00d7e8f6cf73cd682e8fc50a716a9d501672eacec77c9e17996d579449",
+      "bytes": 44601,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-slipstream_surge_activate.ogg",
+      "sha256": "5d17f6567138a4c497817b7db5c2fe8a5fa7fd1e40e8d79de2349e821503d683",
+      "bytes": 63663,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-slipstream_surge_deactivate.ogg",
+      "sha256": "9ef047225d3b852b4105b72dce983052a12a64279ab82fe932e1f23de19db074",
+      "bytes": 30988,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-slipstream_surge_flight_loop.ogg",
+      "sha256": "e276f7293ce431939b0f4b134101a5ee6c54e89c0bd63a576357a0637584f03b",
+      "bytes": 164401,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-sustained_burn_01.ogg",
+      "sha256": "6bdbe2cdc02519ad1e32f850d5aae7578268380c96bc71a56bd15411e0502e4c",
+      "bytes": 31667,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-sustained_burn_02.ogg",
+      "sha256": "7e2dde817c23fb202e6d7c2041b4732d3f8cb01b96be0a4416a5d49ac7b69751",
+      "bytes": 25271,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-sustained_burn_loop.ogg",
+      "sha256": "629e18a8761da4288067bea4e40d0269f60b3e7ca9d2fd945a94281d2290e8a1",
+      "bytes": 170002,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-transponder_01_enabled.ogg",
+      "sha256": "83c0a3876b5bb9ae0a3ffd1e83fc92132d0fb50de72ed5a2a9f9f8c21d91baa8",
+      "bytes": 54048,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-transponder_02_disabled.ogg",
+      "sha256": "24b6fd74026cb2d47dbabc756a432376f6ce8152ff6678af4f820c6230d432ad",
+      "bytes": 27749,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-world-interdiction_pulse_activate.ogg",
+      "sha256": "ae9adc14853b827e9bfa79f3d862b889b0fb8aef84762b812fe4aca51945eab7",
+      "bytes": 57241,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability-world-interdiction_pulse_charge.ogg",
+      "sha256": "47ec87041279a628f427bae7865cf9e4bedcd32c3dde73da348ed43d41d5f7e8",
+      "bytes": 64121,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability_emergency_signal_01.ogg",
+      "sha256": "d4207d54250c371e9dc23964b5e62757c0b6250f4c9f43e0680640fad88f1b51",
+      "bytes": 99636,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability_remote_survey_01.ogg",
+      "sha256": "154bb597c70e5652ee3f29df9091322ebde9175973fe437704b63b98d0674fab",
+      "bytes": 71366,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability_scavenge_01.ogg",
+      "sha256": "8e8d1846fd91661f6e8971b818d519538c9b7d3663f748a20506c84cc053da6b",
+      "bytes": 180691,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability_world-emergency_burn_activate.ogg",
+      "sha256": "8ddf740d3e4239ab48fde31d3ad7ca8b038f81c2a2a8ec0b086b99f515c2c90c",
+      "bytes": 63590,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability_world-go_dark_01.ogg",
+      "sha256": "345e5bd39ef0e987692897d28e162dee4a869bd417c6af7694d816047fb04cb5",
+      "bytes": 56321,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability_world-go_dark_02.ogg",
+      "sha256": "30cb39998d6d5b89636967dce404e835b962d05e01ffb072ea1e9e4e00a6621b",
+      "bytes": 56365,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability_world-go_dark_03.ogg",
+      "sha256": "07e2779dfae8b7002ff9e8e2a41059c88e446b025a586e0f60dfab27bbb670df",
+      "bytes": 59795,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability_world-go_dark_04.ogg",
+      "sha256": "e3c9f80957cf86d996ef15a217e5761f6d630089721e87613ee77d3aa529f93a",
+      "bytes": 60223,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability_world-go_dark_off_01.ogg",
+      "sha256": "8e3805c3f78cd49b4eba30c6b7e256b5d4e6cdf527d7743205021deebd83ff86",
+      "bytes": 46806,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability_world-go_dark_off_02.ogg",
+      "sha256": "cd5ed4c1fb7850211ffb2aeed9f554fdaf4dd8816cca26480041df56bf570be0",
+      "bytes": 43184,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability_world-go_dark_off_03.ogg",
+      "sha256": "0201070b09b759a7564eaec8a2cd6e4c033e8ba5633d05804b13c703a1a5b8f0",
+      "bytes": 48148,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability_world-go_dark_off_04.ogg",
+      "sha256": "81edfa8bea7d33de218192832ef17939d44e996f9d3db76a54131af9ac21ddd7",
+      "bytes": 47905,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability_world-sensor_burst_01.ogg",
+      "sha256": "0da176fc9eef0f9dbd229614a34e693e3eb3c4c47fc410533c7269ecbf735233",
+      "bytes": 94495,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability_world-sensor_burst_02.ogg",
+      "sha256": "c675b79b3e3562c2e4463de258a9af4206f0152797bc92cb2790b317f3f574e1",
+      "bytes": 92513,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability_world-sensor_burst_03.ogg",
+      "sha256": "d25370ecf4f29a09600cd09a5af0a32985f823b7922fcb7aecbb07339f27f947",
+      "bytes": 97749,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability_world-sensor_burst_04.ogg",
+      "sha256": "1255508def91a790e378dd80b377efca6e223ce67d1c6659d59cddf286b6b6d5",
+      "bytes": 92087,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability_world-sensor_burst_05.ogg",
+      "sha256": "a466be93883aafa4cd05c297f505b39fa34ba748447a730384c4f9d915d4ec2f",
+      "bytes": 94984,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability_world-sensor_burst_06.ogg",
+      "sha256": "e21c6f76c52f82b1daf6c31b5b36b1d1b74a2c0ee0ff6452248ba761c651f3c9",
+      "bytes": 92204,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability_world-sensor_burst_07.ogg",
+      "sha256": "3de5b62c4190fec433b2d43d1beda355b43d614a48f7cc1b68ed5258d3bf53ca",
+      "bytes": 93932,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability_world-sensor_burst_08.ogg",
+      "sha256": "133a5a7d2aa725426f089613a72325613661e5bcc2854034a38b8c1ec04143be",
+      "bytes": 92439,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability_world-sustained_burn_activate.ogg",
+      "sha256": "62c69950df7bdc227921cbda2415b8d08ef843c1a1542b8c98a8467caab8967b",
+      "bytes": 12582,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_abilities/ability_world-sustained_burn_deactivate.ogg",
+      "sha256": "7b576ba835b117897c5cdd1c4e9574399241a9289ed84569a349a6105a8ed7e5",
+      "bytes": 15401,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_bar/portside_bar_neutral_v7.ogg",
+      "sha256": "fb594daa2799e28ac213860d3599b41747cd4750a8bcd04fa24ec53d5ff081db",
+      "bytes": 409067,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_aicore_alpha_drop.ogg",
+      "sha256": "7c9861522999257b2eb7c8be12722b85575a1f1af086871f5874af22a72823ef",
+      "bytes": 25787,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_aicore_beta_drop.ogg",
+      "sha256": "c5da602c47a090cb3a27c752ac8c6a806ba586e0873f34f03065fa322ba311c7",
+      "bytes": 23651,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_aicore_gamma_drop.ogg",
+      "sha256": "4eabba6f34e49c246d19875620b153aa6009b897d59cfcbb8f32e48b46dbf238",
+      "bytes": 16414,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_aicore_pickup.ogg",
+      "sha256": "856046aa77f932eeb2f589ed6ace933f0f3c53c1ac4f8ffebed092b6fa8e33a0",
+      "bytes": 12594,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_chip_fighter_lpc_pickup.ogg",
+      "sha256": "aaf7e918edccede788916a4eb4d56953adaba03b19c282c8b340b6272b381bff",
+      "bytes": 19188,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_chip_modspec_pickup.ogg",
+      "sha256": "f9b70061eedba19bbf52eed59a043937fa239212ba17f1f7f3b81a1c1d9e9cf0",
+      "bytes": 25132,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_chip_pickup.ogg",
+      "sha256": "1d38b5ecb417dbb871912602b753fec98bb33f51284000abaf84fb2f26009706",
+      "bytes": 11605,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_crew_drop.ogg",
+      "sha256": "48ac88593bc54de8bcbcb6212107fd25057e364d7ae0e4fd9891201b540d2c44",
+      "bytes": 14401,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_crew_pickup.ogg",
+      "sha256": "d64e65dba7db961d94d2cf7c4722c58948cbc6e4db07a6b8b88371d069533fb6",
+      "bytes": 10433,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_drugs_drop.ogg",
+      "sha256": "2ad7319419ba39510e20c7ad058f5f76f98c91e3592cd7c2dda43f3e501e39f7",
+      "bytes": 11522,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_drugs_pickup.ogg",
+      "sha256": "9b75218dfe4b145302be0fee771f739aaa7b18ac5d2fab36ba368904843a338a",
+      "bytes": 10056,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_food_drop.ogg",
+      "sha256": "9815a6cb31bea52d80f8daf6268fd0d33d4afd02b4e62c7bc8a98541a1ee4b0c",
+      "bytes": 14803,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_food_pickup.ogg",
+      "sha256": "3ad6b0aafe3fc7f73fa802363b3664b5a596c9568b1cf250231c0c064b83edf4",
+      "bytes": 11589,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_fuel_drop.ogg",
+      "sha256": "3ad5be761e94e951b298a9e0a68351831b2afbd5e2de086264af810444169290",
+      "bytes": 19725,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_fuel_pickup.ogg",
+      "sha256": "5f244fbab2e5d352a2eb962a46f8432ace1e9b58854640a2988b9fa694c60529",
+      "bytes": 6154,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_goods_drop.ogg",
+      "sha256": "f2c9b96d5621aac0b539abf49aa2f7397e7b4526f0b172bbe65e5d31a4e09e00",
+      "bytes": 14522,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_goods_pickup.ogg",
+      "sha256": "450f0db1b52f8dda6767d006cd15d9ba401dbc0d6a12fc2800428ded8644b567",
+      "bytes": 7492,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_hullmod_acquire.ogg",
+      "sha256": "dcfe204c5cc05c604cd469fc7fd438122f9ac74d649b3e0f09a6267aa2b1c733",
+      "bytes": 19842,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_luxuries_drop.ogg",
+      "sha256": "de55103e01faef82dba982236dc866060e9cfc028188bc1322a84c0f6a3921bf",
+      "bytes": 27606,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_luxuries_pickup.ogg",
+      "sha256": "1de5ea3a38e6f68a8d856d5edd2f8619129f4ebfad2c081f1064fe4fe4e9b0b5",
+      "bytes": 7911,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_machinery_drop.ogg",
+      "sha256": "276442442893a02429b570f20034a9b13190f4c9587e8b83db2f258aea207a18",
+      "bytes": 21648,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_machinery_pickup.ogg",
+      "sha256": "cd83921cf5ef926f0a1c631d4a0759748cd325d3bbdedcec3ce2607c07b46944",
+      "bytes": 9145,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_marines_drop.ogg",
+      "sha256": "92bb95d42c10a60ba34012428c2787f82c11b0cf18367f89ca32e52d31d16e36",
+      "bytes": 20054,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_marines_pickup.ogg",
+      "sha256": "7f2c3401c5a662c5f008ff6172bf1fed92d4ad3df6811a8d84bc5986547e786f",
+      "bytes": 10433,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_metals_drop.ogg",
+      "sha256": "b27434a51a1ebb63a267842ffc1e6e8a3deb9101f032c81f93126851e8dca755",
+      "bytes": 39054,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_metals_pickup.ogg",
+      "sha256": "12e6a1589a09ae2f4b8871b33ac39e219b0710becb5f008158a663ea32275826",
+      "bytes": 10861,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_metals_rare_drop.ogg",
+      "sha256": "4df9c546702188dad138f090734c325e32000383cf04dbfce6d0c30b9f374627",
+      "bytes": 25499,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_metals_rare_pickup.ogg",
+      "sha256": "dc3f7daf4ca1927ae60bb3e0cea83575f798a963bd7fe40481aa71c9d4483648",
+      "bytes": 26472,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_ore_drop.ogg",
+      "sha256": "682da6b6be4638fbd1ebf612cea26de6075d0ee0e9a3dbbe0eed05de0be28602",
+      "bytes": 14433,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_ore_pickup.ogg",
+      "sha256": "98cca46690cff87ea90c61eb30ee0252f996d5028020e8f689cbe77de868a22e",
+      "bytes": 5986,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_ore_rare_drop.ogg",
+      "sha256": "6ab2bebc080162d514598b63e7109d6dc57bd4c2958997a58d55affa98bcc4dd",
+      "bytes": 18273,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_ore_rare_pickup.ogg",
+      "sha256": "1d944e3cd53b10a1e56112ce8585cb55af4a6667dcd2482a4a8389ef473f5202",
+      "bytes": 9174,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_organics_drop.ogg",
+      "sha256": "8f85d076d513ee6b5c4e4827b3624e71438fc275930c5aeeb1996926ccee628c",
+      "bytes": 16632,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_organics_pickup.ogg",
+      "sha256": "c68a5a2b768f33d5d15f9f9db223f49c1dd0f4fa0f80d76e766d1d59761a4c60",
+      "bytes": 11607,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_organs_drop.ogg",
+      "sha256": "98458f9777a7b36fff1de77d02194cfab7bbd4aba2d1933e033c099834e6b79a",
+      "bytes": 24230,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_organs_pickup.ogg",
+      "sha256": "070d77ec43bd08e5325b4da4d7dd0cbb1057aba8c9ad608fcb21c7e7f3846475",
+      "bytes": 16308,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_small_arms_drop.ogg",
+      "sha256": "5e1a6bbcca22c5394ad3c4c7ffa93b05844b5088902f1e102e29311e3832a10e",
+      "bytes": 16719,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_small_arms_pickup.ogg",
+      "sha256": "a55b17c8cd96fdb40cef5eb64e127f3e4fa3325c6419346281676ce3977198c6",
+      "bytes": 9371,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_special_drop_bio.ogg",
+      "sha256": "e38bc08dead389dbf455cb12a1438137bb40dfa06bb4c72bee351f3e126b1e3f",
+      "bytes": 50391,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_special_drop_tech_01.ogg",
+      "sha256": "679e105ed9c2113e2135ad56f784f8663aa4288a6b6c403dceba3beb527ca66d",
+      "bytes": 38210,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_special_drop_tech_02.ogg",
+      "sha256": "3b9fc6010ba756197d1f6458b7f10941254e4ff1e121ae9de7e2ff401648352c",
+      "bytes": 33379,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_special_drop_tech_03.ogg",
+      "sha256": "ef48aaaf1c0be916d9cb57bd52b18f01a448655b348b3d9efba16b2eec47e125",
+      "bytes": 39689,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_special_drop_tech_04.ogg",
+      "sha256": "4d72e82ce5455f8804e93d37ead52cf87b125e9b753aa2b2c62b85c857cefb45",
+      "bytes": 39190,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_special_pickup_01.ogg",
+      "sha256": "db0083966f0e52bca3d7d0148a1b31b7c4290ec3ad74b0c02b73ed7370181145",
+      "bytes": 25501,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_special_pickup_02.ogg",
+      "sha256": "cd9c812e6a2abc3d00999dd08b6a3297d781777dce4a1e75d743d4772d3192c4",
+      "bytes": 28606,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_special_pickup_03.ogg",
+      "sha256": "c1207102aa77c02e9000292b2bfb1e47227067fdcf82721b59107bbe07d03f65",
+      "bytes": 22703,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_special_pickup_04.ogg",
+      "sha256": "4c50137bf946c043c26ed2bd98c3b37594689ef187f2bb1daa66b5b71c9ef4e0",
+      "bytes": 18355,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_supplies_drop.ogg",
+      "sha256": "1fb527763fc048f3f3a73a35f551daab1f6b7fd21f808731abca7b1c9c1a2d12",
+      "bytes": 19611,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_supplies_pickup.ogg",
+      "sha256": "c1fd6ae6e48d9821bbec31c35378228a7f71d478a1bb3fcc5a3a1aba98e06503",
+      "bytes": 10888,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_volatiles_drop.ogg",
+      "sha256": "095381c8fd38de34b6fa755aae4dbad2e91562751f6b9b9bed80657e75e068e7",
+      "bytes": 24642,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_volatiles_pickup.ogg",
+      "sha256": "f8f85727d044b611759c3d2ffdd8fa5e0f30fe1586f0f84130c7513b31b7d124",
+      "bytes": 11798,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_volturn_lobster_drop.ogg",
+      "sha256": "38ca2544930f1d4c75432144c006a0976f36d62321cd8cbd938773a6324546da",
+      "bytes": 18387,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_cargo/cargo_volturn_lobster_pickup.ogg",
+      "sha256": "4da6adb56585ee18abcf53118ba20ded188efd238ba70eb854cc6106373b08f7",
+      "bytes": 19644,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-combat01.ogg",
+      "sha256": "2d183cb1081110dcdc4ae5ed889e0baafc90b727a48d2606d7688fae8fdeb1a0",
+      "bytes": 25747,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-combat02.ogg",
+      "sha256": "f6a8379f5f6b40fc185ab727e8a043d8de502b937dc04b9a19c55ac4eb1d6223",
+      "bytes": 25802,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-combat03.ogg",
+      "sha256": "1b2d1c5bc0153aa5d3ce617a91924147f87768fa96b8d37536a08a425b8b403b",
+      "bytes": 26619,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-combat04.ogg",
+      "sha256": "12e8135764129c37091f7ba318c797027ed047906dbfb1dbf8837bbc2dc8b180",
+      "bytes": 26552,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-combat05.ogg",
+      "sha256": "cda846b5ced446f203bc7968ff5e1855c122d5a3030b62ac7efafa5cb1219446",
+      "bytes": 29732,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-industry01.ogg",
+      "sha256": "cf29015a6e10d4da5cbf6729ca5fff2e5888a2697e22eb7c9f03668fde4abf7b",
+      "bytes": 27464,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-industry02.ogg",
+      "sha256": "459c609590eaef1a48d9dc6c3771a870b3c45da726dd18fe379ba1bdfea993ec",
+      "bytes": 28924,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-industry03.ogg",
+      "sha256": "557dc0a352c6a63bfdf262a15ede97d528d248fe3b785be88da0470ea2de5cd4",
+      "bytes": 29437,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-industry04.ogg",
+      "sha256": "b435aa0f7866794634274c488839240709e56e193a665dc754d289cb28691174",
+      "bytes": 30279,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-industry05.ogg",
+      "sha256": "02c5ad617541086ddd85068908d8336f86c9913d4fb0534b8f1797889cffbe64",
+      "bytes": 39223,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-leadership01.ogg",
+      "sha256": "c280f37705f9438e2c09397eed9f7e11e997a32d442ebc0059af8735fc5238e0",
+      "bytes": 26280,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-leadership02.ogg",
+      "sha256": "19725234eaf95da6d20823e0f9887583ce3790e4cc575fbb201f568f43373024",
+      "bytes": 26781,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-leadership03.ogg",
+      "sha256": "f58dca62da4a94c6f1e7d2174c759c962e7cad28dfa13d9885a67af98931f3ac",
+      "bytes": 26811,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-leadership04.ogg",
+      "sha256": "906de86ad3775aa6897abe9274923f06d4eb660a99312a41eb100ec27fe541ef",
+      "bytes": 27039,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-leadership05.ogg",
+      "sha256": "d92a16bd727bfb7027b15d9f6d41cf26a6b45479af5ffdde9b334cba73cb9559",
+      "bytes": 35804,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-maxed_out.ogg",
+      "sha256": "e20e2eb2f6f735adb05ca13a49b1ad24ada8bb6e657d95f43ef0323f5566d39f",
+      "bytes": 33607,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-reset.ogg",
+      "sha256": "b934541b41989bcb656d99b8e044f2523936541d8e1c0c53d95498db98fd38ef",
+      "bytes": 30541,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-revert.ogg",
+      "sha256": "78b2e46c71274a70a04bda49aec7159db81455ec4792f629256af479a6b35499",
+      "bytes": 34176,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-tech01.ogg",
+      "sha256": "eb29d4e03f10327d6dff9715fa196dadc78a85022f1bde28101399af45fc6fd5",
+      "bytes": 27107,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-tech02.ogg",
+      "sha256": "5bf34064bc27327ff3abd68b87eec60441612eefc5d76b936a6f86651c54e48e",
+      "bytes": 26274,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-tech03.ogg",
+      "sha256": "34680a8648396ca0501422bfeb2272c8bd786bdeff808388c0dbb6facae05052",
+      "bytes": 28804,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-tech04.ogg",
+      "sha256": "468a196459812576442caa5842dbb190938f0de3699aee53622e53ba4583b09d",
+      "bytes": 31569,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/charscreen-tech05.ogg",
+      "sha256": "4bf6a769f7b3d3c44b039b3e237e3c8b53935f2966a570938b2fb1a18659aa05",
+      "bytes": 35925,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/story_point_gain.ogg",
+      "sha256": "d4c19c23d7b80a5299f2df83c3f55336c676be831e2579e31fed2dfc9a9344bd",
+      "bytes": 54879,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/story_point_use_combat.ogg",
+      "sha256": "c2b6a9e9021eec84156652228e2c4eff0dfa7ea19c48bdfdfbd6d1db80dbd0df",
+      "bytes": 38382,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/story_point_use_generic.ogg",
+      "sha256": "4c14122215c2a8ad8795d1a7c8ce22c0101012ef9c5cc9877fe0e7f81074dec1",
+      "bytes": 45709,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/story_point_use_industry.ogg",
+      "sha256": "d09e60dac7e88e548612ff1dd31f0890e9ea58733e502de55bf033a56101de02",
+      "bytes": 44759,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/story_point_use_leadership.ogg",
+      "sha256": "c2beba62fec0983426367db6689c6de2f38c8d079f16fb7e780eeaca9e2c5f85",
+      "bytes": 44919,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_charscreen/story_point_use_tech.ogg",
+      "sha256": "736bcae703652dd53d17f93940033f86edc37b5ea3fef5b01e2f766b822f28e8",
+      "bytes": 52544,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_01_lotek_00_fighter.ogg",
+      "sha256": "7eb843c82d48721b32f724bcc8484ab0e46f78abe2563e407b27cc3ea28a8125",
+      "bytes": 39622,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_01_lotek_01_frigate.ogg",
+      "sha256": "69abeeb6aa5dc87624d805bbd38ccb19457de08d514802d5f77935c0cef6d994",
+      "bytes": 43896,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_01_lotek_02_destroyer.ogg",
+      "sha256": "0ea8ee34b5beb679090053275abe2044226257e2702b609e828d202112d41495",
+      "bytes": 20612,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_01_lotek_03_cruiser.ogg",
+      "sha256": "4806e7d43dce9fa612791092a5f4a95e4decf00b7b20625b0a09bbae6f9685f4",
+      "bytes": 18600,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_02_midtek_00_fighter.ogg",
+      "sha256": "24d903253f43c9981e0a411da9613805210bc9c30ce2752e8a765337ce4a2418",
+      "bytes": 55128,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_02_midtek_01_frigate.ogg",
+      "sha256": "be2a89a5a4dd0879190dd07760488b446902431cf917eb815ef43101ce45c4a4",
+      "bytes": 39690,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_02_midtek_02_destroyer.ogg",
+      "sha256": "bada2fc5d72052a1545f70f2a1fc4954814aa29e285971f5f6440e12bf5a2ddd",
+      "bytes": 28539,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_02_midtek_03_cruiser.ogg",
+      "sha256": "773cb18cee93f8502a862efad46b87664098e032c3be7bef0f93e55a49464db5",
+      "bytes": 24047,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_02_midtek_04_capital.ogg",
+      "sha256": "03da051696ccf2cb7f11652ba5bec5f99b0c0c16c389dcc9e45541c8d5e567c1",
+      "bytes": 22801,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_03_hitek_00_fighter.ogg",
+      "sha256": "d464ee0be637487fb7b850582c15511a6937f56345778fdc1c2df89efd507ac4",
+      "bytes": 76297,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_03_hitek_01_frigate.ogg",
+      "sha256": "38f019ee4b19689e8011f7a7346c89f64a3e3599dc1f0cbe2c93e8802ce83bca",
+      "bytes": 45577,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_03_hitek_02_destroyer.ogg",
+      "sha256": "d20cce37a17f113123b0dd36c78a73ea55985fb0f71229f69f8fa68771dfb97b",
+      "bytes": 33045,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_03_hitek_03_cruiser.ogg",
+      "sha256": "152ba2fb7295a6bb7c7122b4ebda7ac8c5816e024ebe28d0feec8fd97496d999",
+      "bytes": 36472,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_04_omega_00_fighter.ogg",
+      "sha256": "04e47c3132abfe6f7e92d894e6a4835652eac13014235acb4608d8055e64a159",
+      "bytes": 24140,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_04_omega_01_frigate.ogg",
+      "sha256": "d784c24430b2b60a05292692121bbbb39b351a74af496d1ccf3d4b6af96dc5f9",
+      "bytes": 23104,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_04_omega_02_destroyer.ogg",
+      "sha256": "e006dbbcf516ae7bcde40aae66784f22133f56d2400d43e1248583953c09ddf3",
+      "bytes": 23026,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_04_omega_03_cruiser.ogg",
+      "sha256": "455672c195e8f6cf0b515471f46e7bfb21b95fbc7ec0e636c292b396fb9e82de",
+      "bytes": 19010,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_04_omega_04_capital.ogg",
+      "sha256": "d18bddbfa8593daf1bc90fd15204c64019e0ddce22e12f680c3b4429e206a23d",
+      "bytes": 15253,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_05_dweller_01_frigate.ogg",
+      "sha256": "b359865938e8cde56935dddb7940b54cff8eee59a3c6ca68e70cbe736d55a692",
+      "bytes": 17533,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_05_dweller_02_destroyer.ogg",
+      "sha256": "4e9ac241d8ff738539f22a0fa7370b73d1c5bf5f3b0249b632ca32d7ef8f127c",
+      "bytes": 15503,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_05_dweller_03_cruiser.ogg",
+      "sha256": "c4bed67a392ab78f98412826277ef04af21c7150b5fbbbb7568850cf09d36077",
+      "bytes": 14299,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_05_dweller_04_capital.ogg",
+      "sha256": "fd12a3475242d54d540c904db92ef8ee7f27fe165307e450ce9cdb03c67747ba",
+      "bytes": 18063,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_boost_01.ogg",
+      "sha256": "9dd9c1d1a2b5afdaa696f79febc4d681a2a13a96831596b4994d82414137e883",
+      "bytes": 15515,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_boost_02.ogg",
+      "sha256": "6d27370514cd2f309ed8847548056c26e59d7156e352ac33d5123bf5d3cd398a",
+      "bytes": 15405,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_boost_03.ogg",
+      "sha256": "dfe71d6eff6fdef4491c5257823869692838f8b83645985964219a4a372cd9e8",
+      "bytes": 15406,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_boost_04_dweller.ogg",
+      "sha256": "f7d1187e483dda29f1e6954a8bb4cf44bb0b6beb23eddde9f9b442cb54fc79f7",
+      "bytes": 15963,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/collision_asteroid_vs_asteroid_02.ogg",
+      "sha256": "095b3161cb01ae58d2ca04e881d8ef5f60546afba30909a553f745c7014034e3",
+      "bytes": 7459,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/collision_asteroid_vs_asteroid_03.ogg",
+      "sha256": "d01e6b20bf0c0609e60b138a5c7df205078f8a16447a00309dfa28c2d131653c",
+      "bytes": 14422,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/collision_dweller_vs_asteroid_01.ogg",
+      "sha256": "5c54f5975d7fa607455fa1184c5f42f15f3d2dcbaefd64d315c8bc4f36b4b746",
+      "bytes": 17035,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/collision_dweller_vs_ship_01.ogg",
+      "sha256": "fcb910f99efe19b300a5f9b878af5789feb5a25acdc387e262d3977e43cb28a8",
+      "bytes": 17681,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/collision_dweller_vs_ship_02.ogg",
+      "sha256": "1e7cccf63cae272ab68e303a7a03628bcc28a67ef548739bc6f8254de9f7b886",
+      "bytes": 18209,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/collision_ship_vs_asteroid_02.ogg",
+      "sha256": "47607fe7bb1951bcd6c96e5786bb77749f48f79fbd8cf17c4b896cc9075f0322",
+      "bytes": 18968,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/collision_ship_vs_asteroid_03.ogg",
+      "sha256": "fbc27b3966e9505be75634c74ea441a4f9968463082d559edee20f439f491596",
+      "bytes": 20887,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/collision_ship_vs_ship_02.ogg",
+      "sha256": "1174b02ee7db7d4b0c354297913bdd49204319449e4933cfe1a175ef93368eb6",
+      "bytes": 41949,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/collision_ship_vs_ship_03.ogg",
+      "sha256": "a9b4f6d6182fbec1bcc6f5b047ea815cf2258d4fbd35ede6008840d91c927949",
+      "bytes": 36640,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_hull_hit_01.ogg",
+      "sha256": "9f9dbd3514e6f17ec01d90ff7b55b82a32d166728e56d29b84d191b7348aac84",
+      "bytes": 5907,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_hull_hit_02.ogg",
+      "sha256": "9e84e26279a9fc2e4caee6aafc375b66ceb80d36c06950191d31f072f9f08bc4",
+      "bytes": 5152,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_hull_hit_03.ogg",
+      "sha256": "99c070d42a066be2d6c5714fa784b5b9dcafa3ed8caeb6606104fa6495f66422",
+      "bytes": 5491,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_hull_hit_04.ogg",
+      "sha256": "304c88e104ea9164802f9698562fdb8802ccb553f69c27228b18da809cfb1277",
+      "bytes": 5414,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_hull_hit_05.ogg",
+      "sha256": "16cd1269ffc0ed3c0727e405932013f088aaa9c4848fd6fc86291eb9e104ff8e",
+      "bytes": 4807,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_hull_hit_06.ogg",
+      "sha256": "00c12602611d280e0e754cd42fdf70fdb54ecb6b83a5cac7555c8a606162d894",
+      "bytes": 4764,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_hull_hit_07.ogg",
+      "sha256": "59fe8ff33644f058af3b796b30181f39853159218ad752d1826007967375d74c",
+      "bytes": 6058,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_hull_hit_08.ogg",
+      "sha256": "e6aa816ad0c8e200f0d6c13d53cae0559bd262d01967a0e11e53930fb2f924a4",
+      "bytes": 5485,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_hull_hit_09.ogg",
+      "sha256": "057e9c2fe5203614bd215e92c96aa9d4bbf430f70c172fce265e1e697598e60d",
+      "bytes": 5708,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_hull_hit_10.ogg",
+      "sha256": "9544168463385098d60d3bd63be556f6c4573360d33f36d9a865d0ca6521e63f",
+      "bytes": 5978,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_hull_hit_11.ogg",
+      "sha256": "367f3c22b86529eb485e992009b64d017020a63424ba4f66c98b7a0a543fd43a",
+      "bytes": 5812,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_hull_hit_12.ogg",
+      "sha256": "3d19ec524445267ac310a8003bde9e23c20b8c47758ce6fdf1c253732f8ed080",
+      "bytes": 5254,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_hull_hit_13.ogg",
+      "sha256": "fe8e3944e3e7c7a1dab19b56badc194fef6539fedc4712f03ea52c74f4f6d6f7",
+      "bytes": 6396,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_hull_hit_14.ogg",
+      "sha256": "5395b589fc04d0407cc3da77233ee20cf6d13428995d16859a4532aa2199322e",
+      "bytes": 6502,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_hull_hit_15.ogg",
+      "sha256": "5d4e1fc2cb66c750b8c8b7ac6b24b9709598810c5e3ffb4bde03e543adf9ad95",
+      "bytes": 5517,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_hull_hit_16.ogg",
+      "sha256": "0ab968d9ecdc7a81fd95afd7a4e06ba85a6305da7767ed57f40666ca1c8a52a7",
+      "bytes": 7190,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_shield_hit_01.ogg",
+      "sha256": "88cb924a82d4c4ac2d97d5db8941d4b6cb6de20fd84484b27754b217b34862fc",
+      "bytes": 4694,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_shield_hit_02.ogg",
+      "sha256": "3e728d9a72ce596389579a4f16efe90c2adb18f994f80b85b0b3b5a1cc2eead4",
+      "bytes": 4939,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_shield_hit_03.ogg",
+      "sha256": "d70aa9fe174fef9abbaa42c10a6c81bb63417b7513723d9b041bb3341defbb57",
+      "bytes": 4773,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_shield_hit_04.ogg",
+      "sha256": "03f2dc2ce50cfa370924f58c3fb5e6b4e9eb41b52fe49526786e36234417ff72",
+      "bytes": 5008,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_shield_hit_05.ogg",
+      "sha256": "5b7138207fe878a4119f50317195fd7a4a463f2b5b66a59b8b12c6b495b99564",
+      "bytes": 4803,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_shield_hit_06.ogg",
+      "sha256": "488f4526354494efe5170b760c399fa8eb3fa9ea34954d51af332fd0964b26d0",
+      "bytes": 4795,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_shield_hit_07.ogg",
+      "sha256": "617d700b42cf4cccbb3fc71dab204fda262f204571d617007e6e67745704dea2",
+      "bytes": 4838,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_shield_hit_08.ogg",
+      "sha256": "4bab7a45c816e7d56bb58bf7adc530c47279b669eb31be6efff01827512f42fd",
+      "bytes": 4601,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_shield_hit_09.ogg",
+      "sha256": "84d35b7e242617289aa24d20a127ab144d0b6d8c1acea082e8fece25c8bcaaa6",
+      "bytes": 4691,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_shield_hit_10.ogg",
+      "sha256": "99e42b7c0f465513ec5c5665813c34af367da3b4d10616140cfa7285706aeb40",
+      "bytes": 4567,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_shield_hit_11.ogg",
+      "sha256": "d1e99f0d48efc548391943c845146abc69d67889baf0b7a9876761dd0034c5a4",
+      "bytes": 4684,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/cryoflamer_shield_hit_12.ogg",
+      "sha256": "776981b196a5d141e5938cb0c5c36f3afb7c6cf957439b2dbcad12183dd46f76",
+      "bytes": 4948,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/energy_hit_01.ogg",
+      "sha256": "1c962f817030b50a939271bf7f9fe2ac654080ac9917073ebfabceeadee5253f",
+      "bytes": 28999,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/energy_hit_02.ogg",
+      "sha256": "d6adc59ae420481e90a364e9fa8492b68d885f0ba2fec95599b403d50aac34fb",
+      "bytes": 29828,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/energy_hit_03.ogg",
+      "sha256": "bdf76249bbbc18bdbb6a484bdb79a5e425d947016dde26f59f7d736be52582be",
+      "bytes": 29388,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/energy_hit_04.ogg",
+      "sha256": "9b16f1a5403073aaf552d4522ad03d8b7631167ed6b9618164d978da4111ee41",
+      "bytes": 29979,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/explosion_campaign_01.ogg",
+      "sha256": "319177556f27cb5ede78e75cc8369e832ddc19ebfd023f5a752cdaa9a89657af",
+      "bytes": 22062,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/explosion_dweller_01.ogg",
+      "sha256": "80d6cd3f0d361987d705ef53b86bf967d37ae8914487398c82a49a3966b2a23e",
+      "bytes": 29516,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/explosion_missile_02.ogg",
+      "sha256": "b307c68134dacc9a87081148ea2227a7c087240a1f0e79d9a9b2bcc0d56af5fd",
+      "bytes": 12568,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/explosion_secondary_02.ogg",
+      "sha256": "1e1c1fd8cc59785155b9e33892a3d70182ebd0c619d8ab0e5d31e0afc1f423a1",
+      "bytes": 18438,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/explosion_secondary_03.ogg",
+      "sha256": "92de5ee1f6c02aad05c7ed2cddf724e567d2f390da4348064ba9a6bdefbb05cc",
+      "bytes": 24119,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/fragment_defabrication_hit_01.ogg",
+      "sha256": "0aea11fa08a573fef620f713ff98df1ebd3b7ed80015423051613612466943a6",
+      "bytes": 7219,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/fragment_defabrication_hit_02.ogg",
+      "sha256": "4d3163013cf7635e4d42942a9c80472e36726dd712da8fa084d026380a762b3e",
+      "bytes": 6963,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/fragment_swarm_destroyed_01.ogg",
+      "sha256": "914a2e50f64fd60a6bd67958856d82ced9b3c993fc43b080d41ed93b0e5d1ce3",
+      "bytes": 10920,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/gun_hit_heavy_02.ogg",
+      "sha256": "a465bb377c3b80e5932855d2c0aaf8cf4d274163da91a786eb202b93802ab6e6",
+      "bytes": 27303,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/gun_hit_heavy_03.ogg",
+      "sha256": "8756534ef6065bcfc09d04521b2b8e03678e26f560f51c0cca6265acb784453d",
+      "bytes": 28792,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/gun_hit_light_02.ogg",
+      "sha256": "73a4ed44ca5d939dd187fcded9c3f1440ab0fe97ed97018f6dc2ecb673c41c38",
+      "bytes": 18895,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/gun_hit_light_03.ogg",
+      "sha256": "4127f24b69a1f837b4cd5055e7a958fcbde1881b68e8bfee3a50a9a9eb66aeef",
+      "bytes": 17808,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/gun_hit_solid_02.ogg",
+      "sha256": "cd16dd44d65d1cabe4e734a1c0d4a54efeec2f9732dd65912c2bf6dba7c50f97",
+      "bytes": 27813,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/gun_hit_solid_03.ogg",
+      "sha256": "98213a3e703cdabdf0038c1cd9a5aeebeb02f8f90f50feeb809cc841fbf726a1",
+      "bytes": 21471,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/pseudoparticle_hull_hit_01.ogg",
+      "sha256": "1cb21b6f1eb190c4dd48acbc9173492dc0437b14dfd00a86a301fe28f1f5b802",
+      "bytes": 5399,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/pseudoparticle_hull_hit_02.ogg",
+      "sha256": "c6e52f64e7d698709aa858854ceebed79595408d83c0877b732970f6fb773657",
+      "bytes": 4857,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/pseudoparticle_hull_hit_03.ogg",
+      "sha256": "7d3b4c4d1b04cc1b18c4b1db0f88f4f2295b3648ce78a47c33f90e517e89383d",
+      "bytes": 5091,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/pseudoparticle_hull_hit_04.ogg",
+      "sha256": "60f42b99dcafdc191ee93f25760da7d4541608ba3c0ab9a8975c8fc5d93ce5f5",
+      "bytes": 5039,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/pseudoparticle_hull_hit_05.ogg",
+      "sha256": "43ba84a06cb55fe06608dca3c11f93d1aa98ef0f5a5845f6170d0a7aa22d60b3",
+      "bytes": 4561,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/pseudoparticle_hull_hit_06.ogg",
+      "sha256": "1b26cc81261cfd3c16bee5b1437096bad4d401fdab3fb43a1bd96dfe8546e2ed",
+      "bytes": 4549,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/pseudoparticle_hull_hit_07.ogg",
+      "sha256": "30d7c7d7a3b47c51119f3fd72586dd1cbbcbb887206c401fdc636caa00c4e589",
+      "bytes": 5648,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/pseudoparticle_hull_hit_08.ogg",
+      "sha256": "393ecbc3a9686b2b607bdcbe94021472707747c5352d87baa125d0b16d06fa0f",
+      "bytes": 5061,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/pseudoparticle_shield_hit_01.ogg",
+      "sha256": "e3e82d9ff0f3ea198afcf0d63452c5c1a39063f794f6c15ac12b95691828457b",
+      "bytes": 4601,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/pseudoparticle_shield_hit_02.ogg",
+      "sha256": "17bd06fe2671d813cd992c5d4e4f8a27d6a4bd8a538e3c8c4499dd7ebbbce4cb",
+      "bytes": 4642,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/pseudoparticle_shield_hit_03.ogg",
+      "sha256": "0ca0ddc59c8dc1904ce8ea323445cf101a4e0a1e22dca10b72a0800b4ec7fe94",
+      "bytes": 4523,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/pseudoparticle_shield_hit_04.ogg",
+      "sha256": "19b1960e6f55fb9f064da0d231bfb1e3d8867a5ff700af822a74c25b9a520855",
+      "bytes": 4683,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/pseudoparticle_shield_hit_05.ogg",
+      "sha256": "0bb8405bfc70a640e406ab71e15e6a34b9cdfea2093b9271671cbbfa46d116b6",
+      "bytes": 4589,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/pseudoparticle_shield_hit_06.ogg",
+      "sha256": "53ea53daef9348b3e8bb835886266f05a8a35ebdd172a11fba440b40e0fdcc89",
+      "bytes": 4990,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/pseudoparticle_shield_hit_07.ogg",
+      "sha256": "b29e26eb103f1773c290646ebc1cfd776e3ecf6bc45dfdd927ceb496ae02dc51",
+      "bytes": 4742,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/pseudoparticle_shield_hit_08.ogg",
+      "sha256": "d1ea8a38b958aa930aa86b6c609cae704b7cbdf17203a2fcf3a76d8d528206a3",
+      "bytes": 4586,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/shield_hit_heavy_02.ogg",
+      "sha256": "fd7ebf8661692cf3fd26e9e75314c494b2c274d14c4cf5546b8dcd30a74d3c38",
+      "bytes": 18291,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/shield_hit_heavy_03.ogg",
+      "sha256": "61df9bb697c16c0d3612e8fac6e8be744a93931f1f9a22615f669ef2fd9a7706",
+      "bytes": 15778,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/shield_hit_heavy_04.ogg",
+      "sha256": "6bf7898b08a09e4e49095ca04b760d6cf09f9cc3dd48e575565ae10c9f7c70e3",
+      "bytes": 17427,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/shield_hit_light_01.ogg",
+      "sha256": "37e153bdc1cc210474f894aef205f3558dd385dc4e61080cf44532aff340f880",
+      "bytes": 11028,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/shield_hit_light_02.ogg",
+      "sha256": "7861cf054a70d493c702f62c811acfaf76cdc4ec8ccf25a4e9afa8dbbda06b4b",
+      "bytes": 10616,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/shield_hit_solid_01.ogg",
+      "sha256": "7a3bf79fdde35b2b28d20a9ce7496013407c2dca4cdef9f4f31b24a4ed3e6dd9",
+      "bytes": 10243,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/shield_hit_solid_02.ogg",
+      "sha256": "8c11a9002eb28d3423cab9379c671c51b2631c71bec65df5ab41248ca8ddb665",
+      "bytes": 11127,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/shield_hit_solid_03.ogg",
+      "sha256": "69264aafdf64c7e06c96dd67117b485de8db37fae75e7d7d6b5b267dc2c03879",
+      "bytes": 12786,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/voltaic_discharge_impact_02.ogg",
+      "sha256": "5db130995fb9c98e59b1d284c2fe3fba871fe178ef2199a5a6b61fc0c44c3fc6",
+      "bytes": 11695,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_impacts/voltaic_discharge_impact_03.ogg",
+      "sha256": "e08325259304bcc411b6d4edccd88ff8cbe4a9f69a59eae3a1113dc83d5c1015",
+      "bytes": 14470,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/campaign_warp_point_close.ogg",
+      "sha256": "04e796c1d1d92e358131f47eacb7ab8e23b1cadea1b06a9c9904212ee20ff9c4",
+      "bytes": 39885,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/campaign_warp_point_open.ogg",
+      "sha256": "db881c91cb5b9fcedceba84c06a66478568295a69c1c51b5080e9e8589882232",
+      "bytes": 33526,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/campaign_warp_ship_in_01.ogg",
+      "sha256": "176ee06fe931c9b8a9938ba5d691b0d53726db42c4f2a415f78cdac84f5a59c3",
+      "bytes": 13102,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/campaign_warp_ship_in_02.ogg",
+      "sha256": "cdbb56e1c9e8c33c4723ab08b205b8192cd228e2d2e28bcc90c6fef1a7917b94",
+      "bytes": 15813,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/campaign_warp_ship_in_03.ogg",
+      "sha256": "ecc1af24ceae383359b4786480becd3a67b223b40d8ef092afe76eec5bb81efe",
+      "bytes": 15794,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/campaign_warp_ship_in_04.ogg",
+      "sha256": "14a38b613cb6ffc77378b8be291eac0954d56da38fcab42782b31019e4f3ce36",
+      "bytes": 15702,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/campaign_warp_ship_in_05.ogg",
+      "sha256": "a00942cfaa45f154436b52f480e19d75720dbb0f102d06dc71011b2eef469dfc",
+      "bytes": 14357,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/campaign_warp_ship_out.ogg",
+      "sha256": "970e6a5b5477104f6fa4c7e7fe561db71013ae629d71d9457acf1028161625e6",
+      "bytes": 52449,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/campaign_warp_ship_out_01.ogg",
+      "sha256": "2e26581f4899ebc75e98209208a6ddb445e1d303e07079fef5754e2ae89b223c",
+      "bytes": 29499,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/campaign_warp_ship_out_02.ogg",
+      "sha256": "7a9157d5352a45c89c64a5ec3996a4a8d168fb0549897fb9b12696e24e334f50",
+      "bytes": 21941,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/campaign_warp_ship_out_03.ogg",
+      "sha256": "90983bd46e7bc20a234b992eaa00f59ac84f5725266a067658d4a1581dd98d81",
+      "bytes": 22624,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/campaign_warp_ship_out_04.ogg",
+      "sha256": "334fe95b93681dfb3c7fbfb1bef3a292694227e3589ce97f3a4c718c035d458d",
+      "bytes": 21816,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/campaign_warp_ship_out_05.ogg",
+      "sha256": "273d9a8ed58819262eba630e898085d2fa089c79f38438512908f1434b1cb0ac",
+      "bytes": 22242,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/colony_engage_ai.ogg",
+      "sha256": "706b6cd5997cbf284c6fcf49bbf3388214c3c7d7b488aecaa0968ce3e0de84c6",
+      "bytes": 25895,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/colony_establish.ogg",
+      "sha256": "634e94405e012807b03057a7503c96634487d720f1f0c790beaf2f1b33c7b6a5",
+      "bytes": 74503,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/colony_faction_establish.ogg",
+      "sha256": "9d664bc37ab95a744b6a2f315eb5bfb2f2f177cc5f9783ed282b212704a93a2f",
+      "bytes": 76194,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/colony_industry_build.ogg",
+      "sha256": "3c6aede30df5a1852e6ce16457c677765e1431044cb7c289e1f9a9b8e5dbec10",
+      "bytes": 44356,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/colony_industry_cancel.ogg",
+      "sha256": "82e60ffc1169722389c579d1d1638c182e50fb86b40e8aa8d8803bbfd530003f",
+      "bytes": 27347,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/colony_industry_grade_down.ogg",
+      "sha256": "4c5facc0681464accd1dd1d7daa14e2fe788fa4db749e13e6340d1a69bc99f81",
+      "bytes": 31668,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/colony_industry_grade_up.ogg",
+      "sha256": "7d35a938a98e2565254e7397a5ec8e49ed89bc36a59091bddca71e55c4b2036e",
+      "bytes": 39927,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/colony_industry_shutdown.ogg",
+      "sha256": "1620886096f8aa9ad59a4b7241247c0ab122440761e5b8398e8f7ea4af7faebf",
+      "bytes": 46334,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/combat_readiness_malfunctions_alarm_allied_01.ogg",
+      "sha256": "d21c6810c31efb0941a5d656ee729b4111fbc5bfb901b27fa933f2e896dc0bb7",
+      "bytes": 22014,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/combat_readiness_malfunctions_alarm_allied_02.ogg",
+      "sha256": "7a49d59911451736a2e0b8d9bbf5799356a05606e6d1466ae4ceb0098aa3b474",
+      "bytes": 19125,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/combat_readiness_malfunctions_alarm_allied_03.ogg",
+      "sha256": "565f10b9547eafe2b1fc1c65bd7b09786e829caff81a6a6d1353a5d8a71ddee1",
+      "bytes": 26929,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/combat_readiness_malfunctions_alarm_flagship_02.ogg",
+      "sha256": "810752df8907c484b6aa404f36cefa1aa3c981baec2497aa304ca32c40dc7d70",
+      "bytes": 27280,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/combat_readiness_malfunctions_alarm_flagship_03.ogg",
+      "sha256": "5e6f93165028455e4c863f1a33b165cde9ee5ac4ca8087cd6bb332cfbf2d2b50",
+      "bytes": 34201,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/neural_link_transfer_begin.ogg",
+      "sha256": "f0e7fa01dc54a1554e4db301462ca6ef0c54c2c34204a011d45d13db3f5a58ff",
+      "bytes": 24146,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/neural_link_transfer_complete.ogg",
+      "sha256": "e0be171ad8e414a62ec6ee62a32d424f737f9e044a295cf65bd9a3e71250fab8",
+      "bytes": 38994,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/perform_survey_exp_gain.ogg",
+      "sha256": "f8f8dbf70945d93bc42e0c69fdf67badd190fd8132c47ab46cca23b411d95d34",
+      "bytes": 45490,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/survey_result_01.ogg",
+      "sha256": "8f93066ea485b4c25f85da3fe042f4a6f0d21f7c734c41d2793db3dfcb02f600",
+      "bytes": 18112,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/survey_result_02.ogg",
+      "sha256": "55b6c3342a36d58c9dd0d4d297a7dd4754bcc998e3d8f9aa6f9d340c4e3dac7e",
+      "bytes": 19569,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/survey_result_03.ogg",
+      "sha256": "93203c0a7fd0eb9b8009a195d9dcb4e1c129f7b7f745d8b9f7a8a33e726b3cf3",
+      "bytes": 24223,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/survey_result_04.ogg",
+      "sha256": "2e9abcdad9945e41f50a66591b100e6bfec17590c55843d21279f0dbbe11de84",
+      "bytes": 30097,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/survey_result_05.ogg",
+      "sha256": "b80e56987e4532ebd07361903944d6753a43d228286b6f62c148daedfed660f9",
+      "bytes": 32910,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/survey_scan_01.ogg",
+      "sha256": "9d1c64b65fcd851caf93fdf4ed8e109467f0d96d723b1d59adbe93bf88956096",
+      "bytes": 21983,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/survey_scan_02.ogg",
+      "sha256": "bee30715bd577f05dc008ee3f97123d8c6e4d4e72053cf61482d226bcb2e5091",
+      "bytes": 21453,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_button_disabled_pressed.ogg",
+      "sha256": "8f894f7a23b95769ee5a8102da5169d265ab6b0a303e59a93dab3358ab10fd21",
+      "bytes": 64652,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_button_mouseover.ogg",
+      "sha256": "41e17ffedbd1524620f7689bd02361eb541f55ae1a66d0783affcf7cadaa0898",
+      "bytes": 25444,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_campaign_sensor_detect_fleet_01.ogg",
+      "sha256": "d914ee3d66ab78208366040601f26f9d5ea1d65a2a344e7f4bf8aef43a0fa7d0",
+      "bytes": 19235,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_campaign_sensor_detect_fleet_02.ogg",
+      "sha256": "a410bca2ce50970e5d87b340c494439395d4bf44bc1d064b4d8a5e1ade77ea63",
+      "bytes": 21099,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_campaign_sensor_detect_fleet_03.ogg",
+      "sha256": "5b95f46aa098ed57761967245130520669dacd8bdea6c470345414234447322a",
+      "bytes": 19227,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_campaign_sensor_detect_fleet_04.ogg",
+      "sha256": "6606df8b138f1e9bb6409769d8fe3e5f1798284d647eba0f4e6d5e2c1e89a1d4",
+      "bytes": 20672,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_campaign_sensor_detect_fleet_05.ogg",
+      "sha256": "53e1d37c7150a6453c40a324ac71bbf10c47d4824ba444e791f58d605d26174b",
+      "bytes": 18519,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_campaign_sensor_detect_fleet_06.ogg",
+      "sha256": "79f5ea57d2a30e4c0c4ed654a4bab4311cdd06ccd493f9dde9de5a851d971547",
+      "bytes": 18970,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_campaign_sensor_lose_fleet_01.ogg",
+      "sha256": "1fa4c6e47fbc024647564f72b74c903bbf9febb0840b75db76597283ebb0816e",
+      "bytes": 18124,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_campaign_sensor_lose_fleet_02.ogg",
+      "sha256": "510938fbfd798838a1b07a2c202f07c17630e741729558e28e41cff9e7071ece",
+      "bytes": 18525,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_campaign_sensor_lose_fleet_03.ogg",
+      "sha256": "f6dd01af00cc82e934f333436ee7125a1c3daa804628c897587b9b8f70fe961c",
+      "bytes": 18234,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_campaign_sensor_lose_fleet_04.ogg",
+      "sha256": "42c0bd1010a639f902179285db5ef30f00b36f548fb6e1317fefa943a1dcd794",
+      "bytes": 17479,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_campaign_sensor_lose_fleet_05.ogg",
+      "sha256": "09843fc4d86763b2838d6367a4f9b88526f98b86032eb5a76c8f799e5742d00a",
+      "bytes": 17594,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_campaign_sensor_lose_fleet_06.ogg",
+      "sha256": "73638cdbf1b1f80ea995c7200db4206ea6ca0ec117a5ce9b437e4eae962868de",
+      "bytes": 18020,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_channel_colony alert.ogg",
+      "sha256": "b5ecbe79dcbb193a0dffc49f897d9a7d4a5216d180bbb1c350a6ca080549b08a",
+      "bytes": 47775,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_channel_comm_local_02.ogg",
+      "sha256": "360f3e9c2d267ebb54d76720b8b4734ddf7af1d7c8712b086d9644596abd70d5",
+      "bytes": 12179,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_channel_comm_local_03.ogg",
+      "sha256": "fd5e455700839ebfd2f63ae9207813b5cf32e7ccfc33e9ec672680e3f59a80c0",
+      "bytes": 13857,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_channel_comm_local_04.ogg",
+      "sha256": "83757a12713b68a57250d715292f905261216e74672ee9c07c5327999d6c7ce8",
+      "bytes": 11760,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_channel_comm_secure_01.ogg",
+      "sha256": "45d9f5672124c2ce2e172e59bcbb038fafd82dec14a7a972d43264edd1a701a9",
+      "bytes": 13373,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_channel_default_01.ogg",
+      "sha256": "bd4da91e1b01f1e2b8a4ee3233d291ff0a75ae370e2ab654a0bd281169b3c740",
+      "bytes": 11506,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_channel_default_02.ogg",
+      "sha256": "c07845ad251f2c36ea4ecddc5c4d78a1e1e96af0d9560ba957c60b7073364226",
+      "bytes": 11802,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_channel_default_03.ogg",
+      "sha256": "e5dd4d1495f4d8ad2a49c803ad65791d8aab928a17df6dc94660ae0a0a6a2aad",
+      "bytes": 10088,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_channel_default_04.ogg",
+      "sha256": "cf0cfdf54f4d5db7c4ad5eea4465b2a263645e4d259e33f0d11ed9298e134f51",
+      "bytes": 12385,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_channel_income_report_negative.ogg",
+      "sha256": "0b2c06f1274e608d2926fac36b2f20bb3c356bdf194031a74d105e52ae36800d",
+      "bytes": 77686,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_channel_income_report_positive.ogg",
+      "sha256": "3abfb0e9bff318f19c734f5c45f74a24cc990c47350f622b69f61454867d8d08",
+      "bytes": 103707,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_channel_intel_assessment_01.ogg",
+      "sha256": "9991d983544a875eb357c22d8c392a7ffdc02aa0dce9a813393afdab90b93875",
+      "bytes": 11397,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_channel_news_01.ogg",
+      "sha256": "1eb48860444c95fd6303adb3a5cbfc8b4c1c514ee6a6e205170b36cc908ae171",
+      "bytes": 9435,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_channel_news_02.ogg",
+      "sha256": "faef9bc351ab874dcab271bab0af6bdcc6109ab1ff2fc5a65d3c44c79d4057ca",
+      "bytes": 8974,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_channel_news_03.ogg",
+      "sha256": "07ee932f4bdfcb0ebb34293d49d9497f2f02ca9ded8c80863b8df78df96ab4a2",
+      "bytes": 8639,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_channel_news_04.ogg",
+      "sha256": "b7761644e5b2b42402707031d097d11d74180769273544d1a289d2b9dd2524c9",
+      "bytes": 8726,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_channel_sniffer_01.ogg",
+      "sha256": "a7f9f601a995cdc18d2233b55cc0dbd51a62760ddef84e6b29adfdc6c6b06d20",
+      "bytes": 20243,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_char_level_up.ogg",
+      "sha256": "2ccf8e5cd468431a5b9546401db39da6445993baa21af232d8bd9fb156d4c6a7",
+      "bytes": 67091,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_colony_raid_event_01.ogg",
+      "sha256": "6f4a1b782bc79187f3e68d8beadf1a98678c7968473078bc7dc5d1115b5365e6",
+      "bytes": 27157,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_colony_raid_event_02.ogg",
+      "sha256": "50837edb1390ce92f3b54727a9d0a79aca818c2e3a490e464d8e1721afb92250",
+      "bytes": 40986,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_discovery.ogg",
+      "sha256": "845f90a4052e1f3f7d81633191b0560250e23b2133fe1705764624429bdf7e4e",
+      "bytes": 24272,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_objective_constructed.ogg",
+      "sha256": "dcb445b7d5dab4cad389bf9f3f9f152472a9d97271ac3a3f447e40954d6551bf",
+      "bytes": 45866,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_reputation_drop.ogg",
+      "sha256": "a9125c2f194d9d58832ce0f732e314c74c79a4ed6715491677fe869eafe1b224",
+      "bytes": 143279,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_reputation_raise.ogg",
+      "sha256": "432b772cee7c95243284d73eb6b0d079a8c6fa670f15ce627afb9e7dad8fb93d",
+      "bytes": 141042,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_static02.ogg",
+      "sha256": "c3aef1dcbcc0771a96090f3dc7aaeca73f17cbbe03614a9b9431542503ae4d1b",
+      "bytes": 39432,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_static03.ogg",
+      "sha256": "414c36be143570b042cdff241b08842a5196139340d977841cd6cd487b2f35d7",
+      "bytes": 55011,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_type.ogg",
+      "sha256": "b916e669aa121b1a54980358c64efe93948a1366f473b2a6ce34c8a9d9268dc4",
+      "bytes": 6786,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_misc/storyevent_diktat_execution.ogg",
+      "sha256": "53d089bd17ad553f90612c89336d5129e4478c4fec429b167cee7e799cfc0f4b",
+      "bytes": 33355,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_refit/refit_ballistic_01.ogg",
+      "sha256": "4e6fba7acadae14ad492b2144b5dc4ed148d35ef06710874aee5ea1fcd2568e8",
+      "bytes": 16797,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_refit/refit_ballistic_02.ogg",
+      "sha256": "dae1fe8a35ab16e5838ee20779bc77f78827d92b732ce34241bdb0992b921925",
+      "bytes": 26355,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_refit/refit_ballistic_03.ogg",
+      "sha256": "dc9d70b189b2a9b6baea03ca2c6d896f9fbc52419fa902d56d1e0a9bc625bac1",
+      "bytes": 51169,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_refit/refit_clear_01.ogg",
+      "sha256": "17265e095b89d3c9c6ce149956330027ed7acd3c567290d26b027c0a5390ad44",
+      "bytes": 23165,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_refit/refit_energy_01.ogg",
+      "sha256": "e14adfc33247fd8bc4cf01a1f5515e79850a9f59797a7f4682cf48947c0be230",
+      "bytes": 18628,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_refit/refit_energy_02.ogg",
+      "sha256": "722031aa081d143b86597cf2b23bcd4c7f9ec27a0e66d5cec934e9e630a56dcd",
+      "bytes": 29605,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_refit/refit_energy_03.ogg",
+      "sha256": "5497520ef8a6aee4ffe3fd4fc365be8828309d939c88a196df273af3f552741a",
+      "bytes": 40746,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_refit/refit_fighter_01_clear.ogg",
+      "sha256": "f697e778ce418a04c2dec19233c75e1b3ff9965696bbab8d13f31ff1595194dc",
+      "bytes": 20429,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_refit/refit_fighter_02_install.ogg",
+      "sha256": "243443ba0da59dacf5d1b8eab61bd5d9055b1fde3583fad56564df2312c096c5",
+      "bytes": 14080,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_refit/refit_missile_01.ogg",
+      "sha256": "4b65f6e252d92081e31b3e23d1b3d915ad5678f1597a9a5852d9cb3a24c2ee81",
+      "bytes": 23096,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_refit/refit_missile_02.ogg",
+      "sha256": "fcbee3f1e04ab9df7a8b5c9beef8b6eec44e5493522ed18dc51a88602f2cb8cf",
+      "bytes": 34042,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_refit/refit_missile_03.ogg",
+      "sha256": "fd5ad59facf863fc6f52e307fdb02cee4b052b62aab43d9c3df0d52127df2624",
+      "bytes": 52467,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_shields/flux_lightning_dweller_01.ogg",
+      "sha256": "aacf4053d4cda30e49117c980372383754b4d0ddf54c085b8cc81195e0e6ecd9",
+      "bytes": 9547,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_shields/flux_lightning_dweller_02.ogg",
+      "sha256": "3e54215ca786e68a86a7bac6ecf7a4115d0c1c0cb1d8824d4eecdc2dcb0c580d",
+      "bytes": 8649,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_shields/flux_lightning_dweller_03.ogg",
+      "sha256": "5a524e609ea682124c20a5a8b2caffdc7aec51c07eeb9e24582922fe85c1cb9e",
+      "bytes": 7875,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_shields/flux_lightning_loop.ogg",
+      "sha256": "5333d36f1441cd60ff7589bec424925a7c4939bd222b09a20e2ec6de8628db12",
+      "bytes": 21534,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_shields/shields_burnout_dweller.ogg",
+      "sha256": "414dc457fc81bf5cba7a2443a1da7cf638daaa1b59e18e1f3be422b23728b2e1",
+      "bytes": 26541,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_shields/shields_burnout_loop.ogg",
+      "sha256": "0abc82150c863ff93890b0012c296586dd1fe99c8f1c94f568fe3d04ae13db06",
+      "bytes": 26400,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_shields/shields_down_dweller.ogg",
+      "sha256": "d2e2553e84d7ba24ad62a5e294602fe438c3aa7d8880618bbcdac0a96f3e494e",
+      "bytes": 12044,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_shields/shields_down_medium.ogg",
+      "sha256": "75c414f933e9a698663ff03b30b2ac9399d5bb4d0685b20245f81ed1b40e30a7",
+      "bytes": 8033,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_shields/shields_down_small.ogg",
+      "sha256": "5dd0a720f9360508d76a24622148cf3ed909e450504f950caa43a1ac3cf9de0c",
+      "bytes": 6949,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_shields/shields_up_dweller.ogg",
+      "sha256": "6260852e8fca1b2713c4a52ccf1a9896f8adb93aab476dcc3c3355f11ac03575",
+      "bytes": 17879,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_shields/shields_up_medium.ogg",
+      "sha256": "67f74953ec1a13abb6ecffb16b50745e5db088525fd9227550276dfd84ad4588",
+      "bytes": 11631,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_shields/shields_up_small.ogg",
+      "sha256": "9d39e6a4784534e708d91d48f27eff181cc8fa3e164286d5e2cb5ea34aa0648c",
+      "bytes": 14574,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/ammo_feeder_oneshot.ogg",
+      "sha256": "f918fc6e8e838ca1bc601570d18ad617888a0784afb14bfd1bee100df9504830",
+      "bytes": 14500,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/combat_burn_activate.ogg",
+      "sha256": "389075b3b0d228cddf71e6ed70016b64ce8ac6b50b334481da08ead251df5c6e",
+      "bytes": 69976,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/combat_burn_deactivate.ogg",
+      "sha256": "f2e83014a545d22f07a886234b1e74e70bda911492d06275bb56a5a04c82fd60",
+      "bytes": 27947,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/combat_burn_loop.ogg",
+      "sha256": "1b75b00402d9459d84bebae37b93b4b2784558ce269be71ac0603d2fc4039a63",
+      "bytes": 125732,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/combat_readiness_malfunctions_engine_02.ogg",
+      "sha256": "b70fd7913d641b212c644b4393177f77d0a7d37dce77502b70771eb72e177d42",
+      "bytes": 12304,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/combat_readiness_malfunctions_engine_03.ogg",
+      "sha256": "4a4f63c01116548d5b94acd17f3ca60df9ee534958eb21537181b9686742cac6",
+      "bytes": 11569,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/damper_field_activate.ogg",
+      "sha256": "3b94c84d8aba89f7d1d1771c2bddb96f6a6fec6e5d98834b093933c2844bf9a3",
+      "bytes": 27728,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/damper_field_deactivate.ogg",
+      "sha256": "b7c508cc0728fd468c977f647ab0a0386c8fcfac24738e1567050cdbb53a3128",
+      "bytes": 27541,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/damper_field_loop.ogg",
+      "sha256": "ba71fd722c99170fd5609d1691d071c69a81999f55a1b5f93957e1b9cec48c86",
+      "bytes": 61379,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/darkened_gaze_activate.ogg",
+      "sha256": "0c87e88050974ed63932741606d68929570d1426eca537a9f16718d7905ad459",
+      "bytes": 21133,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/darkened_gaze_explosion_01.ogg",
+      "sha256": "03118a941dd6d35fb9b33b241aaebbdcafa5875e8eb7ef842111d3500f3c44f3",
+      "bytes": 9989,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/darkened_gaze_explosion_02.ogg",
+      "sha256": "d7cdb348d111d57c8fb2434ecb4fe4b0e71f67644c72aeac1d2d9955cbb24e7a",
+      "bytes": 10046,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/darkened_gaze_explosion_03.ogg",
+      "sha256": "0fdfdacd41dcb210fc002e6345796c35fb91975ab3cc3b7ea78bc72ae8966b81",
+      "bytes": 9606,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/darkened_gaze_idle.ogg",
+      "sha256": "5976aff84d4b67b4da21d389cf96c9f7938104bd43a68576c5e1da5726459734",
+      "bytes": 46549,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/darkened_gaze_loop.ogg",
+      "sha256": "b38dcff969ffb853435d8be42324978d9cc85374b57ed33845db8f093aba876a",
+      "bytes": 52137,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/energy_lash_activate.ogg",
+      "sha256": "7c9698a066bf8b770ec1dbb3040d2ad34cb309b7514c332ba9ebd9636f94759f",
+      "bytes": 20439,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/energy_lash_extraction_protocol.ogg",
+      "sha256": "b4bc22c00b2a2c21e4fab3dd2bd658a53cf16b39dc3e414d52a497fd269cf342",
+      "bytes": 15039,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/energy_lash_fire_01.ogg",
+      "sha256": "36a138f2ff4d2346a62d59479521fbe29e605fe2ddb67f574b81ef56555dfbbe",
+      "bytes": 12402,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/energy_lash_fragment_volley.ogg",
+      "sha256": "07dba8903708bb55cbb4f66175b155a9b18ece48cfc29c095f8883779bfa4608",
+      "bytes": 35981,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/energy_lash_incursion_mode.ogg",
+      "sha256": "c8187ab8c6bd0b689718ca393abc1e0c0130e577b24895a1dc6606f42d6ba5bb",
+      "bytes": 24463,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/entropy_amplifier_activate.ogg",
+      "sha256": "e7ea598ee1d54ecd7ac928a99d4e619f392a5dd698c0d315b96c568884a18210",
+      "bytes": 68412,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/entropy_amplifier_deactivate.ogg",
+      "sha256": "18cf6a7aa5b39b469ec20331ca196b61c3d85f966eca21a42749da3cfee9c4bc",
+      "bytes": 30113,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/entropy_amplifier_loop.ogg",
+      "sha256": "80fbca1a78744cbebd27d04dad30d1b465d1703501ac4238466b0e3948b3fdee",
+      "bytes": 419557,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/fast_missile_racks_oneshot.ogg",
+      "sha256": "917a5053490b494a4bffd97f28c0a3968f73d9126c96942f3ef410750acf8385",
+      "bytes": 15391,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/fragment_construction_activate.ogg",
+      "sha256": "a108bffda6871bc8e47c775803b5790e0de1390636c85e60eb5b0c05b2c05ea3",
+      "bytes": 14017,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/fragment_construction_loop.ogg",
+      "sha256": "e2eb443ca7a6e15691386ef6b929b42fb1a01f0debbb0d809b12f3a9b9030ed5",
+      "bytes": 15774,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/high_energy_focus_activate.ogg",
+      "sha256": "88f96ef4ab21d89c21f0c99a24ec28a3d23b05ef9c3dcc356543bd5846e7ab93",
+      "bytes": 7748,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/high_energy_focus_deactivate.ogg",
+      "sha256": "eb9ca9179a9fed45e241b92ebb62c6badcd5e8ad6d39ad7cc47dc1b6b6a8f102",
+      "bytes": 8026,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/high_energy_focus_loop.ogg",
+      "sha256": "7a92140b55ad903423210e13893ad0f21e3423fa96a8bbfd0dee54c4984374ca",
+      "bytes": 142084,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/lidar_array_targeting.ogg",
+      "sha256": "ac5483060e71b26f7f22e553a975d2bc843f6f38f119074ae982a714eb3155d5",
+      "bytes": 20545,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/lidar_array_windup.ogg",
+      "sha256": "f866c55e3f12a10bcaa01915ebe764a8ca4ffcbab7acb1b500a9d333af832d1d",
+      "bytes": 52888,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/maneuvering_jets_activate.ogg",
+      "sha256": "8f011d3549993cd65cf4ba0bd4dc094d43ef8402976512edc0fa3f72685d74dd",
+      "bytes": 6713,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/maneuvering_jets_loop.ogg",
+      "sha256": "833502e610fb5379cd6faaeeefd33657885b3a5f550d6c4c0a659048235d48f5",
+      "bytes": 55743,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/mine_strike_pinged_02.ogg",
+      "sha256": "487bd88c8baf96c9e7d9f8bca995adba55be70b23ae436862a98a2f3bee1feb3",
+      "bytes": 16553,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/mine_strike_pinged_03.ogg",
+      "sha256": "cd7b0be63bebc1ed6d3c95b67bc424d55b28bd4382e7bf64b14ff17ba4782325",
+      "bytes": 16799,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/mine_strike_pinged_04.ogg",
+      "sha256": "ef7e60473072e98a4f2c103f87ecdc9caa7849b7b15ea0561aa5be5ee902fbd4",
+      "bytes": 16777,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/mine_strike_teleport_02.ogg",
+      "sha256": "bc7f0d67fcea7773b915e364419cc737c5e3d9a1a689eafda89d1586bc288acd",
+      "bytes": 17860,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/mine_strike_teleport_03.ogg",
+      "sha256": "e08f45fa88dd34b1f2cd0a2a151fc3196a063361dd8b9f7f540880f49f2beb38",
+      "bytes": 16862,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/mine_strike_teleport_04.ogg",
+      "sha256": "f9666abacee95bbd216d47a424df31e6e5498a7ce7a80738e81123e32a185526",
+      "bytes": 17388,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/mine_strike_teleport_05.ogg",
+      "sha256": "912ba875856e37ea4963c953184b93ed63ad12ef5a46bbb140470be89b4d77f0",
+      "bytes": 17231,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/mine_strike_windup_02.ogg",
+      "sha256": "ba87625583dcab8e2b114f9f9da5ccb1f0115447298a9eb1d9c4ad4fd7ebcc0c",
+      "bytes": 18113,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/mine_strike_windup_03.ogg",
+      "sha256": "5e6829a07ca053b45af8b70d489116171dbbd588a149fe5543ecabaddce5870d",
+      "bytes": 17571,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/mine_strike_windup_04.ogg",
+      "sha256": "714bfb1fff8be980ea2f86acc5bc09bd6d4c29f4606194d788536420fdeca01b",
+      "bytes": 17077,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/mote_attractor_ambience_DARK_VARIANT.ogg",
+      "sha256": "c9e10c0c64860bc56e8211ebebf35f38e5b5ba4127b83e0acd94d4b7c4c2920f",
+      "bytes": 231965,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/mote_attractor_targeted_empty_space_01.ogg",
+      "sha256": "111b21f0bb30fdb27b6ccfbb9b855f28e640e5b330030cb5cf372019b5c9d562",
+      "bytes": 17389,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/mote_attractor_targeted_empty_space_02.ogg",
+      "sha256": "09c87558c8b6eb1ffa4d83e2962d66bd634fac484c808e820785c98011d50cb8",
+      "bytes": 18051,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/out_of_ammo_01.ogg",
+      "sha256": "46048865beea7013edc442dd56e15c64b1706829053b19625cf86af4cca854a4",
+      "bytes": 14805,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/phase_cloak_collision.ogg",
+      "sha256": "03be69e308735041559521e4127411f689363128ac4097f3baad99e641679877",
+      "bytes": 38515,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/quantum_disruptor_oneshot.ogg",
+      "sha256": "cb3d0098bf17570d903a81561fc247c70593dc4ef2305cecdb78e9a7b725fab9",
+      "bytes": 65150,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/recall_device_oneshot.ogg",
+      "sha256": "f8533a59103582f236be9aa48cb807cfeb20353f0d8aa8a46661fd0cc9372ce6",
+      "bytes": 12638,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/reserve_wing_oneshot.ogg",
+      "sha256": "6c62286b799b02bb9bb3140e111f8cf8296d2624e3211df9faab63054a6decb9",
+      "bytes": 13176,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/targeting_feed_activate.ogg",
+      "sha256": "393cf51227bf313884d91c41802f2f62c58b56f1e7dcebcc68783c396d84543f",
+      "bytes": 7222,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/temporal_shell_activate.ogg",
+      "sha256": "965e45c06ef4e42887269f1de963ea33e659564d494f5a1bc1fd8e514473c444",
+      "bytes": 65840,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/temporal_shell_deactivate.ogg",
+      "sha256": "8f65b78533be5dd99f8836b2ce4a140eda0eaec3d86b951847a298ecb1c7e22b",
+      "bytes": 74933,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/temporal_shell_loop.ogg",
+      "sha256": "6077d91f2a3e9161cad1bac350b5912fdbcb61042567f9d522c3fd454f93092c",
+      "bytes": 491312,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/tenebrous_expulsion_01.ogg",
+      "sha256": "9949b2ac757022cb644f023e9563530767f710f99da98343aba934b77aae239f",
+      "bytes": 10522,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/tenebrous_expulsion_02.ogg",
+      "sha256": "ad5ae3d04f47382b12594e44de88eabf3f36ec64de81aefd176eceda867e0bad",
+      "bytes": 11264,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/tenebrous_expulsion_03.ogg",
+      "sha256": "a364e5826a8d1503efdfe603fad99f025dcbd51f0f5ad8f7aa66707317aa6c6e",
+      "bytes": 10929,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_systems/tenebrous_expulsion_activate.ogg",
+      "sha256": "1923f2c436451b4d91342b66eac67b87daf5c21e95e727dc099ff56c7083e25c",
+      "bytes": 18646,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/campaign_location-gate_explode.ogg",
+      "sha256": "dfe0081aff35f87f4a9566f6f93f8f4254e5e21c212b6130686599dff42fa236",
+      "bytes": 41656,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/campaign_location-gate_loop_standby.ogg",
+      "sha256": "c24cccebcb0e80771e11d7b45c6418d83a0a7caa7ed08cb67fe33117ed56ae56",
+      "bytes": 49454,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/campaign_location-gate_loop_traveling.ogg",
+      "sha256": "6848d5166d9f92951e2b5d481e0c65f74443bfb05e700f9a86cccaa8d5a3e0d1",
+      "bytes": 105828,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/campaign_location-gate_windup.ogg",
+      "sha256": "18f4d24e6eb09af92f5fd4d1228f5b667bcc0e5be34df23e82bdaa0b35e377d9",
+      "bytes": 47550,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/campaign_location-station_02_market_01.ogg",
+      "sha256": "f845906888cd6f45259ab16e53d533d8ee6906d996aa3721630d3b3677433fa8",
+      "bytes": 142284,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/campaign_location-station_03_market_02.ogg",
+      "sha256": "c9141445305f8ccc2a0cbca33b00b7ce5829151fa6430a18f09875ed0b4de67d",
+      "bytes": 135559,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/campaign_location-station_04_market_03.ogg",
+      "sha256": "ea688c157dadcac21884f0499c284815c37d6279a26cf22c5161df3fc3f520fa",
+      "bytes": 133564,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_abyssal_hyperspace.ogg",
+      "sha256": "30229ece16dfbbd7a25c1447b456e6c0f6180d5a16b5bead27d2c95eac640e93",
+      "bytes": 47054,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_abyssal_light_01.ogg",
+      "sha256": "09247730152852ed0789e723f82c56d30512f06c01f5649723480dd081ed5f39",
+      "bytes": 40478,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_abyssal_light_02.ogg",
+      "sha256": "6f3db5df6e3c41e4ab726e925b35f61dbe4d376928748c48824afd2d4712047c",
+      "bytes": 47700,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_abyssal_light_03.ogg",
+      "sha256": "e28bc3db8e64f0dd799478dcc2986ac5fd89487bb21d6707f2f04e72e2d42986",
+      "bytes": 40613,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_abyssal_light_04.ogg",
+      "sha256": "02f7c8555f63cddf1caeb51854bf2084234cd006f968f34e2b702469a3456a06",
+      "bytes": 46186,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_abyssal_light_05.ogg",
+      "sha256": "f797cef1a628ad1bf50db5a6eff363954549c5c44e32159127da106334d2eaca",
+      "bytes": 47469,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_abyssal_light_06.ogg",
+      "sha256": "de77867937b9ef4ee2fef9e13a26d0bec648ab58faa327b31014d8f28523a327",
+      "bytes": 44584,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_abyssal_light_despawn_01.ogg",
+      "sha256": "2174ed202467baa9b8d3432a51899a9dc6e14d269b68ffcf9c7664f1836eb5eb",
+      "bytes": 39029,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_abyssal_light_windup_01.ogg",
+      "sha256": "9b53693c8397edf9cd8f2f5704ea21ee6de9e93db3577bfde39b3fd0b930fb59",
+      "bytes": 32643,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_asteroid_field.ogg",
+      "sha256": "bb7c06109850adaf0bf01df16443a23d6f73c3fc028316d02ead9b09ccae1dd7",
+      "bytes": 163883,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_corona_am_default.ogg",
+      "sha256": "a2f91d2a349d896ab696de67970a4e393834420919bdf0973ac01f9aa0d93f62",
+      "bytes": 158911,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_corona_am_flare.ogg",
+      "sha256": "96deae695253ca08d6f4146cc0ba555f0c472d8a6a7c828991d41324a6465279",
+      "bytes": 251890,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_corona_default.ogg",
+      "sha256": "7585381346f7c9ee23b16710d07da6efc01441974dfb18a13b7cc3e53948f2f2",
+      "bytes": 102480,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_corona_flare.ogg",
+      "sha256": "47e3f299c11b6d3537a2c3a28278df2fead1b44501f311cabc749a126262a702",
+      "bytes": 192798,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_hyperspace_deep.ogg",
+      "sha256": "5a111ce416645cd59591595ef9aed4136377f49552b621af0598514cec121e2d",
+      "bytes": 169166,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_hyperspace_deep_storm.ogg",
+      "sha256": "b79bf58c1eedd8303ff9071c2e0438612df764ed394e84e75d6d2775b853fec7",
+      "bytes": 249361,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_hyperspace_deep_storm_lightning_01.ogg",
+      "sha256": "39ea157485bcf82ca624ba91183b1d5e0110bc1eacc47c608dc8675e57d22a6b",
+      "bytes": 19954,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_hyperspace_deep_storm_lightning_02.ogg",
+      "sha256": "ece30d9d643d359840d0f4105518e6d587b0d59ea0da057ce89412e33d071214",
+      "bytes": 22594,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_hyperspace_deep_storm_lightning_03.ogg",
+      "sha256": "40c61853593fd7f054ab71f79d4487f7dfcbf3b8be76a3ff2ec3a91c0965881f",
+      "bytes": 22616,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_hyperspace_deep_storm_lightning_04.ogg",
+      "sha256": "6ead59e6043c74c69aa7d4495404462c76b89e12d4017799e1306b3ede14da04",
+      "bytes": 18493,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_hyperspace_deep_storm_lightning_05.ogg",
+      "sha256": "67e5fbebfabf68782926de246be2383950180be81911eae98eff1ff71e15b2aa",
+      "bytes": 17032,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_magfield_default.ogg",
+      "sha256": "b701e7e7f68251f8aab54ff6fdca201580bae3a4683d60c6916ebafc7577a8c4",
+      "bytes": 134791,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_magfield_storm.ogg",
+      "sha256": "d289ef18f62fd4151c246dd71407f0096b361065bad14e67a98f6b98804db209",
+      "bytes": 170451,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_nebula_default.ogg",
+      "sha256": "a0bf82ba81c7827f9eeed8bb84fc838c937103559b92e87e53cd5bcb04b47312",
+      "bytes": 215532,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_slipstream_inside.ogg",
+      "sha256": "4baa377833cc0eb1a206619119c2fa007a9e03969a29d71d11fc8974672f6ec1",
+      "bytes": 332068,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_terrain/terrain_slipstream_outside.ogg",
+      "sha256": "63f1e5f1d2c11e93963c4502c0554f1c6fff75e108678fac709693ca51e4a12a",
+      "bytes": 383958,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/abyssal_glare_loop.ogg",
+      "sha256": "b6cf6a08e2846d53087b07a91fac8328dbbe76e4a431193c37bc5f5efbcee740",
+      "bytes": 56903,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/cryoflamer_loop.ogg",
+      "sha256": "b733704431eda89430a48fc8c1f7b9bc282ebb471745426e3441682007c307be",
+      "bytes": 51702,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/disintegrator_armor_decay_loop.ogg",
+      "sha256": "8475b4afbfae956eaf9d790b3be77b94aa9def1659e018c760b7f520ef272b54",
+      "bytes": 140623,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/pseudoparticle_jet_loop.ogg",
+      "sha256": "6140730dd669aaaba5e9b05f70071539892128a86328aa7fe0ed6939e2a72c7c",
+      "bytes": 24020,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/reality_disruptor_arc_01.ogg",
+      "sha256": "f4279a3311fb0e02e20cd0f787edf0fd22d9de5c8d2c8f4600dc13f5437853a8",
+      "bytes": 14792,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/reality_disruptor_loop_01.ogg",
+      "sha256": "221ec05a61884c24b1bd2d208f15c95e6fb642b705fa5432887b124f7cc8f377",
+      "bytes": 27266,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/rift_beam_explosion_01.ogg",
+      "sha256": "d892a4b5dece3a9d6a6d78ada8bc4f8e3ca992475a97de99dfabe501f30998d3",
+      "bytes": 12522,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/rift_beam_explosion_02.ogg",
+      "sha256": "55ef8a236f7ad7592d55e2051a0aa4da14eea05099a1375a8218353d4773aad1",
+      "bytes": 12209,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/rift_beam_explosion_03.ogg",
+      "sha256": "eccee9a9a727ef82a4eff0969bc01d229b80d7918ccad190b0152c942acfe179",
+      "bytes": 11677,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/rift_beam_explosion_04.ogg",
+      "sha256": "ba3b25c050d70e143cbbdad38ba739d4fbd362b29d8f3e893d94c1bc5d689084",
+      "bytes": 12189,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/rift_explosion_01.ogg",
+      "sha256": "a11de294cd955aa947db85591c0c6183c494d241192cab6a90e402b62ab3ed4e",
+      "bytes": 20870,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/rift_explosion_02.ogg",
+      "sha256": "3493ed59ec8b148505ccbad0d1318f54ecfb728c8bd83ab1cd0b8861cd47d0bc",
+      "bytes": 19727,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/rift_explosion_03.ogg",
+      "sha256": "638070cb28e36a1f9f0ef82ca16e844de6cad7f1dc3cc05bfa0c2b90fa2a6d83",
+      "bytes": 20659,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/rift_explosion_04.ogg",
+      "sha256": "974ae3925f2e809c05beef1ef780f72495f93341330a0d57a3e3da848c81c6f9",
+      "bytes": 20390,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/rift_explosion_windup_01.ogg",
+      "sha256": "38990400bf0ba54b7e064251c228ead337164f4c78c181929cc9b993dfaa2b1b",
+      "bytes": 13021,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/rift_explosion_windup_02.ogg",
+      "sha256": "525dff6eb62079424445b9fa64e38901d486bb4fee4caf7c01226b79c08495b5",
+      "bytes": 12908,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/rift_explosion_windup_03.ogg",
+      "sha256": "fcb57204afffd9b9794178af29d103664b8ca06789a0deae07f659aa4f718d01",
+      "bytes": 12871,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/rift_explosion_windup_04.ogg",
+      "sha256": "f36b200b9b2f951c0a5e39a43abf03834330350229a34b34a1ec2023fdcad97a",
+      "bytes": 13334,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/rift_explosion_windup_05.ogg",
+      "sha256": "8fbd57b7421b89955ef19a30680c3cadd71e067198c00c91992c480457e4f409",
+      "bytes": 12667,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/shock_repeater_impact_01_short.ogg",
+      "sha256": "7179fbbe17361375096fb83fdc8660be3fc9924e51641c15e0f919d5b4c68a8f",
+      "bytes": 12864,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/shock_repeater_impact_02_short.ogg",
+      "sha256": "6378a1d5698928fd720e633594d97e59d04d64fc9ef6333a87181819691ab46f",
+      "bytes": 12435,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/shock_repeater_impact_03_short.ogg",
+      "sha256": "d2ed34893ac233666170eec8283296630f5c0734a00cc31eb6de0a8a8e5eb887",
+      "bytes": 12608,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/shock_repeater_impact_04_short.ogg",
+      "sha256": "7036635a1cbea9aa1a1296512135b86842493fbd6d2daf0bdc8be723f211d10e",
+      "bytes": 13318,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/hypervel_driver_fire_01.ogg",
+      "sha256": "437a302337003aff5a16236bc39ef4bd1594b55e04dc98c3e2aedd5d47cfbfca",
+      "bytes": 12741,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/needler_spinup_01.ogg",
+      "sha256": "d9c551bb5fd2534a36a24ee834f396d1a7679bb577375a9e2bca6a0d95a50885",
+      "bytes": 16487,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/fragment_defabrication_loop.ogg",
+      "sha256": "a10085276806ef124c110833dab7e80762e415fa7c4a74425faca05dc0fc63c0",
+      "bytes": 16112,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/hungering_rift_explosion_01.ogg",
+      "sha256": "7fdf0ab80f4a7830bec432790010489592fac4567aab8aefe878d7157633adbe",
+      "bytes": 12752,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/hungering_rift_explosion_02.ogg",
+      "sha256": "07335607edb1353e6596a0298b91e9971189562651eaaf953500fec6e3bd44ec",
+      "bytes": 12446,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/hungering_rift_explosion_03.ogg",
+      "sha256": "f3d040f2ab94774b114db07fcdbdb8400264731045b0de7d88a4494551341765",
+      "bytes": 13002,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/hydra_dem_split_01.ogg",
+      "sha256": "d575f7a917b0395f2441007123a7006e63d8a5eca893161b7e0b7fe1cfc882ce",
+      "bytes": 13381,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/rift_torpedo_exp_01.ogg",
+      "sha256": "174b6f5a22943edc852d2b156c68d3c2aaa948a77fb5214eaac1a5f74b3d33c0",
+      "bytes": 93227,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/rift_torpedo_flight_loop.ogg",
+      "sha256": "75affbfc6619c0e4725d7b653c27ecadd39509b4861bb81919afbfd003363ed7",
+      "bytes": 16256,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/sabot_srm_fire_01.ogg",
+      "sha256": "7eb26eda0c6eaf54b03059592bdeb16e691e04df3509727648b8db312157b797",
+      "bytes": 10251,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_ambience_crowd.ogg",
+      "sha256": "361c2a8b65e4be1a19b3adafd8153100433669288650735867fe5c618ef33d44",
+      "bytes": 114117,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_ambience_crowd_gasp.ogg",
+      "sha256": "b05058de5c621af0fcc7733d169b84cb50411bddb0769cfc4222fcd502506672",
+      "bytes": 27820,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_ambience_wind.ogg",
+      "sha256": "f49361510220ffdeb509e331b08ab4603bc7b26a866340c0cf8310125ea41642",
+      "bytes": 162102,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_bodyfall.ogg",
+      "sha256": "9cd91a8c410a08205d2c38b8b51c01f6642692317937cd3839fb1be265f263d3",
+      "bytes": 11436,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_cloth_movement1.ogg",
+      "sha256": "d73cd83860e453f609d36ec50a92239e0029b5a8a055d091075f61e7c856d72a",
+      "bytes": 7524,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_cloth_movement2.ogg",
+      "sha256": "eb61b9c64961f5f3efbdaa996127ca5b1c5b2ee57ad4c3a1daabaab577d08a7c",
+      "bytes": 6666,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_cloth_movement3.ogg",
+      "sha256": "2e8455593af5e81c60d3d8fd53d05e7dcc8ae3d49d2e839c3044ddbcc92d3b02",
+      "bytes": 6802,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_cloth_movement4.ogg",
+      "sha256": "b413a47ab5c0ace3e1fc38e72293968306070e49c5aed9dd8f2d8276a93d4724",
+      "bytes": 7980,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_footstep1.ogg",
+      "sha256": "9b2eb29138f68840f2f95b6a89bb36f283aeecf4e3de52eefe2da081a8389147",
+      "bytes": 7470,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_footstep2.ogg",
+      "sha256": "4ad6dc02f40f99a24fd084790b78d6ce6b95d51023a746567fde8f4e480a0ae4",
+      "bytes": 7458,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_footstep3.ogg",
+      "sha256": "a75f2eedb88db0f5e5b79632c05cf7b20d96e47d67ad0336c5b3ef6b25b92228",
+      "bytes": 7059,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_footstep4.ogg",
+      "sha256": "f1c75a73e91596fab411cec799c6828e02620e30c4548f8a8cb5fe065d7060e1",
+      "bytes": 7616,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_footstep5.ogg",
+      "sha256": "c278317a29ec7bce3d78b875b25d2ac8e6a33b0ffeab4d136764612a4360e564",
+      "bytes": 7473,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_sword_clash1.ogg",
+      "sha256": "b42eebe1955ce265f262722bec63f5b26b69ef264a1a114dce9d3d4907505832",
+      "bytes": 10841,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_sword_clash2.ogg",
+      "sha256": "fc62427178d302de8b188c9d065049ea368cf7bb9d2da27c6a0ce76dc8a5510e",
+      "bytes": 11306,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_sword_clash3.ogg",
+      "sha256": "a3775741cd64b0a0f8a509bfbdd1bbe9ab0ee2cd7e778b3c016304d77ab47f24",
+      "bytes": 11061,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_sword_clash4.ogg",
+      "sha256": "128252cc0e35774ed1932e4b584d25d3a6d6080c4ba961a683b7d4db2616fd02",
+      "bytes": 11306,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_sword_swish1.ogg",
+      "sha256": "ddb04709363273bfe75e5f7e73d8e88226f3428aa96991bf20c5fceb23cdea25",
+      "bytes": 11002,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_sword_swish2.ogg",
+      "sha256": "be3379df246b89b2af0822945346a4a3b1e1dfdfcbea179c943c9dad2649dbf7",
+      "bytes": 10719,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_sword_swish3.ogg",
+      "sha256": "ed86d1082675f862d840ac84afee8dc43ba174c80a98d1ff9fa451e1042370a1",
+      "bytes": 10691,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_sword_swish4.ogg",
+      "sha256": "40bcbfb423460d3d949e8fa40bf62363a14174f8c128faf564f0a69065109bd8",
+      "bytes": 10560,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_sword_swish5.ogg",
+      "sha256": "f9e81ad90e8da7125336752a5ea4b749524b2418bd51faaf5503e7831dccad59",
+      "bytes": 10699,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_sword_swish6.ogg",
+      "sha256": "534953e21135ca7a61efd70b274883376b4ec1d273d5ed4bc29ba97716e612f0",
+      "bytes": 10675,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_sword_swish7.ogg",
+      "sha256": "fc8e013adbcbe4ff55cd5d0bc8b3ab686da795e506dc44c93630d7413af29c6c",
+      "bytes": 10915,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_sword_swish8.ogg",
+      "sha256": "c99ac1c64098f183a1f77a4684eec49e6c0ddd4cbd035a37a61034ed052a29a5",
+      "bytes": 10927,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_sword_wound1.ogg",
+      "sha256": "2421cf8d45bdf820d2e29adcbb633a6d779fbec4c380a64ec4b30055d3315d7b",
+      "bytes": 10628,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_sword_wound2.ogg",
+      "sha256": "223bcaf459b0fab630279ad7cf226e87e88ae2e3ce70e3798c80f0379c1d568d",
+      "bytes": 11431,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_sword_wound3.ogg",
+      "sha256": "f4d2978ea4a395a4fb7e40d01e5c6bbfdcec6aec8e4b7f684ad251ce7b2ec683",
+      "bytes": 10449,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "sounds/soe/eventide_sword_wound4.ogg",
+      "sha256": "4ed8927bab37f1d5ae3958591dfe5034fbaee4fbda67ce5497aac67d20859fda",
+      "bytes": 10707,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/misc/the_duel.png",
+      "sha256": "3b6e3aa3005c5bf77834566620368318f421054eb3498d2d67982de39c781c6f",
+      "bytes": 831,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/arid.jpg",
+      "sha256": "fc40d0b4dae020a4ff8a116a8fd5d3e9844a3afa26c60ddb8741793658c8f7fc",
+      "bytes": 527831,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/asharu_sparse_glow.png",
+      "sha256": "c4331ee9aeef5031e27c23e1f20a9c8df76629c000ab121002a3e7899a457518",
+      "bytes": 25069,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/atmosphere.png",
+      "sha256": "4727537afb4e22a07c8dee36760d5404485dd77c208fcd07d7bce5261fd7e4d2",
+      "bytes": 219,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/aurorae.png",
+      "sha256": "f46cc3a78b7d2dc8175d071378682bd0d687f23a4f83917c010c6fa2d4b60462",
+      "bytes": 142504,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/barren00.jpg",
+      "sha256": "54d6dd9706fe850918703d9cf3133a827dd4fd28df18ff28957b10995ee28a40",
+      "bytes": 413687,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/barren01.jpg",
+      "sha256": "d6f00f0e735b40e6dc298e6156c6297a12a4a030e81d89a4d8eb85ef5afc6175",
+      "bytes": 571828,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/barren02.jpg",
+      "sha256": "9303ba7f1d9b0075d8dab381151e15aafd83804a909080364de8c17b4c9634a9",
+      "bytes": 616318,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/barren03.jpg",
+      "sha256": "70bd3fe5916218d991401f6b472532483501db6886755d2e312c4b4a1019cae5",
+      "bytes": 824266,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/barren_bombarded_lights.png",
+      "sha256": "fc8064fd617e26f59893b6a904151ae3bdda115d66a134f91a813f26948b1180",
+      "bytes": 13817,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/brown_dwarf.jpg",
+      "sha256": "d3c9dab98a916d9c5dd514aacbb2808d4a4edc7f49895638d127e9675b78e8f4",
+      "bytes": 87337,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/castiron.jpg",
+      "sha256": "a2fd813068f77ee6179181f20b478ca287f9d726d369359569ca9c86a5cc1a73",
+      "bytes": 502356,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/clouds_aurorae.png",
+      "sha256": "54066117bf19bb8530e40bb12acf34f39844fbbf32ffdbdcfd1453ea5ab3b247",
+      "bytes": 43566,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/clouds_banded01.png",
+      "sha256": "f31f7c97b0f2eb678588992893ab8bf2e01e1897671d52522b5ba1019c4f091c",
+      "bytes": 69806,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/clouds_white.png",
+      "sha256": "5cd8e2942e4e6e470e45860973d86108003b81d1caa3590c45fd331836e2e178",
+      "bytes": 86944,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/cryovolcanic01.jpg",
+      "sha256": "cc789bf3f70efbfaed5ceef5593a9755d8d504db676f86583fb5bc9b29b2e48a",
+      "bytes": 152414,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/desert.jpg",
+      "sha256": "3e98ef7d8efc35d391cc72de07946f758d3d32680bceb8eb3da38f9bde6aa1ff",
+      "bytes": 451449,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/desert01.jpg",
+      "sha256": "8b873db08696ff14b5058f6fcb88c22a4da8e4fda037e273de850960704601c3",
+      "bytes": 579831,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/frozen00.jpg",
+      "sha256": "073cef9c7de7baa43ecd3d24873c34051505ec43b94d9dcbbe08686045168a5b",
+      "bytes": 653976,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/frozen01.jpg",
+      "sha256": "4e100f485c40a1c31a6ba874af1c3767d231041b98e410cd082db1a1b8498bae",
+      "bytes": 633433,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/frozen02.jpg",
+      "sha256": "0457be8ac33bfa78cedac657f8a6392317eb456973308ce6fb97a9cc17517e70",
+      "bytes": 634912,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/gas_giant.jpg",
+      "sha256": "d8ac94308c5ce9cbb8f59a56053a7b3aa75553e969f8e459867ab2f0ad77d02a",
+      "bytes": 78813,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/ice_giant.jpg",
+      "sha256": "5f4dc895c197fc7ea74a380e14e45c8ac276a7290e9d200ee78dcc7af5a57091",
+      "bytes": 56802,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/jungle.jpg",
+      "sha256": "e699e3cc4de5eeaa2de92b3cf9e5a6ca63fb70043df592f8cf716a4dd539b1f5",
+      "bytes": 454674,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/lava_major.jpg",
+      "sha256": "f55db2ae8347fc4c473122e95fbc78a4506108022bdcda6d3b6413a716474616",
+      "bytes": 683788,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/lava_major_glow.png",
+      "sha256": "e66c49e9f8f2b78fdb0185725a0e59f3cf5d25e7d3e99484041000780814b0ca",
+      "bytes": 349070,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/lava_minor.jpg",
+      "sha256": "ac0e27278ca7a73766ff0d86da2fbb6b59d8e4536b4c73b1708270d042c03200",
+      "bytes": 572190,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/lava_minor_glow.png",
+      "sha256": "59aca7c4a407eb002953bd9992da5f8e8d2d96a0b30381f923adc3bbaa49514c",
+      "bytes": 219118,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/marslike.jpg",
+      "sha256": "e51fc2c21c47570abd99b76135924aa21d8e9a96fc06f8bf7582a571c6567237",
+      "bytes": 553201,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/planet_ice01.jpg",
+      "sha256": "56b673d83ceac862601243096c3d6b0b1bb56b667557479c06092fb8ee1810a9",
+      "bytes": 143456,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/radiated.jpg",
+      "sha256": "1caefaf5162f8c69feea0a0bd3b8ab0cbd081f6e16e2612ae0d369b8977eee7a",
+      "bytes": 371208,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/rings_asteroids0.png",
+      "sha256": "25fa60ba466c6224e9e45085c3f5da10da9e78eb58d02d83355c721d26ca3fa4",
+      "bytes": 669674,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/rings_dust0.png",
+      "sha256": "505794adea5a520a6231027100bef2659fb6cdccb9e96763339cda51fbd9ad2e",
+      "bytes": 816467,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/rings_ice0.png",
+      "sha256": "1f2396dab519fe6de86cb9abfd7de3b7a96426b78c2e092f16b6c29dac1a48fa",
+      "bytes": 798063,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/rings_special0.png",
+      "sha256": "4048ec95e4ce505abef3d3fa8c842d0004bd48ccd448dac1d24d2cb3c4e4b95f",
+      "bytes": 348607,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/rocky-metallic.jpg",
+      "sha256": "05fe57ffbf5594e8465c2d6ece3fcba2906cf3a6c2b67c565378db18af4483d0",
+      "bytes": 579210,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/rocky-unstable.jpg",
+      "sha256": "9f8dcf77346ec41e40017cbceede8f7b771025414554d58deaba7911d1821f0d",
+      "bytes": 810295,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/rocky_ice.jpg",
+      "sha256": "5bd6c0d0ae99278e756c9ba9bb82c95d2722c4bd762dea60ae54a16b5e247d6e",
+      "bytes": 596354,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/sindria_glow.png",
+      "sha256": "cfeeed56e657616b015efe2e36c47b86b3329f035a9b16e9cd39216807e9bb96",
+      "bytes": 41493,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/star_blue.jpg",
+      "sha256": "accb370db77ba96dfc65ae513c03262d0a93ca5ca219033441a32aa07e3b503e",
+      "bytes": 27329,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/star_orange.jpg",
+      "sha256": "7db6acbf2f759a0da8439dc05d8e7f7d2dc9401cee945dda138c184a5d0aa99a",
+      "bytes": 38319,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/star_red2.jpg",
+      "sha256": "8f1d58cd9c770ec43ae6253c8648ddb2bd038c7faf81a97fb547f7eefa908bbd",
+      "bytes": 28145,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/star_texture_yellow.jpg",
+      "sha256": "7e45c9e77264a54d7501a24a1b5a4e4fbc3f74e7ed8f6d0c9f84e75d4953c5fb",
+      "bytes": 26420,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/star_white.jpg",
+      "sha256": "da2dba10640f5f5e9d55a22356e051a861401e07b25a77d36564dcfa528925c1",
+      "bytes": 2346,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/sun_halo.png",
+      "sha256": "72a79b569d9c0f6ccbb561e53d0bc0cd459bf3a945d8b8d4b9bf0a1f75831781",
+      "bytes": 1982,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/terran.jpg",
+      "sha256": "c7a45c0b7893e89eb2afb538474bc067046a07cf8b1d7d262d2d2b4f802372d3",
+      "bytes": 582808,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/terran_eccentric.jpg",
+      "sha256": "071c277fdb58533bb5ebaeee9f9642b52b1f67299d2ba19bbe4a9f7b70804194",
+      "bytes": 732566,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/toxic_atmosphere.jpg",
+      "sha256": "b11ec08b034f5336c2116fca9c288e95a50a302f2335defcfedd24c7343ef3a2",
+      "bytes": 62826,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/tundra.jpg",
+      "sha256": "150c70adf25a56cbc866316a5ef9a615d2bec40c15ca84c1c107e7f743bb76ea",
+      "bytes": 727199,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/venuslike.jpg",
+      "sha256": "962266da064cc88ee35fa2ea9d59c825207c79fc50d6d1af41a7a3be0e565e09",
+      "bytes": 99239,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/volturn.jpg",
+      "sha256": "d2ee126172e690be78c08c5fa9961a709025d8280090adda4c998e59d1136d57",
+      "bytes": 29608,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/planets/volturn_glow.png",
+      "sha256": "2b2814a1d34770173d00e71b8fd7bc9e967fee915601e1e181d43048ace80d07",
+      "bytes": 128997,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/terrain/deep_hyperspace2.png",
+      "sha256": "7db0aafa8a7607f12fa130adc997095c3c52cc07f6d00d6cd752de7ebdbb8932",
+      "bytes": 485826,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/terrain/deep_hyperspace_blue_glow.png",
+      "sha256": "1e12cc4490f24ee926643ee5c65431df04ec1515398c8a339c623bb436180e75",
+      "bytes": 495094,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/terrain/deep_hyperspace_map.png",
+      "sha256": "192c4f2aa7d8960de7d895409ed7a1658a5faf1e6b1815415998f04570fdafec",
+      "bytes": 9659,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/terrain/map_asteroid_belt.png",
+      "sha256": "5043fdd91d993e6a62b07cad50907df97599b8227bf0317ed3b48aec4ed25ab5",
+      "bytes": 2113,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/terrain/map_ring.png",
+      "sha256": "e4393b94c54f12719f3f0ecbe015ec61e658df9e6386ddc7300fdc81d721b94e",
+      "bytes": 2015,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/terrain/nebula512_blue.png",
+      "sha256": "d43faff000968e685286926fc4ec3f238a9e0725ccf3a41fb3fc39fefa44ed0f",
+      "bytes": 492566,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/terrain/nebula_amber.png",
+      "sha256": "e0dc1d966dd1d6d9be4d94566d45ee4a5dab81fa63d01dc059c89082bfdc53f3",
+      "bytes": 479228,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/terrain/nebula_amber_map.png",
+      "sha256": "812ac9d2eee8e4c5550fa721325e4b80d0cf80334cb4bf759088ebec3c94a2cf",
+      "bytes": 10907,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/terrain/nebula_blue_map.png",
+      "sha256": "cb1ab2dbadcd1ff3b4b9603eec0590df475324933b1690bdbbf2b57be8b75fe4",
+      "bytes": 10710,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    },
+    {
+      "path": "graphics/terrain/nebula_lowres.png",
+      "sha256": "82ca062843583480224019310c282ea8f7ce29794016fdd6863595ca5e7e91a1",
+      "bytes": 25011,
+      "reason": "no runtime filename reference; dynamic-family audit excludes this path"
+    }
+  ]
+}

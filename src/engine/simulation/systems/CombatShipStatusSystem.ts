@@ -1,3 +1,4 @@
+import { weaponSizeBaseline } from '../../content/WeaponSizes';
 import { installedHullMods } from '../../extensions/HullMods';
 import type { SystemWorld } from '../../extensions/ship-systems/Types';
 import type { Projectile } from '../Weapon';
@@ -75,7 +76,7 @@ export class CombatShipStatusSystem {
           1.6
         );
         if (ship.isPlayer) {
-          ctx.addRadioMessage('轮机工段', 'PLAYER', '正在紧急主动排散幅能...', [100, 220, 255]);
+          ctx.addRadioMessage('轮机工段', 'PLAYER', '正在紧急主动排散载荷...', [100, 220, 255]);
         }
       }
       ship.prevVenting = ship.flux.isVenting;
@@ -146,7 +147,7 @@ export class CombatShipStatusSystem {
     // Web radio/floaty presentation remains an adapter, emitted once per transition.
     for (const mount of ship.justDisabledMounts) {
       const mountWorldPos = ship.pos.clone().add(mount.relativePos.clone().rotate(ship.facingRad));
-      const size = mount.spec.mountSize.toLowerCase();
+      const size = weaponSizeBaseline(mount.spec.mountSize).toLowerCase();
       sound.playAtPos(mount.isPermanentlyDisabled ? 'weapon_malfunction_' + size : 'disabled_' + size,
         ship.pos, ctx.playerShip.pos, .5, 1);
       if (!isFighter) ctx.fx.addFloatingText(mountWorldPos, (mount.isPermanentlyDisabled ? 'PERMANENTLY DISABLED: ' : 'WEAPON DISABLED: ') + mount.slotId,

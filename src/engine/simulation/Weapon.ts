@@ -1,3 +1,4 @@
+import type { WeaponSize as WeaponSlotSize } from '../content/WeaponSizes';
 import type { WeaponVisualProfile } from '../visual/VisualProfiles';
 import type { ProjectileImpactFamily } from '../visual/ImpactVisuals';
 import { Vector2 } from '../math/Vector2';
@@ -18,7 +19,7 @@ export interface MissileLifecycleSpec {
 }
 
 export type WeaponMountType = 'TURRET' | 'HARDPOINT' | 'HIDDEN';
-export type WeaponSlotSize = 'SMALL' | 'MEDIUM' | 'LARGE';
+export type { WeaponSize as WeaponSlotSize } from '../content/WeaponSizes';
 
 export interface ProximityFuseSpec {
   range: number; // 接近引信引爆距离 (px)
@@ -125,6 +126,19 @@ export interface ProjectileExplosionSpec {
 }
 
 export interface WeaponSpec {
+  gravityTractor?: import('./GravityTractorState').GravityTractorSpec;
+  gravityDeflector?: import('./GravityTractorState').GravityDeflectorSpec;
+  gravityCoupling?: 'MASS_DRIVER';
+  /** Web-authored superweapon: limited penetration of destroyed rocks / small inert wrecks.
+   * Read by authority from registered content; live energy remains on the projectile. */
+  terrainPenetration?: { maxRadius: number; minDamageCost: number; wreckDamagePerRadius: number };
+
+  /** Optional v1 art calibration shared by body/barrel/glow; all layers must be co-registered.
+   * World dimensions, normalized pivot. Does not scale physical muzzle offsets at runtime. */
+  spriteWidth?: number;
+  spriteHeight?: number;
+  spritePivotX?: number;
+  spritePivotY?: number;
   systemOnly?: boolean;
   /** Source DO_NOT_AIM / GUIDED_POOR: accept manual trigger regardless of cursor arc. */
   alwaysFire?: boolean;
@@ -180,6 +194,8 @@ export interface WeaponSpec {
   spreadDecay?: number; // 散布恢复速率 (度/秒)
 
   // 真实视觉与动画规格
+  /** UI portrait only; never substitute this for an installed turret or hull sprite. */
+  displayIconUrl?: string;
   turretSpriteUrl?: string;
   turretGunSpriteUrl?: string;
   hardpointSpriteUrl?: string;
@@ -190,6 +206,9 @@ export interface WeaponSpec {
   animationType?: 'GLOW_AND_FLASH';
   /** .wpn 显式 hardpointSprite:""：固定炮体已烘焙在舰体贴图里，不应回退绘制 turretSprite。 */
   hardpointUsesHullSprite?: boolean;
+  /** Opt-in Web rule: firing body's reverse velocity increment per accepted solid shot.
+   * Separate from sprite recoil; applied after the projectile inherits pre-shot velocity. */
+  fireRecoilSpeed?: number;
   visualRecoil?: number;
   renderBarrelBelow?: boolean;
   turretOffsets?: number[];
@@ -270,6 +289,10 @@ export interface WeaponSpec {
 }
 
 export interface WeaponMount {
+  gravityTractor?: import('./GravityTractorState').GravityTractorState;
+  gravityDeflection?: { x: number; y: number; age: number };
+  /** Authority-clocked presentation only; included in snapshots, never used to grant/fire ammo. */
+  loadedMissileLevels?: readonly [number, number];
   /** Per-mount targeting, independent of the ship target used by orders/HUD. */
   fireControl?: { targetId?: string | number; targetKind?: 'SHIP' | 'MISSILE'; reason: string };
   fireControlTargetShipId?: string;
@@ -337,6 +360,17 @@ export interface WeaponGroup {
 }
 
 export interface Projectile {
+  gravityOriginalSourceShipId?: string;
+  gravityCapturedBy?: string;
+  gravityWellBinding?: { ownerId: string; serial: number; age: number; turn: number };
+  /** Explicit mass-driver opt-in; a field never changes faction, damage or lifetime. */
+  gravityCoupling?: 'MASS_DRIVER';
+  /** Once deflected, native solid shots drain range by their actual curved world path. */
+  gravityDeflected?: boolean;
+  /** This payload was fully intercepted before its source-duration blast. */
+  voidShieldBlockedRoot?: string;
+  /** A piercing screen impact and its later hull contact are one hit, not two. */
+  voidShieldHitRecorded?: boolean;
   /** Hull-reactor blast: not a weapon shot and never gains offensive weapon/skill scaling. */
   isHullExplosion?: boolean;
   /** Original weapon category and immutable launch point for hit-time damage listeners. */

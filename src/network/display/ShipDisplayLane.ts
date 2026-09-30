@@ -1,3 +1,5 @@
+import { validSurfaceFeedback } from '../../engine/visual/ShipSurfaceFeedback';
+import { validLoadedMissileLevels } from '../../engine/visual/GlorianaTorpedoVisuals';
 /** Experimental fixed-layout renderer lane. Not the LAN HUD/prediction protocol.
  * Hot fields are read directly from owned Float64 storage. Only definitions and
  * variable visual tails use the bounded metadata codec; no Ship is restored. */
@@ -13,7 +15,7 @@ import type { Ship } from '../../engine/simulation/Ship';
 import type { ShipRenderState } from '../../engine/render/ShipRenderState';
 import { RenderWeaponDictionary } from '../../engine/runtime/local/RenderWeaponDictionary';
 import { combatWeaponRange } from '../../engine/simulation/WeaponRange';
-import { pulsePusherOffset } from '../../engine/extensions/ship-systems/PulseDrive';
+import { pulsePusherOffset } from '../../engine/extensions/ship-systems/PulseDriveState';
 import { shipPresentationPose } from '../../engine/visual/ShipPresentation';
 import { weaponPresentationAngle } from '../../engine/visual/WeaponPresentation';
 import { isImmutableMetadata } from '../../engine/extensions/Immutable';
@@ -27,11 +29,11 @@ const forbidden = new Set(['__proto__', 'constructor', 'prototype']);
 const littleEndian = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
 const finiteInt = (n: unknown, max: number): n is number => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 && n <= max;
 const check = (ok: unknown, message: string): void => { if (!ok) throw new Error('Ship display: ' + message); };
-const SHIP_EXTRA = ['id', 'playerTargetId', 'visibilityOverflow', 'phaseGhosts', 'scorchMarks', 'weaponGroups', 'presentationPose'] as const;
+const SHIP_EXTRA = ['id', 'playerTargetId', 'visibilityOverflow', 'phaseGhosts', 'scorchMarks', 'weaponGroups', 'presentationPose', 'fireControlMode', 'surfaceFeedback'] as const;
 const SHIELD_EXTRA = ['type', 'phaseState', 'hitSegmentLevels'] as const;
 const FLUX_EXTRA = ['hullSize'] as const;
 const SYSTEM_EXTRA = ['state', 'type', 'teleportVisual', 'pulseOffset'] as const;
-const WEAPON_EXTRA = ['mountType', 'slotId', 'presentationRelativeAngle'] as const;
+const WEAPON_EXTRA = ['mountType', 'slotId', 'presentationRelativeAngle', 'loadedMissileLevels'] as const;
 
 // Uniform container tags avoid collisions with user metadata. Special numbers,
 // undefined, vectors and absent fields retain their existing display semantics.
@@ -70,6 +72,8 @@ function numberFields(value: any, fields: readonly string[]): boolean {
  return value && typeof value === 'object' && fields.every(key => typeof value[key] === 'number');
 }
 function validateShipExtras(extra: any): void {
+ check(validSurfaceFeedback(extra.surfaceFeedback), 'surface feedback');
+ check(extra.fireControlMode === 'AI' || extra.fireControlMode === 'MANUAL', 'fire-control mode');
  check((extra.playerTargetId === null || typeof extra.playerTargetId === 'string') && typeof extra.visibilityOverflow === 'string', 'ship display strings');
  check(Array.isArray(extra.phaseGhosts) && extra.phaseGhosts.length <= 256 && extra.phaseGhosts.every((v: any) => numberFields(v, ['facingRad', 'alpha', 'life', 'maxLife']) && v.pos instanceof Vector2), 'phase ghosts');
  check(Array.isArray(extra.scorchMarks) && extra.scorchMarks.length <= MAX_ITEMS && extra.scorchMarks.every((v: any) => numberFields(v, ['cellIndex', 'opacity', 'intensity', 'heat', 'flash', 'flashElapsed', 'phase', 'pulsePeriod', 'size', 'rotationRad', 'variant']) && typeof v.justHit === 'boolean' && ['cracks', 'burns', 'holes'].includes(v.kind) && v.localPos instanceof Vector2), 'scorch marks');
@@ -82,12 +86,13 @@ function validateSystemExtras(extra: any): void {
  check(v === undefined || numberFields(v, ['serial', 'destinationFacing']) && v.destination instanceof Vector2 && (v.origin === undefined || v.origin instanceof Vector2) && (v.originFacing === undefined || typeof v.originFacing === 'number'), 'teleport metadata');
 }
 function validateWeapon(spec: any, extra: any, checkDefinition: boolean): void {
+ check(extra.loadedMissileLevels === undefined || validLoadedMissileLevels(extra.loadedMissileLevels), 'loaded missile levels');
  check(typeof extra.slotId === 'string' && extra.slotId.length <= 256 && ['TURRET', 'HARDPOINT', 'HIDDEN'].includes(extra.mountType) && (extra.presentationRelativeAngle === undefined || typeof extra.presentationRelativeAngle === 'number'), 'weapon metadata');
  if (!checkDefinition) return;
  check(typeof spec.id === 'string' && spec.id.length <= 256, 'weapon definition');
  // Admit only data and bundled effect/texture references at the cold boundary.
  for (const [key, value] of Object.entries(spec)) if (key !== 'glowColor' && key !== 'mirv') check(value == null || ['number', 'string', 'boolean', 'undefined'].includes(typeof value), 'weapon definition field');
- const assets = ['turretSpriteUrl', 'hardpointSpriteUrl', 'turretGunSpriteUrl', 'hardpointGunSpriteUrl', 'glowSpriteUrl', 'hardpointGlowSpriteUrl', 'projSpriteUrl'];
+ const assets = ['displayIconUrl', 'turretSpriteUrl', 'hardpointSpriteUrl', 'turretGunSpriteUrl', 'hardpointGunSpriteUrl', 'glowSpriteUrl', 'hardpointGlowSpriteUrl', 'projSpriteUrl'];
  const resources = (value: any): void => {
   for (const key of assets) if (value[key] != null && value[key] !== '') check(typeof value[key] === 'string' && assetManager.isLoaded && assetManager.hasPath(value[key]), 'unbundled weapon asset');
   for (const [key, kind] of [['onHitEffect', 'hit'], ['beamEffect', 'beam'], ['everyFrameEffect', 'advance']] as const) if (value[key] != null && value[key] !== '') requireWeaponEffect(value[key], kind, 'ship display');
@@ -187,7 +192,7 @@ export class ShipDisplayEncoder {
   const start = (HEADER + metadata.length + 7) & ~7, size = start + numbers.length * 8;
   check(size <= MAX_BYTES, 'packet budget');
   const buffer = new ArrayBuffer(size), view = new DataView(buffer);
-  view.setUint32(0, MAGIC, true); view.setUint32(4, 1, true); view.setUint32(8, this.epoch, true); view.setUint32(12, metadata.length, true);
+  view.setUint32(0, MAGIC, true); view.setUint32(4, 3, true); view.setUint32(8, this.epoch, true); view.setUint32(12, metadata.length, true);
   view.setUint32(16, numbers.length, true); view.setUint32(20, rows.length, true); view.setFloat64(24, tick, true); view.setUint32(32, reset ? 1 : 0, true);
   new Uint8Array(buffer, HEADER, metadata.length).set(metadata);
   if (littleEndian) new Float64Array(buffer, start).set(numbers); else for (let i = 0; i < numbers.length; i++) view.setFloat64(start + i * 8, numbers[i], true);
@@ -231,7 +236,7 @@ export class ShipDisplayDecoder {
  decode(input: ArrayBuffer): ShipDisplayFrame {
   check(input instanceof ArrayBuffer && input.byteLength >= HEADER && input.byteLength <= MAX_BYTES, 'packet length');
   const buffer = input.slice(0), view = new DataView(buffer);
-  check(view.getUint32(0, true) === MAGIC && view.getUint32(4, true) === 1, 'protocol');
+  check(view.getUint32(0, true) === MAGIC && view.getUint32(4, true) === 3, 'protocol');
   const epoch = view.getUint32(8, true), length = view.getUint32(12, true), count = view.getUint32(16, true), shipCount = view.getUint32(20, true), tick = view.getFloat64(24, true), flags = view.getUint32(32, true);
   check(flags <= 1 && view.getUint32(36, true) === 0 && epoch > 0 && finiteInt(tick, Number.MAX_SAFE_INTEGER), 'header');
   check((epoch === this.epoch && tick > this.tick) || (flags === 1 && epoch > this.epoch), 'stale or unknown epoch');

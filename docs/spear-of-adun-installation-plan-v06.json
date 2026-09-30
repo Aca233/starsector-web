@@ -1,0 +1,211 @@
+{
+  "schemaVersion": 1,
+  "hullRevision": "spear-of-adun-v06",
+  "stage": "AUTHORING_LAYOUT_NOT_RUNTIME",
+  "sourceImageSize": [
+    512,
+    1024
+  ],
+  "ownershipPolicy": {
+    "ROTATING_CORE": "NO_WEAPON_MOUNTS",
+    "FIXED_HULL": "OPEN_SAME_SIZE",
+    "FORE_MECHANISM": "DEDICATED_BUILT_IN"
+  },
+  "runtimePivot": null,
+  "runtimeWeaponBindings": null,
+  "countAndSizeAreWebDesign": true,
+  "sites": [
+    {
+      "id": "BOW_GUARD_PORT",
+      "role": "BOW_GUARD",
+      "owner": "FIXED_HULL",
+      "binding": "OPEN_SAME_SIZE",
+      "size": "SMALL",
+      "imageAnchorPx": [
+        232,
+        218
+      ],
+      "bearingRadiusPx": 4,
+      "weaponMotion": "TURRET",
+      "approvedFiringArcDeg": null,
+      "artFitAccepted": false
+    },
+    {
+      "id": "BOW_GUARD_STARBOARD",
+      "role": "BOW_GUARD",
+      "owner": "FIXED_HULL",
+      "binding": "OPEN_SAME_SIZE",
+      "size": "SMALL",
+      "imageAnchorPx": [
+        280,
+        218
+      ],
+      "bearingRadiusPx": 4,
+      "weaponMotion": "TURRET",
+      "approvedFiringArcDeg": null,
+      "artFitAccepted": false
+    },
+    {
+      "id": "FORE_SHOULDER_PORT",
+      "role": "FORE_SHOULDER",
+      "owner": "FIXED_HULL",
+      "binding": "OPEN_SAME_SIZE",
+      "size": "MEDIUM",
+      "imageAnchorPx": [
+        207,
+        298
+      ],
+      "bearingRadiusPx": 7,
+      "weaponMotion": "TURRET",
+      "approvedFiringArcDeg": null,
+      "artFitAccepted": false
+    },
+    {
+      "id": "FORE_SHOULDER_STARBOARD",
+      "role": "FORE_SHOULDER",
+      "owner": "FIXED_HULL",
+      "binding": "OPEN_SAME_SIZE",
+      "size": "MEDIUM",
+      "imageAnchorPx": [
+        305,
+        298
+      ],
+      "bearingRadiusPx": 7,
+      "weaponMotion": "TURRET",
+      "approvedFiringArcDeg": null,
+      "artFitAccepted": false
+    },
+    {
+      "id": "AFT_SHOULDER_PORT",
+      "role": "AFT_SHOULDER",
+      "owner": "FIXED_HULL",
+      "binding": "OPEN_SAME_SIZE",
+      "size": "MEDIUM",
+      "imageAnchorPx": [
+        205,
+        724
+      ],
+      "bearingRadiusPx": 7,
+      "weaponMotion": "TURRET",
+      "approvedFiringArcDeg": null,
+      "artFitAccepted": false
+    },
+    {
+      "id": "AFT_SHOULDER_STARBOARD",
+      "role": "AFT_SHOULDER",
+      "owner": "FIXED_HULL",
+      "binding": "OPEN_SAME_SIZE",
+      "size": "MEDIUM",
+      "imageAnchorPx": [
+        307,
+        724
+      ],
+      "bearingRadiusPx": 7,
+      "weaponMotion": "TURRET",
+      "approvedFiringArcDeg": null,
+      "artFitAccepted": false
+    },
+    {
+      "id": "AFT_BATTERY_PORT",
+      "role": "AFT_BATTERY",
+      "owner": "FIXED_HULL",
+      "binding": "OPEN_SAME_SIZE",
+      "size": "LARGE",
+      "imageAnchorPx": [
+        161,
+        789
+      ],
+      "bearingRadiusPx": 10,
+      "weaponMotion": "TURRET",
+      "approvedFiringArcDeg": null,
+      "artFitAccepted": false
+    },
+    {
+      "id": "AFT_BATTERY_STARBOARD",
+      "role": "AFT_BATTERY",
+      "owner": "FIXED_HULL",
+      "binding": "OPEN_SAME_SIZE",
+      "size": "LARGE",
+      "imageAnchorPx": [
+        351,
+        789
+      ],
+      "bearingRadiusPx": 10,
+      "weaponMotion": "TURRET",
+      "approvedFiringArcDeg": null,
+      "artFitAccepted": false
+    },
+    {
+      "id": "AFT_OUTER_GUARD_PORT",
+      "role": "AFT_OUTER_GUARD",
+      "owner": "FIXED_HULL",
+      "binding": "OPEN_SAME_SIZE",
+      "size": "SMALL",
+      "imageAnchorPx": [
+        112,
+        802
+      ],
+      "bearingRadiusPx": 4,
+      "weaponMotion": "TURRET",
+      "approvedFiringArcDeg": null,
+      "artFitAccepted": false
+    },
+    {
+      "id": "AFT_OUTER_GUARD_STARBOARD",
+      "role": "AFT_OUTER_GUARD",
+      "owner": "FIXED_HULL",
+      "binding": "OPEN_SAME_SIZE",
+      "size": "SMALL",
+      "imageAnchorPx": [
+        400,
+        802
+      ],
+      "bearingRadiusPx": 4,
+      "weaponMotion": "TURRET",
+      "approvedFiringArcDeg": null,
+      "artFitAccepted": false
+    },
+    {
+      "id": "STERN_GUARD_PORT",
+      "role": "STERN_GUARD",
+      "owner": "FIXED_HULL",
+      "binding": "OPEN_SAME_SIZE",
+      "size": "SMALL",
+      "imageAnchorPx": [
+        220,
+        828
+      ],
+      "bearingRadiusPx": 4,
+      "weaponMotion": "TURRET",
+      "approvedFiringArcDeg": null,
+      "artFitAccepted": false
+    },
+    {
+      "id": "STERN_GUARD_STARBOARD",
+      "role": "STERN_GUARD",
+      "owner": "FIXED_HULL",
+      "binding": "OPEN_SAME_SIZE",
+      "size": "SMALL",
+      "imageAnchorPx": [
+        292,
+        828
+      ],
+      "bearingRadiusPx": 4,
+      "weaponMotion": "TURRET",
+      "approvedFiringArcDeg": null,
+      "artFitAccepted": false
+    }
+  ],
+  "dedicatedMechanisms": [
+    {
+      "id": "FORE_PROJECTOR",
+      "owner": "FORE_MECHANISM",
+      "binding": "BUILT_IN_UNIQUE_WEAPON",
+      "control": "Ctrl_Gun_Master_15",
+      "mountCount": 1,
+      "sourceControlSegmentCount": 12,
+      "weaponId": null,
+      "muzzleEstablished": false
+    }
+  ]
+}

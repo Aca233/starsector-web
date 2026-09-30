@@ -1,3 +1,4 @@
+import { createRenderCanvas, renderContext2D, type RenderCanvas } from '../RenderSurface';
 import type { ShipRenderState as Ship } from '../../render/ShipRenderState';
 import type { VisualRandom } from '../../runtime/VisualRandom';
 import { OverloadFlicker, overloadFade, overloadTiles } from '../../visual/OverloadVisuals';
@@ -10,8 +11,8 @@ import type { Vector2 } from '../../math/Vector2';
  */
 export class ShipOverloadRenderer {
   private flicker = new OverloadFlicker();
-  private canvas: HTMLCanvasElement | null = null;
-  private mask: HTMLCanvasElement | null = null;
+  private canvas: RenderCanvas | null = null;
+  private mask: RenderCanvas | null = null;
   private drawnCycle = -1;
   private static serial = 0;
   private readonly instanceId = ++ShipOverloadRenderer.serial;
@@ -25,14 +26,14 @@ export class ShipOverloadRenderer {
 
   private prepare(ship: Ship): boolean {
     if (this.drawnCycle === this.flicker.cycle && this.canvas) return true;
-    const hull = textureCache.getImage(ship.spec.spriteUrl);
-    const arcs = textureCache.getImage('/game-assets/graphics/fx/emp_arcs.png');
-    if (!hull.complete || !hull.naturalWidth || !arcs.complete || !arcs.naturalWidth) return false;
+    const hull = textureCache.getCanvasImage(ship.spec.spriteUrl);
+    const arcs = textureCache.getCanvasImage('/game-assets/graphics/fx/emp_arcs.png');
+    if (!hull || !arcs) return false;
     const { spriteWidth: width, spriteHeight: height } = ship.spec;
     if (!this.mask) {
-      this.mask = document.createElement('canvas');
+      this.mask = createRenderCanvas();
       this.mask.width = width; this.mask.height = height;
-      const maskContext = this.mask.getContext('2d');
+      const maskContext = renderContext2D(this.mask);
       if (!maskContext) { this.mask = null; return false; }
       maskContext.drawImage(hull, 0, 0, width, height);
       // Native stencil uses alpha != 0, not the collision polygon (which can omit fins).
@@ -40,9 +41,9 @@ export class ShipOverloadRenderer {
       for (let i = 3; i < pixels.data.length; i += 4) pixels.data[i] = pixels.data[i] ? 255 : 0;
       maskContext.putImageData(pixels, 0, 0);
     }
-    this.canvas ??= document.createElement('canvas');
+    this.canvas ??= createRenderCanvas();
     this.canvas.width = width; this.canvas.height = height;
-    const ctx = this.canvas.getContext('2d');
+    const ctx = renderContext2D(this.canvas);
     if (!ctx) return false;
     ctx.globalCompositeOperation = 'lighter';
     for (const tile of overloadTiles(width, height)) {

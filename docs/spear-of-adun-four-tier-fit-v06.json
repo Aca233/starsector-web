@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "stage": "OFFLINE_FOUR_TIER_ART_SAMPLES_NOT_RUNTIME",
+  "runtimeRegistered": false,
+  "requires3DSourceForOtherWeapons": false,
+  "sourceImageSize": [
+    512,
+    1024
+  ],
+  "profiles": [
+    {
+      "size": "SMALL",
+      "site": "BOW_GUARD_PORT",
+      "binding": "OPEN_SAME_SIZE",
+      "motion": "TURRET",
+      "artProduction": "SOURCE_MESH_RECOMPOSITION_AND_AUTHORED_GEOMETRY",
+      "runtimeMedia": "2D_RASTER",
+      "imageAnchorPx": [
+        232,
+        218
+      ],
+      "muzzleHeadLocalPx": {
+        "S0_Muzzle": [
+          0.0,
+          4.710000038146973,
+          1.2708333730697632
+        ]
+      },
+      "sampledYawRangeDegreesClockwise": [
+        -115,
+        -15
+      ],
+      "sampledPoses": 510,
+      "headHullIntersections": 0,
+      "blockedMuzzles": 0,
+      "completeVsVisibleDifferentPixels": 0,
+      "artFitAccepted": false,
+      "anotherSameTier2DWeaponFitTested": false,
+      "previewFiles": [
+        "output/spear-of-adun-art/weapon-fit-v01/S/empty.png",
+        "output/spear-of-adun-art/weapon-fit-v01/S/rest.png",
+        "output/spear-of-adun-art/weapon-fit-v01/S/outer.png",
+        "output/spear-of-adun-art/weapon-fit-v01/S/inner.png"
+      ]
+    },
+    {
+      "size": "MEDIUM",
+      "site": "FORE_SHOULDER_PORT",
+      "binding": "OPEN_SAME_SIZE",
+      "motion": "TURRET",
+      "artProduction": "SOURCE_MESH_RECOMPOSITION_AND_AUTHORED_GEOMETRY",
+      "runtimeMedia": "2D_RASTER",
+      "imageAnchorPx": [
+        207,
+        298
+      ],
+      "muzzleHeadLocalPx": {
+        "M0_Muzzle": [
+          0.0,
+          15.510000228881836,
+          2.2208333015441895
+        ]
+      },
+      "sampledYawRangeDegreesClockwise": [
+        -60,
+        10
+      ],
+      "sampledPoses": 360,
+      "headHullIntersections": 0,
+      "blockedMuzzles": 0,
+      "completeVsVisibleDifferentPixels": 0,
+      "artFitAccepted": false,
+      "anotherSameTier2DWeaponFitTested": false,
+      "previewFiles": [
+        "output/spear-of-adun-art/weapon-fit-v01/M/empty.png",
+        "output/spear-of-adun-art/weapon-fit-v01/M/rest.png",
+        "output/spear-of-adun-art/weapon-fit-v01/M/outer.png",
+        "output/spear-of-adun-art/weapon-fit-v01/M/inner.png"
+      ]
+    },
+    {
+      "size": "LARGE",
+      "site": "AFT_BATTERY_PORT",
+      "binding": "OPEN_SAME_SIZE",
+      "motion": "TURRET",
+      "artProduction": "SOURCE_MESH_RECOMPOSITION_AND_AUTHORED_GEOMETRY",
+      "runtimeMedia": "2D_RASTER",
+      "imageAnchorPx": [
+        161,
+        789
+      ],
+      "muzzleHeadLocalPx": {
+        "L0_Muzzle": [
+          -2.700000047683716,
+          29.010000228881836,
+          1.6958333253860474
+        ],
+        "L1_Muzzle": [
+          2.700000047683716,
+          29.010000228881836,
+          1.6958333253860474
+        ]
+      },
+      "sampledYawRangeDegreesClockwise": [
+        -65,
+        -5
+      ],
+      "sampledPoses": 310,
+      "headHullIntersections": 0,
+      "blockedMuzzles": 0,
+      "completeVsVisibleDifferentPixels": 0,
+      "artFitAccepted": false,
+      "anotherSameTier2DWeaponFitTested": false,
+      "previewFiles": [
+        "output/spear-of-adun-art/weapon-fit-v01/L/empty.png",
+        "output/spear-of-adun-art/weapon-fit-v01/L/rest.png",
+        "output/spear-of-adun-art/weapon-fit-v01/L/outer.png",
+        "output/spear-of-adun-art/weapon-fit-v01/L/inner.png"
+      ]
+    },
+    {
+      "size": "EXTRA_LARGE",
+      "site": "FORE_PROJECTOR",
+      "binding": "BUILT_IN_UNIQUE_WEAPON",
+      "motion": "HULL_FIXED_FORWARD_WITH_DEPLOYING_SHROUD",
+      "artProduction": "SOURCE_MECHANISM_PLUS_AUTHORED_FIXED_OPTIC",
+      "runtimeMedia": "2D_RASTER",
+      "imageAnchorPx": [
+        256,
+        262
+      ],
+      "muzzleRootLocalPx": [
+        0.0,
+        12.40999984741211,
+        3.973018169403076
+      ],
+      "muzzleImagePx": [
+        256.0,
+        249.59002685546875
+      ],
+      "sourceSurface": "Object_47",
+      "parentBone": "Object8828_39",
+      "mountCount": 1,
+      "sourceControlSegmentCount": 12,
+      "sampledPoses": 54,
+      "headHullIntersections": 0,
+      "blockedMuzzles": 0,
+      "artFitAccepted": false,
+      "previewFiles": [
+        "output/spear-of-adun-art/xl-fit-v01/closed.png",
+        "output/spear-of-adun-art/xl-fit-v01/deployed.png",
+        "output/spear-of-adun-art/xl-fit-v01/charged.png",
+        "output/spear-of-adun-art/xl-fit-v01/recovered.png"
+      ]
+    }
+  ],
+  "sourceSha256": {
+    "scripts/build-spear-of-adun-weapon-fit.py": "9963ded7a48b7c8eea5444a3b8c08a09f686c536f7776e7085e0b3031939d03d",
+    "scripts/check-spear-of-adun-weapon-fit.py": "865aa7748243544c0f2122b0492e2792ff740b9d45b54a7ce8fb163271368621",
+    "scripts/build-spear-of-adun-xl-fit.py": "de87ef57693e643ef1699eee0176bbc888a2285597ab90c3ad5e09cdce7d4a3c",
+    "output/spear-of-adun-art/weapon-fit-v01/weapon-fit.json": "0e6277490fa3ccf6d16e26eb74ed4355295915dc0bc06f5baff141034af6589d",
+    "output/spear-of-adun-art/weapon-fit-v01/geometry-verification.json": "161c48d33eac1174cd16be80077ecf480e17ca98ac8e751994b4f9b8ce045393",
+    "output/spear-of-adun-art/xl-fit-v01/xl-fit.json": "4c94744f38f926827ee54fd8f7a81eb2866906a7cbdcb432b7812e2e00d057af"
+  },
+  "limitations": [
+    "Discrete geometric checks, not continuous collision proof",
+    "Not gameplay balance or cannon identification from canon",
+    "Runtime pivot/lighting and same-tier replacement fit pending",
+    "No v05 slot/save migration or publication"
+  ]
+}

@@ -2,7 +2,7 @@ import { immutableCopy } from '../../extensions/Immutable';
 import type { RenderWeaponSpec } from '../../render/ShipRenderState';
 import type { WeaponSpec } from '../../simulation/Weapon';
 
-const fields = ['id', 'spawnType', 'isRocket', 'isBeam', 'hardpointUsesHullSprite',
+const fields = ['displayIconUrl', 'refireDelay', 'spriteWidth', 'spriteHeight', 'spritePivotX', 'spritePivotY', 'id', 'spawnType', 'isRocket', 'isBeam', 'hardpointUsesHullSprite',
   'turretSpriteUrl', 'hardpointSpriteUrl', 'hardpointGunSpriteUrl', 'turretGunSpriteUrl',
   'glowSpriteUrl', 'hardpointGlowSpriteUrl', 'mountSize', 'visualRecoil', 'renderBarrelBelow',
   'weaponType', 'animationType', 'projSpeed', 'projSpriteUrl', 'beamEffect', 'onHitEffect',

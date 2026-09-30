@@ -4,6 +4,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+if (Test-Path -LiteralPath (Join-Path $projectRoot 'public\ui-artwork-provenance.json')) { throw 'Original UI replaced: this legacy importer is disabled to prevent overwriting approved artwork.' }
 $sourceRoot = [IO.Path]::GetFullPath($StarsectorCore)
 if (-not (Test-Path -LiteralPath $sourceRoot -PathType Container)) { throw "Starsector core not found: $sourceRoot" }
 $destRoot = Join-Path $projectRoot 'public\game-assets'

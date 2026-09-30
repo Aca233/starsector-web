@@ -161,7 +161,7 @@
     "builtInOnly": false
   },
   "fluxcoil": {
-    "name": "附加幅能线圈",
+    "name": "附加载荷线圈",
     "cost": {
       "FRIGATE": 4,
       "DESTROYER": 8,
@@ -177,7 +177,7 @@
     "builtInOnly": false
   },
   "fluxdistributor": {
-    "name": "幅能配送器",
+    "name": "载荷配送器",
     "cost": {
       "FRIGATE": 4,
       "DESTROYER": 8,
@@ -271,7 +271,7 @@
     "builtInOnly": true
   },
   "fluxbreakers": {
-    "name": "幅散管道扩容",
+    "name": "载荷耗散管道扩容",
     "cost": {
       "FRIGATE": 3,
       "DESTROYER": 6,
@@ -370,7 +370,7 @@
     "builtInOnly": true
   },
   "no_weapon_flux": {
-    "name": "零幅能武器",
+    "name": "零载荷武器",
     "cost": {
       "FRIGATE": 0,
       "DESTROYER": 0,
@@ -1061,7 +1061,7 @@
       "scope": "mixed",
       "combat": "implemented",
       "campaign": "not-simulated",
-      "summary": "零幅能加速-10航速；燃料代价不模拟。"
+      "summary": "零载荷加速-10航速；燃料代价不模拟。"
     }
   },
   "malfunctioning_comms": {
@@ -1265,7 +1265,7 @@
       "scope": "mixed",
       "combat": "implemented",
       "campaign": "not-simulated",
-      "summary": "原生幅能/武器惩罚及允许额外机库；部署费用不模拟。"
+      "summary": "原生载荷/武器惩罚及允许额外机库；部署费用不模拟。"
     }
   },
   "bdeck": {
@@ -1352,7 +1352,7 @@
       "scope": "combat",
       "combat": "implemented",
       "campaign": "not-applicable",
-      "summary": "原生隐藏AI指令：非排幅期间不主动退避。"
+      "summary": "原生隐藏AI指令：非排散期间不主动退避。"
     }
   },
   "axialrotation": {
@@ -1419,7 +1419,7 @@
       "scope": "combat",
       "combat": "implemented",
       "campaign": "not-applicable",
-      "summary": "安装军事化子系统后获得结构+10%、装甲+5%、幅容+10%；无额外战役指挥官技能时采用原版基础效果。"
+      "summary": "安装军事化子系统后获得结构+10%、装甲+5%、载荷容量+10%；无额外战役指挥官技能时采用原版基础效果。"
     }
   },
   "militarized_subsystems": {
@@ -1505,7 +1505,7 @@
       "scope": "combat",
       "combat": "implemented",
       "campaign": "not-applicable",
-      "summary": "禁止主动收盾和排幅，过载时长×2；过载/排幅时耗散×10，99%幅能自动进入5秒基础过载。"
+      "summary": "禁止主动收盾和排散，过载时长×2；过载/排散时耗散×10，99%载荷自动进入5秒基础过载。"
     }
   },
   "hiressensors": {
@@ -1712,7 +1712,7 @@
     "builtInOnly": true
   },
   "shared_flux_sink": {
-    "name": "共享幅散管道",
+    "name": "共享载荷耗散管道",
     "cost": {
       "FRIGATE": 0,
       "DESTROYER": 0,

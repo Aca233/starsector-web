@@ -1,13 +1,16 @@
 import { aiHullId } from "./ai-loadouts.mjs";
+import protocol from './protocol.json' with {type:'json'};
+const roomHullCosts = new Map(protocol.ships.map(hull => [hull.id, hull.deploymentPoints]));
 import costs from '../engine/data/generated/deployment-costs.json' with {type:'json'};
 import { battleTeamCount, battleTeamLimit, BATTLE_SIZE_STEP, MAX_BATTLE_SIZE } from '../shared/battle-size.mjs';
 import { teamName } from './room-fleet.mjs';
-/** Lobby, server and combat share resolved native costs, including skin inheritance/overrides. */
+/** Authored room hulls use their declared DP, verified against ShipSpec;
+ * legacy native costs retain the existing inheritance/override fallback. */
 export function roomDeploymentBlockReason(members, options) {
   const count = battleTeamCount(members, options.aiHulls);
   const limit = battleTeamLimit(options.battleSize, count);
   const teams = new Map();
-  const cost = hull => costs[hull];
+  const cost = hull => roomHullCosts.get(hull) ?? costs[hull];
   const get = team => { if (!teams.has(team)) teams.set(team, {humans:0, max:0, first:0}); return teams.get(team); };
   for (const member of members) {
     const dp = cost(member.design?.hullId ?? member.hull);

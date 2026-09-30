@@ -3,9 +3,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { NativeButton } from '../ui/NativeChrome';
 import { Modal } from '../ui/core/UI';
 import { data, hulls, createDesign, evaluate, readLibrary, storageKey, type Design } from '../studio/DesignModel';
-import { nativeVariantsForHull } from '../studio/NativeVariantCatalog';
 import { LoadoutFlyout } from '../ui/LoadoutFlyout';
-import { aiFitsForHull } from './LanAiFits';
+import { aiFitCountForHull, aiFitsForHull } from './LanAiFits';
 import { matchesRefitSearch, refitSearchRank, hullMatchesCategory, hullSearchAliases, hullAssemblyLabel } from '../studio/RefitSearch';
 import { lanHullUnavailable, validateLanDesign } from './LanDesign';
 import { roomTeams, teamName, teamColor, type LanConnection, type Room } from './protocol';
@@ -253,14 +252,14 @@ export function LanAiFleet({ room, isHost, editable, connection, currentDesign, 
             </div>
             <div className="lan-ai-catalog-grid" ref={catalogElement} onScroll={event=>{scroll.current.catalog=event.currentTarget.scrollTop;}}>
               {!candidates.length && <p className="lan-muted">没有匹配的舰船，请调整条件或重置筛选。</p>}
-              {candidates.map(spec => { const reason = lanHullUnavailable(spec), fits = nativeVariantsForHull(spec.id);
+              {candidates.map(spec => { const reason = lanHullUnavailable(spec);
                 return <button type="button" className="lan-ai-catalog-choice" data-ai-loadout-anchor key={spec.id} disabled={pending || !!reason}
                   title={reason} aria-pressed={selection?.design.hullId === spec.id} aria-expanded={picker?.hullId === spec.id}
                   aria-controls={picker?.hullId === spec.id ? pickerHover.tooltipId : undefined} aria-label={'选择 ' + hullName(spec.id) + ' 舰体'}
                   onMouseEnter={event => openPicker(spec.id, event.currentTarget, false)} onMouseLeave={leavePicker}
                   onFocus={event => { if(event.currentTarget.matches(':focus-visible'))openPicker(spec.id, event.currentTarget, true); }} onBlur={leavePicker}
                   onClick={event => openPicker(spec.id, event.currentTarget, true)}>
-                  <LanHullThumbnail hull={spec.id} name={hullName(spec.id)}/><span>{hullName(spec.id)}</span><small>{hullAssemblyLabel(spec) && hullAssemblyLabel(spec)+' · '}{(fits.length || 1) + (savedCounts.get(spec.id) ?? 0)} 项配装{savedCounts.has(spec.id) && ' · 已存 ' + savedCounts.get(spec.id)}</small>
+                  <LanHullThumbnail hull={spec.id} name={hullName(spec.id)}/><span>{hullName(spec.id)}</span><small>{hullAssemblyLabel(spec) && hullAssemblyLabel(spec)+' · '}{aiFitCountForHull(spec.id, savedCounts.get(spec.id) ?? 0)} 项配装{savedCounts.has(spec.id) && ' · 已存 ' + savedCounts.get(spec.id)}</small>
                 </button>;
               })}
             </div>

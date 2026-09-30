@@ -25,11 +25,11 @@ const groups = [
       ["1–7", "选择武器组"],
       ["Ctrl + 1–7", "切换武器组自动开火"],
       ["Shift + 1–7", "切换武器组齐射 / 交替（不改变选中组）"],
-      ["鼠标悬停", "仅显示鼠标下舰船的幅能 / 结构 / 战备；移开隐藏，R 锁定详情保留"],
+      ["鼠标悬停", "仅显示鼠标下舰船的载荷 / 结构 / 战备；移开隐藏，R 锁定详情保留"],
       ["R", "锁定鼠标下的可见敌舰并显示详情；同舰 / 空白处再按 R 取消，其他敌舰则切换"],
       ["F / G / H（默认）", "按槽位激活舰船技能；可在设置中改键。点击 HUD 也可释放，与右键防御独立"],
       ["Shift + 滚轮 / J（可选）", "设置中启用轮选后，选择技能 / 释放选中技能；普通滚轮仍缩放"],
-      ["V", "排散幅能"],
+      ["V", "排散载荷"],
     ],
   },
   {
@@ -61,6 +61,7 @@ export function TacticalHelpPanel({
   canRestart,
   hasSystem,
   hasShield,
+  hasRightClickSystem = false,
   defaultMouseSteering = DEFAULT_MOUSE_STEERING,
   onDefaultMouseSteeringChange,
   onClose,
@@ -71,6 +72,7 @@ export function TacticalHelpPanel({
   canRestart: boolean;
   hasSystem: boolean;
   hasShield: boolean;
+  hasRightClickSystem?: boolean;
   defaultMouseSteering?: boolean;
   onDefaultMouseSteeringChange?: (value: boolean) => void;
   onClose: () => void;
@@ -113,7 +115,8 @@ export function TacticalHelpPanel({
                   (key !== "Z" || hasFighters) &&
                   (key !== "Esc 菜单" || canRestart) &&
                   (!key.startsWith("F / G / H") || hasSystem) &&
-                  ((key !== "鼠标右键" && key !== "护盾朝向") || hasShield),
+                  (key !== "鼠标右键" || hasShield || hasRightClickSystem) &&
+                  ((key !== "护盾朝向" && key !== "Shift + 右键") || hasShield),
               )
               .map(([key, text]) => (
                 <div className="ui-help-row" key={key}>
@@ -126,7 +129,9 @@ export function TacticalHelpPanel({
                           ? "暂停鼠标转向，A / D 改为转向"
                           : defaultMouseSteering && key === "鼠标指针"
                             ? "武器瞄准并引导船头、全向盾转向，镜头平滑偏向鼠标方向"
-                            : text}
+                            : key === "鼠标右键" && !hasShield
+                              ? "使用右键槽技能；本舰无护盾或相位"
+                              : text}
                   </span>
                   <Keycap>{key.replace("1–7", `1–${weaponGroupCount}`)}</Keycap>
                 </div>

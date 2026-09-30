@@ -1,3 +1,4 @@
+export { qualifiedFireTargets } from '../../src/engine/ai/QualifiedFireTargets';
 import type { Ship } from '../../src/engine/simulation/Ship';
 import { CombatEngine } from '../../src/engine/simulation/CombatEngine';
 import { CapitalShipAI } from '../../src/engine/ai/CapitalShipAI';
@@ -16,7 +17,8 @@ export { chooseCombatVelocity, forecastCombatPosition } from '../../src/engine/a
 export { combatProfile, weaponRange } from '../../src/engine/ai/ShipCombatProfile';
 export { planFleetTactics } from '../../src/engine/ai/FleetTactics';
 export { Owner } from '../../src/engine/ai/multicore/Owner';
-export { Publisher } from '../../src/engine/ai/multicore/Protocol';
+export { Publisher, NumericStore, NumericReader, readPath, writePath } from '../../src/engine/ai/multicore/Protocol';
+export * as observationWire from '../../src/engine/ai/multicore/ObservationWire';
 
 // Small, explicit curriculum. This is a training harness, NOT a claim of fleet-scale validation.
 export const LAB_SCENARIOS = [
@@ -99,3 +101,15 @@ export * from './FleetCombatLab';
 export { assessThreats } from '../../src/engine/ai/ThreatAssessment';
 export { WeaponThreatEnvelope } from '../../src/engine/ai/WeaponThreatEnvelope';
 export { ShipDefenseController } from '../../src/engine/ai/ShipDefenseController';
+
+export { CombatEngine };
+export { FireControlQueryRoster, FireControlQueryBatch } from '../../src/engine/ai/FireControlQueryBatch';
+export { hasOwnedFireControlReadHooks } from '../../src/engine/simulation/Ship';
+
+export { PreAimRangeIndex } from '../../src/engine/ai/PreAimRangeIndex';
+
+export { shipSystemDefinitions, hasNativeThreatPhaseAI, hasNativeSystemStats } from '../../src/engine/extensions/ship-systems/Registry';
+
+export { createOwnedHostileQueries } from '../../src/engine/simulation/CombatEngine';
+export { HostileQueryBatch } from '../../src/engine/ai/HostileQueryBatch';
+export { immutableCopy } from '../../src/engine/extensions/Immutable';

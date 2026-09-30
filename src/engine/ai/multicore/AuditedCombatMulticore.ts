@@ -45,7 +45,7 @@ export class AuditedCombatMulticore {
             workers, tier: this.legacy ? 'legacy-native' : 'audited',
         });
     }
-    prepare(engine: CombatEngine, dt: number, local?: { ais: CapitalShipAI[]; allowAudited: boolean }): Promise<AIPhaseBatch> | null {
+    prepare(engine: CombatEngine, dt: number, local?: { ais: CapitalShipAI[]; allowOwners: boolean }): Promise<AIPhaseBatch> | null {
         if (this.disposed || this.failed || this.pending) return null;
         if (engine.ships.length < (this.options.minShips ?? 0)) {
             if (this.pool) this.reset();
@@ -67,13 +67,14 @@ export class AuditedCombatMulticore {
         if (hardware < (this.options.minHardwareConcurrency ?? 2)) { this.reason = 'hardware-concurrency'; return null; }
         if (this.pool && (engine !== this.engine || this.pool.isDisposed)) this.reset();
         if (!engine.canPreviewNativeAI) { this.reason = 'unsupported-prephase'; return null; }
-        if (this.pool && !this.legacy && local && !local.allowAudited) return null;
+        // Local latency probes apply to BOTH codecs. Leave the LAN caller (no local
+        // context) unchanged, and check the gate before repeating native eligibility.
+        if (local && !local.allowOwners) return null;
         if (!this.pool) {
             try {
-                // Preserve the already measured default-Onslaught fast codec. The
-                // generic derived-world audit is intentionally more expensive.
+                // Keep the default-Onslaught codec and four-owner partitioning, but do not
+                // assume a supported codec is faster than serial on this host.
                 this.legacy = !!local && supportsOwnership(engine, local.ais);
-                if (!this.legacy && local && !local.allowAudited) return null;
                 const ais = this.legacy ? local!.ais : engine.getNativeAIs();
                 let count = 4;
                 if (!this.legacy) {

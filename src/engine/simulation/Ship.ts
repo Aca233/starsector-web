@@ -1,5 +1,10 @@
+import type { ShipSurfaceFeedback } from '../visual/ShipSurfaceFeedback';
+import { ADUN_ARK_ID } from '../content/AdunArkIds';
+import { voidShieldContact } from './VoidShield';
+import { containsVastBulk } from '../extensions/HullModPresence';
 import { combatWeaponRange, combatProjectileSpeed } from './WeaponRange';
 import { isImmutableMetadata } from '../extensions/Immutable';
+import { hasNativeSystemStats, hasNativeThreatPhaseAI } from '../extensions/ship-systems/Registry';
 import { defenseSystemId, tacticalSystemIds } from '../extensions/ship-systems/Loadout';
 import { moduleOffset } from '../content/ModuleGeometry';
 import type { ShipModuleSpec } from '../content/ShipSpec';
@@ -7,7 +12,7 @@ import { shipPresentationPose } from "../visual/ShipPresentation";
 import { sameTeam } from "./CombatTeams";
 import { RuntimeCombatModifiers } from '../extensions/RuntimeCombatModifiers';
 import { advanceCombatSkills, polarizedArmorLevel } from '../extensions/CombatSkills';
-import { hasOnlyNativeRangeModifiers, installedHullMods, effectiveHullStats, hullModLoadoutErrors } from '../extensions/HullMods';
+import { hasOnlyLocalAdvanceHullMods, hasOnlyNativeRangeModifiers, installedHullMods, effectiveHullStats, hullModLoadoutErrors } from '../extensions/HullMods';
 import { i18n } from '../i18n/LocalizationManager';
 import { applyComponentDamage } from './systems/weapon/ComponentDamage';
 import { advanceShipMotion, advanceAngularVelocity, shipMotionStats } from './systems/ShipMotion';
@@ -42,6 +47,11 @@ import {
 const nativeArmorReaders = new WeakMap<Ship, { damage: ArmorGrid['damageTakenModifiers']; effective: ArmorGrid['dynamicEffectiveArmorMultiplier']; cell: ArmorGrid['onCellDamage']; overload: FluxTracker['onOverloadStarted'] }>();
 const nativeShieldReaders = new WeakMap<Ship, () => number>();
 const nativeShieldDamageFor = Shield.prototype.damageTakenMultiplierFor;
+
+// Realm-local opt-in, used ONLY by the closed data-command combat Worker.
+// Never enable in a realm exposing mutable ships, array builtins or prototypes.
+let workerOwnedPhaseReads = false;
+export function enableWorkerOwnedPhaseReads(): void { workerOwnedPhaseReads = true; }
 
 export type { EngineStatus } from './systems/EngineController';
 
@@ -110,7 +120,7 @@ export class Ship {
   public get assemblyRoot(): Ship { return this.parentShip?.assemblyRoot ?? this; }
   public get isStation(): boolean { return this.spec.sourceHullTraits?.includes('STATION') ?? false; }
   public get isAttachedModule(): boolean { return this.parentShip !== null; }
-  public get hasVastBulk(): boolean { return !!(this.spec.builtInHullMods?.includes('vastbulk') || this.spec.hullMods?.includes('vastbulk')); }
+  public get hasVastBulk(): boolean { return !!(containsVastBulk(this.spec.builtInHullMods) || containsVastBulk(this.spec.hullMods)); }
   public get isCombatModule(): boolean { return this.spec.moduleCombat ?? (this.weapons.length > 0 || this.hullStats.fighterBays > 0); }
   public get assemblyShips(): Ship[] { return [this, ...this.childModules.flatMap(child => child.assemblyShips)]; }
   public get deploymentRadius(): number {
@@ -161,6 +171,7 @@ export class Ship {
   public applyHullDamage(damage: number): number {
     if (!(damage > 0) || this.isDead || this.isRetreated || this.hullDamageSuppressed || this.hasVastBulk) return 0;
     for (const intercept of this.hullDamageInterceptors) if (intercept(damage)) return 0;
+    voidShieldContact(this.assemblyRoot.shield.voidShield);
     const dealt = Math.min(this.hullHp,damage); this.hullHp -= dealt; return dealt;
   }
   public retreatFromCombat(): void {
@@ -192,6 +203,15 @@ export class Ship {
   // 物理与刚体 (支持亚帧插值)
   public pos: Vector2;
   public prevPos: Vector2;
+  /** Cosmetic only: queries current authority state, never caches a display-side timer. */
+  public get surfaceFeedback(): ShipSurfaceFeedback | undefined {
+    if (this.isDead || this.hullHp <= 0 || this.isDocked || this.isRetreated) return undefined;
+    for (const mod of installedHullMods(this.spec)) {
+      const feedback = mod.surfaceFeedback?.(this);
+      if (feedback) return feedback;
+    }
+    return undefined;
+  }
   /** Persistent presentation markers; not physics or a temporary system effect. */
   public teleportSequence = 0;
   public teleportCameraOffset = new Vector2();
@@ -258,6 +278,34 @@ export class Ship {
       && this.system.hasNativeThreatPhaseAI && this.defenseSystem.hasNativeThreatPhaseAI
       && hasOnlyNativeRangeModifiers(this.spec)
       && (!this.sourceCarrier || hasOnlyNativeRangeModifiers(this.sourceCarrier.spec));
+  }
+  /** Same damage/range read boundary, but separately audited authored AI may
+   * reuse exact statistics. Never use this permission for forecast cadence. */
+  public get hasExactThreatPhaseHooks(): boolean {
+    return this.damageTakenModifiers.size === 0 && this.externalPhaseEffects.size === 0
+      && !Object.hasOwn(this, 'externalDamageTakenMultiplier')
+      && this.shield.externalDamageTakenMultiplier === nativeShieldReaders.get(this)
+      && this.shield.damageTakenMultiplierFor === nativeShieldDamageFor
+      && !Object.hasOwn(this.shield, 'damageTakenMultiplier')
+      && this.allSystems.every(system => system.hasExactThreatPhaseAI)
+      && hasOnlyNativeRangeModifiers(this.spec)
+      && (!this.sourceCarrier || hasOnlyNativeRangeModifiers(this.sourceCarrier.spec));
+  }
+  /** Independent write-domain gate for the private data-command Worker. The
+   * admitted update writes only this ship and its parent/carrier dependency group.
+   * No permission for arbitrary caller-owned Ships or later event dispatch. */
+  public get hasOwnedLocalThreatUpdate(): boolean {
+    const native = nativeArmorReaders.get(this);
+    return this.update === nativeLocalShipUpdate && this.statusEffects.size === 0
+      && this.hullDamageInterceptors.size === 0 && this.shield.type !== 'PHASE'
+      && this.shield.update === nativeLocalShieldUpdate
+      && this.weaponControl.update === nativeLocalWeaponUpdate
+      && this.engineController.advance === nativeLocalEngineAdvance
+      && this.hasExactThreatPhaseHooks && hasOnlyLocalAdvanceHullMods(this.spec)
+      && this.allSystems.every(system => system.update === nativeLocalSystemUpdate && system.hasNativeStats)
+      && !!native && this.armor.damageTakenModifiers === native.damage
+      && this.armor.dynamicEffectiveArmorMultiplier === native.effective
+      && this.armor.onCellDamage === native.cell && this.flux.onOverloadStarted === native.overload;
   }
   /** Unknown damage hooks retain the full advisory forecast. */
   public get hasNativeFireBudgetPolicyInputs(): boolean {
@@ -399,7 +447,7 @@ export class Ship {
     this.armor.maxDamageReduction = Math.min(1, .85 + refit.maxArmorDamageReductionBonus);
     this.armor.minArmorFractionMultiplier = refit.minArmorFractionMultiplier;
     this.damageDecals = new ShipDamageState(this.armor, visualRandom);
-    this.armor.onCellDamage = (c, r, damage) => this.damageDecals.onCellDamage(c, r, damage);
+    this.armor.onCellDamage = (c, r, damage) => { if(damage>0) voidShieldContact(this.assemblyRoot.shield?.voidShield); this.damageDecals.onCellDamage(c, r, damage); };
     const inferredHullSize = spec.collisionRadius <= 50
       ? 'FIGHTER'
       : spec.collisionRadius <= 90
@@ -413,7 +461,7 @@ export class Ship {
     this.flux.ventRateMultiplier = refit.ventRateMultiplier;
     this.flux.shieldSoftFluxConversion = refit.shieldSoftFluxConversion;
     this.flux.overloadTimeMultiplier = refit.overloadTimeMultiplier;
-    this.flux.onOverloadStarted = () => this.shield.setActive(false);
+    this.flux.onOverloadStarted = () => { if(this.shield.voidShield) { this.shield.voidShield.suppressed=true; this.shield.isActive=false; this.shield.currentArcDeg=0; } else this.shield.setActive(false); };
     this.empDamageTakenMultiplier *= refit.empDamageMultiplier;
     if (spec.captainSkills?.target_analysis === 2) {
       this.damageToTargetWeaponsMultiplier *= 2;
@@ -430,6 +478,7 @@ export class Ship {
       shieldUpkeepRate,
       (amount) => this.flux.increaseFluxClamped(amount, true)
     );
+    if (refit.voidShield) this.shield.configureVoidShield(refit.voidShield);
     // ship_data.csv: phase cost / phase upkeep 是基础幅能容量的比例 (厄运 0.05/0.05)。
     this.shield.externalDamageTakenMultiplier = () => this.externalDamageTakenMultiplier;
     nativeShieldReaders.set(this, this.shield.externalDamageTakenMultiplier);
@@ -454,7 +503,8 @@ export class Ship {
     this.weaponControl.init(spec, initialFacingRad, this.weaponHealthMultiplier);
     for (const [index, mount] of (spec.modules ?? []).entries()) {
       const child = new Ship(`${id}:module:${index}`, mount.spec, isPlayer, initialPos.clone(), initialFacingRad, random, visualRandom);
-      child.parentShip = this; child.moduleMount = mount; child.fireControlMode = 'AI';
+      child.parentShip = this; child.moduleMount = mount;
+      child.fireControlMode = isPlayer && (spec.sourceHullId ?? spec.id) === ADUN_ARK_ID && mount.slotId === 'FORE' ? 'MANUAL' : 'AI';
       child.syncModulePose(true); child.syncModuleTree(true);
       this.childModules.push(child);
     }
@@ -678,6 +728,21 @@ export class Ship {
   public readonly externalPhaseEffects = new Map<object, () => number | undefined>();
   public isDocked = false;
   public isSystemDrone = false;
+  /** Live purity gate for early acquisition rejection in a CLOSED data-command
+   * Worker only. No state is memoized; unknown callbacks keep their read order.
+   * This is narrower than full fire-control batching and grants no other lease. */
+  public hasNativePreAimRangeReads(): boolean {
+    if (!isImmutableMetadata(this.spec) || this.getShieldCenter !== nativeGetShieldCenter
+      || this.externalPhaseEffects.size !== 0 || !this.runtimeModifiers.empty) return false;
+    if (!hasNativeSystemStats(this.system.definition)
+      || !hasNativeSystemStats(this.defenseSystem.definition)) return false;
+    // Exactly the slots seen by allSystems/isPhased, without allocating a copy.
+    for (let i = 1; i < this.systems.length; i++) {
+      if (!hasNativeSystemStats(this.systems[i].definition)) return false;
+    }
+    return !this.parentShip || this.parentShip.hasNativePreAimRangeReads();
+  }
+
   public get isCollisionless(): boolean { return this.isPhased || (this.runtimeModifiers.value.collisionDisabled ?? 0) > 0; }
   public get phaseVisualAlpha(): number {
     let alpha = this.shield.type === 'PHASE' ? 1 - .75 * this.shield.phaseEffectLevel : 1;
@@ -688,7 +753,15 @@ export class Ship {
     return this.isDocked || this.isRetreated ? 0 : alpha * (this.runtimeModifiers.value.visualAlphaMultiplier ?? 1);
   }
   public get isPhased(): boolean {
-    if (this.parentShip?.isPhased || this.isDocked || this.isRetreated || this.shield.isPhased || this.allSystems.some(system => system.isPhased)) return true;
+    if (this.parentShip?.isPhased || this.isDocked || this.isRetreated || this.shield.isPhased) return true;
+    if (workerOwnedPhaseReads && Object.getPrototypeOf(this) === Ship.prototype
+      && !Object.hasOwn(this, 'allSystems') && this.systems.length <= 1) {
+      // In this domain slot fields/arrays are plain construction-owned data.
+      // Snapshot BOTH members before the first phase read, just as allSystems
+      // does; phase readers may replace a slot, recurse, or change live state.
+      const system = this.system, defense = this.defenseSystem;
+      if (system.isPhased || defense.isPhased) return true;
+    } else if (this.allSystems.some(system => system.isPhased)) return true;
     for (const effect of this.externalPhaseEffects.values()) if (effect() !== undefined) return true;
     return false;
   }
@@ -712,8 +785,8 @@ export class Ship {
     if (this.shield.type === 'PHASE' && this.shield.phaseState === 'OUT') return '正在退出相位';
     if (this.shield.type === 'PHASE' && this.shield.phaseState === 'COOLDOWN') return '相位线圈冷却中';
     if (this.system.blocksShields || this.crEffects.defenseDisabled) return '防御被禁用';
-    if (this.flux.isOverloaded) return '幅能过载';
-    if (this.flux.isVenting) return '正在排散幅能';
+    if (this.flux.isOverloaded) return '载荷过载';
+    if (this.flux.isVenting) return '正在排散载荷';
     if (this.retreating) return '撤退中';
     return undefined;
   }
@@ -762,17 +835,18 @@ export class Ship {
   public get ventFailureReason(): string | undefined {
     if (this.isDead || this.hullHp <= 0 || this.isDocked || this.isRetreated) return '舰船不在战斗状态';
     if (this.retreating) return '撤退中';
-    if (this.shield.toggleLocked || this.system.blocksVenting || this.hullStats.ventRateMultiplier <= 0) return '当前配置禁止主动排幅';
-    if (this.flux.isOverloaded) return '幅能过载';
-    if (this.flux.isVenting) return '正在排散幅能';
-    if (this.flux.totalFlux <= 5) return '无需排散幅能';
+    if (this.shield.toggleLocked || this.system.blocksVenting || this.hullStats.ventRateMultiplier <= 0) return '当前配置禁止主动排散';
+    if (this.flux.isOverloaded) return '载荷过载';
+    if (this.flux.isVenting) return '正在排散载荷';
+    if (this.flux.totalFlux <= 5) return '无需排散载荷';
     return undefined;
   }
   public startVenting(): boolean {
     if (this.ventFailureReason) return false;
 
     // 1. 取消防护但不清零当前展开弧度；Shield.update() 会完成收拢动画。
-    this.lowerShieldWithFeedback();
+    if(this.shield.voidShield) { this.shield.voidShield.suppressed=true; this.shield.isActive=false; this.shield.currentArcDeg=0; }
+    else this.lowerShieldWithFeedback();
 
     // 2. 强制解除战术技能 (堡垒护盾 / 冲刺推进)
     for (const system of this.systems) system.deactivate();
@@ -819,6 +893,10 @@ export class Ship {
         ? this.flux.timeSinceFluxIncrease : boostTimer + dt) : 0;
       this.flux.isEngineBoostActive = canBoost && this.flux.zeroFluxTimer >= this.flux.boostDelay;
     }
+    if (this.system.suppressesZeroFluxBoost) {
+      this.flux.zeroFluxTimer = 0;
+      this.flux.isEngineBoostActive = false;
+    }
   }
 
   public update(
@@ -826,7 +904,7 @@ export class Ship {
     targetShip: Ship | null,
     spawnProjectile: (p: Projectile) => void,
     spawnBeam: (b: Beam) => void,
-    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec) => void,
+    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec, underHullShipId?: string) => void,
     fireControlWorld?: FireControlWorld
   ) {
     // Ship.advance advances listeners before weapons; use the Web combat step.
@@ -834,10 +912,17 @@ export class Ship {
     if (dt > 0) for (const [id, effect] of this.statusEffects) {
       if (!effect.advance(this, dt)) this.statusEffects.delete(id);
     }
+    const measureJets = this.spec.engineSlots.some(slot => slot.maneuver);
+    const jetVelocity = measureJets ? this.vel.clone() : undefined;
+    const jetAngularVelocity = this.angularVelRad;
+    const jetFacing = this.facingRad;
     if (dt > 0) for (const mod of installedHullMods(this.spec)) if (mod.status === 'implemented') mod.advance?.(this, dt, this.random);
     // This deployment plugin uses world dt, before phase scales the ship clock.
     this.advanceDeploymentReadiness(dt);
-    if (this.isDead || this.isRetreated || this.hullHp <= 0) return;
+    if (this.isDead || this.isRetreated || this.hullHp <= 0) {
+      for (const system of this.allSystems) if (system.definition.controls?.cancelOnDeath) system.deactivate();
+      return;
+    }
 
     // 记录上一物理帧状态，用于渲染亚帧平滑插值
     this.prevPos.copy(this.pos);
@@ -873,14 +958,20 @@ export class Ship {
     advanceCombatSkills(this, effectiveDt);
 
     // 1. 更新战术技能与幅能
-    for (const system of this.allSystems) system.update(effectiveDt);
+    for (const system of this.allSystems) {
+      // Navigation cancellation happens before motion reads blockAcceleration.
+      // Only opted-in systems release control; other drive contracts are unchanged.
+      const controls = system.definition.controls;
+      if (effectiveDt > 0 && ((controls?.cancelOnBrake && this.brakeInput) || (controls?.cancelOnRetreat && this.retreating))) system.deactivate();
+      system.update(effectiveDt);
+    }
 
     // 1.1 战备值惩罚：cr <= 0 时舰船系统与防御彻底失效；低战备触发故障机制
     this.applyCombatReadiness(effectiveDt);
 
     // Existing Web system-cancellation rules remain an adapter, not native controller behavior.
     for (const system of this.allSystems) {
-      if (this.flux.isOverloaded || this.flux.isVenting || (system.isActive && system.definition.controls?.cancelOnFlameout && this.getFlameoutRatio() >= 1)) system.deactivate();
+      if (this.flux.isOverloaded || this.flux.isVenting || (system.isActive && system.definition.controls?.cancelOnFlameout && (this.getFlameoutRatio() >= 1 || this.engineController.isFlamedOut))) system.deactivate();
     }
 
     // ship_systems.csv marks Burn Drive as noShield for its entire applied IN/ACTIVE/OUT lifecycle.
@@ -891,13 +982,13 @@ export class Ship {
     }
 
     // 严禁过载或排散时使用护盾；同样保留视觉收拢阶段，避免一帧消失。
-    if ((this.flux.isOverloaded || this.flux.isVenting) && this.shield.isRaiseRequested) {
+    if (!this.shield.voidShield && (this.flux.isOverloaded || this.flux.isVenting) && this.shield.isRaiseRequested) {
       this.lowerShieldWithFeedback();
     }
     
     // 护盾维持能耗 (堡垒护盾激活时普通 shield upkeep 为 0，对齐 FortressShieldStats.java)
     // 相位线圈的开启/维持成本由 Shield 状态机以硬幅能结算，绝不过载。
-    if (this.shield.type !== 'PHASE' && this.shield.isActive && !this.flux.isOverloaded && !this.flux.isVenting) {
+    if (!this.shield.voidShield && this.shield.type !== 'PHASE' && this.shield.isActive && !this.flux.isOverloaded && !this.flux.isVenting) {
       const upkeepMult = this.system.getShieldUpkeepMultiplier();
       if (this.flux.totalFlux >= this.flux.maxFlux
         || !this.flux.trySpendSoftFlux(this.shield.upkeepRate * upkeepMult * tacticalDt)) this.lowerShieldWithFeedback();
@@ -925,6 +1016,15 @@ export class Ship {
 
     // 2. 物理运动推力与转向 (相位下机动时限加速)
     const engineCommands = this.updateMotion(effectiveDt);
+    // Capture before weapon recoil, after accepted motion and hullmod compensation.
+    const jetDelta = jetVelocity ? this.vel.clone().sub(jetVelocity) : undefined;
+    const jetCos = Math.cos(jetFacing), jetSin = Math.sin(jetFacing);
+    const jetScale = Math.max(.000001, effectiveDt * this.spec.acceleration);
+    const maneuver: [number, number, number] | undefined = jetDelta ? [
+      (jetDelta.x*jetCos + jetDelta.y*jetSin)/jetScale,
+      (-jetDelta.x*jetSin + jetDelta.y*jetCos)/jetScale,
+      (this.angularVelRad - jetAngularVelocity) / Math.max(.000001,effectiveDt*this.spec.turnAccelerationDeg*Math.PI/180)
+    ] : undefined;
 
     // 3. 护盾朝向与展开
     const aimAngle = Math.atan2(this.aimTargetWorld.y - this.pos.y, this.aimTargetWorld.x - this.pos.x);
@@ -935,7 +1035,8 @@ export class Ship {
       const dx = this.aimTargetWorld.x - center.x, dy = this.aimTargetWorld.y - center.y;
       shieldAimAngle = dx * dx + dy * dy > 1e-12 ? Math.atan2(dy, dx) : this.shield.facingAngleRad;
     }
-    this.shield.update(effectiveDt, this.facingRad, this.fireControlMode === 'AI' ? this.defenseFacingRad ?? shieldAimAngle : shieldAimAngle);
+    if(this.shield.voidShield) this.shield.voidShield.suppressed = !this.canUseShields();
+    this.shield.update(effectiveDt, this.facingRad, (this.fireControlMode === 'AI' || this.isAttachedModule) ? this.defenseFacingRad ?? shieldAimAngle : shieldAimAngle);
 
     // 4. 武器挂点瞄准与开火解算
     this.weaponControl.update(effectiveDt, this, aimAngle, targetShip, spawnProjectile, spawnBeam, spawnMuzzleFlash, fireControlWorld);
@@ -945,7 +1046,7 @@ export class Ship {
 
     // Native ship order: movement commands, component health, controller, then glow.
     this.engineController.advance(effectiveDt, {
-      ...this.engineDisableContext, ...engineCommands, canRepair: !this.isDead && this.hullHp > 0,
+      ...this.engineDisableContext, ...engineCommands, maneuver, canRepair: !this.isDead && this.hullHp > 0,
       repairTimeMultiplier: this.combatEngineRepairTimeMultiplier * this.system.getRepairTimeMultiplier(),
       canRepairUnderFire: this.canRepairModulesUnderFire,
       malfunctionChance: this.crEffects.engineMalfunctionChance,
@@ -992,12 +1093,26 @@ export class Ship {
         this.facingRad += this.angularVelRad * dt;
       }
       if (this.isStation) this.vel.set(0, 0);
+      // Opt-in for fixed custom propulsion sections; native station modules stay unchanged.
+      const parent = this.parentShip;
+      if (this.spec.inheritParentEngineCommands && parent && !parent.isDead && !parent.isRetreated && !parent.engineController.isFlamedOut) {
+        const burn = parent.system.forcesForward;
+        const brake = parent.system.forcesBraking || (!burn && !parent.system.blocksAcceleration && parent.brakeInput);
+        const throttle = brake || parent.system.blocksAcceleration ? 0 : burn ? 1 : parent.throttle;
+        const strafe = !brake && !burn && !parent.system.blocksStrafing && Math.abs(parent.strafeInput) > .01;
+        return { accelerating: throttle > .01, spreading: brake || throttle < -.01 || strafe };
+      }
       return { accelerating: false, spreading: false };
     }
     return advanceShipMotion(this, dt);
   }
 }
 
+const nativeLocalShipUpdate = Ship.prototype.update;
+const nativeLocalShieldUpdate = Shield.prototype.update;
+const nativeLocalWeaponUpdate = ShipWeaponControlSystem.prototype.update;
+const nativeLocalEngineAdvance = EngineController.prototype.advance;
+const nativeLocalSystemUpdate = ShipSystem.prototype.update;
 const shieldCenterRotations = new WeakMap<Ship, { facing: number; cos: number; sin: number }>();
 /** Identity gate for read-only geometry memoization; overridden callbacks stay uncached. */
 export const nativeGetShieldCenter = Ship.prototype.getShieldCenter;
@@ -1041,4 +1156,71 @@ export function hasNativeFireControlReaders(ship: Ship): boolean {
     && ship.armor.onCellDamage === armor?.cell && ship.flux.onOverloadStarted === armor?.overload
     && ship.runtimeModifiers.empty && !ship.parentShip && !ship.sourceCarrier
     && ship.hullDamageInterceptors.size === 0 && ShipWeaponControlSystem.hasNativeQueryLoop(ship.weaponControl);
+}
+
+
+/** Hook admission for a closed data-command Worker, NOT a substitute for the
+ * descriptor audit on caller-owned Ships. Rechecked at every pre-emission batch.
+ * Prototype/field ownership is guaranteed by that boundary; effect/hook state is
+ * live and may have changed during the previous ship's update or this ship's repair. */
+export function hasOwnedFireControlReadHooks(ship: Ship): boolean {
+  if (!isImmutableMetadata(ship.spec) || ship.system.auxiliary !== ship.defenseSystem
+    || ship.defenseSystem.auxiliary || ship.systems.length > 1) return false;
+  const armor = nativeArmorReaders.get(ship);
+  // In this closed Worker domain, the native threat-AI gate recursively checks
+  // the same system definitions as stats, against a STRICTER allowlist. It already
+  // implies both stats gates (Eclipse is stats-only and still rejected by AI).
+  // Keep the generic descriptor-audited path above unchanged for caller objects.
+  return ship.hasNativeThreatPhaseHooks
+    && ship.armor.damageTakenModifiers === armor?.damage && ship.armor.dynamicEffectiveArmorMultiplier === armor?.effective
+    && ship.armor.onCellDamage === armor?.cell && ship.flux.onOverloadStarted === armor?.overload
+    && ship.runtimeModifiers.empty && !ship.parentShip && !ship.sourceCarrier && ship.hullDamageInterceptors.size === 0;
+}
+
+/** Phase-local certificate of immutable facts, NOT cached live admission.
+ * Only FireControlQueryRoster's closed Worker branch may use this fast surface.
+ * Every mutable hook below is still read at every begin, after native updates.
+ * Private registry membership and constructor-registered callback identities never
+ * change. Replacing metadata/definitions must earn a fresh certificate. */
+export class OwnedFireControlReadGuard {
+  private spec?: ShipSpec;
+  private systemDefinition?: ShipSystem['definition'];
+  private defenseDefinition?: ShipSystem['definition'];
+  private readonly armor;
+  private readonly shieldReader;
+  public constructor(public readonly ship: Ship) {
+    this.armor = nativeArmorReaders.get(ship);
+    this.shieldReader = nativeShieldReaders.get(ship);
+  }
+
+  public allows(): boolean {
+    const ship = this.ship, system = ship.system, defense = ship.defenseSystem;
+    if ((!this.spec || ship.spec !== this.spec) && !isImmutableMetadata(ship.spec)) return false;
+    if (system.auxiliary !== defense || defense.auxiliary || ship.systems.length > 1) return false;
+    if (ship.damageTakenModifiers.size !== 0 || ship.externalPhaseEffects.size !== 0
+      || Object.hasOwn(ship, 'externalDamageTakenMultiplier')
+      || ship.shield.externalDamageTakenMultiplier !== this.shieldReader
+      || ship.shield.damageTakenMultiplierFor !== nativeShieldDamageFor
+      || Object.hasOwn(ship.shield, 'damageTakenMultiplier')) return false;
+    // The exact auxiliary topology above makes these two lookups equivalent to
+    // system.hasNativeThreatPhaseAI && defense.hasNativeThreatPhaseAI, including
+    // its stricter-than-stats native allowlist. Only positive facts are retained.
+    if (!this.systemDefinition || system.definition !== this.systemDefinition) {
+      if (!hasNativeThreatPhaseAI(system.definition)) return false;
+      this.systemDefinition = system.definition;
+    }
+    if (!this.defenseDefinition || defense.definition !== this.defenseDefinition) {
+      if (!hasNativeThreatPhaseAI(defense.definition)) return false;
+      this.defenseDefinition = defense.definition;
+    }
+    if (!this.spec || ship.spec !== this.spec) {
+      if (!hasOnlyNativeRangeModifiers(ship.spec)) return false;
+      this.spec = ship.spec;
+    }
+    const armor = this.armor;
+    return (!ship.sourceCarrier || hasOnlyNativeRangeModifiers(ship.sourceCarrier.spec))
+      && ship.armor.damageTakenModifiers === armor?.damage && ship.armor.dynamicEffectiveArmorMultiplier === armor?.effective
+      && ship.armor.onCellDamage === armor?.cell && ship.flux.onOverloadStarted === armor?.overload
+      && ship.runtimeModifiers.empty && !ship.parentShip && !ship.sourceCarrier && ship.hullDamageInterceptors.size === 0;
+  }
 }

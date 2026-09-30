@@ -2,7 +2,7 @@ import { contentRegistry } from '../content/ContentRegistry';
 import type { ShipSpec } from '../content/ShipSpec';
 export type Rgb255 = [number, number, number];
 export type RgbUnit = [number, number, number];
-export type ShieldVisualKey = 'lowTech' | 'highTech' | 'fortress';
+export type ShieldVisualKey = 'lowTech' | 'highTech' | 'fortress' | 'void' | 'arkFighter';
 export type WeaponVisualFamily = 'TPC' | 'BALLISTIC' | 'BEAM' | 'MISSILE';
 export type ExplosionVisualKind = 'impact' | 'missile' | 'ship';
 
@@ -58,6 +58,17 @@ export interface ShipVisualProfile {
 // Rim width (world units), inner rotation and ring cadence: combat/systems/G.java.
 // Impact/deployment envelopes still need matched runtime captures.
 export const SHIELD_VISUAL_PROFILES: Record<ShieldVisualKey, ShieldVisualProfile> = {
+  // Web ark escorts: a quiet narrow shield, not the high-tech capital rim.
+  arkFighter: {
+    innerColor: [115, 165, 200], outerColor: [100, 156, 185], opacity: .18,
+    rimWidth: 1.4, textureRotationSpeed: 0, ringSpeedScale: 0,
+    brightness: .48, deployCurve: 'linear'
+  },
+  void: {
+    innerColor: [100, 145, 255], outerColor: [185, 220, 255], opacity: .55,
+    rimWidth: 7, textureRotationSpeed: Math.PI / 16, ringSpeedScale: .6,
+    brightness: 1, deployCurve: 'linear'
+  },
   lowTech: {
     innerColor: [255, 125, 125], outerColor: [255, 255, 255], opacity: 1,
     rimWidth: 5, textureRotationSpeed: Math.PI / 8, ringSpeedScale: 1,
@@ -120,7 +131,7 @@ export const WEAPON_VISUAL_PROFILES: Record<WeaponVisualFamily, WeaponVisualProf
 export function getShipVisualProfile(input: string | ShipSpec): ShipVisualProfile {
   const spec = typeof input === 'string' ? contentRegistry.getShip(input) : input;
   if (spec?.visualProfile) return spec.visualProfile;
-  return { ...DEFAULT_SHIP_VISUAL, shieldProfile: spec?.engineSlots[0]?.style === 'LOW_TECH' ? 'lowTech' : 'highTech' };
+  return { ...DEFAULT_SHIP_VISUAL, shieldProfile: spec?.voidShield ? 'void' : spec?.engineSlots[0]?.style === 'LOW_TECH' ? 'lowTech' : 'highTech' };
 }
 
 export function getWeaponVisualFamily(

@@ -1,3 +1,4 @@
+import { AssemblyThumbnail } from '../ui/core/AssemblyThumbnail';
 import { VariantInspection } from './VariantInspection';
 import { useInspectionCodex } from './useInspectionCodex';
 import { RefitHint } from './RefitHint';
@@ -6,12 +7,12 @@ import { useMemo, useState } from "react";
 import { Modal } from "../ui/core/UI";
 import { NativeButton } from "../ui/NativeChrome";
 import { NativeBitmapText } from "../ui/NativeBitmapText";
-import { runtimeAssetUrl } from "../engine/runtime/RuntimePaths";
 import { contentRegistry } from "../engine/content/ContentRegistry";
 import { ShipStage } from "./ShipStage";
 import { importNativeVariant } from "./NativeVariantImport";
 import { withDesignCaptain, autoGroups, baseHull, budget, compatibility, createDesign, evaluate, isBuiltIn, modReason, weaponOPCost, weapons } from "./DesignModel";
 import type { Design } from "./DesignModel";
+import { extensionVariantsForHull } from './ExtensionVariantCatalog';
 import { nativeVariantsForHull } from "./NativeVariantCatalog";
 
 const signature = (d: Design) => JSON.stringify({ ...d, updatedAt: 0 });
@@ -39,6 +40,10 @@ export function SourceVariantPicker({ draft, designs, onClose, onApply, onSave, 
     const order = ["火力支援", "突击", "精英"];
     return (order.includes(a.name) ? order.indexOf(a.name) : 9) - (order.includes(b.name) ? order.indexOf(b.name) : 9);
   }), [draft.hullId]);
+  const extensionChoices = useMemo<Choice[]>(() => extensionVariantsForHull(draft.hullId).map(choice => ({
+    id: choice.id, name: choice.name, design: choice.create({ wings: draft.wings }),
+    warnings: [...(choice.warnings ?? ['Web主题方案；确认后替换整舰装配，可撤消。如超出装配点，需调整后确认。'])],
+  })), [draft.hullId, draft.wings]);
   const savedChoices: Choice[] = designs.filter(d => d.hullId === draft.hullId).map(d => ({ id: d.id, name: d.name, design: d, warnings: [], saved: d }));
   const [selected, setSelected] = useState<string | null>(null);
   const [hidden, setHidden] = useState<string[]>([]);
@@ -49,8 +54,8 @@ export function SourceVariantPicker({ draft, designs, onClose, onApply, onSave, 
   const [naming, setNaming] = useState<"save" | "rename" | null>(null);
   const [name, setName] = useState(draft.name);
   const [message, setMessage] = useState("");
-  const choice = [...nativeChoices, ...savedChoices].find(c => c.id === selected);
-  const options = [...nativeChoices.filter(c => !hidden.includes(c.id)), ...savedChoices];
+  const choice = [...nativeChoices, ...extensionChoices, ...savedChoices].find(c => c.id === selected);
+  const options = [...[...nativeChoices, ...extensionChoices].filter(c => !hidden.includes(c.id)), ...savedChoices];
   const planned = (() => {
     const d = withDesignCaptain(structuredClone(automatic ?? choice?.design ?? draft), draft);
     const warnings: string[] = [];
@@ -105,12 +110,12 @@ export function SourceVariantPicker({ draft, designs, onClose, onApply, onSave, 
                 <ShipStage spec={evaluate(c.design).spec} home />
                 <span>{c.name}</span>
               </button></VariantInspection>
-              <RefitHint text={c.saved ? "删除保存的方案（需确认）" : "隐藏此原版方案；可恢复"}><button className="source-fit-remove" aria-label={(c.saved ? "删除方案：" : "隐藏原版方案：") + c.name}
+              <RefitHint text={c.saved ? "删除保存的方案（需确认）" : "隐藏此预设方案；可恢复"}><button className="source-fit-remove" aria-label={(c.saved ? "删除方案：" : "隐藏预设方案：") + c.name}
                 onClick={() => c.saved ? onDelete(c.saved) : setHidden(prev => [...prev, c.id])}>×</button></RefitHint>
             </div>)}
             <RefitHint text="保存当前舰船的装配方案"><button className="source-fit-save" disabled={evaluate(draft).errors.length > 0} aria-label="保存当前配置为装配方案"
               onClick={() => { setName(draft.name); setNaming("save"); }}>
-              <span className="source-fit-silhouette" style={{ maskImage: 'url("' + runtimeAssetUrl(baseHull(draft.hullId)!.spriteUrl) + '")' }} />
+              <AssemblyThumbnail spec={evaluate(draft).spec} className="source-fit-silhouette" silhouette="#194b59" />
               <span className="source-fit-save-caption">保存当前配置</span>
             </button></RefitHint>
           </div>
@@ -125,7 +130,7 @@ export function SourceVariantPicker({ draft, designs, onClose, onApply, onSave, 
           </div>
           <div className="source-fit-notes">
             <p>模拟改装 · 全装备库可用；未接入货舱、市场与经济。</p>
-            {hidden.length > 0 && <button onClick={() => setHidden([])}>恢复隐藏的原版方案（{hidden.length}）</button>}
+            {hidden.length > 0 && <button onClick={() => setHidden([])}>恢复隐藏的预设方案（{hidden.length}）</button>}
             {warnings.length > 0 && <details><summary>适配说明（{warnings.length}）{result.errors.length > 0 && " · 需修正后才能确认"}</summary><ul>{warnings.map((w, i) => <li key={i}>{w}</li>)}</ul></details>}
             {message && <p role="status">{message}</p>}
           </div>

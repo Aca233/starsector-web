@@ -45,12 +45,48 @@ export class CapitalShipAI {
   private tacticalPositioning: CombatPositionChoice['reason'] | undefined = undefined;
   private tacticalScoreGain: number | undefined = undefined;
   private tacticalClearFire: number | undefined = undefined;
+  // Used only by the opt-in authority rule. Keep clocks primitive for AI codecs.
+  private decisionRemaining = -1;
+  private decisionElapsed = 0;
+  private decisionOrderKey = '';
+  private decisionStateKey = '';
+  private decisionTargetId: string | undefined = undefined;
   private readonly tacticalPhase: number;
   constructor(public ship:Ship,public targetShip:Ship) {
     // Stable across host/owner realms, creation order and replays; consumes no RNG.
     let hash = 2166136261;
     for (let i = 0; i < ship.id.length; i++) hash = Math.imul(hash ^ ship.id.charCodeAt(i), 16777619);
     this.tacticalPhase = (hash >>> 0) % 3;
+  }
+
+  /** Opt-in whole-decision sampler: held controls, NOT a slower physical tick.
+   * First ownership/invalidated intent is immediate. No catch-up burst after a long
+   * step; elapsed simulation time reaches defense/intent timers exactly once. */
+  public sampleDecision(dt: number, order: TacticalOrder | null, ships: readonly Ship[]): number | null {
+    const ship = this.ship;
+    if (!(dt > 0) || !Number.isFinite(dt) || ship.fireControlMode !== 'AI' || !ship.tacticalAI
+      || ship.isDead || ship.isRetreated || ship.isDocked || ship.retreating) {
+      this.decisionRemaining = -1; this.decisionElapsed = 0;
+      return dt;
+    }
+    const orderKey = order ? JSON.stringify([order.id, order.type, order.targetShipId, order.targetPos?.x, order.targetPos?.y, order.issuedTime]) : '';
+    const stateKey = JSON.stringify([ship.system.tacticalMode, ship.flux.isVenting, ship.flux.isOverloaded]);
+    const target = ship.currentTargetShip;
+    const invalidTarget = !!target && (target.isDead || target.isRetreated || target.isDocked
+      || target.hasVastBulk || !target.isVisibleTo(ship.teamId) || sameTeam(ship, target) || !ships.includes(target));
+    const first = this.decisionRemaining < 0;
+    this.decisionElapsed += dt;
+    this.decisionRemaining -= dt;
+    const scheduled = first || this.decisionRemaining <= 1e-9;
+    if (scheduled) this.decisionRemaining = first ? (this.tacticalPhase + 1) / 60
+      : 1 / 20 + Math.min(0, this.decisionRemaining % (1 / 20));
+    // Do not hold an obsolete world roster during the skipped control steps.
+    ship.combatShips = ships;
+    if (!scheduled && orderKey === this.decisionOrderKey && stateKey === this.decisionStateKey
+      && target?.id === this.decisionTargetId && !invalidTarget) return null;
+    this.decisionOrderKey = orderKey; this.decisionStateKey = stateKey; this.decisionTargetId = target?.id;
+    const elapsed = this.decisionElapsed; this.decisionElapsed = 0;
+    return elapsed;
   }
 
   public update(dt:number,order:TacticalOrder|null=null,world?:TacticalWorld):void {
@@ -189,7 +225,7 @@ export class CapitalShipAI {
       for (const system of tacticalSystems) {
         const modifiers=system.definition.modifiers?.({...system,state:'ACTIVE',effectLevel:1} as typeof system,ship.flux.maxFlux);
         const boostSpeed=ship.spec.maxSpeed+(modifiers?.speedFlat??0);
-        system.definition.advanceAI?.({ship,system,target,distance:ship.pos.distanceTo(target.pos),angleDiff:signedAngle(facing-ship.facingRad),
+        system.definition.advanceAI?.({ship,system,world:scene,target,distance:ship.pos.distanceTo(target.pos),angleDiff:signedAngle(facing-ship.facingRad),
           tactical:{allowOffensiveManeuver,desiredRange:profile.range,withdrawing:withdrawing||!!regroup,waypoint:!!waypoint,avoidingCollision:avoidance.avoiding||cooperation.yielding,
             forwardClear:forwardPathClear(ship,scene,Math.max(boostSpeed,ship.vel.length()),Math.max(policy.avoidanceLookahead,system.chargeUpDuration+system.chargeDownDuration)),
             quietFor:this.defense.quietFor,threat}});

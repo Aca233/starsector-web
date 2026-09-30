@@ -1,186 +1,58 @@
 import React, { useRef, useEffect } from 'react';
 import type { HudShip as Ship } from '../../engine/runtime/CombatHudView';
-import { getCachedImage } from './hudUtils';
-import { drawShipDamageDecals, shipLocalToSpritePixel } from '../../engine/render/ShipDamageVisuals';
+import { assemblyShipIds } from '../../engine/content/ModuleGeometry';
+import { HullPortraitPainter, pickHullPortraitPart } from './HullPortraitPainter';
 
 export interface ShipPaperDollProps {
-  ship: Ship;
-  isEnemy?: boolean;
-  size?: number;
+  ship: Ship; isEnemy?: boolean; size?: number;
+  selectedModuleId?: string;
+  onSelectModule?: (index: number) => void;
 }
-
-/**
- * 100% 还原 Starsector 官方 _new.java / _return.java 战术舰船结构与装甲纸娃娃 (Paper Doll)
- * - 背景: holo_status.png 同心准星底纹
- * - 朝向: ship.facingRad + Math.PI / 2
- * - 遮罩: source-atop 严格将装甲色块剪裁至舰船外廓内
- * - 装甲着色: 完好翠绿 (盟友) / 警戒橙 (敌对) -> 黄色 -> 猩红 -> 剥落暗黑
- * - 表面: 覆绘 0.28 真实舰体贴图，透出船体金属结构与机械细节
- */
-export const ShipPaperDoll: React.FC<ShipPaperDollProps> = ({ ship, isEnemy = false, size = 140 }) => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  useEffect(() => {
-    let animId = 0;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // 离屏装甲网格缓冲贴图
-    const offCanvas = document.createElement('canvas');
-    let lastRenderedVersion = -1;
-    let lastDamageVersion = -1;
-    let lastDrawW = 0;
-    let lastDrawH = 0;
-
-    const updateOffscreenArmor = (drawW: number, drawH: number, shipImg: HTMLImageElement) => {
-      const offW = Math.ceil(drawW);
-      const offH = Math.ceil(drawH);
-      if (offCanvas.width !== offW || offCanvas.height !== offH) {
-        offCanvas.width = offW;
-        offCanvas.height = offH;
+/** Native-style assembly armor portrait. Click-to-control is a user-approved Web extension. */
+export const ShipPaperDoll: React.FC<ShipPaperDollProps> = ({ship,isEnemy=false,size=140,selectedModuleId,onSelectModule}) => {
+  const canvasRef=useRef<HTMLCanvasElement|null>(null);
+  const painted=useRef<{parts:Ship['hullPortrait'];facing:number}|null>(null);
+  const interactive=!isEnemy&&!!onSelectModule;
+  useEffect(()=>{
+    const canvas=canvasRef.current,ctx=canvas?.getContext('2d');if(!canvas||!ctx)return;
+    const painter=new HullPortraitPainter(isEnemy?'enemy':'friendly');
+    let frame=0,last=-100;
+    const render=(time:number)=>{
+      if(time-last>=66){last=time;ctx.clearRect(0,0,size,size);
+        const parts=ship.hullPortrait,facing=ship.facingRad+Math.PI/2;
+        canvas.dataset.renderedParts=String(painter.draw(ctx,parts,size,size,facing,selectedModuleId));
+        painted.current={parts,facing};
       }
-      const offCtx = offCanvas.getContext('2d');
-      if (!offCtx) return;
-
-      offCtx.clearRect(0, 0, offW, offH);
-
-      // 1. 绘制舰体机械结构底图
-      offCtx.save();
-      offCtx.globalAlpha = Math.max(0.2, ship.hullHp / ship.maxHullHp);
-      offCtx.drawImage(shipImg, 0, 0, offW, offH);
-      offCtx.restore();
-
-      // 2. 局部装甲网格色彩投影
-      offCtx.save();
-      offCtx.globalCompositeOperation = 'source-atop';
-
-      const armor = ship.armor;
-      const cols = armor.cols;
-      const rows = armor.rows;
-      const sourceW = Math.max(1, ship.spec.spriteWidth);
-      const sourceH = Math.max(1, ship.spec.spriteHeight);
-      const scaleX = offW / sourceW;
-      const scaleY = offH / sourceH;
-      // Armor cellWidth runs along ship-local +X (source-image vertical axis), while
-      // cellHeight runs along local +Y (source-image horizontal axis).
-      const cellPixelW = armor.cellHeight * scaleX;
-      const cellPixelH = armor.cellWidth * scaleY;
-
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          const val = armor.cells[r * armor.cols + c];
-          const ratio = Math.min(1.0, Math.max(0, val / armor.maxCellArmor));
-
-          let fillColor: string;
-          if (ratio > 0.75) {
-            fillColor = isEnemy
-              ? `rgba(240, 140, 30, ${0.38 + ratio * 0.25})`
-              : `rgba(25, 230, 25, ${0.35 + ratio * 0.25})`;
-          } else if (ratio > 0.35) {
-            fillColor = 'rgba(245, 210, 25, 0.65)';
-          } else if (ratio > 0.05) {
-            fillColor = 'rgba(235, 45, 30, 0.85)';
-          } else {
-            fillColor = 'rgba(15, 20, 25, 0.9)';
-          }
-
-          const localCenter = {x: armor.minX + (c + .5) * armor.cellWidth, y: armor.minY + (r + .5) * armor.cellHeight};
-          const spriteCenter = shipLocalToSpritePixel(ship.spec, localCenter);
-          const cx = spriteCenter.x * scaleX;
-          const cy = spriteCenter.y * scaleY;
-          offCtx.fillStyle = fillColor;
-          offCtx.fillRect(
-            cx - cellPixelW * 0.5,
-            cy - cellPixelH * 0.5,
-            Math.max(0.5, cellPixelW - 0.5),
-            Math.max(0.5, cellPixelH - 0.5)
-          );
-        }
-      }
-      offCtx.restore();
-
-      // 3. 顶层叠加微弱金属结构反光
-      offCtx.save();
-      offCtx.globalCompositeOperation = 'source-over';
-      offCtx.globalAlpha = 0.28;
-      offCtx.drawImage(shipImg, 0, 0, offW, offH);
-      offCtx.restore();
-
-      // 4. 与主战斗画面共用同一组装甲格战损贴花和同一 local→sprite 变换。
-      // source-atop 让边缘贴花仍严格受舰体透明像素裁切。
-      if (ship.scorchMarks.length > 0) {
-        offCtx.save();
-        offCtx.globalCompositeOperation = 'source-atop';
-        drawShipDamageDecals(offCtx, ship, 'base', offW / sourceW, offH / sourceH);
-        offCtx.restore();
-      }
+      frame=requestAnimationFrame(render);
     };
-
-    let lastRenderTime = 0;
-    const render = (timeMs: number) => {
-      if (timeMs - lastRenderTime >= 66) {
-        lastRenderTime = timeMs;
-        const w = canvas.width;
-        const h = canvas.height;
-        ctx.clearRect(0, 0, w, h);
-
-        // 1. 绘制 holo_status.png 同心准星底图
-        const holoImg = getCachedImage('/game-assets/graphics/hud/holo_status.png');
-        if (holoImg.complete && holoImg.naturalWidth > 0) {
-          ctx.save();
-          ctx.globalAlpha = 0.35;
-          ctx.drawImage(holoImg, 0, 0, w, h);
-          ctx.restore();
-        }
-
-        const shipImg = getCachedImage(ship.spec.spriteUrl);
-        if (shipImg.complete && shipImg.naturalWidth > 0) {
-          const maxDimension = Math.max(
-            ship.spec.spriteWidth || ship.spec.collisionRadius * 2,
-            ship.spec.spriteHeight || ship.spec.collisionRadius * 2
-          );
-          const targetSize = size * 0.72;
-          const scale = targetSize / maxDimension;
-          const drawW = (ship.spec.spriteWidth || ship.spec.collisionRadius * 2) * scale;
-          const drawH = (ship.spec.spriteHeight || ship.spec.collisionRadius * 2) * scale;
-
-          if (
-            lastRenderedVersion !== ship.armor.dirtyVersion
-            || lastDamageVersion !== ship.scorchMarkVersion
-            || lastDrawW !== drawW
-            || lastDrawH !== drawH
-          ) {
-            updateOffscreenArmor(drawW, drawH, shipImg);
-            lastRenderedVersion = ship.armor.dirtyVersion;
-            lastDamageVersion = ship.scorchMarkVersion;
-            lastDrawW = drawW;
-            lastDrawH = drawH;
-          }
-
-          ctx.save();
-          ctx.translate(w / 2, h / 2);
-          ctx.rotate(ship.facingRad + Math.PI / 2);
-          ctx.drawImage(offCanvas, -drawW / 2, -drawH / 2, drawW, drawH);
-          ctx.restore();
-        }
-      }
-
-      animId = requestAnimationFrame(render);
-    };
-
-    animId = requestAnimationFrame(render);
-    return () => cancelAnimationFrame(animId);
-  }, [ship, isEnemy, size]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      width={size}
-      height={size}
-      style={{ width: `${size}px`, height: `${size}px` }}
-      className="block select-none pointer-events-none"
-    />
-  );
+    frame=requestAnimationFrame(render);return()=>cancelAnimationFrame(frame);
+  },[ship,isEnemy,size,selectedModuleId]);
+  const select=(id:string)=>{
+    const index=assemblyShipIds(ship.id,ship.spec).indexOf(id);
+    if(index>=0)onSelectModule?.(index);
+  };
+  return <canvas ref={canvasRef} width={size} height={size} style={{width:size,height:size}}
+    aria-label={isEnemy?'目标装甲状况':'本舰装甲状况'} tabIndex={interactive?0:undefined}
+    aria-description={interactive?'点击存活武器模块接管火控；左右方向键切换，Home 返回本体。移动和防御仍控制本体。':undefined}
+    title={interactive?'点击模块接管武器 · 点击本体返回 · 左右键切换 / Home 返回本体':undefined}
+    data-weapon-owner={selectedModuleId}
+    onPointerDown={interactive?event=>{event.stopPropagation();event.preventDefault();event.currentTarget.focus();}:undefined}
+    onMouseDown={interactive?event=>event.stopPropagation():undefined}
+    onClick={interactive?event=>{
+      event.stopPropagation();event.preventDefault();
+      const pose=painted.current;if(!pose)return;
+      const rect=event.currentTarget.getBoundingClientRect();
+      const part=pickHullPortraitPart(pose.parts,size,size,pose.facing,(event.clientX-rect.left)*size/rect.width,(event.clientY-rect.top)*size/rect.height);
+      if(part&&(part.id===ship.id||part.canControlWeapons))select(part.id);
+    }:undefined}
+    onKeyDown={interactive?event=>{
+      if(event.altKey||event.ctrlKey||event.metaKey||event.shiftKey||!['ArrowLeft','ArrowRight','Home'].includes(event.key))return;
+      event.stopPropagation();event.preventDefault();
+      if(event.key==='Home'){select(ship.id);return;}
+      const parts=ship.hullPortrait.filter(part=>!part.isDead&&part.hullHp>0&&(part.id===ship.id||part.canControlWeapons));
+      if(!parts.length)return;
+      const current=Math.max(0,parts.findIndex(part=>part.id===(selectedModuleId??ship.id)));
+      select(parts[(current+(event.key==='ArrowRight'?1:-1)+parts.length)%parts.length].id);
+    }:undefined}
+    className={`block select-none ${interactive?'cursor-pointer focus-visible:outline focus-visible:outline-1 focus-visible:outline-cyan-200':'pointer-events-none'}`} />;
 };

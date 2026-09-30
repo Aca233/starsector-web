@@ -1,3 +1,4 @@
+import { manualWeaponShip } from '../../../runtime/ModuleFireControl';
 import { lockedCombatTarget } from '../../../runtime/CombatTargeting';
 import { renderWeaponRange } from '../../ShipRenderQueries';
 import type { CombatRenderView } from '../../CombatRenderView';
@@ -19,7 +20,7 @@ export class WebGLTacticalOverlayPass {
     ctx: WebGLPassContext,
     nowSec: number,
     _enemyPos: Vector2,
-    playerPos: Vector2,
+    _playerPos: Vector2,
     activeGroupIndex: number,
     arcAnimProgress: number
   ) {
@@ -27,22 +28,24 @@ export class WebGLTacticalOverlayPass {
     // Inspection diamonds are drawn by TargetShipHUD. Lead assistance must use
     // the explicit R lock, never silently select the nearest hostile contact.
     const target = lockedCombatTarget(engine.ships, engine.playerShip);
+    const weaponShip = manualWeaponShip(engine.playerShip, engine.ships);
+    const weaponPos = weaponShip.interpolatedPos(ctx.alpha);
 
     // 1.1 射击前置量指示星标 (Target Lead Pip)
-    if (!engine.playerShip.isDead && target) {
+    if (!weaponShip.isDead && target) {
       let projSpeed = 800;
       let isBeam = false;
-      const activeGroup = engine.playerShip.weaponGroups[activeGroupIndex];
+      const activeGroup = weaponShip.weaponGroups[activeGroupIndex];
       if (activeGroup) {
-        const activeMount = engine.playerShip.weapons.find((w) => activeGroup.weaponSlotIds.includes(w.slotId));
+        const activeMount = weaponShip.weapons.find((w) => activeGroup.weaponSlotIds.includes(w.slotId));
         if (activeMount) {
           if (activeMount.spec.isBeam) isBeam = true;
           else if (activeMount.spec.projSpeed > 0) projSpeed = activeMount.spec.projSpeed;
         }
       }
-      const dist = engine.playerShip.pos.distanceTo(target.pos);
+      const dist = weaponShip.pos.distanceTo(target.pos);
       const flightTime = isBeam ? 0 : dist / projSpeed;
-      const relVel = target.vel.clone().sub(engine.playerShip.vel);
+      const relVel = target.vel.clone().sub(weaponShip.vel);
       const leadPos = target.pos.clone().addScaled(relVel, flightTime);
 
       const pipTex = textures.getTexture('/game-assets/graphics/hud/holo_target.png');
@@ -51,8 +54,8 @@ export class WebGLTacticalOverlayPass {
     }
 
     // 2. 官方原版战术武器射界与测距弧圈 (1:1 _super.java & renderers/E.java)
-    if (!engine.playerShip.isDead && engine.playerShip.weapons && engine.playerShip.weaponGroups && arcAnimProgress > 0.001) {
-      const p = engine.playerShip;
+    if (!weaponShip.isDead && weaponShip.weapons && weaponShip.weaponGroups && arcAnimProgress > 0.001) {
+      const p = weaponShip;
       const activeGroup = p.weaponGroups[activeGroupIndex];
       if (activeGroup && activeGroup.weaponSlotIds && activeGroup.weaponSlotIds.length > 0) {
         let activeMounts = p.weapons.filter(
@@ -72,8 +75,8 @@ export class WebGLTacticalOverlayPass {
           for (const mount of activeMounts) {
 
             const offsetWorld = new Vector2(mount.relativePos.x, mount.relativePos.y).rotate(p.facingRad);
-            const mountX = playerPos.x + offsetWorld.x;
-            const mountY = playerPos.y + offsetWorld.y;
+            const mountX = weaponPos.x + offsetWorld.x;
+            const mountY = weaponPos.y + offsetWorld.y;
 
             let f8 = mount.arcDeg;
             if (f8 === 0) f8 = 3.0; // 1:1 _super.java:164: 固定挂点使用 3.0 度

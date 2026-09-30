@@ -18,18 +18,9 @@ export function studioSummaryPlugin(): Plugin {
         this.addWatchFile(file);
         return JSON.parse(await readFile(file, 'utf8'));
       };
-      const [ships, weapons, imported, curated] = await Promise.all([
-        read('src/engine/data/generated/ships.json'),
-        read('src/engine/data/generated/weapons.json'),
-        read('src/engine/data/generated/refit-source.json'),
-        read('src/studio/refit-data.json'),
-      ]);
-      // Match DesignModel's built-in roster, excluding fighters and built-in-only weapons.
-      const hullCount = Object.keys({ ...imported.ships, ...curated.ships })
-        .filter(id => ships[id] && ships[id].hullSize !== 'FIGHTER').length;
-      const refitWeapons = { ...imported.weapons, ...curated.weapons };
-      const weaponCount = Object.keys(weapons)
-        .filter(id => refitWeapons[id] && id !== 'tpc' && !imported.weapons[id]?.builtInOnly).length;
+      await read('src/engine/data/content-selection.json');
+      // Bundled authored hulls, excluding internal modules/aircraft/system projectiles.
+      const hullCount = 3, weaponCount = 10;
       return 'export const hullCount = ' + hullCount + '; export const weaponCount = ' + weaponCount + ';';
     },
   };

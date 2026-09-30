@@ -1,4 +1,5 @@
 import type { CombatDisplayReads, CombatDisplayShip } from './CombatDisplayReads';
+import { HullPortraitProjector, captureHullSprites, type HullSpritePart, type HullPortraitPart } from './HullPortraitView';
 import { ArmorReadCache } from './ArmorReadView';
 import type { CombatEngine } from '../simulation/CombatEngine';
 import type { ShipSpec } from '../content/ShipSpec';
@@ -18,12 +19,14 @@ export type TacticalMapViewSource = Readonly<Pick<CombatDisplayReads,
 
 export interface MapPoint { readonly x: number; readonly y: number }
 export interface MapContact {
+  readonly hullSprites: readonly HullSpritePart[];
   readonly id: string; readonly teamId: number; readonly pos: MapPoint; readonly facingRad: number;
   readonly hullHp: number; readonly maxHullHp: number; readonly retreating: boolean;
   readonly flux: { readonly fluxPercent: number };
   readonly spec: Readonly<Pick<ShipSpec, 'nameKey' | 'designationKey' | 'spriteUrl' | 'spriteWidth' | 'spriteHeight' | 'pivotX' | 'pivotY' | 'hullSize'>>;
 }
 export interface MapFlagship extends MapContact {
+  readonly hullPortrait: readonly HullPortraitPart[];
   readonly currentCR: number;
   readonly flux: { readonly fluxPercent: number; readonly hardFlux: number; readonly maxFlux: number; readonly totalFlux: number };
   readonly armor: { readonly cols: number; readonly rows: number; readonly cellWidth: number; readonly cellHeight: number;
@@ -52,9 +55,9 @@ export interface TacticalMapView {
 export interface TacticalMapSnapshot { readonly generation: number; readonly available: boolean; readonly map: TacticalMapView | null }
 export interface TacticalMapSource { read(): TacticalMapSnapshot }
 const point = (value: MapPoint): MapPoint => ({ x: value.x, y: value.y });
-function contact(ship: CombatDisplayShip): MapContact {
+function contact(ship: CombatDisplayShip, byId: ReadonlyMap<string, CombatDisplayShip>): MapContact {
   const spec = ship.spec;
-  return { id: ship.id, teamId: ship.teamId, pos: point(ship.pos), facingRad: ship.facingRad, hullHp: ship.hullHp,
+  return { hullSprites: captureHullSprites(ship, byId), id: ship.id, teamId: ship.teamId, pos: point(ship.pos), facingRad: ship.facingRad, hullHp: ship.hullHp,
     maxHullHp: ship.maxHullHp, retreating: ship.retreating, flux: { fluxPercent: ship.flux.fluxPercent },
     spec: { nameKey: spec.nameKey, designationKey: spec.designationKey, spriteUrl: spec.spriteUrl, spriteWidth: spec.spriteWidth,
       spriteHeight: spec.spriteHeight, pivotX: spec.pivotX, pivotY: spec.pivotY, hullSize: spec.hullSize } };
@@ -75,6 +78,7 @@ export function copyTacticalMapSnapshot(value: TacticalMapSnapshot, previous?: T
 }
 
 export class TacticalMapViewProjector {
+  private readonly portrait = new HullPortraitProjector();
   private readonly armorCache = new ArmorReadCache();
   private engine?: TacticalMapViewSource;
   private flagship?: CombatDisplayShip;
@@ -95,6 +99,7 @@ export class TacticalMapViewProjector {
       return result;
     };
     const living = engine.capitalShips.filter(visible), byId = new Map(ships.map(ship => [ship.id, ship]));
+    const visibleById = new Map(ships.filter(visible).map(ship => [ship.id, ship]));
     const orders = Object.fromEntries([...engine.orders].map(([id, order]) => [id, {
       id: order.id, type: order.type, issuedTime: order.issuedTime, targetShipId: order.targetShipId,
       targetPos: order.targetPos ? point(order.targetPos) : undefined,
@@ -105,12 +110,12 @@ export class TacticalMapViewProjector {
       if (target && visible(target)) Object.defineProperty(targetPositions, target.id, { value: point(target.pos), enumerable: true, configurable: true });
     }
     const ship = engine.playerShip, armor = this.armorCache.read(ship.armor);
-    const playerShip: MapFlagship = { ...contact(ship), currentCR: ship.currentCR,
+    const playerShip: MapFlagship = { ...contact(ship, byId), currentCR: ship.currentCR, hullPortrait: this.portrait.capture(ship, ships),
       flux: { fluxPercent: ship.flux.fluxPercent, hardFlux: ship.flux.hardFlux, maxFlux: ship.flux.maxFlux, totalFlux: ship.flux.totalFlux },
       armor: { cols: armor.cols, rows: armor.rows, cellWidth: armor.cellWidth, cellHeight: armor.cellHeight,
         minX: armor.minX, minY: armor.minY, maxCellArmor: armor.maxCellArmor, cells: Array.from(armor.cells) } };
     return this.previous = copyTacticalMapSnapshot({ ...envelope, map: {
-      playerShip, capitalShips: living.map(contact), fighters: [...engine.fighters, ...engine.bombers].filter(visible)
+      playerShip, capitalShips: living.map(ship => contact(ship, visibleById)), fighters: [...engine.fighters, ...engine.bombers].filter(visible)
         .map(ship => ({ id: ship.id, teamId: ship.teamId, pos: point(ship.pos), facingRad: ship.facingRad })),
       observers: observers.map(ship => ({ pos: point(ship.pos), sightRadius: ship.sightRadius })),
       orders, targetPositions, selectedUnitId: engine.selectedUnitId, commandPoints: engine.commandPoints,

@@ -1,3 +1,4 @@
+import { sameTeam } from '../CombatTeams';
 import { applyComponentDamage } from './weapon/ComponentDamage';
 import { isImmutableMetadata } from '../../extensions/Immutable';
 import { Vector2 } from '../../math/Vector2';
@@ -56,7 +57,10 @@ function findShipPairCollisionContact(s1: Ship, s2: Ship): ShipPairCollisionCont
   // Nonfinite inputs make these comparisons false and fall through conservatively.
   const pad = 1e-7 * Math.max(1, radius, Math.abs(s1.pos.x), Math.abs(s1.pos.y), Math.abs(s2.pos.x), Math.abs(s2.pos.y));
   if (Math.abs(s2.pos.x-s1.pos.x)>radius+pad || Math.abs(s2.pos.y-s1.pos.y)>radius+pad) return null;
-  const shieldContact = getShieldToShieldContact(s1, s2);
+  // Allied craft pass through the void field, never through the physical hull.
+  const passFirst = !!s1.shield.voidShield && sameTeam(s1,s2);
+  const passSecond = !!s2.shield.voidShield && sameTeam(s1,s2);
+  const shieldContact = !passFirst && !passSecond ? getShieldToShieldContact(s1, s2) : null;
   if (shieldContact) {
     return {
       normal: shieldContact.normal,
@@ -75,8 +79,8 @@ function findShipPairCollisionContact(s1: Ship, s2: Ship): ShipPairCollisionCont
 
   const s1Hull = getDirectionalHullCollisionExtent(s1, normal);
   const s2Hull = getDirectionalHullCollisionExtent(s2, normal.clone().scale(-1));
-  const s1Shield = getDirectionalShieldCollisionExtent(s1, normal);
-  const s2Shield = getDirectionalShieldCollisionExtent(s2, normal.clone().scale(-1));
+  const s1Shield = passFirst ? null : getDirectionalShieldCollisionExtent(s1, normal);
+  const s2Shield = passSecond ? null : getDirectionalShieldCollisionExtent(s2, normal.clone().scale(-1));
   const candidates = [
     [s1Hull, s2Hull] as const,
     ...(s1Shield ? [[s1Shield, s2Hull] as const] : []),
@@ -136,8 +140,8 @@ export class ShipCollisionSystem {
 
         const baseRamDmg = impactSpeed * 8;
         // 同质量时双方仍各吃 baseRamDmg；质量差越大，重舰承伤越低、轻舰承伤越高。
-        const s1RamDmg = baseRamDmg * 2 * s1ResponseShare;
-        const s2RamDmg = baseRamDmg * 2 * s2ResponseShare;
+        let s1RamDmg = baseRamDmg * 2 * s1ResponseShare;
+        let s2RamDmg = baseRamDmg * 2 * s2ResponseShare;
         let s1ShieldDmg = 0;
         let s2ShieldDmg = 0;
         let s1ArmorDmg = 0;
@@ -151,10 +155,12 @@ export class ShipCollisionSystem {
           const s1ShieldCenter = s1.getShieldCenter();
           const hitAngle = Math.atan2(contactPoint.y - s1ShieldCenter.y, contactPoint.x - s1ShieldCenter.x);
           s1ShieldDmg = s1RamDmg * s1.system.getShieldDamageMultiplier() * s1.crDamageTakenMultiplier;
-          const fluxGain = s1.shield.absorbDamage(s1ShieldDmg, 'KINETIC', hitAngle);
-          s1ShieldDmg *= s1.shield.damageTakenMultiplier;
-          s1.flux.increaseShieldFlux(fluxGain, true);
-        } else {
+          const absorption = s1.shield.absorbImpact(s1ShieldDmg, 'KINETIC', hitAngle);
+          s1ShieldDmg = absorption.absorbed;
+          s1.flux.increaseShieldFlux(absorption.flux, true);
+          s1RamDmg *= absorption.remainingFraction;
+        }
+        if(s1RamDmg>0) {
           const contact1 = contactPoint.clone().sub(s1.pos).rotate(-s1.facingRad);
           // CR 只修正实际承伤，hitStrength 保持碰撞原始强度，避免装甲减伤被二次放大。
           const takenDamage = s1RamDmg * s1.crDamageTakenMultiplier;
@@ -171,10 +177,12 @@ export class ShipCollisionSystem {
           const s2ShieldCenter = s2.getShieldCenter();
           const hitAngle = Math.atan2(contactPoint.y - s2ShieldCenter.y, contactPoint.x - s2ShieldCenter.x);
           s2ShieldDmg = s2RamDmg * s2.system.getShieldDamageMultiplier() * s2.crDamageTakenMultiplier;
-          const fluxGain = s2.shield.absorbDamage(s2ShieldDmg, 'KINETIC', hitAngle);
-          s2ShieldDmg *= s2.shield.damageTakenMultiplier;
-          s2.flux.increaseShieldFlux(fluxGain, true);
-        } else {
+          const absorption = s2.shield.absorbImpact(s2ShieldDmg, 'KINETIC', hitAngle);
+          s2ShieldDmg = absorption.absorbed;
+          s2.flux.increaseShieldFlux(absorption.flux, true);
+          s2RamDmg *= absorption.remainingFraction;
+        }
+        if(s2RamDmg>0) {
           const contact2 = contactPoint.clone().sub(s2.pos).rotate(-s2.facingRad);
           const takenDamage = s2RamDmg * s2.crDamageTakenMultiplier;
           const result2 = s2.armor.takeDamage(contact2, takenDamage, 'KINETIC', s2RamDmg, false);

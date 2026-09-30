@@ -30,7 +30,7 @@ export function createShipHulk(ship: Ship, random: SimulationRandom): HulkFragme
     angularVel: ship.angularVelRad, localOffset: new Vector2(),
     breakup: remainingSplits > 0 ? { remainingSplits, interval, elapsed: 0, nextInterval: interval * (0.5 + 0.5 * random.next()) } : null,
     bounds: ship.spec.bounds.map(([x, y]) => new Vector2(x, y)), visualBounds: null,
-    mountSlotIds: ship.weapons.map(mount => mount.slotId), collisionRadius: ship.spec.collisionRadius
+    mountSlotIds: [...new Set([...ship.weapons.map(mount => mount.slotId), ...ship.spec.weaponSlots.filter(slot => slot.installation).map(slot => slot.slotId)])], collisionRadius: ship.spec.collisionRadius
   };
 }
 
@@ -78,10 +78,12 @@ export function splitHulk(hulk: HulkFragment, random: SimulationRandom): HulkFra
   const sourceOrigin = hulk.pos.clone().sub(hulk.localOffset.clone().rotate(hulk.facingRad));
   const grid = Math.min(30, Math.max(15, hulk.sourceShip.spec.spriteHeight / 10));
   const slots: [string[], string[]] = [[], []];
-  for (const mount of hulk.sourceShip.weapons) {
-    if (!hulk.mountSlotIds.includes(mount.slotId)) continue;
-    if (pointInHull(mount.relativePos, cuts[0].bounds)) slots[0].push(mount.slotId);
-    else if (pointInHull(mount.relativePos, cuts[1].bounds)) slots[1].push(mount.slotId);
+  for (const id of hulk.mountSlotIds) {
+    const slot = ship.spec.weaponSlots.find(s => s.slotId === id);
+    const pos = slot ? new Vector2(slot.x, slot.y) : ship.weapons.find(m => m.slotId === id)?.relativePos;
+    if (!pos) continue;
+    if (pointInHull(pos, cuts[0].bounds)) slots[0].push(id);
+    else if (pointInHull(pos, cuts[1].bounds)) slots[1].push(id);
   }
   return cuts.map((cut, index) => {
     const box = hullBounds(cut.bounds), relative = box.center.clone().sub(hulk.localOffset);
@@ -96,12 +98,12 @@ export function splitHulk(hulk: HulkFragment, random: SimulationRandom): HulkFra
 
 /** H advances one shared sequence and cuts the largest bounding-area piece each interval. */
 export function updateHulkBreakups(hulks: HulkFragment[], dt: number, random: SimulationRandom): void {
-  const sequences = new Set(hulks.map(hulk => hulk.breakup).filter(sequence => sequence !== null));
+  const sequences = new Set(hulks.filter(hulk=>!hulk.gravityFixed).map(hulk => hulk.breakup).filter(sequence => sequence !== null));
   for (const sequence of sequences) {
     sequence.elapsed += dt;
     if (sequence.elapsed < sequence.nextInterval) continue;
     sequence.elapsed = 0;
-    const pieces = hulks.filter(hulk => hulk.breakup === sequence);
+    const pieces = hulks.filter(hulk => !hulk.gravityFixed && hulk.breakup === sequence);
     const largest = pieces.reduce<HulkFragment | null>((best, next) => {
       const box = hullBounds(next.bounds), previous = best ? hullBounds(best.bounds) : null;
       return !previous || box.width * box.height > previous.width * previous.height ? next : best;

@@ -1,0 +1,94 @@
+{
+  "S": {
+    "head": {
+      "file": "S-head-painted-v14.png",
+      "width": 11.847133757961783,
+      "height": 14.672219500244978,
+      "pivotX": 0.5,
+      "pivotY": 0.7329192546583851,
+      "offsets": [
+        7.184830965213133,
+        -0.0647035766780997
+      ]
+    },
+    "seat": {
+      "file": "S-seat-painted-v14.png",
+      "width": 13.990593505039193,
+      "height": 13.557894736842105,
+      "pivotX": 0.4966896812635961,
+      "pivotY": 0.497652200316655,
+      "offsets": []
+    },
+    "foreground": {
+      "file": "S-lip-painted-v14.png",
+      "width": 13.990593505039193,
+      "height": 13.557894736842105,
+      "pivotX": 0.4966896812635961,
+      "pivotY": 0.497652200316655,
+      "offsets": []
+    },
+    "icon": "S-detail-seated-v16.png"
+  },
+  "M": {
+    "head": {
+      "file": "M-head-painted-v14.png",
+      "width": 24.0,
+      "height": 38.5,
+      "pivotX": 0.5,
+      "pivotY": 0.8246753246753247,
+      "offsets": [
+        25.65,
+        -0.05500000000000682
+      ]
+    },
+    "seat": {
+      "file": "M-seat-painted-v14.png",
+      "width": 23.30065359477124,
+      "height": 23.0,
+      "pivotX": 0.4981835449048724,
+      "pivotY": 0.49791349971457327,
+      "offsets": []
+    },
+    "foreground": {
+      "file": "M-lip-painted-v14.png",
+      "width": 23.30065359477124,
+      "height": 23.0,
+      "pivotX": 0.4981835449048724,
+      "pivotY": 0.49791349971457327,
+      "offsets": []
+    },
+    "icon": "M-detail-seated-v16.png"
+  },
+  "L": {
+    "head": {
+      "file": "L-head-painted-v14.png",
+      "width": 26.217391304347824,
+      "height": 66.54223602484471,
+      "pivotX": 0.5,
+      "pivotY": 0.8123827392120075,
+      "offsets": [
+        47.42850931677018,
+        -4.639229813664592,
+        47.440993788819874,
+        4.37206211180124
+      ]
+    },
+    "seat": {
+      "file": "L-seat-painted-v14.png",
+      "width": 31.95876288659794,
+      "height": 30.693069306930692,
+      "pivotX": 0.4985665157061494,
+      "pivotY": 0.4987075145434043,
+      "offsets": []
+    },
+    "foreground": {
+      "file": "L-lip-painted-v14.png",
+      "width": 31.95876288659794,
+      "height": 30.693069306930692,
+      "pivotX": 0.4985665157061494,
+      "pivotY": 0.4987075145434043,
+      "offsets": []
+    },
+    "icon": "L-detail-seated-v16.png"
+  }
+}

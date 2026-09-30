@@ -2,16 +2,14 @@ import { sameTeam, combatTeamColor } from "../../engine/simulation/CombatTeams";
 import React, { useRef, useEffect } from 'react';
 import type { CombatHudView as CombatEngine } from '../../engine/runtime/CombatHudView';
 import { Vector2 } from '../../engine/math/Vector2';
-import { runtimeAssetUrl } from '../../engine/runtime/RuntimePaths';
 
 export interface CombatRadarProps {
   engine: CombatEngine;
 }
 
 /**
- * 1:1 官方正统战术雷达小地图 (CombatRadar)
- * 严格对齐 Starsector H.java & minimap_bg2.png / holo_grid.png
- * 尺寸: 204x204 军规外框，内部 198x198 极坐标雷达显示区
+ * Original interface frame around the existing 198px tactical projection.
+ * Range, team affiliation and projection semantics are unchanged.
  */
 export const CombatRadar: React.FC<CombatRadarProps> = ({ engine }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -52,7 +50,7 @@ export const CombatRadar: React.FC<CombatRadarProps> = ({ engine }) => {
       };
 
       // 2. 绘制交战边界限制圈 (Boundary Ring)
-      ctx.strokeStyle = 'rgba(70, 200, 255, 0.25)';
+      ctx.strokeStyle = 'rgba(138, 170, 187, 0.28)';
       ctx.lineWidth = 1;
       ctx.setLineDash([4, 4]);
       ctx.beginPath();
@@ -139,30 +137,9 @@ export const CombatRadar: React.FC<CombatRadarProps> = ({ engine }) => {
   }, [engine]);
 
   return (
-    <div 
-      className="relative w-[204px] h-[204px] select-none shadow-2xl"
-      style={{
-        backgroundImage: `url(${runtimeAssetUrl('graphics/hud/minimap_bg2.png')})`,
-        backgroundSize: '204px 204px',
-        backgroundRepeat: 'no-repeat'
-      }}
-    >
-      {/* 内部 198x198 全息网格背景 holo_grid.png */}
-      <div 
-        className="absolute top-[3px] left-[3px] w-[198px] h-[198px] pointer-events-none opacity-40"
-        style={{
-          backgroundImage: `url(${runtimeAssetUrl('graphics/hud/holo_grid.png')})`,
-          backgroundSize: '198px 198px',
-          backgroundRepeat: 'no-repeat'
-        }}
-      />
-      {/* 雷达动态实体投影 Canvas */}
-      <canvas
-        ref={canvasRef}
-        width={198}
-        height={198}
-        className="absolute top-[3px] left-[3px] w-[198px] h-[198px] pointer-events-none"
-      />
+    <div className="combat-radar relative w-[204px] h-[204px] select-none">
+      <canvas ref={canvasRef} width={198} height={198}
+        aria-label="战术雷达" className="absolute top-[3px] left-[3px] w-[198px] h-[198px] pointer-events-none" />
     </div>
   );
 };

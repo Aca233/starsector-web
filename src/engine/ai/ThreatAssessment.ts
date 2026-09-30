@@ -93,8 +93,10 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
     const duration = Math.min(defenseWindow,b.duration);
     add('BEAM',b.sourceShipId,0,b.damagePerSec*duration,b.damageType,b.startPos);
   }
-  const weaponEnvelopes = world.weaponThreatEnvelope && Number.isFinite(weaponHorizon) && weaponHorizon >= 0 && ship.hasNativeThreatPhaseHooks
-    ? world.weaponThreatEnvelope : undefined;
+  const weaponEnvelopes = Number.isFinite(weaponHorizon) && weaponHorizon >= 0
+    ? world.weaponThreatEnvelope && ship.hasNativeThreatPhaseHooks ? world.weaponThreatEnvelope
+      : world.exactWeaponThreatEnvelope?.permitsExactObserver(ship) ? world.exactWeaponThreatEnvelope : undefined
+    : undefined;
   for (const enemy of world.ships) {
     if (enemy===ship || enemy.isDead || !enemy.isVisibleTo(ship.teamId) || sameTeam(enemy, ship)) continue;
     const recovery = Math.max(enemy.flux.isOverloaded ? enemy.flux.overloadTimer : 0,

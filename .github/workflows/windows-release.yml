@@ -70,6 +70,8 @@ jobs:
         run: node scripts/check-release-scope.mjs
       - run: npm run package:steam -- --skip-build --version $env:RELEASE_VERSION
       - run: npm run release:manifest -- --version $env:RELEASE_VERSION
+      - name: Check lightweight desktop updater
+        run: node --test scripts/check-desktop-content.mjs
       - run: npm run package:electron -- --skip-build --version $env:RELEASE_VERSION
       - name: Publish checked release or retain draft for review
         shell: pwsh
@@ -87,7 +89,7 @@ jobs:
           }
           $desktop = Get-Content -LiteralPath (Join-Path $PWD 'artifacts/electron/latest-build.json') -Raw | ConvertFrom-Json
           if ($desktop.version -ne $env:RELEASE_VERSION) { throw 'Electron version does not match release' }
-          foreach ($name in @("Starsector-Web-Desktop-Setup-${env:RELEASE_VERSION}-x64.exe", "Starsector-Web-Desktop-Setup-${env:RELEASE_VERSION}-x64.exe.blockmap", "Starsector-Web-Desktop-${env:RELEASE_VERSION}-x64.zip", 'latest.yml')) {
+          foreach ($name in @("Starsector-Web-Desktop-Setup-${env:RELEASE_VERSION}-x64.exe", "Starsector-Web-Desktop-Setup-${env:RELEASE_VERSION}-x64.exe.blockmap", "Starsector-Web-Desktop-${env:RELEASE_VERSION}-x64.zip", 'latest.yml', 'desktop-content.json', "Starsector-Web-Content-${env:RELEASE_VERSION}-x64.bin")) {
             $asset = Join-Path $desktop.output $name
             if (-not (Test-Path -LiteralPath $asset -PathType Leaf)) { throw "Missing Electron artifact: $name" }
             $files += $asset

@@ -3,7 +3,7 @@
  * BROWSER_PATH optionally selects a browser. Uses isolated profiles, no Steam connections. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-const { chromium } = createRequire(import.meta.url)('playwright');
+const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_PACKAGE || 'playwright');
 const browser = await chromium.launch({ headless: true, ...(process.env.BROWSER_PATH ? { executablePath: process.env.BROWSER_PATH } : {}) });
 const targets = [[process.env.COMBAT_TEST_URL ?? 'http://127.0.0.1:5173', false]];
 if (process.env.STATIC_TEST_URL) targets.push([process.env.STATIC_TEST_URL, true]);

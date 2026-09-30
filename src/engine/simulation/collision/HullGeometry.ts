@@ -192,12 +192,77 @@ export function distanceToShipHull(ship: Ship, worldPoint: Vector2): number {
   return Math.sqrt(distanceSquared);
 }
 
+export interface HullCircleContact {
+  /** Closest point on the authored hull, in world coordinates. */
+  point: Vector2;
+  /** Unit separation direction from the hull toward the colliding circle. */
+  normal: Vector2;
+  penetration: number;
+}
+export type HullCollisionSurface = Pick<Ship,'pos'|'facingRad'> & {spec:Pick<Ship['spec'],'bounds'|'collisionRadius'>};
+
+/** Circle against the actual hull outline, including concave edges and rotation.
+ * Enclosing radii only reject distant pairs; they never replace authored bounds.
+ * An embedded center exits via its nearest boundary instead of being pushed deeper. */
+export function getHullCircleContact(ship: HullCollisionSurface, circleCenter: Vector2, circleRadius: number): HullCircleContact | null {
+  const radius = Math.max(0, circleRadius);
+  if (!mayBeWithinShipHullDistance(ship, circleCenter, radius)) return null;
+  const bounds = ship.spec.bounds;
+  if (!bounds || bounds.length < 3) {
+    const radial = circleCenter.clone().sub(ship.pos);
+    const distance = radial.length();
+    const hullRadius = Math.max(0, ship.spec.collisionRadius);
+    const penetration = hullRadius + radius - distance;
+    if (penetration <= 1e-7 * Math.max(1, hullRadius, radius, distance)) return null;
+    const normal = distance > 1e-12 ? radial.scale(1 / distance) : new Vector2(1, 0);
+    return { point: ship.pos.clone().addScaled(normal, hullRadius), normal, penetration };
+  }
+
+  const local = circleCenter.clone().sub(ship.pos).rotate(-ship.facingRad);
+  let inside = false, signedArea2 = 0;
+  let closestX = 0, closestY = 0, edgeX = 0, edgeY = 0;
+  let distanceSquared = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < bounds.length; i++) {
+    const [ax, ay] = bounds[i], [bx, by] = bounds[(i + 1) % bounds.length];
+    const dx = bx - ax, dy = by - ay;
+    signedArea2 += ax * by - bx * ay;
+    if ((ay > local.y) !== (by > local.y) && local.x < ax + (local.y - ay) * dx / dy) inside = !inside;
+    const lengthSquared = dx * dx + dy * dy;
+    if (lengthSquared <= 1e-12) continue;
+    const t = Math.max(0, Math.min(1, ((local.x - ax) * dx + (local.y - ay) * dy) / lengthSquared));
+    const x = ax + t * dx, y = ay + t * dy;
+    const squared = (local.x - x) ** 2 + (local.y - y) ** 2;
+    if (squared < distanceSquared) {
+      distanceSquared = squared;
+      closestX = x; closestY = y; edgeX = dx; edgeY = dy;
+    }
+  }
+  if (!Number.isFinite(distanceSquared)) return null;
+  const distance = Math.sqrt(distanceSquared);
+  const penetration = inside ? radius + distance : radius - distance;
+  // Ignore roundoff at a just-separated/tangent surface to avoid repeated damage.
+  if (penetration <= 1e-7 * Math.max(1, radius, Math.abs(local.x), Math.abs(local.y))) return null;
+  let normal: Vector2;
+  if (distance > 1e-12) {
+    normal = new Vector2(local.x - closestX, local.y - closestY).scale((inside ? -1 : 1) / distance);
+  } else {
+    // A center exactly on an edge has no radial direction. Respect either winding.
+    const sign = signedArea2 >= 0 ? 1 : -1;
+    normal = new Vector2(edgeY, -edgeX).scale(sign / Math.hypot(edgeX, edgeY));
+  }
+  return {
+    point: new Vector2(closestX, closestY).rotate(ship.facingRad).add(ship.pos),
+    normal: normal.rotate(ship.facingRad),
+    penetration
+  };
+}
+
 const immutableHullReach = new WeakMap<[number, number][], number>();
 
 /** Conservative rejection for a distance-limited query, never a replacement hull
  * surface. Only deeply frozen finite outlines are cached; mutable/refit geometry
  * and exceptional numeric inputs retain the exact distance calculation. */
-export function mayBeWithinShipHullDistance(ship: Ship, worldPoint: Vector2, distance: number): boolean {
+export function mayBeWithinShipHullDistance(ship: HullCollisionSurface, worldPoint: Vector2, distance: number): boolean {
   const bounds = ship.spec.bounds;
   if (!bounds || bounds.length < 3 || !(distance >= 0) || !Number.isFinite(ship.facingRad)) return true;
   let reach = immutableHullReach.get(bounds);

@@ -161,5 +161,5 @@ export const phaseTeleporter = teleportDefinition('PHASE_TELEPORTER', 'phasetele
 export const droneSkimmer: ShipSystemDefinition = {
   ...teleportDefinition('SKIMMER_DRONE', 'skimmer_drone', '闪现（无人机）', 200, 3, .25),
   fluxPerUseFraction: .05,
-  description: '沿速度方向闪现最多200距离；3次储备，每4秒恢复1次，消耗基础容量5%的硬幅能。采用确定性安全落点，不包含原版25距离随机散布。',
+  description: '沿速度方向闪现最多200距离；3次储备，每4秒恢复1次，消耗基础容量5%的硬载荷。采用确定性安全落点，不包含原版25距离随机散布。',
 };

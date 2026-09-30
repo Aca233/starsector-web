@@ -1,0 +1,576 @@
+{
+  "web_zhuyuan_star_needle": {
+    "soundKey": "heavy_blaster_fire",
+    "color": [
+      100,
+      100,
+      255
+    ],
+    "fringeColor": [
+      100,
+      100,
+      255,
+      255
+    ],
+    "coreColor": [
+      255,
+      255,
+      255,
+      255
+    ],
+    "glowColor": [
+      100,
+      100,
+      255,
+      75
+    ],
+    "hitGlowRadius": 75,
+    "glowRadius": 35,
+    "textureScrollSpeed": 64,
+    "pixelsPerTexel": 5,
+    "projSpriteUrl": "/game-assets/graphics/missiles/shell_gauss_cannon.png",
+    "projLength": 45,
+    "projWidth": 7,
+    "muzzleFlashSpec": {
+      "length": 40,
+      "spread": 15,
+      "particleSizeMin": 20,
+      "particleSizeRange": 10,
+      "particleDuration": 0.12,
+      "particleCount": 12,
+      "particleColor": [
+        100,
+        100,
+        255,
+        255
+      ]
+    }
+  },
+  "web_gloriana_macro": {
+    "soundKey": "autocannon_fire_mark9",
+    "color": [
+      235,
+      255,
+      215
+    ],
+    "fringeColor": [
+      235,
+      255,
+      215,
+      235
+    ],
+    "coreColor": [
+      225,
+      255,
+      205,
+      200
+    ],
+    "hitGlowRadius": 50,
+    "textureScrollSpeed": 64,
+    "pixelsPerTexel": 5,
+    "projSpriteUrl": "/game-assets/graphics/missiles/shell_large_green.png",
+    "projLength": 40,
+    "projWidth": 7.5,
+    "muzzleFlashSpec": {
+      "length": 45,
+      "spread": 25,
+      "particleSizeMin": 12,
+      "particleSizeRange": 22,
+      "particleDuration": 0.13,
+      "particleCount": 35,
+      "particleColor": [
+        165,
+        225,
+        185,
+        175
+      ]
+    }
+  },
+  "web_gloriana_lance": {
+    "soundKey": "tachyon_lance_fire",
+    "color": [
+      165,
+      100,
+      255
+    ],
+    "fringeColor": [
+      85,
+      25,
+      215,
+      255
+    ],
+    "coreColor": [
+      255,
+      255,
+      255,
+      255
+    ],
+    "glowColor": [
+      165,
+      100,
+      255,
+      235
+    ],
+    "textureType": "ROUGH",
+    "textureScrollSpeed": 292,
+    "pixelsPerTexel": 5,
+    "beamWidth": 25,
+    "beamVisualMode": "BURST",
+    "hitGlowBrightenDuration": 1,
+    "useGlowColorForHitGlow": false,
+    "fringeScrollSpeedMult": 1,
+    "darkCore": false,
+    "darkFringeIter": 1,
+    "darkCoreIter": 1
+  },
+  "web_gloriana_siege": {
+    "soundKey": "heavy_mauler_fire",
+    "color": [
+      255,
+      200,
+      70
+    ],
+    "fringeColor": [
+      255,
+      200,
+      70,
+      225
+    ],
+    "coreColor": [
+      255,
+      200,
+      200,
+      180
+    ],
+    "hitGlowRadius": 80,
+    "textureScrollSpeed": 64,
+    "pixelsPerTexel": 5,
+    "projSpriteUrl": "/game-assets/graphics/missiles/shell_large_yellow.png",
+    "projLength": 50,
+    "projWidth": 9,
+    "muzzleFlashSpec": {
+      "length": 40,
+      "spread": 5,
+      "particleSizeMin": 12,
+      "particleSizeRange": 14,
+      "particleDuration": 0.5,
+      "particleCount": 12,
+      "particleColor": [
+        255,
+        240,
+        165,
+        200
+      ]
+    }
+  },
+  "web_gloriana_torpedo": {
+    "soundKey": "atropos_fire",
+    "color": [
+      255,
+      200,
+      100
+    ],
+    "projSpriteUrl": "/game-assets/graphics/missiles/torpedo_guided2.png",
+    "projLength": 21,
+    "projWidth": 10,
+    "launcherSmokeSpec": {
+      "particleSizeMin": 12,
+      "particleSizeRange": 12,
+      "cloudParticleCount": 6,
+      "cloudDuration": 1.5,
+      "cloudRadius": 10,
+      "blowbackParticleCount": 4,
+      "blowbackDuration": 2,
+      "blowbackLength": 22,
+      "blowbackSpread": 15,
+      "particleColor": [
+        125,
+        75,
+        25,
+        105
+      ]
+    },
+    "missileEngineVisualSpec": {
+      "nozzleOffset": -10,
+      "width": 10,
+      "length": 30,
+      "color": [
+        255,
+        150,
+        100,
+        255
+      ],
+      "glowSizeMult": 2,
+      "glowAlternateColor": [
+        255,
+        200,
+        0,
+        255
+      ]
+    },
+    "missileExplosionVisualSpec": {
+      "radius": 250,
+      "color": [
+        255,
+        155,
+        100,
+        255
+      ],
+      "useHitGlowWhenDealingDamage": true
+    }
+  },
+  "web_gloriana_bolter": {
+    "soundKey": "vulcan_cannon_fire",
+    "color": [
+      240,
+      220,
+      180
+    ],
+    "fringeColor": [
+      240,
+      220,
+      180,
+      200
+    ],
+    "coreColor": [
+      245,
+      245,
+      225,
+      80
+    ],
+    "hitGlowRadius": 15,
+    "textureScrollSpeed": 64,
+    "pixelsPerTexel": 5,
+    "projSpriteUrl": "/game-assets/graphics/missiles/shell_small_yellow.png",
+    "projLength": 30,
+    "projWidth": 3.5,
+    "muzzleFlashSpec": {
+      "length": 20,
+      "spread": 6,
+      "particleSizeMin": 6,
+      "particleSizeRange": 8,
+      "particleDuration": 0.15,
+      "particleCount": 7,
+      "particleColor": [
+        255,
+        240,
+        165,
+        200
+      ]
+    }
+  },
+  "web_gloriana_interceptor": {
+    "soundKey": "pd_laser_loop",
+    "soundIntroKey": "laser_intro",
+    "soundLoopKey": "pd_laser_loop",
+    "color": [
+      255,
+      100,
+      100
+    ],
+    "fringeColor": [
+      155,
+      0,
+      0,
+      255
+    ],
+    "coreColor": [
+      255,
+      255,
+      255,
+      255
+    ],
+    "glowColor": [
+      255,
+      100,
+      100,
+      255
+    ],
+    "textureType": "ROUGH",
+    "textureScrollSpeed": 64,
+    "pixelsPerTexel": 5,
+    "beamWidth": 12,
+    "beamVisualMode": "SUSTAINED",
+    "hitGlowBrightenDuration": 1,
+    "useGlowColorForHitGlow": false,
+    "fringeScrollSpeedMult": 1,
+    "darkCore": false,
+    "darkFringeIter": 1,
+    "darkCoreIter": 1
+  },
+  "web_sc2_hyperion_ata": {
+    "soundKey": "autopulse_laser_fire",
+    "color": [
+      0,
+      0,
+      255
+    ],
+    "fringeColor": [
+      0,
+      0,
+      255,
+      255
+    ],
+    "coreColor": [
+      255,
+      255,
+      255,
+      200
+    ],
+    "hitGlowRadius": 50,
+    "textureType": "SMOOTH",
+    "textureScrollSpeed": -256,
+    "pixelsPerTexel": 1,
+    "projLength": 50,
+    "projWidth": 20,
+    "muzzleFlashSpec": {
+      "length": 35,
+      "spread": 0,
+      "particleSizeMin": 12,
+      "particleSizeRange": 12,
+      "particleDuration": 0.12,
+      "particleCount": 12,
+      "particleColor": [
+        100,
+        100,
+        255,
+        255
+      ]
+    }
+  },
+  "web_sc2_hyperion_al": {
+    "soundKey": "pulse_laser_fire",
+    "color": [
+      0,
+      200,
+      0
+    ],
+    "fringeColor": [
+      0,
+      200,
+      0,
+      255
+    ],
+    "coreColor": [
+      255,
+      255,
+      255,
+      200
+    ],
+    "textureType": "SMOOTH",
+    "textureScrollSpeed": -256,
+    "pixelsPerTexel": 1,
+    "projLength": 90,
+    "projWidth": 15,
+    "muzzleFlashSpec": {
+      "length": 30,
+      "spread": 5,
+      "particleSizeMin": 15,
+      "particleSizeRange": 20,
+      "particleDuration": 0.12,
+      "particleCount": 10,
+      "particleColor": [
+        100,
+        255,
+        100,
+        255
+      ]
+    }
+  },
+  "web_sc2_hyperion_pd": {
+    "soundKey": "pd_laser_loop",
+    "soundIntroKey": "laser_intro",
+    "soundLoopKey": "pd_laser_loop",
+    "color": [
+      255,
+      100,
+      100
+    ],
+    "fringeColor": [
+      155,
+      0,
+      0,
+      255
+    ],
+    "coreColor": [
+      255,
+      255,
+      255,
+      255
+    ],
+    "glowColor": [
+      255,
+      100,
+      100,
+      255
+    ],
+    "textureType": "ROUGH",
+    "textureScrollSpeed": 64,
+    "pixelsPerTexel": 5,
+    "beamWidth": 12,
+    "beamVisualMode": "SUSTAINED",
+    "hitGlowBrightenDuration": 1,
+    "useGlowColorForHitGlow": false,
+    "fringeScrollSpeedMult": 1,
+    "darkCore": false,
+    "darkFringeIter": 1,
+    "darkCoreIter": 1
+  },
+  "web_gloriana_fury_laser": {
+    "soundKey": "light_machinegun_fire",
+    "color": [
+      240,
+      220,
+      220
+    ],
+    "fringeColor": [
+      240,
+      220,
+      220,
+      200
+    ],
+    "coreColor": [
+      245,
+      245,
+      245,
+      80
+    ],
+    "hitGlowRadius": 15,
+    "textureScrollSpeed": 64,
+    "pixelsPerTexel": 5,
+    "projSpriteUrl": "/game-assets/graphics/missiles/shell_small_yellow.png",
+    "projLength": 35,
+    "projWidth": 3.5,
+    "muzzleFlashSpec": {
+      "length": 20,
+      "spread": 6,
+      "particleSizeMin": 6,
+      "particleSizeRange": 8,
+      "particleDuration": 0.15,
+      "particleCount": 7,
+      "particleColor": [
+        255,
+        240,
+        165,
+        200
+      ]
+    }
+  },
+  "web_gloriana_thunderhawk_cannon": {
+    "soundKey": "light_autocannon_fire",
+    "color": [
+      235,
+      255,
+      215
+    ],
+    "fringeColor": [
+      235,
+      255,
+      215,
+      235
+    ],
+    "coreColor": [
+      225,
+      255,
+      200,
+      200
+    ],
+    "hitGlowRadius": 24,
+    "textureScrollSpeed": 64,
+    "pixelsPerTexel": 5,
+    "projSpriteUrl": "/game-assets/graphics/missiles/shell_large_green.png",
+    "projLength": 20,
+    "projWidth": 5.5,
+    "muzzleFlashSpec": {
+      "length": 10,
+      "spread": 28,
+      "particleSizeMin": 12,
+      "particleSizeRange": 14,
+      "particleDuration": 0.2,
+      "particleCount": 18,
+      "particleColor": [
+        165,
+        225,
+        185,
+        175
+      ]
+    }
+  },
+  "web_gloriana_starhawk_torpedo": {
+    "soundKey": "atropos_fire",
+    "color": [
+      255,
+      200,
+      100
+    ],
+    "projSpriteUrl": "/game-assets/graphics/missiles/torpedo_guided2.png",
+    "projLength": 21,
+    "projWidth": 10,
+    "launcherSmokeSpec": {
+      "particleSizeMin": 12,
+      "particleSizeRange": 12,
+      "cloudParticleCount": 6,
+      "cloudDuration": 1.5,
+      "cloudRadius": 10,
+      "blowbackParticleCount": 4,
+      "blowbackDuration": 2,
+      "blowbackLength": 22,
+      "blowbackSpread": 15,
+      "particleColor": [
+        125,
+        75,
+        25,
+        105
+      ]
+    },
+    "missileEngineVisualSpec": {
+      "nozzleOffset": -10,
+      "width": 10,
+      "length": 30,
+      "color": [
+        255,
+        150,
+        100,
+        255
+      ],
+      "glowSizeMult": 2,
+      "glowAlternateColor": [
+        255,
+        200,
+        0,
+        255
+      ]
+    },
+    "missileExplosionVisualSpec": {
+      "radius": 250,
+      "color": [
+        255,
+        155,
+        100,
+        255
+      ],
+      "useHitGlowWhenDealingDamage": true
+    }
+  },
+  "web_sc2_hyperion_yamato_shot": {
+    "soundKey": "plasma_cannon_fire",
+    "color": [
+      0,
+      0,
+      255
+    ],
+    "fringeColor": [
+      0,
+      0,
+      255,
+      255
+    ],
+    "coreColor": [
+      255,
+      100,
+      100,
+      255
+    ],
+    "projWidth": 45
+  }
+}

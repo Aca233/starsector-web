@@ -1,0 +1,307 @@
+/* Out-of-combat counterpart to the compact, transparent combat HUD.
+ * Page geometry only. Shared controls and dialogs use core/theme.css everywhere.
+ * Uiverse-adapted outline, underline and glass treatments; attribution and MIT
+ * license: public/licenses/uiverse-ui.txt. Layout dimensions remain unchanged. */
+:is(.native-refit-app, .captain-skills-screen, .fleet-home) {
+  --ui-accent: var(--ds-menu-accent);
+  --ui-highlight: var(--ds-menu-highlight);
+  --ui-success: var(--ds-menu-success);
+  --ui-warning: var(--ds-menu-warning);
+  --ui-danger: var(--ds-menu-danger);
+  --ui-border: var(--ds-menu-border);
+  --ui-divider: var(--ds-menu-divider);
+  --ui-text: var(--ds-menu-text);
+  --ui-muted: var(--ds-menu-muted);
+  --ui-dim: var(--ds-menu-dim);
+  --native-button-text: var(--ds-menu-button-text);
+  color: var(--ui-text);
+  font-family: var(--ui-font);
+}
+:is(.native-refit-app, .captain-skills-screen) {
+  background-image: linear-gradient(100deg, #080f18ed, #080f18c7), url('/game-assets/graphics/original-ui/observatory.png') !important;
+}
+:is(.native-refit-app, .captain-skills-screen, .fleet-home) .native-frame.native-chrome[data-native-surface] {
+  background: transparent; border: 0; border-radius: 0; outline: 0; box-shadow: none;
+}
+:is(.native-refit-app, .captain-skills-screen, .fleet-home) .native-chrome::before,
+:is(.native-refit-app, .captain-skills-screen, .fleet-home) .native-chrome-border::before { display: none; }
+:is(.native-refit-app, .captain-skills-screen, .fleet-home) .native-bitmap-text,
+:is(.native-refit-app, .captain-skills-screen, .fleet-home) .native-bitmap-text .native-bitmap-fallback { font: inherit; }
+:is(.native-refit-app, .captain-skills-screen, .fleet-home) .native-action {
+  min-height: 28px; padding: 4px 9px; border: 1px solid var(--ds-control-border); border-radius: var(--ds-radius-control);
+  background: var(--ds-control-sheen); box-shadow: none; font-size: var(--ds-type-caption); color: var(--ui-text);
+  translate: none;
+  transition: background-color var(--ds-motion-feedback) var(--ds-motion-ease), border-color var(--ds-motion-feedback) var(--ds-motion-ease), color var(--ds-motion-feedback) var(--ds-motion-ease), box-shadow var(--ds-motion-feedback) var(--ds-motion-ease);
+}
+:is(.native-refit-app, .captain-skills-screen, .fleet-home) .native-action:hover:not(:disabled) {
+  background-color: var(--ds-control-hover); border-color: var(--ds-control-highlight); box-shadow: none;
+}
+:is(.native-refit-app, .captain-skills-screen, .fleet-home) .native-action:active:not(:disabled) {
+  background-color: var(--ds-control-pressed); translate: none; box-shadow: none;
+}
+:is(.native-refit-app, .captain-skills-screen) .native-action[aria-pressed="true"] {
+  color: var(--ds-control-focus); background-color: var(--ds-control-selected); border-color: var(--ds-control-highlight); box-shadow: inset 0 -2px var(--ds-menu-accent);
+}
+:is(.native-refit-app, .captain-skills-screen, .fleet-home) :focus-visible { outline: var(--ds-focus-width) solid var(--ds-control-focus); outline-offset: var(--ds-focus-offset); }
+:is(.native-refit-app, .captain-skills-screen) .native-shortcut { color: #acb5ad !important; font-size: 10px; }
+:is(.native-refit-app, .captain-skills-screen) .native-green { color: #89b8a8 !important; }
+:is(.native-refit-app, .captain-skills-screen) :is(input:not([type="range"]):not([type="checkbox"]), select, textarea) {
+  background-color: #101c2640; border-color: var(--ui-border); border-radius: 2px; color: #d7e1e5; font-size: 12px; color-scheme: dark;
+}
+:is(.native-refit-app, .captain-skills-screen) select option { background: #121d27; color: #d7e1e5; }
+
+/* Refit: narrow rails; the ship remains the visual centre, not the controls. */
+.native-refit-app:not(.lan-entry-page) { --u: 1px; font-size: 13px; }
+.native-refit-app .native-screen-tab {
+  left: 18px; top: 10px; height: 26px; min-width: 0; padding: 3px 0;
+  border: 0; border-radius: 0; clip-path: none; background: transparent; color: #d7e1e5 !important; letter-spacing: 0; font-size: 14px;
+}
+.native-refit-app .native-screen-close { top: 9px; right: 14px; width: 28px; height: 28px; background: transparent; color: #acbec7; }
+.native-refit-app .refit-skills-entry { top: 9px; right: 52px; height: 28px; }
+.native-refit-app .refit-skills-entry .native-button { font-size: 12px; border-color: transparent; }
+.native-refit-app .refit-shell { inset: 46px 18px 14px; padding: 0; gap: 18px; }
+.native-refit-app .refit-roster.refit-roster-filtered { flex-basis: 220px; background: transparent; border-color: var(--ui-divider); padding-right: 12px; }
+.native-refit-app .refit-roster-filters { background: transparent; gap: 7px; padding-top: 0; padding-right: 0; border-color: var(--ui-divider); }
+.native-refit-app .refit-filter-heading { font-size: 12px; }
+.native-refit-app .refit-filter-heading > span { color: var(--ui-dim); font-size: 10px; }
+.native-refit-app .refit-search-field input[type="search"] { height: 31px; padding-block: 5px; font-size: 12px; }
+/* Retain native input/clear handlers and dimensions. The focus underline is
+ * decorative, never the sole keyboard-focus indication. */
+.native-refit-app .refit-search-field input[type="search"] {
+  background: transparent; border-color: transparent; border-bottom-color: var(--ds-control-border); border-radius: 0;
+  transition: background-color var(--ds-motion-feedback) var(--ds-motion-ease), border-color var(--ds-motion-feedback) var(--ds-motion-ease);
+}
+.native-refit-app .refit-search-field input[type="search"]:hover:not(:disabled) { background-color: var(--ds-surface-hover); }
+.native-refit-app .refit-search-field input[type="search"]:focus-visible { outline: var(--ds-focus-width) solid var(--ds-control-focus); outline-offset: var(--ds-focus-offset); }
+.native-refit-app .refit-search-field::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; pointer-events: none;
+  background: var(--ds-control-focus); transform: scaleX(0); transform-origin: left;
+  transition: transform var(--ds-motion-feedback) var(--ds-motion-ease);
+}
+.native-refit-app .refit-search-field:focus-within::after { transform: scaleX(1); }
+.native-refit-app .refit-faction-filter select { min-height: 29px; padding-block: 4px; }
+.native-refit-app :is(.refit-class-chips, .refit-assembly-chips) .native-button { padding-inline: 2px; min-height: 28px; font-size: 11px; }
+.native-refit-app .refit-roster-results { scrollbar-color: #8ca7b14d transparent; }
+.native-refit-app .refit-roster-filtered .refit-roster-ship { height: 84px; min-height: 84px; background: transparent; border-color: var(--ui-divider); text-shadow: none; }
+.native-refit-app .refit-roster-ship::before, .native-refit-app .refit-roster-ship::after { display: none; }
+.native-refit-app .refit-roster-ship.is-current { background: linear-gradient(90deg, var(--ds-control-selected), transparent); box-shadow: inset 2px 0 var(--ds-menu-accent); }
+.native-refit-app .refit-roster-ship:hover:not(.is-current):not(:disabled) { background: var(--ds-control-hover); }
+.native-refit-app .refit-roster-filtered .refit-roster-ship > span { top: 16px; bottom: auto; left: 10px; right: 68px; }
+.native-refit-app .refit-roster-filtered .refit-roster-ship strong { font-size: 12px; }
+.native-refit-app .refit-roster-filtered .refit-roster-ship small { font-size: 10px; color: var(--ui-dim); }
+.native-refit-app .refit-roster-filtered .refit-roster-ship > .refit-roster-thumbnail { width: 58px; height: 66px; top: 8px; right: 6px; }
+.native-refit-app .refit-grid {
+  background-color: transparent; background-image: linear-gradient(#9eb9c008 1px, transparent 1px), linear-gradient(90deg, #9eb9c008 1px, transparent 1px);
+  background-size: 40px 40px; border-radius: 0;
+}
+.native-refit-app .refit-stats { width: 276px; top: 0; right: 0; bottom: 150px; background: transparent; border: 0; border-left: 1px solid var(--ui-divider); border-radius: 0; padding-left: 14px; }
+.native-refit-app .refit-cr { top: 5px; left: 2px; width: 205px; gap: 8px; }
+.native-refit-app .native-cr-meter { width: 156px; height: 4px; padding: 0; border: 0; background: #b4cad020; border-radius: 0; box-shadow: none; margin-top: 5px; }
+.native-refit-app .native-cr-meter > i { background: #91b6b8; box-shadow: none; }
+.native-refit-app .refit-cr > label { top: 17px; font-size: 11px; color: var(--ui-dim); }
+.native-refit-app .native-op-bar { height: 28px; background: transparent; border: 0; border-bottom: 2px solid #adc8cd26; border-radius: 0; box-shadow: none; }
+.native-refit-app .native-op-bar i { top: auto; bottom: 0; left: 0; height: 2px; background: #86abae; box-shadow: none; }
+.native-refit-app .native-op-bar strong { font-size: 13px; font-weight: 500; color: #d9dfdb; text-shadow: none; }
+.native-refit-app .native-op-bar.over-budget strong { color: #ed998f; }
+.native-refit-app .native-op-bar.over-budget i { background: #ed998f; }
+.native-refit-app .native-help-button { top: 2px; width: 22px; height: 22px; font-size: 17px !important; color: var(--ui-dim); }
+.native-refit-app .native-help-button::after { border: 0; }
+.native-refit-app .native-stat-three { margin-block: 9px; }
+.native-refit-app :is(.native-stat-three, .native-flux-row) b { font-size: 14px; font-weight: 500; color: #d3deda; }
+.native-refit-app :is(.native-stat-three, .native-flux-row, .refit-weapon-flux) small { font-size: 10px; color: #93a8b1; line-height: 1.6; }
+.native-refit-app .native-flux-row { grid-template-columns: 1fr 22px 26px 22px 70px; gap: 3px; margin-top: 8px; }
+.native-refit-app .native-flux-row > label { font-size: 12px; color: #bccdd3; }
+.native-refit-app .native-flux-row input { font-size: 13px; color: #d6bf91; }
+.native-refit-app .native-step { width: 22px; height: 24px; clip-path: none; border: 1px solid var(--ui-border); border-radius: 2px; background: transparent; font-size: 16px !important; color: #b9ced5; }
+.native-refit-app .native-step:hover:not(:disabled) { background: #bfd5dc12; }
+.native-refit-app .native-step:disabled { opacity: .35; }
+.native-refit-app .refit-weapon-flux b { font-size: 13px; font-weight: 500; color: #d6bf91; }
+.native-refit-app .refit-hullmods { margin-top: 16px; padding-left: 0; }
+.native-refit-app .refit-hullmods h2 { font-size: 12px; color: #9db2bc; padding-bottom: 8px; border-bottom: 1px solid var(--ui-divider); }
+.native-refit-app .refit-mod-row { height: 30px; font-size: 12px; gap: 5px; text-shadow: none; }
+.native-refit-app .refit-mod-row > img { width: 22px; height: 22px; border-radius: 0; opacity: .75; }
+.native-refit-app .refit-mod-row > b { font-size: 12px; }
+.native-refit-app .refit-hullmods > .native-button { font-size: 12px; }
+.native-refit-app :is(.refit-system-readiness, .refit-missing-mods) { background: transparent; border: 0; border-bottom: 1px solid var(--ui-divider); padding: 5px 0; font-size: 11px; }
+.native-refit-app .refit-bottom { left: 2px; right: 2px; bottom: 0; }
+.native-refit-app .refit-role { font-size: 12px; height: 21px; margin-bottom: 3px; }
+.native-refit-app .refit-role > span { width: auto; height: auto; line-height: 1.5; border: 0; background: transparent; padding-right: 10px; border-right: 1px solid var(--ui-border); }
+.native-refit-app .refit-name { font-size: 13px; height: 28px; }
+.native-refit-app .refit-name small { font-size: 11px; color: var(--ui-dim); }
+.native-refit-app .refit-actions { grid-template-columns: repeat(3, 148px); grid-template-rows: repeat(3, 28px); gap: 4px; }
+.native-refit-app .refit-actions .native-button { font-size: 12px; }
+.native-refit-app .refit-warning { background: #211c13cf; border: 0; border-left: 2px solid #dbb77d; }
+
+/* Skills: named compact choices rather than an icon wall. */
+main.captain-skills-screen { --cs: 1px; padding: 18px 28px; gap: 16px; overflow-y: auto; font-size: 13px; }
+.captain-skills-screen > .captain-page-title { width: min(1240px, 100%); margin: 0 auto; color: #d7e1e5; font-size: 14px; font-weight: 500; }
+.captain-skills-screen .captain-character-sheet { width: min(1240px, 100%); margin: 0 auto auto; padding: 0; flex: none; min-height: 0; background: transparent !important; }
+.captain-skills-screen .captain-sheet-top { grid-template-columns: 232px minmax(0, 1fr); flex: none; height: 290px; min-height: 0; border-color: var(--ui-divider); }
+.captain-skills-screen .captain-character { background: transparent; padding: 4px 22px 18px 0; border-color: var(--ui-divider); }
+.captain-skills-screen .captain-name-button { text-align: left; font-size: 19px !important; margin-bottom: 16px; color: #d6e1e5; }
+.captain-skills-screen .captain-portrait-button { width: 80px; height: 80px; }
+.captain-skills-screen .captain-points { padding-right: 8px; }
+.captain-skills-screen .captain-points dt { font-size: 11px; color: #9caeb7; }
+.captain-skills-screen .captain-points dd { font-size: 18px; }
+.captain-skills-screen .captain-yellow, .captain-skills-screen .captain-loadout-count b { color: #d6bf91; }
+.captain-skills-screen .captain-progress { height: 3px; border: 0; border-radius: 0; background: #b5c9cf1a; margin-top: 17px; }
+.captain-skills-screen .captain-progress i { background: #86abae; }
+.captain-skills-screen .captain-loadout-count { padding: 6px 0 0; font-size: 11px; }
+.captain-skills-screen .captain-current-design { color: #8d9fa9; }
+.captain-skills-screen .captain-character-actions { gap: 5px; padding-top: 12px; }
+.captain-skills-screen .captain-skill-detail { background: transparent; padding: 4px 0 16px 26px; gap: 10px; }
+.captain-skills-screen .captain-detail-title h2 { color: #d6e1e5; font-size: 19px; }
+.captain-skills-screen .captain-effects { color: #d0c7a5; line-height: 1.8; font-size: 13px; }
+.captain-skills-screen .captain-effects h3 { color: #91b6a4; }
+.captain-skills-screen .captain-native-requirement { color: #a9997e; font-size: 11px; line-height: 1.6; }
+.captain-skills-screen .captain-lore { color: #8fa3ad; font-size: 11px; }
+.captain-lore summary { cursor: pointer; padding: 5px 0; }
+.captain-skills-screen .captain-lore blockquote { font-size: 12px; font-style: normal; line-height: 1.7; color: #a4b3ba; padding: 8px 0; }
+.captain-skills-screen .captain-aptitude-tree { flex: none; grid-template-rows: repeat(4, 80px); padding: 12px 0 0; gap: 0; }
+.captain-skills-screen .captain-aptitude-row { background: transparent; border-bottom: 1px solid var(--ui-divider); gap: 18px; padding: 9px 0; }
+.captain-skills-screen .captain-aptitude-label { flex: 0 0 44px; height: auto; }
+.captain-skills-screen .captain-aptitude-label img, .captain-skills-screen .captain-aptitude-arrow { display: none; }
+.captain-skills-screen .captain-aptitude-label h3 { font-size: 12px; text-align: left; color: color-mix(in srgb, var(--aptitude-color) 40%, #b5c5cb); }
+.captain-skills-screen .captain-aptitude-icons { gap: 4px; overflow-x: auto; scrollbar-width: thin; scrollbar-color: #8ca7b14d transparent; }
+.captain-skills-screen .captain-aptitude-tree .captain-skill-icon { flex: 1 0 78px; max-width: 109px; height: 58px; max-height: none; aspect-ratio: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 4px; border: 0; border-bottom: 1px solid transparent; border-radius: 0; background: transparent; box-shadow: none; color: #aabcc4; }
+.captain-skills-screen .captain-skill-icon > img { width: 28px; height: 28px; opacity: .65; }
+.captain-skills-screen .captain-skill-name { font-size: 11px; line-height: 1.3; white-space: nowrap; }
+.captain-skills-screen .captain-skill-icon.is-unimplemented > img { opacity: .3; }
+.captain-skills-screen .captain-skill-icon.is-unimplemented .captain-skill-name { color: #71858f; }
+.captain-skills-screen .captain-skill-icon.is-configured { border-bottom-color: #89b8a8; }
+.captain-skills-screen .captain-skill-icon.is-configured > img { opacity: 1; }
+.captain-skills-screen .captain-skill-icon:is(:hover, [aria-pressed="true"], :focus-visible) { background: #b8cdd10b; border-bottom-color: #d6bf91; box-shadow: none; color: #e0e8e9; }
+.captain-skills-screen .captain-skill-icon img.captain-elite-overlay { display: none; }
+.captain-skills-screen .captain-configured-badge { top: 4px; bottom: auto; right: 7px; font-size: 11px; color: #d6bf91; }
+.captain-skills-screen .captain-web-tools { width: min(1240px, 100%); margin: 0 auto; padding: 10px 0 0; background: transparent; border-top: 1px solid var(--ui-divider); }
+.captain-skills-screen .captain-web-status { color: #8799a2; padding-top: 7px; }
+
+/* Entry and room chrome share the same transparent surface. */
+.native-refit-app.lan-entry-page { --u: 1px; --lan-title-top: 10px; --lan-title-height: 26px; }
+.lan-entry-page .lan-entry-shell { width: min(840px, 100%); padding: 20px 0; font-size: 13px; }
+.lan-entry-page .lan-entry-heading h2 { font-size: 20px; font-weight: 500; color: #d7e1e5; }
+.lan-entry-page .lan-entry-shell .lan-workflow { margin: 18px 0 24px; font-size: 11px; color: #879aa5; }
+.lan-entry-page .lan-entry-options { gap: 36px; }
+.lan-entry-page .lan-entry-option { min-height: 205px; padding: 0; border: 0; border-top: 1px solid var(--ui-divider); padding-top: 16px; background: transparent; }
+.lan-entry-page .lan-entry-option h2 { font-size: 14px; }
+.lan-entry-page .lan-entry-option .native-button { width: auto; align-self: flex-start; min-width: 132px; min-height: 32px; }
+.lan-entry-page .lan-entry-option small { color: #8e9fa9; font-size: 11px; }
+.lan-entry-page .lan-entry-footer { gap: 6px 12px; margin-top: 26px; }
+.lan-entry-page .lan-entry-footer .native-button { border-color: transparent; padding-inline: 0; }
+.native-refit-app :is(.lan-team, .lan-team-heading, .lan-member, .lan-ship-choice, .lan-room-progress, .lan-editor-footer) { background: transparent; border-color: var(--ui-divider); box-shadow: none; border-radius: 0; }
+.native-refit-app :is(.lan-member-ship, .lan-hull-thumbnail) { background: transparent; border: 0; }
+.native-refit-app .lan-team-member[data-local="true"] { background: #aecacf08; box-shadow: inset 2px 0 #a5bec5; }
+.native-refit-app.lan-room-workbench .refit-shell { bottom: var(--lan-room-footer-space); }
+.native-refit-app .lan-editor-footer { background: #0a131dd9; border: 0; border-top: 1px solid var(--ui-divider); }
+
+/* Homepage: retain the existing generated vista, remove the solid launch slab. */
+main.fleet-home { --fleet-paper: var(--ui-text); --fleet-accent: var(--ui-accent); --fleet-line: var(--ui-divider); }
+main.fleet-home .fleet-masthead { min-height: 76px; }
+main.fleet-home #command-title { font-size: clamp(34px, 3.5vw, 54px); margin-bottom: 28px; font-weight: 500; }
+main.fleet-home .fleet-home-command { width: min(340px, 100%); }
+main.fleet-home .fleet-launch { min-height: 56px; margin: 0; padding: 13px 14px; background: transparent; color: #dce8e8; border: 0; border-left: 2px solid #afc8c7; border-bottom: 1px solid var(--fleet-line); box-shadow: none; }
+main.fleet-home .fleet-launch:hover { background-color: var(--ds-control-hover); box-shadow: none; }
+main.fleet-home .fleet-launch-copy > strong { font-size: 16px; font-weight: 500; letter-spacing: .06em; }
+main.fleet-home .fleet-menu-item { min-height: 50px; gap: 14px; }
+main.fleet-home .fleet-menu-item:hover { background: var(--ds-control-hover); }
+main.fleet-home :is(.fleet-launch, .fleet-menu-item) { translate: none; transition: background-color var(--ds-motion-feedback) var(--ds-motion-ease), color var(--ds-motion-feedback) var(--ds-motion-ease); }
+main.fleet-home :is(.fleet-launch, .fleet-menu-item):active { background-color: var(--ds-control-pressed); }
+main.fleet-home .fleet-item-label { font-size: 13px; }
+main.fleet-home .fleet-item-number { display: none; }
+main.fleet-home .fleet-menu-item { padding-left: 16px; }
+main.fleet-home .fleet-home-footer { min-height: 80px; padding-block: 14px; }
+main.fleet-home .fleet-catalog-summary strong { font-size: 23px; color: #c0cfce; }
+
+/* Picker and tooltip adaptations apply equally inside and outside combat. */
+:root .ui-modal .refit-search-field input[type="search"] { background: transparent; border-color: transparent; border-bottom-color: var(--ds-control-border); border-radius: 0; transition: background-color var(--ds-motion-feedback) var(--ds-motion-ease); }
+:root .ui-modal .refit-search-field input[type="search"]:hover:not(:disabled) { background-color: var(--ds-surface-hover); }
+:root .ui-modal .refit-search-field input[type="search"]:focus-visible { outline: var(--ds-focus-width) solid var(--ds-control-focus); outline-offset: var(--ds-focus-offset); }
+:root .ui-modal .refit-search-field::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; pointer-events: none; background: var(--ds-control-focus); transform: scaleX(0); transform-origin: left; transition: transform var(--ds-motion-feedback) var(--ds-motion-ease); }
+:root .ui-modal .refit-search-field:focus-within::after { transform: scaleX(1); }
+:root .source-weapon-row { background: transparent; border-bottom: 1px solid #b7cbd018; }
+:root .source-weapon-row:is([data-preview="true"], :hover, :focus-visible):not([aria-disabled="true"]) { background: var(--ds-control-selected); }
+:root .source-equipped-weapon { background: #b7cbd00a; }
+:root .source-weapon-icon, .source-weapon-icon > span { background: transparent; border-width: 1px; border-color: #adc5cf45; }
+:root .source-weapon-details.native-chrome { background: var(--ds-surface-tooltip); border: 1px solid #b7cbd038; border-radius: 2px; box-shadow: none; font-size: 13px; }
+:root .source-weapon-details.native-chrome::before { display: none; }
+:root .source-weapon-detail-stat dd, .source-damage-effect { color: #d1c298; }
+:root .source-weapon-codex, .source-weapon-search-toggle { background: transparent; }
+:root .source-weapon-details .native-bitmap-fallback { font: inherit; }
+:root .source-weapon-row { min-height: 68px; height: 68px; font-size: 12px; line-height: 14px; }
+:root .source-weapon-icon { width: 54px; height: 54px; padding: 4px; }
+:root .source-weapon-row-info { font-size: 12px; line-height: 14px; }
+:root .source-weapon-row-info strong { font-size: 13px; line-height: 16px; }
+:root .source-weapon-row-info > span { color: #aebfc7; font-size: 12px; line-height: 14px; }
+:root .source-weapon-row-info .source-weapon-stock { margin-top: 1px; }
+:root .source-weapon-row[aria-disabled="true"] :is(.source-weapon-stock, .source-weapon-op b) { color: #dba285; }
+:root .source-weapon-row-info :is(.source-weapon-stock, b), .source-weapon-op b { color: #d1c298; font-weight: 500; }
+:root .source-weapon-op b { font-size: 17px; }
+:root .source-weapon-row-info small { font-size: 10px; }
+:root .source-fit-title { color: #b9cdd4; background: transparent; border-bottom: 1px solid #b7cbd024; }
+:root .source-fit-select { font-size: 13px; }
+:root .source-fit-select:is(:hover, [aria-pressed="true"]) { background: #b7cbd00c; }
+:root .source-fit-option input { appearance: auto; accent-color: #91b1b3; background: transparent; box-shadow: none; border: 0; }
+:root .system-loadout-modal { font-size: 13px; }
+:root .system-loadout-modal :is(.system-equipped-list li, .system-library-item, .system-binding-slot, .system-search, .system-slot-actions button) { background: transparent; border-color: #b7cbd024; }
+:root .system-loadout-modal :is(.system-equipped-list li.is-selected, .system-library-item[aria-pressed="true"], .system-library-item:hover) { background: #b7cbd00c; }
+:root .system-loadout-modal :is(.system-slot-select strong, .system-library-item strong, .system-detail-description) { font-size: 13px; line-height: 1.6; color: #cad9df; }
+:root .system-loadout-modal :is(.system-detail h3, .system-detail-stats dd, .system-pane-heading > span, .system-slot-select kbd) { color: #d1c298; }
+:root .system-loadout-modal .system-detail-state.is-installed { color: #89b8a8; }
+:root .dwell-popover.native-dwell.native-frame[data-native-surface], .equipment-tooltip { background: var(--ds-surface-tooltip); border: 1px solid var(--ds-control-border); border-radius: var(--ds-radius-overlay); color: #cbd7dd; font-size: var(--ds-type-body); line-height: var(--ds-line-body); box-shadow: var(--ds-shadow-floating); }
+:root .native-dwell::before, .native-dwell .native-chrome-border { display: none; }
+:root .native-dwell .native-dwell-content h4 { background: transparent; border-bottom: 1px solid #b7cbd024; font-size: 13px; }
+:root .native-dwell .native-dwell-content h3 { color: #bccfd5; font-size: 14px; }
+
+@media (max-width: 1100px) and (min-width: 850px) {
+  .native-refit-app .refit-roster.refit-roster-filtered { flex-basis: 192px; padding-right: 8px; }
+  .native-refit-app .refit-shell { gap: 12px; inset-inline: 12px; }
+  .native-refit-app .refit-stats { width: 260px; padding-left: 10px; }
+  .native-refit-app .refit-actions { grid-template-columns: repeat(3, 132px); }
+}
+@media (max-width: 849px) {
+  .native-refit-app .refit-shell { inset: 44px 8px 8px; gap: 8px; }
+  .native-refit-app .refit-roster.refit-roster-filtered { flex-basis: 170px; }
+  .native-refit-app .refit-actions { grid-template-columns: repeat(3, 132px); }
+  main.captain-skills-screen { padding: 14px; }
+  .captain-skills-screen .captain-sheet-top { grid-template-columns: 202px minmax(0, 1fr); }
+  .captain-skills-screen .captain-character { padding-right: 15px; }
+  .captain-skills-screen .captain-skill-detail { padding-left: 18px; }
+  .captain-skills-screen .captain-aptitude-row { gap: 8px; }
+  .captain-skills-screen .captain-web-tools { position: static; }
+}
+@media (max-width: 500px) {
+  .captain-skills-screen .captain-sheet-top { display: flex; flex-direction: column; height: auto; }
+  .captain-skills-screen .captain-character { display: flex; padding: 0 0 16px; border: 0; border-bottom: 1px solid var(--ui-divider); }
+  .captain-skills-screen .captain-character-body { justify-content: flex-start; gap: 28px; }
+  .captain-skills-screen .captain-points { display: flex; gap: 25px; }
+  .captain-skills-screen .captain-character-actions { grid-template-columns: 1fr 1fr; margin-top: 0; }
+  .captain-skills-screen .captain-skill-detail { padding: 18px 0; height: 270px; }
+  .captain-skills-screen .captain-aptitude-tree { grid-template-rows: repeat(4, 78px); }
+  .lan-entry-page .lan-entry-shell { padding: 10px; }
+  .lan-entry-page .lan-entry-options { gap: 20px; }
+  .lan-entry-page .lan-entry-option { min-height: 0; }
+  main.fleet-home .fleet-home-footer { gap: 14px; }
+}
+
+/* Compact controls must still fit their complete functional labels. */
+.native-refit-app .refit-mod-row > :is(button, b, img) { flex-shrink: 0; }
+.native-refit-app .refit-mod-row .refit-smod-toggle { width: 47px; padding: 2px; font-size: 10px !important; white-space: nowrap; }
+.captain-skills-screen button:focus-visible { outline: var(--ds-focus-width) solid var(--ds-control-focus); outline-offset: 2px; }
+.native-refit-app .source-mod-picker { right: 302px; color: #bdcfd6; font-size: 12px; }
+.native-refit-app .source-mod-heading button { background: transparent; border: 0; border-bottom: 1px solid var(--ui-border); }
+.native-refit-app .source-mod-scroll { border: 0; scrollbar-color: #8ca7b14d transparent; }
+.native-refit-app .source-mod-scroll > .source-mod-row { border-bottom: 1px solid var(--ui-divider); }
+.native-refit-app .source-mod-scroll > .source-mod-row.is-installed { background: #b7cbd008; }
+.native-refit-app .source-mod-row.is-installed .source-mod-select { color: #d1c298; }
+.native-refit-app .source-mod-scroll > .source-mod-row[data-unavailable="true"] { background: #9bb4bf0a; }
+.native-refit-app .source-mod-scroll .source-mod-row .source-mod-cost { color: #cca885; }
+.native-refit-app .source-mod-select img { width: 24px; height: 24px; }
+.native-refit-app .source-mod-check { color: #89b8a8; font-size: 18px; }
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.native-refit-app, .captain-skills-screen, .fleet-home) :is(.native-action, .fleet-launch, .fleet-menu-item, .refit-search-field input[type="search"]),
+  .native-refit-app .refit-search-field::after { transition: none; }
+  .ui-modal .native-action { transition: none; }
+  .ui-modal .refit-search-field input[type="search"],
+  .ui-modal .refit-search-field::after { transition: none; }
+}

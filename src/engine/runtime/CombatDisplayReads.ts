@@ -12,17 +12,17 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 export type WeaponDisplayState = Pick<WeaponMount,
  'slotId'|'spec'|'relativePos'|'mountType'|'arcDeg'|'baseAngleDeg'|'currentAngleRad'|'currentSpreadDeg'|'glowAlpha'|'recoil'
  |'ammo'|'barrelIndex'|'burstRemaining'|'cooldownTimer'|'firingState'|'isDisabled'|'isPermanentlyDisabled'|'reloadDelayRemaining'|'disabledTimer'
- |'isAutofire'|'triggerHeld'|'ammoRechargeProgress'|'health'|'maxHealth'|'disabledDuration'|'burstTimer'|'firingStateTimer'|'firingCycleId'>;
+ |'isAutofire'|'triggerHeld'|'ammoRechargeProgress'|'health'|'maxHealth'|'disabledDuration'|'burstTimer'|'firingStateTimer'|'firingCycleId'|'gravityTractor'|'gravityDeflection'>;
 export type SystemDisplayReads = Mutable<HudSystem & RenderSystem> & Pick<ShipSystem,
  'forcesAutofire'|'blocksWeapons'|'forcesForward'|'locksTurning'|'forcesBraking'|'blocksAcceleration'|'blocksStrafing'|'isPhased'
  |'getWeaponFluxCostMultiplier'|'getWeaponRateOfFireMultiplier'|'canFireWeapon'>;
-export interface CombatDisplayShip extends Mutable<Omit<ShipRenderState,'shield'|'flux'|'armor'|'system'|'allSystems'|'sourceCarrier'|'weapons'|'engineController'>>,
+export interface CombatDisplayShip extends Mutable<Omit<ShipRenderState,'shield'|'flux'|'armor'|'system'|'allSystems'|'sourceCarrier'|'weapons'|'engineController'|'maxHullHp'>>,
  Pick<Ship,'shipName'|'isPlayer'|'currentCR'|'maxHullHp'|'retreating'|'sightRadius'|'fireControlMode'|'isFiringMain'
  |'throttle'|'brakeInput'|'strafeInput'|'turnInput'|'peakPerformanceRemaining'|'combatWeaponRepairTimeMultiplier'|'fighterRecall'
  |'teleportCameraOffset'|'teleportSequence'|'subjectiveTimeMultiplier'|'aimTargetWorld'|'flightDeckWingId'|'defenseFacingRad'|'aiHoldOffensiveFire'
  |'isPhased'|'isSystemDrone'|'hasVastBulk'|'getMotionStats'|'getFlameoutRatio'|'clearInput'> {
- shield: Mutable<ShipRenderState['shield']> & Pick<Ship['shield'],'isActive'|'isRaiseRequested'|'getPhaseSpeedMultiplier'>;
- flux: Mutable<ShipRenderState['flux']> & Pick<Ship['flux'],'totalFlux'|'softFlux'|'getTimeToVent'>;
+ shield: Mutable<ShipRenderState['shield']> & Pick<Ship['shield'],'isActive'|'isRaiseRequested'|'getPhaseSpeedMultiplier'|'voidShield'>;
+ flux: Mutable<ShipRenderState['flux']> & Pick<Ship['flux'],'totalFlux'|'softFlux'|'getTimeToVent'|'isEngineBoostActive'>;
  armor: ArmorReadSource;
  system:SystemDisplayReads; systems:SystemDisplayReads[]; allSystems:SystemDisplayReads[]; defenseSystem:SystemDisplayReads|undefined;
  weapons:WeaponDisplayState[];

@@ -1,3 +1,4 @@
+// ShipDisplayLane v3 adds authoritative maxHullHp for target-aware reconstruction materials.
 import type {
   RenderEngineStatus, RenderFlux, RenderShield, RenderSystem, RenderWeapon, ShipRenderState,
 } from '../../engine/render/ShipRenderState';
@@ -41,6 +42,7 @@ export const SHIP_NUMBERS = Object.freeze([
   'prevFacingRad',
   'angularVelRad',
   'hullHp',
+  'maxHullHp',
   'teamId',
   'visibilityMask',
   'phaseVisualAlpha',

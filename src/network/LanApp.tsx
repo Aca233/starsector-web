@@ -284,7 +284,7 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
   return <main className="native-refit-app lan-page lan-entry-page">
     <h1 className="native-screen-tab"><NativeBitmapText font="caption">{transport === "steam" ? "Steam 联机" : dedicatedServer ? "服务器战斗房间" : "局域网联机"}</NativeBitmapText></h1>
     <NativeFrame className="lan-entry-shell">
-      <header className="lan-entry-heading"><h2><NativeBitmapText>创建或加入房间</NativeBitmapText></h2><p>{dedicatedServer ? "直接在浏览器中开房游玩，服务器负责战斗计算。" : "选船、改装和分队，都在进入房间后进行。"}</p></header>
+      <header className="lan-entry-heading"><h2><NativeBitmapText>创建或加入房间</NativeBitmapText></h2>{dedicatedServer && <p>服务器负责战斗计算。</p>}</header>
       <ol className="lan-workflow" aria-label="联机操作步骤"><li aria-current="step">1 · 创建 / 加入</li><li>2 · 房间内改装与分队</li><li>3 · 准备 / 开始</li></ol>
       {reconnecting&&<p className="lan-menu-note" role="status">{reconnecting}</p>}
       {error&&<p className="lan-error" role="alert">{error}</p>}
@@ -331,7 +331,7 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
             </p>
             <h3>使用舰船设计</h3>
             <p>进入房间后，点击自己的舰船或“更换舰船”，在房间中选船、改装，完成后客机可点击“应用并准备”，也可“仅应用配装”；房主满足条件时可“应用并开始”，有客机需重新确认时只应用配装。入房前不再选船，不必另开页面或先保存。编辑时保持房间连接并取消自己的准备，未应用的修改不会改变房间配装；只有明确另存方案才写入本机方案库。已存方案 / JSON 导入保留在次要入口。</p>
-            <p>武器、插件、S-mod、幅能配置、武器组、支持的战斗技能及舰载机随方案同步。准备和加载阶段按同一版本的设计规则校验，开局后不能改装。</p>
+            <p>武器、插件、S-mod、载荷配置、武器组、支持的战斗技能及舰载机随方案同步。准备和加载阶段按同一版本的设计规则校验，开局后不能改装。</p>
             <h3>当前版本</h3>
             <p>
               所有房间统一采用房间编成，

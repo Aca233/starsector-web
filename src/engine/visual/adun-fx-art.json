@@ -1,0 +1,147 @@
+{
+  "ignition": {
+    "sourceBox": [
+      117,
+      641,
+      138,
+      288
+    ],
+    "sourcePivot": [
+      185,
+      790
+    ],
+    "width": 138,
+    "height": 288,
+    "scale": 1,
+    "pivotX": 0.4927536231884058,
+    "pivotY": 0.5173611111111112,
+    "offsets": []
+  },
+  "core": {
+    "sourceBox": [
+      418,
+      636,
+      137,
+      300
+    ],
+    "sourcePivot": [
+      486,
+      790
+    ],
+    "width": 137,
+    "height": 300,
+    "scale": 1,
+    "pivotX": 0.49635036496350365,
+    "pivotY": 0.5133333333333333,
+    "offsets": []
+  },
+  "shutdown": {
+    "sourceBox": [
+      730,
+      650,
+      111,
+      255
+    ],
+    "sourcePivot": [
+      785,
+      788
+    ],
+    "width": 111,
+    "height": 255,
+    "scale": 1,
+    "pivotX": 0.4954954954954955,
+    "pivotY": 0.5411764705882353,
+    "offsets": []
+  },
+  "lance": {
+    "sourceBox": [
+      1057,
+      601,
+      87,
+      326
+    ],
+    "sourcePivot": [
+      1100,
+      643
+    ],
+    "width": 87,
+    "height": 326,
+    "scale": 1,
+    "pivotX": 0.4942528735632184,
+    "pivotY": 0.12883435582822086,
+    "offsets": []
+  },
+  "muzzle": {
+    "sourceBox": [
+      112,
+      998,
+      150,
+      206
+    ],
+    "sourcePivot": [
+      186,
+      1191
+    ],
+    "width": 150,
+    "height": 206,
+    "scale": 1,
+    "pivotX": 0.49333333333333335,
+    "pivotY": 0.9368932038834952,
+    "offsets": []
+  },
+  "impact": {
+    "sourceBox": [
+      375,
+      970,
+      230,
+      225
+    ],
+    "sourcePivot": [
+      487,
+      1083
+    ],
+    "width": 230,
+    "height": 225,
+    "scale": 1,
+    "pivotX": 0.48695652173913045,
+    "pivotY": 0.5022222222222222,
+    "offsets": []
+  },
+  "beam": {
+    "sourceBox": [
+      758,
+      923,
+      58,
+      316
+    ],
+    "sourcePivot": [
+      786,
+      1082
+    ],
+    "width": 58,
+    "height": 316,
+    "scale": 1,
+    "pivotX": 0.4827586206896552,
+    "pivotY": 0.5031645569620253,
+    "offsets": []
+  },
+  "exhaust": {
+    "sourceBox": [
+      1047,
+      947,
+      106,
+      304
+    ],
+    "sourcePivot": [
+      1099,
+      980
+    ],
+    "width": 106,
+    "height": 304,
+    "scale": 1,
+    "pivotX": 0.49056603773584906,
+    "pivotY": 0.10855263157894737,
+    "offsets": []
+  },
+  "sourceSha256": "de83427c47ec2ec4c64f208b16b679bd59826010f0bf0bc7505fcb32d7ff2c88"
+}

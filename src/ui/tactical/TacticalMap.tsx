@@ -73,7 +73,12 @@ function TacticalMapContent(props: TacticalMapProps & { map: TacticalMapView; ge
     if (props.readOnlyCommands && (command.kind !== 'tactical' || !['select', 'close'].includes(command.command.action))) {
       setMessage('联机地图仅提供观察、增援和撤退；战术指令尚未接入主机。'); return;
     }
-    const current = () => mounted.current && live.current.source === source && source.read().generation === generation;
+    const current = () => {
+      if (!mounted.current || live.current.source !== source) return false;
+      // A revoked remote view is intentionally unreadable. Late command replies
+      // must not turn that lifecycle guard into an unhandled Promise rejection.
+      try { return source.read().generation === generation; } catch { return false; }
+    };
     const complete = (result: CommandResult) => {
       if (!current()) return;
       if (result.accepted) accepted?.(); else setMessage(result.reason ?? '指令未获确认。');
@@ -89,8 +94,8 @@ function TacticalMapContent(props: TacticalMapProps & { map: TacticalMapView; ge
     const ids = friendly.filter(s => !s.retreating && (full || selected === 'fleet' || s.id === selected)).map(s => s.id);
     const confirmed = () => setMessage('撤退指令已确认；舰船驶离本方边缘后释放部署点。');
     if (!props.onRetreat) { dispatch({ kind: 'tactical', command: { action: 'retreat', unitIds: ids, full } }, confirmed); return; }
-    try { await props.onRetreat(ids, full); if (mounted.current && live.current.source === source && source.read().generation === generation) confirmed(); }
-    catch (error) { if (mounted.current && live.current.source === source && source.read().generation === generation) setMessage(error instanceof Error ? error.message : String(error)); }
+    try { await props.onRetreat(ids, full); if (mounted.current && live.current.source === source) { try { if (source.read().generation === generation) confirmed(); } catch { /* revoked view */ } } }
+    catch (error) { if (mounted.current && live.current.source === source) { try { if (source.read().generation === generation) setMessage(error instanceof Error ? error.message : String(error)); } catch { /* revoked view */ } } }
   };
   const fullAssault = map.orders.fleet?.type === 'ASSAULT';
   const close = () => dispatch({ kind: 'tactical', command: { action: 'close' } }, () => { props.onClosed?.(); props.canvasRef?.current?.focus({ preventScroll: true }); });
@@ -331,7 +336,7 @@ function TacticalMapContent(props: TacticalMapProps & { map: TacticalMapView; ge
     </aside>
     <TacticalShipStatus ship={map.playerShip} readShip={() => displayed.current.playerShip} />
     {!props.readOnlyCommands&&groups.length>0&&<TacticalCommandDock groups={groups} onAction={runAction} />}
-    {showInfo&&<aside className="tactical-map-info" aria-label="战术信息"><strong>{inspected?nameOf(inspected):'全舰指令'}</strong><p>{inspected?'结构 '+Math.ceil(inspected.hullHp)+' / '+inspected.maxHullHp+' · 幅能 '+Math.round(inspected.flux.fluxPercent*100)+'%':''}</p><p>左键选择接触；右键空白处移动，右键敌舰集火。A 选择全舰，Del 取消指令。</p><p>拖动或方向键平移；滚轮 / ± 缩放。Home 全览，Tab 返回战斗。</p><p>{map.openBattlefield ? "多队联机为公开战场：显示所有已部署且存活的舰船；队色与大厅一致。后备、入库和已撤退舰不显示。" : "灰蓝色为未探明区域，黑色为己方地图视野；基础传感器半径为 3000，受舰船和系统视野加成影响。"}</p><button onClick={()=>setShowInfo(false)}>关闭 [F2]</button></aside>}
+    {showInfo&&<aside className="tactical-map-info" aria-label="战术信息"><strong>{inspected?nameOf(inspected):'全舰指令'}</strong><p>{inspected?'结构 '+Math.ceil(inspected.hullHp)+' / '+inspected.maxHullHp+' · 载荷 '+Math.round(inspected.flux.fluxPercent*100)+'%':''}</p><p>左键选择接触；右键空白处移动，右键敌舰集火。A 选择全舰，Del 取消指令。</p><p>拖动或方向键平移；滚轮 / ± 缩放。Home 全览，Tab 返回战斗。</p><p>{map.openBattlefield ? "多队联机为公开战场：显示所有已部署且存活的舰船；队色与大厅一致。后备、入库和已撤退舰不显示。" : "灰蓝色为未探明区域，黑色为己方地图视野；基础传感器半径为 3000，受舰船和系统视野加成影响。"}</p><button onClick={()=>setShowInfo(false)}>关闭 [F2]</button></aside>}
     <footer className="tactical-map-help"><div role="status">{message}</div></footer>
   </section>;
 }

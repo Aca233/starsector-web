@@ -1,3 +1,5 @@
+import { shipPaths, mountPaths, shipObservationWidth, mountObservationWidth, encodeShipObservation, encodeMountObservation, matchesShipObservation, matchesMountObservation } from './ObservationWire';
+export { shipPaths, mountPaths };
 import { remainingProjectileLifetime } from '../../simulation/systems/weapon/SourceMissileLifecycle';
 import type { Projectile } from '../../simulation/Weapon';
 import { scalarWireCodec, type ScalarWireCodec } from './ScalarWire';
@@ -7,6 +9,7 @@ import { weaponMuzzle, weaponMuzzleExtent } from '../FireControlGeometry';
 import type { Ship } from '../../simulation/Ship';
 import { CapitalShipAI } from '../CapitalShipAI';
 import type { CombatEngine } from '../../simulation/CombatEngine';
+import type { HostileQueryBatch } from '../HostileQueryBatch';
 import type { Fields, Part, Model, NumericPacket, Frame, Row } from './Types';
 export const controls = ['fireControlMode', 'isFiringMain', 'defenseFacingRad', 'aiHoldOffensiveFire', 'throttle', 'brakeInput', 'strafeInput', 'turnInput'];
 export const primitive = (v: unknown) => v === null || typeof v !== 'object' && typeof v !== 'function';
@@ -35,12 +38,8 @@ export function matchesParts(s: Ship, ai: CapitalShipAI, expected: Part[]): bool
     return same(ai) && same(ai['defense']) && index === expected.length;
 }
 export const motionKeys = ['maxSpeed', 'acceleration', 'deceleration', 'maxTurnRate', 'turnAcceleration', 'turnDeceleration', 'driftAcceleration', 'strafeMultiplier'];
-// Target observation/range policy consumes these scalars on read-only owner views too.
-const shipFields = ['hullHp', 'maxHullHp', 'hasVastBulk', 'isRetreated', 'isDocked', 'isCollisionless', 'flux.fluxPercent', 'pos.x', 'pos.y', 'vel.x', 'vel.y', 'facingRad', 'isDead', 'isPlayer', 'teamId', 'visibilityMask', 'visibilityOverflow', 'visibleToPlayer', 'visibleToEnemy', 'isPhased', 'shield.type', 'shield.isActive', 'shield.radius', 'shield.currentArcDeg', 'shield.phaseChargeDownDuration', 'flux.isOverloaded', 'flux.overloadTimer', 'flux.isVenting', 'system.blocksWeapons', 'system.chargeDownDuration'];
-const mountFields = ['currentAngleRad', 'ammo', 'isDisabled', 'firingState', 'firingStateTimer', 'burstRemaining', 'burstTimer', 'cooldownTimer', 'barrelIndex', 'fireControlTargetShipId', 'fireControl.reason', 'fireControl.targetKind'];
 const projectileFields = ['sourceShipId', 'isPlayer', 'isFlare', 'didDamage', 'damage', 'damageType', 'flightTimeRemaining', 'rangeRemaining', 'sourceMoveSpeed', 'fadeTime', 'fadeProgress', 'pos.x', 'pos.y', 'vel.x', 'vel.y', 'radius', 'proximityFuse.range', 'isGuided', 'targetShipId', 'facingRad', 'maxTurnRate', 'maxSpeed', 'teamId', 'isDisarmed', 'collisionDisabled'] as const;
-export const shipPaths = shipFields.map(s => s.split('.'));
-export const mountPaths = mountFields.map(s => s.split('.'));
+
 export const projectilePaths = projectileFields.map(s => s.split('.'));
 export function readPath(o: Fields, p: string[]) { return p.length === 1 ? o[p[0]] : o[p[0]]?.[p[1]]; }
 export function writePath(o: Fields, p: string[], v: unknown) {
@@ -230,7 +229,10 @@ export class Publisher {
     private sequence = 0;
     private lastFrame: Frame | null = null;
     private lastMetadata = '';
-    constructor(ships: Ship[], ais: CapitalShipAI[]) {
+    // Inject the authority-only query factory: importing CombatEngine here would
+    // pull the entire simulation into every owner Worker through this shared codec.
+    constructor(ships: Ship[], ais: CapitalShipAI[], private readonly hostileQueryFactory?:
+        (engine: CombatEngine, roster: readonly Ship[]) => HostileQueryBatch | undefined) {
         this.ships = [...ships];
         this.indices = new Map(ships.map((s, i) => [s, i]));
         this.aiByShip = new Map(ais.map(a => [a.ship, a]));
@@ -271,15 +273,15 @@ export class Publisher {
         let q = 0;
         const muzzle = new Vector2();
         for (const s of this.ships) {
-            for (const p of shipPaths)
-                this.world.set(q++, readPath(s, p));
+            encodeShipObservation(this.world, s, q);
+            q += shipObservationWidth;
             this.world.set(q++, s.flux.getTimeToVent());
             const motion = s.getMotionStats();
             for (const k of motionKeys)
                 this.world.set(q++, motion[k]);
             for (const m of s.weapons) {
-                for (const p of mountPaths)
-                    this.world.set(q++, readPath(m, p));
+                encodeMountObservation(this.world, m, q);
+                q += mountObservationWidth;
                 this.world.set(q++, weaponRange(s, m));
                 this.world.set(q++, weaponDps(m));
                 this.world.set(q++, weaponMuzzleExtent(m));
@@ -300,11 +302,17 @@ export class Publisher {
             beams: engine.beams.map(b => ({ ...b, startPos: { x: b.startPos.x, y: b.startPos.y }, endPos: { x: b.endPos.x, y: b.endPos.y } })),
             asteroids: engine.asteroids.map(a => ({ hp: a.hp, radius: a.radius, pos: { x: a.pos.x, y: a.pos.y }, vel: { x: a.vel.x, y: a.vel.y } })),
             jobs: ais.map(ai => this.indices.get(ai.ship)!),
-            targets: this.ships.map(s => this.indices.get(engine.findHostile(s) ?? this.aiByShip.get(s)!.targetShip)!),
+            targets: this.queryTargets(engine),
             currentTargets: this.ships.map(s => this.indices.get(s.currentTargetShip) ?? -1),
             tactical: this.ships.map(s => s.tacticalAI),
             fleetPlan: [...engine.planFleetAI()]
         };
+    }
+    private queryTargets(engine: CombatEngine): number[] {
+        const queries = this.hostileQueryFactory?.(engine, this.ships);
+        try {
+            return this.ships.map(s => this.indices.get((queries ? queries.find(s) : engine.findHostile(s)) ?? this.aiByShip.get(s)!.targetShip)!);
+        } finally { queries?.close(); }
     }
     private metadata(f: Frame): string {
         return JSON.stringify([f.dt, f.own.count, f.world.count, f.projectiles.count, f.beams, f.asteroids, f.jobs, f.targets, f.currentTargets, f.tactical], (_key, value) => typeof value === 'number' && (!Number.isFinite(value) || Object.is(value, -0)) ? ['number', String(value), Object.is(value, -0)] : value);
@@ -337,12 +345,14 @@ export class Publisher {
             const same = (v: unknown) => this.world.equals(q++, v);
             const muzzle = new Vector2();
             for (const s of this.ships) {
-                for (const path of shipPaths) if (!same(readPath(s, path))) return false;
+                if (!matchesShipObservation(this.world, s, q)) return false;
+                q += shipObservationWidth;
                 if (!same(s.flux.getTimeToVent())) return false;
                 const motion = s.getMotionStats();
                 for (const key of motionKeys) if (!same(motion[key])) return false;
                 for (const m of s.weapons) {
-                    for (const path of mountPaths) if (!same(readPath(m, path))) return false;
+                    if (!matchesMountObservation(this.world, m, q)) return false;
+                    q += mountObservationWidth;
                     if (!same(weaponRange(s, m)) || !same(weaponDps(m)) || !same(weaponMuzzleExtent(m))) return false;
                     weaponMuzzle(s, m, muzzle);
                     if (!same(muzzle.x) || !same(muzzle.y)) return false;
@@ -370,7 +380,7 @@ export class Publisher {
         // Only small non-scalar scene metadata remains; no SAB writes or duplicated geometry queries.
         const current: Frame = {
             ...old, dt, jobs: ais.map(ai => this.indices.get(ai.ship)!),
-            targets: this.ships.map(s => this.indices.get(engine.findHostile(s) ?? this.aiByShip.get(s)!.targetShip)!),
+            targets: this.queryTargets(engine),
             currentTargets: this.ships.map(s => this.indices.get(s.currentTargetShip) ?? -1),
             tactical: this.ships.map(s => s.tacticalAI),
             beams: engine.beams.map(b => ({ ...b, startPos: { x: b.startPos.x, y: b.startPos.y }, endPos: { x: b.endPos.x, y: b.endPos.y } })),

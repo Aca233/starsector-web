@@ -7,6 +7,7 @@ import { combatAudio as sound } from '../../audio/CombatAudioEvents';
 import { VisualRandom } from '../../runtime/VisualRandom';
 import { SimulationRandom } from '../SimulationRandom';
 import { getShieldCircleContact } from '../collision/ShieldCollisionGeometry';
+import { getHullCircleContact } from '../collision/HullGeometry';
 
 export interface AsteroidFXCallbacks {
   spawnShieldRipple: (pos: Vector2, maxRadius: number, color: [number, number, number]) => void;
@@ -106,6 +107,7 @@ export class AsteroidSystem {
   public update(dt: number) {
     for (let i = this.asteroids.length - 1; i >= 0; i--) {
       const ast = this.asteroids[i];
+      if (ast.gravityFixed) continue;
       ast.pos.addScaled(ast.vel, dt);
       ast.facingRad += ast.angularVel * dt;
 
@@ -141,35 +143,32 @@ export class AsteroidSystem {
           sound.playAtPos('collision_asteroid_ship', shieldContact.point, playerPos, 0.6);
 
           // 护盾作为真实物理表面：沿护盾法线把小行星推出可见弧面。
-          ast.vel.addScaled(shieldContact.normal, (impulse / ast.mass) * 80);
-          ast.pos.addScaled(shieldContact.normal, shieldContact.penetration);
+          if (ast.gravityFixed) ship.assemblyRoot.pos.subScaled(shieldContact.normal, shieldContact.penetration);
+          else { ast.vel.addScaled(shieldContact.normal, (impulse / ast.mass) * 80); ast.pos.addScaled(shieldContact.normal, shieldContact.penetration); }
           continue;
         }
 
-        const toShip = ship.pos.clone().sub(ast.pos);
-        const dist = toShip.length();
-        const combinedR = ast.radius + ship.spec.collisionRadius;
-        if (dist < combinedR) {
-          const normal = dist > 1e-12 ? toShip.scale(1 / dist) : new Vector2(1, 0);
-          const overlap = combinedR - dist;
+        const hullContact = getHullCircleContact(ship, ast.pos, ast.radius);
+        if (hullContact) {
+          const { point, normal, penetration } = hullContact;
 
           // 装甲撞击金属与岩石碎屑
           const impactDmg = Math.min(600, 80 + ast.mass * 0.15);
-          const localHit = ast.pos.clone().sub(ship.pos).rotate(-ship.facingRad);
+          const localHit = point.clone().sub(ship.pos).rotate(-ship.facingRad);
           const res = ship.armor.takeDamage(localHit, impactDmg, 'KINETIC', impactDmg, false);
           applyComponentDamage(ship, localHit, res, 0);
           fx.spawnArmorDamageSparks(ship, localHit, res.armorDamage);
           ship.applyHullDamage(res.hullDamage);
 
-          if (res.armorDamage > 0) fx.addFloatingDamage(ast.pos, res.armorDamage, [255, 180, 50]);
-          if (res.hullDamage > 0) fx.addFloatingDamage(ast.pos, res.hullDamage, [255, 60, 60]);
+          if (res.armorDamage > 0) fx.addFloatingDamage(point, res.armorDamage, [255, 180, 50]);
+          if (res.hullDamage > 0) fx.addFloatingDamage(point, res.hullDamage, [255, 60, 60]);
 
-          fx.spawnDebris(ast.pos, 6, [140, 120, 100], 80);
-          sound.playAtPos('collision_asteroid_ship', ast.pos, playerPos, 0.7);
+          fx.spawnDebris(point, 6, [140, 120, 100], 80);
+          sound.playAtPos('collision_asteroid_ship', point, playerPos, 0.7);
 
           // 物理反冲
-          ast.vel.subScaled(normal, 60);
-          ast.pos.subScaled(normal, overlap);
+          if (ast.gravityFixed) ship.assemblyRoot.pos.subScaled(normal, penetration);
+          else { ast.vel.addScaled(normal, 60); ast.pos.addScaled(normal, penetration); }
           ast.hp -= impactDmg * 0.5;
           if (ast.hp <= 0) {
             this.shatter(i, fx);
@@ -184,19 +183,18 @@ export class AsteroidSystem {
       const a1 = this.asteroids[i];
       for (let j = i + 1; j < this.asteroids.length; j++) {
         const a2 = this.asteroids[j];
+        if (a1.gravityFixed && a2.gravityFixed) continue;
         const diff = a2.pos.clone().sub(a1.pos);
         const dist = diff.length();
         const minR = a1.radius + a2.radius;
         if (dist < minR) {
           // Array pair order is stable; do not consume gameplay RNG for overlap.
           const n = dist > 1e-12 ? diff.scale(1 / dist) : new Vector2(1, 0);
-          const p = (2 * (a1.vel.x * n.x + a1.vel.y * n.y - a2.vel.x * n.x - a2.vel.y * n.y)) / (a1.mass + a2.mass);
-          a1.vel.subScaled(n, p * a2.mass);
-          a2.vel.addScaled(n, p * a1.mass);
-
-          const overlap = 0.5 * (minR - dist);
-          a1.pos.subScaled(n, overlap);
-          a2.pos.addScaled(n, overlap);
+          const inv1=a1.gravityFixed?0:1/a1.mass,inv2=a2.gravityFixed?0:1/a2.mass;
+          const relative=a1.vel.clone().sub(a2.vel).dot(n);
+          const kick=Math.max(0,2*relative/(inv1+inv2));
+          if (!a1.gravityFixed) {a1.vel.subScaled(n,kick*inv1);a1.pos.subScaled(n,(minR-dist)*inv1/(inv1+inv2));}
+          if (!a2.gravityFixed) {a2.vel.addScaled(n,kick*inv2);a2.pos.addScaled(n,(minR-dist)*inv2/(inv1+inv2));}
 
           if (this.visualRandom.next() < 0.25) {
             sound.playAtPos('collision_asteroid_asteroid', a1.pos, playerPos, 0.35);
@@ -214,7 +212,7 @@ export class AsteroidSystem {
     let best: AsteroidProjectileImpact | null = null;
     for (let j = 0; j < this.asteroids.length; j++) {
       const ast = this.asteroids[j];
-      if (ast.hp <= 0) continue;
+      if (ast.hp <= 0 || p.damagedTargetIds?.includes('terrain:asteroid:' + ast.id)) continue;
       const impact = segmentCircleImpact(p.prevPos, p.pos, ast.pos, ast.radius + p.radius);
       if (!impact) continue;
       if (!best || impact.t < best.t) {
@@ -229,7 +227,8 @@ export class AsteroidSystem {
     p: Projectile,
     impact: AsteroidProjectileImpact,
     fx: AsteroidFXCallbacks,
-    playerPos: Vector2 = fx.getPlayerPos()
+    playerPos: Vector2 = fx.getPlayerPos(),
+    projectileFeedbackHandled = false
   ): void {
     const ast = this.asteroids[impact.asteroidIndex];
     if (!ast || ast.hp <= 0) return;
@@ -239,7 +238,7 @@ export class AsteroidSystem {
     fx.spawnSparks(impact.point, 12, [255, 180, 80]);
     fx.spawnDebris(impact.point, 4, [130, 110, 90], 60);
 
-    if (p.isRocket) {
+    if (p.isRocket && !projectileFeedbackHandled) {
       fx.detachContrail(p.id);
       fx.spawnAuthenticExplosion(impact.point, 60, [255, 120, 40], true);
       sound.playAtPos('explosion', impact.point, playerPos, 0.5);

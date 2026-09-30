@@ -13,7 +13,7 @@ export function WeaponGroupInspection({ group, draft, spec, flux, children, onOp
   });
   return <RefitInspection title={'武器组 ' + (group.index + 1)} className="refit-group-inspection" enabled={enabled} content={<>
     <p><RefitHoverTerm term={group.mode === 'LINKED' ? 'linked' : 'alternating'}>{group.mode === 'LINKED' ? '同步射击' : '交替射击'}</RefitHoverTerm> · <RefitHoverTerm term="autofire">自动开火{group.isAutofire ? '开启' : '关闭'}</RefitHoverTerm></p>
-    <p><RefitHoverTerm term="groupFlux">组幅能 / 秒</RefitHoverTerm> {flux}</p>
+    <p><RefitHoverTerm term="groupFlux">组载荷 / 秒</RefitHoverTerm> {flux}</p>
     <p className="refit-inspection-note">当前窗口中的待确认编组。确认后生效；取消不会保存修改。</p>
     <h4>组内武器 · {members.length} 门</h4>
     {members.length ? <ul className="refit-inspection-list">{members.map(slot => <li key={slot.slotId}>

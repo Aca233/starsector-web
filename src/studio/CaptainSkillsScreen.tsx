@@ -10,7 +10,7 @@ import { runtimeAssetUrl } from "../engine/runtime/RuntimePaths";
 import { NativeButton, NativeFrame } from "../ui/NativeChrome";
 import { Modal } from "../ui/core/UI";
 import { captainPortraits, defaultCaptainProfile, validCaptainProfile, type CaptainProfile } from "./CaptainProfile";
-import tree from "./native-skill-tree.json";
+import tree from "./SkillTree";
 import "./captain-skills.css";
 
 const definitions = new Map(combatSkillDefinitions.map(skill => [skill.id, skill]));
@@ -154,7 +154,7 @@ export function CaptainSkillsScreen(props: Props) {
   };
 
   return <main className="captain-skills-screen" aria-labelledby="captain-skills-title">
-    <h1 id="captain-skills-title" className="captain-sr-only" ref={heading} tabIndex={-1}>角色技能</h1>
+    <h1 id="captain-skills-title" className="captain-page-title" ref={heading} tabIndex={-1}>角色技能</h1>
     <NativeFrame className="captain-character-sheet" surface="glass">
       <div className="captain-sheet-top">
         <aside className="captain-character" aria-label="当前舰长配置">
@@ -173,12 +173,12 @@ export function CaptainSkillsScreen(props: Props) {
         </aside>
         <section className="captain-skill-detail" style={aptitudeStyle(active.aptitude)} aria-label="技能详情" ref={details} tabIndex={0}>
           <DwellReader><header className="captain-detail-title"><h2>{active.name}</h2><span>{supported ? activeLevel === 2 ? "精英已配置" : activeLevel === 1 ? "普通已配置" : "可配置" : "未接入 · 仅可查看"}</span></header>
-          <blockquote><p>{active.quote}</p><cite>－ {active.author}</cite></blockquote>
+          <details className="captain-lore"><summary>背景资料</summary><blockquote><p>{active.quote}</p><cite>－ {active.author}</cite></blockquote></details>
           <p className="captain-detail-scope">影响：<strong>{nativeScope(active)}</strong>{active.id === "point_defense" && <span>（含所属战机）</span>}</p>
           {definition ? <div className="captain-effects">
             <div className="captain-normal-effects">{effectLines(definition.normal)}</div>
             <h3><RefitHoverTerm term="elite">精英</RefitHoverTerm></h3><div className="captain-elite-effects">{effectLines(definition.elite)}</div>
-          </div> : <div className="captain-unimplemented"><p>此角色技能尚未接入 Web 版，不能学习或获得加成。</p><p>保留原版图标、引文和分类供查看；相关舰装或舰船系统已经实现，不代表此技能已经生效。</p></div>}
+          </div> : <div className="captain-unimplemented"><p>此角色技能尚未接入 Web 版，不能学习或获得加成。</p><p>保留技能引文和分类供查看；相关舰装或舰船系统已经实现，不代表此技能已经生效。</p></div>}
           <p className="captain-native-requirement">{active.requiredPoints > 0 ? `原版需先投入至少 ${active.requiredPoints} 点低阶技能；` : ""}Web 沙盒不消耗技能点、故事点，也不限制低阶技能门槛。</p>
           <div className="captain-detail-controls">
             <button type="button" className="captain-codex-button" onClick={() => setEncyclopedia(active)}>按 <b>F2</b> 打开数据百科</button>
@@ -200,6 +200,7 @@ export function CaptainSkillsScreen(props: Props) {
                 onFocus={event => { setSelectedId(skill.id); skillHover.bind(skill.id).onFocus(event); }} onClick={() => advanceSkill(skill.id)}
                 onContextMenu={event => { event.preventDefault(); event.stopPropagation(); event.currentTarget.focus(); selectSkill(skill.id); setLevel(skill.id, 0); }} onKeyDown={event => navigateSkill(event, skill)}>
                 <img src={asset(skill.icon)} alt="" />
+                <span className="captain-skill-name" aria-hidden="true">{skill.name}</span>
                 {value[skill.id] === 2 && <img className="captain-elite-overlay" src={asset(`graphics/icons/skills/elite_${aptitude.id}.png`)} alt="" />}
                 {value[skill.id] && <span className="captain-configured-badge">{value[skill.id] === 2 ? "Ⅱ" : "Ⅰ"}</span>}
                 {!definitions.has(skill.id) && <span className="captain-unimplemented-mark" aria-hidden="true">—</span>}

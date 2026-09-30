@@ -67,13 +67,18 @@ export function SourceModPicker({
       if (previous?.isConnected) previous.focus({ preventScroll: true });
     };
   }, []);
-  const costOf = (id: string) =>
-    hullModOPCost(designHullSpec(draft), id);
-  const reasonFor = (id: string) =>
-    modReason(draft, id) ??
-    (!draft.hullMods.includes(id) && costOf(id) > remaining
-      ? "装配点不足"
-      : null);
+  const hull = designHullSpec(draft);
+  // Restricted custom mods need not quote a price for every hull class. Keep
+  // their disabled rows visible, but never call the strict purchase API for them.
+  const costOf = (id: string): number | null =>
+    hullModDefinitions.get(id)?.refit?.cost[hull.hullSize ?? "FRIGATE"] === undefined
+      ? null : hullModOPCost(hull, id);
+  const reasonFor = (id: string) => {
+    const reason = modReason(draft, id);
+    if (reason || draft.hullMods.includes(id)) return reason;
+    const cost = costOf(id);
+    return cost === null ? "该舰级没有可安装的装配点费用" : cost > remaining ? "装配点不足" : null;
+  };
   const details = useHullModTooltip(true, id => draft.hullMods.includes(id) ? "已安装 · 点击卸下" : reasonFor(id) ?? "点击安装");
   const matchesType = (id: string, type: string) =>
     type === "所有类型" || data.hullmods[id].uiTags.includes(type);
@@ -91,7 +96,7 @@ export function SourceModPicker({
     .sort((a, b) => {
       const value = (id: string) =>
         sort.key === "cost"
-          ? costOf(id)
+          ? (costOf(id) ?? Number.POSITIVE_INFINITY)
           : sort.key === "status"
             ? draft.hullMods.includes(id)
               ? "0"
@@ -222,7 +227,7 @@ export function SourceModPicker({
                   {data.hullmods[id].manufacturer}
                 </div>
                 <div role="cell" className="source-mod-cost" onClick={toggle}>
-                  {costOf(id)}
+                  {costOf(id) ?? "—"}
                 </div>
                 <div role="cell" className="source-mod-status" onClick={toggle}>
                   {installed ? (

@@ -164,7 +164,7 @@ test('oversized wire controls close only the side lane; primary rate limit also 
   await until(() => flood.readyState === WebSocket.CLOSED, 'rate revoke');
 });
 
-test('bridge replays latest idempotent controls when the optional lane loses its final ACK', async t => {
+test('duplicate LAN launch preserves replay of the optional lane final ACK', async t => {
   const remote = await server(t), host = await client(t, remote.origin);
   host.ws.send('{"type":"create","password":""}');
   const room = await until(() => [...remote.app.rooms.values()][0], 'recovery room');
@@ -189,11 +189,25 @@ test('bridge replays latest idempotent controls when the optional lane loses its
   // Simulate loss after local TCP accepted writes, before authority dispatch.
   // No future state/input is sent to accidentally unstick the consumed credit.
   const side = peer.controlLane.socket, received = peer.controlLane.received;
-  side._socket.pause(); guest.rows.length = 0;
+  // Fault injection is at authority dispatch, after real WS delivery. Merely
+  // pausing a TCP/WS reader is insufficient: ws can flush buffered messages
+  // from socketOnClose and make a supposedly lost ACK succeed during teardown.
+  const lost = [];
+  side.removeAllListeners('message');
+  side.on('message', raw => lost.push(JSON.parse(raw).type));
+  guest.rows.length = 0;
   guest.send(JSON.stringify({ type: 'state-consumed', matchId, seq: 1 }));
   guest.send(JSON.stringify({ type: 'sync-ready', matchId, syncId: peer.sync.id, tick: 1 }));
   guest.send(JSON.stringify({ type: 'input', matchId, syncId: peer.sync.id, input: { seq: 1, keys: 1, aim: [0, 0], firing: false, pointerActive: false, actions: [{ id: 1, kind: 'shield' }] } }));
-  await wait(50); assert.equal(peer.controlLane.received, received); assert.equal(peer.stateCredits.stats().inflight, 1); assert.equal(peer.seq, -1);
+  await until(() => lost.length === 3, 'three actual lane writes lost before authority dispatch');
+  assert.deepEqual(lost, ['state-consumed', 'sync-ready', 'input']);
+  assert.equal(peer.controlLane.received, received); assert.equal(peer.stateCredits.stats().inflight, 1); assert.equal(peer.seq, -1);
+  // This valid launch was already seen; a retry on the primary stream must
+  // not erase the receipt accepted by the helper but still stuck on the lane.
+  const launches = guest.rows.filter(r => r.type === 'launch').length;
+  peer.ws.send(JSON.stringify({type:'launch',matchId,syncId:peer.sync.id,minTick:peer.sync.tick}));
+  await until(() => guest.rows.filter(r => r.type === 'launch').length === launches + 1, 'repeated launch forwarded');
+  assert.equal(peer.stateCredits.stats().inflight, 1, 'launch is not consumption');
   side.terminate();
   await until(() => peer.stateCredits.stats().inflight === 0 && peer.seq === 1 && guest.rows.some(r => r.type === 'controls-ready'), 'fallback ACK, sync and input');
   assert.equal(peer.stateCredits.stats().acked, 1); assert.equal(peer.action, 1);

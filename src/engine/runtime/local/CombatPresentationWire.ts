@@ -12,7 +12,7 @@ export const prototypes = new Map<object, number>(classes.flatMap((ctor, i) => c
 export const behaviorKeys = classes.map(ctor => new Set(ctor ? Object.getOwnPropertyNames(ctor.prototype) : []));
 export const typed = [Float64Array, Float32Array, Int32Array, Uint32Array, Int16Array, Uint16Array, Int8Array, Uint8Array, Uint8ClampedArray] as const;
 export type NumericArray = InstanceType<typeof typed[number]>;
-export const enum Kind { Object, Array, Map, Set, Typed, Vector }
+export const enum Kind { Object, Array, Map, Set, Typed, Vector, ObjectPatch }
 export const enum Tag { Undefined, Null, False, True, Number, String, Ref, Metadata, System }
 export const LIMIT = 250_000, VALUE_LIMIT = 8_000_000;
 export const integer = (n: number) => Number.isSafeInteger(n) && n >= 0;
@@ -21,11 +21,12 @@ export const forbidden = new Set(['__proto__', 'prototype', 'constructor']);
 export type CombatPresentationMode = 'render' | 'render-strict';
 export const simulationTypes = new Set([1,2,3,4,5,6,7,8,9]); // Retired protocol IDs are always rejected.
 export interface Shape { type: number; keys: string[] }
-export interface CombatPresentationPacket {
-  epoch: number; revision: number; tick: number; visuals: PackedVisualPacket;
+export interface CombatPresentationGraphPacket {
+  epoch: number; revision: number; tick: number;
   buffer: ArrayBuffer; length: number; nodeCount: number; liveNodeCount: number; removed: number[]; strings: string[]; shapes: Shape[];
   metadata: { id: number; value: unknown }[];
 }
+export interface CombatPresentationPacket extends CombatPresentationGraphPacket { visuals: PackedVisualPacket }
 export interface DetachedCombatPresentation {
   view: CombatRenderView & { readonly kind: 'detached-combat-render-view' };
   hud: {

@@ -1,3 +1,7 @@
+import { arkAircraftBeamPose, renderArkAircraftPlasma } from '../ArkAircraftFXRenderer';
+import { renderArkShotMuzzle } from '../ArkWeaponFXRenderer';
+import { renderAdunProjectile, renderAdunBeam } from '../AdunFXRenderer';
+import { renderHyperionProjectile } from '../HyperionSystemRenderer';
 import { projectileDisplayPose } from '../../ProjectileFlightLayer';
 import { renderMissileEngines, type MissileEngineRenderItem } from '../MissileEngineRenderer';
 import { contrailMayBeVisible } from '../ContrailVisibility';
@@ -52,8 +56,10 @@ export class WebGLProjectilePass {
     const roughCore = textures.getTexture('/game-assets/graphics/fx/beam_rough2_core.png', true);
     const smoothCore = textures.getTexture('/game-assets/graphics/fx/beam_laser_core.png', true);
     // One authoritative beam per mounted firing cycle; don't hide duplicate simulation entities.
-    for (const beam of engine.beams) {
+    for (const sourceBeam of engine.beams) {
+      const beam = arkAircraftBeamPose(sourceBeam, engine.ships, ctx.alpha);
       if (beam.startPos.distanceTo(beam.endPos) <= 0 || (beam.brightness ?? 1) <= 0) continue;
+      if (renderAdunBeam(ctx,beam)) continue;
       const rough = beam.textureType === 'ROUGH';
       batcher.flush();
       ribbonBatcher.begin(batcher.currentViewProj);
@@ -126,6 +132,10 @@ export class WebGLProjectilePass {
       if (p.isMine) continue; // Native mine sprite/glow are drawn once in the FX pass.
       const pPos = Vector2.lerp(p.prevPos, p.pos, alpha);
       const pAngle = p.facingRad !== undefined ? p.facingRad : p.vel.heading();
+      if (renderArkAircraftPlasma(ctx, p, pPos)) continue;
+      renderArkShotMuzzle(ctx, p, engine.ships);
+      if (renderAdunProjectile(ctx, p, pPos, pAngle)) continue;
+      if (renderHyperionProjectile(ctx, p, pPos, pAngle)) continue;
       const fwd = Vector2.fromAngle(pAngle);
       const visualSpawnType = p.visualSpawnType ?? p.spawnType;
       const visual = getWeaponVisualProfile(p.specId, visualSpawnType, !!p.isRocket, false);
@@ -136,6 +146,7 @@ export class WebGLProjectilePass {
       }
       // 4.3 动能 / 高爆实弹 (BALLISTIC: 1:1 BallisticProjectile.java & N.java & _if.java)
       else if (p.projSpriteUrl && !p.isRocket) {
+        const opacity = Math.max(0, 1 - ((p.prevFadeProgress ?? p.fadeProgress ?? 0) * (1 - alpha) + (p.fadeProgress ?? 0) * alpha));
         const len = p.projLength || 40;
         const wid = p.projWidth || 8;
         const [fr, fg, fb, fa = 255] = p.fringeColor || [...(p.color || [235, 255, 215]), 255];
@@ -149,24 +160,24 @@ export class WebGLProjectilePass {
         } else {
           const tracerLen = len * 1.5 * visual.trailScale;
           const tracerCenter = pPos.clone().addScaled(fwd, -tracerLen * 0.5);
-          batcher.drawSprite(projTrailTex, tracerCenter.x, tracerCenter.y, tracerLen, wid * 1.3 * Math.max(0.82, visual.glowScale), pAngle, 0, 0, fr / 255, fg / 255, fb / 255, 0.85 * (fa / 255));
+          batcher.drawSprite(projTrailTex, tracerCenter.x, tracerCenter.y, tracerLen, wid * 1.3 * Math.max(0.82, visual.glowScale), pAngle, 0, 0, fr / 255, fg / 255, fb / 255, 0.85 * (fa / 255) * opacity);
 
           const coreTracerLen = tracerLen * 0.75;
           const coreTracerCenter = pPos.clone().addScaled(fwd, -coreTracerLen * 0.5);
-          batcher.drawSprite(projBodyTex, coreTracerCenter.x, coreTracerCenter.y, coreTracerLen, wid * 0.55, pAngle, 0, 0, cr / 255, cg / 255, cb / 255, 0.95 * (ca / 255));
+          batcher.drawSprite(projBodyTex, coreTracerCenter.x, coreTracerCenter.y, coreTracerLen, wid * 0.55, pAngle, 0, 0, cr / 255, cg / 255, cb / 255, 0.95 * (ca / 255) * opacity);
         }
 
         const bulletTex = textures.getTexture(p.projSpriteUrl);
         batcher.setBlendMode('NORMAL');
-        batcher.drawSprite(bulletTex, pPos.x, pPos.y, wid, len, pAngle + Math.PI / 2, 0, 0, 1.0, 1.0, 1.0, 1.0);
+        batcher.drawSprite(bulletTex, pPos.x, pPos.y, wid, len, pAngle + Math.PI / 2, 0, 0, 1.0, 1.0, 1.0, opacity);
 
         if (!sourceGeometry) {
           // Legacy fallback for projectiles that do not provide source strip geometry.
           batcher.setBlendMode('ADDITIVE');
           const tipPos = pPos.clone().addScaled(fwd, len * 0.4);
           const glintSize = Math.max(8, Math.min(24, wid * 1.6 * visual.impactScale));
-          batcher.drawSprite(hitGlowTex, tipPos.x, tipPos.y, glintSize, glintSize, 0, 0, 0, fr / 255, fg / 255, fb / 255, 0.8);
-          batcher.drawSprite(hitGlowTex, tipPos.x, tipPos.y, glintSize * 0.45, glintSize * 0.45, 0, 0, 0, 1.0, 1.0, 1.0, 0.95);
+          batcher.drawSprite(hitGlowTex, tipPos.x, tipPos.y, glintSize, glintSize, 0, 0, 0, fr / 255, fg / 255, fb / 255, 0.8 * opacity);
+          batcher.drawSprite(hitGlowTex, tipPos.x, tipPos.y, glintSize * 0.45, glintSize * 0.45, 0, 0, 0, 1.0, 1.0, 1.0, 0.95 * opacity);
         }
       }
       // 4.4 导弹 / 火箭 (火箭推进喷口羽流 + 4 尖透镜星芒耀斑 + 导弹弹体)
@@ -205,7 +216,14 @@ export class WebGLProjectilePass {
           : pos.clone().addScaled(Vector2.fromAngle(p.facingRad ?? p.vel.heading()),
             -Math.min(p.projLength ?? 0, p.elapsedTime * p.vel.length()));
         const fade = (p.prevFadeProgress ?? p.fadeProgress ?? 0) * (1 - alpha) + (p.fadeProgress ?? 0) * alpha;
-        const brightness = (1 - fade) * Math.min(1, pos.distanceTo(tail) / Math.max(.001, p.projLength ?? 0));
+        // Legacy/custom shells may retain a launch-position tail without source fade lifecycle.
+        // Clamp only this render copy; never change simulation range or damage to shorten a trail.
+        const tailDistance = pos.distanceTo(tail);
+        const maxTailLength = p.projLength ?? 0;
+        if (maxTailLength > 0 && tailDistance > maxTailLength) {
+          tail.sub(pos).scale(maxTailLength / tailDistance).add(pos);
+        }
+        const brightness = (1 - fade) * Math.min(1, pos.distanceTo(tail) / Math.max(.001, maxTailLength));
         const phase = getMovingRaySourceRenderState(0, width, brightness, p.elapsedTime, p.textureScrollSpeed ?? 0).texturePhase;
         ribbonBatcher.drawBallisticProjectile(sprite.texture, projTrailTex, pos, tail, width,
           sprite.height / sprite.width * width, p.coreWidthMult ?? 1,

@@ -1,5 +1,7 @@
 # starsector-web
 
+> **2026-09-26 原创 UI：** 共享界面使用本地生成的观测站背景和面板材质、系统字体及 Lucide/原创几何图标。UI 素材来源见 [改造记录](docs/original-ui-redesign-2026-09-26.md)。旧 UI 逻辑路径保留，但像素已替换，原版字体/标题图已移除。旧素材导入器现被阻止，以免重新混入原版 UI。舰船、武器、人物/事件美术、音频及导入数据仍在；这不是整体 EULA 合规完成声明。
+
 A self-contained React + TypeScript + Vite ship-design studio and combat sandbox inspired by Starsector. The browser runtime is independent from a Starsector installation: all runtime images, audio and packaged content are served from this repository.
 
 Current fidelity and verification status: [Visual Fidelity Audit](docs/visual-fidelity-audit.md).

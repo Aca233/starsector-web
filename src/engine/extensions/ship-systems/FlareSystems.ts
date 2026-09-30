@@ -1,4 +1,6 @@
-import data from './native-flare-weapons.json';
+import rawData from './native-flare-weapons.json';
+import type { FlareSystemData } from './LegacySystemData';
+const data: Readonly<Record<string, FlareSystemData>> = rawData;
 import { nativeSystem } from './NativeSystemFactory';
 import { systemWeaponLauncher } from './SystemWeaponLauncher';
 import { Vector2 } from '../../math/Vector2';

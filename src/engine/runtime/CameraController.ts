@@ -1,6 +1,6 @@
 import { Vector2 } from '../math/Vector2';
 
-type CombatCanvas = Pick<HTMLCanvasElement, 'width' | 'height' | 'getBoundingClientRect'>;
+import type { CombatCanvas, CombatViewport } from './CombatViewport';
 type TeleportAnchor = { teleportCameraOffset: Vector2 };
 
 /** CombatState + O0OO: ship anchor plus independently smoothed screen-relative mouse pan. */
@@ -69,17 +69,28 @@ export class CameraController {
   }
 
   public follow(current: Vector2, focus: Vector2, canvas: CombatCanvas, zoom: number, dt: number, allowPointer = true, anchor?: TeleportAnchor): void {
+    this.followSurface(current, focus, canvas, undefined, zoom, dt, allowPointer, anchor);
+  }
+
+  /** Explicit numeric surface; never installs a fake DOM canvas in a worker. */
+  public followViewport(current: Vector2, focus: Vector2, viewport: CombatViewport, zoom: number, dt: number, allowPointer = true, anchor?: TeleportAnchor): void {
+    this.followSurface(current, focus, undefined, viewport, zoom, dt, allowPointer, anchor);
+  }
+
+  private followSurface(current: Vector2, focus: Vector2, canvas: CombatCanvas | undefined, viewport: CombatViewport | undefined,
+    zoom: number, dt: number, allowPointer: boolean, anchor?: TeleportAnchor): void {
     const jumped = this.syncTeleports(anchor);
     if (!allowPointer) this.suspendPointer();
     if (this.pointerActive) {
-      const rect = canvas.getBoundingClientRect();
-      if (!(rect.width > 0 && rect.height > 0 && canvas.width > 0 && canvas.height > 0 && Number.isFinite(zoom) && zoom > 0)
+      const rect = canvas ? canvas.getBoundingClientRect() : viewport!.rect;
+      const surface = canvas ?? viewport!;
+      if (!(rect.width > 0 && rect.height > 0 && surface.width > 0 && surface.height > 0 && Number.isFinite(zoom) && zoom > 0)
         || this.pointer.x < rect.left || this.pointer.x > rect.left + rect.width
         || this.pointer.y < rect.top || this.pointer.y > rect.top + rect.height) {
         this.suspendPointer();
       } else {
-        const scaleX = canvas.width / rect.width / zoom;
-        const scaleY = canvas.height / rect.height / zoom;
+        const scaleX = surface.width / rect.width / zoom;
+        const scaleY = surface.height / rect.height / zoom;
         // Native default mouse pan gain is 2. Never derive this from aimTargetWorld:
         // that includes the current camera offset and would create positive feedback.
         const x = (this.pointer.x - rect.left - rect.width / 2) * scaleX * 2;

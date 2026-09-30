@@ -20,7 +20,7 @@ export function initializeSourceProjectile(p: Projectile, speed: number, inherit
 
 /** True after complete fade; a range-fading shot can still hit at reduced damage/soft flux. */
 export function advanceSourceProjectile(p: Projectile, dt: number): boolean {
-  const speed = p.sourceMoveSpeed ?? p.movingRayMoveSpeed ?? p.vel.length();
+  const speed = p.gravityDeflected ? p.vel.length() : p.sourceMoveSpeed ?? p.movingRayMoveSpeed ?? p.vel.length();
   p.sourceMoveSpeed ??= speed;
   p.unfadedDamage ??= p.damage;
   p.unfadedEmp ??= p.empDamage ?? 0;

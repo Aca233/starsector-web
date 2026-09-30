@@ -18,7 +18,7 @@ function targetFor(ship: Ship, system: ShipSystem): Ship | undefined {
 }
 export const droneStrike=nativeSystem('drone_strike',{
   installReason: needsWings,
-  description:'每次消耗600软幅能，将一架现有舰载机从联队分离并转化为终结导弹；母舰正常重建缺员。无人机仍可被击毁，不凭空生成免费弹药。',
+  description:'每次消耗600软载荷，将一架现有舰载机从联队分离并转化为终结导弹；母舰正常重建缺员。无人机仍可被击毁，不凭空生成免费弹药。',
   implementationDetails:'DroneStrikeStats：最近机体、原生terminator_missile、系统范围修正、EMP抗性10000、100%抗诱骗、机体/导弹生命周期绑定。飞行采用Web制导，转化抖动不是逐帧原生表现。',
   resources:{weapons:['terminator_missile'],sounds:['system_termination_sequence']},
   audio:{activate:'system_termination_sequence'},

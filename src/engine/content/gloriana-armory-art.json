@@ -1,0 +1,134 @@
+{
+  "macro": {
+    "source": "approved-large-medium.png",
+    "sourceSha256": "8d0bcdd4713f11cd0c9c89576ea7c30c403509eda263886108be889e1e2eba9f",
+    "crop": {
+      "left": 109,
+      "top": 21,
+      "width": 461,
+      "height": 592
+    },
+    "pivot": [
+      338,
+      438
+    ],
+    "scale": 0.165,
+    "width": 80,
+    "height": 142,
+    "offsets": [
+      68.97,
+      -8.25,
+      68.97,
+      8.75
+    ]
+  },
+  "lance": {
+    "source": "approved-large-medium.png",
+    "sourceSha256": "8d0bcdd4713f11cd0c9c89576ea7c30c403509eda263886108be889e1e2eba9f",
+    "crop": {
+      "left": 810,
+      "top": 7,
+      "width": 279,
+      "height": 608
+    },
+    "pivot": [
+      950,
+      483
+    ],
+    "scale": 0.14,
+    "width": 44,
+    "height": 138,
+    "offsets": [
+      64.82,
+      0
+    ]
+  },
+  "siege": {
+    "source": "approved-large-medium.png",
+    "sourceSha256": "8d0bcdd4713f11cd0c9c89576ea7c30c403509eda263886108be889e1e2eba9f",
+    "crop": {
+      "left": 97,
+      "top": 664,
+      "width": 485,
+      "height": 554
+    },
+    "pivot": [
+      340,
+      998
+    ],
+    "scale": 0.1,
+    "width": 54,
+    "height": 70,
+    "offsets": [
+      32.4,
+      0
+    ]
+  },
+  "torpedo": {
+    "source": "approved-large-medium.png",
+    "sourceSha256": "8d0bcdd4713f11cd0c9c89576ea7c30c403509eda263886108be889e1e2eba9f",
+    "crop": {
+      "left": 759,
+      "top": 634,
+      "width": 373,
+      "height": 597
+    },
+    "pivot": [
+      945,
+      1000
+    ],
+    "scale": 0.12,
+    "width": 50,
+    "height": 92,
+    "offsets": [
+      42.72,
+      -7.08,
+      42.72,
+      6.24
+    ]
+  },
+  "bolter": {
+    "source": "approved-small.png",
+    "sourceSha256": "264714d8da51c0b044d605d9fe6082c94f60176acc7b70e92738c7c28ae65d21",
+    "crop": {
+      "left": 205,
+      "top": 237,
+      "width": 547,
+      "height": 497
+    },
+    "pivot": [
+      478,
+      550
+    ],
+    "scale": 0.048,
+    "width": 30,
+    "height": 34,
+    "offsets": [
+      14.69,
+      -3.74,
+      14.69,
+      3.5
+    ]
+  },
+  "interceptor": {
+    "source": "approved-small.png",
+    "sourceSha256": "264714d8da51c0b044d605d9fe6082c94f60176acc7b70e92738c7c28ae65d21",
+    "crop": {
+      "left": 1029,
+      "top": 184,
+      "width": 521,
+      "height": 560
+    },
+    "pivot": [
+      1286,
+      552
+    ],
+    "scale": 0.048,
+    "width": 30,
+    "height": 40,
+    "offsets": [
+      17.38,
+      0
+    ]
+  }
+}

@@ -23,7 +23,7 @@ export function fleetInspectionDesign(spec: ShipSpec): Design {
   if (!data.ships[hullId]) throw Error('此舰体没有装配点资料');
   const draft = designFromModule({ ...spec, id: hullId });
   draft.name = i18n.t(spec.nameKey); draft.captainSkills = structuredClone(spec.captainSkills ?? {});
-  if (draft.capacitors < 0 || draft.vents < 0) throw Error('不能从此舰体反推幅能投资');
+  if (draft.capacitors < 0 || draft.vents < 0) throw Error('不能从此舰体反推载荷投资');
   if ((spec.fighterWings ?? []).some((_, index) => !draft.wings?.[index])) throw Error('联队配装资料不完整');
   draft.modules = Object.fromEntries((spec.modules ?? []).map(mount => [mount.slotId, fleetInspectionDesign(mount.spec)]));
   budget(draft); // Validate availability before rendering the nested equipment reader.

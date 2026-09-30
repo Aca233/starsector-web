@@ -1,3 +1,4 @@
+import { screenVoidArea, voidAreaDamageFraction, type VoidAreaScreens } from './VoidShieldArea';
 import { sameTeam } from "../../CombatTeams";
 import { damageToMissiles } from './DamageToMissiles';
 import { Vector2 } from '../../../math/Vector2';
@@ -12,6 +13,7 @@ interface Explosion {
   spec: ProjectileExplosionSpec;
   pos: Vector2;
   life: number;
+  voidScreens: VoidAreaScreens;
   ships: Set<string>;
   asteroids: Set<number>;
   missiles: Set<number>;
@@ -27,7 +29,7 @@ export class ProjectileExplosionSystem {
     const spec = p.projectileExplosionSpec;
     if (!spec || spec.radius <= 0) return;
     const explosion: Explosion = { projectile: p, spec, pos: point.clone(), life: spec.duration,
-      ships: new Set(shipId ? [shipId] : []), asteroids: new Set(asteroidId === undefined ? [] : [asteroidId]), missiles: new Set([p.id]) };
+      voidScreens: new Map(), ships: new Set(shipId ? [shipId] : []), asteroids: new Set(asteroidId === undefined ? [] : [asteroidId]), missiles: new Set([p.id]) };
     this.active.push(explosion);
     this.apply(explosion, ctx);
   }
@@ -50,14 +52,20 @@ export class ProjectileExplosionSystem {
     const source = projectileSource(p, ctx);
     const noFriendlyFire = spec.collisionClass.endsWith('_NO_FF');
     const hitsSmall = ['MISSILE_FF','MISSILE_NO_FF','PROJECTILE_NO_FF','PROJECTILE_FF'].includes(spec.collisionClass);
-    for (const ship of ctx.ships ?? [ctx.playerShip, ctx.enemyShip, ...ctx.fighters]) {
+    const targets = ctx.ships ?? [ctx.playerShip, ctx.enemyShip, ...ctx.fighters];
+    screenVoidArea(p, targets.filter(s=>!noFriendlyFire || !sameTeam(s,p)), e.pos, spec.radius, scale, ctx, e.voidScreens);
+    for (const ship of targets) {
       if (e.ships.has(ship.id) || ship.isDead || ship.isCollisionless || (ship.spec.hullSize === 'FIGHTER' && !hitsSmall) || (noFriendlyFire && sameTeam(ship, p))) continue;
-      const hit = getShipExplosionContact(ship, e.pos), damage = p.damage * scale(hit.distance) * projectileOutgoingMultiplier(p, ship, hit.point, ctx);
+      const hit = getShipExplosionContact(ship, e.pos, !!ship.assemblyRoot.shield.voidShield);
+      if (hit.distance > spec.radius) continue;
+      const fraction = voidAreaDamageFraction(e.voidScreens,ship,hit.point);
+      if(fraction<=0) { e.ships.add(ship.id); continue; }
+      const damage = p.damage * fraction * scale(hit.distance) * projectileOutgoingMultiplier(p, ship, hit.point, ctx);
       if (hit.distance > spec.radius || damage <= 0) continue;
       e.ships.add(ship.id);
       if (hit.shield) {
         const taken = damage * ship.crDamageTakenMultiplier * ship.system.getShieldDamageMultiplier();
-        const flux = ship.shield.absorbDamage(taken, p.damageType, hit.point.clone().sub(ship.getShieldCenter()).heading());
+        const flux = ship.shield.absorbImpact(taken, p.damageType, hit.point.clone().sub(ship.getShieldCenter()).heading()).flux;
         ship.flux.increaseShieldFlux(flux, !p.softFlux);
         ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, p.damageType, taken * ship.shield.damageTakenMultiplierFor(p.damageType), 'SHIELD', 0, ship.isPlayer);
         ctx.fx.addFloatingDamage(hit.point, taken * ship.shield.damageTakenMultiplierFor(p.damageType), [80, 200, 255]);

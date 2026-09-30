@@ -5,16 +5,19 @@ import electronUpdater from 'electron-updater';
 import { getNetSession } from 'electron-updater/out/electronHttpExecutor.js';
 import { reliableUpdaterClass } from './update-transport.mjs';
 import { formatBytes, progressText } from './update-status.mjs';
+import { checkContentUpdate } from './content-updates.mjs';
+import { compareVersions } from './content-manifest.mjs';
 
 const RELEASES = 'https://github.com/Aca233/starsector-web/releases/latest';
 /** NSIS only. ZIP/dev installs never modify themselves or the user's running game. */
-export function desktopUpdater({ changed, install, log, enabled = true }) {
+export function desktopUpdater({ changed, install, log, enabled = true, contentStore = null }) {
   const supported = app.isPackaged && process.platform === 'win32'
     && fs.existsSync(path.join(process.resourcesPath, 'app-update.yml'))
     && fs.existsSync(path.join(path.dirname(process.execPath), 'Uninstall Starsector Web.exe'));
   let status = supported ? '尚未检查更新' : 'ZIP / 开发版：手动更新';
   let downloaded = false, checking = null, downloading = null, available = null, phase = '准备下载';
-  let reason = '', detail = '', lastProgressLog = 0;
+  let reason = '', detail = '', lastProgressLog = 0, contentReady = null;
+  const fetchImpl = (url, options) => getNetSession().fetch(String(url), options);
   const Updater = reliableUpdaterClass(electronUpdater.NsisUpdater, (url, options) => getNetSession().fetch(String(url), options));
   const updater = process.platform === 'win32' ? new Updater() : electronUpdater.autoUpdater;
   const notify = text => { status = text; log('[update] ' + text); changed(); };
@@ -25,7 +28,9 @@ export function desktopUpdater({ changed, install, log, enabled = true }) {
   updater.disableWebInstaller = true;
   updater.logger = { info: log, warn: log, error: log, debug: () => {} };
   updater.on('checking-for-update', () => notify('正在检查更新…'));
-  updater.on('update-available', info => { available = info; reason = ''; detail = ''; notify(`准备下载 ${info.version}…`); });
+  updater.on('update-available', info => {
+    if (contentStore && compareVersions(info.version, contentStore.current.manifest.version) <= 0) { available = null; notify('已是最新版本'); return; }
+    available = info; reason = ''; detail = ''; notify(`准备下载 ${info.version}…`); });
   updater.on('update-not-available', () => { available = null; detail = ''; notify('已是最新版本'); });
   updater.on('download-phase', info => {
     phase = info.mode === 'delta' ? '增量下载' : info.mode === 'full' ? `整包下载（${info.connections}路）` : '核对增量基线';
@@ -52,7 +57,20 @@ export function desktopUpdater({ changed, install, log, enabled = true }) {
     }
     // Repeated clicks show progress, never reset the download label or start another check.
     if (downloading || downloaded || checking) { if (manual) await showStatus(); return; }
-    checking = updater.checkForUpdates().then(async () => {
+    checking = (async () => {
+      if (contentStore) {
+        detail = ''; notify('正在检查游戏更新…');
+        try {
+          const result = await checkContentUpdate({ store: contentStore, fetchImpl, log,
+            notify: (text, info) => { detail = info; notify(text); } });
+          if (result) {
+            if (!result.current) { contentReady = result; downloaded = true; }
+            if (manual) await showStatus();
+            return;
+          }
+        } catch (error) { log('[content] 轻量更新失败，保留现有文件并尝试安装器：' + error.message); }
+      }
+      await updater.checkForUpdates();
       if (available && !downloaded) {
         downloading = updater.downloadUpdate().catch(error => {
           detail = '下载未完成，点击检查更新可重试；不会安装未校验文件';
@@ -60,7 +78,7 @@ export function desktopUpdater({ changed, install, log, enabled = true }) {
         }).finally(() => { downloading = null; });
       }
       if (manual) await showStatus();
-    }).catch(async error => {
+    })().catch(async error => {
       if (manual) await dialog.showMessageBox({ type: 'warning', title: '检查更新失败', message: error.message, detail: '现有版本仍可继续使用。' });
     }).finally(() => { checking = null; });
     return checking;
@@ -71,6 +89,14 @@ export function desktopUpdater({ changed, install, log, enabled = true }) {
     check,
     ready: () => downloaded,
     start: () => { if (enabled && supported) void check(); },
-    install: () => { if (downloaded) void install(() => updater.quitAndInstall(false, true)); },
+    install: () => {
+      if (!downloaded) return;
+      void install(async () => {
+        if (contentReady) {
+          await contentStore.activate(contentReady.reference);
+          app.relaunch(); app.quit();
+        } else updater.quitAndInstall(false, true);
+      });
+    },
   };
 }

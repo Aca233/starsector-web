@@ -1,0 +1,78 @@
+{
+  "L": {
+    "head": {
+      "file": "L-head.png",
+      "width": 32,
+      "height": 69,
+      "pivotX": 0.5,
+      "pivotY": 0.855072463768116,
+      "offsets": [
+        58.02,
+        -5.4,
+        58.02,
+        5.4
+      ]
+    },
+    "seat": {
+      "file": "L-seat.png",
+      "width": 34,
+      "height": 31,
+      "pivotX": 0.5,
+      "pivotY": 0.5483870967741935,
+      "offsets": [
+        58.02,
+        -5.4,
+        58.02,
+        5.4
+      ]
+    }
+  },
+  "M": {
+    "head": {
+      "file": "M-head.png",
+      "width": 24,
+      "height": 43,
+      "pivotX": 0.5,
+      "pivotY": 0.7441860465116279,
+      "offsets": [
+        31.02,
+        0.0
+      ]
+    },
+    "seat": {
+      "file": "M-seat.png",
+      "width": 24,
+      "height": 23,
+      "pivotX": 0.5,
+      "pivotY": 0.5217391304347826,
+      "offsets": [
+        31.02,
+        0.0
+      ]
+    }
+  },
+  "S": {
+    "head": {
+      "file": "S-head.png",
+      "width": 16,
+      "height": 15,
+      "pivotX": 0.5,
+      "pivotY": 0.7333333333333333,
+      "offsets": [
+        9.42,
+        0.0
+      ]
+    },
+    "seat": {
+      "file": "S-seat.png",
+      "width": 14,
+      "height": 15,
+      "pivotX": 0.5,
+      "pivotY": 0.5333333333333333,
+      "offsets": [
+        9.42,
+        0.0
+      ]
+    }
+  }
+}

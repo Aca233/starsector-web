@@ -4,6 +4,7 @@ import type { shipPresentationPose } from '../visual/ShipPresentation';
 
 /** Display-only query facade. It deliberately does not inherit any simulation class. */
 export class ProjectedRenderShip implements ShipRenderState {
+ declare surfaceFeedback: ShipRenderState['surfaceFeedback'];
  declare id: ShipRenderState['id'];
  declare spec: ShipRenderState['spec'];
  declare pos: ShipRenderState['pos'];
@@ -13,6 +14,7 @@ export class ProjectedRenderShip implements ShipRenderState {
  declare prevFacingRad: ShipRenderState['prevFacingRad'];
  declare angularVelRad: ShipRenderState['angularVelRad'];
  declare hullHp: ShipRenderState['hullHp'];
+ declare maxHullHp: ShipRenderState['maxHullHp'];
  declare isDead: ShipRenderState['isDead'];
  declare isDocked: ShipRenderState['isDocked'];
  declare isRetreated: ShipRenderState['isRetreated'];
@@ -27,6 +29,7 @@ export class ProjectedRenderShip implements ShipRenderState {
  declare prevEngineBoostLevel: ShipRenderState['prevEngineBoostLevel'];
  declare scorchMarks: ShipRenderState['scorchMarks'];
  declare scorchMarkVersion: ShipRenderState['scorchMarkVersion'];
+ declare fireControlMode: ShipRenderState['fireControlMode'];
  declare selectedGroupIndex: ShipRenderState['selectedGroupIndex'];
  declare shield: ShipRenderState['shield'];
  declare flux: ShipRenderState['flux'];
@@ -72,11 +75,16 @@ export class ProjectedRenderSystem implements RenderSystem {
  declare isActive: RenderSystem['isActive'];
  declare state: RenderSystem['state'];
  declare teleportVisual: RenderSystem['teleportVisual'];
+ declare gravityField: RenderSystem['gravityField'];
+ declare gravityManeuver: RenderSystem['gravityManeuver'];
  declare type: RenderSystem['type'];
  declare definition: RenderSystem['definition'];
  declare pulseOffset: number;
 }
 export class ProjectedRenderWeapon implements RenderWeapon {
+ declare gravityTractor: RenderWeapon['gravityTractor'];
+ declare gravityDeflection: RenderWeapon['gravityDeflection'];
+ declare loadedMissileLevels: RenderWeapon['loadedMissileLevels'];
  declare arcDeg: RenderWeapon['arcDeg'];
  declare baseAngleDeg: RenderWeapon['baseAngleDeg'];
  declare currentAngleRad: RenderWeapon['currentAngleRad'];

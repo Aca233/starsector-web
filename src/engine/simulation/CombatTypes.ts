@@ -74,6 +74,8 @@ export interface ExplosionAnimation {
 
 /** One native GenericTextureParticle, not a composite expanding flash. */
 export interface HitGlowAnimation {
+  /** Authored hit artwork replaces (never overlays) the generic glow. */
+  spriteUrl?: string;
   id: number;
   pos: Vector2;
   vel: Vector2;
@@ -122,6 +124,8 @@ export interface EmpArc {
 }
 
 export interface MuzzleFlash {
+  /** Display ownership only; emitted particles remain in world space. */
+  underHullShipId?: string;
   id: number;
   specId?: string;
   pos: Vector2;
@@ -136,6 +140,8 @@ export interface MuzzleFlash {
  * 原版枪口爆炸风粒子 (1:1 SmoothParticle.java & _class.java)
  */
 export interface MuzzleParticle {
+  /** Display ownership only; emitted particles remain in world space. */
+  underHullShipId?: string;
   pos: Vector2;
   vel: Vector2;
   size: number;
@@ -209,6 +215,9 @@ export interface HulkBreakup {
 }
 
 export interface HulkFragment {
+  gravityFixed?: boolean;
+  /** Opt-in physical/navigation obstacle after a real gravity interaction. */
+  gravityManaged?: boolean;
   id: number;
   pos: Vector2;
   vel: Vector2;
@@ -228,6 +237,7 @@ export interface HulkFragment {
 }
 
 export interface Asteroid {
+  gravityFixed?: boolean;
   id: number;
   pos: Vector2;
   vel: Vector2;

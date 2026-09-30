@@ -668,15 +668,24 @@ export function encodeBinaryState(matchId, seq, frame) {
   result.set(meta, 8); result.set(payload, 8 + meta.length);
   return result;
 }
-function decodeState(buffer, relay = false, spans = null) {
+function readStateHeader(buffer) {
   const bytes = bytesOf(buffer);
   if (bytes.length < 10 || bytes.length > LIMIT || bytes[0] !== 83 || bytes[1] !== 87 || bytes[2] !== 66 || bytes[3] !== 49) throw Error('Invalid binary state header');
   const size = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(4, true);
   if (!size || size > 1024 || 8 + size >= bytes.length) throw Error('Invalid binary state header');
   const header = JSON.parse(text.decode(bytes.subarray(8, 8 + size)));
   if (!validHeader(header)) throw Error('Invalid binary state header');
-  if (spans) spans.frameStart = 8 + size;
-  return { type: 'state', ...header, frame: decodeFrame(bytes.subarray(8 + size), relay, spans) };
+  return { bytes, header, frameStart: 8 + size };
+}
+/** Envelope-only admission, never proof of a valid/consumed frame. */
+export function inspectBinaryState(buffer) {
+  const { bytes, header } = readStateHeader(buffer);
+  return { matchId: header.matchId, seq: header.seq, bytes: bytes.length };
+}
+function decodeState(buffer, relay = false, spans = null) {
+  const { bytes, header, frameStart } = readStateHeader(buffer);
+  if (spans) spans.frameStart = frameStart;
+  return { type: 'state', ...header, frame: decodeFrame(bytes.subarray(frameStart), relay, spans) };
 }
 export function decodeBinaryState(buffer) { return decodeState(buffer); }
 /** Relay-only projection. Must still pass summarizeCombatFrame before forwarding the ORIGINAL bytes. */

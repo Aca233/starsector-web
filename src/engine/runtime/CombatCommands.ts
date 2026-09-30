@@ -1,3 +1,4 @@
+import { manualWeaponShip, moduleWeaponCandidate, selectModuleFireControl } from './ModuleFireControl';
 import { mouseBindingCode, readSystemBindings, selectedSystemSlot } from './SystemBindings';
 import type { Ship } from '../simulation/Ship';
 import type { Vector2 } from '../math/Vector2';
@@ -8,7 +9,7 @@ import { combatAudio as sound } from '../audio/CombatAudioEvents';
 export type ShipCommand =
   | { kind: 'shield' | 'hullShield' | 'vent' | 'target' | 'recall' }
   | { kind: 'system'; value?: number }
-  | { kind: 'group' | 'mode' | 'autofire'; value: number };
+  | { kind: 'group' | 'mode' | 'autofire' | 'module'; value: number };
 export interface CommandResult { accepted: boolean; reason?: string }
 export interface CombatKey { code: string; ctrlKey: boolean; altKey: boolean; metaKey: boolean; shiftKey: boolean }
 export const flightKeyAliases: Readonly<Record<string, string>> = {
@@ -46,12 +47,20 @@ export function shipCommandForMouse(mouse: Omit<CombatKey, 'code'> & { button: n
 export function shipCommandFailure(ship: Ship, command: ShipCommand): string | undefined {
   if (ship.isDead || ship.hullHp <= 0) return '舰船已失去战斗能力';
   if (ship.isDocked || ship.isRetreated) return '舰船不在战场';
+  if (command.kind === 'module') {
+    const part = moduleWeaponCandidate(ship, command.value);
+    if (!part || part.isDead || part.hullHp <= 0 || part.isDocked || part.isRetreated) return '该模块已失效或不属于本舰';
+    if (part !== ship && ship.fireControlMode !== 'MANUAL') return '请先关闭自动驾驶';
+    if (part !== ship && !part.weapons.length) return '该模块没有可手操的武器';
+    return undefined;
+  }
   if (command.kind === 'group' || command.kind === 'mode' || command.kind === 'autofire') {
-    if (!Number.isInteger(command.value) || !ship.weaponGroups.some(g => g.index === command.value && g.weaponSlotIds.length)) return '该武器组不存在或没有武器';
+    if (!Number.isInteger(command.value) || !manualWeaponShip(ship, ship.assemblyShips).weaponGroups.some(g => g.index === command.value && g.weaponSlotIds.length)) return '该武器组不存在或没有武器';
     return undefined;
   }
   if (command.kind === 'target') return undefined;
-  if (command.kind === 'recall') return ship.hullStats.fighterBays > 0 && ((ship.spec.fighterWings?.length ?? 0) > 0 || ship.deployedWingCraft.size > 0) ? undefined : '本舰没有舰载联队';
+  if (command.kind === 'recall') return ship.assemblyShips.some(part => !part.isDead && part.hullHp > 0 && !part.isRetreated && !part.isDocked
+    && part.hullStats.fighterBays > 0 && ((part.spec.fighterWings?.length ?? 0) > 0 || part.deployedWingCraft.size > 0)) ? undefined : '本舰及存活模块没有舰载联队';
   if (command.kind === 'system') {
     const system = ship.getSystem(command.value ?? 0);
     return system ? system.activationFailureReason : '该技能槽为空或不存在';
@@ -66,9 +75,13 @@ export function dispatchShipCommand(ship: Ship, command: ShipCommand, aim?: Vect
   const reason = shipCommandFailure(ship, command);
   if (reason) return { accepted: false, reason };
   let accepted = true;
+  const weaponShip = manualWeaponShip(ship, ship.assemblyShips);
   switch (command.kind) {
     case 'recall':
       ship.fighterRecall = !ship.fighterRecall;
+      // Edge commands also execute while paused: do not wait for pose synchronization.
+      for (const part of ship.assemblyShips) if (!part.isDead && part.hullHp > 0 && !part.isRetreated && !part.isDocked)
+        part.fighterRecall = ship.fighterRecall;
       sound.play(ship.fighterRecall ? 'fighter_recall' : 'fighter_deploy', .85);
       break;
     case 'target': {
@@ -81,9 +94,10 @@ export function dispatchShipCommand(ship: Ship, command: ShipCommand, aim?: Vect
     case 'shield': accepted = ship.toggleDefense(); break;
     case 'hullShield': accepted = ship.toggleHullShield(); break;
     case 'vent': accepted = ship.startVenting(); break;
-    case 'group': ship.selectWeaponGroup(command.value); break;
-    case 'mode': ship.toggleFireMode(command.value); break;
-    case 'autofire': ship.toggleAutofire(command.value); break;
+    case 'module': selectModuleFireControl(ship, moduleWeaponCandidate(ship, command.value)!); break;
+    case 'group': weaponShip.selectWeaponGroup(command.value); break;
+    case 'mode': weaponShip.toggleFireMode(command.value); break;
+    case 'autofire': weaponShip.toggleAutofire(command.value); break;
   }
   return accepted ? { accepted: true } : { accepted: false, reason: shipCommandFailure(ship, command) ?? '当前无法执行该操作' };
 }

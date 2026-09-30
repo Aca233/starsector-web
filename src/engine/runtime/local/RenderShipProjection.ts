@@ -2,26 +2,33 @@ import { ProjectedRenderShip, ProjectedRenderSystem, ProjectedRenderWeapon } fro
 export { ProjectedRenderShip, ProjectedRenderSystem, ProjectedRenderWeapon } from '../../render/ProjectedRenderState';
 // Authority-only explicit projection. No projected class inherits simulation behavior.
 import { RenderWeaponDictionary } from './RenderWeaponDictionary';
+import { updateProjectionArray } from './ProjectionArrays';
 import { Ship } from '../../simulation/Ship';
 import { ShipSystem } from '../../simulation/ShipSystem';
 import { combatWeaponRange } from '../../simulation/WeaponRange';
 import { hasOnlyNativePhaseReaders } from '../../extensions/NativePhaseReaders';
 import { hasOnlyNativeRangeModifiers } from '../../extensions/HullMods';
-import { pulsePusherOffset } from '../../extensions/ship-systems/PulseDrive';
+import { pulsePusherOffset } from '../../extensions/ship-systems/PulseDriveState';
 import { shipPresentationPose } from '../../visual/ShipPresentation';
 import type { RenderWeapon } from '../../render/ShipRenderState';
 import { weaponPresentationAngle } from '../../visual/WeaponPresentation';
 import type { WeaponMount } from '../../simulation/Weapon';
 
-export const renderShipFields = ["id","spec","pos","prevPos","vel","facingRad","prevFacingRad","angularVelRad","hullHp","isDead","isDocked","isRetreated","isAttachedModule","teamId","playerTargetId","visibilityMask","visibilityOverflow","phaseGhosts","phaseVisualAlpha","engineBoostLevel","prevEngineBoostLevel","scorchMarks","scorchMarkVersion","selectedGroupIndex"] as const satisfies readonly (keyof Ship)[];
-const shieldFields = ["facingAngleRad","isPhaseEngaged","isVisuallyDeployed","phaseCooldownLevel","phaseEffectLevel","phaseState","radius","renderArcRad","type","visualAlpha"] as const;
+export const renderShipFields = ["id","spec","pos","prevPos","vel","facingRad","prevFacingRad","angularVelRad","hullHp","maxHullHp","isDead","isDocked","isRetreated","isAttachedModule","teamId","playerTargetId","visibilityMask","visibilityOverflow","phaseGhosts","phaseVisualAlpha","engineBoostLevel","prevEngineBoostLevel","scorchMarks","scorchMarkVersion","selectedGroupIndex","fireControlMode","surfaceFeedback"] as const satisfies readonly (keyof Ship)[];
+const shieldFields = ["voidShield","facingAngleRad","isPhaseEngaged","isVisuallyDeployed","phaseCooldownLevel","phaseEffectLevel","phaseState","radius","renderArcRad","type","visualAlpha"] as const;
 const fluxFields = ["fluxPercent","hardFlux","hullSize","isOverloaded","isVenting","maxFlux","overloadTimer"] as const;
 const systemFields = ["activationSerial","available","disabled","effectLevel","fortressVisualLevel","isActive","state","teleportVisual","type"] as const;
 export const renderEngineStatusFields = ["prevThrust","currentThrust","prevSpread","spread"] as const;
-const weaponFields = ["arcDeg","baseAngleDeg","currentAngleRad","currentSpreadDeg","glowAlpha","isDisabled","mountType","recoil","relativePos","slotId","spec"] as const;
+const weaponFields = ["arcDeg","baseAngleDeg","currentAngleRad","currentSpreadDeg","glowAlpha","isDisabled","loadedMissileLevels","mountType","recoil","relativePos","slotId","spec","gravityTractor","gravityDeflection"] as const;
 const nativeQueries = ['interpolatedPos', 'interpolatedFacing', 'getShieldCenter', 'isVisibleTo'] as const;
 const queries = nativeQueries.map(key => Ship.prototype[key]);
 const nativeRangeReader = ShipSystem.prototype.getWeaponRangePercent;
+
+/** Targets are projector-owned records, never source components or received DTOs. */
+function copyFields<T extends object, K extends keyof T>(target: object, source: T, keys: readonly K[]): void {
+ const output = target as Record<keyof T, unknown>;
+ for (const key of keys) output[key] = source[key];
+}
 
 /** Per-encoder identities survive ticks, but field values are sampled anew on every
  * completed authority phase. No AI/weapon controller/armor-cell graphs are walked.
@@ -59,14 +66,19 @@ export class RenderShipProjection {
  private weapon(source: WeaponMount): ProjectedRenderWeapon {
   let target = this.records.get(source) as ProjectedRenderWeapon | undefined;
   if (!target) { target = new ProjectedRenderWeapon(); this.records.set(source, target); }
-  Object.assign(target, Object.fromEntries(weaponFields.map(key => [key, source[key]])), { spec: this.weaponDictionary.project(source.spec), presentationRelativeAngle: weaponPresentationAngle(source, 0) });
+  copyFields(target, source, weaponFields);
+  target.spec = this.weaponDictionary.project(source.spec);
+  target.presentationRelativeAngle = weaponPresentationAngle(source, 0);
   return target;
  }
  private system(source: ShipSystem): ProjectedRenderSystem {
   let target = this.records.get(source) as ProjectedRenderSystem | undefined;
   if (!target) { target = new ProjectedRenderSystem(); this.records.set(source, target); }
-  const values = Object.fromEntries(systemFields.map(key => [key, source[key]]));
-  Object.assign(target, values, { definition: this.select(source.definition, ['visuals']), pulseOffset: pulsePusherOffset(source) });
+  copyFields(target, source, systemFields);
+  if (source.definition.gravityField || source.definition.gravityCollapse) target.gravityField = source.gravityField;
+  if (source.definition.gravityManeuver) target.gravityManeuver = source.gravityManeuver;
+  target.definition = this.select(source.definition, ['visuals']);
+  target.pulseOffset = pulsePusherOffset(source);
   return target;
  }
  project(source: Ship): ProjectedRenderShip {
@@ -78,15 +90,15 @@ export class RenderShipProjection {
   let target = this.records.get(source) as ProjectedRenderShip | undefined;
   if (!target) { target = new ProjectedRenderShip(); this.records.set(source, target); }
   this.sampled.set(source, target);
-  const fields = Object.fromEntries(renderShipFields.map(key => [key, source[key]]));
+  copyFields(target, source, renderShipFields);
   const ranges = target.weaponRanges ?? new Map<RenderWeapon, number>(); ranges.clear();
-  const weapons = source.weapons.map(mount => this.weapon(mount));
+  const weapons = updateProjectionArray(target.weapons, source.weapons, mount => this.weapon(mount));
   for (let i = 0; i < weapons.length; i++) ranges.set(weapons[i], combatWeaponRange(source, source.weapons[i].spec));
-  Object.assign(target, fields, {
+  Object.assign(target, {
    shield: Object.assign(this.select(source.shield, shieldFields), { hitSegmentLevels: source.shield.presentationHitSegmentLevels() }), flux: this.select(source.flux, fluxFields),
    armor: this.select(source.armor, ['cellWidth']), engineController: this.select(source.engineController, ['flameAccelerating']),
-   engineStatuses: source.engineStatuses.map(status => this.select(status, renderEngineStatusFields)), weapons,
-   weaponGroups: source.weaponGroups, system: this.system(source.system), allSystems: source.allSystems.map(system => this.system(system)),
+   engineStatuses: updateProjectionArray(target.engineStatuses, source.engineStatuses, status => this.select(status, renderEngineStatusFields)), weapons,
+   weaponGroups: source.weaponGroups, system: this.system(source.system), allSystems: updateProjectionArray(target.allSystems, source.allSystems, system => this.system(system)),
    sourceCarrier: source.sourceCarrier ? this.project(source.sourceCarrier) : undefined, weaponRanges: ranges, presentationPose: shipPresentationPose(source),
   });
   return target;

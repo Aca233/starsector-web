@@ -22,11 +22,11 @@ export function WeaponIcon({ weapon }: { weapon: WeaponSpec }) {
       <span>
         <img
           src={runtimeAssetUrl(
-            weapon.turretSpriteUrl ?? weapon.hardpointSpriteUrl ?? "",
+            weapon.displayIconUrl ?? weapon.turretSpriteUrl ?? weapon.hardpointSpriteUrl ?? "",
           )}
           alt=""
         />
-        {weapon.turretGunSpriteUrl && (
+        {!weapon.displayIconUrl && weapon.turretGunSpriteUrl && (
           <img src={runtimeAssetUrl(weapon.turretGunSpriteUrl)} alt="" />
         )}
       </span>
@@ -52,7 +52,7 @@ export function WeaponInformation({ candidate, installed, draft, selected, compa
   const specOf = (w: WeaponSpec) => previewInstallation && installed?.id === w.id && w.id !== candidate.id ? currentSpec : hullSpec;
   const rangeOf = (w: WeaponSpec) => showFitted ? effectiveWeaponRange(specOf(w), w) : w.range;
   const fitted = (w: WeaponSpec) => showFitted ? effectiveHullModWeaponSpec(specOf(w), w) : w;
-  const terms: Record<string, RefitHoverTermId> = { '战术应用': 'role', '安装类型': 'mount', '伤害': 'hitDamage', '精确度': 'accuracy', '转向速度': 'turnRate', '弹药容量': 'ammo', '装配点数': 'op', '武器射程': 'range', '伤害 / 秒': 'dps', '幅能 / 秒': 'flux', '幅能 / 每发射弹': 'shotFlux', '幅能 / 伤害': 'efficiency', '伤害类型': 'damage', '开火间隔 (秒)': 'cycle' };
+  const terms: Record<string, RefitHoverTermId> = { '战术应用': 'role', '安装类型': 'mount', '伤害': 'hitDamage', '精确度': 'accuracy', '转向速度': 'turnRate', '弹药容量': 'ammo', '装配点数': 'op', '武器射程': 'range', '伤害 / 秒': 'dps', '载荷 / 秒': 'flux', '载荷 / 每发射弹': 'shotFlux', '载荷 / 伤害': 'efficiency', '伤害类型': 'damage', '开火间隔 (秒)': 'cycle' };
   const stat = (label: string, read: (weapon: WeaponSpec) => number | string) =>
     candidate && (
       <div
@@ -98,16 +98,16 @@ export function WeaponInformation({ candidate, installed, draft, selected, compa
         {stat(
           "伤害",
           (w) =>
-            formatWeaponNumber(w.isBeam ? fitted(w).damagePerSecond : fitted(w).damagePerShot) +
-            (w.isBeam ? "/秒" : ""),
+            formatWeaponNumber(w.gravityTractor ? dps(fitted(w)) : w.isBeam ? fitted(w).damagePerSecond : fitted(w).damagePerShot) +
+            (w.isBeam || w.gravityTractor ? "/秒" : ""),
         )}
         {stat("伤害 / 秒", (w) => formatWeaponNumber(dps(fitted(w))))}
         <div className="source-weapon-stat-gap" />
-        {stat("幅能 / 秒", (w) => formatWeaponNumber(weaponFluxPerSecond(fitted(w))))}
-        {stat("幅能 / 每发射弹", (w) =>
-          w.isBeam ? "—" : formatWeaponNumber(fitted(w).fluxPerShot),
+        {stat("载荷 / 秒", (w) => formatWeaponNumber(weaponFluxPerSecond(fitted(w))))}
+        {stat("载荷 / 每发射弹", (w) =>
+          w.isBeam || w.gravityTractor ? "—" : formatWeaponNumber(fitted(w).fluxPerShot),
         )}
-        {stat("幅能 / 伤害", (w) =>
+        {stat("载荷 / 伤害", (w) =>
           dps(fitted(w)) ? Number((weaponFluxPerSecond(fitted(w)) / dps(fitted(w))).toFixed(2)).toString() : "—",
         )}
       </dl>
@@ -140,7 +140,7 @@ export function WeaponInformation({ candidate, installed, draft, selected, compa
         )}
         <div className="source-weapon-stat-gap" />
         {stat("开火间隔 (秒)", (w) =>
-          w.isBeam && w.beamVisualMode !== "BURST"
+          w.gravityTractor || w.isBeam && w.beamVisualMode !== "BURST"
             ? "持续"
             : formatWeaponNumber(cycleSeconds(fitted(w))),
         )}

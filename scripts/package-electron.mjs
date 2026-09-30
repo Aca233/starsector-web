@@ -1,3 +1,4 @@
+import { buildContentBundle, runtimeFingerprint } from './package-desktop-content.mjs';
 import { copySteamMetricsRuntime, steamMetricsExtraResources, verifySteamMetricsRuntime } from './package-steam-metrics-runtime.mjs';
 import fs from 'node:fs/promises';
 import { assertCleanWebBuild } from './web-build-integrity.mjs';
@@ -94,6 +95,8 @@ const artifacts = await build({ projectDir: project, targets: Platform.WINDOWS.c
       await fs.access(path.join(packagedBackend, 'node_modules', 'steamworks.js', 'dist', 'win64', 'steamworksjs.win32-x64-msvc.node'));
       await fs.access(path.join(appOutDir, 'steam_api64.dll'));
       await fs.access(path.join(appOutDir, 'resources', 'app.asar.unpacked', 'node_modules', '@koromix', 'koffi-win32-x64', 'win32_x64', 'koffi.node'));
+      await buildContentBundle({ backend: packagedBackend, output, version, build: buildId,
+        runtime: await runtimeFingerprint(appOutDir, path.join(electronDist, 'electron.exe')), baseManifestPath: path.join(appOutDir, 'resources', 'desktop-content.json') });
     },
     win: { artifactName: 'Starsector-Web-Desktop-${version}-${arch}.${ext}' },
     nsis: { artifactName: 'Starsector-Web-Desktop-Setup-${version}-${arch}.${ext}', oneClick: false,

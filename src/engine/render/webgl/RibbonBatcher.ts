@@ -32,7 +32,6 @@ precision mediump float;
 
 in vec2 v_uv;
 in vec4 v_color;
-
 uniform sampler2D u_texture;
 uniform float u_alphaDensityScale;
 
@@ -380,8 +379,11 @@ export class RibbonBatcher {
       }
     };
     this.setBlendMode('ADDITIVE');
-    strip(bulletTexture, [v(tip, -coreWidth, 0, 1, core, alpha), v(tip, coreWidth, 1, 1, core, alpha),
-      v(head, -coreWidth, 0, 0, core, alpha), v(head, coreWidth, 1, 0, core, alpha)]);
+    // N.java uses the original OpenGL upload's inverted V. Web images/bitmaps
+    // are uploaded unflipped: their TOP (V=0), where the shell nose is painted,
+    // must lead the velocity vector. Copying native V=1 made every shell fly backwards.
+    strip(bulletTexture, [v(tip, -coreWidth, 0, 0, core, alpha), v(tip, coreWidth, 1, 0, core, alpha),
+      v(head, -coreWidth, 0, 1, core, alpha), v(head, coreWidth, 1, 1, core, alpha)]);
     strip(fringeTexture, [v(tip, -1, phase - noseLength / 128, 0, fringe, 0), v(tip, 1, phase - noseLength / 128, 1, fringe, 0),
       v(head, -1, phase, 0, fringe, alpha), v(head, 1, phase, 1, fringe, alpha),
       v(tail, -1, phase + length / 128, 0, fringe, 0), v(tail, 1, phase + length / 128, 1, fringe, 0)]);
@@ -471,11 +473,28 @@ export class RibbonBatcher {
     }
   }
 
+  /** PlasmaShot.java: torpedoray32 quad, 1:4 aspect, 20% root pivot,
+   * core-color root vertices and fringe-color tip vertices. */
+  public drawPlasmaRay(texture: WebGLTexture, x: number, y: number, angle: number, size: number,
+    core: readonly number[], fringe: readonly number[], alpha: number): void {
+    if (size <= 0 || alpha <= 0) return;
+    this.setBlendMode('ADDITIVE'); this.setAlphaDensityScale(1);
+    if (this.currentTexture !== texture) { this.flush(); this.currentTexture = texture; }
+    if (this.vertexCount + 6 >= RibbonBatcher.MAX_VERTICES) this.flush();
+    const c = Math.cos(angle), s = Math.sin(angle);
+    for (const [u,v] of [[0,0],[1,0],[0,1],[0,1],[1,0],[1,1]]) {
+      const across = (u - .5) * size / 4, along = (v - .2) * size;
+      const color = v ? fringe : core;
+      this.emitVertex(x + across*c - along*s, y + across*s + along*c, u, 1-v,
+        color[0]/255, color[1]/255, color[2]/255, alpha * (color[3] ?? 255)/255);
+    }
+  }
+
   /** Three cross-sections from G.java: dim nozzle, bright throat, transparent tip. */
   public drawEnginePlume(
     texture: WebGLTexture, x: number, y: number, angle: number,
     length: number, width: number, throat: number, phase: number, uvLength: number,
-    color: readonly [number, number, number], nozzleAlpha: number, throatAlpha: number
+    color: readonly [number, number, number], nozzleAlpha: number, throatAlpha: number, v0 = .01, v1 = .99
   ): void {
     if (length <= 0 || width <= 0) return;
     this.setBlendMode('ADDITIVE');
@@ -490,7 +509,7 @@ export class RibbonBatcher {
     const emit = (along: number, side: number, u: number, alpha: number) => {
       const across = side * width / 2;
       this.emitVertex(x + c * along - s * across, y + s * along + c * across,
-        u, side < 0 ? 0.01 : 0.99, color[0], color[1], color[2], alpha);
+        u, side < 0 ? v0 : v1, color[0], color[1], color[2], alpha);
     };
     const positions = [0, throat, length];
     const u = [phase, phase + throat / length, phase + uvLength];

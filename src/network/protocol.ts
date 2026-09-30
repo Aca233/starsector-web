@@ -1,3 +1,9 @@
+import type { AIDecisionProfile } from '../shared/ai-decision-profile.mjs';
+import type { LanVisualDelivery } from './LanPresentationVisuals';
+import { inspectLanComponent, LAN_COMPONENT_LIMITS, type LanComponentDelivery } from './LanPresentationComponents';
+import { inspectLanBinaryState, type LanBinaryDelivery, type LanBinaryIngressSession } from './LanBinaryStateIngress';
+import { PresentationReceipts, type PresentationReceipt, type PresentationReceiptStatus, type PresentationReceiptToken } from './PresentationReceipts';
+import { ANCHORED_VISUAL_LIMITS } from './AnchoredProjectileVisual.mjs';
 import { networkCloseCause } from '../../desktop/network-diagnostic-record.mjs';
 import { AuthorityComponentPublisher } from './AuthorityComponents.mjs';
 import { networkFeaturePolicy, networkHelloFeatures, networkFeatureStatus } from './NetworkFeaturePolicy.mjs';
@@ -47,6 +53,8 @@ export interface RoomOptions {
   assignment: "teams" | "solo";
   /** Whole-battle DP selected by the host. Frozen on match start. */
   battleSize: number;
+  /** Host-selected gameplay rule, frozen in Match. Missing means standard. */
+  aiDecisionProfile?: AIDecisionProfile;
   /** Server-derived per-team active DP ceiling. */
   deploymentLimit?: number;
   /** Initial DP target; humans and each team flagship always deploy. */
@@ -78,7 +86,7 @@ export interface Room {
 }
 export interface Action {
   id: number;
-  kind: "shield" | "hullShield" | "vent" | "system" | "group" | "mode" | "autofire" | "target" | "recall";
+  kind: "shield" | "hullShield" | "vent" | "system" | "group" | "mode" | "autofire" | "target" | "recall" | "module";
   value?: number;
   /** Command-edge world point, independent of a later movement packet. */
   aim?: [number, number];
@@ -110,7 +118,7 @@ export const blankInput = (): PlayerInput => ({
   pointerActive: false,
   actions: [],
 });
-export type Listener = (message: any) => void;
+export type Listener = (message: any, receipt?: PresentationReceipt) => void;
 const STORAGE_KEY = "starsector.lan.session.v5";
 /** Session token is tab-local. A new page can resume a guest, never reconstruct a host Worker. */
 const NETWORK_FEATURE_POLICY = networkFeaturePolicy(import.meta.env);
@@ -119,9 +127,165 @@ export const LAN_LAYERED_SYNC_ENABLED = NETWORK_FEATURE_POLICY.mode === 'experim
 export const LAN_MOTION_SYNC_ENABLED = NETWORK_FEATURE_POLICY.motion;
 export const LAN_CRITICAL_COMBAT_ENABLED = NETWORK_FEATURE_POLICY.combat;
 
+export interface LanBinaryStateOwner {
+  readonly matchId: string;
+  /** Must synchronously fence old jobs; an async owner sends an ordered reset. */
+  reset(session: LanBinaryIngressSession): void;
+  /** Defer synchronously before transferring data; complete only after retain. */
+  receive(packet: LanBinaryDelivery, receipt: PresentationReceipt): void;
+  receiveComponent?(packet: LanComponentDelivery, receipt: PresentationReceipt): void;
+  receiveVisual?(packet: LanVisualDelivery, receipt: PresentationReceipt): void;
+}
 export class LanConnection {
+  private binaryOwner: LanBinaryStateOwner | null = null;
+  private binaryOwnerId = '';
+  private binaryOwnerEpoch = 0;
+  private binaryOwnerFailed = false;
+  private binaryStateSeen = false;
+  private presentationEncoding: 'binary' | 'json' | null = null;
+  private motionReference = false;
+  private binarySession(): LanBinaryIngressSession {
+    return { owner: this.binaryOwnerId, epoch: this.binaryOwnerEpoch, matchId: this.binaryOwner!.matchId,
+      binaryDelta: this.binaryDelta, motionReference: this.motionReference, projectileVisuals: this.visualState,
+      components: { syncId: this.presentationSyncKey ? JSON.parse(this.presentationSyncKey)[1] : '', motion: this.motionState, combat: this.combatState } };
+  }
+  private resetBinaryOwner(): void {
+    if (!this.binaryOwner) return;
+    this.binaryOwnerEpoch++;
+    try { this.binaryOwner.reset(this.binarySession()); this.binaryOwnerFailed = false; }
+    catch (error) {
+      this.binaryOwnerFailed = true; this.presentationReceipts.reset();
+      this.emit({ type: 'error', code: 'PRESENTATION_INGRESS', message: String(error) });
+    }
+  }
+  /** Opt-in before the first binary state, never silently switch a live anchor
+   * chain. JSON states remain on the legacy subscriber path and fence this lane.
+   * Releasing an active stream reconnects to obtain a fresh main-thread anchor. */
+  claimBinaryState(owner: LanBinaryStateOwner): (() => void) | null {
+    if (this.binaryOwner || this.binaryStateSeen) return null;
+    if (!owner || typeof owner.matchId !== 'string' || !owner.matchId || owner.matchId.length > 128) throw Error('Invalid binary presentation owner');
+    this.binaryOwner = owner;
+    this.binaryOwnerId = Array.from(crypto.getRandomValues(new Uint8Array(16)), n => n.toString(16).padStart(2, '0')).join('');
+    this.binaryOwnerEpoch = 0; this.deltaReceiver.reset(); this.resetBinaryOwner();
+    return () => {
+      if (this.binaryOwner !== owner) return;
+      // Components/visuals can arrive before the first binary anchor. Revoking
+      // their receipts also needs fresh remote credits, not a silent handoff.
+      const active = this.binaryStateSeen || this.presentationReceipts.stats.pending > 0;
+      this.resetPresentationConsumption(); this.binaryOwner = null; this.deltaReceiver.reset();
+      if (active && this.socket && this.ready) this.retry(this.socket, 1006, 'presentation-owner-changed');
+    };
+  }
+  /** Format handoff, not a per-JSON-frame reset: repeatedly revoking an
+   * unchanged JSON stream destroys playback/UI and prevents stable prediction.
+   * Never overtake retained events from the other format. */
+  private enterPresentationEncoding(encoding: 'binary' | 'json', socket: LanSocket): boolean {
+    if (this.binaryOwner && this.presentationEncoding !== null && this.presentationEncoding !== encoding) {
+      if (this.presentationReceipts.stats.pending) { this.retry(socket, 1006, 'binary-json-handoff'); return false; }
+      this.resetPresentationConsumption();
+    }
+    this.presentationEncoding = encoding;
+    return true;
+  }
+  private deliverBinaryState(data: ArrayBuffer, socket: LanSocket): void {
+    const owner = this.binaryOwner;
+    if (!owner || this.binaryOwnerFailed) return;
+    try {
+      const session = this.binarySession(), identity = inspectLanBinaryState(data, session);
+      this.snapshotBytes = identity.bytes; this.snapshotParseMs = 0;
+      this.lastMessageAt = performance.now();
+      const acknowledge = this.stateCredits
+        ? this.receiptSender(socket, { type: 'state-consumed', matchId: identity.matchId, seq: identity.seq }) : () => true;
+      // This is the decoded wire budget, not patch length or restored heap size.
+      this.presentationReceipts.deliver('state', identity.bytes, acknowledge, receipt => {
+        this.requirePresentationClaim(receipt, required => owner.receive({ owner: session.owner, epoch: session.epoch, ...identity, data }, required));
+      });
+    } catch {
+      // Failed admission/dispatch grants no ACK; reset both owner and wire chain.
+      this.retry(socket, 1006, 'decode-failed');
+    }
+  }
+  private requirePresentationClaim(receipt: PresentationReceipt, dispatch: (required: PresentationReceipt) => void): void {
+    let claimed = false;
+    const required: PresentationReceipt = {
+      defer: cancel => { const token = receipt.defer(cancel); claimed = true; return token; },
+      complete: status => { claimed = true; return receipt.complete(status); },
+      reject: error => { claimed = true; receipt.reject(error); },
+    };
+    const result: unknown = dispatch(required);
+    if (result && typeof (result as Promise<unknown>).then === 'function') {
+      void Promise.resolve(result).catch(() => {});
+      throw Error('Presentation owner must defer before returning, not return a Promise');
+    }
+    if (!claimed) throw Error('Presentation owner did not claim consumption');
+  }
+  private deliverComponent(m: any, socket: LanSocket): void {
+    const kind = m.type === 'motion' ? 'motion' : 'combat';
+    if (!(kind === 'motion' ? this.motionState : this.combatState) || (this.binaryOwner && this.binaryOwnerFailed)) return;
+    if (typeof m.matchId !== 'string' || !m.matchId || m.matchId.length > 128 || typeof m.syncId !== 'string'
+      || !m.syncId || m.syncId.length > 128 || JSON.stringify([m.matchId, m.syncId]) !== this.presentationSyncKey) return;
+    const owner = this.binaryOwner;
+    if (owner && owner.matchId !== m.matchId) return;
+    try {
+      const tick = inspectLanComponent(kind, m.data);
+      if (kind === 'combat' && tick !== m.tick) throw Error('Critical combat tick mismatch');
+      const acknowledge = this.receiptSender(socket, { type: kind === 'motion' ? 'motion-consumed' : 'combat-consumed',
+        matchId: m.matchId, syncId: m.syncId, tick }, kind === 'combat', kind === 'motion');
+      // Discarding inactive motion must NOT activate the relay's motion lane.
+      const packet: LanComponentDelivery = { owner: this.binaryOwnerId, epoch: this.binaryOwnerEpoch,
+        matchId: m.matchId, syncId: m.syncId, kind, tick, data: m.data };
+      this.presentationReceipts.deliver(kind, m.data.length, acknowledge, receipt => {
+        if (owner?.receiveComponent) this.requirePresentationClaim(receipt, required => owner.receiveComponent!(packet, required));
+        else this.emit(m, receipt);
+      });
+    } catch { this.retry(socket, 1006, 'decode-failed'); }
+  }
+  private deliverVisual(m: any, socket: LanSocket): void {
+    if (!this.visualState) return;
+    const owner = this.binaryOwner;
+    if (owner?.receiveVisual && (this.binaryOwnerFailed || m.matchId !== owner.matchId
+      || JSON.stringify([m.matchId, m.syncId]) !== this.presentationSyncKey)) return;
+    let bytes: Uint8Array | null;
+    try { bytes = this.visualPackets.take(m); }
+    catch { this.visualPackets.reset(); this.send(visualReceipt(m, 'discarded')); return; }
+    if (!bytes) { this.send(visualReceipt(m, 'fragment')); return; }
+    const acknowledge = this.receiptSender(socket, visualReceipt(m), true);
+    const identity = { owner: this.binaryOwnerId, epoch: this.binaryOwnerEpoch, matchId: m.matchId,
+      syncId: m.syncId, key: m.key, tick: m.tick, kind: m.kind };
+    this.presentationReceipts.deliver('visual', bytes.byteLength, acknowledge, receipt => {
+      if (owner?.receiveVisual) {
+        // Assembler owns these bytes; transfer without retaining or restoring a
+        // projectile graph on the UI thread. Never transfer a pooled backing slab.
+        const data = bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength
+          ? bytes.buffer as ArrayBuffer : bytes.slice().buffer as ArrayBuffer;
+        this.requirePresentationClaim(receipt, required => owner.receiveVisual!({ ...identity, data }, required));
+      } else this.emit({ ...m, visualBytes: bytes }, receipt);
+    });
+  }
   socket: LanSocket | null = null;
   private readonly realtimeGate = new RealtimeSendGate();
+  private presentationSyncKey = '';
+  private readonly presentationReceipts = new PresentationReceipts(error => {
+    if (this.binaryOwner) this.binaryOwnerFailed = true;
+    this.emit({ type: 'error', code: 'PRESENTATION_CONSUMPTION', message: '呈现接收失败：' + (error instanceof Error ? error.message : String(error)) });
+  }, { state: { count: 64, units: config.maxSnapshotBytes * 2 },
+    visual: { count: 4, units: ANCHORED_VISUAL_LIMITS.baselineBytes * 4 }, ...LAN_COMPONENT_LIMITS });
+  /** These tokens are local correlation, never authority input or server ACKs. */
+  completePresentation(token: PresentationReceiptToken, status: PresentationReceiptStatus): boolean {
+    return this.presentationReceipts.complete(token, status);
+  }
+  resetPresentationConsumption(): void {
+    this.presentationReceipts.reset();
+    if (this.binaryOwner?.receiveVisual) this.visualPackets.reset();
+    this.resetBinaryOwner();
+  }
+  get presentationConsumption() { return this.presentationReceipts.stats; }
+  // Separate scope deliberately keeps pending ACK closures from retaining m.frame,
+  // decoded arrays or the onmessage event through a shared closure environment.
+  private receiptSender(socket: LanSocket, receipt: Record<string, unknown>, statusField = false, discardWithoutSend = false) {
+    return (status: PresentationReceiptStatus) => (discardWithoutSend && status === 'discarded')
+      || (this.socket === socket && this.send(statusField ? { ...receipt, status } : receipt));
+  }
   canSendInput(): boolean {
     return this.socket?.readyState === WebSocket.OPEN && this.realtimeGate.canSendInput(this.socket.bufferedAmount, performance.now());
   }
@@ -147,6 +311,7 @@ export class LanConnection {
   private pipelineEpoch = 0;
   private pipelineProbeEpoch = -1;
   private resetPipeline(): void {
+    this.presentationSyncKey = ''; this.resetPresentationConsumption(); this.binaryStateSeen = false; this.presentationEncoding = null;
     this.visualPackets.reset();
     this.snapshotPipeline = null;
     this.snapshotPipelineAt = null;
@@ -208,8 +373,16 @@ export class LanConnection {
       this.listeners.delete(fn);
     };
   }
-  emit(message: any) {
-    for (const fn of this.listeners) fn(message);
+  emit(message: any, receipt?: PresentationReceipt) {
+    for (const fn of this.listeners) {
+      const result: unknown = fn(message, receipt);
+      // Async work must explicitly defer before returning; an async listener is
+      // otherwise indistinguishable from a silently dropped presentation packet.
+      if (receipt && result && typeof (result as Promise<unknown>).then === 'function') {
+        void Promise.resolve(result).catch(() => {});
+        throw Error('Presentation listeners must explicitly defer, not return a Promise');
+      }
+    }
   }
   private forget() {
     this.saved = null;
@@ -269,7 +442,7 @@ export class LanConnection {
     this.stateCredits = false;
     this.networkFeatures = networkFeatureStatus(this.transport, NETWORK_FEATURE_POLICY);
     this.motionState = false; this.visualState = false; this.combatState = false;
-    this.binaryDelta = false;
+    this.binaryDelta = false; this.motionReference = false;
     this.steamBinarySnapshots = false;
     this.deltaReceiver.setMotionReference(false);
     this.deltaReceiver.reset();
@@ -311,6 +484,11 @@ export class LanConnection {
       // Heartbeats, room changes and terminal reports must still be processed.
       if (document.visibilityState === "hidden" && (event.data instanceof ArrayBuffer ||
           (typeof event.data === "string" && event.data.startsWith('{"type":"state",')))) return;
+      if (event.data instanceof ArrayBuffer) {
+        if (!this.enterPresentationEncoding('binary', socket)) return;
+        this.binaryStateSeen = true;
+        if (this.binaryOwner) { this.deliverBinaryState(event.data, socket); return; }
+      }
       let m: any;
       try {
         const started = performance.now();
@@ -318,6 +496,7 @@ export class LanConnection {
         const packet = binary && this.binaryDelta ? this.deltaReceiver.decode(event.data) : event.data;
         m = binary ? decodeBinaryState(packet) : JSON.parse(packet);
         if (!binary && (m.type === "state" || m.type === "match")) this.deltaReceiver.reset();
+        if (!binary && m.type === "state" && !this.enterPresentationEncoding('json', socket)) return;
         if (m.type === "state") {
           if (m.frame?.projectileVisuals === 1 && !this.visualState) throw Error("Unnegotiated projectile projection");
           this.snapshotBytes = event.data instanceof ArrayBuffer ? packet.byteLength : event.data.length;
@@ -346,7 +525,9 @@ export class LanConnection {
         this.networkFeatures = networkFeatureStatus(this.transport, NETWORK_FEATURE_POLICY, m);
         this.binaryDelta = this.transport === "lan" && this.stateCredits && m.binaryDelta === 1;
         this.steamBinarySnapshots = this.transport === "steam" && m.binarySnapshots === 1;
-        this.deltaReceiver.setMotionReference(this.binaryDelta && m.motionReference === 1);
+        this.motionReference = this.binaryDelta && m.motionReference === 1;
+        this.deltaReceiver.setMotionReference(this.motionReference);
+        this.resetBinaryOwner();
         clearTimeout(this.handshakeTimer);
         this.ready = true;
         this.lastMessageAt = performance.now();
@@ -383,12 +564,29 @@ export class LanConnection {
           /* optional */
         }
       }
-      if (m.type === "layered-ready" && this.transport === "steam") { this.visualState = NETWORK_FEATURE_POLICY.visuals && m.visualState === 1; this.combatState = NETWORK_FEATURE_POLICY.combat && m.combatState === 1; this.networkFeatures = { ...this.networkFeatures, visuals: this.visualState, combat: this.combatState, reason: "steam-components-check-receiver" }; }
-      if (m.type === "layered-unavailable") { this.visualState = this.combatState = false; this.visualPackets.reset(); this.networkFeatures = { ...this.networkFeatures, visuals: false, combat: false, reason: "component-fallback" }; }
-      if (m.type === "match" || m.type === "ended") {
+      if (m.type === "layered-ready" && this.transport === "steam") { this.visualState = NETWORK_FEATURE_POLICY.visuals && m.visualState === 1; this.combatState = NETWORK_FEATURE_POLICY.combat && m.combatState === 1; this.networkFeatures = { ...this.networkFeatures, visuals: this.visualState, combat: this.combatState, reason: "steam-components-check-receiver" }; if (this.binaryOwner) { this.resetPresentationConsumption(); if (this.binaryStateSeen) this.send({type:'resync',matchId:this.binaryOwner.matchId}); } }
+      if (m.type === "layered-unavailable") { this.visualState = this.combatState = false; this.visualPackets.reset(); this.presentationReceipts.discardVisual(); this.networkFeatures = { ...this.networkFeatures, visuals: false, combat: false, reason: "component-fallback" }; if (this.binaryOwner) { this.resetPresentationConsumption(); if (this.binaryStateSeen) this.send({type:'resync',matchId:this.binaryOwner.matchId}); } }
+      if (m.type === 'launch') {
+        const key = JSON.stringify([m.matchId, m.syncId]);
+        if (key !== this.presentationSyncKey) {
+          this.presentationSyncKey = key; this.resetPresentationConsumption(); this.visualPackets.reset();
+        }
+      }
+      if (m.type === 'roomClosed' || m.type === 'left') this.resetPipeline();
+      if (m.type === 'ended') {
+        // The last async receive must finish before LanApp/React can stop its
+        // owner. Heartbeats still pass; this retains only one bounded report.
+        this.presentationReceipts.afterPending(m.matchId, () => {
+          if (this.socket !== socket) return;
+          this.authorityComponents.reset(); this.resetPipeline(); this.authoritySample = null;
+          this.emit(m);
+        });
+        return;
+      }
+      if (m.type === "match") {
         this.authorityComponents.reset();
         this.resetPipeline();
-        if (m.type === "ended" || this.authoritySample?.matchId !== m.match?.id) this.authoritySample = null;
+        if (this.authoritySample?.matchId !== m.match?.id) this.authoritySample = null;
       }
       if (m.type === "pong" && m.sent === this.pingSent && this.pingSent > 0) {
         if (this.transport === "lan") this.lanTransport = m.lanTransport ?? null;
@@ -409,23 +607,20 @@ export class LanConnection {
       }
       if (m.type === "error" && ["RESUME_EXPIRED", "VERSION"].includes(m.code))
         this.forget();
-      if (m.type === 'projectile-visual') {
-        if (!this.visualState) return;
-        try { m.visualBytes = this.visualPackets.take(m); } catch { this.visualPackets.reset(); this.send(visualReceipt(m,'discarded')); return; }
-        if (!m.visualBytes) { this.send(visualReceipt(m,'fragment')); return; }
-        // Synchronous subscribers set visualHandled only after successful CRC,
-        // epoch and projection validation/retention. No listener => discard,
-        // which frees bounded flight but never grants baseline-ready credit.
-        this.emit(m);
-        this.send(visualReceipt(m,m.visualHandled === true ? 'consumed' : 'discarded'));
+      if (m.type === 'motion' || m.type === 'combat-state') { this.deliverComponent(m, socket); return; }
+      if (m.type === 'projectile-visual') { this.deliverVisual(m, socket); return; }
+      if (m.type === 'state') {
+        if (typeof m.matchId !== 'string' || !m.matchId || m.matchId.length > 128 || !Number.isSafeInteger(m.seq) || m.seq < 0) {
+          this.presentationReceipts.reset(); this.emit({ type: 'error', message: '无效快照回执身份' }); return;
+        }
+        const acknowledge = this.stateCredits
+          ? this.receiptSender(socket, { type: 'state-consumed', matchId: m.matchId, seq: m.seq }) : () => true;
+        // snapshotBytes is exact for binary, string code-unit length for JSON,
+        // as in diagnostics. This bounds encoded units, not restored heap bytes.
+        this.presentationReceipts.deliver('state', this.snapshotBytes, acknowledge, receipt => this.emit(m, receipt));
         return;
       }
       this.emit(m);
-      // Application consumption credit, never a GPU/display ACK or RTT sample.
-      // Release only after the synchronous subscribers have retained the frame
-      // and its discrete events. Hidden/resync epochs are reset by the relay.
-      if (m.type === "state" && this.stateCredits && this.socket === socket)
-        this.send({type:"state-consumed",matchId:m.matchId,seq:m.seq});
     };
     socket.onclose = (event) => this.retry(socket, event.code, networkCloseCause(event.reason));
     socket.onerror = () => {}; // close owns retry/error reporting.
@@ -436,6 +631,7 @@ export class LanConnection {
     clearTimeout(this.handshakeTimer);
     clearInterval(this.heartbeatTimer);
     this.socket = null;
+    this.resetPresentationConsumption();
     socket.close();
     this.ready = false;
     if ([1008, 1009, 4001, 4003].includes(code) || !this.saved) {
@@ -542,6 +738,6 @@ export class LanConnection {
     this.socket = null;
     this.ready = false;
     socket?.close();
-    if (clearListeners) this.listeners.clear();
+    if (clearListeners) { this.listeners.clear(); this.binaryOwner = null; }
   }
 }

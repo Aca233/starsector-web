@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "records": [
+    {
+      "path": "graphics/original/glow.png",
+      "sha256": "b6e90b10d8596d108e49e588c765e67b11ab479bd5fe29c992f011d088aac6a6",
+      "source": "scripts/generate-original-primitives.mjs: independent mathematical geometry/synthesis"
+    },
+    {
+      "path": "graphics/original/ring.png",
+      "sha256": "d7bf285612827489ad0b6c02decec06edbad0548dfcc7129f0b794bfdc0e4e98",
+      "source": "scripts/generate-original-primitives.mjs: independent mathematical geometry/synthesis"
+    },
+    {
+      "path": "graphics/original/beam.png",
+      "sha256": "cb2e914b3f072f8f45dff7568193a25d6359bd88c377516efd6695e80f40cb68",
+      "source": "scripts/generate-original-primitives.mjs: independent mathematical geometry/synthesis"
+    },
+    {
+      "path": "graphics/original/flame.png",
+      "sha256": "92b9d82addb7952f8867abe3d1d32e2bbf9718ff103f7a59e4aac963244c05e7",
+      "source": "scripts/generate-original-primitives.mjs: independent mathematical geometry/synthesis"
+    },
+    {
+      "path": "graphics/original/projectile.png",
+      "sha256": "296a161dd5b6f46c64fe8dfa8df050d2b4fc3557a01dc900d0a95f96ecf64d1d",
+      "source": "scripts/generate-original-primitives.mjs: independent mathematical geometry/synthesis"
+    },
+    {
+      "path": "graphics/original/rocket.png",
+      "sha256": "0c2e86f8da3fd1cfefb0eae5fdebb5497da78df7257dddf733d5d1522c091b23",
+      "source": "scripts/generate-original-primitives.mjs: independent mathematical geometry/synthesis"
+    },
+    {
+      "path": "graphics/original/asteroid.png",
+      "sha256": "106e3b3c8b5d7e1ac929f0e72532b68eb73c3783709ac9160d3a7f23db6aa070",
+      "source": "scripts/generate-original-primitives.mjs: independent mathematical geometry/synthesis"
+    },
+    {
+      "path": "graphics/original/nebula.png",
+      "sha256": "7f3e0b9f12e09f95484e6306eb2566cc45275f6b9a3ebdaa179f5bccda660dc4",
+      "source": "scripts/generate-original-primitives.mjs: independent mathematical geometry/synthesis"
+    },
+    {
+      "path": "graphics/original/damage.png",
+      "sha256": "30b55fcd186b7dc126db642ccb1adbf1ed405251e18bfdceeaf94c20c7c59043",
+      "source": "scripts/generate-original-primitives.mjs: independent mathematical geometry/synthesis"
+    },
+    {
+      "path": "graphics/original/arc.png",
+      "sha256": "88d52927ac712f94c8c7a0bc2118318b9b42ec5b3f112416f4e9caf44cad7504",
+      "source": "scripts/generate-original-primitives.mjs: independent mathematical geometry/synthesis"
+    },
+    {
+      "path": "graphics/original/space.png",
+      "sha256": "887aaa6402902d3831b983fe62e45100a882c2043563f4c7ed300d7bd85634be",
+      "source": "scripts/generate-original-primitives.mjs: independent mathematical geometry/synthesis"
+    },
+    {
+      "path": "graphics/portraits/web_captain.png",
+      "sha256": "7d7d9d8f1e176f7f1e99d4ea95320f46ecd9209791965b0450bddc4d4bca32c5",
+      "source": "scripts/generate-original-primitives.mjs: independent mathematical geometry/synthesis"
+    },
+    {
+      "path": "sounds/original/ui.wav",
+      "sha256": "c6ed33e4bc0c3a134dec12ec3dc9f106ed9e61d232981fd33472e8b879854ede",
+      "source": "scripts/generate-original-primitives.mjs: independent mathematical geometry/synthesis"
+    },
+    {
+      "path": "sounds/original/fire.wav",
+      "sha256": "0f32f972c4e8957453540c7d8387dfbb929d34e7739fa2a934a6f70ab6e7fcc9",
+      "source": "scripts/generate-original-primitives.mjs: independent mathematical geometry/synthesis"
+    },
+    {
+      "path": "sounds/original/impact.wav",
+      "sha256": "ddb78e1866dd96448d441c1fb4350b46ab41430953ff0e184ae3e212c561ab63",
+      "source": "scripts/generate-original-primitives.mjs: independent mathematical geometry/synthesis"
+    },
+    {
+      "path": "sounds/original/engine.wav",
+      "sha256": "8d3b403372b7709ce033808a943e97998159f059c7d4bd2ab18cb4ddb93b78cb",
+      "source": "scripts/generate-original-primitives.mjs: independent mathematical geometry/synthesis"
+    }
+  ]
+}

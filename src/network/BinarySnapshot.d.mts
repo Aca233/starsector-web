@@ -23,3 +23,6 @@ export function decodeBinaryStateWithProjectileVariantForRelay(buffer: ArrayBuff
   state: ReturnType<typeof decodeBinaryStateForRelay>;
   projectileVariant(): Uint8Array<ArrayBuffer> | null;
 };
+
+/** Bounded envelope only; payload is not decoded or validated. */
+export function inspectBinaryState(buffer: ArrayBuffer | ArrayBufferView): { matchId: string; seq: number; bytes: number };

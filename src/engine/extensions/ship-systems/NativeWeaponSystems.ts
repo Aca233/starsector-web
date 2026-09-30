@@ -1,4 +1,6 @@
-import data from './native-system-weapons.json';
+import rawData from './native-system-weapons.json';
+import type { SystemWeaponData } from './LegacySystemData';
+const data: Readonly<Partial<Record<string, SystemWeaponData>>> = rawData;
 import { nativeSystem } from './NativeSystemFactory';
 import { Vector2 } from '../../math/Vector2';
 import { combatAudio as sound } from '../../audio/CombatAudioEvents';
@@ -9,8 +11,9 @@ import type { LauncherSmokeSpec, Projectile } from '../../simulation/Weapon';
 import type { SystemWorld } from './Types';
 
 const native = data.canister_flak;
-const number = (key: keyof typeof native.row) => Number(native.row[key] || 0);
+const number = (key: string) => Number(native?.row[key] || 0);
 function emit(ship: Ship, slot: WeaponMountSlotConfig, world: SystemWorld): number {
+  if (!native) throw new Error('Native canister system content has been removed');
   if (!world.projectiles) throw new Error('System weapons require the combat projectile collection');
   const random = world.combatRandom;
   const facing = ship.facingRad + slot.baseAngleDeg * Math.PI / 180;
@@ -47,9 +50,9 @@ function emit(ship: Ship, slot: WeaponMountSlotConfig, world: SystemWorld): numb
   sound.play(native.weapon.fireSoundTwo,ship.isPlayer ? .85 : .45);
   return delay;
 }
-export const canisterFlak = nativeSystem('canister_flak', {
+export const canisterFlak = native ? nativeSystem('canister_flak', {
   description:'每个原生系统发射口发射5枚高爆罐弹；近炸半径40、爆炸半径75，使用独立防御槽、次数与恢复。',
   implementationDetails:'S 武器型系统和 CanisterFlakPlugin 的发射口、连发、随机初速/自旋/寿命/间隔，原生高爆范围伤害。专用详细爆炸视觉尚未逐项还原。',
   resources:{textures:['/game-assets/'+native.projectile.sprite],sounds:[native.weapon.fireSoundTwo,native.projectile.behaviorSpec.explosionSpec.sound]},
   ...systemWeaponLauncher(number('burst size'), emit),
-});
+}) : undefined;

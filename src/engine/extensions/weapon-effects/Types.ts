@@ -8,6 +8,8 @@ export interface WeaponEffectDefinition {
   id: string;
   beam?: (beam: Beam, target: Ship | undefined, mount: WeaponMount | undefined, ctx: WeaponSimContext) => void;
   hitProjectile?: (projectile: Projectile, target: Projectile, point: Vector2, source: Ship | undefined, ctx: WeaponSimContext) => void;
+  /** Non-ship solid contact. Cosmetic hooks must not invent a ship or repeat payload damage. */
+  hitEnvironment?: (projectile: Projectile, point: Vector2, velocity: Vector2, ctx: WeaponSimContext) => void;
   hit?: (projectile: Projectile, target: Ship, point: Vector2, shield: boolean, source: Ship | undefined, ctx: WeaponSimContext) => void;
   advance?: (ship: Ship, mount: WeaponMount, dt: number, ctx: WeaponSimContext) => void;
 }

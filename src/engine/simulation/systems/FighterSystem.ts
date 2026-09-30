@@ -1,11 +1,16 @@
-import { sameTeam } from "../CombatTeams";
+import { isArkCraft, isArkInterceptor, advanceArkFlightDefense } from '../../extensions/AdunArkFlight';
+import { glorianaCraftRole } from '../../content/GlorianaAviation';
+import { advanceGlorianaCraft } from './GlorianaFlightAI';
+import { FlightFormation } from './FlightFormation';
+import type { FireControlWorld } from '../../ai/AutofireController';
+import { aimFlight, attackFlight, carrierOperational, dogfightTarget, flightHostile,
+  incomingFlightThreat, payloadNeedsRearm, steerFlight, strikeMounts, wingCanReach } from './FighterTactics';
 import { dispatchShipCommand } from '../../runtime/CombatCommands';
 import wingRanges from '../../extensions/native-wing-ranges.json';
-import { combatWeaponRange } from '../WeaponRange';
 import { Vector2 } from '../../math/Vector2';
 import { FighterAIState, BomberAIState, TacticalOrder, ContrailParticle, FlightDeckWing } from '../CombatTypes';
 import { Ship } from '../Ship';
-import { Projectile, Beam, WeaponMount } from '../Weapon';
+import { Projectile, Beam } from '../Weapon';
 import { modManager, type FighterWingSpec } from '../../modding/ModManager';
 import { combatAudio as sound } from '../../audio/CombatAudioEvents';
 import { SimulationRandom } from '../SimulationRandom';
@@ -43,6 +48,7 @@ export class FighterSystem {
   public playerWings: FlightDeckWing[] = [];
   public enemyWings: FlightDeckWing[] = [];
   private carriers = new Map<string, Ship>();
+  private readonly formation = new FlightFormation();
   private readonly reserveDeckUsed = new Set<Ship>();
   private readonly reserveCraft = new Map<Ship, number>();
   private readonly dockedReserve = new Set<Ship>();
@@ -62,6 +68,7 @@ export class FighterSystem {
     this.enemyWings = [];
     for (const carrier of this.carriers.values()) { carrier.deployedWingCraft.clear(); carrier.fighterRecall = false; }
     this.carriers.clear();
+    this.formation.reset();
     this.reserveDeckUsed.clear();
     this.recoveredCraft.clear();
     this.reserveCraft.clear();
@@ -82,7 +89,7 @@ export class FighterSystem {
     specs.forEach((spec, index) => {
       const wing: FlightDeckWing = {
         wingId: `${carrier.id}:wing:${index}`, carrierId: carrier.id,
-        name: spec.specId, specId: spec.specId, role: spec.role, tags: spec.tags,
+        name: (glorianaCraftRole({id:spec.specId}) || isArkCraft({spec:modManager.requireShip(spec.specId)})) ? 'ship.'+spec.specId+'.name' : spec.specId, specId: spec.specId, role: spec.role, tags: spec.tags,
         rebuildSeconds: spec.rebuildSeconds, range: spec.range ?? (wingRanges as Record<string, number>)[spec.specId + '#' + spec.count], isPlayer: carrier.isPlayer, teamId: carrier.teamId,
         maxCrafts: spec.count, crr: 1, rebuildQueue: []
       };
@@ -94,7 +101,10 @@ export class FighterSystem {
   private spawnCraft(carrier: Ship, wing: FlightDeckWing, index: number): Ship {
     const spec = modManager.getShip(wing.specId);
     if (!spec) throw new Error(`Unknown flight deck craft: ${wing.specId}`);
-    const offset = new Vector2(-100 - index * 45, (index % 2 ? -1 : 1) * (70 + index * 30)).rotate(carrier.facingRad);
+    const deckIndex=Number(wing.wingId.split(':').at(-1))||0;
+    const offset = (glorianaCraftRole(spec)
+      ? new Vector2(-carrier.spec.collisionRadius*.35-index*(spec.spriteHeight+24)-Math.floor(deckIndex/2)*60,(deckIndex%2?-1:1)*(carrier.spec.collisionRadius*.7+70+Math.floor(deckIndex/2)*100))
+      : new Vector2(-100-index*45,(index%2?-1:1)*(70+index*30))).rotate(carrier.facingRad);
     const pointDefense = carrier.spec.captainSkills?.point_defense;
     const craftSpec = pointDefense ? { ...spec, captainSkills: { ...spec.captainSkills, point_defense: pointDefense } } : spec;
     const craft = new Ship(this.random.nextId(`${carrier.id}_craft`), craftSpec, carrier.isPlayer,
@@ -102,6 +112,10 @@ export class FighterSystem {
     craft.flightDeckWingId = wing.wingId;
     craft.sourceCarrier = carrier;
     carrier.deployedWingCraft.add(craft);
+    if (!glorianaCraftRole(spec)) {
+      craft.pos.copy(this.formation.station(craft, carrier, true));
+      craft.prevPos.copy(craft.pos);
+    }
     craft.vel.copy(carrier.vel);
     if (wing.role === 'BOMBER') {
       this.bombers.push(craft);
@@ -195,17 +209,10 @@ export class FighterSystem {
     return carrier.hullStats.fighterWingRangeMultiplier <= 0 ? 0 : (this.wingFor(craft)?.range ?? Infinity) * carrier.hullStats.fighterWingRangeMultiplier;
   }
   /** Hold a real formation station without preventing in-range defensive fire. */
-  private guardCarrier(craft: Ship, carrier: Ship, target: Ship, index: number): void {
-    const station = carrier.pos.clone().add(new Vector2(carrier.spec.collisionRadius + 120, (index % 3 - 1) * 80).rotate(carrier.facingRad));
-    const targetKnown = !target.isDead && target.isVisibleTo(craft.teamId);
-    const delta = station.sub(craft.pos), desired = delta.length() > 100 ? delta.heading() : targetKnown ? target.pos.clone().sub(craft.pos).heading() : carrier.facingRad;
-    const angle = Math.atan2(Math.sin(desired - craft.facingRad), Math.cos(desired - craft.facingRad));
-    craft.turnInput = Math.max(-1, Math.min(1, angle * 3));
-    craft.throttle = Math.abs(angle) < .7 ? Math.min(1, delta.length()/200) : 0;
-    craft.brakeInput = delta.length() < 50; craft.strafeInput = 0;
-    craft.aimTargetWorld.copy(targetKnown ? target.pos : carrier.pos);
-    const range = Math.max(0, ...craft.weapons.map(w => combatWeaponRange(craft,w.spec)));
-    craft.isFiringMain = targetKnown && craft.pos.distanceTo(target.pos) <= range + target.spec.collisionRadius;
+  private guardCarrier(craft: Ship, carrier: Ship, target: Ship | null | undefined): void {
+    steerFlight(craft, this.formation.station(craft, carrier), carrier.vel);
+    if (flightHostile(craft, target)) aimFlight(craft, { kind: 'SHIP', entity: target });
+    else craft.aimTargetWorld.copy(carrier.pos);
   }
   private carrierFor(craft: Ship, fallback: Ship): Ship {
     const wing = [...this.playerWings, ...this.enemyWings].find(w => w.wingId === craft.flightDeckWingId);
@@ -325,208 +332,94 @@ export class FighterSystem {
     spawnProj: (p: Projectile) => void,
     spawnBeam: (b: Beam) => void,
     spawnFlash: (pos: Vector2, angleRad: number, size: number, color: [number, number, number]) => void,
-    fx: FighterFXCallbacks
+    fx: FighterFXCallbacks,
+    world?: FireControlWorld
   ) {
-    const formationOffsets = [
-      new Vector2(-110, 85),
-      new Vector2(-155, 140),
-      new Vector2(-155, -140)
-    ];
-
+    const crafts = [...this.fighters, ...this.bombers];
+    const stations = new Map<Ship, number>();
     for (let i = 0; i < this.fighters.length; i++) {
       const ftr = this.fighters[i];
-      if (ftr.isDead) continue;
-
-      ftr.brakeInput = false; ftr.strafeInput = 0;
+      if (ftr.isDead || ftr.isRetreated || ftr.isDocked) continue;
+      if (ftr.hullHp <= 0) {
+        if (fx.destructionSideEffectsEnabled()) fx.handleShipDestruction(ftr);
+        continue;
+      }
       const isPlayer = ftr.isPlayer;
-      const teamId = ftr.teamId;
       const friendlyCapital = this.carrierFor(ftr, isPlayer ? playerShip : enemyShip);
+      const index = stations.get(friendlyCapital) ?? 0;
+      stations.set(friendlyCapital, index + 1);
       if (this.returnReserve(ftr, friendlyCapital, dt, isPlayer ? enemyShip : playerShip, spawnProj, spawnBeam, spawnFlash)) continue;
-
       let modeData = this.fighterAIModes.get(ftr.id);
       if (!modeData) {
         modeData = { state: 'ESCORT', timer: 0 };
         this.fighterAIModes.set(ftr.id, modeData);
       }
-      modeData.timer -= dt;
-
-      // 检查战术地图对战斗机的特定指令 (Tactical Orders)
-      // 舰队级指令只属于玩家编队，敌机不得执行玩家标定的航路点
+      if (glorianaCraftRole(ftr.spec) && advanceGlorianaCraft({craft:ftr,carrier:friendlyCapital,fallback:isPlayer?enemyShip:playerShip,crafts,projectiles,
+        mode:modeData,dt,index:i,range:this.wingRange(ftr,friendlyCapital),fx,world,spawnProj,spawnBeam,spawnFlash})) continue;
+      advanceArkFlightDefense(ftr);
+      ftr.clearInput(); ftr.fireControlMode = 'AI'; ftr.aiHoldOffensiveFire = false;
+      modeData.timer = Math.max(0, modeData.timer - dt);
       const specificOrder = fx.getOrder(ftr.id);
-      const fleetOrder = isPlayer ? fx.getOrder('fleet') : undefined;
-      const activeOrder = specificOrder || fleetOrder;
-      const hostileCapital = fx.findHostile?.(ftr, activeOrder?.targetShipId) ?? (isPlayer ? enemyShip : playerShip);
-      const hostileKnown = !hostileCapital.isDead && hostileCapital.isVisibleTo(ftr.teamId);
-      ftr.currentTargetShip = hostileKnown ? hostileCapital : null;
+      const activeOrder = specificOrder ?? (isPlayer ? fx.getOrder('fleet') : undefined);
+      const candidate = fx.findHostile ? fx.findHostile(ftr, activeOrder?.targetShipId ?? friendlyCapital.playerTargetId ?? undefined)
+        : isPlayer ? enemyShip : playerShip;
+      const hostile = flightHostile(ftr, candidate) ? candidate : null;
+      const carrierAlive = carrierOperational(friendlyCapital), range = this.wingRange(ftr, friendlyCapital);
+      const inRange = (target: Ship) => !carrierAlive || wingCanReach(friendlyCapital, range, target.pos, target.spec.collisionRadius);
+      let fireTarget: Ship | null = hostile;
+      const guard = () => { modeData.state = 'ESCORT'; this.guardCarrier(ftr, friendlyCapital, hostile); };
+      const forced = hostile && inRange(hostile) && (activeOrder?.type === 'ENGAGE' || activeOrder?.type === 'ASSAULT')
+        && (!activeOrder.targetShipId || activeOrder.targetShipId === hostile.id);
 
-      // 敌方来袭重型导弹检测 (点防近程威胁)
-      const nearbyHostileMissile = projectiles.find(
-        (p) => p.isRocket && !sameTeam(p, ftr) && p.pos.distanceTo(ftr.pos) < 680
-      );
-
-      // 敌方航空中队检测 (空战咬尾目标)
-      const opposingCrafts = [...this.fighters, ...this.bombers].filter(f => f.teamId !== teamId && !f.isDead && f.isVisibleTo(teamId));
-
-      let closestOpposingCraft: Ship | null = null;
-      let minOpposingDist = 950;
-      for (const op of opposingCrafts) {
-        const d = ftr.pos.distanceTo(op.pos);
-        if (d < minOpposingDist) {
-          minOpposingDist = d;
-          closestOpposingCraft = op;
-        }
-      }
-
-      // 1. 点防威胁最高优先：拦截威胁母舰与战机编队的导弹
-      const range = this.wingRange(ftr, friendlyCapital);
-      const mustGuard = !friendlyCapital.isDead && (range <= 0 || ftr.pos.distanceTo(friendlyCapital.pos) > range
-        || (hostileCapital.pos.distanceTo(friendlyCapital.pos) > range && !nearbyHostileMissile && !closestOpposingCraft));
-      if (mustGuard || (!hostileKnown && !nearbyHostileMissile && !closestOpposingCraft && !activeOrder)) {
-        modeData.state = 'ESCORT';
-        this.guardCarrier(ftr, friendlyCapital, closestOpposingCraft ?? hostileCapital, i);
-        if (nearbyHostileMissile) { ftr.aimTargetWorld.copy(nearbyHostileMissile.pos); ftr.isFiringMain = true; }
-      } else if (nearbyHostileMissile) {
-        modeData.state = 'INTERCEPT';
-        const toM = nearbyHostileMissile.pos.clone().sub(ftr.pos);
-        ftr.aimTargetWorld = nearbyHostileMissile.pos.clone();
-        ftr.isFiringMain = toM.length() < 480;
-
-        const targetAngle = toM.heading();
-        let angleDiff = targetAngle - ftr.facingRad;
-        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-        ftr.turnInput = Math.sign(angleDiff);
-        ftr.throttle = toM.length() > 200 ? 1.0 : 0.4;
-      }
-      // 2. 玩家召回令：强制返航母舰护卫
-      else if (friendlyCapital.fighterRecall) {
-        modeData.state = 'ESCORT';
-        const escortSlot = formationOffsets[i % formationOffsets.length];
-        const targetWorldPos = friendlyCapital.pos.clone().add(escortSlot.clone().rotate(friendlyCapital.facingRad));
-        const toSlot = targetWorldPos.sub(ftr.pos);
-        const dist = toSlot.length();
-        ftr.aimTargetWorld = hostileCapital.pos.clone();
-        ftr.isFiringMain = false;
-
-        const targetAngle = toSlot.heading();
-        let angleDiff = targetAngle - ftr.facingRad;
-        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-        ftr.turnInput = Math.sign(angleDiff);
-        ftr.throttle = Math.min(1.0, dist / 180);
-      }
-      // 3. 战术航路点指令：直接指令优先于自主追击逻辑，全速转场并在抵达后消耗指令
-      else if (activeOrder && activeOrder.type === 'WAYPOINT' && activeOrder.targetPos) {
-        modeData.state = 'ESCORT';
-        const toWp = activeOrder.targetPos.clone().sub(ftr.pos);
-        const dist = toWp.length();
-        if (dist < 90) {
-          // 抵达航路点：消耗指令（舰队级指令按存储键注销，避免残留指令把战机钉在航路点上）
+      // Commands and the carrier leash precede opportunistic interception.
+      if (carrierAlive && (friendlyCapital.fighterRecall || range <= 0 || !wingCanReach(friendlyCapital, range, ftr.pos, ftr.spec.collisionRadius))) {
+        guard(); ftr.aiHoldOffensiveFire = friendlyCapital.fighterRecall;
+      } else if (activeOrder?.type === 'WAYPOINT' && activeOrder.targetPos) {
+        modeData.state = 'ESCORT'; ftr.aiHoldOffensiveFire = true; fireTarget = null;
+        if (carrierAlive && !wingCanReach(friendlyCapital, range, activeOrder.targetPos)) guard();
+        else if (ftr.pos.distanceTo(activeOrder.targetPos) < 90) {
           if (specificOrder) fx.cancelOrder(ftr.id);
-          ftr.clearInput();
-        } else {
-          // 转场期间不主动追击敌人：仅当原瞄准点仍处于有效射界内时才保留开火状态
-          const prevAim = ftr.aimTargetWorld.clone().sub(ftr.pos);
-          let prevAimDiff = prevAim.heading() - ftr.facingRad;
-          while (prevAimDiff >= Math.PI) prevAimDiff -= Math.PI * 2;
-          while (prevAimDiff < -Math.PI) prevAimDiff += Math.PI * 2;
-          ftr.isFiringMain = ftr.isFiringMain && prevAim.length() > 1 && Math.abs(prevAimDiff) < 0.35;
-
-          ftr.aimTargetWorld = activeOrder.targetPos.clone();
-          // 方位偏差归一化到 [-π, π)：正后方时统一向左破转，保证航路点机动方向确定
-          let angleDiff = toWp.heading() - ftr.facingRad;
-          while (angleDiff >= Math.PI) angleDiff -= Math.PI * 2;
-          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-          ftr.turnInput = Math.sign(angleDiff);
-          ftr.throttle = 1.0;
+          ftr.brakeInput = true;
+        } else steerFlight(ftr, activeOrder.targetPos);
+      } else if (activeOrder && ['AVOID', 'DEFEND', 'ESCORT'].includes(activeOrder.type)) {
+        guard();
+        if (activeOrder.type === 'AVOID' && hostile) {
+          const away = ftr.pos.clone().sub(hostile.pos);
+          if (away.length() < 1) away.set(1, 0);
+          const point = ftr.pos.clone().add(away.normalize().scale(600));
+          if (!carrierAlive || wingCanReach(friendlyCapital, range, point)) steerFlight(ftr, point);
+          ftr.aiHoldOffensiveFire = true;
         }
+      } else {
+        const missile = !forced ? incomingFlightThreat(ftr, friendlyCapital, range, projectiles) : undefined;
+        const opponent = !forced && !missile ? dogfightTarget(ftr, friendlyCapital, range, crafts, modeData.targetUnitId) : undefined;
+        if (missile) {
+          modeData.state = 'INTERCEPT'; fireTarget = null;
+          aimFlight(ftr, { kind: 'MISSILE', entity: missile });
+          steerFlight(ftr, ftr.aimTargetWorld, missile.vel, 100);
+        } else if (opponent) {
+          modeData.state = 'DOGFIGHT'; fireTarget = opponent;
+          attackFlight(ftr, opponent, index);
+        } else if (hostile && inRange(hostile) && (!isArkInterceptor(ftr) || forced)) {
+          modeData.state = 'ATTACK'; attackFlight(ftr, hostile, index);
+        } else if (hostile && inRange(hostile) && carrierAlive && isArkInterceptor(ftr)) {
+          // No local threat yet: meet the battle at a forward screen, not the hangar.
+          const screen = this.formation.station(ftr, friendlyCapital, false, hostile);
+          if (wingCanReach(friendlyCapital, range, screen, ftr.spec.collisionRadius)) {
+            modeData.state = 'ESCORT';
+            steerFlight(ftr, screen, friendlyCapital.assemblyRoot.vel);
+            aimFlight(ftr, { kind: 'SHIP', entity: hostile });
+          } else guard();
+        } else guard();
       }
-      // 4. 空空格斗咬尾 (Dogfight): 发现敌方战机/轰炸机，进入高速咬尾火神扫射
-      else if (closestOpposingCraft) {
-        modeData.state = 'DOGFIGHT';
-        const toOpp = closestOpposingCraft.pos.clone().sub(ftr.pos);
-        const dist = toOpp.length();
-
-        // 提前量射击预判
-        const relVel = closestOpposingCraft.vel.clone().sub(ftr.vel);
-        const flightTime = dist / 900;
-        const leadPos = closestOpposingCraft.pos.clone().addScaled(relVel, flightTime);
-        ftr.aimTargetWorld = leadPos;
-
-        const targetAngle = leadPos.clone().sub(ftr.pos).heading();
-        let angleDiff = targetAngle - ftr.facingRad;
-        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-
-        ftr.turnInput = Math.sign(angleDiff);
-        ftr.throttle = dist > 260 ? 1.0 : 0.55;
-        ftr.isFiringMain = dist < 500 && Math.abs(angleDiff) < 0.4;
-
-        if (dist <= 220) {
-          // 破空大仰角滚转脱离，防止相撞
-          const breakAngle = targetAngle + (Math.PI * 0.55);
-          let breakDiff = breakAngle - ftr.facingRad;
-          while (breakDiff > Math.PI) breakDiff -= Math.PI * 2;
-          while (breakDiff < -Math.PI) breakDiff += Math.PI * 2;
-          ftr.turnInput = Math.sign(breakDiff);
-        }
-      }
-      // 5. 敌舰在攻击范围内：发起俯冲扫射突击 (Attack Run)
-      else if (hostileKnown && ftr.pos.distanceTo(hostileCapital.pos) < 1800) {
-        modeData.state = 'ATTACK';
-        const toHostile = hostileCapital.pos.clone().sub(ftr.pos);
-        const dist = toHostile.length();
-        ftr.aimTargetWorld = hostileCapital.pos.clone();
-
-        if (dist > 350) {
-          const targetAngle = toHostile.heading();
-          let angleDiff = targetAngle - ftr.facingRad;
-          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-          ftr.turnInput = Math.sign(angleDiff);
-          ftr.throttle = 1.0;
-          ftr.isFiringMain = dist < 480 && Math.abs(angleDiff) < 0.35;
-        } else {
-          // 破空侧转脱离
-          const breakAngle = toHostile.heading() + Math.PI * 0.65;
-          let angleDiff = breakAngle - ftr.facingRad;
-          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-          ftr.turnInput = Math.sign(angleDiff);
-          ftr.throttle = 1.0;
-          ftr.isFiringMain = true;
-        }
-      }
-      // 6. 巡弋编队护卫母舰 (Escort Formation)
-      else {
-        modeData.state = 'ESCORT';
-        const escortSlot = formationOffsets[i % formationOffsets.length];
-        const targetWorldPos = friendlyCapital.pos.clone().add(escortSlot.clone().rotate(friendlyCapital.facingRad));
-        const toSlot = targetWorldPos.sub(ftr.pos);
-        const dist = toSlot.length();
-        ftr.aimTargetWorld = hostileCapital.pos.clone();
-        ftr.isFiringMain = false;
-
-        if (dist > 60) {
-          const targetAngle = toSlot.heading();
-          let angleDiff = targetAngle - ftr.facingRad;
-          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-          ftr.turnInput = Math.sign(angleDiff);
-          ftr.throttle = Math.min(1.0, dist / 200);
-        } else {
-          let angleDiff = friendlyCapital.facingRad - ftr.facingRad;
-          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-          ftr.turnInput = Math.sign(angleDiff) * 0.5;
-          ftr.throttle = friendlyCapital.throttle * 0.8;
-        }
-      }
-
-      ftr.update(dt, hostileKnown ? hostileCapital : null, spawnProj, spawnBeam, spawnFlash);
+      modeData.targetUnitId = modeData.state === 'DOGFIGHT' || modeData.state === 'ATTACK' ? fireTarget?.id : undefined;
+      ftr.currentTargetShip = fireTarget;
+      ftr.update(dt, fireTarget, spawnProj, spawnBeam, spawnFlash, world ?? {
+        ships: [friendlyCapital, ...crafts, ...(fireTarget ? [fireTarget] : [])], missiles: projectiles, asteroids: []
+      });
 
       // 战机尾气推进火焰粒子
-      if (Math.abs(ftr.throttle) > 0.1 && this.visualRandom.next() < 0.6) {
+      if (!isArkCraft(ftr) && Math.abs(ftr.throttle) > 0.1 && this.visualRandom.next() < 0.6) {
         for (const slot of ftr.spec.engineSlots) {
           const nozzlePos = ftr.pos.clone().add(new Vector2(slot.x, slot.y).rotate(ftr.facingRad));
           fx.spawnContrail({
@@ -555,7 +448,7 @@ export class FighterSystem {
   }
 
   /**
-   * 匕首鱼雷轰炸机突击与返航装填循环
+   * 普通轰炸机突击与返航装填循环（荣耀女王机型保留专用逻辑）
    */
   public updateBombers(
     dt: number,
@@ -564,187 +457,104 @@ export class FighterSystem {
     spawnProj: (p: Projectile) => void,
     spawnBeam: (b: Beam) => void,
     spawnFlash: (pos: Vector2, angleRad: number, size: number, color: [number, number, number]) => void,
-    fx: FighterFXCallbacks
+    fx: FighterFXCallbacks,
+    world?: FireControlWorld
   ) {
-    const escortSlots = [
-      new Vector2(-190, 70),
-      new Vector2(-190, -70)
-    ];
-
+    const crafts = [...this.fighters, ...this.bombers];
+    const stations = new Map<Ship, number>();
     for (let i = 0; i < this.bombers.length; i++) {
       const bmr = this.bombers[i];
-      if (bmr.isDead) continue;
+      if (bmr.isDead || bmr.isRetreated) continue;
+      if (bmr.hullHp <= 0) {
+        if (fx.destructionSideEffectsEnabled()) fx.handleShipDestruction(bmr);
+        continue;
+      }
       const friendlyCapital = this.carrierFor(bmr, bmr.isPlayer ? playerShip : enemyShip);
-      if (this.returnReserve(bmr, friendlyCapital, dt, bmr.isPlayer ? enemyShip : playerShip, spawnProj, spawnBeam, spawnFlash)) continue;
-      bmr.brakeInput = false; bmr.strafeInput = 0;
-      const recalled = friendlyCapital.fighterRecall;
-
+      const index = stations.get(friendlyCapital) ?? 0;
+      stations.set(friendlyCapital, index + 1);
+      if (!bmr.isDocked && this.returnReserve(bmr, friendlyCapital, dt, bmr.isPlayer ? enemyShip : playerShip, spawnProj, spawnBeam, spawnFlash)) continue;
       let mode = this.bomberAIModes.get(bmr.id);
       if (!mode) {
         mode = { state: 'ESCORT', timer: 0, hasTorpedo: true };
         this.bomberAIModes.set(bmr.id, mode);
       }
-      mode.timer -= dt;
-
-      // 发射确认：请求开火前记录鱼雷挂点状态，只有真正离管才承认发射成功
-      // (挂点瘫痪/弹药耗尽/未完成开火循环时不得清空挂载并返航)
-      let launchRequested = false;
-      let launcherStateBefore: {
-        mount: WeaponMount;
-        ammo: number;
-        cooldownTimer: number;
-        burstRemaining: number;
-        firingCycleId: number;
-      }[] = [];
-
-      // 检查战术地图对轰炸机的特定指令 (Tactical Orders)
+      if (glorianaCraftRole(bmr.spec) && advanceGlorianaCraft({craft:bmr,carrier:friendlyCapital,fallback:bmr.isPlayer?enemyShip:playerShip,crafts,projectiles:world?.missiles ?? [],
+        mode,dt,index:i,range:this.wingRange(bmr,friendlyCapital),fx,world,spawnProj,spawnBeam,spawnFlash})) continue;
+      advanceArkFlightDefense(bmr);
+      bmr.clearInput(); bmr.fireControlMode = 'AI'; bmr.aiHoldOffensiveFire = true;
+      mode.timer = Math.max(0, mode.timer - dt);
+      const carrierAlive = carrierOperational(friendlyCapital), recalled = carrierAlive && friendlyCapital.fighterRecall;
+      const payload = strikeMounts(bmr);
       const specificOrder = fx.getOrder(bmr.id);
-      const fleetOrder = bmr.isPlayer ? fx.getOrder('fleet') : undefined;
-      const activeOrder = specificOrder || fleetOrder;
-      const hostileCapital = fx.findHostile?.(bmr, activeOrder?.targetShipId) ?? (bmr.isPlayer ? enemyShip : playerShip);
-      const hostileKnown = !hostileCapital.isDead && hostileCapital.isVisibleTo(bmr.teamId);
-      bmr.currentTargetShip = hostileKnown ? hostileCapital : null;
-      bmr.isFiringMain = false;
-      if (mode.state === 'DOCKED' && friendlyCapital.isDead) mode.state = 'RETURN_TO_REARM';
+      const activeOrder = specificOrder ?? (bmr.isPlayer ? fx.getOrder('fleet') : undefined);
+      const candidate = fx.findHostile ? fx.findHostile(bmr, activeOrder?.targetShipId ?? friendlyCapital.playerTargetId ?? undefined)
+        : bmr.isPlayer ? enemyShip : playerShip;
+      const hostile = flightHostile(bmr, candidate) ? candidate : null;
+      bmr.currentTargetShip = hostile;
+      const range = this.wingRange(bmr, friendlyCapital);
 
-      // 1. 召回模式或正在重载修理
       if (mode.state === 'DOCKED') {
+        bmr.isDocked = true;
+        bmr.pos.copy(friendlyCapital.pos); bmr.prevPos.copy(bmr.pos); bmr.vel.copy(friendlyCapital.vel);
+        if (!carrierAlive) {
+          bmr.isDocked = false;
+          if (friendlyCapital.isRetreated || friendlyCapital.assemblyRoot.isRetreated) bmr.isRetreated = true;
+          else { bmr.hullHp = 0; bmr.isDead = true; }
+          friendlyCapital.deployedWingCraft.delete(bmr);
+          continue;
+        }
+        // Preserve the existing Web repair/rearm clock; do not reload until it actually expires.
         bmr.hullHp = Math.min(bmr.maxHullHp, bmr.hullHp + 60 * dt);
-        bmr.throttle = 0;
-        bmr.turnInput = 0;
-        bmr.vel.scale(0.8);
-        if (mode.timer <= 0) {
-          mode.hasTorpedo = true;
-          for (const mount of bmr.weapons) {
-            if (!Number.isFinite(mount.ammo) || mount.spec.maxAmmo === undefined) continue;
-            mount.ammo = mount.spec.maxAmmo;
-            mount.ammoRechargeProgress = 0;
-          }
-          mode.state = recalled ? 'ESCORT' : 'ATTACK_RUN';
-          mode.timer = 12.0;
-          fx.addFloatingText(bmr.pos, 'DAGGER ARMED & LAUNCHING', [100, 220, 255], 13, 1.8);
-          sound.playAtPos('fighter_deploy', bmr.pos, fx.getPlayerPos(), 0.6);
-          fx.addRadioMessage('匕首轰炸分队', bmr.isPlayer ? 'PLAYER' : 'ENEMY', '重型鱼雷补充完毕，重新出击！', [100, 220, 255]);
+        if (mode.timer > 0) continue;
+        for (const mount of bmr.weapons) {
+          if (!Number.isFinite(mount.ammo) || mount.spec.maxAmmo === undefined) continue;
+          mount.ammo = mount.spec.maxAmmo; mount.ammoRechargeProgress = 0;
         }
-      } else if (recalled || mode.state === 'RETURN_TO_REARM' || !mode.hasTorpedo) {
-        // 返航母舰甲板
-        const dockPoint = friendlyCapital.pos.clone().add(new Vector2(-120, 0).rotate(friendlyCapital.facingRad));
-        const toDock = dockPoint.sub(bmr.pos);
-        const dist = toDock.length();
-
-        if (dist < 70 && !mode.hasTorpedo && !friendlyCapital.isDead) {
-          mode.state = 'DOCKED';
-          mode.timer = 3.2 + (this.wingFor(bmr)?.rebuildSeconds ?? 0) * friendlyCapital.hullStats.fighterRearmTimeFraction;
-          fx.addFloatingText(bmr.pos, 'DOCKING & REARMING...', [120, 210, 255], 12, 1.5);
-        } else {
-          const targetAngle = toDock.heading();
-          let angleDiff = targetAngle - bmr.facingRad;
-          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-          bmr.turnInput = Math.sign(angleDiff);
-          bmr.throttle = Math.min(1.0, dist / 180);
-          bmr.isFiringMain = false;
-        }
-      } else if (!friendlyCapital.isDead && (this.wingRange(bmr, friendlyCapital) <= 0 || hostileCapital.pos.distanceTo(friendlyCapital.pos) > this.wingRange(bmr, friendlyCapital))) {
-        mode.state = 'ESCORT';
-        this.guardCarrier(bmr, friendlyCapital, hostileCapital, i);
-      } else if (activeOrder && activeOrder.type === 'WAYPOINT' && activeOrder.targetPos) {
-        // 执行战术航路点机动
-        const toWp = activeOrder.targetPos.clone().sub(bmr.pos);
-        const dist = toWp.length();
-        if (dist < 90) {
-          // 抵达航路点：注销真正持有该指令的键 (舰队级指令挂在 'fleet' 上)，
-          // 否则注销单位 id 不会移除舰队指令，轰炸机会被永久钉在航点上。
-          if (specificOrder) fx.cancelOrder(bmr.id);
-          bmr.clearInput();
-        } else {
-          const targetAngle = toWp.heading();
-          let angleDiff = targetAngle - bmr.facingRad;
-          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-          bmr.turnInput = Math.sign(angleDiff);
-          bmr.throttle = 1.0;
-        }
-      } else if (hostileKnown && mode.hasTorpedo) {
-        // 发起鱼雷突袭攻击循环 (Torpedo Attack Run)
-        mode.state = 'ATTACK_RUN';
-        const targetShip = hostileCapital;
-        const toEnemy = targetShip.pos.clone().sub(bmr.pos);
-        const dist = toEnemy.length();
-        bmr.aimTargetWorld = targetShip.pos.clone();
-
-        const targetAngle = toEnemy.heading();
-        let angleDiff = targetAngle - bmr.facingRad;
-        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-        bmr.turnInput = Math.sign(angleDiff);
-        bmr.throttle = 1.0;
-
-        // 进入 650 SU 鱼雷射界并迎头对准 (角度差 < 20度): 请求发射阿特罗波斯高爆鱼雷！
-        if (dist < 650 && Math.abs(angleDiff) < 0.35 && mode.hasTorpedo) {
-          bmr.isFiringMain = true;
-          // 只登记发射请求；是否真的打出鱼雷要等本帧 update 之后校验挂点证据
-          launchRequested = true;
-          launcherStateBefore = bmr.weapons.map(mount => ({
-            mount,
-            ammo: mount.ammo,
-            cooldownTimer: mount.cooldownTimer,
-            burstRemaining: mount.burstRemaining,
-            firingCycleId: mount.firingCycleId
-          }));
-        } else {
-          bmr.isFiringMain = false;
-        }
-      } else {
-        // 巡航编队护卫
-        mode.state = 'ESCORT';
-        const slot = escortSlots[i % escortSlots.length];
-        const targetWorld = friendlyCapital.pos.clone().add(slot.clone().rotate(friendlyCapital.facingRad));
-        const toSlot = targetWorld.sub(bmr.pos);
-        const dist = toSlot.length();
-        if (dist > 70) {
-          const targetAngle = toSlot.heading();
-          let angleDiff = targetAngle - bmr.facingRad;
-          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-          bmr.turnInput = Math.sign(angleDiff);
-          bmr.throttle = Math.min(1.0, dist / 180);
-        } else {
-          let angleDiff = friendlyCapital.facingRad - bmr.facingRad;
-          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-          bmr.turnInput = Math.sign(angleDiff) * 0.4;
-          bmr.throttle = friendlyCapital.throttle * 0.8;
-        }
+        mode.hasTorpedo = !payloadNeedsRearm(payload);
+        if (recalled) continue;
+        bmr.isDocked = false; mode.state = 'ESCORT';
+        bmr.pos.copy(this.formation.station(bmr, friendlyCapital, true)); bmr.prevPos.copy(bmr.pos);
+        fx.addFloatingText(bmr.pos, 'REARMED & LAUNCHING', [100, 220, 255], 13, 1.8);
+        sound.playAtPos('fighter_deploy', bmr.pos, fx.getPlayerPos(), 0.6);
       }
-
-      bmr.update(dt, hostileKnown ? hostileCapital : null, spawnProj, spawnBeam, spawnFlash);
-      const finiteLaunchers = bmr.weapons.filter(w => w.spec.weaponType === 'MISSILE' && Number.isFinite(w.ammo));
-      if (mode.state !== 'DOCKED' && finiteLaunchers.length && finiteLaunchers.every(w => w.ammo <= 0 && w.burstRemaining <= 0)) { mode.hasTorpedo = false; mode.state = 'RETURN_TO_REARM'; }
-
-      // 校验鱼雷是否真的离管：有限弹药挂点看弹药消耗，无限弹药挂点看冷却/连发/开火周期推进
-      if (launchRequested) {
-        const torpedoLaunched = launcherStateBefore.some(before => {
-          const mount = before.mount;
-          if (Number.isFinite(mount.ammo) && mount.spec.maxAmmo !== undefined) {
-            return mount.ammo < before.ammo;
-          }
-          return mount.cooldownTimer > before.cooldownTimer
-            || mount.burstRemaining > before.burstRemaining
-            || mount.firingCycleId > before.firingCycleId;
-        });
-        if (torpedoLaunched) {
-          // 仅在确认鱼雷离管后才宣告发射成功并脱离攻击航线（每次实际发射只宣告一次）
-          mode.hasTorpedo = false;
-          mode.state = 'RETURN_TO_REARM';
-          fx.addFloatingText(bmr.pos, 'ATROPOS TORPEDO LAUNCHED!', [255, 140, 40], 14, 2.0);
-          fx.addCameraShake(3, 0.2);
-          fx.addRadioMessage('匕首轰炸分队', bmr.isPlayer ? 'PLAYER' : 'ENEMY', '阿特罗波斯重型鱼雷已齐射！脱离攻击航线！', [255, 180, 60]);
+      // All strike mounts must be low, and no committed burst may still be in flight from the rack.
+      mode.hasTorpedo = !payloadNeedsRearm(payload);
+      const guard = () => { mode.state = 'ESCORT'; this.guardCarrier(bmr, friendlyCapital, hostile); };
+      if (!mode.hasTorpedo && carrierAlive) {
+        mode.state = 'RETURN_TO_REARM';
+        const dockPoint = friendlyCapital.pos.clone().add(new Vector2(-friendlyCapital.spec.collisionRadius * .6, 0).rotate(friendlyCapital.facingRad));
+        steerFlight(bmr, dockPoint, friendlyCapital.vel, 15);
+        if (bmr.pos.distanceTo(dockPoint) < 70 && bmr.vel.clone().sub(friendlyCapital.vel).length() < 100) {
+          mode.state = 'DOCKED'; bmr.isDocked = true; bmr.clearInput();
+          mode.timer = 3.2 + (this.wingFor(bmr)?.rebuildSeconds ?? 0) * friendlyCapital.hullStats.fighterRearmTimeFraction;
+          bmr.pos.copy(friendlyCapital.pos); bmr.prevPos.copy(bmr.pos); bmr.vel.copy(friendlyCapital.vel);
+          continue;
         }
+      } else if (recalled || (carrierAlive && (range <= 0 || !wingCanReach(friendlyCapital, range, bmr.pos, bmr.spec.collisionRadius)))) guard();
+      else if (activeOrder?.type === 'WAYPOINT' && activeOrder.targetPos) {
+        mode.state = 'ESCORT';
+        if (carrierAlive && !wingCanReach(friendlyCapital, range, activeOrder.targetPos)) guard();
+        else if (bmr.pos.distanceTo(activeOrder.targetPos) < 90) {
+          if (specificOrder) fx.cancelOrder(bmr.id);
+          bmr.brakeInput = true;
+        } else steerFlight(bmr, activeOrder.targetPos);
+      } else if (activeOrder && ['AVOID', 'DEFEND', 'ESCORT'].includes(activeOrder.type)) guard();
+      else if (hostile && mode.hasTorpedo && (!carrierAlive || wingCanReach(friendlyCapital, range, hostile.pos, hostile.spec.collisionRadius))) {
+        mode.state = 'ATTACK_RUN'; bmr.aiHoldOffensiveFire = false;
+        attackFlight(bmr, hostile, index, true);
+      } else guard(); // An orphan cannot replenish ammo at a wreck or a retreated carrier.
+
+      const before = payload.map(mount => ({ mount, ammo: mount.ammo, cycle: mount.firingCycleId }));
+      bmr.update(dt, hostile, spawnProj, spawnBeam, spawnFlash, world);
+      const launched = before.some(({ mount, ammo, cycle }) => mount.ammo < ammo || mount.firingCycleId > cycle);
+      if (payloadNeedsRearm(payload)) {
+        mode.hasTorpedo = false;
+        if (carrierAlive) mode.state = 'RETURN_TO_REARM';
+        if (launched) fx.addFloatingText(bmr.pos, 'PAYLOAD AWAY - RETURNING', [255, 140, 40], 14, 2);
       }
 
       // 高技术蓝紫推进器尾焰
-      if (Math.abs(bmr.throttle) > 0.1 && this.visualRandom.next() < 0.65) {
+      if (!isArkCraft(bmr) && Math.abs(bmr.throttle) > 0.1 && this.visualRandom.next() < 0.65) {
         for (const slot of bmr.spec.engineSlots) {
           const nozzlePos = bmr.pos.clone().add(new Vector2(slot.x, slot.y).rotate(bmr.facingRad));
           fx.spawnContrail({

@@ -10,6 +10,7 @@ import { N2nDiagnostics } from './n2n-diagnostics.mjs';
 import { DesktopBackend } from './backend.mjs';
 import { DesktopSteamOverlay, loadDesktopSteam, steamRestartArgs } from './steam-overlay.mjs';
 import { desktopUpdater } from './updates.mjs';
+import { openContentStore } from './content-store.mjs';
 import { contentSecurityPolicy, desktopOptions, isGameUrl, isProjectLink, requestedMode } from './policy.mjs';
 
 const options = desktopOptions(process.argv);
@@ -35,9 +36,11 @@ try { settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8')); } catch { /*
 // Ordinary launches always start at home; explicit mode arguments also carry the Steam restart handoff.
 let mode = options.mode ?? 'local';
 let win, backend, updater, switching = false, quitting = false, quitPrompt = false, allowQuit = false, unloadCancelled = false;
-const backendRoot = app.isPackaged ? path.join(process.resourcesPath, 'backend') : project;
+const installedBackendRoot = app.isPackaged ? path.join(process.resourcesPath, 'backend') : project;
+let backendRoot = installedBackendRoot, contentStore = null, contentHealthTimer = null, contentLoaded = false, contentRecovering = false;
+const gameVersion = () => contentStore?.current.manifest.version ?? app.getVersion();
 let pendingSteamInvite = null, steamEntry = null;
-const steamOverlay = new DesktopSteamOverlay({ appId: options.appId, load: () => loadDesktopSteam(backendRoot),
+const steamOverlay = new DesktopSteamOverlay({ appId: options.appId, load: () => loadDesktopSteam(installedBackendRoot),
   getWindow: () => win, log, onInvite: lobby => { if (backend) backend.receiveSteamInvite(lobby); else pendingSteamInvite = lobby; } });
 const modeNames = { local: '单机', lan: '局域网', steam: 'Steam' };
 function log(message) {
@@ -76,6 +79,10 @@ async function closeNetworkLog(reason) {
   } finally { clearTimeout(timer); }
 }
 async function stopAll(reason = 'quit') {
+  clearTimeout(contentHealthTimer);
+  if (contentLoaded && ['quit', 'update'].includes(reason)) {
+    try { await contentStore?.healthy(); } catch (error) { log('[content] ' + error.message); }
+  }
   saveSettings();
   try { await session.defaultSession.flushStorageData(); await backend?.stop(); }
   finally { await closeNetworkLog(reason); }
@@ -127,13 +134,13 @@ async function requestQuit({ install } = {}) {
   quitting = true;
   try {
     await stopAll(install ? 'update' : 'quit'); allowQuit = true;
-    if (install) install(); else app.quit();
+    if (install) await install(); else app.quit();
   } catch (error) { log(error.message); allowQuit = true; app.quit(); }
 }
 async function openProject(url) { if (isProjectLink(url)) await shell.openExternal(url); }
 function updateMenu() {
   if (!win || win.isDestroyed()) return;
-  win.setTitle(`Starsector Web ${app.getVersion()} · ${modeNames[mode]}${switching ? ' · 正在准备后台服务' : ''}`);
+  win.setTitle(`Starsector Web ${gameVersion()} · ${modeNames[mode]}${switching ? ' · 正在准备后台服务' : ''}`);
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: '游戏', submenu: [
       { label: '返回主菜单', enabled: !switching, click: () => void navigateHome() },
@@ -160,10 +167,10 @@ function updateMenu() {
     { label: '帮助', submenu: [
       { label: '导出本次完整联机日志', click: () => void exportNetworkLog() },
       { label: '打开本次联机性能日志', click: async () => { await networkLog.flush(); if (fs.existsSync(networkLogFile)) shell.showItemInFolder(networkLogFile); else await dialog.showMessageBox(win, { title: '联机性能日志', message: '本次日志尚未写入，请检查磁盘空间。', detail: networkLogFile }); } },
-      { label: '打开联机日志', click: () => { log('[desktop] diagnostic-log version=' + app.getVersion()); shell.showItemInFolder(path.join(app.getPath('userData'), 'desktop.log')); } },
+      { label: '打开联机日志', click: () => { log('[desktop] diagnostic-log version=' + gameVersion()); shell.showItemInFolder(path.join(app.getPath('userData'), 'desktop.log')); } },
       { label: 'GitHub / 使用说明', click: () => void openProject('https://github.com/Aca233/starsector-web') },
-      { label: '关于', click: () => void dialog.showMessageBox(win, { title: '关于 Starsector Web', message: `Starsector Web ${app.getVersion()}`,
-        detail: `非官方舰船设计与战斗沙盒\nElectron ${process.versions.electron} · Chromium ${process.versions.chrome}\nSteam AppID ${options.appId}${options.appId === 480 ? '（仅开发测试）' : ''}\n素材权利属于原权利人，非官方发行。` }) },
+      { label: '关于', click: () => void dialog.showMessageBox(win, { title: '关于 Starsector Web', message: `Starsector Web ${gameVersion()}`,
+        detail: `非官方舰船设计与战斗沙盒\n桌面运行环境 ${app.getVersion()}\nElectron ${process.versions.electron} · Chromium ${process.versions.chrome}\nSteam AppID ${options.appId}${options.appId === 480 ? '（仅开发测试）' : ''}\n素材权利属于原权利人，非官方发行。` }) },
     ] },
   ]));
 }
@@ -220,9 +227,20 @@ async function switchMode(next, target = origin + (next === 'local' ? '/' : `/?v
       detail: '请重试联机入口。端口被占用或 Steam 未就绪时，不会结束其他程序。' });
   } finally { switching = false; updateMenu(); }
 }
+async function recoverContent() {
+  if (contentRecovering || !contentStore?.state.trial) return false;
+  contentRecovering = true; clearTimeout(contentHealthTimer);
+  try {
+    try { if (!await contentStore.rollback()) return false; }
+    catch (error) { log('[content] 无法保存回退状态：' + error.message); return false; }
+    quitting = true; await stopAll('content-rollback'); allowQuit = true;
+    app.relaunch(); app.quit(); return true;
+  } finally { contentRecovering = false; }
+}
 async function backendFailed(message) {
   networkLog.event('backend-failed', { mode });
   log(message);
+  if (!quitting && !switching && await recoverContent()) return;
   if (quitting || switching || !win || win.isDestroyed()) return;
   if (options.hidden) { await stopAll('backend-failed'); allowQuit = true; app.exit(1); return; }
   const result = await dialog.showMessageBox(win, { type: 'error', title: '后台停止', message,
@@ -234,7 +252,7 @@ async function backendFailed(message) {
 }
 function installSecurity() {
   const gameSession = session.defaultSession;
-  const userAgent = gameSession.getUserAgent() + ` StarsectorDesktop/${app.getVersion()}`;
+  const userAgent = gameSession.getUserAgent() + ` StarsectorDesktop/${gameVersion()}`;
   gameSession.setUserAgent(userAgent);
   // The first WebContents already exists; session defaults only affect new contents.
   win.webContents.setUserAgent(userAgent);
@@ -263,7 +281,14 @@ function windowBounds() {
 }
 async function ready() {
   fs.mkdirSync(app.getPath('userData'), { recursive: true });
-  log(`[desktop] start version=${app.getVersion()} electron=${process.versions.electron} mode=${mode}`);
+  if (app.isPackaged && process.platform === 'win32' && fs.existsSync(path.join(path.dirname(process.execPath), 'Uninstall Starsector Web.exe'))) {
+    try {
+      contentStore = await openContentStore({ baseRoot: installedBackendRoot,
+        storage: path.join(app.getPath('userData'), 'content-updates'), log });
+      backendRoot = contentStore.current.root;
+    } catch (error) { log('[content] 轻量更新不可用，使用安装版：' + error.message); }
+  }
+  log(`[desktop] start version=${gameVersion()} shell=${app.getVersion()} electron=${process.versions.electron} mode=${mode}`);
   backend = new DesktopBackend({ root: backendRoot, overlay: steamOverlay,
     port: options.port, appId: options.appId, log, failed: message => void backendFailed(message), quitRequested: () => void requestQuit() });
   if (pendingSteamInvite) { backend.receiveSteamInvite(pendingSteamInvite); pendingSteamInvite = null; }
@@ -301,12 +326,19 @@ async function ready() {
     // Keep the renderer's unsaved-work guard unless the local user explicitly confirms.
   });
   win.on('close', event => { if (!allowQuit) { event.preventDefault(); void requestQuit(); } });
-  updater = desktopUpdater({ changed: updateMenu, log, enabled: !options.noUpdate, install: install => requestQuit({ install }) });
+  updater = desktopUpdater({ changed: updateMenu, log, contentStore, enabled: !options.noUpdate, install: install => requestQuit({ install }) });
   updateMenu();
   await startBackend(mode);
   const entry = mode === 'steam' && isGameUrl(settings.steamEntry, origin) && requestedMode(settings.steamEntry, 'local') === 'steam'
     ? settings.steamEntry : origin + (mode === 'local' ? '/' : `/?view=${mode}`);
   await win.loadURL(entry); saveSettings();
+  contentLoaded = true;
+  if (contentStore?.state.trial) {
+    contentHealthTimer = setTimeout(() => {
+      if (!quitting && backend.info && !win.isDestroyed()) void contentStore.healthy().catch(error => log('[content] ' + error.message));
+    }, 15000);
+    contentHealthTimer.unref();
+  }
   if (settings.maximized) win.maximize();
   if (!options.hidden) win.show();
   updater.start();
@@ -339,6 +371,7 @@ else {
   app.on('window-all-closed', () => { if (allowQuit) app.quit(); });
   void app.whenReady().then(ready).catch(async error => {
     log(error.stack || error.message);
+    try { if (await recoverContent()) return; } catch (rollbackError) { log('[content] 无法自动回退：' + rollbackError.message); }
     if (!options.hidden) dialog.showErrorBox('Starsector Web 启动失败', error.message);
     quitting = true; await stopAll('startup-failed'); allowQuit = true; app.exit(1);
   });

@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "stage": "DEPTH_RESOLVED_2D_SUBLAYERS_SAMPLED_NOT_RUNTIME",
+  "battleEntities": 5,
+  "runtimeRegistered": false,
+  "damageArtReady": false,
+  "sourceImageSize": [
+    512,
+    1024
+  ],
+  "sourceAuthoringAnchors": {
+    "CORE": [
+      256,
+      500
+    ],
+    "FORE": [
+      256,
+      230
+    ],
+    "PORT": [
+      156,
+      785
+    ],
+    "STARBOARD": [
+      356,
+      785
+    ],
+    "AFT": [
+      256,
+      800
+    ]
+  },
+  "sourceManifest": "output/spear-of-adun-art/module-layers-v01/layer-build.json",
+  "evidenceSha256": "5e5158895d7fd5d5740a2526cd832ee0e292dc5f7a7c8ebf8b7f56bdded4cb55",
+  "frames": [
+    {
+      "frame": 0,
+      "manifest": "output/spear-of-adun-art/module-layers-v01/frame-0000/layers.json",
+      "drawItems": 11
+    },
+    {
+      "frame": 42,
+      "manifest": "output/spear-of-adun-art/module-layers-v01/frame-0042/layers.json",
+      "drawItems": 12
+    },
+    {
+      "frame": 90,
+      "manifest": "output/spear-of-adun-art/module-layers-v01/frame-0090/layers.json",
+      "drawItems": 10
+    },
+    {
+      "frame": 375,
+      "manifest": "output/spear-of-adun-art/module-layers-v01/frame-0375/layers.json",
+      "drawItems": 11
+    },
+    {
+      "frame": 750,
+      "manifest": "output/spear-of-adun-art/module-layers-v01/frame-0750/layers.json",
+      "drawItems": 11
+    },
+    {
+      "frame": 1500,
+      "manifest": "output/spear-of-adun-art/module-layers-v01/frame-1500/layers.json",
+      "drawItems": 11
+    },
+    {
+      "frame": 2250,
+      "manifest": "output/spear-of-adun-art/module-layers-v01/frame-2250/layers.json",
+      "drawItems": 11
+    },
+    {
+      "frame": 3000,
+      "manifest": "output/spear-of-adun-art/module-layers-v01/frame-3000/layers.json",
+      "drawItems": 11
+    }
+  ],
+  "drawing": "Use owner presence filter, then ascending drawOrder; draw cropped sprite with offsetFromModuleAnchorPx. Switch all sublayers atomically on pose changes.",
+  "remaining": [
+    "Final damaged interface artwork",
+    "Removal-state relighting/contact shadows",
+    "Continuous animation frame atlas",
+    "Engine module collision and weapon control"
+  ]
+}

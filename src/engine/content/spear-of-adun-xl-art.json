@@ -1,0 +1,70 @@
+{
+  "sourcePath": "output/imagegen/spear-of-adun-xl-v05/atlas.png",
+  "sourceSha256": "90d0575e9fe7fb2fa25ccba52cfd928e4c1c4fda7dd25012a9681f16f97a28b8",
+  "sourceSize": [
+    1536,
+    1024
+  ],
+  "body": {
+    "file": "xl-v05/body.png",
+    "sourceBox": [
+      110,
+      8,
+      365,
+      889
+    ],
+    "sourcePivot": [
+      292,
+      745
+    ],
+    "width": 38.0,
+    "height": 92.553425,
+    "pivotX": 0.4986301369863014,
+    "pivotY": 0.829021372328459,
+    "scale": 0.10410958904109589,
+    "offsets": [
+      74.854795,
+      0.0
+    ],
+    "sourcePath": "output/imagegen/spear-of-adun-xl-v05/atlas-refined.png",
+    "sourceSha256": "5e5abe969dd2ee61faa7e5687ae5de8085e29aeab69db558dfc763bb2a8de7ad"
+  },
+  "seat": {
+    "file": "xl-v05/seat.png",
+    "sourceBox": [
+      554,
+      480,
+      428,
+      440
+    ],
+    "sourcePivot": [
+      767,
+      700
+    ],
+    "width": 38.0,
+    "height": 39.065421,
+    "pivotX": 0.4976635514018692,
+    "pivotY": 0.5,
+    "scale": 0.08878504672897196,
+    "offsets": []
+  },
+  "foreground": {
+    "file": "xl-v05/collar.png",
+    "sourceBox": [
+      1059,
+      595,
+      425,
+      325
+    ],
+    "sourcePivot": [
+      1279,
+      700
+    ],
+    "width": 37.733645,
+    "height": 28.85514,
+    "pivotX": 0.5176470588235295,
+    "pivotY": 0.3230769230769231,
+    "scale": 0.08878504672897196,
+    "offsets": []
+  }
+}

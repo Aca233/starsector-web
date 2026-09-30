@@ -1,3 +1,5 @@
+import { ARK_IMPACT_FX, arkWeaponFxProfile } from './ArkWeaponFX';
+import { ADUN_FX, adunWeaponFxScale } from './AdunFXAssets';
 import { Vector2 } from '../math/Vector2';
 import type { DamageType } from '../simulation/ArmorGrid';
 import type { HitGlowAnimation } from '../simulation/CombatTypes';
@@ -70,5 +72,12 @@ export function createProjectileHitGlows(projectile: Projectile, pos: Vector2, t
     return { id: random.next(), pos: pos.clone(), vel: targetVelocity.clone(), diameter,
       life, maxLife: life, peakAlpha: Math.trunc(255 * brightness) / 255, color: rgb };
   };
+  if (adunWeaponFxScale(projectile.specId)) {
+    const hit=make(size*.95,.72,[255,255,255]);
+    const ark = !!arkWeaponFxProfile(projectile.specId);
+    hit.spriteUrl=ark ? ARK_IMPACT_FX : ADUN_FX.impact;
+    hit.maxLife=hit.life=ark ? (projectile.specId === 'web_ark_solar_lance' ? .48 : .28) : .18;
+    return [hit];
+  }
   return [make(size * (missile ? 2 : 3), missile ? 1 : 0.4, color), make(size * 0.5, 1, [255, 255, 255])];
 }

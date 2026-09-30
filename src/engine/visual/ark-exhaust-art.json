@@ -1,0 +1,102 @@
+{
+  "version": 8,
+  "source": "output/imagegen/adun-drive-v08/plume-sheet.png",
+  "sourceSha256": "e6c810395b7688720e8a0c9e84a96828e4d8b3e8d530c544dec5eb79aa0f4deb",
+  "sourceSize": [
+    1536,
+    1024
+  ],
+  "width": 128,
+  "height": 224,
+  "throatWidth": 39.083333333333336,
+  "pivotX": 0.5,
+  "pivotY": 0.05357142857142857,
+  "fps": 8,
+  "blend": "ADDITIVE",
+  "frames": [
+    {
+      "file": "plume-0.png",
+      "sourceCrop": [
+        127,
+        49,
+        383,
+        497
+      ],
+      "sourceThroat": [
+        255,
+        73
+      ],
+      "sourceMouthWidth": 79
+    },
+    {
+      "file": "plume-1.png",
+      "sourceCrop": [
+        126,
+        49,
+        382,
+        497
+      ],
+      "sourceThroat": [
+        254,
+        73
+      ],
+      "sourceMouthWidth": 78
+    },
+    {
+      "file": "plume-2.png",
+      "sourceCrop": [
+        127,
+        49,
+        383,
+        497
+      ],
+      "sourceThroat": [
+        255,
+        73
+      ],
+      "sourceMouthWidth": 77
+    },
+    {
+      "file": "plume-3.png",
+      "sourceCrop": [
+        127,
+        44,
+        383,
+        492
+      ],
+      "sourceThroat": [
+        255,
+        68
+      ],
+      "sourceMouthWidth": 79
+    },
+    {
+      "file": "plume-4.png",
+      "sourceCrop": [
+        127,
+        44,
+        383,
+        492
+      ],
+      "sourceThroat": [
+        255,
+        68
+      ],
+      "sourceMouthWidth": 79
+    },
+    {
+      "file": "plume-5.png",
+      "sourceCrop": [
+        127,
+        44,
+        383,
+        492
+      ],
+      "sourceThroat": [
+        255,
+        68
+      ],
+      "sourceMouthWidth": 77
+    }
+  ]
+}

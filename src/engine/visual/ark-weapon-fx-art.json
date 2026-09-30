@@ -1,0 +1,137 @@
+{
+  "sourceSha256": "981de236c0f1701ddb8d982710c5f7f100c8c046a9711f785ad1f722170b2e64",
+  "sourceSize": [
+    1254,
+    1254
+  ],
+  "clips": {
+    "charge": {
+      "frames": [
+        {
+          "file": "charge-0.png",
+          "width": 118,
+          "height": 240,
+          "pivotX": 0.5190839694656488,
+          "pivotY": 0.5225563909774437
+        },
+        {
+          "file": "charge-1.png",
+          "width": 118,
+          "height": 240,
+          "pivotX": 0.5190839694656488,
+          "pivotY": 0.5225563909774437
+        },
+        {
+          "file": "charge-2.png",
+          "width": 118,
+          "height": 240,
+          "pivotX": 0.5190839694656488,
+          "pivotY": 0.5225563909774437
+        },
+        {
+          "file": "charge-3.png",
+          "width": 118,
+          "height": 240,
+          "pivotX": 0.5190839694656488,
+          "pivotY": 0.5225563909774437
+        }
+      ]
+    },
+    "muzzle": {
+      "frames": [
+        {
+          "file": "muzzle-0.png",
+          "width": 95,
+          "height": 240,
+          "pivotX": 0.5096153846153846,
+          "pivotY": 0.7984790874524715
+        },
+        {
+          "file": "muzzle-1.png",
+          "width": 95,
+          "height": 240,
+          "pivotX": 0.5096153846153846,
+          "pivotY": 0.7984790874524715
+        },
+        {
+          "file": "muzzle-2.png",
+          "width": 95,
+          "height": 240,
+          "pivotX": 0.5096153846153846,
+          "pivotY": 0.7984790874524715
+        },
+        {
+          "file": "muzzle-3.png",
+          "width": 95,
+          "height": 240,
+          "pivotX": 0.5096153846153846,
+          "pivotY": 0.7984790874524715
+        }
+      ]
+    },
+    "packet": {
+      "frames": [
+        {
+          "file": "packet-0.png",
+          "width": 62,
+          "height": 240,
+          "pivotX": 0.5135135135135135,
+          "pivotY": 0.10139860139860139
+        },
+        {
+          "file": "packet-1.png",
+          "width": 62,
+          "height": 240,
+          "pivotX": 0.5135135135135135,
+          "pivotY": 0.10139860139860139
+        },
+        {
+          "file": "packet-2.png",
+          "width": 62,
+          "height": 240,
+          "pivotX": 0.5135135135135135,
+          "pivotY": 0.10139860139860139
+        },
+        {
+          "file": "packet-3.png",
+          "width": 62,
+          "height": 240,
+          "pivotX": 0.5135135135135135,
+          "pivotY": 0.10139860139860139
+        }
+      ]
+    },
+    "impact": {
+      "frames": [
+        {
+          "file": "impact-0.png",
+          "width": 240,
+          "height": 223,
+          "pivotX": 0.484251968503937,
+          "pivotY": 0.4745762711864407
+        },
+        {
+          "file": "impact-1.png",
+          "width": 240,
+          "height": 223,
+          "pivotX": 0.484251968503937,
+          "pivotY": 0.4745762711864407
+        },
+        {
+          "file": "impact-2.png",
+          "width": 240,
+          "height": 223,
+          "pivotX": 0.484251968503937,
+          "pivotY": 0.4745762711864407
+        },
+        {
+          "file": "impact-3.png",
+          "width": 240,
+          "height": 223,
+          "pivotX": 0.484251968503937,
+          "pivotY": 0.4745762711864407
+        }
+      ]
+    }
+  }
+}

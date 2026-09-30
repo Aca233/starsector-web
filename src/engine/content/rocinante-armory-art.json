@@ -1,0 +1,106 @@
+{
+  "source": "armory-v01.png",
+  "actualSize": [
+    948,
+    1659
+  ],
+  "sourceSha256": "c30cbb9b2a381d123fcccf7e01321e21f78d75082d23593a1c9c903d95fea16a",
+  "art": {
+    "railgun": {
+      "purpose": "Web-adaptation fit study, not canonical coordinates or final balance",
+      "visibleLength": 57,
+      "spriteWidth": 28.85625,
+      "spriteHeight": 68.4,
+      "spritePivotX": 0.5013093901982791,
+      "spritePivotY": 0.7850877192982456,
+      "turretOffsets": [
+        48,
+        0
+      ],
+      "spriteUrl": "/game-assets/graphics/ships/web_rocinante/armory-v01/railgun.png",
+      "sourceBox": [
+        160,
+        30,
+        255,
+        780
+      ],
+      "sha256": "1d2fea9948e86d72fd5cc38a5228907a0ea244d5d26bee43e2cf7750903642e8",
+      "textureSize": [
+        81,
+        192
+      ]
+    },
+    "tube": {
+      "purpose": "Web-adaptation fit study, not canonical coordinates or final balance",
+      "visibleLength": 19,
+      "spriteWidth": 17.099999999999998,
+      "spriteHeight": 26.599999999999998,
+      "spritePivotX": 0.5076855511638121,
+      "spritePivotY": 0.6082036775106082,
+      "turretOffsets": [
+        12.001980198019801,
+        0
+      ],
+      "spriteUrl": "/game-assets/graphics/ships/web_rocinante/armory-v01/tube.png",
+      "sourceBox": [
+        540,
+        270,
+        261,
+        522
+      ],
+      "sha256": "eb244c5589f5664557523e883c548c761ac29a9409d9c5e89793e1aca9bd1d6a",
+      "textureSize": [
+        72,
+        112
+      ]
+    },
+    "agile": {
+      "purpose": "Web-adaptation fit study, not canonical coordinates or final balance",
+      "visibleLength": 12,
+      "spriteWidth": 7.5,
+      "spriteHeight": 16.8,
+      "spritePivotX": 0.505,
+      "spritePivotY": 0.49836921069797785,
+      "turretOffsets": [
+        6.027397260273973,
+        0
+      ],
+      "spriteUrl": "/game-assets/graphics/ships/web_rocinante/armory-v01/agile.png",
+      "sourceBox": [
+        210,
+        835,
+        166,
+        690
+      ],
+      "sha256": "fc247cab992845a2dca2c9d932ffa9ea362d91bf8426e45958879af21a2546c3",
+      "textureSize": [
+        50,
+        112
+      ]
+    },
+    "heavy": {
+      "purpose": "Web-adaptation fit study, not canonical coordinates or final balance",
+      "visibleLength": 15,
+      "spriteWidth": 11.25,
+      "spriteHeight": 21,
+      "spritePivotX": 0.4970212765957447,
+      "spritePivotY": 0.5026692291266281,
+      "turretOffsets": [
+        7.399103139013452,
+        0
+      ],
+      "spriteUrl": "/game-assets/graphics/ships/web_rocinante/armory-v01/heavy.png",
+      "sourceBox": [
+        550,
+        835,
+        255,
+        690
+      ],
+      "sha256": "6b72bad45cdab7628464d14821f6c434ec0fdff6cabbe34135b755c317de0015",
+      "textureSize": [
+        60,
+        112
+      ]
+    }
+  }
+}

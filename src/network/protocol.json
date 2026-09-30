@@ -1,14 +1,24 @@
 {
-  "version": 30,
+  "version": 31,
   "snapshotHz": 60,
   "ships": [
     {
-      "id": "onslaught",
-      "name": "攻势"
+      "id": "web_zhuyuan",
+      "name": "烛渊",
+      "deploymentPoints": 35,
+      "spriteUrl": "/game-assets/graphics/ships/web_zhuyuan/zhuyuan.png"
     },
     {
-      "id": "paragon",
-      "name": "典范"
+      "id": "web_gloriana",
+      "name": "荣光女王 · 不屈誓约",
+      "deploymentPoints": 180,
+      "spriteUrl": "/game-assets/graphics/ships/web_gloriana/c.png"
+    },
+    {
+      "id": "web_sc2_hyperion",
+      "name": "休伯利安号",
+      "deploymentPoints": 65,
+      "spriteUrl": "/game-assets/graphics/ships/web_sc2_hyperion/hyperion.png"
     }
   ],
   "reconnectMs": 30000,

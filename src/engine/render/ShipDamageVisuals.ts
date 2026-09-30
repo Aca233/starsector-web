@@ -1,3 +1,4 @@
+import { createRenderCanvas, renderContext2D, imageWidth, imageHeight, type RenderCanvas, type RenderContext2D, type RenderImage } from './RenderSurface';
 import type { ShipSpec } from '../modding/ModManager';
 import type { ShipRenderState } from '../render/ShipRenderState';
 type Ship = Pick<ShipRenderState, 'spec'|'isDead'|'scorchMarks'|'scorchMarkVersion'|'armor'>;
@@ -57,28 +58,35 @@ export function hasHotDamageGlow(ship: Ship, bounds?: readonly Vector2[]): boole
   return damageMarks(ship, bounds).some(mark => glowColor(mark)[2] > 0);
 }
 
-const glowPixels = new WeakMap<HTMLImageElement, ImageData>();
-const tintedGlowTiles = new WeakMap<HTMLImageElement, Map<number, HTMLCanvasElement>>();
+const glowPixels = new WeakMap<RenderImage, ImageData>();
+const tintedGlowTiles = new WeakMap<RenderImage, Map<number, RenderCanvas>>();
 /**
  * Cache the native integer green/blue channel pair, independent of per-draw alpha.
  * A tile has fewer than230 reachable pairs along the source heat curve, rather than
  * rebuilding its pixels for every hot cell, piece and frame. No managed WebGL texture is
  * allocated for these small CPU canvases; ordinary hull overlays remain batched.
  */
-function tintGlowTile(image: HTMLImageElement, green: number, blue: number): HTMLCanvasElement {
+function tintGlowTile(image: RenderImage, green: number, blue: number): RenderCanvas {
   let variants = tintedGlowTiles.get(image);
   if (!variants) { variants = new Map(); tintedGlowTiles.set(image, variants); }
   const key = green * 256 + blue;
   const cached = variants.get(key);
   if (cached) return cached;
-  const tile = document.createElement('canvas');
-  tile.width = image.naturalWidth;
-  tile.height = image.naturalHeight;
-  const ctx = tile.getContext('2d')!;
+  const tile = createRenderCanvas();
+  tile.width = imageWidth(image);
+  tile.height = imageHeight(image);
+  const ctx = renderContext2D(tile)!;
   let source = glowPixels.get(image);
   if (!source) {
+    // Preserve the draw-source tile's original initialization. Read each source
+    // once on a CPU-oriented scratch canvas instead of synchronizing this canvas.
     ctx.drawImage(image, 0, 0);
-    source = ctx.getImageData(0, 0, tile.width, tile.height);
+    const reader = createRenderCanvas();
+    reader.width = tile.width;
+    reader.height = tile.height;
+    const readContext = renderContext2D(reader, { willReadFrequently: true })!;
+    readContext.drawImage(image, 0, 0);
+    source = readContext.getImageData(0, 0, tile.width, tile.height);
     glowPixels.set(image, source);
   }
   const pixels = ctx.createImageData(source.width, source.height);
@@ -99,7 +107,7 @@ function tintGlowTile(image: HTMLImageElement, green: number, blue: number): HTM
  * transparent parts of a ship sprite never receive a decal.
  */
 export function drawShipDamageDecals(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext2D,
   ship: Ship,
   layer: DamageDecalLayer,
   scaleX = 1,
@@ -111,8 +119,8 @@ export function drawShipDamageDecals(
     const [green, blue, glowAlpha] = glowColor(mark);
     if (layer === 'glow' && (glowAlpha === 0 || (ship.spec.hullSize === 'FIGHTER' && !ship.isDead))) continue;
     if (layer === 'base' && mark.opacity <= 0) continue;
-    const img = textureCache.getImage(damageDecalUrl(mark, layer));
-    if (!img.complete || img.naturalWidth <= 0) {
+    const img = textureCache.getCanvasImage(damageDecalUrl(mark, layer));
+    if (!img) {
       allReady = false;
       continue;
     }
@@ -145,7 +153,7 @@ export function drawShipDamageDecals(
  * It intentionally contains no hull color so it can be layered over the normally rendered ship.
  */
 export function renderShipDamageOverlayCanvas(
-  canvas: HTMLCanvasElement,
+  canvas: RenderCanvas,
   ship: Ship,
   layer: DamageDecalLayer,
   clipPolygon?: readonly Vector2[]
@@ -155,12 +163,12 @@ export function renderShipDamageOverlayCanvas(
   if (canvas.width !== width) canvas.width = width;
   if (canvas.height !== height) canvas.height = height;
 
-  const ctx = canvas.getContext('2d');
+  const ctx = renderContext2D(canvas);
   if (!ctx) return false;
   ctx.clearRect(0, 0, width, height);
 
-  const hull = textureCache.getImage(ship.spec.spriteUrl);
-  if (!hull.complete || hull.naturalWidth <= 0) return false;
+  const hull = textureCache.getCanvasImage(ship.spec.spriteUrl);
+  if (!hull) return false;
 
   ctx.save();
   if (clipPolygon) clipShipPolygon(ctx, ship.spec, clipPolygon);

@@ -1,0 +1,4 @@
+import {readdir,readFile,writeFile} from 'node:fs/promises';import {createHash} from 'node:crypto';
+const folders=['graphics/ships/web_adun_ark/','graphics/fx/web_adun_ark_exhaust_v07/','graphics/fx/web_adun_ark_exhaust_v08/'],p='public/game-assets/',file=p+'asset-manifest.json';const rows=JSON.parse(await readFile(file,'utf8'));
+for(const folder of folders)for(const name of await readdir(p+folder)){if(!name.endsWith('.png'))continue;const b=await readFile(p+folder+name),id=folder+name,entry={id,path:id,type:'image',bytes:b.length,hash:createHash('sha256').update(b).digest('hex'),group:'graphics',sampler:{wrap:'clamp',minFilter:'linear',magFilter:'linear',mipmap:false}};const i=rows.findIndex(r=>r.id===id);if(i<0)rows.push(entry);else rows[i]=entry;}
+await writeFile(file,JSON.stringify(rows,null,2)+'\n');console.log('ARK ASSETS REGISTERED');

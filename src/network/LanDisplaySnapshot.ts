@@ -1,3 +1,6 @@
+import { validLoadedMissileLevels } from '../engine/visual/GlorianaTorpedoVisuals';
+import { DisplayDefinitionReceiver, resolveDisplayDefinition } from './display/DisplayDefinitionReceiver';
+import { PackedSnapshotNumbers } from './PackedSnapshotNumbers.mjs';
 import { registerShipDisplayStrings } from '../engine/content/ShipDisplayStrings';
 /** Display protocol receiver. No simulation constructors, system registry or
  * executable definition restoration can be reached through this module. */
@@ -18,16 +21,18 @@ const readKeys = ['multiTeamBattle','openBattlefield','simulationPointLimit','co
 interface Receiver {
  ships: Map<string,LanDisplayShip>; controlled: Map<number,string>; capitals: Set<string>;
  tick: number; projectileTick: number;
+ definitions: DisplayDefinitionReceiver;
  specs: Map<string,ShipSpec>; puffs: ExplosionPuffDecoder; particles: DynamicParticleDecoder;
 }
 const receivers = new WeakMap<LanDisplayWorld,Receiver>();
 function validate(frame:CombatSnapshot):void {
- if(!frame || frame.displayVersion!==1 || !Number.isSafeInteger(frame.tick) || frame.tick<0
+ if(!frame || (frame.displayVersion!==1&&frame.displayVersion!==2) || !Number.isSafeInteger(frame.tick) || frame.tick<0
   || frame.componentMode!==undefined || frame.fixedDisplay!==undefined || frame.recordDefinitions!==undefined
   || !Array.isArray(frame.ships) || frame.ships.length<2 || frame.ships.length>4096
   || !Array.isArray(frame.crafts) || frame.crafts.length>8192 || !Array.isArray(frame.craftSpecs) || frame.craftSpecs.length>12288
   || !frame.controlled || !frame.displayWings || !Array.isArray(frame.displayWings.player) || !Array.isArray(frame.displayWings.enemy)
   || !frame.displayWorld || !frame.world || !frame.deployment || !Array.isArray(frame.deployment.rows)) throw Error('Invalid LAN display protocol');
+ if(frame.displayVersion===1&&frame.displayDefinitions!==undefined||frame.displayVersion===2&&!Array.isArray(frame.displayDefinitions))throw Error('Invalid display definition version');
  const ids=new Set<string>();
  for(const row of [...frame.ships,...frame.crafts]) {
   if(typeof row.id!=='string'||!row.id.length||row.id.length>256||ids.has(row.id)||!Number.isInteger(row.spec)||!frame.craftSpecs[row.spec!]
@@ -49,19 +54,36 @@ function validate(frame:CombatSnapshot):void {
  if(frame.particleEvents!==undefined)validateParticleEvents(frame.particleEvents);
  if(frame.projectileVisuals!==undefined&&(frame.projectileVisuals!==1||!Array.isArray(frame.world.projectiles)||frame.world.projectiles.length))throw Error('Invalid separate projectile snapshot');
 }
-function system(value:DisplaySystem):DisplaySystem {
+function system(value:DisplaySystem,definitions:DisplayDefinitionReceiver):DisplaySystem {
  if(!(value instanceof DisplaySystem)) {
   const record=new DisplaySystem();
   for(const key of Object.keys(value)){assertDataField(record,key);Reflect.set(record,key,Reflect.get(value,key));}
   value=record;
  }
- validateDisplayDefinition(value.definitionData);
+ if(!definitions.owns(value.definitionData))validateDisplayDefinition(value.definitionData);
  value.definition=value.definitionData;
  if(!value.definition||!value.fluxCosts||!value.fireRates||!Array.isArray(value.fireSlots))throw Error('Invalid display system');
  return value;
 }
 function decodeShips(frame:CombatSnapshot,state:Receiver,reset:boolean,world?:LanDisplayWorld) {
  const layouts=displayLayouts(frame.layouts,state.puffs,state.particles);
+ if(state.definitions.active||frame.displayVersion===2)layouts.definitionOwner=state.definitions;
+ if(frame.displayVersion===2) {
+  layouts.definitions=state.definitions.prepare(frame.displayDefinitions);
+  // Reject missing/out-of-range references before touching the live display.
+  // Skip packed numeric blocks; they cannot contain reference envelopes.
+  let nodes=0;
+  const preflight=(value:any,depth=0):void=>{
+   if(++nodes>2000000||depth>128)throw Error('Display definition reference budget exceeded');
+   if(!value||typeof value!=='object'||value instanceof PackedSnapshotNumbers)return;
+   if(Object.hasOwn(value,'$displayDefinition')){
+    if(Object.keys(value).length!==1)throw Error('Invalid display definition envelope');
+    resolveDisplayDefinition(layouts.definitions,value.$displayDefinition);return;
+   }
+   for(const child of Object.values(value))if(child&&typeof child==='object')preflight(child,depth+1);
+  };
+  preflight(frame);
+ }
  const specs=frame.craftSpecs.map(value=>{
   const signature=JSON.stringify(value);let spec=state.specs.get(signature);
   if(!spec){validateDisplayShipSpec(value);spec=immutableCopy(value) as ShipSpec;state.specs.set(signature,spec);registerShipDisplayStrings(spec);}
@@ -80,9 +102,9 @@ function decodeShips(frame:CombatSnapshot,state:Receiver,reset:boolean,world?:La
     ||!(ship.pos instanceof Vector2)||!(ship.vel instanceof Vector2)||!Number.isFinite(ship.facingRad)||!Number.isSafeInteger(ship.teamId)
     ||!Array.isArray(ship.weapons)||!ship.motionStats||!(ship.armor.cells instanceof Float32Array)
     ||ship.armor.cells.length!==ship.armor.cols*ship.armor.rows)throw Error('Incomplete display ship');
-  ship.system=system(ship.system);ship.systems=ship.systems.map(system);ship.allSystems=ship.allSystems.map(system);
-  if(ship.defenseSystem)ship.defenseSystem=system(ship.defenseSystem);
-  for(const mount of ship.weapons){if(!mount.weaponSpec||!Number.isFinite(mount.displayRange)||!Number.isFinite(mount.displaySpeed))throw Error('Invalid display weapon');validateDisplayDefinition(mount.weaponSpec);mount.spec=mount.weaponSpec;}
+  ship.system=system(ship.system,state.definitions);ship.systems=ship.systems.map(value=>system(value,state.definitions));ship.allSystems=ship.allSystems.map(value=>system(value,state.definitions));
+  if(ship.defenseSystem)ship.defenseSystem=system(ship.defenseSystem,state.definitions);
+  for(const mount of ship.weapons){if(mount.loadedMissileLevels!==undefined&&!validLoadedMissileLevels(mount.loadedMissileLevels))throw Error('Invalid loaded missile levels');if(!mount.weaponSpec||!Number.isFinite(mount.displayRange)||!Number.isFinite(mount.displaySpeed))throw Error('Invalid display weapon');if(!state.definitions.owns(mount.weaponSpec))validateDisplayDefinition(mount.weaponSpec);mount.spec=mount.weaponSpec;}
   ship.weaponRanges=new Map(ship.weapons.map(mount=>[mount,mount.displayRange]));
   const snap=reset||!prior||world?.deployment.isReserve(ship.id)||teleport!==ship.teleportSequence;
   ship.prevPos=snap?ship.pos.clone():pos!;ship.prevFacingRad=snap?ship.facingRad:facing!;
@@ -123,7 +145,7 @@ function restore(world:LanDisplayWorld,frame:CombatSnapshot,state:Receiver,reset
 }
 export function initializeLanDisplayWorld(seat:number,frame:CombatSnapshot):{world:LanDisplayWorld;controlled:Map<number,LanDisplayShip>} {
  validate(frame);
- const state:Receiver={ships:new Map(),controlled:new Map(Object.entries(frame.controlled!).map(([seat,id])=>[Number(seat),id])),capitals:new Set(frame.ships.map(row=>row.id)),tick:-1,projectileTick:-1,specs:new Map(),puffs:new ExplosionPuffDecoder(),particles:new DynamicParticleDecoder()};
+ const state:Receiver={ships:new Map(),controlled:new Map(Object.entries(frame.controlled!).map(([seat,id])=>[Number(seat),id])),capitals:new Set(frame.ships.map(row=>row.id)),tick:-1,projectileTick:-1,definitions:new DisplayDefinitionReceiver(),specs:new Map(),puffs:new ExplosionPuffDecoder(),particles:new DynamicParticleDecoder()};
  const layouts=decodeShips(frame,state,true);
  const world=new LanDisplayWorld(seat,frame.ships.map(row=>state.ships.get(row.id)!),state.controlled,frame.deployment!);
  restore(world,frame,state,true,layouts);receivers.set(world,state);

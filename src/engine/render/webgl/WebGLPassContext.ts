@@ -1,3 +1,4 @@
+import type { RenderCanvas } from '../RenderSurface';
 import { WebGLTextureManager } from './WebGLTextureManager';
 import { SpriteBatcher } from './SpriteBatcher';
 import { RibbonBatcher } from './RibbonBatcher';
@@ -19,7 +20,7 @@ export interface ViewportBounds {
  */
 export interface WebGLPassContext {
   gl: WebGL2RenderingContext;
-  canvas: HTMLCanvasElement;
+  canvas: RenderCanvas;
   textures: WebGLTextureManager;
   batcher: SpriteBatcher;
   ribbonBatcher: RibbonBatcher;
@@ -27,6 +28,7 @@ export interface WebGLPassContext {
   cameraPos: Vector2;
   zoom: number;
   alpha: number;
+  gravityEffects?: boolean;
   viewport: ViewportBounds;
   whiteTex: WebGLTexture;
   hitGlowTex: WebGLTexture;

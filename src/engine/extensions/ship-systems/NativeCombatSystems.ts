@@ -38,14 +38,14 @@ const damper = nativeSystem('damper', {
 const omegaDamage = { armorDamageMultiplier: .5, hullDamageMultiplier: .5, empDamageMultiplier: .5,
   weapons: allWeapons({ fluxCostMultiplier: .5 }) };
 const damperOmega = nativeSystem('damper_omega', {
-  description: '展开熵抑制场，使装甲、船体与EMP承伤降低50%，武器幅能消耗降低50%，失效武器与引擎的修复时间缩短90%。生效期间禁用护盾，但仍可开火。', modifiers: () => ({ ...omegaDamage, repairTimeMultiplier: .1 }), advanceAI: defensiveAI });
+  description: '展开熵抑制场，使装甲、船体与EMP承伤降低50%，武器载荷消耗降低50%，失效武器与引擎的修复时间缩短90%。生效期间禁用护盾，但仍可开火。', modifiers: () => ({ ...omegaDamage, repairTimeMultiplier: .1 }), advanceAI: defensiveAI });
 const cryoflux = nativeSystem('cryoflux', {
-  description: '使装甲、船体与EMP承伤降低50%，同时将武器幅能消耗减半；不提供熵抑制器的快速修复效果。这是独立的幅能场变频技能，不是同名武器的特殊效果。', modifiers: () => omegaDamage, advanceAI: defensiveAI });
+  description: '使装甲、船体与EMP承伤降低50%，同时将武器载荷消耗减半；不提供熵抑制器的快速修复效果。这是独立的载荷场变频技能，不是同名武器的特殊效果。', modifiers: () => omegaDamage, advanceAI: defensiveAI });
 function burnModifiers(system: ShipSystem, speed: number, acceleration: number): SystemModifiers {
   return { speedFlat: system.state === 'OUT' ? 0 : speed * system.effectLevel, accelerationFlat: acceleration * system.retainedEffectLevel };
 }
 const infernium = nativeSystem('inferniuminjector', {
-  description: '切换烈焰喷射：航速+50且+50%，加速度+800且+800%，转向加速度+400%，最大转速+50%；每秒1软幅能。保持原生noAccel限制，不擅自添加强制前进。',
+  description: '切换烈焰喷射：航速+50且+50%，加速度+800且+800%，转向加速度+400%，最大转速+50%；每秒1软载荷。保持原生noAccel限制，不擅自添加强制前进。',
   canActivate: ship => !ship.engineController.isFlamedOut && ship.engineController.state !== 'DISABLED',
   controls: {blockAcceleration:true,releaseOnOut:true}, visuals: {engineBoost:true},
   modifiers: s => ({speedFlat:s.state === 'OUT'?0:50*s.effectLevel,speedPercent:s.state === 'OUT'?0:50*s.effectLevel,
@@ -71,7 +71,7 @@ const dynamicStabilizer = nativeSystem('dynamic_stabilizer', {
   advanceAI: context => { advanceWeaponBoostAI(context, 'BALLISTIC'); advanceWeaponBoostAI(context, 'ENERGY'); advanceJetsAI(context); },
 });
 const temporalShell = nativeSystem('temporalshell', {
-  description: '加速本舰的局部时间流动，完全展开时达到正常的3倍，使本舰行动与武器运转加快。开启时持续产生幅能，不改变其他舰船的时间流速。',
+  description: '加速本舰的局部时间流动，完全展开时达到正常的3倍，使本舰行动与武器运转加快。开启时持续产生载荷，不改变其他舰船的时间流速。',
   modifiers: system => ({ timeMultiplier: 1 + 2 * system.effectLevel * system.effectLevel }),
   advanceAI: context => { advanceWeaponBoostAI(context, 'BALLISTIC'); advanceWeaponBoostAI(context, 'ENERGY'); defensiveAI(context); },
 });
@@ -91,7 +91,7 @@ const fastMissileRacks = nativeSystem('fastmissileracks', {
   advanceAI: context => reloadAI(context, true),
 });
 const forgeVats = nativeSystem('forgevats', {
-  description: '利用舰内纳米锻炉为有限弹药的导弹武器补弹，每次补充该武器的基础备弹量，最多补至当前容量上限。技能或插件扩大的弹舱可能需要多次补充；启动会产生幅能。',
+  description: '利用舰内纳米锻炉为有限弹药的导弹武器补弹，每次补充该武器的基础备弹量，最多补至当前容量上限。技能或插件扩大的弹舱可能需要多次补充；启动会产生载荷。',
   activationReason: ship => finiteMissiles(ship).some(w => w.ammo < w.spec.maxAmmo!) ? undefined : '没有需要补充弹药的有限弹药导弹',
   onActivate: ship => { for (const w of finiteMissiles(ship)) w.ammo = Math.min(w.spec.maxAmmo!, w.ammo + (w.baseMaxAmmo ?? w.spec.maxAmmo!)); },
   advanceAI: context => reloadAI(context, false),
@@ -131,9 +131,9 @@ const entropyAmplifier = nativeSystem('entropyamplifier', {
   }, advanceAI: targetedAI,
 });
 const acausalDisruptor = nativeSystem('acausaldisruptor', {
-  description: '使基础射程500内的一艘敌舰强制过载1秒，短暂打断其行动。目标必须可见、未相位，且不是战机、未在过载或主动排幅中。',
+  description: '使基础射程500内的一艘敌舰强制过载1秒，短暂打断其行动。目标必须可见、未相位，且不是战机、未在过载或主动排散中。',
   selectTarget: disruptTarget,
-  targetFailureReason: ship => `需要未过载、未排幅的非战机敌舰（射程 ${Math.round(500 * ship.hullStats.systemRangeMultiplier)}）；已选目标无效时请重新选定`,
+  targetFailureReason: ship => `需要未过载、未排散的非战机敌舰（射程 ${Math.round(500 * ship.hullStats.systemRangeMultiplier)}）；已选目标无效时请重新选定`,
   onActive: (_ship, _world, system) => {
     const target = system.activationTarget;
     if (target && alive(target) && !target.flux.isOverloaded && !target.flux.isVenting) target.flux.overloadFor(1);

@@ -1,17 +1,1 @@
-/* Exact subsets of the existing faces, compiled by scripts/optimize-web-fonts.py.
- * Scope to the initial menu. Unknown text and other screens retain full native fonts. */
-@font-face {
-  font-family: StarsectorHomeCN;
-  src: url("/game-assets/graphics/fonts/native-home-zh.woff2") format("woff2");
-  font-display: swap;
-}
-@font-face {
-  font-family: StarsectorHomeHeadingCN;
-  src: url("/game-assets/graphics/fonts/native-home-heading-zh.woff2") format("woff2");
-  font-display: swap;
-}
-.native-home {
-  --native-font-body: StarsectorLatin, StarsectorHomeCN, StarsectorCN, sans-serif;
-  --native-font-heading: StarsectorNumber, StarsectorHomeHeadingCN, StarsectorHeadingCN, sans-serif;
-  --ui-font: var(--native-font-body);
-}
+/* Home shares the system typography from original-interface.css; no bitmap/WOFF assets. */

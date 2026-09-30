@@ -75,7 +75,7 @@ try {
     assert.ok(style.coversSidebar, 'plugin panel intercepts clicks over the background room text');
     await page.screenshot({ path: resolve(work, 'room-' + viewport.width + '.png') });
     await page.getByRole('button', { name: '测试房间操作', exact: true }).click();
-    const plus = page.getByRole('button', { name: '增加幅能容存器', exact: true });
+    const plus = page.getByRole('button', { name: '增加载荷容存器', exact: true });
     const before = await page.evaluate(() => fixtureState.draft.capacitors);
     await plus.click();
     assert.equal(await page.evaluate(() => fixtureState.draft.capacitors), before + 1);

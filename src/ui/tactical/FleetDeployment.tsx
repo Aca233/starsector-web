@@ -1,7 +1,7 @@
+import { AssemblyThumbnail } from '../core/AssemblyThumbnail';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { deploymentViewReason, deploymentViewUsed, type DeploymentViewSource } from '../../engine/runtime/DeploymentView';
 import { useDeploymentView, useDeploymentSelection } from './useDeploymentView';
-import { runtimeAssetUrl } from '../../engine/runtime/RuntimePaths';
 import { matchesRefitSearch, hullMatchesCategory, hullSearchAliases } from '../../studio/RefitSearch';
 import { RefitHint } from '../../studio/RefitHint';
 import { useInspectionCodex } from '../../studio/useInspectionCodex';
@@ -60,7 +60,10 @@ export function FleetDeployment({ source, team, onClose, onDeployed, onDeploy }:
     const currentReason = deploymentViewReason(source.read(), ids, team);
     if (currentReason) { setError(currentReason); return; }
     const token = generation.current, viewGeneration = view.generation;
-    const current = () => mounted.current && generation.current === token && source.read().generation === viewGeneration;
+    const current = () => {
+      if (!mounted.current || generation.current !== token) return false;
+      try { return source.read().generation === viewGeneration; } catch { return false; }
+    };
     pending.current = true; setBusyOwner({ source, generation: viewGeneration, team }); setError('');
     try {
       await onDeploy(ids);
@@ -90,7 +93,7 @@ export function FleetDeployment({ source, team, onClose, onDeployed, onDeploy }:
       return <button type="button" key={hull.id} className="sim-deployment-ship" disabled={busy} aria-label={hull.name + ' · ' + hull.entries.length + ' 艘' + (count ? ' · 已选 ' + count : '')}
         aria-pressed={count > 0} data-unavailable={hull.entries.every(entry => entry.status !== 'reserve')}
         {...hullButtonProps(hull.id, () => setHoverId(hull.entries[0].id))}>
-        <img src={runtimeAssetUrl(spec.spriteUrl)} alt="" draggable={false} style={{ width: spec.spriteWidth * Math.min(.2, 52 / spec.spriteWidth, 56 / spec.spriteHeight) }} />
+        <AssemblyThumbnail spec={spec} fit={{width:52,height:56,scale:.2}} />
         <b>{price}</b><span className="sim-hull-fits">{count ? '已选 ' + count + '/' : ''}{hull.entries.length} 艘</span>
       </button>;
     })}{!hulls.length && <p className="sim-empty">{entries.some(entry => entry.status === 'reserve') ? '没有符合筛选条件的舰船。' : '本队没有待命后备舰。可切换状态查看已部署或已撤离的舰船。'}</p>}</div>

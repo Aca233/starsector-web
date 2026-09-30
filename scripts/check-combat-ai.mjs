@@ -1,12 +1,21 @@
+import { checkQualifiedFireTargets } from './lib/qualified-fire-target-contracts.mjs';
+import { checkOwnerObservationWire } from './lib/owner-observation-wire-contracts.mjs';
+import { checkOwnedFireGuards } from './lib/owned-fire-guard-contracts.mjs';
+import { checkOwnedHostileQueries } from './lib/owned-hostile-query-contracts.mjs';
+import {checkOwnedPreAimRange} from './lib/owned-preaim-range-contracts.mjs';
 import assert from 'node:assert/strict';
 import { loadCombatLab } from './ai/load-combat-lab.mjs';
-const lab = await loadCombatLab();
+const lab = await loadCombatLab({ autofireBaseline: process.env.AUTOFIRE_BASELINE, ownedAdmissionBaseline: process.env.OWNED_ADMISSION_BASELINE, publisherBaseline: process.env.PUBLISHER_BASELINE });
 const { CombatLab, CapitalShipAI, Ship, Vector2, modManager, AutofireController, solveWeaponAim,
   emptyCombatPolicy, validateCombatPolicy, POLICY_ACTIONS, POLICY_STATES, combatObservation, policyAction,
   shipPolicyAction, setTrainingAction, learnTransition, fireTargetUtility, fleetEngagementRange,
   InFlightFireBudget, chooseCombatVelocity, forecastCombatPosition, Publisher, Owner } = lab;
-let passed = 0;
-function test(name, fn) { fn(); passed++; console.log(`ok ${passed} - ${name}`); }
+if(process.env.OWNED_PREAIM_ONLY==='true'){console.log(JSON.stringify(checkOwnedPreAimRange(lab,ownedQueryFixture,fireTargetSnapshot)));process.exit(0);}
+let passed = 0, visited = 0;
+// Resume a failed/unvisited tail without rerunning completed checks.
+const fromTest = Number(process.env.COMBAT_AI_FROM ?? 1);
+assert.ok(Number.isInteger(fromTest) && fromTest >= 1);
+function test(name, fn) { const index = ++visited; if (index < fromTest) return; fn(); passed++; console.log(`ok ${index} - ${name}`); }
 function fixture() {
   const ship = new Ship('test-own', modManager.requireShip('hammerhead'), true, new Vector2(), 0);
   const target = new Ship('test-target', modManager.requireShip('hammerhead'), false, new Vector2(500, 0), Math.PI);
@@ -276,6 +285,10 @@ test('carrier station and vent ownership bypass tactical repositioning', () => {
   f.ship.flux.isVenting=true;
   assert.equal(chooseCombatVelocity(f.ship,f.target,new Vector2(),f.profile,f.scene).adjusted,false);
 });
+test('fixed owner observations preserve complete packets, live validation and read/write order', () => {
+  console.log('  '+JSON.stringify(checkOwnerObservationWire(lab,ownedQueryFixture)));
+});
+
 test('owner packet and serial AI agree on a blocked-lane scene', () => {
   for (const window of ['normal','high-flux','low-hull']) {
   const env=new CombatLab(52,0,0,2), e=env.engine;
@@ -467,6 +480,428 @@ test('native forecast cadence is staggered, while fallback and control re-entry 
   assert.equal(schedules.size,3);
 });
 
+
+// Scan wrappers can be recycled only before a solution accepts ownership. Frozen
+// reference imports share the same Ship/Vector2 classes, not a different realm.
+function fireTargetSnapshot(controller, f, value) {
+  const tracker=controller.trackers.get(f.mount);
+  return { target:value?.target.entity.id, kind:value?.target.kind, point:value&&[value.point.x,value.point.y],
+    delay:value?.delay,speed:value?.speed,range:value?.range,fireControl:structuredClone(f.mount.fireControl),
+    tracker:tracker&&{target:tracker.target?.entity.id,scanIn:tracker.scanIn,firingTime:tracker.firingTime,
+      idleFireTime:tracker.idleFireTime,ammoAllowed:tracker.ammoAllowed,random:tracker.random.checkpointWitness()} };
+}
+function recordOwnershipRun(Controller, missiles) {
+  const f=fixture(), controller=new Controller(), log=[], rows=[];
+  f.ship.fireControlMode='MANUAL';
+  const hull=(id,x,y)=>{const s=new Ship(id,f.target.spec,false,new Vector2(x,y),Math.PI);s.shield.isActive=false;return s;};
+  const second=hull('second-hull',400,280),far=hull('far-hull',100000,20000),hidden=hull('hidden-hull',400,-200),dead=hull('dead-hull',200,200);
+  hidden.visibilityMask=0;dead.isDead=true;
+  f.world.ships=[f.ship,hidden,f.target,far,second,dead];
+  for(const s of [f.target,second,far]) {
+    const visible=s.isVisibleTo; s.isVisibleTo=function(team){log.push(['visible',this.id,team]);return visible.call(this,team);};
+    let x=s.pos.x;Object.defineProperty(s.pos,'x',{enumerable:true,configurable:true,get(){log.push(['x',s.id]);return x;},set(v){x=v;}});
+  }
+  if(missiles) {
+    f.target.pos.set(250,-140);second.pos.set(200,160);
+    f.mount.spec={...modManager.getWeapon('pdlaser'),aiHints:['PD'],isPointDefense:true};
+    const missile=(id,x,y,vx,vy)=>({id,teamId:1,pos:new Vector2(x,y),vel:new Vector2(vx,vy),radius:8,
+      hitpoints:100,flightTimeRemaining:20,isRocket:true,damage:100});
+    f.world.missiles=[{...missile('dead-missile',40,0,-10,0),hitpoints:0},missile('one',240,0,-10,0),
+      missile('far-missile',100000,20000,-10,0),missile('two',150,60,-150,-60),
+      {...missile('last-reject',200,0,-10,0),collisionDisabled:true}];
+  }
+  const first=controller.aim(.1,f.ship,f.mount,f.world);assert.ok(first);
+  const firstTarget=first.target,firstEntity=firstTarget.entity;
+  assert.equal(firstTarget.kind,missiles?'MISSILE':'SHIP');if(!missiles)assert.equal(firstEntity,f.target);
+  rows.push(fireTargetSnapshot(controller,f,first));
+  if(missiles)firstEntity.hitpoints=0;else {f.target.visibilityMask=0;f.ship.currentTargetShip=second;}
+  const next=controller.aim(1,f.ship,f.mount,f.world);assert.ok(next);assert.notEqual(next.target,firstTarget);
+  assert.notEqual(next.target.entity,firstEntity);assert.equal(firstTarget.entity,firstEntity);
+  rows.push(fireTargetSnapshot(controller,f,next));
+  const nextTarget=next.target,nextEntity=nextTarget.entity;
+  for(const s of f.world.ships)if(s!==f.ship)s.visibilityMask=0;
+  for(const p of f.world.missiles)p.hitpoints=0;
+  assert.equal(controller.aim(1,f.ship,f.mount,f.world),null);
+  assert.equal(firstTarget.entity,firstEntity);assert.equal(nextTarget.entity,nextEntity);
+  rows.push(fireTargetSnapshot(controller,f,null));
+  // A retained target is an accepted snapshot of the reference, not a live scan cursor.
+  assert.equal(first.target,firstTarget);assert.equal(next.target,nextTarget);
+  return {rows,log};
+}
+test('fire target records preserve accepted identities, mixed candidates and observable reads',()=>{
+  for(const missiles of [false,true]) {
+    const actual=recordOwnershipRun(AutofireController,missiles);
+    if(lab.BeforeAutofireController)assert.deepEqual(actual,recordOwnershipRun(lab.BeforeAutofireController,missiles));
+  }
+});
+function reentrantPreAimRun(Controller) {
+  const outer=fixture(), inner=fixture(), controller=new Controller(),log=[];
+  const far=new Ship('last-far',outer.target.spec,false,new Vector2(100000,100000),0);far.shield.isActive=false;
+  outer.world.ships=[outer.ship,far,outer.target];outer.ship.currentTargetShip=null;
+  inner.target.pos.set(300,180);
+  let entered=false,nested,nestedPoint;
+  const read=outer.target.isVisibleTo;
+  outer.target.isVisibleTo=function(team){
+    log.push(['outer-visible',this.id,team]);
+    if(!entered){entered=true;nested=controller.aim(.1,inner.ship,inner.mount,inner.world);
+      nestedPoint=controller.preAim(inner.ship,inner.mount,inner.world);log.push(['reentered',nested?.target.entity.id]);}
+    return read.call(this,team);
+  };
+  const point=controller.preAim(outer.ship,outer.mount,outer.world);assert.ok(point);assert.ok(nestedPoint);assert.ok(nested);
+  assert.equal(nested.target.entity,inner.target);
+  const preferred=controller.preAim(outer.ship,outer.mount,{...outer.world,ships:[outer.ship,outer.target]});
+  assert.deepEqual(point,preferred);
+  outer.target.isVisibleTo=()=>{log.push(['throws']);throw Error('live query failure');};
+  assert.throws(()=>controller.preAim(outer.ship,outer.mount,outer.world),/live query failure/);
+  outer.target.isVisibleTo=read;outer.target.visibilityMask=0;
+  assert.equal(controller.preAim(outer.ship,outer.mount,outer.world),null);
+  outer.target.visibilityMask=3;
+  const recovered=controller.preAim(outer.ship,outer.mount,outer.world);assert.deepEqual(recovered,point);
+  assert.equal(nested.target.entity,inner.target);
+  return {point:[point.x,point.y],nestedPoint:[nestedPoint.x,nestedPoint.y],nested:fireTargetSnapshot(controller,inner,nested),log};
+}
+test('preAim scan records are call-local through reentry, dynamic reads and exceptions',()=>{
+  const actual=reentrantPreAimRun(AutofireController);
+  if(lab.BeforeAutofireController)assert.deepEqual(actual,reentrantPreAimRun(lab.BeforeAutofireController));
+});
+
+// Eligibility must preserve the established short-circuit reads even for
+// mutable/refitted specs and targets that change kind between acquisition scans.
+function eligibilityMatrix(Controller) {
+  const rows=[]; let acceptedShips=0, acceptedMissiles=0;
+  const cases=[
+    {}, {aiHints:['PD_ONLY']}, {aiHints:['PD_ONLY','ANTI_FTR']}, {aiHints:['STRIKE']},
+    {aiHints:['STRIKE','USE_VS_FRIGATES']}, {aiHints:['ANTI_FTR']},
+    {passThroughFighters:true}, {passThroughFighters:true,passThroughFightersOnlyWhenDestroyed:true},
+    {isGuided:true}, {isBeam:false,isRocket:true}, {isBeam:false,spawnType:'MISSILE'},
+    {isBeam:false,isRocket:true,proximityFuse:{range:40}}, {aiHints:['IGNORES_FLARES']},
+    {weaponType:'MISSILE',aiHints:[]}, {weaponType:'MISSILE',aiHints:['DO_NOT_AIM']}
+  ];
+  for(const changes of cases) for(const kind of ['SHIP','MISSILE']) {
+    const f=fixture(),controller=new Controller(),log=[];
+    f.ship.fireControlMode='MANUAL';f.target.pos.set(250,0);
+    f.mount.spec={...modManager.getWeapon('pdlaser'),aiHints:['PD'],isPointDefense:true,...changes};
+    const visible=f.target.isVisibleTo;
+    f.target.isVisibleTo=function(team){log.push(['visible',team]);return visible.call(this,team);};
+    const phase=Object.getOwnPropertyDescriptor(Ship.prototype,'isCollisionless').get;
+    Object.defineProperty(f.target,'isCollisionless',{configurable:true,get(){log.push(['collision']);return phase.call(this);}});
+    const p={id:'eligibility-missile',sourceShipId:f.target.id,pos:new Vector2(180,0),vel:new Vector2(-10,0),
+      radius:8,hitpoints:100,flightTimeRemaining:20,isRocket:true,damage:100};
+    f.world.missiles=kind==='MISSILE'?[p]:[];
+    if(kind==='MISSILE')f.target.visibilityMask=0;
+    for(let stage=0;stage<8;stage++) {
+      if(stage===1) {f.target.spec={...f.target.spec,hullSize:'FIGHTER'};p.isFighterDecoy=true;}
+      if(stage===2) {f.target.spec={...f.target.spec,hullSize:'FRIGATE'};p.isFighterDecoy=false;p.isFlare=true;}
+      if(stage===3) {f.target.isDocked=true;p.collisionDisabled=true;}
+      if(stage===4) {f.target.isDocked=false;f.target.isDead=true;p.collisionDisabled=false;p.hitpoints=0;}
+      if(stage===5) {f.target.isDead=false;p.hitpoints=100;p.flightTimeRemaining=0;f.target.visibilityMask=0;}
+      if(stage===6) {f.target.visibilityMask=kind==='SHIP'?3:0;p.flightTimeRemaining=20;p.isFlare=false;}
+      if(stage===7) {f.world.ships=[f.ship];f.world.missiles=[];}
+      const value=controller.aim(.3,f.ship,f.mount,f.world);
+      if(value?.target.kind==='SHIP')acceptedShips++;
+      if(value?.target.kind==='MISSILE')acceptedMissiles++;
+      const pre=controller.preAim(f.ship,f.mount,f.world);
+      rows.push({kind,changes,stage,value:fireTargetSnapshot(controller,f,value),pre:pre&&[pre.x,pre.y],log:log.splice(0)});
+    }
+  }
+  assert.ok(acceptedShips>0);assert.ok(acceptedMissiles>0);
+  return {rows,acceptedShips,acceptedMissiles};
+}
+test('fire control preserves 240 eligibility transitions, source fallback and live read order',()=>{
+  const actual=eligibilityMatrix(AutofireController);
+  assert.equal(actual.rows.length,240);
+  if(lab.BeforeAutofireController)assert.deepEqual(actual,eligibilityMatrix(lab.BeforeAutofireController));
+});
+
+
+function rankingPreAimRun(Controller,mode) {
+  const f=fixture(),controller=new Controller(),log=[];
+  f.ship.currentTargetShip=null;
+  const second=new Ship('ranking-second',f.target.spec,false,new Vector2(520,80),0);second.shield.isActive=false;
+  const far=new Ship('ranking-far',f.target.spec,false,new Vector2(100000,0),0);far.shield.isActive=false;
+  const hidden=new Ship('ranking-hidden',f.target.spec,false,new Vector2(30,0),0);hidden.visibilityMask=0;
+  f.target.pos.set(550,0);f.world.ships=[f.ship,far,hidden,f.target,second];
+  if(mode==='tie') {f.target.pos.set(500,50);second.pos.set(500,-50);}
+  if(mode==='preferred')f.ship.currentTargetShip=second;
+  if(mode==='none') {f.target.pos.set(100000,0);second.pos.set(100000,0);}
+  const originalVisible=f.target.isVisibleTo;
+  f.target.isVisibleTo=function(team){log.push(['visible',this.id]);if(mode==='move')this.pos.set(450,0);return originalVisible.call(this,team);};
+  const originalSecond=second.isVisibleTo;
+  second.isVisibleTo=function(team){log.push(['visible',this.id]);return originalSecond.call(this,team);};
+  const point=controller.preAim(f.ship,f.mount,f.world);
+  if(mode==='none')assert.equal(point,null);else assert.ok(point);
+  if(mode==='move')assert.deepEqual([point.x,point.y],[second.pos.x,second.pos.y],'rank by coordinates captured BEFORE callback movement');
+  if(mode==='tie')assert.deepEqual([point.x,point.y],[f.target.pos.x,f.target.pos.y],'first candidate wins exact tie');
+  return {point:point&&[point.x,point.y],log};
+}
+test('preAim ranking preserves moving callbacks, ties, preferred targets and all-rejected scans',()=>{
+  for(const mode of ['move','tie','preferred','none']) {
+    const actual=rankingPreAimRun(AutofireController,mode);
+    if(lab.BeforeAutofireController)assert.deepEqual(actual,rankingPreAimRun(lab.BeforeAutofireController,mode));
+  }
+});
+
+
+function ownedQueryFixture() {
+  const engine=new lab.CombatEngine('onslaught','onslaught',917);
+  engine.playerShip.fireControlMode='AI';engine.playerShip.currentTargetShip=null;
+  engine.playerShip.pos.set(0,0);engine.enemyShip.pos.set(600,0);
+  for(let i=0;i<98;i++)engine.addShip('onslaught',i%2===0,new Vector2(850+(i%7)*160,(Math.floor(i/7)-7)*260),0);
+  const ships=engine.ships;
+  for(const ship of ships) {ship.shield.isActive=false;ship.vel.set(0,0);}
+  return {engine,ships,ship:engine.playerShip,target:engine.enemyShip,world:{ships,missiles:[],asteroids:[]}};
+}
+test('private Worker registration admits real native rosters but never upgrades a generic engine',()=>{
+  const f=ownedQueryFixture(),Roster=lab.FireControlQueryRoster;
+  assert.equal(f.ships.length,100);
+  assert.equal(Roster.create(f.ships,f.engine),undefined,'legacy reflective admission remains unchanged');
+  assert.equal(f.ships.every(lab.hasOwnedFireControlReadHooks),true);
+  Roster.ownForWorker(f.engine);
+  assert.equal(Roster.create(f.ships.slice(0,99),f.engine),undefined,'small battles retain old path');
+  const roster=Roster.create(f.ships,f.engine);assert.ok(roster);
+  assert.equal(Roster.create(f.ships),undefined,'no ambient/global opt-in');
+  const world={...f.world,queryRoster:roster},batch=lab.FireControlQueryBatch.create(f.ship,world);assert.ok(batch);
+  const targets=batch.targets();assert.ok(targets.length>1);assert.ok(targets.includes(f.target));assert.ok(!targets.includes(f.ship));
+  assert.equal(batch.targets(),targets,'one materialized candidate roster for all mounts');
+  assert.equal(batch.targetStatus.size,100,'eligibility read once per roster entry');
+  for(let i=0;i<50;i++){assert.equal(batch.canTarget(f.target),true);assert.equal(batch.targets(),targets);}
+  assert.equal(batch.targetStatus.size,100,'repeated mount queries reuse the same entries');
+  assert.equal(batch.forShip(f.target,f.ships),undefined);
+  assert.equal(batch.forShip(f.ship,[...f.ships]),undefined);
+  batch.close();assert.equal(batch.forShip(f.ship,f.ships),undefined);
+  for(const [field,value,expected] of [['isDead',true,false],['isDocked',true,false],['visibilityMask',0,false],['teamId',f.ship.teamId,false],['isRetreated',true,false]]) {
+    const before=f.target[field];f.target[field]=value;
+    const next=roster.begin(f.ship,world);assert.ok(next);assert.equal(next.canTarget(f.target),expected,field);next.close();
+    f.target[field]=before;const restored=roster.begin(f.ship,world);assert.ok(restored);assert.equal(restored.canTarget(f.target),true,field+' restored');restored.close();
+  }
+  const type=f.target.shield.type;f.target.shield.type='PHASE';f.target.shield.phaseState='ACTIVE';f.target.shield.phaseEffectLevel=1;
+  const phased=roster.begin(f.ship,world);assert.ok(phased);assert.equal(phased.canTarget(f.target),false);phased.close();
+  f.target.shield.type=type;f.target.shield.phaseState='IDLE';f.target.shield.phaseEffectLevel=0;
+  f.ships.push(f.ship);assert.equal(roster.begin(f.ship,world),undefined);f.ships.pop();
+  assert.equal(roster.begin(f.ship,{...world,ships:[...f.ships]}),undefined);
+  roster.close();assert.equal(roster.matches(f.ships),false);assert.equal(roster.begin(f.ship,world),undefined);
+});
+
+test('owned fire-query admission refreshes live effects, definitions and component callbacks at every begin',()=>{
+  const f=ownedQueryFixture(),Roster=lab.FireControlQueryRoster;Roster.ownForWorker(f.engine);
+  const roster=Roster.create(f.ships,f.engine),s=f.target;
+  const compare=label=>{if(lab.BeforeHasOwnedFireControlReadHooks)assert.equal(lab.hasOwnedFireControlReadHooks(s),lab.BeforeHasOwnedFireControlReadHooks(s),label);};
+  const reject=(install,label)=>{const undo=install();try{compare(label);assert.equal(roster.begin(f.ship,f.world),undefined,label);}finally{undo();}
+    compare(label+' restored');const batch=roster.begin(f.ship,f.world);assert.ok(batch,label+' restored');batch.close();};
+  const replace=(obj,key,value)=>()=>{const before=obj[key];obj[key]=value;return()=>{obj[key]=before;};};
+  reject(()=>{s.externalPhaseEffects.set(f,()=>undefined);return()=>s.externalPhaseEffects.delete(f);},'external phase callback');
+  reject(()=>{s.damageTakenModifiers.set('test',()=>1);return()=>s.damageTakenModifiers.delete('test');},'external damage callback');
+  reject(()=>{s.runtimeModifiers.set('test',{collisionDisabled:1});return()=>s.runtimeModifiers.delete('test');},'runtime modifier');
+  reject(replace(s.shield,'externalDamageTakenMultiplier',()=>1),'shield callback');
+  reject(replace(s.armor,'damageTakenModifiers',()=>({armor:1,hull:1})),'armor callback');
+  reject(replace(s.armor,'dynamicEffectiveArmorMultiplier',()=>1),'effective armor callback');
+  reject(replace(s.armor,'onCellDamage',()=>{}),'cell callback');
+  reject(replace(s.flux,'onOverloadStarted',()=>{}),'overload callback');
+  reject(replace(s,'spec',{...s.spec}),'mutable/foreign metadata');
+  reject(replace(s.system,'definition',{...s.system.definition}),'unregistered system definition');
+  reject(replace(s.defenseSystem,'definition',{...s.defenseSystem.definition}),'unregistered defense definition');
+  reject(replace(s.system,'auxiliary',undefined),'broken auxiliary chain');
+  reject(replace(s.defenseSystem,'auxiliary',s.system),'extra auxiliary chain');
+  reject(replace(s,'parentShip',f.ship),'assembly');reject(replace(s,'sourceCarrier',f.ship),'carrier');
+  reject(()=>{s.systems.push(s.defenseSystem);return()=>s.systems.pop();},'multi-system composition');
+  reject(()=>{const intercept=()=>false;s.hullDamageInterceptors.add(intercept);return()=>s.hullDamageInterceptors.delete(intercept);},'damage interceptor');
+  assert.equal(roster.begin(f.ship,{...f.world,fireBudget:{estimate:()=>0,penalty:()=>0}}),undefined,'foreign budget');
+  roster.close();
+});
+
+test('owned admission preserves the native AI-to-stats implication across live system compositions',()=>{
+  const f=ownedQueryFixture(),Roster=lab.FireControlQueryRoster,s=f.target;
+  Roster.ownForWorker(f.engine);const roster=Roster.create(f.ships,f.engine);assert.ok(roster);
+  const registry=lab.shipSystemDefinitions,registered=registry.all();
+  const native=registered.filter(lab.hasNativeThreatPhaseAI);
+  const statsOnly=registered.filter(d=>!lab.hasNativeThreatPhaseAI(d)&&lab.hasNativeSystemStats(d));
+  assert.ok(native.length>1);assert.ok(statsOnly.length>0,'Eclipse must remain stats-only');
+  // Even a registry-frozen external definition is not in the private native AI set.
+  const foreignId='TEST_OWNED_ADMISSION_FOREIGN';
+  registry.register({...registry.require('NONE'),id:foreignId,sourceIds:[]});
+  const foreign=registry.require(foreignId),cloned=Object.freeze({...native[0]});
+  assert.equal(lab.hasNativeThreatPhaseAI(foreign),false);assert.equal(lab.hasNativeSystemStats(foreign),false);
+  assert.equal(lab.hasNativeThreatPhaseAI(cloned),false);assert.equal(lab.hasNativeSystemStats(cloned),false);
+  const definitions=[...registered,foreign,cloned],main=s.system.definition,defense=s.defenseSystem.definition;
+  let comparisons=0,admitted=0,rejected=0;
+  const check=(expected,label)=>{
+    const actual=lab.hasOwnedFireControlReadHooks(s);assert.equal(actual,expected,label);
+    if(lab.BeforeHasOwnedFireControlReadHooks)assert.equal(actual,lab.BeforeHasOwnedFireControlReadHooks(s),'frozen/'+label);
+    const batch=roster.begin(f.ship,f.world);assert.equal(!!batch,expected,'batch/'+label);batch?.close();
+    comparisons++;if(expected)admitted++;else rejected++;
+  };
+  try {
+    for(const a of definitions)for(const b of definitions){
+      s.system.definition=a;s.defenseSystem.definition=b;
+      const expected=lab.hasNativeThreatPhaseAI(a)&&lab.hasNativeThreatPhaseAI(b);
+      if(expected){assert.equal(s.system.hasNativeStats,true);assert.equal(s.defenseSystem.hasNativeStats,true);}
+      check(expected,a.id+'/'+b.id);
+    }
+    s.system.definition=main;s.defenseSystem.definition=defense;
+    check(true,'restored');
+    // Rejection of an earlier batch never becomes cached permission. Nor may the
+    // full roster scan be removed: mutate the last entry rather than the shooter.
+    const last=f.ships.at(-1),lastDefinition=last.system.definition;
+    for(const d of [foreign,...statsOnly]){
+      last.system.definition=d;
+      try {
+        assert.equal(lab.hasOwnedFireControlReadHooks(last),false);
+        if(lab.BeforeHasOwnedFireControlReadHooks)assert.equal(lab.BeforeHasOwnedFireControlReadHooks(last),false);
+        assert.equal(roster.begin(f.ship,f.world),undefined,'last roster entry invalidates each begin');
+      } finally {last.system.definition=lastDefinition;}
+      check(true,'last entry restored');
+    }
+  } finally {s.system.definition=main;s.defenseSystem.definition=defense;roster.close();}
+  assert.equal(roster.begin(f.ship,f.world),undefined);
+  console.log('  '+JSON.stringify({registered:registered.length,native:native.length,statsOnly:statsOnly.map(d=>d.id),comparisons,admitted,rejected,frozenReference:!!lab.BeforeHasOwnedFireControlReadHooks}));
+});
+
+test('owned multi-mount queries match uncached selection, preAim, decisions and tracker RNG through live transitions',()=>{
+  const f=ownedQueryFixture(),Roster=lab.FireControlQueryRoster;Roster.ownForWorker(f.engine);
+  const roster=Roster.create(f.ships,f.engine),reference=new AutofireController(),candidate=new AutofireController();
+  f.world.fireBudget=new InFlightFireBudget(f.ships,[]);
+  let compared=0;
+  for(let stage=0;stage<8;stage++) {
+    f.target.isDead=stage===1;f.target.visibilityMask=stage===2?0:3;f.target.isDocked=stage===3;
+    f.target.teamId=stage===4?f.ship.teamId:1;f.target.pos.set(600+stage*24,stage*7);f.target.vel.set(stage*3,stage*-2);
+    f.target.shield.isActive=stage===5;f.target.shield.currentArcDeg=stage===5?180:0;
+    f.target.shield.phaseState=stage===6?'ACTIVE':'IDLE';f.target.shield.phaseEffectLevel=stage===6?1:0;
+    const type=f.target.shield.type;if(stage===6)f.target.shield.type='PHASE';
+    const batch=roster.begin(f.ship,f.world);assert.ok(batch);
+    try {
+      for(const mount of f.ship.weapons) {
+        const read=(controller,world)=>{const value=controller.aim(.1,f.ship,mount,world),pre=controller.preAim(f.ship,mount,world);
+          const decision=controller.decide(f.ship,mount,value,world,.1);
+          return {state:fireTargetSnapshot(controller,{...f,mount},value),pre:pre&&[pre.x,pre.y],decision};};
+        assert.deepEqual(read(candidate,{...f.world,queryBatch:batch}),read(reference,f.world),`stage ${stage}/${mount.slotId}`);compared++;
+      }
+    } finally {batch.close();f.target.shield.type=type;}
+  }
+  roster.close();assert.ok(compared>=100);console.log(`  ${compared} mount/stage comparisons`);
+});
+
+test('native engine integration closes every owned batch before leaving the ship weapon loop',()=>{
+  const f=ownedQueryFixture(),Roster=lab.FireControlQueryRoster,captured=[],begin=Roster.prototype.begin;
+  Roster.ownForWorker(f.engine);
+  try {Roster.prototype.begin=function(ship,world){const batch=begin.call(this,ship,world);if(batch)captured.push({batch,ship,ships:world.ships});return batch;};
+    f.engine.fixedUpdate(1/60);
+  } finally {Roster.prototype.begin=begin;}
+  assert.equal(captured.length,100,'production engine gate and complete weapon update must actually use the query domain');
+  for(const {batch,ship,ships} of captured)assert.equal(batch.forShip(ship,ships),undefined,'batch cannot escape its pre-emission loop');
+});
+
+test('owned preAim range bounds preserve old candidates, live batches and full fire-control state',()=>{
+  console.log('  '+JSON.stringify(checkOwnedPreAimRange(lab,ownedQueryFixture,fireTargetSnapshot)));
+});
+
+test('owned fire-query certificates refresh every live hook and replaced identity',()=>{
+  console.log('  '+JSON.stringify(checkOwnedFireGuards(lab,ownedQueryFixture)));
+});
+
+test('owned hostile-query membership preserves live targeting and complete Publisher validation',()=>{
+  console.log('  '+JSON.stringify(checkOwnedHostileQueries(lab,ownedQueryFixture)));
+});
+test('owned qualified lists preserve per-weapon results and revoke at the read-phase boundary',()=>{
+  console.log('  '+JSON.stringify(checkQualifiedFireTargets(lab,ownedQueryFixture,fireTargetSnapshot)));
+});
+// Ordinary wings share the live carrier system, not a separate mock AI implementation.
+function wingFixture(real = false) {
+  const engine = new lab.CombatEngine('hammerhead', 'hammerhead', 781);
+  const carrier = engine.playerShip, enemy = engine.enemyShip, system = engine.fighterSystem;
+  carrier.pos.set(-500, 0); carrier.facingRad = 0; enemy.pos.set(1600, 0); enemy.facingRad = Math.PI;
+  system.init(carrier, enemy, {player:[
+    {specId:'broadsword',role:'FIGHTER',count:1,range:4000,rebuildSeconds:10},
+    {specId:'dagger',role:'BOMBER',count:1,range:4000,rebuildSeconds:18}],
+    enemy:[{specId:'broadsword',role:'FIGHTER',count:2,range:4000,rebuildSeconds:10}]});
+  const fighter = system.fighters[0], bomber = system.bombers[0], foes = system.fighters.slice(1);
+  fighter.pos.set(0,0); bomber.pos.set(0,500); fighter.facingRad = bomber.facingRad = 0;
+  for(const foe of foes)foe.pos.set(10000,0);
+  const orders = new Map(), updates = new Map(), missiles = [], noop = () => {};
+  const fx = {spawnContrail:noop,spawnAuthenticExplosion:noop,spawnDebris:noop,addFloatingText:noop,addCameraShake:noop,
+    addRadioMessage:noop,cancelOrder:id=>orders.delete(id),getOrder:id=>orders.get(id),findHostile:craft=>craft.teamId===carrier.teamId?enemy:carrier,
+    getPlayerPos:()=>carrier.pos,handleShipDestruction:ship=>{ship.isDead=true;},recordFighterRebuilt:noop,destructionSideEffectsEnabled:()=>true};
+  if(!real)for(const craft of [...system.fighters,...system.bombers])craft.update=(...args)=>updates.set(craft.id,args);
+  const fighters=()=>system.updateFighters(1/60,carrier,enemy,missiles,noop,noop,noop,fx);
+  const bombers=(dt=1/60)=>system.updateBombers(dt,carrier,enemy,noop,noop,noop,fx);
+  const payload=bomber.weapons.filter(w=>w.spec.weaponType==='MISSILE'&&!w.spec.isPointDefense);
+  assert.ok(payload.length,'native dagger payload');
+  const rocket=(id,x=400,y=0,vx=-200,vy=0)=>({id,isRocket:true,teamId:enemy.teamId,pos:new Vector2(x,y),vel:new Vector2(vx,vy),radius:8,rangeRemaining:3000,hitpoints:50});
+  return {engine,carrier,enemy,system,fighter,bomber,foes,orders,updates,missiles,fx,fighters,bombers,payload,rocket};
+}
+test('fighter recall and waypoint orders beat interception; zero-range wings remain on station',()=>{
+  const f=wingFixture();f.missiles.push(f.rocket(1));f.carrier.fighterRecall=true;f.fighters();
+  assert.equal(f.system.fighterAIModes.get(f.fighter.id).state,'ESCORT');assert.equal(f.fighter.aiHoldOffensiveFire,true);
+  f.carrier.fighterRecall=false;f.orders.set(f.fighter.id,{type:'WAYPOINT',targetPos:new Vector2(0,-700)});f.fighters();
+  assert.equal(f.system.fighterAIModes.get(f.fighter.id).state,'ESCORT');assert.ok(f.fighter.turnInput<0);assert.equal(f.fighter.currentTargetShip,null);
+  f.orders.clear();f.system.playerWings[0].range=0;f.fighters();assert.equal(f.system.fighterAIModes.get(f.fighter.id).state,'ESCORT');
+});
+test('fighter interception rejects decoys, dead, disarmed and receding missiles and ranks incoming trajectories',()=>{
+  const f=wingFixture();f.missiles.push(f.rocket(1,100,0,200),{...f.rocket(2),isFlare:true},{...f.rocket(3),isDisarmed:true},
+    {...f.rocket(4),hitpoints:0},{...f.rocket(5),rangeRemaining:0},{...f.rocket(6),collisionDisabled:true},
+    {...f.rocket(7),missileFizzleTime:1}, {...f.rocket(8),teamId:f.carrier.teamId});
+  f.fighters();assert.notEqual(f.system.fighterAIModes.get(f.fighter.id).state,'INTERCEPT');
+  // Earlier array entry has a much later intercept. The urgent trajectory is below the fighter.
+  f.missiles.push(f.rocket(9,800,0,-210),f.rocket(10,200,-80,-250,100));f.fighters();
+  assert.equal(f.system.fighterAIModes.get(f.fighter.id).state,'INTERCEPT');assert.ok(f.fighter.aimTargetWorld.y<0);
+  assert.equal(f.fighter.currentTargetShip,null);assert.equal(f.updates.get(f.fighter.id)[1],null);
+});
+test('fighter dogfight target is stable, visible, hostile and passed through to weapon control',()=>{
+  const f=wingFixture(),[a,b]=f.foes;a.pos.set(400,50);b.pos.set(470,50);f.fighters();
+  assert.equal(f.fighter.currentTargetShip,a);assert.equal(f.updates.get(f.fighter.id)[1],a);assert.equal(f.fighter.fireControlMode,'AI');
+  a.pos.x=430;b.pos.x=420;f.fighters();assert.equal(f.fighter.currentTargetShip,a);
+  a.visibilityMask=0;f.fighters();assert.equal(f.fighter.currentTargetShip,b);
+  b.teamId=f.fighter.teamId;f.fighters();assert.equal(f.fighter.currentTargetShip,f.enemy);
+  b.teamId=3;b.isDocked=true;f.fighters();assert.equal(f.fighter.currentTargetShip,f.enemy);
+  b.isDocked=false;b.isRetreated=true;f.fighters();assert.equal(f.fighter.currentTargetShip,f.enemy);
+  b.isRetreated=false;f.fighters();assert.equal(f.fighter.currentTargetShip,b);
+  f.system.playerWings[0].range=100;f.fighters();assert.equal(f.system.fighterAIModes.get(f.fighter.id).state,'ESCORT');
+});
+test('fighter uses live weapon ranges and lead; large hulls cause an outward break, not a center charge',()=>{
+  const f=wingFixture();const gun=f.fighter.weapons.find(w=>w.spec.weaponType!=='MISSILE');assert.ok(gun);
+  f.fighter.weapons=[gun];gun.spec={...gun.spec,range:1200};gun.arcDeg=360;gun.baseAngleDeg=0;gun.relativePos.set(0,0);
+  f.enemy.pos.set(800,0);f.enemy.vel.set(0,50);f.fighters();assert.ok(f.fighter.aimTargetWorld.y>0);assert.equal(f.fighter.isFiringMain,true);
+  gun.spec={...gun.spec,range:100};f.fighters();assert.equal(f.fighter.isFiringMain,false);
+  f.enemy.spec={...f.enemy.spec,collisionRadius:600};f.enemy.pos.set(650,0);f.enemy.vel.set(0,0);f.fighters();
+  assert.ok(Math.abs(f.fighter.turnInput)>.5);assert.ok(f.fighter.throttle<.5,'do not drive straight into a capital hull');
+});
+test('bombers use payload ammo rather than gunfire; finish multiple mounts and committed bursts before returning',()=>{
+  const f=wingFixture();for(const w of f.payload){w.spec={...w.spec,maxAmmo:4};w.ammo=4;w.burstRemaining=0;w.firingState='IDLE';}
+  f.bombers();assert.equal(f.system.bomberAIModes.get(f.bomber.id).state,'ATTACK_RUN');
+  f.payload[0].ammo=3;f.bombers();assert.equal(f.system.bomberAIModes.get(f.bomber.id).hasTorpedo,true);
+  const gun={...f.fighter.weapons.find(w=>w.spec.weaponType!=='MISSILE'),slotId:'test-defensive-gun'};f.bomber.weapons.push(gun);const cycle=gun.firingCycleId;
+  f.bomber.update=()=>{gun.firingCycleId=cycle+1;};f.bombers();assert.equal(f.system.bomberAIModes.get(f.bomber.id).state,'ATTACK_RUN');
+  for(const w of f.payload)w.ammo=0;f.payload[0].burstRemaining=1;f.bombers();assert.equal(f.system.bomberAIModes.get(f.bomber.id).hasTorpedo,true);
+  f.payload[0].burstRemaining=0;f.payload[0].firingState='CHARGING';f.bombers();assert.equal(f.system.bomberAIModes.get(f.bomber.id).hasTorpedo,true);
+  f.payload[0].firingState='IDLE';f.bombers();assert.equal(f.system.bomberAIModes.get(f.bomber.id).state,'RETURN_TO_REARM');
+  assert.equal(f.system.bomberAIModes.get(f.bomber.id).hasTorpedo,false);
+});
+test('bomber docking follows moving carrier, waits for reload and recall, and never reloads at a dead deck',()=>{
+  const f=wingFixture();for(const w of f.payload){w.ammo=0;w.burstRemaining=0;w.firingState='IDLE';}
+  f.bomber.pos.copy(f.carrier.pos).add(new Vector2(-f.carrier.spec.collisionRadius*.6,0));f.bomber.vel.set(0,0);f.bombers();
+  const mode=f.system.bomberAIModes.get(f.bomber.id);assert.equal(mode.state,'DOCKED');assert.equal(f.bomber.isDocked,true);
+  f.carrier.pos.x+=200;f.carrier.fighterRecall=true;f.bombers(.1);assert.deepEqual(f.bomber.pos,f.carrier.pos);assert.equal(f.payload[0].ammo,0);
+  f.bombers(30);assert.equal(f.bomber.isDocked,true);assert.ok(f.payload[0].ammo>0);
+  f.carrier.fighterRecall=false;f.bombers();assert.equal(f.bomber.isDocked,false);
+  const dead=wingFixture();for(const w of dead.payload){w.ammo=0;w.burstRemaining=0;w.firingState='IDLE';}
+  dead.system.bomberAIModes.get(dead.bomber.id).state='DOCKED';dead.carrier.isDead=true;dead.bombers(30);
+  assert.equal(dead.payload[0].ammo,0);assert.equal(dead.bomber.isDead,true);
+  const destroyed=wingFixture();destroyed.bomber.hullHp=0;destroyed.system.bomberAIModes.get(destroyed.bomber.id).state='DOCKED';
+  destroyed.bombers(30);assert.equal(destroyed.bomber.isDead,true);assert.equal(destroyed.bomber.hullHp,0);
+  const retreat=wingFixture();for(const w of retreat.payload){w.ammo=0;w.burstRemaining=0;w.firingState='IDLE';}
+  retreat.carrier.isRetreated=true;retreat.bombers(30);assert.equal(retreat.bomber.isDocked,false);assert.equal(retreat.payload[0].ammo,0);
+});
+test('ordinary wings run live motion and fire control deterministically in the existing combat engine',()=>{
+  function run(){const f=wingFixture(true);f.engine.asteroids.length=0;f.engine.nebulae.length=0;
+    f.enemy.pos.set(850,0);f.enemy.weapons=[];f.enemy.shield.isActive=false;f.bomber.pos.set(0,100);
+    for(const foe of f.foes)foe.isDead=true;
+    let fired=false;
+    for(let i=0;i<300;i++){f.engine.fixedUpdate(1/60);fired ||= f.engine.projectiles.some(p=>p.sourceShipId===f.fighter.id||p.sourceShipId===f.bomber.id);}
+    assert.equal(fired,true,'real craft must produce projectiles');
+    for(const craft of [f.fighter,f.bomber])for(const value of [craft.pos.x,craft.pos.y,craft.vel.x,craft.vel.y,craft.facingRad])assert.ok(Number.isFinite(value));
+    return [f.fighter.pos.x,f.fighter.pos.y,f.bomber.pos.x,f.bomber.pos.y,f.enemy.hullHp,...f.payload.map(w=>w.ammo)];
+  }
+  assert.deepEqual(run(),run());
+});
 console.log(`PASS ${passed} combat AI foundation checks`);
 
 

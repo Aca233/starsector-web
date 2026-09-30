@@ -1,0 +1,1491 @@
+{
+  "version": 1,
+  "date": "2026-09-26",
+  "authorization": "用户明确保留光效、弹体、音效、船体插件、战斗场景与特效",
+  "policy": "Only referenced original combat/environment media retained; unused entries removed at user request. This is not a license grant.",
+  "records": [
+    {
+      "path": "sounds/sfx_engines/engine_01_lotek_04_capital.ogg",
+      "sha256": "1366e417a76989ac9904cbc427d1cefeabed534a23fa7d5ed6a70ed287d2bace",
+      "bytes": 24997,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_engines/engine_03_hitek_04_capital.ogg",
+      "sha256": "5e75a16703f3a126b280e17992404effb1c959a9516c0f351eaafbbd7d2bb5e5",
+      "bytes": 34422,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_flux/flux_flush_loop.ogg",
+      "sha256": "8e49061456042c8170f3567ba97095c5c125952fde142794f4e420f05c4a524c",
+      "bytes": 11653,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_flux/flux_vent.ogg",
+      "sha256": "6c26ae0edac896be8ef412577a8cc1eaf19c7f098a962c686f3cfd4681375542",
+      "bytes": 18899,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_impacts/beam_hit_01.ogg",
+      "sha256": "d3c3981183faf40e1c90ea9aa9e4fc2fd53c0a0bea1999be593ee30fc9e42695",
+      "bytes": 20567,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_impacts/collision_asteroid_vs_asteroid_01.ogg",
+      "sha256": "66b0e3c566501fcb6389ab61b32481e4345f4019010bb7ec05048a873ea794e7",
+      "bytes": 9456,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_impacts/collision_ship_vs_asteroid_01.ogg",
+      "sha256": "365ea54eb8417749e0b9ca34ed18f27581a0018612f1bd881de57550643dd086",
+      "bytes": 26211,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_impacts/collision_ship_vs_ship_01.ogg",
+      "sha256": "6c10d3273cb5b35838b5bfe86e7afb6bf4ba3ffa24f5b728f073eebb5156b285",
+      "bytes": 25178,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_impacts/explosion_01.ogg",
+      "sha256": "2c8b1ea043b08782e15db4aaa9a1832e772cc5cad54283a1bc4010a9d6e4f0ee",
+      "bytes": 45791,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_impacts/explosion_02.ogg",
+      "sha256": "7534e7a8d5cd95a31707fbca74c884dddaf977e9c3bb5dfb49cd893488af478b",
+      "bytes": 39119,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_impacts/explosion_03_fighter.ogg",
+      "sha256": "9217ddef9a59b410529b3b9d870d2b9f41de45fbf3f61fa1bb37893cb791015f",
+      "bytes": 30167,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_impacts/explosion_04.ogg",
+      "sha256": "a5e6801cfaa2b6c49a3246d3800aa8ee4458bbb81fa3b96f5a858168ff0844e1",
+      "bytes": 44944,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_impacts/explosion_missile_01.ogg",
+      "sha256": "39ed8b0326301390943b9a8d7a2f3024e16b76c638a0d2db0cbd64a8a7695709",
+      "bytes": 29504,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_impacts/explosion_secondary_01.ogg",
+      "sha256": "41b3612d00e47c73d5ab9dc0e11bc95eb9726e5eb03aeec38a9e375603b78a5d",
+      "bytes": 26558,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_impacts/gun_hit_glancing_01.ogg",
+      "sha256": "abfd466ef39c2187bc351857a1464803b205e3e84766dc87f134ffe744da6721",
+      "bytes": 14304,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_impacts/gun_hit_glancing_02.ogg",
+      "sha256": "80a4ed46831107e6df35909d3995c1eaf0a7d3c5c10455afbf92c190580383d9",
+      "bytes": 15598,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_impacts/gun_hit_glancing_03.ogg",
+      "sha256": "acb82a32067f51314aebf87596704f2cb9d206c767ef03f608c877bd3ff4f645",
+      "bytes": 14165,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_impacts/gun_hit_heavy_01.ogg",
+      "sha256": "4329847b6ecf0c477def5e8423e334bafcd757495fb23b74ab2c7418857358bd",
+      "bytes": 26965,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_impacts/gun_hit_light_01.ogg",
+      "sha256": "bbd6a8b9af91a613955680cbd0488af55b35adb56391a665b05528e27d30e25f",
+      "bytes": 20391,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_impacts/gun_hit_solid_01.ogg",
+      "sha256": "c5af48aa6090a841b898166828050eee56df87bb1567d6d42af879902dbddaf8",
+      "bytes": 24774,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_impacts/shield_hit_heavy_01.ogg",
+      "sha256": "0f05a8c5cc7df5cc549191367c1ee2bb5adc20d04db6bed55b076a20b36560f0",
+      "bytes": 15662,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_impacts/voltaic_discharge_impact_01.ogg",
+      "sha256": "0aa98d45821f8910c7545cedc12885fbcbf2695dffa8345e017022d7f89fe746",
+      "bytes": 12857,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_interface/autofire_toggle_01.ogg",
+      "sha256": "7503b7739ef02cb9316360ab0691580ff5ca7d709bd3b70f4cc9eac8be11163f",
+      "bytes": 10047,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_interface/combat_readiness_malfunctions_alarm_flagship_01.ogg",
+      "sha256": "68914dfb7c4ac19681802ed6e37b619f34a0afce1f356edf36456b69cb8dff2f",
+      "bytes": 22544,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_interface/fighter_recall_activate.ogg",
+      "sha256": "16d1868fbe34332fe863d03d861a50b12f664023da671f86f74acb14144d809f",
+      "bytes": 12490,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_interface/fighter_recall_deactivate.ogg",
+      "sha256": "1dcd12a9b0ef44a0bc902d7198fbd7a7a2225fe12ab8c3cef0063cebdc0f688b",
+      "bytes": 12365,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_button_pressed.ogg",
+      "sha256": "5bf6cea9273a747dacaa124bc7bdab165264fd7e8ccd817b4364c814a1e5965a",
+      "bytes": 37510,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_channel_comm_local_01.ogg",
+      "sha256": "44785ff0feaaf664eed50ffce8162ee43b12517713c0f6f0e4a4f396db4dc25c",
+      "bytes": 15198,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_command_create_waypoint.ogg",
+      "sha256": "facaba3a0cdfe5610c38ac76707da50fbf8b16968f7a3aab46e59aa777d6679e",
+      "bytes": 18160,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_command_out_of_command_points.ogg",
+      "sha256": "ea2b6db42cd5ca573c62b8fe0e8695f48a06d4a02c26e37533174f886083d5f6",
+      "bytes": 83352,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_command_refund_command_point.ogg",
+      "sha256": "1d35beb52c9f8170c7de3cf23e337b39f6719eb4ddc75cba0df95567208133cc",
+      "bytes": 23895,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_command_right_click_command_given.ogg",
+      "sha256": "858e5c00b37a12c48846c99c7f0bb9a112bfb1ebf478eabff6df7f1a238c62ec",
+      "bytes": 43212,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_command_selection_cleared.ogg",
+      "sha256": "2c6fc5cf612f95d5f7021f230a60f34bc46ffd59e8dbceb0ccc42a427fbecefa",
+      "bytes": 71246,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_command_select_command_ui_icon.ogg",
+      "sha256": "426a99882a8ff42db41c482cccada02eac5616d8da034f270383722b980204d4",
+      "bytes": 79495,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_radar_detect_mine.ogg",
+      "sha256": "77fc10c2c832242b8f708da193d734bbc4c3649f2367ae9d6e0275e172ad3688",
+      "bytes": 6931,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_radar_detect_missile.ogg",
+      "sha256": "77fc10c2c832242b8f708da193d734bbc4c3649f2367ae9d6e0275e172ad3688",
+      "bytes": 6931,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_radar_detect_vessel.ogg",
+      "sha256": "679fa4800d812783c7ae8f2fb284320a0959de8310d35742892f96f54d1e35de",
+      "bytes": 12916,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_interface/ui_static01.ogg",
+      "sha256": "af7498ccee917577217dea8454ff194abc2a8b09cf222159d58594ce642ba635",
+      "bytes": 54650,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_shields/shields_burnout_oneshot.ogg",
+      "sha256": "0ca8e799d715aa93fba04519e0db066f0a967410ae28490d4a65d780cab1f82c",
+      "bytes": 13792,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_shields/shields_down_large.ogg",
+      "sha256": "45c5548b2c18ad18f6f89bf8c840c1e28e459a2d9e7fc40002a965cf789a43a8",
+      "bytes": 33692,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_shields/shields_up_large.ogg",
+      "sha256": "dcc25b239a5955844224fb867dce94f4b39819477d79710e3b99229a048eedc1",
+      "bytes": 48835,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/burn_drive_activate.ogg",
+      "sha256": "df91ec5906d46c9f441fe2d5770a5485ab79ba6659596ab1ece203c9e0bc5948",
+      "bytes": 26954,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/burn_drive_deactivate.ogg",
+      "sha256": "54024fdcb3cbf94140d488b1cba945b9c9e94f7c64a421fd07b5ba3a80726e26",
+      "bytes": 10579,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/burn_drive_loop.ogg",
+      "sha256": "fd94747d03ac0b2489891bc15bb0dce994371e26e3a7ba89e002ce42048df34b",
+      "bytes": 47664,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/canister_flak_01.ogg",
+      "sha256": "f9686a2c6cb84083a3aa83d23e9a03cd13a7df291a6f3c10e46e2e77e18ecf48",
+      "bytes": 6826,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/canister_flak_02.ogg",
+      "sha256": "07066b7f1b80b45706c6ff42ddf5dc772f44b24a198397f4a13e02ab54eac6c6",
+      "bytes": 7076,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/canister_flak_03.ogg",
+      "sha256": "44087618f3602558c4f08e71e4c6a440515ba52fbac79edc1f4e19d3c65c0e10",
+      "bytes": 7076,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/canister_flak_04.ogg",
+      "sha256": "84bd59eb72059a3878aecd9b9703e0b289becc85deab55768bfdc770d2be1b30",
+      "bytes": 6458,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/canister_flak_05.ogg",
+      "sha256": "dcce9a74219d47b7aeef1a7ade68b19ea3f283cf317d4c0df976eac2e5dc71ba",
+      "bytes": 7100,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/canister_flak_06.ogg",
+      "sha256": "dd116900e7e554520422ea03caa0300d257b70eac25d4d55745f1353c21deaa6",
+      "bytes": 6701,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/canister_flak_explosion_01.ogg",
+      "sha256": "d5f2bf9366a50fd88119198458fff10f2db9726148b2e2fc948558d91ec5cf94",
+      "bytes": 14891,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/canister_flak_explosion_02.ogg",
+      "sha256": "1088caefb61d6c0daf8c25923bef8b8b161694a751342ceba36e5fc5666c6f1d",
+      "bytes": 14910,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/canister_flak_explosion_03.ogg",
+      "sha256": "32ee23f37c44b08d0833573357f6bcaa3b3632235c68665da7151e64cb956cbb",
+      "bytes": 13783,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/canister_flak_explosion_04.ogg",
+      "sha256": "6545397beb21f398e2e0b1ca4aea38c3bba8c7ae7eda2dc01d9216db85cae7b6",
+      "bytes": 15477,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/canister_flak_explosion_05.ogg",
+      "sha256": "9c7060818b9e0893a76f1f8c36e890a387c1812aaeb0a15cee507cedff264ebd",
+      "bytes": 15578,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/combat_readiness_malfunctions_engine_01.ogg",
+      "sha256": "9ef1143ea32db988eda61bffd51cd43062b83b9d9282be2eb2ae515f63c5a1d1",
+      "bytes": 11673,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/combat_readiness_malfunctions_weapon_large_01.ogg",
+      "sha256": "9f5aac3772a66b5db3a4aad6f1f424e56488ac64f4acd117e10b0be0b0b9cf3a",
+      "bytes": 17317,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/combat_readiness_malfunctions_weapon_medium_01.ogg",
+      "sha256": "47207b28fd26128755c1a373d6645e758c001d29bb915c7ea7bb22a6cf896e2a",
+      "bytes": 16812,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/combat_readiness_malfunctions_weapon_small_01.ogg",
+      "sha256": "2be145fad789c6a0d669f64975d76ead8cac9db23172d6de15cf0d608b601950",
+      "bytes": 14805,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/disabled_large.ogg",
+      "sha256": "b6d59949c20fdb19d49e4e24591c84023e8f9aa2c18a291aa1bdc595754245ac",
+      "bytes": 14453,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/disabled_medium.ogg",
+      "sha256": "fcecb54eb0d9a7067dc98d7f52ff6c8d3a0dccf617fc6c534ca85acd622ad039",
+      "bytes": 12881,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/disabled_small.ogg",
+      "sha256": "553ec5746dae100ca1e5b8f61277cae4dd296f6d409d0051f015a675a81d81f1",
+      "bytes": 10768,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/drone_launch.ogg",
+      "sha256": "3404e6830e846972ceef6758150a364cfead214c38c0f3492f1a7a8898c57022",
+      "bytes": 9687,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/dweller_convulsive_lunge.ogg",
+      "sha256": "22aead355002afa6cf155b39abcf6898a18cdf8c9aa72dc666d3c002319fb03a",
+      "bytes": 39000,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/emp_emitter_activate.ogg",
+      "sha256": "3aea5b75ce0e5c3382774c77d9c994a72019fcdabd390e8381625a221b153c7c",
+      "bytes": 7774,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/emp_emitter_impact_01.ogg",
+      "sha256": "aa7f92ef126dc932a736a565f63f2b97edc989bcb073887b14fbdd79edff2093",
+      "bytes": 25698,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/emp_emitter_impact_02.ogg",
+      "sha256": "62bbede5dad6c245c1837b0a35277377606a7740c4c27e8c31f8e5531016678c",
+      "bytes": 28100,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/emp_emitter_impact_03.ogg",
+      "sha256": "b3fbf65f9bd93469a80574d816eced707a7c6e450e4d85e051f422bc04d0438e",
+      "bytes": 28056,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/emp_emitter_loop.ogg",
+      "sha256": "9f99b5e4eab89bfcd323429539488084c61b3de9357584d92c35d0a100886cff",
+      "bytes": 218777,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/flare_launcher_active_oneshot.ogg",
+      "sha256": "c2954bfc75f0de4f5351c533d4e004c8ff4b0268c18a4602c1a878c89e882eda",
+      "bytes": 11343,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/flare_launcher_active_triplet.ogg",
+      "sha256": "82b3f84cd55987e1baf510377872c8a224937adb50b2d5787632e3cf0f371798",
+      "bytes": 26183,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/flare_launcher_passive_oneshot.ogg",
+      "sha256": "a39cd401d42e997615aed145a4db42f78e2c99e766f047533afcfc8697ddcc5c",
+      "bytes": 15086,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/fortress_shield_loop.ogg",
+      "sha256": "e56e847b8e65870ec43302badb240f8ffdba81f32c36ca818d8af8c954896e34",
+      "bytes": 95751,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/interdictor_array.ogg",
+      "sha256": "aa7853787382577cf5213ec879baa7af1ea0500283ebed713450c321c91c45af",
+      "bytes": 67981,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/mine_strike_explosion_01.ogg",
+      "sha256": "68a02d3326891f2c782796c8be5f1bc7073bd0ba49701f718f56e3872e652e2a",
+      "bytes": 15337,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/mine_strike_explosion_02.ogg",
+      "sha256": "6870a64f8fedcc87d74bc2b531226dfbb6494448b9984810dea08018cc8c40eb",
+      "bytes": 19682,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/mine_strike_explosion_03.ogg",
+      "sha256": "696dc4b86d9d01f488077d740c6c8f6f48fe8ce4c3f785e1419d09839ed1ccef",
+      "bytes": 16148,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/mine_strike_explosion_04.ogg",
+      "sha256": "22a7073beca7cbd62a18d208ad339e8763282b33c49a67db9af30a97e69b84fc",
+      "bytes": 18584,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/mine_strike_pinged_01.ogg",
+      "sha256": "0b14216dbb1afc69fb6a17869c8be4b9c6502ef11e15791ff6aeda7b5dea69e1",
+      "bytes": 16873,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/mine_strike_teleport_01.ogg",
+      "sha256": "6be20f0f91b676c47ce833eb49616f72610a906ef41f568cf776d2683fb198c4",
+      "bytes": 18155,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/mine_strike_windup_01.ogg",
+      "sha256": "b3f651c01d799266c0d82936f054a515b132140bbe422ac046e7491f58a18262",
+      "bytes": 17157,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/mote_attractor_activation.ogg",
+      "sha256": "07800d72b4b3549bc7c46f9ef3bbabd2051e3d182b1943fda1235e5416360727",
+      "bytes": 14617,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/mote_attractor_impact_heavy_01.ogg",
+      "sha256": "c28577083323477b4efbcee722ab2b3a08654cbc78b4fb68785340ff9374330a",
+      "bytes": 17784,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/mote_attractor_impact_heavy_02.ogg",
+      "sha256": "ea8210e70ee5b4abb7e580afa0642b78fb141e304a9d40bdfdfe9795ba57f5c2",
+      "bytes": 16181,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/mote_attractor_impact_heavy_03.ogg",
+      "sha256": "1f3cf53364fe64df2c8480c6d63202228e679be90964c5830b56cace345eea2b",
+      "bytes": 17431,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/mote_attractor_impact_heavy_04.ogg",
+      "sha256": "dc46022fb4ec61704b9e520cafc597c52795256d22ba108d1e4c289e2c6eb7b3",
+      "bytes": 16950,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/mote_attractor_impact_light_01.ogg",
+      "sha256": "6999ecb02e90d0ed66e8967136a73ed2a39c16feeb6fff448d54a9177e873739",
+      "bytes": 16591,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/mote_attractor_impact_light_02.ogg",
+      "sha256": "417af4bbe9686860f006fd9a41fbfceb3278d0ba4264cc5ec61ec9bc060431f9",
+      "bytes": 16016,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/mote_attractor_impact_light_03.ogg",
+      "sha256": "1cc065a3a0f794d51eed454b4efafa5582950a95972c9a9fe130893bcbb8c918",
+      "bytes": 16252,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/mote_attractor_impact_light_04.ogg",
+      "sha256": "00aa4e1008a01972f64baa45be8685e7db1b26de5b346ae358d97fb0d97840e0",
+      "bytes": 16325,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/mote_attractor_spawn_01.ogg",
+      "sha256": "7dc219ff746e3fa7b41f55ce69d6dc57e133422249e535b33bb3f79d565b3bc4",
+      "bytes": 23239,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/mote_attractor_targeted_ship_01.ogg",
+      "sha256": "3b26531d0a1f455faf635cd1596c7caf2d8090fa9ed820d3bd5bb38017fb5a49",
+      "bytes": 33344,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/mote_attractor_targeted_ship_02.ogg",
+      "sha256": "23ada1e335f9dda27f4a65d309b5bfa4ad9f07bc588f3dc61b6dfa87c443c6e3",
+      "bytes": 38029,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/nova_burst_charge_1.ogg",
+      "sha256": "3e28a8f65ea3e1bd6e47bdd4629a54428bd8023251b73e4a5f410c2f7418cdc6",
+      "bytes": 11745,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/nova_burst_charge_2.ogg",
+      "sha256": "1ac39d5df250d544fbea5d2e5a0ff1baef1552a1b60afa81354a9bcedb1d6204",
+      "bytes": 11741,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/nova_burst_charge_3.ogg",
+      "sha256": "176a62ba55b693a807e6bea89a9f99a322182cda65cbe3645c5306c36e65d18e",
+      "bytes": 11755,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/nova_burst_detonate_1.ogg",
+      "sha256": "db512ec532f33c99fc5d25480291c5d2c58113fc5895634f8700fb67d88ee8e1",
+      "bytes": 18371,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/nova_burst_detonate_2.ogg",
+      "sha256": "f1747eadb858f5f15678689ff0ce91015774af99c2a5f33198bed7370cd98d64",
+      "bytes": 18654,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/nova_burst_detonate_3.ogg",
+      "sha256": "c662b8f51f811900cf4aa23540f3ed4b0b18f1f68576563af25d35b491070dbc",
+      "bytes": 18637,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/orion_device_charge_1.ogg",
+      "sha256": "a651bfaf76519f54585ec7b55375c82a266fa6625631fd1632ff595802ed5ac4",
+      "bytes": 8564,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/orion_device_detonate_1.ogg",
+      "sha256": "6337694a5fd2da13ea17a8de58abedc79243cb58109a44d795b75c1bb107b753",
+      "bytes": 25252,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/phase_cloak_activate.ogg",
+      "sha256": "5653768e3b19b3349f7d683f81879ffd283e1e7abe14f75e04b2db6cb122136a",
+      "bytes": 25892,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/phase_cloak_deactivate.ogg",
+      "sha256": "044aceb6a3ec9a33f4f312b865ef3268cb0fc345f9c0282647b90db8a7d2fff3",
+      "bytes": 7947,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/phase_skimmer_oneshot.ogg",
+      "sha256": "700c9c406c847074821a01b657d72c1e968df1db8df84a8c126632e93ff72179",
+      "bytes": 21276,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/phase_teleporter_oneshot.ogg",
+      "sha256": "b5319baf869fca2725fae52e7230a87f40aafa85ad84f33a86153a776d557cc9",
+      "bytes": 30009,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_systems/termination_sequence_activate.ogg",
+      "sha256": "6b1184c01fbc794161f80d80d88cea235aed42a9051737b1a933bef76682e4a3",
+      "bytes": 15869,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/antimatter_blaster_fire_01.ogg",
+      "sha256": "3173cbffeec68768d21561b86941e09d7ffa36fe06ed6c61c00135ed8fae9e99",
+      "bytes": 7779,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/autopulse_laser_fire_01.ogg",
+      "sha256": "75a80cc5e5c1a220111f83fa94b46b592c98f0056857554e99cf3cfdf6545f00",
+      "bytes": 5838,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/burst_pd_fire_01.ogg",
+      "sha256": "93553b250e27e80df115e436cce07422cd1251c878f29416bc85124db1d709f6",
+      "bytes": 7895,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/cryoblaster_fire_01.ogg",
+      "sha256": "8be3946677edd1d0751f929d4bf8ffa2175ca34453355b71ad923e2315e70db0",
+      "bytes": 28352,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/cryoblaster_fire_02.ogg",
+      "sha256": "6402f73408cd8d40cd5b56e861c83c8a528a1195214901969a1d071b8a439117",
+      "bytes": 28442,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/cryoblaster_fire_03.ogg",
+      "sha256": "b27d06ee64312b1708728fac5f2b6b552dc1696eacab097e4a1f73facb135abc",
+      "bytes": 39365,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/disintegrator_fire_01.ogg",
+      "sha256": "cef6c86213ff80472da0b46da67c0fea18ca9d669560baf31f089dd533814dd5",
+      "bytes": 11920,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/disintegrator_fire_02.ogg",
+      "sha256": "59f9e823bf605152240e9b1278d8c50893d86564b78cd06f78f2ac0bec48e3d1",
+      "bytes": 11732,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/disintegrator_fire_03.ogg",
+      "sha256": "4dc19d8593a8af6099a1a741a07cb335c3414f8e92194019261d4debbc7950f1",
+      "bytes": 11813,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/gigacannon_charge_01.ogg",
+      "sha256": "98c746b66bf1239f825c470a6a4b32b6f820680f3980e31d632581c3851279b2",
+      "bytes": 17335,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/gigacannon_fire_01.ogg",
+      "sha256": "464c85a17c7b0801c3be03a74f479e08d5eaa13ceba6f754f9c39d9ff6f0a72b",
+      "bytes": 15414,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/graviton_beam_loop.ogg",
+      "sha256": "78439e6e8633809e27ad2e8ddb081f83c6b006557666d41d36dbe317402a5f84",
+      "bytes": 26941,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/guardian_pd_fire_01.ogg",
+      "sha256": "36699766b2b6b8b287b014c4c21afc188dcadf2af24323e9d6846ddfc56552fb",
+      "bytes": 8047,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/heavy_blaster_fire_01.ogg",
+      "sha256": "c584e5bb28454a363578aaf110763e549bb12f8d1d98fc82b14d0fa936b185c6",
+      "bytes": 10806,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/heavy_burst_laser_fire_01.ogg",
+      "sha256": "916bc176f189667efdd4c23fd89727ee1ba6b40b6c03672370c0db4957562dd6",
+      "bytes": 5945,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/high_intens_laser_loop.ogg",
+      "sha256": "3a3b480baf70cf0ce46c53fe95a50ef73ea25233ad04e8683879aab8b35c8d5b",
+      "bytes": 19960,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/ion_beam_loop_loud.ogg",
+      "sha256": "6e02ed647511867ada736ffc1c369818a3307bb7a88c0a54a91c5e883bea6b9e",
+      "bytes": 78498,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/ion_cannon_fire_01.ogg",
+      "sha256": "7dbc271673aacbc105d52897ac9983b19d3271078a3408cec87ffbd4bf13e013",
+      "bytes": 9543,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/ion_pulser_fire_01.ogg",
+      "sha256": "e8ee422cc86103e78405b12d99ab41d988d6c83bdab0fe6ec713d85d3e3a6c2c",
+      "bytes": 9346,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/ir_autolance_loop.ogg",
+      "sha256": "84c45c6faaa582b388906e74d4e8c73c5a1f82565059e983c2832e6a25599928",
+      "bytes": 36678,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/kinetic_blaster_01.ogg",
+      "sha256": "25fc4005bf8e84886bad8c1f8bd0c5852f6b7fb6eaf57ebed63cc264da3663ae",
+      "bytes": 17736,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/kinetic_blaster_02.ogg",
+      "sha256": "f39978f815468a47a47ee8c001a4e4ae7bd729c5fd7535851230ab67feb6b64e",
+      "bytes": 14263,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/laser_intro_2.ogg",
+      "sha256": "78906f2e49d56469e802d9d32d28a8c6c68f03d150788090e33d4b0c23664df9",
+      "bytes": 7775,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/laser_loop.ogg",
+      "sha256": "a63a35d323161e902d305113a912ec5298a2313f784bef3b771d7dbf349dee2f",
+      "bytes": 13013,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/mining_blaster_fire_01.ogg",
+      "sha256": "c1927d2a129cbf7be172414ba39a744e9ca61fbfca7ad9c0c1a4dce5c27de22f",
+      "bytes": 11432,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/minipulser_fire_01.ogg",
+      "sha256": "9feb5e1fca91f00594b596f1b899edaf83c3656c4535c6a2920aefe3b9cfc25d",
+      "bytes": 8417,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/minipulser_fire_02.ogg",
+      "sha256": "d3c302d1cceeb1e6245fb2a77a5946f5e7ba961947c325ac03aa9bb770c91b40",
+      "bytes": 8370,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/minipulser_fire_03.ogg",
+      "sha256": "6ca69d1802b3df580a541b9230036f29580d1d391f35b8ef5f89dfd32ca552ae",
+      "bytes": 8494,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/minipulser_fire_04.ogg",
+      "sha256": "50bd599a7fe691cf8cb6e35a2e2bf8478b66fd7bfdb743890301b3b7f16a15c3",
+      "bytes": 8144,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/minipulser_fire_05.ogg",
+      "sha256": "e28932172dc7bd27d4fb857a8bb02d0641de52e2d8f1e644fd00e6ca2ae0ef62",
+      "bytes": 8117,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/phase_beam_loop_loud.ogg",
+      "sha256": "c3102abd7c0352cc5fc881bf850fff41df3bf0fe0d8289076cf837a38db36a83",
+      "bytes": 134666,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/plasma_cannon_fire_01.ogg",
+      "sha256": "df3c95c08ed436ba9d5b770c7fbc0a6d0cc165b7642d8dec15b976467368c5d0",
+      "bytes": 11399,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/plasma_cannon_fire_02.ogg",
+      "sha256": "f6df74cf6c473edf13e1c75f95e6cc2ff41f9582de55921867752a52810add39",
+      "bytes": 11304,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/plasma_cannon_fire_03.ogg",
+      "sha256": "5e0b352742ed97b77e57d5f93e1fa9a5f10a2738b8828189f7d6a2d2b50dab09",
+      "bytes": 11127,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/pulse_laser_fire_01.ogg",
+      "sha256": "dc85985ac1931b0dce13743faeecbd394938b852833347077a2013e12c84aa43",
+      "bytes": 10896,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/pulse_laser_fire_02.ogg",
+      "sha256": "efb856fcca374f149d0e051b85f7117c30147f12463a33308e4332c96079379a",
+      "bytes": 10653,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/pulse_laser_fire_03.ogg",
+      "sha256": "550ff62f87bf2a44605ea2728c2f919211d6c4a7a1f988cdf59ff24003c69c11",
+      "bytes": 10661,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/pulse_laser_fire_04.ogg",
+      "sha256": "f71adb78130f5752d09378977bd23d2fc69897aa595d4b13c541c25733509dce",
+      "bytes": 10583,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/pulse_laser_fire_05.ogg",
+      "sha256": "cea05c2ff009d569dca2c9d5da07e612660baccac63775c7cabe07218f254a6a",
+      "bytes": 10648,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/reality_disruptor_fire_01.ogg",
+      "sha256": "7184e3795c61e065e0d0a92943da9838a0f8e64a11b64e6cc588dec51aeb5ee7",
+      "bytes": 36192,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/rift_beam_loop.ogg",
+      "sha256": "58d68208f1b9309e5e974087ce6d841eac9b7a345c7aaf155703f0c75b43ad78",
+      "bytes": 17378,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/rift_cascade_emitter_loop.ogg",
+      "sha256": "2f951cff8897aae3bcdaca0ec3a5bf1b7d87bdae8c8aede633d5866bd3d3714e",
+      "bytes": 64094,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/rift_lightning_01.ogg",
+      "sha256": "b01f0adb69a0a20960d2a5c8fdab1680f01440907fea9197e7662501a17dd09e",
+      "bytes": 14490,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/shock_repeater_fire_01_short.ogg",
+      "sha256": "834b3aed753955d38744b7d9160524f4455fa8149105680c4654555aa2eec994",
+      "bytes": 12963,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/shock_repeater_fire_02_short.ogg",
+      "sha256": "010b023db464c6604345a5f3f33d6b35d3871647245fc5005bbc3a5601ac3d42",
+      "bytes": 12677,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/shock_repeater_fire_03_short.ogg",
+      "sha256": "3070f5c0f5d0419f900006c2b1aa85862448dd418e5206d764d31c29d4fb2e31",
+      "bytes": 11941,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/tachyon_lance_fire_01.ogg",
+      "sha256": "ff84db090c5d8f4360cfbba22db9dfbdd150bb3595df90f096b88034ccf3b913",
+      "bytes": 22883,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/thermal_pulse_cannon_fire_01.ogg",
+      "sha256": "e1b7adc8125f29c9b91a62ab5dc4470bed7267d72aff25be1f666cae33bbc322",
+      "bytes": 10838,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/voidblaster_fire_01.ogg",
+      "sha256": "8b74dee12f3f3d78df0affb9d9ee3013737db146fea2b17f992b1e74406513a7",
+      "bytes": 10877,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/voidblaster_fire_02.ogg",
+      "sha256": "3c677dbe8cf612d39151ae8a72a7869a4b4e1606b11cc518b5d1fa93dacf303a",
+      "bytes": 10840,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/voidblaster_fire_03.ogg",
+      "sha256": "ce959fc77785fd5ed43c4d82b00bc7fbac496bb5e6d7296c7fbe825623876aa9",
+      "bytes": 10504,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/volatile_particle_driver_exp_01.ogg",
+      "sha256": "9ecc63e19cca58895d8c6f3319d4198826b7976619ce0a3f1b05cd38c6781d2e",
+      "bytes": 8898,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/volatile_particle_driver_fire_01.ogg",
+      "sha256": "2f728165c6f84dfaa801c6eb5473d90b4a030cdb6547832aac27c655b9a84f81",
+      "bytes": 7133,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/voltaic_cannon_fire_01.ogg",
+      "sha256": "20061b511a754fe600500df088d5b72f8ee3cd32fb0bcab95c58dc14e51a9aef",
+      "bytes": 23280,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/voltaic_discharge_fire_01.ogg",
+      "sha256": "cee549b143afc407260ba6e6f302aff850b01771bd307c7eb5ef6d8ab77a394b",
+      "bytes": 7774,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/voltaic_discharge_fire_02.ogg",
+      "sha256": "218f6e0088a93b52d0ccfd187fcf513721bab4652cc9d323ee01b36b18e1676e",
+      "bytes": 7109,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/voltaic_discharge_fire_03.ogg",
+      "sha256": "1c561827b25a6aff8a3e6577c1154f52f43065a0b07a8a172ab2f22e1f64d42d",
+      "bytes": 7011,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_energy/voltaic_discharge_fire_04.ogg",
+      "sha256": "4905daf78a77f444a4eeeac4bbc417b2e0c51a09601da38bfb73b07f604ad0da",
+      "bytes": 7162,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/autocannon_fire_01.ogg",
+      "sha256": "313d35d4346bd3ae66a0d75a4bb741ef52ec861d1c577d8559771ab56bb9fa6d",
+      "bytes": 9373,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/bomb_bay_fire_01.ogg",
+      "sha256": "339fe4b1432019fe671c1988838dd585b3191263596c8665033f2e4ed8aeb8a2",
+      "bytes": 8824,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/chaingun_fire_01.ogg",
+      "sha256": "1a5c637fe9640838d1a28e1c110cc07bcb8b24c1a8944cf29de8f04024c49fcb",
+      "bytes": 9013,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/devastator_fire_01.ogg",
+      "sha256": "d0b677319599d691cf0265b9231e3926d6d0d1922c514e4692db67446e234520",
+      "bytes": 7736,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/devastator_fire_02.ogg",
+      "sha256": "755cfe4166171cec21688c22af38d68616eada5d6170e9a5d361a1c813a56841",
+      "bytes": 7711,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/devastator_fire_03.ogg",
+      "sha256": "68a791949887c72c4576ab3827ece9fd7759fffcbe785c57ddc399b0cfec0e60",
+      "bytes": 7629,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/devastator_fire_04.ogg",
+      "sha256": "33672e7877679af09a9c2234eeb7162a44ba01b991248de74bea19f0ccbfbf7d",
+      "bytes": 7682,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/devastator_shell_exp_01.ogg",
+      "sha256": "add5f89c090559053a05bed855b0583aa4421fca58cd6ddc1ad111446c71d0b2",
+      "bytes": 10886,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/devastator_shell_exp_02.ogg",
+      "sha256": "3551af615d2c3c107154c460dd1bcc1d5368fb1054b79aa10cb6a620fd64440c",
+      "bytes": 10622,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/devastator_shell_exp_03.ogg",
+      "sha256": "6f4b1c579390310687daca09dcfef48616ac8254a5f3b09cf5ff8ce8d1bde956",
+      "bytes": 9967,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/devastator_shell_exp_04.ogg",
+      "sha256": "7015343aa3a7e7ffbf9d66019eacc4c5e89d7c0e7d43a335dfacfd4bf045e3ab",
+      "bytes": 10343,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/flak_fire_01.ogg",
+      "sha256": "ba9de42f04808b411530c30e9a4d060aaaa0b37e20719785d50e66497d31bb15",
+      "bytes": 8411,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/gauss_cannon_fire_01.ogg",
+      "sha256": "37b9eadc93a928fd95c286bf07bfdd334e836209b97c81da95866d5a6bb217ff",
+      "bytes": 11397,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/heavy_adjudicator_fire_01.ogg",
+      "sha256": "6db5ddbe2ffbe7675ca767bfcf47c1e2660a44b8366b7bc06129e703319e51b6",
+      "bytes": 12272,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/heavy_adjudicator_fire_02.ogg",
+      "sha256": "f3d5889c6f3a9940505d26ec5121dff4895d93350d20f78d1b62b0d5478ff8c6",
+      "bytes": 12356,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/heavy_adjudicator_fire_03.ogg",
+      "sha256": "9ba558c04396ae272943480c3d4dc29664bc982b0e62111957726711a5483695",
+      "bytes": 11876,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/heavy_adjudicator_fire_04.ogg",
+      "sha256": "e46bf8c0008bef3e77f56d2e226dfa25628e7482627ba9683af19761248152bb",
+      "bytes": 12143,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/heavy_adjudicator_shell_exp_01.ogg",
+      "sha256": "4690e76da324421932c0cbb651c8326c309b75fcf7a1c775aa0b9152c84c39c2",
+      "bytes": 12176,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/heavy_adjudicator_shell_exp_02.ogg",
+      "sha256": "cb93d7ef2c362c9881b3d356d24730d8ec4ded385caa2201081913a372d747c4",
+      "bytes": 11027,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/heavy_adjudicator_shell_exp_03.ogg",
+      "sha256": "fd91ff7f91b0c1e549c0acd59ce4738e6862527d8eadfd5780fb6da5303fec0f",
+      "bytes": 11968,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/heavy_machinegun_fire_01.ogg",
+      "sha256": "24580064015290073eeb1bfad0685ebea1ee597a10a34a75cd58ad25a9f2e92d",
+      "bytes": 7535,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/heavy_mass_driver_fire_01.ogg",
+      "sha256": "d7ed808b697a342a3484e7dbe016a869a9d7da0f3aabe8ccf93944bdd0c7c794",
+      "bytes": 16521,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/heavy_mass_driver_fire_02.ogg",
+      "sha256": "7e3c66834e813be62eb9541162b43f7e477e7c04c67e990090a1692a57095da9",
+      "bytes": 16953,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/heavy_mortar_fire_01.ogg",
+      "sha256": "f2562c87f3702a135951c31fadf03fc5982336b9051f612e0763e627236d0f83",
+      "bytes": 10182,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/hellbore_fire_01.ogg",
+      "sha256": "6a18e361634ce410ebb0ceebbd65496ac0ca8e07e4773743b042cf9c53eddce7",
+      "bytes": 16149,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/hephaestus_fire_01_loud.ogg",
+      "sha256": "01d6975263f9f164cdd8511f76042ec1f4c4f97d69be2623c424b9627875d227",
+      "bytes": 11068,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/hephaestus_fire_02_loud.ogg",
+      "sha256": "b41da0388d43be0497e5459d11ee29f05184fae9c8737668d836a8eb9ce4599d",
+      "bytes": 11195,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/hephaestus_fire_03_loud.ogg",
+      "sha256": "d1704869eecefab8916fe5044bf3483c167ac200983aee7da6b3366b63830ff7",
+      "bytes": 10721,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/hypervel_driver_fire_01_loud.ogg",
+      "sha256": "81e1cc216203f779b41c04e9c656e487c809a323d13c372715d418c05801b0dd",
+      "bytes": 13847,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/light_assault_gun_fire_01.ogg",
+      "sha256": "3343f0327783fb7e97cace9469aebc58f7bcce6c9186356dbf96a8061b04bec2",
+      "bytes": 10262,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/light_machinegun_fire_01.ogg",
+      "sha256": "4c977c6c81c81dc03d75482d898b3be8729d5bceacfddb70b3b16dc1aeb16dfb",
+      "bytes": 6836,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/light_mass_driver_fire_01.ogg",
+      "sha256": "b2bc7a20b8e335d76f342b56f17dbbf6386ec2856dd2793887456740955097ca",
+      "bytes": 9626,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/light_mass_driver_fire_02.ogg",
+      "sha256": "8dff5115234663e1c49228a3684de6b652b95e96b623b405697eef951de8a9f7",
+      "bytes": 9339,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/light_mortar_fire_01.ogg",
+      "sha256": "62ac2f0dda68e60251629aaaaf7c2be143187d464e11aa3d9ef25c2acf19fd1a",
+      "bytes": 9293,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/mauler_fire_01.ogg",
+      "sha256": "47566ed70f936fdd8dd2575e76014bc543b3f9cb3ad13bc4a919ec8a2a2ca3cc",
+      "bytes": 11503,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/mauler_fire_01_loud.ogg",
+      "sha256": "5e7f46305ea4676a09cd997742eb44e2fe4ebec4f05210ab408a779faab242f9",
+      "bytes": 13138,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/mjolnir_fire_01.ogg",
+      "sha256": "2a72fff37b81559e20944b0ef5429cdea68d68a8abe53773129aef70cce6fc2e",
+      "bytes": 16715,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/needler_fire_01.ogg",
+      "sha256": "68da602dd5408ada3ab00a00c39429b1e1715b5058acb0978b4a00872d3aff30",
+      "bytes": 7213,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/neoferric_quadcoil_fire_01.ogg",
+      "sha256": "569dbb9d9331d34d4202180fd96b6e2385884e92528ac2515686fed3c263f2be",
+      "bytes": 18634,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/neoferric_quadcoil_fire_02.ogg",
+      "sha256": "0389aa387ed8f6cd1c427415d6a9970853506a04b5727dc206e694b1477040f2",
+      "bytes": 18428,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/neoferric_quadcoil_fire_03.ogg",
+      "sha256": "3de37dfbbfa3898d1dd226939ab0ec6f2fc7daf5f223e4e5b8a9fcefa2a89fe5",
+      "bytes": 18777,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/neoferric_quadcoil_fire_04.ogg",
+      "sha256": "ba506ad4b113702ae4a78d73773fe0db8a0a7ac5227a84b912e8e74dbd6da05e",
+      "bytes": 17200,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/rail_gun_fire_01.ogg",
+      "sha256": "2463f5dc0232461adaa7274589afd8fbe56196c2ebf098bdfa513fa9fc1ace53",
+      "bytes": 9032,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/thumper_spinup_01.ogg",
+      "sha256": "087420de4f49990daa174453c847e749f19b6999171562e8b052cfc4232e59b3",
+      "bytes": 10254,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/vulcan_cannon_fire_01_01.ogg",
+      "sha256": "0d35e69b64d63026e0341750247990d5a3bca4136d3bfd6efa38480c08df1129",
+      "bytes": 4488,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/vulcan_cannon_fire_01_02.ogg",
+      "sha256": "d04d146c26f3346f8ebdb09f56196e5e45282ae9e330c00a51b9e25fd19154f1",
+      "bytes": 4518,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/vulcan_cannon_fire_01_03.ogg",
+      "sha256": "7e1676b62738516cb2be790f76121eecf79c83e8d10e5e5c295b05901e04ea94",
+      "bytes": 4505,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/vulcan_cannon_fire_01_04.ogg",
+      "sha256": "945991632a7ffbf73b59f0b9a954eaabde0953af4a5596ada139626ae42be109",
+      "bytes": 4507,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/vulcan_cannon_fire_01_05.ogg",
+      "sha256": "880849df7f075cffcb94bf1f2fa33b9ff110ec05c55ba6e1ed558b759d358e26",
+      "bytes": 4488,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_guns/vulcan_cannon_fire_01_06.ogg",
+      "sha256": "dd5ae9abe5f725c824a4bea8d9fd5a8da0b91109fc0118a8844a39eacbd624c1",
+      "bytes": 4426,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/annihilator_fire_01.ogg",
+      "sha256": "d62c0b6c4540c996931e393370e8d40947a0bd3c17ea437999fb4d5ec569e272",
+      "bytes": 9802,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/antimatter_srm_fire_01.ogg",
+      "sha256": "657d7842b7cee4fc41aed15b2de51a12efc3cd7f45b032ffc310c2c70a5b7c81",
+      "bytes": 18163,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/antimatter_srm_fire_02.ogg",
+      "sha256": "111392b2bd8ea5e26e5586c5612d9c57a964807f6a248b784600fdb5fc1d11af",
+      "bytes": 19046,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/antimatter_srm_fire_03.ogg",
+      "sha256": "b7560a2ba82937bab36416693ea701f3bf29d33ffa87b2dc880941e14a9cd835",
+      "bytes": 18594,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/atropos_fire_01.ogg",
+      "sha256": "22a03d254e7c2214aa9f92397bfc565b8da06aa85b5351cbd537906ca4434e1b",
+      "bytes": 16998,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/churning_locus_fire_01.ogg",
+      "sha256": "185017a6399d4da4751f46fea94e26f5a70b760cd2ca1c9fb11efa40577d676c",
+      "bytes": 13028,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/dragonfire_dem_fire_01.ogg",
+      "sha256": "7154e77a30ba58af33367b745197e74869ad1beacafcba71fd02454a9e8f681b",
+      "bytes": 15546,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/dragonfire_dem_payload_01.ogg",
+      "sha256": "9e084344ce95d2de54a7399a3125f60706f0c641e66a0c2a2d0d78c6b4c5fb7f",
+      "bytes": 27335,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/dragonfire_dem_targeting_01.ogg",
+      "sha256": "bf27f9689d238d09f042e58bfebd3bcfe2e99bb4a8659d855cc075e7213dd114",
+      "bytes": 55787,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/fragment_defabrication_fire_01.ogg",
+      "sha256": "e0df00bcf59bb9017763a6ae54986230e0b563712fd00174966738394ea3a64b",
+      "bytes": 10675,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/fragment_kinetic_fire_01.ogg",
+      "sha256": "1e5362d6f303df4d98846237424d836eeabb64b52376ac0286706a617511ae39",
+      "bytes": 9712,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/fragment_seeker_fire_01.ogg",
+      "sha256": "887a6d147594d0aac8541cabcc41b3e08efe2ebe8d1b3a6ffe9b8a85af68c74f",
+      "bytes": 11031,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/fragment_swarm_launched_01.ogg",
+      "sha256": "b418441c01336b7d029fc32506f9f1494692c6f807208a863ae335e92d8937d7",
+      "bytes": 8400,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/fragment_unstable_fire_01.ogg",
+      "sha256": "28fe5ebc153f262a43f0b29b6978e7b989398e22d73d9fce8a04d9768d6821ce",
+      "bytes": 11694,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/gazer_dem_fire_01.ogg",
+      "sha256": "8ddcaa97c7909d84b0214339ba71a581ed8db6f800f28b3d6ed37775e24933ff",
+      "bytes": 13675,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/gazer_dem_payload_01.ogg",
+      "sha256": "5470a75f491e405b7fba6ea9e22200e81ecbedb328d5c86dff469950d2994483",
+      "bytes": 41356,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/gorgon_dem_fire_01.ogg",
+      "sha256": "dbfdbd58e89d9a3d910dee976b220229cb4be278458ad591e39f13a4d1d9f4fb",
+      "bytes": 14997,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/gorgon_dem_payload_01.ogg",
+      "sha256": "cda4d099bdb212ac238456030e2703c4607068f61f54f6bafda575152c52e1c5",
+      "bytes": 19968,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/gorgon_dem_targeting_01.ogg",
+      "sha256": "72a5d85a09f5ac4e6cae1e23301df8b9f9445237ab9d7c6c95f8cb60b0982c5e",
+      "bytes": 5040,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/hammer_fire_01.ogg",
+      "sha256": "fdce99542c63270253f1d974fc50b2b8994ab3776b814e408d2de36a4bc890ae",
+      "bytes": 21185,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/harpoon_fire_01.ogg",
+      "sha256": "45c3168641090096af53a19d5546d99bdea3c121759515296a0dfdc9ead0b5ec",
+      "bytes": 16086,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/hungering_rift_fire_01.ogg",
+      "sha256": "034f1dfcf10bb8f7fbdca5569b70ed11c18084e21819e6c00e4ff8b486e73f8a",
+      "bytes": 15534,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/hurricane_mirv_fire_01.ogg",
+      "sha256": "570f8085a622856884ea5effcb8d53bc62645a6b2a9aa4942595ed60d5d996b8",
+      "bytes": 19073,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/hydra_dem_fire_01.ogg",
+      "sha256": "8cb4fed2d7663dd2064382b9050843521219035cec18e1d22800082f038d5a05",
+      "bytes": 18232,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/hydra_dem_payload_01.ogg",
+      "sha256": "5444a8a118aecebbe9c0a468828c64c30c6c6ad16896724ef576b445e57c2998",
+      "bytes": 19756,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/neutron_torpedo_fire_01.ogg",
+      "sha256": "c04084642ae843fbd304caa658599b9d8fa416566c9d3e62691e87274bd7b3e7",
+      "bytes": 34656,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/pilum_lrm_fire_01.ogg",
+      "sha256": "8b585f7a4e6dd72bbca89c9b30652f7c9cd29cf905b0510fabc61bc8cb576a47",
+      "bytes": 14141,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/proximity_charge_launcher_fire_01.ogg",
+      "sha256": "a771beda878edfe579bf7079787126b18caa809fd88e4b333911ba2a67a3ec95",
+      "bytes": 13174,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/reaper_fire_01.ogg",
+      "sha256": "43cbcbdbe15283c6e2391ac071d2d0af9dc61ede628a0a0668bf026d49fd661d",
+      "bytes": 15427,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/resonator_mrm_fire_01.ogg",
+      "sha256": "0bf243781de1555c91ac3c249b2ad9ed4fabf48db1d85a4522a3aab9a387c50d",
+      "bytes": 20526,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/rift_torpedo_fire_01.ogg",
+      "sha256": "bb78dd8397149c6ee1c1910e9f2bbf76d35062e77c5d72d667e96c767dee7142",
+      "bytes": 23046,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/sabot_srm_fire_01_loud.ogg",
+      "sha256": "227402ee475ac57f078b21879efe84f3015ce58f6048145018c06cb251ba2c67",
+      "bytes": 11865,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    },
+    {
+      "path": "sounds/sfx_wpn_missiles/salamander_mrm_fire_01.ogg",
+      "sha256": "d1db597ffc154f253e58164aabea4143604add68a2889948e7a35a71ddbe2c16",
+      "bytes": 16618,
+      "source": "Retained original Starsector media; restored from local install, not user-authored"
+    }
+  ],
+  "unusedMediaRemovalReport": "docs/unused-native-media-removal-2026-09-29.json"
+}

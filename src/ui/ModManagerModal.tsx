@@ -1,3 +1,4 @@
+import { WEAPON_SIZE_LABELS } from '../engine/content/WeaponSizes';
 import { tacticalSystemIds } from '../engine/extensions/ship-systems/Loadout';
 import { installedHullMods, effectiveHullStats } from '../engine/extensions/HullMods';
 import { shipSystemDefinitions } from '../engine/extensions/ship-systems/Registry';
@@ -5,12 +6,12 @@ import React, { useState } from 'react';
 import { modManager } from '../engine/modding/ModManager';
 import { i18n } from '../engine/i18n/LocalizationManager';
 import { contentRegistry } from '../engine/content/ContentRegistry';
-import { runtimeAssetUrl } from '../engine/runtime/RuntimePaths';
+import { AssemblyThumbnail } from './core/AssemblyThumbnail';
 import { effectiveWeaponRange } from '../engine/simulation/WeaponRange';
 import { Button, Modal } from './core/UI';
 import { Readout, ShipPreview } from './core/ShipPreview';
 
-const sizes = { SMALL: '小型', MEDIUM: '中型', LARGE: '大型' };
+const sizes = WEAPON_SIZE_LABELS;
 const slots: Record<string, string> = { BALLISTIC:'实弹', ENERGY:'能量', MISSILE:'导弹', HYBRID:'混合', COMPOSITE:'复合', SYNERGY:'协同', UNIVERSAL:'通用', BUILT_IN:'内置' };
 interface Props { isOpen: boolean; onClose: () => void; onSelectShip: (shipId: string) => void; allowSandboxSwitch?: boolean; currentShipId?: string }
 export function ModManagerModal({ isOpen, onClose, onSelectShip, allowSandboxSwitch = true, currentShipId }: Props) {
@@ -27,11 +28,11 @@ export function ModManagerModal({ isOpen, onClose, onSelectShip, allowSandboxSwi
   </>}>
     <div className="native-console">
       <nav className="native-roster" aria-label="舰船目录">{ships.map(s => <button type="button" className="native-roster-item" key={s.id} aria-pressed={s.id === selectedId} onClick={() => { setSelectedId(s.id); setSlotId(''); }}>
-        <img src={runtimeAssetUrl(s.spriteUrl)} alt="" /><strong>{i18n.t(s.nameKey).split(' (')[0]}</strong>
+        <AssemblyThumbnail spec={s} /><strong>{i18n.t(s.nameKey).split(' (')[0]}</strong>
       </button>)}</nav>
       {ship && <ShipPreview spec={ship} selectedSlot={slotId} onSelectSlot={setSlotId} />}
       <aside className="native-side">{ship && <>
-        <h3>舰船参数</h3><Readout label="结构值" value={ship.hitpoints.toLocaleString()} /><Readout label="装甲值" value={stats!.armorRating.toLocaleString()} /><Readout label="幅能容量" value={stats!.maxFlux.toLocaleString()} /><Readout label="幅能耗散" value={stats!.fluxDissipation.toLocaleString()} /><Readout label="基础航速" value={ship.maxSpeed} />
+        <h3>舰船参数</h3><Readout label="结构值" value={ship.hitpoints.toLocaleString()} /><Readout label="装甲值" value={stats!.armorRating.toLocaleString()} /><Readout label="载荷容量" value={stats!.maxFlux.toLocaleString()} /><Readout label="载荷耗散" value={stats!.fluxDissipation.toLocaleString()} /><Readout label="基础航速" value={ship.maxSpeed} />
         {tacticalSystemIds(ship).map((id, index) => <Readout key={index} label={'技能 ' + (index + 1)} value={shipSystemDefinitions.require(id).name} />)}
         {installedHullMods(ship).map(mod => <Readout key={mod.id} label={mod.status === 'implemented' ? '生效舰装' : '尚未实现'} value={mod.name} />)}
         <h3>{slot ? '挂点 ' + slot.slotId : '武器'}</h3>

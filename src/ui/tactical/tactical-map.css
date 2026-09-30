@@ -1,4 +1,4 @@
-/* Warroom layout: original textures and bitmap type, not generic web panels. */
+/* Tactical controls retain their layout; textures are newly authored and text uses OS fonts. */
 .tactical-map { --tac-blue: #a0d8ed; --tac-muted: #6091a4; --tac-sidebar: 260px; position: absolute; inset: 0; z-index: 40; pointer-events: auto; color: var(--tac-blue); font: 15px/1.4 var(--font-ui, 'Microsoft YaHei', sans-serif); outline: none; }
 .tactical-map-shade { position: absolute; inset: 0; background: rgba(0, 0, 0, .72); pointer-events: none; }
 .tactical-map-state { position: absolute; top: 28px; left: 26px; color: #ddd; font-size: 15px; letter-spacing: 1px; text-shadow: 1px 1px #000; }

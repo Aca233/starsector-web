@@ -1,0 +1,179 @@
+/* Combat presentation only. No generated labels, invented telemetry or gameplay rules. */
+.hud-overlay {
+  --combat-text: var(--ds-hud-text);
+  --combat-muted: var(--ds-hud-muted);
+  --combat-line: var(--ds-hud-divider);
+  --combat-accent: var(--ds-hud-accent);
+  --combat-flux: var(--ds-hud-flux);
+  --combat-hull: var(--ds-hud-hull);
+  --combat-danger: var(--ds-hud-danger);
+  color: var(--combat-text);
+}
+.hud-overlay .hud-console-anchor { left: 16px; bottom: 14px; max-height: none; overflow: visible; width: min(614px, calc(100vw - 216px)); scale: 1; text-shadow: none; filter: none; }
+.hud-overlay .combat-console { position: relative; display: grid; grid-template-columns: minmax(180px,.85fr) minmax(225px,1.15fr); align-items: start; gap: 14px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--combat-text); font: 12px/1.45 var(--ui-font); pointer-events: auto; max-height: none; overflow: visible; user-select: none; text-shadow: 0 1px 3px #000, 0 0 5px #0009; }
+.hud-overlay .combat-console::before { display: none; }
+.hud-overlay .combat-console .hud-text { color: inherit; font-size: 12px; line-height: 1.5; font-family: var(--ui-font); }
+.hud-overlay .combat-console [class*="text-[#9bff00]"] { color: var(--combat-text); }
+.hud-overlay .combat-console :is(button, input, select) { text-shadow: none; }
+.hud-overlay .combat-console button { cursor: pointer; }
+.hud-overlay .combat-console button:disabled { cursor: default; opacity: .55; }
+.hud-overlay .combat-console button:focus-visible { outline: 2px solid var(--ds-control-focus); outline-offset: 2px; }
+.hud-overlay .hud-ship-portrait { align-self: center; flex-shrink: 0; margin-top: 10px; }
+.hud-overlay .hud-ship-speed { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 0 6px; color: var(--combat-muted); white-space: nowrap; }
+.hud-overlay .hud-speed-readout { display: inline-flex; align-items: baseline; gap: 5px; color: var(--combat-text); font-variant-numeric: tabular-nums; }
+.hud-overlay .hud-speed-readout small { color: var(--combat-muted); font: 10px/1.5 var(--ui-mono); }
+.hud-overlay .combat-console-body { min-width: 0; width: auto; margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; overflow: visible; max-height: none; }
+.hud-overlay .combat-console-armament { min-width: 0; padding: 0; overflow: visible; max-height: none; }
+.hud-overlay .hud-console-meter-row { height: auto; display: grid; grid-template-columns: auto 1fr; row-gap: 4px; margin: 0 0 8px; color: var(--combat-flux); }
+.hud-overlay .hud-console-meter-row[data-meter="hull"] { color: var(--combat-hull); }
+.hud-overlay .hud-console-meter-row[data-critical="true"] { color: var(--combat-danger); }
+.hud-overlay .hud-console-meter-row > .hud-text { color: #b9c5ce; }
+.hud-overlay .hud-console-meter-row .hud-meter-number { grid-column: 2; grid-row: 1; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hud-overlay .hud-meter-number small { color: #879aa7; font-size: 10px; }
+.hud-overlay .hud-console-meter-row > .hud-meter { grid-column: 1 / -1; grid-row: 2; margin: 0; transform: none; background: #718b9826; filter: none; }
+.hud-overlay .hud-console-meter-row .hud-meter-cap { opacity: .35; }
+.hud-overlay .hud-console-meter-row .hud-meter-minimum { border-color: #f1d6a0; background: #e6d3ac; width: 2px; }
+.hud-overlay .hud-console-alerts { display: flex; flex-direction: column; gap: 6px; order: 1; }
+.hud-overlay .hud-console-alerts:not(:empty) { padding: 7px 0; border-top: 1px solid var(--combat-line); }
+.hud-overlay .hud-console-alerts .hud-text { font-size: 11px; }
+.hud-overlay .hud-system-list { display: flex; flex-direction: column; gap: 2px; max-height: none; overflow: visible; margin-top: 1px; flex-shrink: 0; }
+.hud-overlay .hud-system-button { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 3px 7px; background: none; border: 1px solid transparent; color: #d7e0e4; border-radius: 0; padding: 4px 2px; margin: 0; min-height: 40px; font: 11px/1.4 var(--ui-font); }
+.hud-overlay .hud-system-button .hud-system-name { min-width: 0; display: flex; align-items: center; white-space: normal; overflow-wrap: anywhere; }
+.hud-overlay .hud-system-button .ship-system-icon { flex: 0 0 17px; width: 17px; height: 17px; margin-right: 5px; }
+.hud-overlay .hud-system-button .hud-system-status { grid-column: 1 / -1; text-align: left; white-space: normal; color: #a3b8bc; font-size: 10px; }
+.hud-overlay .hud-system-button kbd { align-self: start; font: 10px/1.4 var(--ui-mono); color: #c9b898; padding: 2px 4px; border: 1px solid #d9c49944; border-radius: 2px; white-space: nowrap; }
+.hud-overlay .hud-system-button:hover:not(:disabled), .hud-overlay .hud-system-button[aria-current="true"] { background: #b4c9d114; border-color: #c9bc9c88; }
+.hud-overlay .hud-system-button[data-active="true"] { border-color: transparent; background: none; }
+.hud-overlay .hud-system-button[data-active="true"] .hud-system-status { color: #a4d0b8; }
+.hud-overlay .hud-system-button[data-cooling="true"] .hud-system-status { color: #d9bd87; }
+.hud-overlay .hud-weapon-groups { min-height: 0; }
+.hud-overlay .hud-weapon-heading { height: auto; padding: 0 0 4px; color: var(--combat-muted); }
+.hud-overlay .hud-weapon-list { max-height: none; overflow: visible; }
+.hud-overlay .hud-weapon-group { display: grid; grid-template-columns: minmax(0,1fr) 44px; gap: 6px; height: auto; min-height: 40px; transform: none; color: var(--combat-text); border: 0; border-left: 2px solid transparent; padding: 3px 4px; margin: 0; background: none; }
+.hud-overlay .hud-weapon-group[data-selected="true"] { border-color: var(--combat-accent); background: none; }
+.hud-overlay .hud-weapon-select { position: static; display: grid; grid-template-columns: 20px minmax(0,1fr); gap: 6px; width: 100%; height: auto; opacity: 1; background: transparent; border: 0; padding: 0; color: inherit; text-align: left; }
+.hud-overlay .hud-group-number { align-self: center; color: #9caeb9; font: 11px/20px var(--ui-mono); border: 1px solid #a6b7bf44; text-align: center; border-radius: 2px; }
+.hud-overlay .hud-weapon-group[data-selected="true"] .hud-group-number { color: #e3cba1; border-color: #c3b18a77; }
+.hud-overlay .hud-weapon-entry { display: grid; grid-template-columns: 27px minmax(0,1fr); grid-template-rows: auto auto; gap: 2px 7px; height: auto; min-height: 34px; align-items: center; }
+.hud-overlay .hud-weapon-entry + .hud-weapon-entry { margin-top: 6px; }
+.hud-overlay .hud-weapon-icon { grid-row: 1 / 3; }
+.hud-overlay .hud-weapon-icon img { width: 25px; height: 29px; object-fit: contain; }
+.hud-overlay .hud-weapon-name { font-size: 12px; line-height: 1.4; overflow: visible; white-space: normal; overflow-wrap: anywhere; }
+.hud-overlay .hud-weapon-damage { grid-column: 2; padding: 0; color: #90a4b2; font-size: 10px; line-height: 1.3; overflow: visible; white-space: normal; overflow-wrap: anywhere; }
+.hud-overlay .hud-group-controls { display: flex; flex-direction: column; justify-content: center; gap: 5px; }
+.hud-overlay .hud-group-mode, .hud-overlay .hud-group-autofire { position: static; width: 100%; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 2px 0; border: 1px solid var(--ds-control-border); border-radius: 2px; color: #aebec8; background: transparent; font: 10px/1.3 var(--ui-font); opacity: 1; }
+.hud-overlay .hud-group-autofire[aria-checked="true"] { color: #accdbb; border-color: #91b59d55; }
+.hud-overlay .hud-group-mode:hover:not(:disabled), .hud-overlay .hud-group-autofire:hover:not(:disabled) { border-color: var(--combat-accent); color: #ead7b5; }
+.hud-overlay .hud-weapon-group .hud-autofire-indicator { width: 5px; height: 5px; border: 1px solid currentColor; background: transparent; }
+.hud-overlay .hud-weapon-group .hud-autofire-indicator[data-active="true"] { background: currentColor; }
+.hud-overlay .hud-weapon-group .hud-autofire-indicator[data-active="false"] { opacity: .4; }
+.hud-overlay .hud-mount-status { position: static; width: auto; max-height: none; overflow: visible; padding-top: 8px; margin-top: 9px; border-top: 1px solid var(--combat-line); }
+.hud-overlay .hud-mount-status > div { gap: 2px 12px; flex-wrap: wrap; padding: 2px 0; }
+.hud-overlay .hud-mount-status .hud-text { font-size: 10px; }
+.hud-overlay .hud-mount-name { color: #9cacb8; overflow: visible; white-space: normal; overflow-wrap: anywhere; }
+.hud-overlay .hud-mount-readout { color: #b4c4bb; flex-wrap: wrap; white-space: normal; }
+.hud-overlay .hud-empty-weapons { color: #99abb5; font-size: 12px; margin: 8px 0; }
+.hud-overlay .hud-carrier-deck { border-top: 1px solid var(--combat-line); padding-top: 8px; margin-top: 8px; }
+.hud-overlay .hud-carrier-deck .hud-text { font-size: 11px; }
+.hud-overlay .hud-void-shield { margin: 0 0 12px; padding: 0 0 10px; border-color: var(--combat-line); }
+.hud-overlay .hud-radar-anchor { right: 14px; bottom: 14px; top: auto; scale: .78; transform-origin: right bottom; opacity: .9; filter: none; }
+.hud-overlay .combat-radar { border: 0; border-radius: 0; background: none; box-shadow: none; }
+.hud-overlay .combat-notifications { font: 12px/1.6 var(--ui-font); color: #bdc9d1; }
+.hud-overlay .combat-notification-friendly, .hud-overlay .combat-control-notice { color: #a6c8b5; }
+.hud-overlay .combat-pause-status { color: #dbe3e7; background: #101c27e8; border-color: #baaf9188; border-radius: 2px; text-shadow: none; }
+
+/* Lock brackets stay in world space; the read-only details no longer spill across combat. */
+.hud-overlay .hud-target-inspection { inset: 0; font: 12px/1.5 var(--ui-font); color: var(--combat-danger); text-shadow: none; pointer-events: none; }
+.hud-overlay .hud-target-lines { left: 0; top: 0; stroke: #e9b098; opacity: .8; }
+.hud-overlay .hud-target-card { position: absolute; top: 54px; right: 16px; width: 220px; max-height: none; overflow: visible; pointer-events: auto; padding: 0; border: 0; border-radius: 0; background: none; color: var(--combat-text); box-shadow: none; text-shadow: 0 1px 3px #000, 0 0 5px #000; }
+.hud-overlay .hud-target-heading { display: flex; justify-content: space-between; margin-bottom: 10px; color: #dfb293; }
+.hud-overlay .hud-target-heading strong { font-size: 11px; font-weight: 500; }
+.hud-overlay .hud-target-heading kbd { font: 10px var(--ui-mono); color: #b4a089; }
+.hud-overlay .hud-target-identity { position: static; width: auto; display: flex; flex-direction: column; gap: 3px; padding-bottom: 6px; border-bottom: 1px solid var(--combat-line); }
+.hud-overlay .hud-target-identity strong { font-size: 14px; font-weight: 500; }
+.hud-overlay .hud-target-identity > span { color: var(--combat-muted); font-size: 10px; }
+.hud-overlay .hud-target-summary { position: static; display: grid; grid-template-columns: minmax(0,1fr) 66px; gap: 12px; align-items: center; width: auto; padding: 8px 0; }
+.hud-overlay .hud-target-meter { display: grid; grid-template-columns: 29px minmax(0,1fr); gap: 7px; height: 22px; color: var(--combat-flux); }
+.hud-overlay .hud-target-meter + .hud-target-meter { color: #c8b69b; }
+.hud-overlay .hud-target-meter > span:first-child { color: #aebac3; font-size: 11px; }
+.hud-overlay .hud-target-meter .hud-meter { background: #718b9826; filter: none; }
+.hud-overlay .hud-target-data { display: flex; justify-content: space-between; font-size: 10px; color: #a4b5c0; line-height: 1.8; }
+.hud-overlay .hud-target-data b { font-weight: 400; color: #ccd6db; }
+.hud-overlay .hud-target-state { min-height: 0; color: #edb295; font-size: 11px; }
+.hud-overlay .hud-target-state:not(:empty) { padding-bottom: 9px; }
+.hud-overlay .hud-target-weapons { position: static; width: auto; max-height: none; overflow: visible; border-top: 1px solid var(--combat-line); }
+.hud-overlay .hud-target-weapon { min-height: 42px; display: grid; grid-template-columns: 15px minmax(0,1fr) auto; align-items: center; column-gap: 6px; padding: 7px 0; border-bottom: 1px solid #8197a81b; }
+.hud-overlay .hud-target-group { color: #a5b3ba; font: 10px var(--ui-mono); }
+.hud-overlay .hud-target-weapon-name { font-size: 11px; overflow: visible; white-space: normal; overflow-wrap: anywhere; }
+.hud-overlay .hud-target-weapon-state { grid-column: 3; grid-row: 1; color: #a8b9bc; font-size: 10px; }
+.hud-overlay .hud-target-weapon-type { grid-column: 2 / -1; color: #8ea1af; font-size: 10px; overflow: visible; white-space: normal; overflow-wrap: anywhere; }
+
+/* Tactical map: keep commands, map transforms and authority wiring, replace noisy chrome. */
+.hud-overlay .tactical-map { --tac-blue: #c7d5dc; --tac-muted: #91a6b3; }
+.hud-overlay .tactical-map-shade { background: #080f18ef; }
+.hud-overlay .tactical-map-commands { background: none; border: 0; border-radius: 0; padding: 8px; right: 14px; top: 14px; }
+.hud-overlay .tactical-map-action { height: 43px; gap: 8px; }
+.hud-overlay .tactical-map-action > span { height: 31px; line-height: 29px; border: 1px solid #8197a84d; border-radius: 2px; background: #18293799; text-align: left; padding-left: 10px; font-size: 12px; }
+.hud-overlay .tactical-map-action > span::before { display: none; }
+.hud-overlay .tactical-map-action > img { width: 29px; height: 29px; border: 0; background: none; opacity: .75; }
+.hud-overlay .tactical-map-action:hover:not(:disabled) > span, .hud-overlay .tactical-map-action[aria-pressed="true"] > span { color: #e7c898; border-color: #c3b28a80; background: #c3b28a18; }
+.hud-overlay .tactical-map em { color: #d5c296; }
+.hud-overlay .tactical-map-counter { background: #18293780; border: 1px solid #8197a82d; border-radius: 2px; }
+.hud-overlay .tactical-map-counter > div { background: transparent; }
+.hud-overlay .tactical-map-counter b { color: #d1dce2; }
+.hud-overlay .tactical-map-counter b[data-tone="yellow"] { color: #d6c49c; }
+.hud-overlay .tactical-command-tile { --cut: none; border-radius: 2px; background: #8197a866; }
+.hud-overlay .tactical-command-tile-face { background: #101c28f5; }
+.hud-overlay .tactical-command-tile[aria-pressed="true"] { background: #cfb98b; }
+.hud-overlay .tactical-command-tile[aria-pressed="true"] .tactical-command-tile-face { background: #333a36; }
+.hud-overlay .tactical-command-tile:hover, .hud-overlay .tactical-command-tile:focus-visible { background: #dac196; }
+.hud-overlay .tactical-command-tooltip { background: #101c28fa; border-color: #c3b28a66; color: #c9d4dc; }
+.ui-modal.simulation-deployment.native-chrome { border: 1px solid var(--ds-control-border); border-radius: 0; background: transparent; }
+.simulation-deployment .sim-deployment-tabs > [aria-selected="true"] { border-color: #c3b28a; background: #c3b28a24; color: #e4d4b4; }
+.simulation-deployment .sim-deployment-ship[aria-pressed="true"] { border-color: #c7b591; background: #c7b59120; }
+.simulation-deployment .sim-deployment-ship[aria-pressed="true"]::after { border-color: #c7b59133; }
+.simulation-deployment .sim-deployment-meter { border-color: #869da866; background: #172837; box-shadow: none; border-radius: 2px; }
+.simulation-deployment .sim-deployment-meter i { background: #7eacb733; }
+/* Portraits are scaled rather than downsampled, preserving their module hit testing. */
+.hud-overlay .hud-ship-portrait, .hud-overlay .hud-ship-portrait canvas { width: 92px !important; height: 92px !important; }
+.hud-overlay .hud-target-summary canvas { width: 66px !important; height: 66px !important; }
+.hud-overlay .hud-mount-details, .hud-overlay .hud-target-armament { margin-top: 5px; font-size: 10px; color: #a7b7c2; }
+.hud-overlay .hud-detail-heading { margin: 0; padding: 3px 0; font: inherit; color: var(--combat-muted); }
+.hud-overlay .hud-mount-details .hud-detail-heading > span { margin-left: 7px; color: #cbb992; }
+.hud-overlay .hud-mount-details .hud-mount-status { margin-top: 3px; padding-top: 4px; }
+/* Dense loadouts use available width instead of clipping or creating nested
+ * scroll areas. The status/weapon columns keep their widths without the removed identity gutter. */
+@media (min-width: 1100px) {
+  .hud-overlay .hud-console-anchor:has([data-expanded-loadout="true"]) { width: min(934px, calc(100vw - 216px)); }
+  .hud-overlay:has(.hud-target-card[data-many-weapons="true"]) .hud-console-anchor:has([data-expanded-loadout="true"]) { width: min(934px, calc(100vw - 464px)); }
+  .hud-overlay .combat-console[data-expanded-loadout="true"] { grid-template-columns: minmax(160px,.6fr) minmax(350px,1.4fr); }
+  .hud-overlay .combat-console[data-expanded-loadout="true"] .hud-weapon-layout { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); align-items: start; gap: 14px; }
+  .hud-overlay .combat-console[data-expanded-loadout="true"] .hud-mount-details { margin-top: 0; }
+  .hud-overlay .hud-target-card[data-many-weapons="true"] { width: 420px; }
+  .hud-overlay .hud-target-card[data-many-weapons="true"] .hud-target-weapons { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 14px; }
+  .hud-overlay .hud-target-card[data-many-weapons="true"] .hud-target-weapon { min-height: 36px; padding: 3px 0; }
+}
+@media (max-width: 1220px) {
+  .hud-overlay .hud-console-anchor { width: min(628px,calc(100vw - 210px)); left: 12px; bottom: 12px; }
+  .hud-overlay .combat-console { grid-template-columns: minmax(160px,.85fr) minmax(210px,1.15fr); gap: 12px; }
+  .hud-overlay .hud-ship-portrait, .hud-overlay .hud-ship-portrait canvas { width: 80px !important; height: 80px !important; }
+  .hud-overlay .hud-radar-anchor { right: 12px; bottom: 12px; }
+}
+@media (max-width: 900px) {
+  .hud-overlay .hud-console-anchor { width: calc(100vw - 24px); max-height: none; }
+  .hud-overlay .combat-console { grid-template-columns: minmax(180px,.85fr) minmax(215px,1.15fr); }
+  .hud-overlay .hud-ship-portrait { display: none; }
+  .hud-overlay .hud-radar-anchor, .hud-overlay:has(.hud-target-inspection) .hud-radar-anchor { top: 46px; bottom: auto; scale: .6; right: 12px; transform-origin: right top; }
+  .hud-overlay .hud-target-card { top: 46px; right: 146px; }
+}
+@media (max-width: 560px) {
+  .hud-overlay .combat-console { grid-template-columns: minmax(120px,.8fr) minmax(0,1.2fr); gap: 8px; }
+  .hud-overlay .combat-console-body, .hud-overlay .combat-console-armament { max-height: none; overflow: visible; }
+  .hud-overlay .hud-weapon-group { grid-template-columns: minmax(0,1fr); gap: 3px; }
+  .hud-overlay .hud-group-controls { flex-direction: row; }
+  .hud-overlay .hud-target-card { width: min(220px,calc(100vw - 126px)); right: 12px; top: 46px; }
+  .hud-overlay:has(.hud-target-inspection) .hud-radar-anchor { display: block; left: 12px; right: auto; top: 46px; scale: .42; transform-origin: left top; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hud-overlay .combat-console * { animation: none !important; transition: none !important; }
+}

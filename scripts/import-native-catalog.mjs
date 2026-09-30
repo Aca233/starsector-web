@@ -14,6 +14,7 @@ if (args.includes('--help')) {
 if (args.some(arg => arg.startsWith('--') && arg !== '--strict') || args.filter(arg => !arg.startsWith('--')).length > 1) {
   throw new Error('Usage: node scripts/import-native-catalog.mjs [StarsectorCore] [--strict]');
 }
+try { await lstat(resolve(projectRoot, 'public/ui-artwork-provenance.json')); throw new Error('Legacy media import disabled after original UI replacement; review resource permissions and preserve approved artwork first.'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
 const coreRoot = await realpath(resolve(args.find(arg => !arg.startsWith('--')) ?? resolve(projectRoot, '../starsector-core')));
 const assetRoot = resolve(projectRoot, 'public/game-assets');
 const catalogPath = resolve(projectRoot, 'src/engine/data/generated/native-catalog.json');

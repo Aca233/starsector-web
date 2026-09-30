@@ -20,7 +20,7 @@
   color-scheme: dark;
   color: var(--nc-text);
   background: radial-gradient(ellipse at 70% 0%, #142f3944, transparent 60%), var(--nc-bg);
-  font: 14px/1.5 StarsectorLatin, "Microsoft YaHei", StarsectorCN, sans-serif;
+  font: 14px/1.5 "Segoe UI", "Microsoft YaHei", "Microsoft YaHei UI", sans-serif;
   text-rendering: optimizeLegibility;
 }
 .native-catalog *, .native-catalog *::before, .native-catalog *::after { box-sizing: border-box; }

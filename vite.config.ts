@@ -1,3 +1,4 @@
+import { originalInterfacePlugin } from './scripts/original-interface-guard.mjs'
 import { componentWriteVitePlugin } from './scripts/component-write-transform.mjs'
 import { combatReplayBuildPlugin } from './scripts/combat-replay-build.ts'
 import { defineConfig, loadEnv } from 'vite'
@@ -23,7 +24,7 @@ export default defineConfig(({ mode }) => {
   server: { watch: { ignored: ['**/artifacts/**', '**/.vite/webp/**'] }, headers: { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' } },
   preview: { headers: { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' } },
   worker: { format: 'es', plugins: () => components ? [componentWriteVitePlugin()] : [] },
-  plugins: [webpAssetsPlugin(), webBuildIntegrityPlugin(), ...(components ? [componentWriteVitePlugin()] : []), combatReplayBuildPlugin(), lanLaunchPlugin(), { name: 'lan-build-id', generateBundle() { this.emitFile({type:'asset',fileName:'lan-build.json',source:JSON.stringify({build:lanBuildId})}); } }, studioSummaryPlugin(), catalogDataPlugin(), tailwindcss(), react(), {
+  plugins: [originalInterfacePlugin(), webpAssetsPlugin(), webBuildIntegrityPlugin(), ...(components ? [componentWriteVitePlugin()] : []), combatReplayBuildPlugin(), lanLaunchPlugin(), { name: 'lan-build-id', generateBundle() { this.emitFile({type:'asset',fileName:'lan-build.json',source:JSON.stringify({build:lanBuildId})}); } }, studioSummaryPlugin(), catalogDataPlugin(), tailwindcss(), react(), {
     name: 'combat-definition-reload',
     apply: 'serve',
     handleHotUpdate({ file, server }) {

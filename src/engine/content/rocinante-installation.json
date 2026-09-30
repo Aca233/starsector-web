@@ -1,0 +1,244 @@
+{
+  "version": 1,
+  "status": "six-pdc-installation-only-not-complete-ship",
+  "sourceImage": "rocinante-hull-v02.png",
+  "sourceSha256": "a56ebcdfb3575aa88993ae89a4b1342ae34b664ceb28089f0867a7fbef8c5b97",
+  "sourceToTexture": {
+    "scale": [
+      0.3333333333333333,
+      0.3333333333333333
+    ],
+    "offset": [
+      -64,
+      -27.666666666666664
+    ]
+  },
+  "hashes": {
+    "hull.png": "951c0fe995b2044664001e87d6590af11b39385f07e1de7ac046b4a3c1672c75",
+    "pdc.png": "09e4199712697655409fecf3c90eaeedee7d45b1ec0b6de66f7da112f1552222",
+    "seat.png": "114649cb1b8937cdb53b6df6870708d5e4359b4b6281adf260dabd04c0b5216c"
+  },
+  "runtimeTextureSizes": {
+    "pdc.png": [
+      57,
+      80
+    ],
+    "seat.png": [
+      66,
+      64
+    ]
+  },
+  "hull": {
+    "spriteUrl": "/game-assets/graphics/ships/web_rocinante/installation-v01/hull.png",
+    "spriteWidth": 86.16666666666666,
+    "spriteHeight": 234.66666666666666,
+    "pivotX": 43.08333333333333,
+    "pivotY": 106.4861111111111,
+    "collisionRadius": 120.73504942846476,
+    "bounds": [
+      [
+        -120.38888888888889,
+        -4.583333333333333
+      ],
+      [
+        -119.93055555555556,
+        -13.75
+      ],
+      [
+        -119.47222222222223,
+        -17.416666666666664
+      ],
+      [
+        -119.01388888888889,
+        -18.333333333333332
+      ],
+      [
+        -118.09722222222223,
+        -18.791666666666664
+      ],
+      [
+        -80.97222222222223,
+        -25.208333333333332
+      ],
+      [
+        4.277777777777769,
+        -34.375
+      ],
+      [
+        19.8611111111111,
+        -35.75
+      ],
+      [
+        30.402777777777768,
+        -35.75
+      ],
+      [
+        75.77777777777777,
+        -19.708333333333332
+      ],
+      [
+        98.69444444444443,
+        -6.875
+      ],
+      [
+        98.69444444444443,
+        6.875
+      ],
+      [
+        75.77777777777777,
+        19.708333333333332
+      ],
+      [
+        30.402777777777768,
+        35.75
+      ],
+      [
+        19.8611111111111,
+        35.75
+      ],
+      [
+        7.944444444444436,
+        34.83333333333333
+      ],
+      [
+        -80.97222222222223,
+        25.208333333333332
+      ],
+      [
+        -118.09722222222223,
+        18.791666666666664
+      ],
+      [
+        -119.01388888888889,
+        18.333333333333332
+      ],
+      [
+        -119.47222222222223,
+        16.958333333333332
+      ],
+      [
+        -119.93055555555556,
+        13.75
+      ],
+      [
+        -120.38888888888889,
+        4.583333333333333
+      ]
+    ]
+  },
+  "pdc": {
+    "purpose": "Web-adaptation fit study, not canonical coordinates or final balance",
+    "visibleLength": 18,
+    "spriteWidth": 15.890625,
+    "spriteHeight": 22.5,
+    "spritePivotX": 0.5,
+    "spritePivotY": 0.6617411225658649,
+    "turretOffsets": [
+      12.536082474226806,
+      0
+    ],
+    "turretSpriteUrl": "/game-assets/graphics/ships/web_rocinante/installation-v01/pdc.png",
+    "hardpointSpriteUrl": "/game-assets/graphics/ships/web_rocinante/installation-v01/pdc.png"
+  },
+  "installation": {
+    "version": 1,
+    "spriteUrl": "/game-assets/graphics/ships/web_rocinante/installation-v01/seat.png",
+    "width": 13.176366590214068,
+    "height": 12.874617737003058,
+    "pivotX": 0.5,
+    "pivotY": 0.5008907363420427,
+    "angleDeg": 0
+  },
+  "mounts": [
+    {
+      "slotId": "PDC_01",
+      "name": "左前舷近防炮",
+      "surface": "PORT_FORE",
+      "sourcePoint": [
+        342,
+        312
+      ],
+      "baseAngleDeg": -65,
+      "arcDeg": 130,
+      "renderLayer": "BELOW_HULL",
+      "x": 71.49999999999999,
+      "y": -20.166666666666664
+    },
+    {
+      "slotId": "PDC_02",
+      "name": "右前舷近防炮",
+      "surface": "STARBOARD_FORE",
+      "sourcePoint": [
+        606,
+        312
+      ],
+      "baseAngleDeg": 65,
+      "arcDeg": 130,
+      "renderLayer": "BELOW_HULL",
+      "x": 71.49999999999999,
+      "y": 20.166666666666664
+    },
+    {
+      "slotId": "PDC_03",
+      "name": "左中舷近防炮",
+      "surface": "PORT_MID",
+      "sourcePoint": [
+        245,
+        690
+      ],
+      "baseAngleDeg": -120,
+      "arcDeg": 120,
+      "renderLayer": "BELOW_HULL",
+      "x": 13.749999999999986,
+      "y": -34.986111111111114
+    },
+    {
+      "slotId": "PDC_04",
+      "name": "右中舷近防炮",
+      "surface": "STARBOARD_MID",
+      "sourcePoint": [
+        703,
+        690
+      ],
+      "baseAngleDeg": 120,
+      "arcDeg": 120,
+      "renderLayer": "BELOW_HULL",
+      "x": 13.749999999999986,
+      "y": 34.9861111111111
+    },
+    {
+      "slotId": "PDC_05",
+      "name": "后段背部近防炮",
+      "surface": "DORSAL",
+      "sourcePoint": [
+        474,
+        1136
+      ],
+      "baseAngleDeg": 0,
+      "arcDeg": 360,
+      "renderLayer": "ABOVE_HULL",
+      "x": -54.38888888888887,
+      "y": 0
+    },
+    {
+      "slotId": "PDC_06",
+      "name": "后段腹部近防炮",
+      "surface": "VENTRAL",
+      "sourcePoint": [
+        474,
+        1136
+      ],
+      "baseAngleDeg": 180,
+      "arcDeg": 360,
+      "renderLayer": "BELOW_HULL",
+      "x": -54.38888888888887,
+      "y": 0
+    }
+  ],
+  "references": [
+    "artifacts/rocinante/reference-study/krichwow-dorsal.png",
+    "artifacts/rocinante/reference-study/krichwow-port.png",
+    "artifacts/rocinante/reference-study/krichwow-ventral-shadeless.png"
+  ],
+  "interpretation": "Reference supports four lateral PDCs plus dorsal/ventral aft-spine pair. Numeric positions and combat-plane arcs authored against the generated hull, not measured as official lore coordinates. Lateral roots are beneath the hull silhouette in this 2D projection."
+}

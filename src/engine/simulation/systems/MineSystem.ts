@@ -9,9 +9,8 @@ import { getShipExplosionContact } from '../collision/ExplosionContact';
 import { combatAudio as sound } from '../../audio/CombatAudioEvents';
 import { SimulationRandom } from '../SimulationRandom';
 import spec from '../../data/generated/mine-spec.json';
-import { nativeMineSpec, type NativeMineWeapon } from '../../extensions/NativeMines';
+import { nativeMineSpec, nativeMinePayload, type NativeMineWeapon } from '../../extensions/NativeMines';
 import { effectiveHullModWeaponSpec } from '../../extensions/HullMods';
-import { contentRegistry } from '../../content/ContentRegistry';
 import { bindProjectileSource, projectileSource } from './weapon/OutgoingDamage';
 
 /** MineStrikeStats + GuidedProximityFuseAI timing/data. Steering is a Web adapter,
@@ -59,8 +58,7 @@ export class MineSystem {
   public spawnMine(position: Vector2, source: Ship, ctx: WeaponSimContext, weaponId: NativeMineWeapon,
     options: { life?: number; fadeIn?: number; sound?: string; stationary?: boolean; facing?: number } = {}): SpatialMine {
     const spec = nativeMineSpec(weaponId), fuse = spec.behaviorSpec;
-    const base = contentRegistry.getWeapon(weaponId);
-    if (!base) throw Error('Missing native mine weapon ' + weaponId);
+    const base = nativeMinePayload(weaponId);
     const weapon = effectiveHullModWeaponSpec(source.spec, base);
     const mult = source.crDamageDealtMultiplier * source.getWeaponDamageMultiplier('MISSILE');
     const m: SpatialMine = { id: this.random.next(), weaponId, pos: position.clone(),

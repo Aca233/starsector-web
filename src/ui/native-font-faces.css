@@ -1,16 +1,1 @@
-@font-face {
-  font-family: StarsectorLatin;
-  src: url("/game-assets/graphics/fonts/native-latin.ttf") format("truetype");
-  font-display: swap;
-}
-@font-face {
-  font-family: StarsectorCN;
-  src: url("/game-assets/graphics/fonts/native-zh.ttf") format("truetype");
-  font-display: swap;
-}
-@font-face {
-  font-family: StarsectorNumber;
-  src: url("/game-assets/graphics/fonts/native-numbers.ttf") format("truetype");
-  font-weight: 100 900;
-  font-display: swap;
-}
+/* Bundled game fonts retired. The shared original skin uses OS fonts only. */

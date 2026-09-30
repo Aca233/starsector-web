@@ -50,6 +50,7 @@ export function cycleSeconds(w: WeaponSpec) {
       );
 }
 export function dps(w: WeaponSpec) {
+  if (w.gravityTractor) return w.gravityTractor.tidalDamagePerSecond ?? 0;
   if (!w.isBeam)
     return (w.damagePerShot * Math.max(1, w.burstSize ?? 1)) / cycleSeconds(w);
   if (w.beamVisualMode !== "BURST") return w.damagePerSecond;

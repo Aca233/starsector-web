@@ -1,3 +1,4 @@
+import { shipObservationWidth, mountObservationWidth, applyShipObservation, applyMountObservation } from './ObservationWire';
 import { immutableCopy } from '../../extensions/Immutable';
 import { scalarWireCodec, type ScalarWireCodec } from './ScalarWire';
 import { Ship } from '../../simulation/Ship.ts';
@@ -6,7 +7,7 @@ import { ProjectileThreatIndex } from '../../ai/ProjectileThreatIndex.ts';
 import { Vector2 } from '../../math/Vector2.ts';
 import { SimulationRandom } from '../../simulation/SimulationRandom.ts';
 import { createWeaponHealthTracker, weaponHealthProfile } from '../../simulation/systems/weapon/WeaponComponentHealth';
-import { parts, controls, primitive, NumericReader, shipPaths, mountPaths, projectileWireWidth, readProjectile, motionKeys, writePath } from './Protocol.ts';
+import { parts, controls, primitive, NumericReader, projectileWireWidth, readProjectile, motionKeys } from './Protocol.ts';
 import type { Model, Frame, OwnerResult, Fields, Part, Row, Scalar } from './Types';
 import type { TacticalWorld } from '../TacticalWorld';
 import type { WeaponThreatEnvelope } from '../WeaponThreatEnvelope';
@@ -87,8 +88,8 @@ export class Owner {
         const ownReader = new NumericReader(frame.own), reader = new NumericReader(frame.world);
         let q = 0;
         for (const v of this.views) {
-            for (const p of shipPaths)
-                writePath(v, p, reader.get(q++));
+            applyShipObservation(reader, v, q);
+            q += shipObservationWidth;
             v.ventTime = reader.get(q++);
             for (const k of motionKeys)
                 v.motion[k] = reader.get(q++);
@@ -98,8 +99,8 @@ export class Owner {
             e.maxRangeAndMuzzle = -Infinity;
             e.maxSpeed = v.motion.maxSpeed;
             for (const mount of v.weapons) {
-                for (const p of mountPaths)
-                    writePath(mount, p, reader.get(q++));
+                applyMountObservation(reader, mount, q);
+                q += mountObservationWidth;
                 const range = (reader.get(q++) as number), dps = (reader.get(q++) as number), extent = (reader.get(q++) as number), mx = (reader.get(q++) as number), my = (reader.get(q++) as number);
                 if (mount.isDisabled || mount.ammo < 1 || dps <= 0)
                     continue;

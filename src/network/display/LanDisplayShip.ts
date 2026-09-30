@@ -27,6 +27,7 @@ export class DisplayFlux {
   getTimeToVent(): number { return this.ventTime; }
 }
 export class DisplayShield {
+  declare voidShield: Ship['shield']['voidShield'];
   declare type: Ship['shield']['type']; declare phaseState: Ship['shield']['phaseState'];
   declare radius: number; declare maxArcDeg: number; declare currentArcDeg: number;
   declare facingAngleRad: number; declare targetFacingAngleRad: number; declare hitSegmentLevels: Float32Array;
@@ -40,7 +41,7 @@ export class DisplayShield {
   get isPhaseEngaged(): boolean {
     return phaseEngaged(this.phaseState);
   }
-  get isRaiseRequested(): boolean { return this.isActive || this.pendingRaise; }
+  get isRaiseRequested(): boolean { return this.voidShield?.armed ?? (this.isActive || this.pendingRaise); }
   get visualAlpha(): number {
     return shieldVisualAlpha(this.isActive,this.closeTimeRemaining,this.maxArcDeg,this.currentArcDeg,shieldUnfoldRate(this.type,this.radius,this.unfoldRateMultiplier));
   }
@@ -64,6 +65,7 @@ export class DisplaySystem extends ProjectedRenderSystem {
   declare charges: HudSystem['charges'];
   declare maxCharges: HudSystem['maxCharges'];
   declare statusText: HudSystem['statusText'];
+  declare passiveStatusText: HudSystem['passiveStatusText'];
   declare forcesAutofire: boolean;
   declare blocksWeapons: boolean;
   declare forcesForward: boolean;
@@ -81,6 +83,7 @@ export class DisplaySystem extends ProjectedRenderSystem {
   canFireWeapon(mount: {slotId:string}): boolean { return this.fireSlots.includes(mount.slotId); }
 }
 export type DisplayWeapon = WeaponDisplayState & {
+ loadedMissileLevels?: WeaponMount['loadedMissileLevels'];
  weaponSpec: WeaponMount['spec']; displayRange:number; displaySpeed:number; presentationRelativeAngle?:number;
 };
 export class LanDisplayShip extends ProjectedRenderShip {

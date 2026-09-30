@@ -37,7 +37,7 @@ export function outgoingDamageMultiplier(source: Ship | undefined, target: Ship 
   return mult;
 }
 export function projectileOutgoingMultiplier(p: Projectile, target: Ship | undefined, point: Vector2, ctx: WeaponSimContext): number {
-  if (p.isHullExplosion) return 1;
+  if (p.isHullExplosion || p.gravityCapturedBy) return 1;
   const source = projectileSource(p, ctx);
   const weaponType = p.sourceWeaponType ?? source?.weapons.find(w => w.slotId === p.slotId)?.spec.weaponType;
   return outgoingDamageMultiplier(source, target, weaponType, p.spawnLocation, point);

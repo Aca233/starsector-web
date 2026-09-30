@@ -1,8 +1,4 @@
-import { nativeShipToRuntime } from './NativeShipCoordinates';
 import { normalizeSourceCapabilities } from './SourceCapabilities';
-import presentation from './PresentationPolicy';
-import sourceShips from './generated/ships.json';
-import loadouts from './generated/loadouts.json';
 import type { ShipSpec } from '../content/ShipSpec';
 export interface SandboxLoadout {
   weapons: Record<string,string>;
@@ -23,6 +19,4 @@ export function assembleShip(source: ShipSpec, loadout?: SandboxLoadout): ShipSp
     defaultWeaponGroups: structuredClone(loadout?.groups ?? source.defaultWeaponGroups)
   });
 }
-export function builtInShips(): ShipSpec[] {
-  return Object.values(sourceShips).map(raw=>nativeShipToRuntime(assembleShip({...raw, ...(presentation.ships as unknown as Record<string, Partial<ShipSpec>>)[raw.id]} as ShipSpec, (loadouts as Record<string,SandboxLoadout>)[raw.id])));
-}
+export function builtInShips(): ShipSpec[] { return []; }

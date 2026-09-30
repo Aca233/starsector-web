@@ -1,3 +1,18 @@
+import { bundledHullTemplate } from '../engine/content/BundledHullTemplates';
+import { zhefengHulls, zhefengRefit } from '../engine/content/ZhefengPack';
+import { zhefengArmoryRefit } from '../engine/content/ZhefengArmory';
+import { removeRetiredAdunWeapons } from './RetiredAdunWeapons';
+import { migrateGlorianaWeaponTiers } from './GlorianaTierMigration';
+import { gravityHulls, gravityRefit } from '../engine/content/GravityPack';
+import { gravityArmoryRefit } from '../engine/content/GravityArmory';
+import { rocinanteHulls, rocinanteRefit } from '../engine/content/RocinantePack';
+import { rocinanteArmoryRefit } from '../engine/content/RocinanteArmory';
+import { arkHulls, arkRefit } from '../engine/content/AdunArkPack';
+import { arkArmoryRefit } from '../engine/content/AdunArkArmory';
+import { arkWings } from '../engine/content/AdunArkAviation';
+import { ADUN_HULL_ID as RETIRED_ADUN_HULL_ID } from '../engine/content/SpearOfAdunIds';
+import { ADUN_ARK_ID } from '../engine/content/AdunArkIds';
+import { WEAPON_SIZE_LABELS, WEAPON_SIZE_RANK, weaponFitsSlotSize } from '../engine/content/WeaponSizes';
 import { resolveSystemId, shipSystemDefinitions } from '../engine/extensions/ship-systems/Registry';
 import { systemLoadoutErrors } from '../engine/extensions/ship-systems/Loadout';
 import { nativeModules } from '../engine/content/ModularVariants';
@@ -6,6 +21,12 @@ import { validCaptainProfile, type CaptainProfile } from "./CaptainProfile";
 import { combatSkillErrors } from "../engine/extensions/CombatSkills";
 import type { CombatSkillLoadout } from "../engine/extensions/CombatSkills";
 import { weaponFitsSlotType } from "../engine/content/WeaponCompatibility";
+import { hyperionArmoryRefit } from '../engine/content/HyperionArmory';
+import { hyperionHulls, hyperionRefit } from '../engine/content/HyperionPack';
+import { glorianaAviationRefit } from '../engine/content/GlorianaAviation';
+import { glorianaArmoryRefit } from '../engine/content/GlorianaArmory';
+import { zhuYuanHulls, zhuYuanRefit } from "../engine/content/ZhuYuanPack";
+import { GLORIANA_HULL_ID, glorianaHulls, glorianaRefit } from "../engine/content/GlorianaPack";
 import sourceShips from "../engine/data/generated/ships.json";
 import refitData from "./refit-data.json";
 import importedRefit from "../engine/data/generated/refit-source.json";
@@ -22,11 +43,19 @@ import { i18n } from "../engine/i18n/LocalizationManager";
 
 export interface RefitWing {
   tags?: string[];
+  description?: string;
   specId: string; role: 'FIGHTER' | 'BOMBER'; count: number; rebuildSeconds: number; op: number; name: string;
   displayName?: string; sourceRole?: string; roleDescription?: string; range?: number | null; formation?: string; category?: 'INTERCEPTOR' | 'FIGHTER' | 'BOMBER';
 }
 export interface ImportStatus { level: 'supported' | 'approximate' | 'unsupported'; reasons: string[]; }
-export const nativeRefit = importedRefit as unknown as {
+export const nativeRefit = {
+  ...importedRefit,
+  ships: { ...importedRefit.ships, ...zhuYuanRefit.ships, ...glorianaRefit.ships, ...hyperionRefit.ships, ...arkRefit.ships, ...rocinanteRefit.ships, ...zhefengRefit.ships, ...gravityRefit.ships },
+  weapons: { ...importedRefit.weapons, ...zhuYuanRefit.weapons, ...glorianaArmoryRefit.weapons, ...glorianaAviationRefit.weapons, ...hyperionArmoryRefit.weapons, ...arkArmoryRefit.weapons, ...rocinanteArmoryRefit.weapons, ...zhefengArmoryRefit.weapons, ...gravityArmoryRefit.weapons },
+  wings: { ...importedRefit.wings, ...glorianaAviationRefit.wings, ...arkWings },
+  shipStatus: { ...importedRefit.shipStatus, ...zhuYuanRefit.shipStatus, ...glorianaRefit.shipStatus, ...hyperionRefit.shipStatus, ...arkRefit.shipStatus, ...rocinanteRefit.shipStatus, ...zhefengRefit.shipStatus, ...gravityRefit.shipStatus },
+  weaponStatus: { ...importedRefit.weaponStatus, ...zhuYuanRefit.weaponStatus, ...glorianaArmoryRefit.weaponStatus, ...hyperionArmoryRefit.weaponStatus, ...arkArmoryRefit.weaponStatus, ...rocinanteArmoryRefit.weaponStatus, ...zhefengArmoryRefit.weaponStatus, ...gravityArmoryRefit.weaponStatus },
+} as unknown as {
   hullmods?: Record<string, {name: string; implemented: boolean; support?: HullModSupport}>;
   sourceBuiltInMods?: Record<string, string[]>;
   sourceBuiltInWings?: Record<string, string[]>;
@@ -69,11 +98,7 @@ export const editableMods = hullModDefinitions.all()
 export const modDescriptions: Record<string, string> = Object.fromEntries(
   hullModDefinitions.all().map(mod => [mod.id, mod.description ?? "尚未实现"]),
 );
-export const sizes: Record<string, string> = {
-  SMALL: "小型",
-  MEDIUM: "中型",
-  LARGE: "大型",
-};
+export const sizes = WEAPON_SIZE_LABELS;
 export const types: Record<string, string> = {
   BALLISTIC: "实弹",
   ENERGY: "能量",
@@ -148,7 +173,7 @@ export const baseHull = (id: string): ShipSpec | undefined => {
   return hull?.hullSize === 'FIGHTER' ? undefined : hull;
 };
 export const nativeHull = (id: string): ShipSpec =>
-  (sourceShips as unknown as Record<string, ShipSpec>)[id];
+  (sourceShips as unknown as Record<string, ShipSpec>)[id] ?? zhuYuanHulls[id] ?? glorianaHulls[id] ?? hyperionHulls[id] ?? arkHulls[id] ?? rocinanteHulls[id] ?? zhefengHulls[id] ?? gravityHulls[id];
 export const isBuiltIn = (hullId: string, slotId: string) =>
   !!nativeHull(hullId)?.weaponSlots.find((s) => s.slotId === slotId)
     ?.defaultWeaponId;
@@ -158,8 +183,7 @@ export function compatibility(
   slot: WeaponMountSlotConfig,
   weapon: WeaponSpec,
 ): string | null {
-  const ranks: Record<string, number> = { SMALL: 1, MEDIUM: 2, LARGE: 3 };
-  if (ranks[weapon.mountSize] > ranks[slot.slotSize]) return "超过挂点尺寸";
+  if (!weaponFitsSlotSize(slot.slotSize, weapon.mountSize)) return `尺寸不符：${WEAPON_SIZE_LABELS[slot.slotSize]}挂点只接受同尺寸武器（当前为${WEAPON_SIZE_LABELS[weapon.mountSize]}）`;
   if (!weaponFitsSlotType(slot.weaponType, weapon)) return "挂点类型不兼容";
   if (weapon.id === "tpc" || nativeRefit.weapons[weapon.id]?.builtInOnly || weapon.weaponType === undefined) return "舰体内置武器，不可外装";
   return null;
@@ -184,7 +208,7 @@ export function builtInWingIds(hullId: string): string[] {
 export function designFighterBays(d: Design): number { return effectiveFighterBays(designHullSpec(d)); }
 export function designWingSlots(d: Design): (string | null)[] {
   const hull = baseHull(d.hullId)!;
-  const legacy = () => (hull.fighterWings ?? []).map(wing => Object.entries(nativeRefit.wings ?? {})
+  const legacy = () => ((bundledHullTemplate(d.hullId) ?? hull).fighterWings ?? []).map(wing => Object.entries(nativeRefit.wings ?? {})
     .find(([, entry]) => entry.specId === wing.specId && entry.count === wing.count)?.[0] ?? null);
   const configured = d.wings ?? legacy();
   const builtins = builtInWingIds(d.hullId);
@@ -223,135 +247,26 @@ export function budget(d: Design) {
     wingOP,
   };
 }
+/** New hulls never inherit a preset. Legacy mode arguments both mean empty.
+ * This only creates new drafts; saved designs/imports keep their explicit equipment. */
 export function createDesign(
-  hullId = "paragon",
-  mode: "standard" | "empty" = "standard",
+  hullId = "web_zhuyuan",
+  _mode: "standard" | "empty" = "empty",
 ): Design {
   const hull = baseHull(hullId);
   if (!hull) throw new Error("当前舰体不支持改装。");
-  const groups: Group[] = Array.from({ length: 7 }, (_, index) => ({
-    index,
-    weaponSlotIds: [],
-    mode: "LINKED",
-    isAutofire: index > 1,
-  }));
-  for (const g of hull.defaultWeaponGroups ?? [])
-    if (groups[g.index]) groups[g.index] = { ...structuredClone(g) };
-  const equipped: Record<string, string | null> = {};
-  for (const slot of hull.weaponSlots) {
-    equipped[slot.slotId] = slot.defaultWeaponId ?? null;
-    if (
-      slot.defaultWeaponId &&
-      !groups.some((g) => g.weaponSlotIds.includes(slot.slotId))
-    )
-      groups[0].weaponSlotIds.push(slot.slotId);
-  }
   const d: Design = {
-    version: 1,
-    id: randomId(),
-    name: `${data.ships[hullId].name} · 方案 01`,
-    hullId,
-    weapons: equipped,
-    hullMods: (hull.hullMods ?? []).filter((id) => editableMods.includes(id)),
-    sMods: [...(hull.sMods ?? [])],
-    wings: (hull.fighterWings ?? []).flatMap(wing => {
-      const match = Object.entries(nativeRefit.wings ?? {}).find(([, entry]) => entry.specId === wing.specId && entry.count === wing.count);
-      return match ? [match[0]] : [];
-    }),
-    capacitors: 0,
-    vents: 0,
-    groups,
+    version: 1, id: randomId(), name: `${data.ships[hullId].name} · 方案 01`, hullId,
+    weapons: Object.fromEntries(hull.weaponSlots.map(slot => [slot.slotId,
+      isBuiltIn(hullId, slot.slotId) ? slot.defaultWeaponId ?? null : null])),
+    hullMods: [], sMods: [], wings: [...builtInWingIds(hullId)], capacitors: 0, vents: 0,
+    groups: Array.from({ length: 7 }, (_, index) => ({ index, weaponSlotIds: [], mode: "LINKED", isAutofire: index > 1 })),
     updatedAt: Date.now(),
   };
-  // Imported hulls start from their own native loadout, never the three curated demo fits.
-  if (mode === "standard" && !["paragon", "onslaught", "doom"].includes(hullId)) {
-    d.hullMods = d.hullMods.filter(id => !modReason(d, id));
-    // Source variants may include unimplemented equipment; only preserve valid fitted weapons.
-    for (const slot of hull.weaponSlots) {
-      const id = d.weapons[slot.slotId];
-      if (!isBuiltIn(hullId, slot.slotId) && id) {
-        const w = contentRegistry.getWeapon(id);
-        if (!w || !data.weapons[id] || compatibility(slot, w)) d.weapons[slot.slotId] = null;
-      }
-    }
-    if (budget(d).remaining < 0) {
-      // Don't silently trim a native fit to disguise source OP discrepancies. Keep it visible for editing.
-      d.groups = autoGroups(d);
-      return d;
-    }
-    d.groups = autoGroups(d);
-    return d;
-  }
-  // A new build can start completely empty. The suggested fits use only bundled,
-  // simulated weapons, not unsupported original variants represented by placeholders.
-  for (const slot of hull.weaponSlots) {
-    if (!isBuiltIn(hullId, slot.slotId)) d.weapons[slot.slotId] = null;
-  }
-  d.hullMods = [];
-  d.sMods = [];
-  d.wings = [...builtInWingIds(hullId)];
-  if (mode === "standard") {
-    d.hullMods =
-      hullId === "paragon"
-        ? [
-            "stabilizedshieldemitter",
-            "hardenedshieldemitter",
-            "fluxbreakers",
-            "fluxdistributor",
-          ]
-        : hullId === "onslaught"
-          ? ["targetingunit", "fluxbreakers"]
-          : ["fluxbreakers"];
-    const slots = [...hull.weaponSlots].sort(
-      (a, b) =>
-        ({ LARGE: 0, MEDIUM: 1, SMALL: 2 })[a.slotSize] -
-        { LARGE: 0, MEDIUM: 1, SMALL: 2 }[b.slotSize],
-    );
-    for (const slot of slots) {
-      if (isBuiltIn(hullId, slot.slotId)) continue;
-      let id: string;
-      if (slot.weaponType === "MISSILE")
-        id =
-          slot.slotSize === "SMALL"
-            ? "atropos_single"
-            : hullId === "doom"
-              ? "typhoon"
-              : "annihilatorpod";
-      else if (slot.weaponType === "BALLISTIC")
-        id =
-          slot.slotSize === "LARGE"
-            ? "mark9"
-            : slot.slotSize === "SMALL"
-              ? "lightmg"
-              : slot.x > 100
-                ? "heavymauler"
-                : "flak";
-      else if (slot.slotSize === "LARGE")
-        id = slot.x > 100 ? "tachyonlance" : "autopulse";
-      else if (slot.slotSize === "MEDIUM")
-        id =
-          slot.weaponType === "UNIVERSAL"
-            ? "hveldriver"
-            : slot.x < 0
-              ? "taclaser"
-              : hullId === "doom"
-                ? "heavyblaster"
-                : "gravitonbeam";
-      else id = "pdburst";
-      const weapon = contentRegistry.getWeapon(id)!;
-      if (
-        !compatibility(slot, weapon) &&
-        budget(d).remaining - weaponOPCost(d, id) >=
-          Math.min(20, fluxLimit(hullId))
-      )
-        d.weapons[slot.slotId] = id;
-    }
-    d.vents = Math.max(0, Math.min(fluxLimit(hullId), budget(d).remaining));
-    d.capacitors = Math.max(
-      0,
-      Math.min(fluxLimit(hullId), budget(d).remaining),
-    );
-  }
+  // Explicit empty child drafts distinguish new builds from legacy saves whose
+  // omitted modules meant "inherit the historical authored module fit".
+  if (hull.modules?.length) d.modules = Object.fromEntries(hull.modules.map(module =>
+    [module.slotId, { ...createDesign(module.spec.id, "empty"), sourceVariantId: module.spec.sourceVariantId }]));
   d.groups = autoGroups(d);
   return d;
 }
@@ -392,12 +307,16 @@ function evaluateAssembly(d: Design, template: ShipSpec | undefined, state: { co
   if (!d.name.trim()) errors.push("请填写方案名称");
   if (op.remaining < 0) errors.push(`装配点超出 ${-op.remaining} OP`);
   if (d.capacitors > fluxLimit(d.hullId) || d.vents > fluxLimit(d.hullId))
-    errors.push("幅能配置超过舰体上限");
+    errors.push("载荷配置超过舰体上限");
   for (const id of d.hullMods) {
     const reason = modReason(d, id);
     if (reason) errors.push(reason);
   }
   const spec = structuredClone(hull);
+  if (d.modules === undefined) {
+    const historical = bundledHullTemplate(d.hullId);
+    if (historical?.modules?.length) spec.modules = historical.modules;
+  }
   spec.maxFlux =
     nativeHull(d.hullId).maxFlux + d.capacitors * data.fluxPerCapacitor;
   spec.fluxDissipation =
@@ -481,7 +400,7 @@ function decodeAssembly(input: unknown, template: ShipSpec | undefined, state: {
   if (depth > 8 || ++state.count > 128) throw new Error("模块编组超过限制。");
   if (!input || typeof input !== "object")
     throw new Error("方案不是有效对象。");
-  const d = input as Design;
+  let d = input as Design;
   if (d.sourceVariantId !== undefined && (typeof d.sourceVariantId !== "string" || !/^[a-zA-Z0-9_-]{1,160}$/.test(d.sourceVariantId))) throw new Error("原生方案身份无效。");
   if (
     d.version !== 1 ||
@@ -498,7 +417,7 @@ function decodeAssembly(input: unknown, template: ShipSpec | undefined, state: {
       (n) => Number.isInteger(n) && n >= 0 && n <= fluxLimit(d.hullId),
     )
   )
-    throw new Error("幅能配置无效。");
+    throw new Error("载荷配置无效。");
   if (!d.weapons || typeof d.weapons !== "object" || Array.isArray(d.weapons))
     throw new Error("武器配置无效。");
   const hull = baseHull(d.hullId)!;
@@ -514,6 +433,11 @@ function decodeAssembly(input: unknown, template: ShipSpec | undefined, state: {
       if (["__proto__", "prototype", "constructor"].includes(slot) || !mount) throw new Error("模块挂点不存在：" + slot);
       decodedModules[slot] = decodeAssembly(child, mount.spec, state, depth + 1);
     }
+  }
+  // Exact pre-carrier Gloriana schema: retain M09 and user groups/modules; new
+  // equipment stays empty. Do not relax the slot validator for other hulls.
+  if (d.hullId === GLORIANA_HULL_ID && Object.keys(d.weapons).length === 1 && Object.hasOwn(d.weapons, 'M09')) {
+    d = { ...d, wings: d.wings ?? [], weapons: Object.fromEntries(hull.weaponSlots.map(slot => [slot.slotId, slot.slotId === 'M09' ? d.weapons.M09 : null])) };
   }
   const slots = new Set(hull.weaponSlots.map((s) => s.slotId));
   if (
@@ -533,8 +457,9 @@ function decodeAssembly(input: unknown, template: ShipSpec | undefined, state: {
     } else if (id !== null) {
       const w =
         typeof id === "string" ? contentRegistry.getWeapon(id) : undefined;
-      if (!w || !data.weapons[id!] || compatibility(slot, w))
-        throw new Error("方案包含不兼容武器。");
+      if (!w || !data.weapons[id!]) throw new Error(`方案包含不兼容武器：${slot.slotId} 武器不可用。`);
+      const reason = compatibility(slot, w);
+      if (reason) throw new Error(`方案包含不兼容武器：${slot.slotId} ${reason}。`);
     }
   }
   if (
@@ -619,21 +544,49 @@ export function readLibrary(): {
       value.designs.length > 100
     )
       throw new Error("不支持的方案库版本");
-    const designs = value.designs.map(decodeDesign);
+    // Only the user-retired hull is removed. Other unknown/corrupt entries must still fail closed.
+    const retired = (d: unknown) => !!d && typeof d === 'object' && (d as { hullId?: unknown }).hullId === RETIRED_ADUN_HULL_ID;
+    const retiredDraft = retired(value.draft);
+    const retained = value.designs.filter((d: unknown) => !retired(d));
+    const hasRetired = retiredDraft || retained.length !== value.designs.length;
+    let tierRemovals = 0, retiredWeaponRemovals = 0;
+    const migrateEquipment = (entry: unknown) => {
+      const retiredWeapons = removeRetiredAdunWeapons(entry);
+      retiredWeaponRemovals += retiredWeapons.removed;
+      const migrated = migrateGlorianaWeaponTiers(retiredWeapons.value, baseHull, id => contentRegistry.getWeapon(id));
+      tierRemovals += migrated.removed;
+      return migrated.value;
+    };
+    const designs = retained.map((entry: unknown) => decodeDesign(migrateEquipment(entry)));
     if (new Set(designs.map((d: Design) => d.id)).size !== designs.length)
       throw new Error("方案 ID 重复");
-    const draft = decodeDesign(value.draft);
-    const baseline = value.baseline
-      ? decodeDesign(value.baseline)
+    const draft = retiredDraft ? createDesign(ADUN_ARK_ID) : decodeDesign(migrateEquipment(value.draft));
+    const baseline = !retiredDraft && value.baseline
+      ? decodeDesign(migrateEquipment(value.baseline))
       : { ...createDesign(draft.hullId), id: draft.id };
     if (
       baseline &&
       (baseline.id !== draft.id || baseline.hullId !== draft.hullId)
     )
       throw new Error("草稿编辑基准不匹配");
+    // Backup exact bytes BEFORE allowing the existing autosave path to replace the library.
+    // Repeated reads reuse the same backup; a different original never overwrites it.
+    for (const suffix of [hasRetired ? ':removed:' + RETIRED_ADUN_HULL_ID : null,
+      retiredWeaponRemovals ? ':removed:web_adun_armory' : null,
+      tierRemovals ? ':backup:gloriana-weapon-tiers-20260929' : null].filter((s): s is string => s !== null)) {
+      const prefix = storageKey + suffix;
+      let key = prefix, existing = localStorage.getItem(key), backupIndex = 0;
+      while (existing !== null && existing !== raw) {
+        key = prefix + ':' + (++backupIndex); existing = localStorage.getItem(key);
+      }
+      if (existing === null) localStorage.setItem(key, raw);
+      if (localStorage.getItem(key) !== raw) throw new Error('原方案库备份未完成');
+    }
     return {
       library: { version: 1, draft, designs, baseline },
-      error: null,
+      error: [retiredWeaponRemovals ? '旧版亚顿军械已下架；原方案库已完整备份，仅卸下旧武器及其分组引用，不替换为新版。' : null,
+        hasRetired ? '旧版亚顿之矛已移除；原方案库已另存为浏览器备份，其它方案保留。' : null,
+        tierRemovals ? '女王号舰载军械已升一档；原方案库已完整备份，仅清空不再同档兼容的武器及其分组，不替换其它装备。' : null].filter(Boolean).join(' ') || null,
       protected: false,
       observedRaw: raw,
     };
@@ -646,6 +599,7 @@ export function readLibrary(): {
     };
   }
 }
+export const designLibraryChangedEvent = 'starsector-design-library-changed';
 export class DesignLibraryConflictError extends Error {
   constructor() { super('另一页面修改了方案库。本页已暂停写入，请先导出当前方案，再刷新。'); }
 }
@@ -657,6 +611,7 @@ export function writeLibrary(library: DesignLibrary, observedRaw: string | null)
   if (raw.length > 2_000_000 || library.designs.length > 100) throw new Error('方案库超过保存上限，请先导出备份。');
   if (localStorage.getItem(storageKey) !== observedRaw) throw new DesignLibraryConflictError();
   localStorage.setItem(storageKey, raw);
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(designLibraryChangedEvent));
   return raw;
 }
 
@@ -678,7 +633,7 @@ export function autoGroups(d: Design): Group[] {
       ? 3
       : w.weaponType === "MISSILE"
         ? 1
-        : w.mountSize === "LARGE"
+        : WEAPON_SIZE_RANK[w.mountSize] >= WEAPON_SIZE_RANK.LARGE
           ? 0
           : 2;
     groups[index].weaponSlotIds.push(slotId);
@@ -687,6 +642,7 @@ export function autoGroups(d: Design): Group[] {
 }
 
 export function weaponFluxPerSecond(w: WeaponSpec): number {
+  if (w.gravityTractor) return w.gravityTractor.fluxPerSecond + (w.gravityTractor.tidalFluxPerSecond ?? 0);
   if (w.isBeam) {
     if (w.beamVisualMode !== "BURST") return w.fluxPerSecond ?? 0;
     const active = (w.beamSourceChargeupTime ?? 0) + (w.beamDuration ?? 0);
@@ -709,7 +665,7 @@ export function designModules(d: Design, template?: ShipSpec) {
   if (template) return template.modules ?? [];
   const hull = baseHull(d.hullId);
   return hull?.moduleSlots?.length && d.sourceVariantId
-    ? nativeModules(d.hullId, d.sourceVariantId) : hull?.modules ?? [];
+    ? nativeModules(d.hullId, d.sourceVariantId) : (d.modules === undefined ? bundledHullTemplate(d.hullId)?.modules : undefined) ?? hull?.modules ?? [];
 }
 
 /** Recover the exact imported module fit, including flux investments and groups. */

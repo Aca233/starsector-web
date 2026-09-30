@@ -1,3 +1,4 @@
+import { DisplayDefinitionRequest, type DisplayDefinitionCapture } from './DisplayDefinitionCapture';
 /** Authority-side read projection. This is the only LAN ship module that reads
  * simulation components; the receiver never reconstructs their classes. */
 import type { Ship } from '../../engine/simulation/Ship';
@@ -6,7 +7,7 @@ import type { ShipSystem } from '../../engine/simulation/ShipSystem';
 import { RenderShipProjection, renderShipFields, renderEngineStatusFields } from '../../engine/runtime/local/RenderShipProjection';
 import { shipPresentationPose } from '../../engine/visual/ShipPresentation';
 import { combatWeaponRange, combatProjectileSpeed } from '../../engine/simulation/WeaponRange';
-import { pulsePusherOffset } from '../../engine/extensions/ship-systems/PulseDrive';
+import { pulsePusherOffset } from '../../engine/extensions/ship-systems/PulseDriveState';
 import { WEAPON_FLAGS, WEAPON_NUMBERS } from '../WeaponPresentationState.mjs';
 import { weaponPresentationAngle } from '../../engine/visual/WeaponPresentation';
 
@@ -14,14 +15,14 @@ const shipKeys = ['shipName','isPlayer','currentCR','maxHullHp','retreating','si
  'throttle','brakeInput','strafeInput','turnInput','peakPerformanceRemaining','combatWeaponRepairTimeMultiplier','fighterRecall',
  'teleportCameraOffset','teleportSequence','subjectiveTimeMultiplier','aimTargetWorld','flightDeckWingId','defenseFacingRad','aiHoldOffensiveFire','isSystemDrone'] as const;
 const systemKeys = ['name','type','description','state','available','disabled','isActive','isCoolingDown','cooldownTimer',
- 'activationFailureReason','charges','maxCharges','statusText','activationSerial','effectLevel','fortressVisualLevel','teleportVisual',
+ 'activationFailureReason','charges','maxCharges','statusText','passiveStatusText','activationSerial','effectLevel','fortressVisualLevel','teleportVisual',
  'forcesAutofire','blocksWeapons','forcesForward','locksTurning','forcesBraking','blocksAcceleration','blocksStrafing','isPhased'] as const;
-const shieldKeys = ['type','phaseState','radius','maxArcDeg','currentArcDeg','facingAngleRad','targetFacingAngleRad','isActive',
+const shieldKeys = ['voidShield','type','phaseState','radius','maxArcDeg','currentArcDeg','facingAngleRad','targetFacingAngleRad','isActive',
  'toggleLocked','pendingRaise','closeTimeRemaining','unfoldRateMultiplier','phaseEffectLevel','phaseStageTimer','phaseCooldownDuration','phaseMinSpeedFluxThresholdMultiplier'];
 const fluxKeys = ['softFlux','hardFlux','maxFlux','isOverloaded','isVenting','overloadTimer','overloadDuration','ventProgress','isEngineBoostActive','hullSize'] as const;
 const armorKeys = ['cols','rows','minX','minY','cellWidth','cellHeight','maxCellArmor','dirtyVersion'] as const;
 const mountKeys = [...new Set(['slotId','relativePos','mountType','arcDeg','baseAngleDeg','currentAngleRad','currentSpreadDeg','glowAlpha','recoil',
- 'ammo','barrelIndex','burstRemaining','cooldownTimer','firingState','isDisabled','isPermanentlyDisabled','reloadDelayRemaining','disabledTimer',...WEAPON_FLAGS,...WEAPON_NUMBERS])];
+ 'loadedMissileLevels','ammo','barrelIndex','burstRemaining','cooldownTimer','firingState','isDisabled','isPermanentlyDisabled','reloadDelayRemaining','disabledTimer','gravityTractor','gravityDeflection',...WEAPON_FLAGS,...WEAPON_NUMBERS])];
 const weaponTypes:readonly SystemWeaponType[]=['BALLISTIC','ENERGY','MISSILE'];
 // Keep v1 wire field order exactly, without constructing renderer components
 // which the LAN projection immediately replaces. Shared lists keep base pose
@@ -30,6 +31,7 @@ const baseKeys=renderShipFields.filter(key=>key!=='phaseVisualAlpha');
 const visualKeys=['shield','flux','armor','engineController','engineStatuses','weapons','weaponGroups','system','allSystems','sourceCarrier','presentationPose'];
 export class LanShipProjection {
  private readonly render=new RenderShipProjection();
+ private definitions?: DisplayDefinitionCapture;
  // These are scratch read models, never wire snapshots. Stable identities let
  // native capture reuse its field plans, while every retained field is sampled
  // on every projection (including undefined and in-place metadata edits).
@@ -46,8 +48,9 @@ export class LanShipProjection {
   for(const key of keys)row[key]=Reflect.get(source,key);
   return row;
  }
- begin():void {this.render.begin();}
- finish():void {this.render.finish();}
+ begin(definitions?:DisplayDefinitionCapture):void {this.definitions=definitions;this.render.begin();}
+ finish():void {this.definitions=undefined;this.render.finish();}
+ private definition(value:object):unknown {return this.definitions?new DisplayDefinitionRequest(value,this.definitions):value;}
  project(ship:Ship):object {
   if(!this.render.supports([ship]))throw Error('LAN display projection requires an authority-side adapter for custom ship readers');
   // system/systems/allSystems often name the same native component. Sample
@@ -56,7 +59,9 @@ export class LanShipProjection {
   const system=(value:ShipSystem)=>{
    const prior=systems.get(value);if(prior)return prior;
    const row=this.pick(value,systemKeys,['definitionData','pulseOffset','fluxCosts','fireRates','fireSlots']);
-   Object.assign(row,{definitionData:this.pick(value.definition,['visuals','audio','charges']),
+   if (value.definition.gravityField || value.definition.gravityCollapse) row.gravityField = value.gravityField;
+   if (value.definition.gravityManeuver) row.gravityManeuver = value.gravityManeuver;
+   Object.assign(row,{definitionData:this.definition(this.pick(value.definition,['visuals','audio','charges'])),
     pulseOffset:pulsePusherOffset(value),
     fluxCosts:Object.fromEntries(weaponTypes.map(type=>[type,value.getWeaponFluxCostMultiplier(type)])),
     fireRates:Object.fromEntries(weaponTypes.map(type=>[type,value.getWeaponRateOfFireMultiplier(type)])),
@@ -76,7 +81,7 @@ export class LanShipProjection {
    externalPhased:phases.length>0,externalPhaseAlpha:phases.length?Math.min(...phases.map(alpha=>Math.max(0,Math.min(1,alpha)))):undefined,
    phaseAlphaMultiplier:ship.runtimeModifiers.value.visualAlphaMultiplier??1,
    system:system(ship.system),systems:ship.systems.map(system),allSystems:ship.allSystems.map(system),defenseSystem:ship.defenseSystem?system(ship.defenseSystem):undefined,
-   weapons:ship.weapons.map(mount=>Object.assign(this.pick(mount,mountKeys,['weaponSpec','displayRange','displaySpeed','presentationRelativeAngle']),{weaponSpec:mount.spec,displayRange:combatWeaponRange(ship,mount.spec),
+   weapons:ship.weapons.map(mount=>Object.assign(this.pick(mount,mountKeys,['weaponSpec','displayRange','displaySpeed','presentationRelativeAngle']),{weaponSpec:this.definition(mount.spec),displayRange:combatWeaponRange(ship,mount.spec),
     displaySpeed:combatProjectileSpeed(ship,mount.spec),presentationRelativeAngle:weaponPresentationAngle(mount,0)})),
    sourceCarrier:ship.sourceCarrier,parentShip:ship.parentShip,childModules:ship.childModules,assemblyShips:ship.assemblyShips,
   };

@@ -58,10 +58,10 @@ const sizeNames: Record<string, string> = {
   SMALL: "小型", MEDIUM: "中型", LARGE: "大型", BALLISTIC: "实弹", ENERGY: "能量", MISSILE: "导弹",
 };
 const fieldNames: Record<string, string> = {
-  cooldown: "冷却时间", "max uses": "最大使用次数", regen: "充能恢复", "charge up": "启动时间", active: "持续时间", down: "关闭时间", "flux/second": "每秒幅能", "flux/use": "单次幅能",
+  cooldown: "冷却时间", "max uses": "最大使用次数", regen: "充能恢复", "charge up": "启动时间", active: "持续时间", down: "关闭时间", "flux/second": "每秒载荷", "flux/use": "单次载荷",
   name: "名称", id: "标识", designation: "舰种", "tech/manufacturer": "科技 / 制造商",
   "system id": "舰船系统", "defense id": "防御系统", "fleet pts": "部署点数", hitpoints: "结构值",
-  "armor rating": "装甲", "max flux": "幅能容量", "flux dissipation": "幅能耗散", "ordnance points": "装配点数",
+  "armor rating": "装甲", "max flux": "载荷容量", "flux dissipation": "载荷耗散", "ordnance points": "装配点数",
   "fighter bays": "机库", "max speed": "最高航速", acceleration: "加速度", deceleration: "减速度",
   "max turn rate": "转向速率", "turn acceleration": "转向加速度", mass: "质量", "shield type": "护盾类型",
   "shield arc": "护盾覆盖角", "shield upkeep": "护盾维持", "shield efficiency": "护盾效率",
@@ -69,14 +69,14 @@ const fieldNames: Record<string, string> = {
   "max burn": "巡航速度", "base value": "基础价值", "peak CR sec": "峰值作战时间", "supplies/mo": "每月补给",
   range: "射程 / 作战范围", "damage/second": "每秒伤害", "damage/shot": "单发伤害", emp: "电磁伤害",
   "turn rate": "转向速率", OPs: "装配点数", ammo: "弹药", "ammo/sec": "弹药再生", type: "类型",
-  "energy/shot": "单发幅能", "energy/second": "每秒幅能", "burst size": "连发数量", "burst delay": "连发间隔",
+  "energy/shot": "单发载荷", "energy/second": "每秒载荷", "burst size": "连发数量", "burst delay": "连发间隔",
   "proj speed": "弹丸速度", "flight time": "飞行时间", "proj hitpoints": "弹丸结构", tags: "标签",
   tier: "等级", rarity: "稀有度", "op cost": "装配点数", num: "编队数量", role: "职责", "role desc": "职责说明",
   variant: "战机装配方案", formation: "队形", refit: "整备时间", uiTags: "界面标签", script: "原生脚本",
   cost_frigate: "护卫舰 OP", cost_dest: "驱逐舰 OP", cost_cruiser: "巡洋舰 OP", cost_capital: "主力舰 OP",
   desc: "原始说明", short: "简述", sModDesc: "永久插件说明", hullId: "舰体", hullSize: "舰体级别",
   systemId: "系统", spriteName: "贴图", sprite: "贴图", projectileSpecId: "弹丸定义", displayName: "显示名称",
-  fluxCapacitors: "幅能容器", fluxVents: "幅能耗散器", builtInMods: "内置插件", builtInWeapons: "内置武器",
+  fluxCapacitors: "载荷容器", fluxVents: "载荷耗散器", builtInMods: "内置插件", builtInWeapons: "内置武器",
   builtInWings: "内置联队", hullMods: "船体插件", permaMods: "永久插件", sMods: "S 插件", modules: "模块",
   weaponGroups: "武器编组", weaponSlots: "武器槽", sourcePath: "来源路径", baseHullId: "基础舰体",
 };
@@ -144,7 +144,7 @@ function makeIndex() {
   for (const entry of byKind.variants) {
     const hull = byId.ships.get(text(entry.spec.hullId));
     if (hull) entry.name = `${hull.name} · ${entry.name}`;
-    if (hull && has(runtime.ships, hull.id) && hull.hullSize !== "FIGHTER") entry.status = {level: "approximate", reasons: ["可转换载入 Web 改装：保留可用武器、编组与幅能投资。未适配插件、联队或特殊机制会在载入前逐项提示并要求确认；不代表无损还原。"]};
+    if (hull && has(runtime.ships, hull.id) && hull.hullSize !== "FIGHTER") entry.status = {level: "approximate", reasons: ["可转换载入 Web 改装：保留可用武器、编组与载荷投资。未适配插件、联队或特殊机制会在载入前逐项提示并要求确认；不代表无损还原。"]};
   }
   for (const entry of byKind.wings) {
     const variant = byId.variants.get(text(entry.stats.variant));

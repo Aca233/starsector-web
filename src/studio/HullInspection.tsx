@@ -28,18 +28,18 @@ function HullBaselineInformation({ spec, unavailable }: { spec: ShipSpec; unavai
   const number = (value: number) => Number(value.toFixed(2));
   return <>
     <p className="equipment-state">{name?.designation ?? spec.designation ?? spec.id}{name?.manufacturer ? ' · ' + name.manufacturer : ''}</p>
-    <p className="refit-inspection-note">舰体基准：含已接入的内置插件，不含外装、幅能投资、舰长技能或临时系统效果。不是当前改装方案。{!spec.isModuleHull && '悬停只查看，点击才切换舰船。'}</p>
+    <p className="refit-inspection-note">舰体基准：含已接入的内置插件，不含外装、载荷投资、舰长技能或临时系统效果。不是当前改装方案。{!spec.isModuleHull && '悬停只查看，点击才切换舰船。'}</p>
     {unavailable && <p className="refit-inspection-warnings">当前不可选择：{unavailable}</p>}
     <dl className="refit-hull-baseline">
       <div><dt><RefitHoverTerm term="armor">舰体装甲</RefitHoverTerm></dt><dd>{number(stats.armorRating)}</dd></div>
       <div><dt><RefitHoverTerm term="hull">舰体结构</RefitHoverTerm></dt><dd>{number(stats.hitpoints)}</dd></div>
       <div><dt><RefitHoverTerm term="speed">最高航速</RefitHoverTerm></dt><dd>{number(stats.maxSpeed)}</dd></div>
-      <div><dt><RefitHoverTerm term="capacity">幅能容量</RefitHoverTerm></dt><dd>{number(stats.maxFlux)}</dd></div>
-      <div><dt><RefitHoverTerm term="dissipation">幅能耗散 / 秒</RefitHoverTerm></dt><dd>{number(stats.fluxDissipation)}</dd></div>
+      <div><dt><RefitHoverTerm term="capacity">载荷容量</RefitHoverTerm></dt><dd>{number(stats.maxFlux)}</dd></div>
+      <div><dt><RefitHoverTerm term="dissipation">载荷耗散 / 秒</RefitHoverTerm></dt><dd>{number(stats.fluxDissipation)}</dd></div>
       <div><dt><RefitHoverTerm term={stats.shieldType === 'PHASE' ? 'phase' : 'shieldBasics'}>防御类型</RefitHoverTerm></dt><dd>{stats.shieldType === 'NONE' ? '无常规护盾' : stats.shieldType === 'PHASE' ? '相位装置（非护盾）' : stats.shieldType === 'OMNI' ? '全向护盾' : '前向护盾'}</dd></div>
       {stats.shieldType !== 'NONE' && stats.shieldType !== 'PHASE' && <>
         <div><dt><RefitHoverTerm term="arc">护盾角度</RefitHoverTerm></dt><dd>{number(stats.shieldArcDeg)}°</dd></div>
-        <div><dt><RefitHoverTerm term="shield">幅能 / 伤害</RefitHoverTerm></dt><dd>{number(stats.shieldFluxPerDamage)}</dd></div>
+        <div><dt><RefitHoverTerm term="shield">载荷 / 伤害</RefitHoverTerm></dt><dd>{number(stats.shieldFluxPerDamage)}</dd></div>
       </>}
       <div><dt><RefitHoverTerm term="flightDeck">战机甲板</RefitHoverTerm></dt><dd>{stats.fighterBays}</dd></div>
       <div><dt><RefitHoverTerm term="mount">武器挂点</RefitHoverTerm></dt><dd>{spec.weaponSlots.length}</dd></div>

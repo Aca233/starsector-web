@@ -1,3 +1,13 @@
+import roomCatalog from '../src/network/protocol.json' with {type:'json'};
+import {inspectMultiplayerFixtureSources} from './lib/multiplayer-fixture-source.mjs';
+import {lanRestoreStagePlugin} from './lib/lan-restore-stages.mjs';
+import {postBlockTimelinePlugin,startPostBlockTimeline} from './lib/post-block-timeline.mjs';
+import {inputAdmissionProbePlugin} from './lib/input-admission-probe.mjs';
+import {checkControlMailbox} from './lib/lan-control-mailbox-check.mjs';
+import {presentationMeasurePlugin,beginPresentationMeasure,finishPresentationMeasure} from './lib/lan-presentation-measure.mjs';
+import {checkPresentationJson} from './lib/lan-presentation-json-check.mjs';
+import {studioSummaryPlugin} from './studio-summary-plugin.ts';
+import {checkPresentationPage} from './lib/lan-presentation-page-check.mjs';
 import {sameTickSkipPlugin} from './lib/same-tick-skip-fixture.mjs';
 import {publicationProbePlugin} from './lib/publication-probe.mjs';
 import {steadyFixturePlugin,STEADY_START_TICK,STEADY_END_TICK} from './lib/steady-multiplayer-fixture.mjs';
@@ -18,6 +28,19 @@ import {DesktopLanBridge} from '../server/desktop-lan-bridge.mjs';
 import {parseNetworkConsole} from '../desktop/network-diagnostic-record.mjs';
 import {measuredSamples,recordedStall} from './lib/multiplayer-measurement.mjs';
 const {chromium}=createRequire(import.meta.url)('playwright');
+const measureMode=process.env.MULTIPLAYER_PRESENTATION_MEASURE??'';
+const postBlockTimeline=process.env.MULTIPLAYER_POST_BLOCK_TIMELINE==='true';
+if(postBlockTimeline)assert.equal(measureMode,'main','Post-block diagnosis is main-owner only');
+const restoreStages=process.env.MULTIPLAYER_RESTORE_STAGES==='true';
+if(restoreStages)assert.ok(postBlockTimeline,'Restore stages require the main-owner timeline');
+const inputAdmissionProbe=process.env.MULTIPLAYER_INPUT_ADMISSION_PROBE==='true';
+if(inputAdmissionProbe)assert.ok(measureMode,'Admission diagnosis requires an explicit measurement window');
+assert.ok(['','main','shared','messages'].includes(measureMode));
+if(measureMode)assert.equal(process.env.VITE_LAN_PRESENTATION_WORKER,measureMode==='main'?'false':'true');
+const controlMailboxCheck=process.env.MULTIPLAYER_CONTROL_MAILBOX_CHECK==='true';
+if(controlMailboxCheck)assert.equal(measureMode,'shared');
+const presentationPage=process.env.MULTIPLAYER_PRESENTATION_PAGE==='true';
+if(presentationPage)assert.equal(process.env.VITE_LAN_PRESENTATION_WORKER,'true');
 const steady=process.env.MULTIPLAYER_STEADY_FIXTURE==='true';
 const commandHeld=process.env.MULTIPLAYER_COMMAND_HELD_FIXTURE==='true';
 assert.ok(!commandHeld||steady,'Command-held recovery fixture requires controlled startup');
@@ -32,22 +55,37 @@ if(compiledCss){
  assert.ok((await fs.readFile('dist/index.html','utf8')).includes(path.basename(compiledCss)),'Use the current main stylesheet');
  compiledCssHref='/'+path.relative(process.cwd(),compiledCss).replaceAll('\\','/');
 }
-const tailwind=styled&&!compiledCss?(await import('@tailwindcss/vite')).default:null;
+const frozenCssPath=process.env.MULTIPLAYER_FROZEN_BATTLE_CSS?path.resolve(process.env.MULTIPLAYER_FROZEN_BATTLE_CSS):null;
+if(frozenCssPath)assert.ok(styled&&!compiledCss&&frozenCssPath.startsWith(path.resolve('artifacts')+path.sep),'Frozen style must be a local measured artifact, not a production stylesheet replacement');
+const frozenCss=frozenCssPath?await fs.readFile(frozenCssPath):null;
+const frozenCssSha256=frozenCss?createHash('sha256').update(frozenCss).digest('hex'):null;
+const frozenCssHref=frozenCss?'/__frozen-battle.css':null;
+const tailwind=styled&&!compiledCss&&!frozenCss?(await import('@tailwindcss/vite')).default:null;
 const out=path.resolve(process.env.MULTIPLAYER_OUT??'artifacts/network-stream-20260921/phase17/browser');
 const count=Number(process.env.MULTIPLAYER_PLAYERS??3), duration=Number(process.env.MULTIPLAYER_MS??15000);
 const fixtureSeed=process.env.MULTIPLAYER_SEED===undefined?null:Number(process.env.MULTIPLAYER_SEED);
 assert.ok(fixtureSeed===null||(Number.isSafeInteger(fixtureSeed)&&fixtureSeed>=0&&fixtureSeed<=0xffffffff));
-assert.ok([2,3,4,5].includes(count));assert.ok(duration>=5000&&duration<=120000);
+assert.ok([2,3,4,5].includes(count));if(presentationPage)assert.equal(count,3,'host + Worker guest + irreversible startup fallback guest');assert.ok(duration>=5000&&duration<=120000);
 if(steady){assert.equal(duration,15000);assert.notEqual(fixtureSeed,null);assert.equal(process.env.MULTIPLAYER_WEAPON_FIXTURE,'true');}
+const aiCount=Number(process.env.MULTIPLAYER_AI??(22-count));assert.ok(Number.isInteger(aiCount)&&aiCount>=0&&aiCount<=24);
+const aiHullCycle=process.env.MULTIPLAYER_AI_HULLS?process.env.MULTIPLAYER_AI_HULLS.split(','):roomCatalog.ships.map(hull=>hull.id);
+assert.ok(aiHullCycle.length&&aiHullCycle.every(id=>typeof id==='string'&&id.length>0),'Explicit AI hull cycle required');
+const aiFleet=Array.from({length:aiCount},(_,i)=>aiHullCycle[i%aiHullCycle.length]);
+const aiHulls=[aiFleet.slice(0,Math.floor(aiCount/2)),aiFleet.slice(Math.floor(aiCount/2))];
 await fs.mkdir(out,{recursive:true});
+await fs.writeFile(path.join(out,'fixture-roster.json'),JSON.stringify({players:count,playerDefault:roomCatalog.ships[0].id,aiHullCycle,aiHulls,battleSize:3200},null,2));
+const fixtureSources=await inspectMultiplayerFixtureSources({frozenFile:process.env.MULTIPLAYER_FROZEN,requiredHulls:[...new Set([roomCatalog.ships[0].id,...aiFleet])],expectedAssetManifestSha256:process.env.MULTIPLAYER_EXPECTED_ASSET_MANIFEST_SHA256});
+await fs.writeFile(path.join(out,'fixture-sources.json'),JSON.stringify(fixtureSources,null,2));
+assert.ok(fixtureSources.pass,'Multiplayer fixture preflight failed before browser/server startup: '+JSON.stringify(fixtureSources.issues));
 const dist=await fs.mkdtemp(path.join(tmpdir(),'normal-multiplayer-'));
 await fs.writeFile(path.join(dist,'lan-build.json'),' {"build":"normal-multiplayer"}');
 const hostLoad=hostLoadProbe();
+const assetResponses=new Map(),entityCounts=[];
 const errors=[],samples=[],pages=[],bridges=[],profilers=[],workerLoopProbes=[],viewerBrowsers=[];let relay,vite,browser,report;
 const until=async(fn,label,timeout=60000)=>{const end=Date.now()+timeout;while(Date.now()<end){if(await fn())return;await new Promise(r=>setTimeout(r,50));}throw Error('Timed out '+label);};
 let currentStage='init';
 const stage=s=>{currentStage=s;console.log('[multiplayer]',s);};
-let heapSession,heapTimer,heapPending,hostProfiler;
+let heapSession,heapTimer,heapPending,hostProfiler,postBlockSession;
 if(process.env.MULTIPLAYER_HEAP==='true'){
  const {Session}=await import('node:inspector/promises');heapSession=new Session();heapSession.connect();
  await heapSession.post('HeapProfiler.startSampling',{samplingInterval:65536});
@@ -61,7 +99,7 @@ if(process.env.MULTIPLAYER_HEAP==='true'){
 const watchdog=setTimeout(()=>{console.error('Watchdog expired');void Promise.all(viewerBrowsers.map(b=>b.close().catch(()=>{}))).finally(()=>process.exit(1));setTimeout(()=>process.exit(1),5000).unref();},240000);watchdog.unref();
 try{
  relay=await createLanServer({host:'127.0.0.1',port:0,dist});const origin='http://127.0.0.1:'+relay.server.address().port;
- vite=await createServer({configFile:false,root:process.cwd(),esbuild:{jsx:'automatic'},optimizeDeps:{noDiscovery:true,entries:[],include:['react','react/jsx-runtime','react/jsx-dev-runtime','react-dom/client','react-dom','lucide-react']},define:{__LAN_BUILD_ID__:'"normal-multiplayer"',...(process.env.SPRITE_CULL==='false'?{'import.meta.env.VITE_CULL_SPRITES':'"false"'}:{}),...(process.env.DAMAGE_CULL==='false'?{'import.meta.env.VITE_CULL_DAMAGE_OVERLAYS':'"false"'}:{}),...(process.env.MULTI_TEXTURE_SHIPS==='false'?{'import.meta.env.VITE_MULTI_TEXTURE_SHIPS':'"false"'}:{}),...(process.env.DIRECT_AUTHORITY==='false'?{'import.meta.env.VITE_LAN_DIRECT_AUTHORITY':'"false"'}:{})},plugins:[...(tailwind?tailwind():[]),frozenBrowserPlugin(process.env.MULTIPLAYER_FROZEN),steadyFixturePlugin(steady,commandHeld),publicationProbePlugin(process.env.MULTIPLAYER_PUBLICATION_PROBE==='true'),sameTickSkipPlugin(process.env.MULTIPLAYER_SAME_TICK_SKIP==='true'),{name:'test-only-initial-particles',enforce:'pre',transform(code,id){if(process.env.MULTIPLAYER_PARTICLE_FIXTURE!=='true'||!id.replaceAll('\\','/').split('?')[0].endsWith('/src/network/HostSnapshot.ts'))return;const marker='return new HostMuzzleEvents(engine.fxSystem';assert.ok(code.includes(marker));return code.replace(marker,'if (localParticles) engine.fxSystem.spawnSparks(engine.playerShip.pos, 60); '+marker);}},{name:'isolated-battle-check',configureServer(s){s.middlewares.use((req,res,next)=>{if(req.url!=='/__multiplayer.html')return next();res.setHeader('Cross-Origin-Opener-Policy','same-origin');res.setHeader('Cross-Origin-Embedder-Policy','require-corp');res.setHeader('Content-Type','text/html');res.end('<!doctype html><meta charset="utf-8"><title>Isolated multiplayer check</title><style>html,body,#root{margin:0;width:100%;height:100%;overflow:hidden}</style><div id="root"></div>');});}}],server:{host:'127.0.0.1',port:0,open:false,headers:{'Cross-Origin-Opener-Policy':'same-origin','Cross-Origin-Embedder-Policy':'require-corp'},watch:null},logLevel:'error'});
+ vite=await createServer({configFile:false,root:process.cwd(),esbuild:{jsx:'automatic'},optimizeDeps:{noDiscovery:true,entries:[],include:['react','react/jsx-runtime','react/jsx-dev-runtime','react-dom/client','react-dom','lucide-react']},define:{__LAN_BUILD_ID__:'"normal-multiplayer"',...(process.env.SPRITE_CULL==='false'?{'import.meta.env.VITE_CULL_SPRITES':'"false"'}:{}),...(process.env.DAMAGE_CULL==='false'?{'import.meta.env.VITE_CULL_DAMAGE_OVERLAYS':'"false"'}:{}),...(process.env.MULTI_TEXTURE_SHIPS==='false'?{'import.meta.env.VITE_MULTI_TEXTURE_SHIPS':'"false"'}:{}),...(process.env.DIRECT_AUTHORITY==='false'?{'import.meta.env.VITE_LAN_DIRECT_AUTHORITY':'"false"'}:{})},plugins:[lanRestoreStagePlugin(restoreStages),postBlockTimelinePlugin(postBlockTimeline),inputAdmissionProbePlugin(inputAdmissionProbe),presentationMeasurePlugin(measureMode),studioSummaryPlugin(),...(tailwind?tailwind():[]),frozenBrowserPlugin(process.env.MULTIPLAYER_FROZEN),steadyFixturePlugin(steady,commandHeld),publicationProbePlugin(process.env.MULTIPLAYER_PUBLICATION_PROBE==='true'),sameTickSkipPlugin(process.env.MULTIPLAYER_SAME_TICK_SKIP==='true'),{name:'test-only-initial-particles',enforce:'pre',transform(code,id){if(process.env.MULTIPLAYER_PARTICLE_FIXTURE!=='true'||!id.replaceAll('\\','/').split('?')[0].endsWith('/src/network/HostSnapshot.ts'))return;const marker='return new HostMuzzleEvents(engine.fxSystem';assert.ok(code.includes(marker));return code.replace(marker,'if (localParticles) engine.fxSystem.spawnSparks(engine.playerShip.pos, 60); '+marker);}},{name:'isolated-battle-check',configureServer(s){s.middlewares.use((req,res,next)=>{if(req.url==='/__frozen-battle.css'&&frozenCss){res.setHeader('Content-Type','text/css; charset=utf-8');res.end(frozenCss);return;}if(req.url!=='/__multiplayer.html')return next();res.setHeader('Cross-Origin-Opener-Policy','same-origin');res.setHeader('Cross-Origin-Embedder-Policy','require-corp');res.setHeader('Content-Type','text/html');res.end('<!doctype html><meta charset="utf-8"><title>Isolated multiplayer check</title><style>html,body,#root{margin:0;width:100%;height:100%;overflow:hidden}</style><div id="root"></div>');});}}],server:{host:'127.0.0.1',port:0,open:false,headers:{'Cross-Origin-Opener-Policy':'same-origin','Cross-Origin-Embedder-Policy':'require-corp'},watch:null},logLevel:'error'});
  await vite.listen();const port=vite.httpServer.address().port;
  // Each real desktop owns its own helper. Do not put five clients behind one
  // helper or raise its deliberate four-connection safety cap for a benchmark.
@@ -75,14 +113,38 @@ try{
   const owner=process.env.MULTIPLAYER_BROWSER_PER_VIEWER==='true'&&i>0?await launchViewerBrowser():browser;
   if(owner!==browser)viewerBrowsers.push(owner);
   stage('joining '+i);const context=await owner.newContext({viewport:styled?{width:1280,height:720}:{width:640,height:360}}),page=await context.newPage();pages.push(page);
-  page.on('pageerror',e=>errors.push({seat:i,error:e.message}));
+  page.on('pageerror',e=>errors.push({seat:i,error:e.message,stack:e.stack}));
+  if(process.env.MULTIPLAYER_RECORD_ASSETS==='true')page.on('response',response=>{const url=new URL(response.url());if(url.pathname.startsWith('/game-assets/'))assetResponses.set(url.pathname+'|'+response.status(),{path:decodeURIComponent(url.pathname),status:response.status()});});
   page.on('console',m=>{if(process.env.MULTIPLAYER_LOOP_PROBE==='true'&&m.text().startsWith('[host-loop-probe] ')){workerLoopProbes.push({seat:i,...JSON.parse(m.text().slice('[host-loop-probe] '.length))});return;}const row=parseNetworkConsole(m.text());if(row){samples.push({seat:i,...row});}else if(m.type()==='error')errors.push({seat:i,console:m.text()});});
   await page.goto(`http://127.0.0.1:${port}/__multiplayer.html`);
-  await page.evaluate(async({origin,index,fixtureSeed,styled,compiledCssHref,steady,textureProbe})=>{
-   if(styled){if(compiledCssHref)await new Promise((resolve,reject)=>{const link=document.createElement('link');link.rel='stylesheet';link.href=compiledCssHref;link.onload=resolve;link.onerror=()=>reject(Error('Compiled CSS failed'));document.head.append(link);});else await import('/src/index.css');await import('/src/network/lan.css');await import('/src/ui/core/motion.css');}
+  await page.evaluate(async({origin,index,fixtureSeed,styled,compiledCssHref,frozenCssHref,steady,textureProbe,presentationPage,measureMode,controlMailboxCheck})=>{
+   if(styled&&frozenCssHref){await new Promise((resolve,reject)=>{const link=document.createElement('link');link.rel='stylesheet';link.href=frozenCssHref;link.onload=resolve;link.onerror=()=>reject(Error('Frozen CSS failed'));document.head.append(link);});}
+   else if(styled){if(compiledCssHref)await new Promise((resolve,reject)=>{const link=document.createElement('link');link.rel='stylesheet';link.href=compiledCssHref;link.onload=resolve;link.onerror=()=>reject(Error('Compiled CSS failed'));document.head.append(link);});else await import('/src/index.css');await import('/src/network/lan.css');await import('/src/ui/core/motion.css');}
    window.__LAN_BUILD_ID__='normal-multiplayer';
    if(textureProbe){const {installTextureProbe}=await import('/scripts/lib/multiplayer-texture-probe.mjs');const {WebGLTextureManager}=await import('/src/engine/render/webgl/WebGLTextureManager.ts');window.textureProbe=installTextureProbe(WebGLTextureManager);}
-   window.workerNotes=[];window.steadyEvents=[];if(steady)window.__steadyAim={x:0,y:0};const NativeWorker=window.Worker;window.Worker=class extends NativeWorker { constructor(...args){super(...args);this.addEventListener('error',e=>window.workerNotes.push({error:e.message,url:String(args[0])}));this.addEventListener('message',e=>{if(steady&&e.data?.type==='snapshot')window.steadySnapshotTick=e.data.tick;if(steady&&e.data?.type==='test-fixture'){window.steadyWorker=this;window.steadyEvents.push(e.data);}if(['failed','io-unavailable','connect-failed'].includes(e.data?.type))window.workerNotes.push(e.data);});} };
+   if(presentationPage && index===2){
+    const transfer=HTMLCanvasElement.prototype.transferControlToOffscreen;
+    HTMLCanvasElement.prototype.transferControlToOffscreen=function(){
+     const canvas=transfer.call(this);window.failedPresentationCanvas=this;void canvas;
+     HTMLCanvasElement.prototype.transferControlToOffscreen=transfer;
+     throw Error('TEST: presentation startup fails after irreversible transfer');
+    };
+   }
+   window.presentationProbe={acked:-1,inputs:[],generations:[],views:0,commands:[],disposed:[],controls:0,graphicsUpdates:0,fallbacks:0};
+   window.workerNotes=[];window.steadyEvents=[];if(steady)window.__steadyAim={x:0,y:0};const NativeWorker=window.Worker;window.Worker=class extends NativeWorker { constructor(...args){super(...args);this.addEventListener('error',e=>window.workerNotes.push({error:e.message,url:String(args[0])}));this.addEventListener('message',e=>{if(presentationPage||measureMode){const m=e.data,p=window.presentationProbe;
+     if(m?.type==='capabilities'&&m.offscreen)window.presentationMeasureWorker=this;
+     if(m?.type==='test-submit-frames')window.workerSubmitFrames=m.frames;
+     if(m?.type==='ui'){p.views++;p.status=m.status;}
+     if(m?.type==='retained'&&m.auxiliary?.acknowledged!==null&&m.auxiliary?.acknowledged!==undefined)p.acked=Math.max(p.acked,m.auxiliary.acknowledged);
+     if(m?.type==='retained'&&m.component?.acknowledged!==undefined)p.acked=Math.max(p.acked,m.component.acknowledged);
+     if(m?.type==='retained'&&window.stallAcks){const ack=m.auxiliary?.acknowledged??m.component?.acknowledged;if(Number.isSafeInteger(ack))window.stallAcks.push({wallTimeMs:Date.now(),ack});}
+     if(m?.type==='view-result')p.commands.push({accepted:m.reply.result.accepted,revision:m.reply.afterRevision});
+     if(m?.type==='disposed')p.disposed.push(m.report);
+    }if(steady&&e.data?.type==='snapshot')window.steadySnapshotTick=e.data.tick;if(steady&&e.data?.type==='test-fixture'){window.steadyWorker=this;window.steadyEvents.push(e.data);}if(['failed','io-unavailable','connect-failed'].includes(e.data?.type))window.workerNotes.push(e.data);});}
+    set onmessage(callback){super.onmessage=callback?event=>{if(controlMailboxCheck&&window.holdControlReceipt&&event.data?.type==='controls-applied'){window.heldControlReceipts.push(()=>callback.call(this,event));return;}callback.call(this,event);}:null;}
+    get onmessage(){return super.onmessage;}
+    postMessage(message,...rest){if(presentationPage||measureMode){const p=window.presentationProbe;if(message?.type==='init'&&message.canvas)window.presentationRealtimeKind=message.realtime?'shared':'messages';if((message?.type==='controls'||message?.type==='controls-wake')){p.controls++;if(message.graphics)p.graphicsUpdates++;}if(message?.type==='fallback')p.fallbacks++;if(message?.type==='accepted-input'){p.inputs.push({seq:message.input.seq,keys:message.input.keys,aim:message.input.aim,actions:message.input.actions});if(p.inputs.length>120)p.inputs.shift();}if(message?.type==='reset')p.generations.push(message.viewGeneration);}return super.postMessage(message,...rest);}
+   };
    const reactModule=await import('/node_modules/.vite/deps/react.js');const React=reactModule.default??reactModule;const domModule=await import('/node_modules/.vite/deps/react-dom_client.js');const createRoot=domModule.createRoot??domModule.default.createRoot;
    const {LanConnection}=await import('/src/network/protocol.ts');const {LanBattle}=await import('/src/network/LanBattle.tsx');
    if(!crossOriginIsolated)throw Error('Missing required isolation headers');window.rows=[];window.connection=new LanConnection();window.battleRoot=createRoot(document.querySelector('#root'));
@@ -91,18 +153,19 @@ try{
     if(m.type==='match' && window.match?.id!==m.match.id) {if(fixtureSeed!==null)m.match.seed=fixtureSeed;window.match=m.match;const seat=m.match.players.find(p=>p.id===window.identity).seat;window.battleRoot.render(React.createElement(LanBattle,{connection,match:m.match,seat,ended:null,onReturn:()=>{window.returned=true;},roomHost:index===0}));}
    });
    connection.connect(location.origin+'/desktop/lan/ws?testClient='+index+'&target='+encodeURIComponent(origin),'test'+index);
-  },{origin,index:i,fixtureSeed,styled,compiledCssHref,steady,textureProbe:process.env.MULTIPLAYER_TEXTURE_PROBE==='true'});
+  },{origin,index:i,fixtureSeed,styled,compiledCssHref,frozenCssHref,steady,presentationPage,measureMode,controlMailboxCheck,textureProbe:process.env.MULTIPLAYER_TEXTURE_PROBE==='true'});
   await until(()=>page.evaluate(()=>connection.ready),'welcome');
   if(i===0){await page.evaluate(()=>connection.send({type:'create',password:'',battleSize:3200}));await until(()=>relay.rooms.size,'create');await page.evaluate(capacity=>connection.send({type:'capacity',capacity}),count);}
   else{await page.evaluate(code=>connection.send({type:'join',code}),[...relay.rooms.values()][0].code);await until(()=>[...relay.rooms.values()][0].peers.length===i+1,'join');}
  }
  const room=[...relay.rooms.values()][0];
- const aiCount=Number(process.env.MULTIPLAYER_AI??(22-count));assert.ok(Number.isInteger(aiCount)&&aiCount>=0&&aiCount<=24);
- await pages[0].evaluate(({aiCount,revision})=>connection.send({type:'options',baseRevision:revision,options:{assignment:'teams',battleSize:3200,aiHulls:[Array(Math.floor(aiCount/2)).fill('hammerhead'),Array(Math.ceil(aiCount/2)).fill('hammerhead')]}}),{aiCount,revision:room.options.aiRevision??0});
+
+ await pages[0].evaluate(({aiHulls,revision})=>connection.send({type:'options',baseRevision:revision,options:{assignment:'teams',battleSize:3200,aiHulls}}),{aiHulls,revision:room.options.aiRevision??0});
  await until(()=>room.options.aiHulls.flat().length===aiCount,'options');
  for(const page of pages.slice(1))await page.evaluate(()=>connection.send({type:'ready',ready:true}));
  await until(()=>room.peers.slice(1).every(p=>p.ready),'ready');stage('start');await pages[0].evaluate(()=>connection.send({type:'start'}));
  await until(()=>room.status==='running'&&room.peers.every(p=>p.loaded),'all real replicas loaded',90000);stage('loaded');if(!steady)await new Promise(r=>setTimeout(r,3000));
+ if(measureMode==='main')entityCounts.push({phase:'before',viewers:await Promise.all(pages.map(p=>p.evaluate(()=>window.__presentationEntityCounts())))});
  // Optional DOM-only input inside our isolated headless pages, never OS input.
  if(!steady&&process.env.MULTIPLAYER_PREDICTION_FIXTURE==='true')for(const page of pages)await page.evaluate(()=>{
   let step=0;
@@ -144,11 +207,13 @@ try{
  }
  if(process.env.MULTIPLAYER_PROFILE==='true')for(const page of pages.slice(0,2)){const cdp=await page.context().newCDPSession(page);await cdp.send('Profiler.enable');await cdp.send('Profiler.start');profilers.push(cdp);}
  if(process.env.MULTIPLAYER_HOST_PROFILE==='true')hostProfiler=await startHostWorkerProfile(browser);
- let started,tickBefore,measuredUntil,measuredTickAfter,steadyEvidence=null;
+ let started,tickBefore,measuredUntil,measuredTickAfter,steadyEvidence=null,presentationMeasurement=null;
  const processSessions=process.env.MULTIPLAYER_PROCESS_PROBE==='true'?await Promise.all(viewerBrowsers.map(b=>b.newBrowserCDPSession())):[];
  const processSample=async()=>({wallTimeMs:Date.now(),browsers:await Promise.all(processSessions.map(async(s,index)=>({index,...await s.send('SystemInfo.getProcessInfo')})))});
  const processBefore=processSessions.length?await processSample():null;
  stage('measurement');
+ if(postBlockTimeline)postBlockSession=await startPostBlockTimeline(pages[1],out);
+ if(measureMode)await beginPresentationMeasure(pages[1],duration);
  if(process.env.MULTIPLAYER_TEXTURE_PROBE==='true')await Promise.all(pages.map(p=>p.evaluate(()=>window.textureProbe.start())));
  if(steady){
   await pages[0].evaluate(()=>window.steadyWorker.postMessage({type:'test-fixture-release'}));
@@ -178,8 +243,12 @@ try{
  }
  if(process.env.MULTIPLAYER_TEXTURE_PROBE==='true')await fs.writeFile(path.join(out,'texture-probe.json'),JSON.stringify({scope:'Full local rendering interval from release through collection of tick1021, not just the121-1021 measurement; API CPU time only, no GPU finish. Revision byte estimates include only changed canvas revisions.',viewers:await Promise.all(pages.map(p=>p.evaluate(()=>window.textureProbe.stop())))},null,2));
  if(processSessions.length){const processAfter=await processSample();await fs.writeFile(path.join(out,'browser-processes.json'),JSON.stringify({mode:process.env.MULTIPLAYER_BROWSER_PER_VIEWER==='true'?'separate-browsers':'shared-browser',before:processBefore,after:processAfter},null,2));await Promise.all(processSessions.map(s=>s.detach()));}
+ if(measureMode==='main')entityCounts.push({phase:'after',viewers:await Promise.all(pages.map(p=>p.evaluate(()=>window.__presentationEntityCounts())))});
  const measurement={commandHeld,steady:steadyEvidence,started,measuredUntil,elapsedMs:measuredUntil-started,requestedMs:duration,tickBefore,tickAfter:measuredTickAfter,seed:fixtureSeed??room.match.seed};
  report={measurement,roomStatus:room.status,failures:samples.filter(s=>s.event==='battle-failed').map(s=>({seat:s.seat,event:s.event,at:s.wallTimeMs,stage:s.failureStage}))};
+ if(measureMode){presentationMeasurement=await finishPresentationMeasure(pages[1],until,evidence=>fs.writeFile(path.join(out,'presentation-submit-raw.json'),JSON.stringify(evidence,null,2)));await fs.writeFile(path.join(out,'presentation-submit.json'),JSON.stringify(presentationMeasurement,null,2));}
+ if(inputAdmissionProbe){const trace=await pages[1].evaluate(()=>window.__inputAdmission);await fs.writeFile(path.join(out,'input-admission.json'),JSON.stringify(trace,null,2));assert.equal(trace.overflow,0,'input admission trace must remain bounded');}
+ if(postBlockSession)await postBlockSession.stop(presentationMeasurement);
  stage('measurement saved');await fs.writeFile(path.join(out,'measurement.json'),JSON.stringify(report,null,2));await fs.writeFile(path.join(out,'samples-measured.jsonl'),samples.map(s=>JSON.stringify(s)).join('\n')+'\n');
  if(hostProfiler){const profile=await hostProfiler.stop();await fs.writeFile(path.join(out,'host.cpuprofile'),JSON.stringify(profile));}
  for(let i=0;i<profilers.length;i++){const {profile}=await profilers[i].send('Profiler.stop');await fs.writeFile(path.join(out,'cpu-'+i+'.json'),JSON.stringify(profile));}
@@ -188,7 +257,7 @@ try{
  assert.deepEqual(report.failures,[],'authority failed before stress/reconnect');assert.equal(room.status,'running');assert.ok(measuredTickAfter>tickBefore,'physics must progress throughout measurement');
  let stall=null;
  if(process.env.MULTIPLAYER_STALL!=='false'){stage('stall: guest probe');
-  await pages[1].evaluate(()=>{const row=window.rows.findLast(m=>m.type==='state');window.stallAcks=[{wallTimeMs:Date.now(),ack:row?.ack?.[1]}];});
+  await pages[1].evaluate(()=>{const row=window.rows.findLast(m=>m.type==='state');window.stallAcks=[{wallTimeMs:Date.now(),ack:document.querySelector('.lan-canvas')?.dataset.presentation==='worker'?window.presentationProbe.acked:row?.ack?.[1]}];});
   const hostSocket=room.peers.find(p=>p.id===room.hostId).ws;
   const trace={startedAt:Date.now()},publications=[{at:trace.startedAt,seq:room.lastSeq,boundary:true}];let lastAccepted=room.lastSeq;
   // This listener runs after the real validation/broadcast handler. Observe
@@ -197,7 +266,13 @@ try{
   hostSocket.on('message',observe);
   let block;
   try{stage('stall: host blocked');block=await pages[0].evaluate(()=>{const startedAt=Date.now(),until=performance.now()+800;while(performance.now()<until){};return {startedAt,finishedAt:Date.now()};});}
-  finally{trace.finishedAt=Date.now();hostSocket.off('message',observe);}
+  finally{
+   // Keep OBSERVING until both reported wall-clock bounds are covered. Browser
+   // and Node Date.now() can quantize the endpoint one millisecond apart; never
+   // manufacture a later timestamp or weaken recordedStall's validity check.
+   if(block&&Date.now()<=block.finishedAt)await new Promise(resolve=>setTimeout(resolve,block.finishedAt-Date.now()+1));
+   trace.finishedAt=Date.now();hostSocket.off('message',observe);
+  }
   stage('stall: guest ACKs');const acks=await pages[1].evaluate(()=>{const rows=window.stallAcks;window.stallAcks=null;return rows;});
   stall=recordedStall(block,publications,acks,trace);
   await fs.writeFile(path.join(out,'stall-acknowledgements.json'),JSON.stringify(acks,null,2));
@@ -213,13 +288,16 @@ try{
   assert.equal(reconnected.matchIdUnchanged,true);
  }
  if(process.env.MULTIPLAYER_WEAPON_FIXTURE==='true')await pages[0].screenshot({path:path.join(out,'weapons.png')});
+ const controlEvidence=controlMailboxCheck?await checkControlMailbox({guest:pages[1],until,stage,retain:evidence=>fs.writeFile(path.join(out,'control-mailbox.json'),JSON.stringify(evidence,null,2))}):null;
+ const jsonEvidence=measureMode==='messages'?await checkPresentationJson({pages,room,until,stage}):null;
+ const presentationEvidence=presentationPage?await checkPresentationPage({pages,room,until,stage}):null;
  stage('viewers');const loaded=room.peers.every(p=>p.loaded),tickAfter=room.lastTick;
- const viewers=await Promise.all(pages.map(p=>p.evaluate(()=>({canvas:(()=>{const c=document.querySelector('canvas'),r=c?.getBoundingClientRect();return c?{width:c.width,height:c.height,cssWidth:r.width,cssHeight:r.height}:null;})(),isolated:crossOriginIsolated,socket:connection.socket?.constructor.name,workerNotes:window.workerNotes,features:connection.networkFeatures,connected:connection.ready,returned:!!window.returned,errors:window.rows.filter(m=>['error','disconnected','roomClosed'].includes(m.type)),gpu:(()=>{const gl=document.querySelector('canvas')?.getContext('webgl2');const debug=gl?.getExtension('WEBGL_debug_renderer_info');return gl?{vendor:gl.getParameter(debug?.UNMASKED_VENDOR_WEBGL??gl.VENDOR),renderer:gl.getParameter(debug?.UNMASKED_RENDERER_WEBGL??gl.RENDERER)}:null;})(),text:document.body.innerText.slice(0,5000)}))));
+ const viewers=await Promise.all(pages.map(p=>p.evaluate(()=>({canvas:(()=>{const c=document.querySelector('canvas'),r=c?.getBoundingClientRect();return c?{width:c.width,height:c.height,cssWidth:r.width,cssHeight:r.height,presentation:c.dataset.presentation}:null;})(),isolated:crossOriginIsolated,socket:connection.socket?.constructor.name,workerNotes:window.workerNotes,features:connection.networkFeatures,connected:connection.ready,returned:!!window.returned,errors:window.rows.filter(m=>['error','disconnected','roomClosed'].includes(m.type)),gpu:(()=>{const canvas=document.querySelector('.lan-canvas');if(canvas?.dataset.presentation==='worker')return {vendor:canvas.dataset.gpuVendor,renderer:canvas.dataset.gpuRenderer};const gl=canvas?.getContext('webgl2');const debug=gl?.getExtension('WEBGL_debug_renderer_info');return gl?{vendor:gl.getParameter(debug?.UNMASKED_VENDOR_WEBGL??gl.VENDOR),renderer:gl.getParameter(debug?.UNMASKED_RENDERER_WEBGL??gl.RENDERER)}:null;})(),text:document.body.innerText.slice(0,5000)}))));
  const measured=measuredSamples(samples,started,measuredUntil);
  const q=(xs,p)=>xs.length?xs.toSorted((a,b)=>a-b)[Math.floor((xs.length-1)*p)]:null;
  if(process.env.MULTIPLAYER_SAME_TICK_SKIP==='true'){const retryEvents=await pages[0].evaluate(()=>window.steadyEvents.filter(e=>e.phase==='same-tick-retry'));await fs.writeFile(path.join(out,'same-tick-retry.json'),JSON.stringify(retryEvents,null,2));const skipped=retryEvents.find(e=>e.delivery==='skipped'),sent=retryEvents.find(e=>e.delivery==='sent'&&e.attempt>skipped?.attempt);assert.ok(skipped&&sent,'forced tick61 skip must recover at the SAME tick with a NEW attempt');}
  const stats=pages.map((_,i)=>{const rows=measured.filter(s=>s.seat===i&&s.hud);return {seat:i,samples:rows.length,hz:q(rows.map(s=>s.hud.hz).filter(Number.isFinite),.5),motionHz:q(rows.map(s=>s.hud.motionHz).filter(Number.isFinite),.5),fps:q(rows.map(s=>s.hud.fps).filter(Number.isFinite),.5),ageP95:q(rows.map(s=>s.hud.age).filter(Number.isFinite),.95),inputP95:q(rows.map(s=>s.hud.acknowledgementMs).filter(Number.isFinite),.95),direct:rows.at(-1)?.hud.authority?.io??null,captureReuse:rows.at(-1)?.hud.authority?.captureReuse??null,capturePlans:rows.at(-1)?.hud.authority?.capturePlans??null,serializer:rows.at(-1)?.hud.authority?.serializer??null,motionPrediction:rows.at(-1)?.hud.input?.motionPrediction??null,turretPrediction:rows.at(-1)?.hud.input?.turretPrediction??null,firePrediction:rows.at(-1)?.hud.input?.firePrediction??null,projectileFlight:rows.at(-1)?.hud.input?.projectileFlight??null,physics:q(rows.map(s=>s.hud.authority?.flow?.rates?.simulated).filter(Number.isFinite),.5)};});
- report={browserMode:process.env.MULTIPLAYER_BROWSER_PER_VIEWER==='true'?'separate-browsers':'shared-browser',scope:'Actual default LAN host Worker + LanBattle + desktop helper + WebGL on ONE headless machine (actual renderer recorded per viewer), 22-ship roster unless overridden; loopback, not Valve/n2n/multi-machine FPS.',players:count,ai:aiCount,fixtureSeed,styled,compiledCss:compiledCssHref,frozenSources:process.env.MULTIPLAYER_FROZEN??null,damageCull:process.env.DAMAGE_CULL!=='false',spriteCull:process.env.SPRITE_CULL!=='false',particleFixture:process.env.MULTIPLAYER_PARTICLE_FIXTURE==='true',roomStatus:room.status,failures:samples.filter(s=>s.event==='battle-failed').map(s=>({seat:s.seat,event:s.event,at:s.wallTimeMs,stage:s.failureStage})),measurement,stall,reconnected,elapsed:measuredUntil-started,ticks:measuredTickAfter-tickBefore,loaded,stats,viewers,errors};
+ report={browserMode:process.env.MULTIPLAYER_BROWSER_PER_VIEWER==='true'?'separate-browsers':'shared-browser',scope:'Actual default LAN host Worker + LanBattle + desktop helper + WebGL on ONE headless machine (actual renderer recorded per viewer), root-hull roster plus authored modules/aircraft (see entity-counts.json); loopback, not Valve/n2n/multi-machine FPS.',players:count,ai:aiCount,fixtureSeed,controlEvidence,presentationEvidence,presentationMeasurement: presentationMeasurement ? {...presentationMeasurement,frames:undefined} : null,jsonEvidence,styled,compiledCss:compiledCssHref,frozenCssSha256,frozenSources:process.env.MULTIPLAYER_FROZEN??null,damageCull:process.env.DAMAGE_CULL!=='false',spriteCull:process.env.SPRITE_CULL!=='false',particleFixture:process.env.MULTIPLAYER_PARTICLE_FIXTURE==='true',roomStatus:room.status,failures:samples.filter(s=>s.event==='battle-failed').map(s=>({seat:s.seat,event:s.event,at:s.wallTimeMs,stage:s.failureStage})),measurement,stall,reconnected,elapsed:measuredUntil-started,ticks:measuredTickAfter-tickBefore,loaded,stats,viewers,errors};
  if(stall&&process.env.DIRECT_AUTHORITY!=='false'){assert.ok(stall.validWindow,'publication sampling must be inside actual browser block');assert.ok(stall.publicationsDuringMiddle450ms>=5,'host rendering stall must not stop publication');assert.ok(stall.validAckProgress,'guest ACK must advance and be observed while host main is blocked');}
  if(process.env.MULTIPLAYER_PREDICTION_FIXTURE==='true')for(let seat=0;seat<count;seat++)assert.ok(measured.some(s=>s.seat===seat&&s.hud?.input?.motionPrediction?.renderedFrames>0&&s.hud?.input?.motionPrediction?.reconciliations>0),'motion prediction must actually run and reconcile on viewer '+seat);
  if(styled)for(const v of viewers)assert.ok(v.canvas?.cssWidth>=1200&&v.canvas?.cssHeight>=650,'styled fixture must render the full battle canvas');
@@ -232,16 +310,27 @@ try{
  if(process.env.MULTIPLAYER_PARTICLE_FIXTURE==='true')for(let seat=0;seat<count;seat++)assert.ok(samples.some(s=>s.seat===seat&&s.hud?.input?.localParticles?.generated>0),'default particle replay must actually run on viewer '+seat);
  assert.deepEqual(report.failures,[],'no authority failure during the run');assert.equal(room.status,'running','battle must remain running');assert.equal(loaded,true);assert.ok(tickAfter>tickBefore);assert.deepEqual(errors,[]);for(const v of viewers){assert.equal(v.connected,true);assert.equal(v.returned,false);assert.deepEqual(v.errors,[]);}for(const s of stats){assert.ok(s.samples>=3);assert.ok(s.hz>0);assert.ok(s.ageP95<1500);}
  assert.equal((process.env.MULTIPLAYER_RECONNECT==='true'?samples.findLast(s=>s.seat===0&&s.hud?.authority?.io)?.hud.authority.io:stats[0].direct)?.enabled,process.env.MULTIPLAYER_RECONNECT==='true'?false:process.env.DIRECT_AUTHORITY!=='false');stage('assertions passed');
-}catch(error){process.exitCode=1;report={...report,error:String(error),errors,bodies:await Promise.all(pages.map(p=>p.locator('body').innerText().catch(()=>''))),lifecycle:await Promise.all(pages.map(p=>p.evaluate(()=>({ready:connection.ready,socket:connection.socket?.constructor.name,workerNotes:window.workerNotes,steadyEvents:window.steadyEvents?.slice(-8).map(({bytes,...e})=>({...e,byteLength:bytes?.length})),rows:window.rows.filter(m=>['welcome','launch','resume','reconnecting','disconnected','error','ended'].includes(m.type)).map(m=>({type:m.type,matchId:m.matchId,stateSeq:m.stateSeq,reason:m.reason,code:m.code}))})).catch(()=>null)))};console.error(error);}
+}catch(error){process.exitCode=1;report={...report,error:String(error),errors,bodies:await Promise.all(pages.map(p=>p.locator('body').innerText().catch(()=>''))),lifecycle:await Promise.all(pages.map(p=>p.evaluate(()=>({ready:connection.ready,socket:connection.socket?.constructor.name,workerNotes:window.workerNotes,steadyEvents:window.steadyEvents?.slice(-8).map(({bytes,...e})=>({...e,byteLength:bytes?.length})),rows:window.rows.filter(m=>['welcome','launch','resume','reconnecting','disconnected','error','ended'].includes(m.type)).map(m=>({type:m.type,matchId:m.matchId,stateSeq:m.stateSeq,reason:m.reason,code:m.code,message:typeof m.message==='string'?m.message.slice(0,2048):undefined}))})).catch(()=>null)))};console.error(error);}
 finally{
+ if(postBlockSession){try{await postBlockSession.stop();}catch(error){process.exitCode=1;console.error('Post-block trace cleanup:',error);}}
  if(report)await fs.writeFile(path.join(out,'result-before-cleanup.json'),JSON.stringify(report,null,2));
  if(hostProfiler){try{await hostProfiler.stop();}catch(error){console.error('Host profile cleanup:',error);}}
+ await fs.writeFile(path.join(out,'entity-counts.json'),JSON.stringify(entityCounts,null,2));
+ await fs.writeFile(path.join(out,'asset-responses.json'),JSON.stringify([...assetResponses.values()],null,2));
  stage('cleanup: snapshots saved');
  await fs.writeFile(path.join(out,'samples.jsonl'),samples.map(s=>JSON.stringify(s)).join('\n')+'\n');
  stage('cleanup: close room');
  if(relay&&relay.rooms.size)for(const code of [...relay.rooms.keys()])relay.closeRoom(code);
  stage('cleanup: unmount');
  if(browser)for(const page of pages)await page.evaluate(()=>{window.battleRoot?.unmount();window.connection?.close();}).catch(()=>{});
+ if(controlMailboxCheck&&pages[1]&&await pages[1].evaluate(()=>!!window.controlClient).catch(()=>false)){
+  try{
+   await until(()=>pages[1].evaluate(()=>window.presentationProbe.disposed.length>0),'actual Worker disposal report',5000);
+   const disposal=await pages[1].evaluate(()=>({reports:window.presentationProbe.disposed,frame:window.controlClient?.readRealtime(),phase:window.controlClient?.stats.phase}));
+   assert.equal(disposal.frame,null);assert.equal(disposal.phase,'closed');for(const r of disposal.reports){assert.equal(r.disposed,true);assert.equal(r.residentTextures,0);assert.equal(r.pendingUploads,0);}
+   report.controlDisposal=disposal;
+  }catch(error){process.exitCode=1;report.cleanupError=String(error);console.error(error);}
+ }
  stage('cleanup: browser');
  await Promise.all(viewerBrowsers.map(b=>b.close()));stage('cleanup: helpers');for(const bridge of bridges)bridge.close();await vite?.close();await relay?.close();await fs.unlink(path.join(dist,'lan-build.json'));await fs.rmdir(dist);clearTimeout(watchdog);clearInterval(heapTimer);await heapPending;heapSession?.disconnect();
 }

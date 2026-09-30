@@ -6,7 +6,7 @@ import "./native-chrome.css";
 
 export type NativeSurface = "solid" | "glass" | "none";
 
-/** Original eight-slice border: no synthetic CSS strokes, tint or corner cuts. */
+/** Shared original frame; decorative children retained for caller compatibility. */
 export function NativeBorder() {
   return <div className="native-chrome-border" aria-hidden="true">{["n", "s", "e", "w", "nw", "ne", "sw", "se"].map((side) =>
     <i key={side} className={"native-chrome-tile native-chrome-tile-" + side} />

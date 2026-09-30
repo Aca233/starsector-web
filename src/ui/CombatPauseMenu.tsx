@@ -44,9 +44,9 @@ export function CombatPauseMenu({
         <section className="combat-pause-ship" aria-label="当前舰船">
           <div className="combat-pause-ship-name">
             <span title={shipName ?? i18n.t(spec.nameKey)}>
-              <NativeBitmapText font="caption" color="rgba(255,255,255,0.392)">{shipName ?? i18n.t(spec.nameKey)}</NativeBitmapText>
+              <NativeBitmapText font="caption" color="var(--ui-muted)">{shipName ?? i18n.t(spec.nameKey)}</NativeBitmapText>
             </span>
-            <span><NativeBitmapText font="caption" color="rgba(255,255,255,0.392)">{i18n.t(spec.designationKey)}</NativeBitmapText></span>
+            <span><NativeBitmapText font="caption" color="var(--ui-muted)">{i18n.t(spec.designationKey)}</NativeBitmapText></span>
           </div>
           <div className="combat-pause-portrait">
             <ShipStage spec={spec} home />
@@ -144,7 +144,8 @@ export function CombatSettingsMenu({
           weaponGroupCount={spec.defaultWeaponGroups?.length ?? 7}
           hasFighters={hasFighters}
           hasSystem={tacticalSystemIds(spec).length > 0}
-          hasShield={effectiveHullStats(spec).shieldType !== "NONE" || (defenseSystemId(spec) !== "NONE")}
+          hasShield={effectiveHullStats(spec).shieldType !== "NONE"}
+          hasRightClickSystem={defenseSystemId(spec) !== "NONE"}
           canRestart={canRestart}
           defaultMouseSteering={defaultMouseSteering}
           onDefaultMouseSteeringChange={onDefaultMouseSteeringChange}

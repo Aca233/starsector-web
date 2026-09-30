@@ -6,6 +6,8 @@ import { immutableCopy } from '../extensions/Immutable';
 export interface SoundSample { file: string; pitch: number; volume: number }
 const nativeWeaponSounds: Record<string, readonly SoundSample[]> = {...weaponSounds,...systemSounds,...extraSystemSounds};
 const paths: Record<string, string> = {
+    // Default custom-weapon fallback uses retained media, not a synthesised replacement.
+    web_fire: 'sounds/sfx_wpn_energy/plasma_cannon_fire_01.ogg',
     // 武器开火
     tpc_fire: 'sounds/sfx_wpn_energy/thermal_pulse_cannon_fire_01.ogg',
     tachyon_fire: 'sounds/sfx_wpn_energy/tachyon_lance_fire_01.ogg',

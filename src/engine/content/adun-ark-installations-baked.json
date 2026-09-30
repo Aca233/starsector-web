@@ -1,0 +1,194 @@
+{
+  "FORE_SHOULDER_PORT": {
+    "seat": {
+      "file": "FORE_SHOULDER_PORT-seat-baked-v16.png",
+      "width": 26.666666666666668,
+      "height": 32.0,
+      "pivotX": 0.5,
+      "pivotY": 0.5
+    },
+    "foreground": {
+      "file": "FORE_SHOULDER_PORT-lip-baked-v16.png",
+      "width": 26.666666666666668,
+      "height": 32.0,
+      "pivotX": 0.5,
+      "pivotY": 0.5
+    }
+  },
+  "AFT_BATTERY_PORT": {
+    "seat": {
+      "file": "AFT_BATTERY_PORT-seat-baked-v16.png",
+      "width": 46.666666666666664,
+      "height": 37.333333333333336,
+      "pivotX": 0.34285714285714286,
+      "pivotY": 0.4642857142857143
+    },
+    "foreground": {
+      "file": "AFT_BATTERY_PORT-lip-baked-v16.png",
+      "width": 46.666666666666664,
+      "height": 37.333333333333336,
+      "pivotX": 0.34285714285714286,
+      "pivotY": 0.4642857142857143
+    }
+  },
+  "BOW_GUARD_PORT": {
+    "seat": {
+      "file": "BOW_GUARD_PORT-seat-baked-v16.png",
+      "width": 16.0,
+      "height": 25.333333333333332,
+      "pivotX": 0.5,
+      "pivotY": 0.47368421052631576
+    },
+    "foreground": {
+      "file": "BOW_GUARD_PORT-lip-baked-v16.png",
+      "width": 16.0,
+      "height": 25.333333333333332,
+      "pivotX": 0.5,
+      "pivotY": 0.47368421052631576
+    }
+  },
+  "BOW_GUARD_STARBOARD": {
+    "seat": {
+      "file": "BOW_GUARD_STARBOARD-seat-baked-v16.png",
+      "width": 17.333333333333332,
+      "height": 21.333333333333332,
+      "pivotX": 0.46153846153846156,
+      "pivotY": 0.5625
+    },
+    "foreground": {
+      "file": "BOW_GUARD_STARBOARD-lip-baked-v16.png",
+      "width": 17.333333333333332,
+      "height": 21.333333333333332,
+      "pivotX": 0.46153846153846156,
+      "pivotY": 0.5625
+    }
+  },
+  "FORE_SHOULDER_STARBOARD": {
+    "seat": {
+      "file": "FORE_SHOULDER_STARBOARD-seat-baked-v16.png",
+      "width": 30.666666666666668,
+      "height": 44.0,
+      "pivotX": 0.43478260869565216,
+      "pivotY": 0.6363636363636364
+    },
+    "foreground": {
+      "file": "FORE_SHOULDER_STARBOARD-lip-baked-v16.png",
+      "width": 30.666666666666668,
+      "height": 44.0,
+      "pivotX": 0.43478260869565216,
+      "pivotY": 0.6363636363636364
+    }
+  },
+  "AFT_SHOULDER_PORT": {
+    "seat": {
+      "file": "AFT_SHOULDER_PORT-seat-baked-v16.png",
+      "width": 26.666666666666668,
+      "height": 42.666666666666664,
+      "pivotX": 0.55,
+      "pivotY": 0.625
+    },
+    "foreground": {
+      "file": "AFT_SHOULDER_PORT-lip-baked-v16.png",
+      "width": 26.666666666666668,
+      "height": 42.666666666666664,
+      "pivotX": 0.55,
+      "pivotY": 0.625
+    }
+  },
+  "AFT_SHOULDER_STARBOARD": {
+    "seat": {
+      "file": "AFT_SHOULDER_STARBOARD-seat-baked-v16.png",
+      "width": 26.666666666666668,
+      "height": 30.666666666666668,
+      "pivotX": 0.45,
+      "pivotY": 0.43478260869565216
+    },
+    "foreground": {
+      "file": "AFT_SHOULDER_STARBOARD-lip-baked-v16.png",
+      "width": 26.666666666666668,
+      "height": 30.666666666666668,
+      "pivotX": 0.45,
+      "pivotY": 0.43478260869565216
+    }
+  },
+  "AFT_BATTERY_STARBOARD": {
+    "seat": {
+      "file": "AFT_BATTERY_STARBOARD-seat-baked-v16.png",
+      "width": 56.0,
+      "height": 44.0,
+      "pivotX": 0.5476190476190477,
+      "pivotY": 0.42424242424242425
+    },
+    "foreground": {
+      "file": "AFT_BATTERY_STARBOARD-lip-baked-v16.png",
+      "width": 56.0,
+      "height": 44.0,
+      "pivotX": 0.5476190476190477,
+      "pivotY": 0.42424242424242425
+    }
+  },
+  "AFT_OUTER_GUARD_PORT": {
+    "seat": {
+      "file": "AFT_OUTER_GUARD_PORT-seat-baked-v16.png",
+      "width": 17.333333333333332,
+      "height": 20.0,
+      "pivotX": 0.46153846153846156,
+      "pivotY": 0.5333333333333333
+    },
+    "foreground": {
+      "file": "AFT_OUTER_GUARD_PORT-lip-baked-v16.png",
+      "width": 17.333333333333332,
+      "height": 20.0,
+      "pivotX": 0.46153846153846156,
+      "pivotY": 0.5333333333333333
+    }
+  },
+  "AFT_OUTER_GUARD_STARBOARD": {
+    "seat": {
+      "file": "AFT_OUTER_GUARD_STARBOARD-seat-baked-v16.png",
+      "width": 25.333333333333332,
+      "height": 37.333333333333336,
+      "pivotX": 0.3684210526315789,
+      "pivotY": 0.5714285714285714
+    },
+    "foreground": {
+      "file": "AFT_OUTER_GUARD_STARBOARD-lip-baked-v16.png",
+      "width": 25.333333333333332,
+      "height": 37.333333333333336,
+      "pivotX": 0.3684210526315789,
+      "pivotY": 0.5714285714285714
+    }
+  },
+  "STERN_GUARD_PORT": {
+    "seat": {
+      "file": "STERN_GUARD_PORT-seat-baked-v16.png",
+      "width": 17.333333333333332,
+      "height": 17.333333333333332,
+      "pivotX": 0.38461538461538464,
+      "pivotY": 0.6923076923076923
+    },
+    "foreground": {
+      "file": "STERN_GUARD_PORT-lip-baked-v16.png",
+      "width": 17.333333333333332,
+      "height": 17.333333333333332,
+      "pivotX": 0.38461538461538464,
+      "pivotY": 0.6923076923076923
+    }
+  },
+  "STERN_GUARD_STARBOARD": {
+    "seat": {
+      "file": "STERN_GUARD_STARBOARD-seat-baked-v16.png",
+      "width": 18.666666666666668,
+      "height": 24.0,
+      "pivotX": 0.6428571428571429,
+      "pivotY": 0.6666666666666666
+    },
+    "foreground": {
+      "file": "STERN_GUARD_STARBOARD-lip-baked-v16.png",
+      "width": 18.666666666666668,
+      "height": 24.0,
+      "pivotX": 0.6428571428571429,
+      "pivotY": 0.6666666666666666
+    }
+  }
+}

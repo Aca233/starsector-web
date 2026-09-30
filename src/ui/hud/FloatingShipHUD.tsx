@@ -65,8 +65,8 @@ export const FloatingShipHUD: React.FC<FloatingShipHUDProps> = ({ ship, isEnemy,
       </svg>
       <div ref={contentBoxRef} className="hud-floating-content absolute w-[115px]" style={{ left: 56, top: -79 }}>
         <div className="hud-floating-meter-row">
-          <span className="hud-text">幅能</span>
-          <HudMeter ref={fluxMeterRef} label="幅能" value={ship.flux.totalFlux / ship.flux.maxFlux} minimum={ship.flux.hardFlux / ship.flux.maxFlux} width={60} height={5} />
+          <span className="hud-text">载荷</span>
+          <HudMeter ref={fluxMeterRef} label="载荷" value={ship.flux.totalFlux / ship.flux.maxFlux} minimum={ship.flux.hardFlux / ship.flux.maxFlux} width={60} height={5} />
         </div>
         <div className="hud-floating-meter-row">
           <span className="hud-text">结构</span>

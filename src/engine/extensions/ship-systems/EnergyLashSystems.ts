@@ -16,7 +16,7 @@ const speed = (s: ShipSystem) => ({ speedFlat: 100 * s.effectLevel, acceleration
 const incursion = nativeSystem('incursion_mode', {
   initialCharges, onEnergyLash, tacticalMode: 'ASSAULT',
   controls: { forceAutofire: true }, preventAIVenting: s => s.effectLevel > 0,
-  description: '由友方能量之鞭激活：航速+100、加减速+200、实弹/能量弹药恢复最高×5、幅能耗散最高×3；自动开火并进攻，AI期间不自主排幅（玩家仍可排幅）。初始无次数。',
+  description: '由友方能量之鞭激活：航速+100、加减速+200、实弹/能量弹药恢复最高×5、载荷耗散最高×3；自动开火并进攻，AI期间不自主排散（玩家仍可排散）。初始无次数。',
   modifiers: s => ({ ...speed(s), dissipationMultiplier: 1 + 2 * s.effectLevel,
     weapons: { BALLISTIC: { ammoRegenMultiplier: 1 + 4 * s.effectLevel }, ENERGY: { ammoRegenMultiplier: 1 + 4 * s.effectLevel } } }),
 });
@@ -24,7 +24,7 @@ const vented = new WeakMap<ShipSystem, number>();
 const extraction = nativeSystem('extraction_protocol', {
   initialCharges, onEnergyLash, tacticalMode: 'EXTRACT', controls: { forceAutofire: true, releaseOnOut: true },
   preventAIVenting: s => s.effectLevel > 0,
-  description: '由友方能量之鞭激活：加速撤离，退场阶段补满非系统武器弹药并开始排幅。初始无次数。',
+  description: '由友方能量之鞭激活：加速撤离，退场阶段补满非系统武器弹药并开始排散。初始无次数。',
   modifiers: speed, onReset:s=>{vented.delete(s);},
   onAdvance: (ship, _dt, _world, s) => {
     if (s.state !== 'OUT' || vented.get(s) === s.activationSerial) return;

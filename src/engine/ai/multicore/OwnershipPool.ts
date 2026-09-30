@@ -4,7 +4,7 @@ import { supportsOwnership } from './Eligibility';
 import { LanOwnershipGate, lanPhaseAIs } from './LanEligibility';
 import type { CapitalShipAI } from '../CapitalShipAI';
 import type { Ship } from '../../simulation/Ship';
-import type { CombatEngine } from '../../simulation/CombatEngine';
+import { createOwnedHostileQueries, type CombatEngine } from '../../simulation/CombatEngine';
 import type { AIPhaseBatch, MulticoreMetrics, OwnerRequest, OwnerReply, OwnerResult } from './Types';
 type Pending = {
     resolve: (reply: OwnerReply) => void;
@@ -46,7 +46,7 @@ export class OwnershipPool {
         if (options.lan ? !Number.isInteger(count) || count < 1 || count > 4 || !this.lanGate!.supports()
             : (count !== 2 && count !== 4) || !supportsOwnership(engine, allAis))
             throw new Error('Unsupported ownership scene');
-        this.publisher = new Publisher(engine.ships, allAis);
+        this.publisher = new Publisher(engine.ships, allAis, createOwnedHostileQueries);
         const groups = Array.from({ length: count }, () => [] as number[]);
         const owned = this.lanGate?.indices ?? engine.ships.map((_, i) => i);
         const n = owned.length;

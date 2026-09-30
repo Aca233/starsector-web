@@ -285,15 +285,21 @@ export class CombatFXSystem {
   /**
    * 1:1 原版枪口爆炸风粒子生成 (com.fs.starfarer.combat.entities.ship.A.class.java:29-54 & SmoothParticle.java)
    */
-  public spawnAuthenticMuzzleFlash(spec: MuzzleFlashSpec, muzzlePos: Vector2, angleRad: number, shipVel: Vector2) {
+  public spawnAuthenticMuzzleFlash(spec: MuzzleFlashSpec, muzzlePos: Vector2, angleRad: number, shipVel: Vector2, underHullShipId?: string) {
     if (!spec || spec.particleCount <= 0) return;
-    if (muzzleEventSinks.get(this)?.(0, spec, muzzlePos, angleRad, shipVel, this.random)) return;
+    // Legacy event rows have no owner field: retain the authoritative record path for depth-tagged FX.
+    if (underHullShipId === undefined && muzzleEventSinks.get(this)?.(0, spec, muzzlePos, angleRad, shipVel, this.random)) return;
+    const start = this.muzzleParticles.length;
     appendMuzzleFlash(this.muzzleParticles, this.random, spec, muzzlePos, angleRad, shipVel);
+    if (underHullShipId !== undefined) for (let i = start; i < this.muzzleParticles.length; i++) this.muzzleParticles[i].underHullShipId = underHullShipId;
   }
 
-  public spawnLauncherSmoke(spec: LauncherSmokeSpec, muzzlePos: Vector2, angleRad: number, shipVel: Vector2) {
-    if (muzzleEventSinks.get(this)?.(1, spec, muzzlePos, angleRad, shipVel, this.random)) return;
+  public spawnLauncherSmoke(spec: LauncherSmokeSpec, muzzlePos: Vector2, angleRad: number, shipVel: Vector2, underHullShipId?: string) {
+    // Legacy event rows have no owner field: retain the authoritative record path for depth-tagged FX.
+    if (underHullShipId === undefined && muzzleEventSinks.get(this)?.(1, spec, muzzlePos, angleRad, shipVel, this.random)) return;
+    const start = this.muzzleParticles.length;
     appendLauncherSmoke(this.muzzleParticles, this.random, spec, muzzlePos, angleRad, shipVel);
+    if (underHullShipId !== undefined) for (let i = start; i < this.muzzleParticles.length; i++) this.muzzleParticles[i].underHullShipId = underHullShipId;
   }
 
   public updateFloatingTexts(dt: number) {
@@ -343,8 +349,7 @@ export class CombatFXSystem {
         this.hulkFragments.splice(i, 1);
         continue;
       }
-      frag.pos.addScaled(frag.vel, dt);
-      frag.facingRad += frag.angularVel * dt;
+      if (!frag.gravityFixed && !frag.gravityManaged) { frag.pos.addScaled(frag.vel, dt); frag.facingRad += frag.angularVel * dt; }
       if (!cooledShips.has(frag.sourceShip)) {
         cooledShips.add(frag.sourceShip);
         frag.sourceShip.updateScorchMarks(dt);
@@ -467,7 +472,7 @@ export class CombatFXSystem {
     if (recipe) rememberParticleRecipe(this.particles.slice(first), recipe);
   }
 
-  public spawnProjectileHitGlows(projectile: Projectile, pos: Vector2, target: Ship, result: HitGlowDamageResult) {
+  public spawnProjectileHitGlows(projectile: Projectile, pos: Vector2, target: Pick<Ship, 'vel'>, result: HitGlowDamageResult) {
     this.hitGlows.push(...createProjectileHitGlows(projectile, pos, target.vel, result, this.random));
   }
 

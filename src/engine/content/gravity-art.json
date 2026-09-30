@@ -1,0 +1,110 @@
+{
+  "tractor": {
+    "spriteWidth": 28.875,
+    "spriteHeight": 40.95,
+    "spritePivotX": 0.4987012987012987,
+    "spritePivotY": 0.575091575091575,
+    "turretSpriteUrl": "/game-assets/graphics/gravity/tractor.png",
+    "hardpointSpriteUrl": "/game-assets/graphics/gravity/tractor.png",
+    "turretOffsets": [
+      23.25,
+      -4.8
+    ],
+    "sourceBox": [
+      256,
+      8,
+      641,
+      554
+    ],
+    "sourcePivot": [
+      448,
+      322
+    ],
+    "sourceMuzzle": [
+      384,
+      12
+    ],
+    "scale": 0.075
+  },
+  "calibrator": {
+    "spriteWidth": 15.84,
+    "spriteHeight": 27.995,
+    "spritePivotX": 0.5,
+    "spritePivotY": 0.7092337917485265,
+    "turretSpriteUrl": "/game-assets/graphics/gravity/calibrator.png",
+    "hardpointSpriteUrl": "/game-assets/graphics/gravity/calibrator.png",
+    "turretOffsets": [
+      19.58,
+      0.0
+    ],
+    "sourceBox": [
+      1016,
+      34,
+      1304,
+      543
+    ],
+    "sourcePivot": [
+      1160,
+      395
+    ],
+    "sourceMuzzle": [
+      1160,
+      39
+    ],
+    "scale": 0.055
+  },
+  "deflector": {
+    "spriteWidth": 13.5,
+    "spriteHeight": 15.705,
+    "spritePivotX": 0.5,
+    "spritePivotY": 0.5845272206303725,
+    "turretSpriteUrl": "/game-assets/graphics/gravity/deflector.png",
+    "hardpointSpriteUrl": "/game-assets/graphics/gravity/deflector.png",
+    "turretOffsets": [
+      9.0,
+      -2.34
+    ],
+    "sourceBox": [
+      298,
+      633,
+      598,
+      982
+    ],
+    "sourcePivot": [
+      448,
+      837
+    ],
+    "sourceMuzzle": [
+      396,
+      637
+    ],
+    "scale": 0.045
+  },
+  "pdc": {
+    "spriteWidth": 12.78,
+    "spriteHeight": 17.64,
+    "spritePivotX": 0.5,
+    "spritePivotY": 0.6198979591836735,
+    "turretSpriteUrl": "/game-assets/graphics/gravity/pdc.png",
+    "hardpointSpriteUrl": "/game-assets/graphics/gravity/pdc.png",
+    "turretOffsets": [
+      10.71,
+      -1.44
+    ],
+    "sourceBox": [
+      1018,
+      604,
+      1302,
+      996
+    ],
+    "sourcePivot": [
+      1160,
+      847
+    ],
+    "sourceMuzzle": [
+      1128,
+      609
+    ],
+    "scale": 0.045
+  }
+}

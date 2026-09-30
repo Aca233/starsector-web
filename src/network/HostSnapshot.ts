@@ -40,8 +40,8 @@ export function captureAuthorityCombat(engine: CombatEngine, tick: number, ackno
  * Simulation component capsules and experimental fixed/record-delta leaves are
  * diagnostic-only; none may enter this versioned receiver contract. */
 export function captureLanDisplayCombat(engine:CombatEngine,tick:number,acknowledged:Record<Seat,number>,simulationMs:number,muzzleEvents:HostMuzzleEvents|null,
- compactParticles=false,packedNumbers=false) {
- const frame=captureCombat(engine,tick,acknowledged,simulationMs,true,true,true,true,compactParticles,packedNumbers,false,false,false,false,false,true);
+ compactParticles=false,packedNumbers=false,displayDefinitions=import.meta.env.VITE_LAN_DISPLAY_DEFINITIONS === 'true') {
+ const frame=captureCombat(engine,tick,acknowledged,simulationMs,true,true,true,true,compactParticles,packedNumbers,false,false,false,false,false,true,displayDefinitions);
  if(muzzleEvents)frame.muzzleEvents=muzzleEvents.snapshot();
  const particles=hostParticleEvents(engine.fxSystem);if(particles)frame.particleEvents=particles.snapshot();
  return frame;

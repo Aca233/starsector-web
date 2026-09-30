@@ -1,3 +1,4 @@
+import { decodeBase64Bytes } from './Base64Bytes.mjs';
 /** SWM1: complete, standalone capital-ship kinematics. No quantization, world
  * mutation, delta baseline, combat result, or caller-controlled allocation. */
 export const MOTION_MAX_SHIPS = 128;
@@ -57,6 +58,5 @@ export function motionToText(bytes) {
 }
 export function motionFromText(value) {
   if (typeof value !== 'string' || value.length > Math.ceil(MOTION_MAX_BYTES / 3) * 4 || value.length % 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(value)) invalid();
-  const raw = atob(value), bytes = Uint8Array.from(raw, c => c.charCodeAt(0));
-  return decodeMotionFrame(bytes);
+  return decodeMotionFrame(decodeBase64Bytes(value));
 }

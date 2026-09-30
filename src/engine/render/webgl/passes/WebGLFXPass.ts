@@ -1,5 +1,11 @@
-import { getGraphicsSettings } from '../../../runtime/GraphicsSettings';
+import { ADUN_ARK_ID } from '../../../content/AdunArkIds';
+import { sampleArkMembrane } from '../../../visual/ArkSystemFX';
+import { ARK_IMPACT_FX } from '../../../visual/ArkWeaponFX';
+import { renderArkWeaponImpact } from '../ArkWeaponFXRenderer';
+import { ADUN_FX } from '../../../visual/AdunFXAssets';
+import { renderAdunImpact } from '../AdunFXRenderer';
 import { nativeMineSpec } from '../../../extensions/NativeMines';
+import { getGraphicsSettings } from '../../../runtime/GraphicsSettings';
 import { visualRandom, visualObjectRandom } from '../../RenderDeterminism';
 import type { CombatRenderView } from '../../CombatRenderView';
 import { WebGLPassContext } from '../WebGLPassContext';
@@ -64,6 +70,15 @@ export class WebGLFXPass {
         if (ship.isDead || !ship.isVisibleTo(engine.playerShip.teamId)) continue;
         const facing = ship.interpolatedFacing(ctx.alpha);
         const center = ship.getShieldCenter(ship.interpolatedPos(ctx.alpha), facing);
+        if ((ship.spec.sourceHullId ?? ship.spec.id) === ADUN_ARK_ID && !ship.shield.voidShield) {
+          const frames = sampleArkMembrane(engine.combatTime).map(f => {
+            const info = textures.getTextureInfo(f.url, true);
+            if (!info.texture || info.width <= 0) throw new Error('Ark membrane was not preloaded: ' + f.url);
+            return { texture: info.texture, weight: f.weight };
+          });
+          shieldShader.renderArkMembrane(batcher.currentViewProj, ship, center, facing, frames);
+          continue;
+        }
         const mainShieldTex = textures.getTexture(ship.shield.radius >= 128
           ? '/game-assets/graphics/fx/shields256.png'
           : ship.shield.radius >= 64 ? '/game-assets/graphics/fx/shields128c.png' : '/game-assets/graphics/fx/shields64.png');
@@ -226,8 +241,23 @@ export class WebGLFXPass {
       for (const glow of engine.hitGlows) {
         const remaining = Math.max(0, glow.life / glow.maxLife);
         const alpha = Math.trunc(glow.peakAlpha * 255 * remaining) / 255;
+        if (glow.spriteUrl === ARK_IMPACT_FX) {
+          renderArkWeaponImpact(ctx, glow.pos, glow.diameter, glow.maxLife - glow.life, glow.maxLife, glow.peakAlpha);
+          batcher.setBlendMode('ADDITIVE');
+          continue;
+        }
+        if (glow.spriteUrl === ADUN_FX.impact) {
+          renderAdunImpact(ctx, glow.pos, glow.diameter, glow.maxLife - glow.life, glow.maxLife, alpha);
+          continue;
+        }
         const [r, g, b] = glow.color;
-        batcher.drawSprite(hitGlowTex, glow.pos.x, glow.pos.y, glow.diameter, glow.diameter,
+        let texture = hitGlowTex;
+        if (glow.spriteUrl) {
+          const art = textures.getTextureInfo(glow.spriteUrl);
+          if (art.width <= 0 || art.height <= 0) throw new Error('Impact VFX was not preloaded: ' + glow.spriteUrl);
+          texture = art.texture;
+        }
+        batcher.drawSprite(texture, glow.pos.x, glow.pos.y, glow.diameter, glow.diameter,
           0, 0, 0, r / 255, g / 255, b / 255, alpha);
       }
     }

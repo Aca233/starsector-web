@@ -37,7 +37,7 @@ function coast(P:typeof MotionPrediction,hz:number) {
  return {meanLagUnits:errors.reduce((a,b)=>a+b,0)/errors.length,maxAbsLagUnits:Math.max(...errors.map(Math.abs))};
 }
 const comparisons=[10,20,60].map(hz=>({hz,before:coast(Before,hz),after:coast(MotionPrediction,hz)}));
-fs.writeFileSync('artifacts/network-stream-20260921/phase26/reconciliation-paired.json',JSON.stringify({fixture:'60 units/s coast, 60FPS, exact no-delay authority; presentation error, NOT RTT',comparisons},null,2));
+fs.writeFileSync(process.env.MOTION_PREDICTION_REPORT_OUT??'artifacts/network-stream-20260921/phase26/reconciliation-paired.json',JSON.stringify({fixture:'60 units/s coast, 60FPS, exact no-delay authority; presentation error, NOT RTT',comparisons},null,2));
 for(const row of comparisons)test(`same-time reconciliation removes invented coast lag at ${row.hz}Hz`,()=>{
  assert.ok(row.before.meanLagUnits>0.2,JSON.stringify(row));
  assert.ok(row.after.maxAbsLagUnits<1e-6,JSON.stringify(row));
@@ -127,5 +127,20 @@ for(const hz of [10,20,60])test(`held thrust/turn remains continuous at ${hz}Hz 
   assert.ok(pose.pos.distanceTo(truth.pos)<1e-6,`${hz}Hz frame ${frame}: distance=${pose.pos.distanceTo(truth.pos)}`);
   assert.ok(Math.abs(pose.facing-truth.facingRad)<1e-6);
   if(frame>60)assert.ok(Math.abs(truth.facingRad)>.1,'fixture must actually turn');
+ }
+});
+
+test('execution-time render consumes a recorded edge that a queued RAF stamp cannot yet replay',()=>{
+ const before=setup(),after=setup();
+ for(const {ship,p} of [before,after]){
+  ship.vel.set(0,0);p.receive(ship,0,0);p.record(input(1,bit('KeyW')),100);
+ }
+ // Both receive the same live controls. Only the actual display time differs.
+ before.p.render(before.ship,input(1,bit('KeyW')),90,true);
+ after.p.render(after.ship,input(1,bit('KeyW')),170,true);
+ assert.ok(shipPresentationPose(before.ship)!.pos.distanceTo(new Vector2())<1e-9);
+ assert.ok(shipPresentationPose(after.ship)!.pos.distanceTo(new Vector2())>0.01);
+ for(const {ship} of [before,after]){
+  assert.equal(ship.pos.distanceTo(new Vector2()),0);assert.equal(ship.vel.distanceTo(new Vector2()),0);assert.equal(ship.facingRad,0);
  }
 });

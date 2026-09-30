@@ -1,3 +1,4 @@
+import { screenVoidArea, voidAreaDamageFraction } from './VoidShieldArea';
 import { sameTeam, combatTeam } from "../../CombatTeams";
 import { damageToMissiles } from './DamageToMissiles';
 import { segmentCircleEntry } from '../../../math/Geometry';
@@ -61,7 +62,7 @@ export class ProjectileCollisionHandler {
   }
 
   public canBatchShipCollision(p: Projectile): boolean {
-    return !p.isRocket && !p.proximityFuse && !p.passThroughFighters && p.specId !== 'lightmg' && !p.isFlare;
+    return !p.isRocket && !p.proximityFuse && !p.projectileExplosionSpec && !p.passThroughFighters && p.specId !== 'lightmg' && !p.isFlare;
   }
 
   public checkShipCollisionsBatch(projectiles: Projectile[], allShips: Ship[], ctx: WeaponSimContext): Set<number> {
@@ -88,7 +89,14 @@ export class ProjectileCollisionHandler {
         hit = this.runtimeCollisionKernel.findHitTypeScript(surviving);
       }
 
-      if (hit && this.applyShipCollisionHit(hit, ctx)) consumed.add(hit.projectile.id);
+      if (hit) {
+        const end = hit.projectile.pos.clone();
+        if (this.applyShipCollisionHit(hit, ctx)) consumed.add(hit.projectile.id);
+        else if (hit.kind === 'SHIELD' && hit.ship.shield.voidShield) {
+          hit.projectile.pos.copy(end);
+          if (this.checkShipCollision(hit.projectile, allShips, ctx)) consumed.add(hit.projectile.id);
+        }
+      }
     }
 
     return consumed;
@@ -260,23 +268,27 @@ export class ProjectileCollisionHandler {
     const sourceShip = projectileSource(p, ctx);
     const sourceTeam = combatTeam(p) ?? sourceShip?.teamId;
     const fighterIds = new Set(ctx.fighters.map(ship => ship.id));
+    const voidFractions = screenVoidArea({...p,damageType:'FRAGMENTATION'}, ships.filter(s=>sourceTeam===undefined || s.teamId!==sourceTeam), p.pos, p.proximityFuse!.explosionRadius,
+      distance=>this.getExplosionDamageScale(p,distance), ctx);
     const visited = new Set<string>();
     for (const ship of ships) {
       if (visited.has(ship.id)) continue;
       visited.add(ship.id);
       if (ship.id === p.sourceShipId || (sourceTeam !== undefined && ship.teamId === sourceTeam) || ship.isDead || ship.isCollisionless) continue;
 
-      const contact = getShipExplosionContact(ship, p.pos);
+      const contact = getShipExplosionContact(ship, p.pos, !!ship.assemblyRoot.shield.voidShield);
+      const voidFraction = voidAreaDamageFraction(voidFractions,ship,contact.point);
+      if(voidFraction<=0) continue;
       const shieldContact = contact.shield;
       const surfaceDistance = contact.distance;
       const shieldCenter = ship.getShieldCenter();
-      const rawDamage = p.damage * this.getExplosionDamageScale(p, surfaceDistance) * projectileOutgoingMultiplier(p, ship, contact.point, ctx);
+      const rawDamage = p.damage * voidFraction * this.getExplosionDamageScale(p, surfaceDistance) * projectileOutgoingMultiplier(p, ship, contact.point, ctx);
       if (rawDamage <= 0) continue;
       const takenDamage = rawDamage * ship.crDamageTakenMultiplier;
       damagedHostileTarget = true;
       if (shieldContact) {
         const shieldDamage = takenDamage * ship.system.getShieldDamageMultiplier();
-        const fluxGain = ship.shield.absorbDamage(shieldDamage, 'FRAGMENTATION', contact.point.clone().sub(shieldCenter).heading());
+        const fluxGain = ship.shield.absorbImpact(shieldDamage, 'FRAGMENTATION', contact.point.clone().sub(shieldCenter).heading()).flux;
         ship.flux.increaseShieldFlux(fluxGain, true);
         ctx.statsTracker?.recordDamageDealt(p.isPlayer ?? false, 'FRAGMENTATION', shieldDamage * ship.shield.damageTakenMultiplierFor("FRAGMENTATION"), 'SHIELD');
         ctx.fx.spawnShieldRipple(p.pos, 35, [255, 120, 100]);
@@ -367,19 +379,44 @@ export class ProjectileCollisionHandler {
    * 舰船残骸遮挡碰撞检测
    * @returns 是否命中残骸
    */
-  public checkHulkCollision(p: Projectile, ctx: WeaponSimContext): boolean {
-    let first = Infinity;
+  public queryHulkCollision(p: Projectile, ctx: WeaponSimContext): { t: number; point: Vector2; velocity: Vector2; id: number; radius: number } | null {
+    let first = Infinity, velocity: Vector2 | undefined, id = 0, radius = 0;
     for (const frag of ctx.hulkFragments) {
+      if (p.damagedTargetIds?.includes('terrain:wreck:' + frag.id)) continue;
       if (distanceToSegment(frag.pos, p.prevPos, p.pos).distance > frag.collisionRadius + Math.max(0, p.radius)) continue;
       const toSource = (point: Vector2) => point.clone().sub(frag.pos).rotate(-frag.facingRad).add(frag.localOffset);
       const t = segmentHullHit(toSource(p.prevPos), toSource(p.pos), frag.bounds);
-      if (t !== null) first = Math.min(first, t);
+      if (t !== null && t < first) { first = t; velocity = frag.vel; id = frag.id; radius = frag.collisionRadius; }
     }
-    if (!Number.isFinite(first)) return false;
-    p.pos.copy(p.prevPos.clone().addScaled(p.pos.clone().sub(p.prevPos), first));
-    sound.playAtPos('shield_hit', p.pos, ctx.playerShip.pos, 0.3);
-    ctx.fx.spawnSparks(p.pos, 10, [255, 160, 60]);
-    ctx.fx.spawnDebris(p.pos, 1, [80, 75, 70], 50, 'small');
+    return Number.isFinite(first) ? { t: first, point: Vector2.lerp(p.prevPos, p.pos, first), velocity: velocity?.clone() ?? new Vector2(), id, radius } : null;
+  }
+
+  public findShipHitParameter(p: Projectile, allShips: Ship[]): number | null {
+    return this.runtimeCollisionKernel.findHits([this.createRuntimeQuery(p, allShips)])[0]?.t ?? null;
+  }
+
+  /** Same authored contact material on rocks and wrecks; damage/explosion payload stays authoritative. */
+  public applyEnvironmentImpact(p: Projectile, point: Vector2, velocity: Vector2, ctx: WeaponSimContext, asteroidId?: number): void {
+    p.pos.copy(point);
+    const visual = getProjectileImpactVisualProfile({ specId: p.specId, damageType: p.damageType, damage: p.damage, isRocket: !!p.isRocket, surface: 'HULL' });
+    sound.playAtPos(visual.soundKey, point, ctx.playerShip.pos, visual.soundVolume);
+    ctx.fx.spawnProjectileHitGlows(p, point, { vel: velocity }, { hullDamage: p.damage });
+    ctx.fx.spawnMovingRayImpactFade(p, point);
+    if (p.isRocket) {
+      ctx.contrailEngine?.detach(p.id);
+      if (!p.missileExplosionVisualSpec || p.missileExplosionVisualSpec.useHitGlowWhenDealingDamage === false) this.spawnMissileDestructionVisual(p, point, ctx);
+    }
+    if (p.onHitEffect) weaponEffects.require(p.onHitEffect).hitEnvironment?.(p, point, velocity, ctx);
+    ctx.spawnProjectileExplosion?.(p, point, undefined, asteroidId);
+    ctx.addCameraShake(visual.cameraShake, .1);
+  }
+
+  public checkHulkCollision(p: Projectile, ctx: WeaponSimContext): boolean {
+    const hit = this.queryHulkCollision(p, ctx);
+    if (!hit) return false;
+    this.applyEnvironmentImpact(p, hit.point, hit.velocity, ctx);
+    ctx.fx.spawnSparks(hit.point, 10, [255, 160, 60]);
+    ctx.fx.spawnDebris(hit.point, 1, [80, 75, 70], 50, 'small');
     return true;
   }
 
@@ -395,7 +432,7 @@ export class ProjectileCollisionHandler {
       if (!hit) return false;
       if (this.applyShipCollisionHit(hit, ctx)) return true;
       p.pos.copy(end);
-      if (!p.damagedTargetIds?.includes(hit.ship.id)) return false;
+      if (!(hit.kind === 'SHIELD' && hit.ship.shield.voidShield && !hit.ship.shield.isActive) && !p.damagedTargetIds?.includes(hit.ship.id)) return false;
     }
     return false;
   }
@@ -406,7 +443,8 @@ export class ProjectileCollisionHandler {
     const impactWorld = hit.worldPoint;
     const impactDamage = p.damage * projectileOutgoingMultiplier(p, ship, impactWorld, ctx);
     p.pos.copy(impactWorld);
-    ctx.statsTracker?.recordShotHit(p.isPlayer ?? false);
+    if(!p.voidShieldHitRecorded) ctx.statsTracker?.recordShotHit(p.isPlayer ?? false);
+    if(hit.kind==='SHIELD' && ship.shield.voidShield) p.voidShieldHitRecorded=true;
 
     if (hit.kind === 'SHIELD') {
       const sCenter = ship.getShieldCenter(ship.pos, ship.facingRad);
@@ -414,13 +452,14 @@ export class ProjectileCollisionHandler {
       const shieldMult = ship.system.getShieldDamageMultiplier();
       // CRPluginImpl: 护盾承伤按战备值修正 (标准 70% 战备时为 1.0)
       const absorbedDmg = impactDamage * shieldMult * ship.crDamageTakenMultiplier;
-      const fluxGain = ship.shield.absorbDamage(absorbedDmg, p.damageType, toShield.heading());
+      const absorption = ship.shield.absorbImpact(absorbedDmg, p.damageType, toShield.heading());
+      const fluxGain = absorption.flux;
       if (ctx.statsTracker) {
-        ctx.statsTracker.recordDamageDealt(p.isPlayer ?? false, p.damageType, absorbedDmg * ship.shield.damageTakenMultiplierFor(p.damageType), 'SHIELD');
+        ctx.statsTracker.recordDamageDealt(p.isPlayer ?? false, p.damageType, absorption.absorbed, 'SHIELD');
       }
-      const shieldDamage = shieldHitGlowDamage(fluxGain, ship.flux.maxFlux - ship.flux.totalFlux, ship.shield.efficiency);
+      const shieldDamage = ship.shield.voidShield ? absorption.absorbed : shieldHitGlowDamage(fluxGain, ship.flux.maxFlux - ship.flux.totalFlux, ship.shield.efficiency);
       ship.flux.increaseShieldFlux(fluxGain, !p.softFlux);
-      ctx.fx.addFloatingDamage(impactWorld, absorbedDmg * ship.shield.damageTakenMultiplierFor(p.damageType), [80, 200, 255]);
+      ctx.fx.addFloatingDamage(impactWorld, absorption.absorbed, [80, 200, 255]);
       const visual = getProjectileImpactVisualProfile({
         specId: p.specId,
         damageType: p.damageType,
@@ -432,6 +471,15 @@ export class ProjectileCollisionHandler {
       // Shield.absorbDamage already updates the source shield segments. The projectile
       // adds its own native hit-particle pair, including missiles; no generic ring/spark burst.
       ctx.fx.spawnProjectileHitGlows(p, impactWorld, ship, { shieldDamage });
+      if (absorption.remainingFraction > 0) {
+        // The screen has collapsed. Keep trajectory/time; only the unabsorbed
+        // payload travels onward, including EMP and a later missile detonation.
+        p.damage *= absorption.remainingFraction;
+        if(p.baseDamage !== undefined) p.baseDamage *= absorption.remainingFraction;
+        if(p.empDamage !== undefined) p.empDamage *= absorption.remainingFraction;
+        return false;
+      }
+      if(ship.shield.voidShield) p.voidShieldBlockedRoot=ship.id;
       ctx.fx.spawnMovingRayImpactFade(p, impactWorld);
       if (p.onHitEffect) requireWeaponEffect(p.onHitEffect, 'hit', p.specId).hit!(p, ship, impactWorld, true, ctx.ships?.find(s => s.id === p.sourceShipId), ctx);
       ctx.spawnProjectileExplosion?.(p, impactWorld, ship.id);

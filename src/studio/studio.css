@@ -1,26 +1,6 @@
 @import "../ui/native-font-faces.css";
-:root {
-  --ui-font: StarsectorLatin, StarsectorCN, sans-serif;
-  --ui-mono: StarsectorNumber, StarsectorCN, monospace;
-  --ui-bg: #020709;
-  --ui-panel: #050d10;
-  --ui-raised: #153d49;
-  --ui-hover: #285767;
-  --ui-border: #477d8b;
-  --ui-divider: #163d49;
-  --ui-text: #dedede;
-  --ui-muted: #a6b7bc;
-  --ui-dim: #779096;
-  --ui-accent: #aadeff;
-  --ui-accent-bg: #1f5e70;
-  --ui-button-text: #aadeff;
-  --ui-highlight: #ffd200;
-  --ui-success: #9bff00;
-  --ui-warning: #ffd200;
-  --ui-danger: #ff8050;
-  --ui-radius: 0;
-  --ui-radius-sm: 0;
-}
+/* Shared palette comes from ui/core/theme.css; this file owns studio geometry. */
+
 .native-refit-app,
 .native-home {
   --u: clamp(0.85px, min(0.12642dvh, 0.09615vw), 1.35px);
@@ -30,8 +10,8 @@
   isolation: isolate;
   font-family: var(--ui-font);
   font-size: calc(15 * var(--u));
-  color: #dcdcdc;
-  background: #010304 url("/game-assets/graphics/backgrounds/background4.jpg")
+  color: var(--ui-text);
+  background: #010304 url("/game-assets/graphics/original-ui/observatory.png")
     center/cover;
 }
 .native-refit-app *,
@@ -58,7 +38,7 @@
 button:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 1px solid #ffd200;
+  outline: 1px solid var(--ui-highlight);
   outline-offset: 2px;
 }
 .native-numeric,
@@ -67,20 +47,20 @@ select:focus-visible {
 .native-flux-row input,
 .refit-weapon-flux b,
 .refit-mod-row b {
-  font-family: StarsectorNumber, monospace;
+  font-family: "Cascadia Code", monospace;
   font-weight: 700;
   line-height: 1.1;
-  color: #ffd200;
+  color: var(--ui-highlight);
 }
 .native-green {
-  color: #9bff00 !important;
+  color: var(--ui-success) !important;
 }
 .native-dim {
   color: #788f94;
 }
 .native-shortcut {
-  color: #ffd200;
-  font-family: StarsectorLatin, StarsectorCN, sans-serif;
+  color: var(--ui-highlight);
+  font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif;
   white-space: nowrap;
   margin-left: 0.35em;
 }
@@ -97,7 +77,7 @@ select:focus-visible {
   padding: 0;
   border: 0;
   background: none;
-  color: #ffd200;
+  color: var(--ui-highlight);
 }
 .ui-keycap:before {
   content: "[";
@@ -109,11 +89,11 @@ select:focus-visible {
   width: 14px;
   height: 14px;
 }
-/* Main menu uses the original title art, not a redesigned brand. */
+/* Legacy geometry below is overridden by the explicitly requested original menu skin. */
 .native-home {
   background-image:
     linear-gradient(#0007, #0003),
-    url("/game-assets/graphics/backgrounds/background4.jpg");
+    url("/game-assets/graphics/original-ui/observatory.png");
 }
 .native-title-logo {
   position: absolute;
@@ -149,7 +129,7 @@ select:focus-visible {
   display: grid;
   place-content: center;
   gap: 20px;
-  color: #aadeff;
+  color: var(--ui-text);
   font: 20px var(--ui-font);
 }
 /* Screenshot reference coordinates are based on the original 1040 x 791 window. */
@@ -184,7 +164,7 @@ select:focus-visible {
   border: 0;
   clip-path: polygon(8px 0, 100% 0, 100% 100%, 0 100%, 0 8px);
   background: #1e4656;
-  color: #aadeff;
+  color: var(--ui-text);
   line-height: 1;
   font-family: Arial, sans-serif !important;
   font-size: calc(27 * var(--u)) !important;
@@ -251,7 +231,7 @@ select:focus-visible {
   text-overflow: ellipsis;
 }
 .refit-roster-ship strong {
-  font-family: StarsectorLatin, StarsectorCN, sans-serif;
+  font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif;
   font-weight: 400;
   font-size: calc(13 * var(--u));
   white-space: nowrap;
@@ -381,7 +361,7 @@ select:focus-visible {
   padding: 0;
   z-index: 3;
   opacity: 0;
-  color: #ffd200;
+  color: var(--ui-highlight);
   pointer-events: auto;
 }
 .studio-mount--medium {
@@ -403,14 +383,14 @@ select:focus-visible {
 .studio-mount:focus-visible,
 .studio-mount.is-selected {
   opacity: 1 !important;
-  border: 1px solid #ffd200;
+  border: 1px solid var(--ui-highlight);
   box-shadow: 0 0 0 1px #07151c;
   background: #0a263baa;
 }
 .studio-mount.is-grouped {
   opacity: 1;
   background: #9bff0040;
-  border-color: #9bff00;
+  border-color: var(--ui-success);
 }
 .ship-arc {
   position: absolute;
@@ -430,7 +410,7 @@ select:focus-visible {
 }
 .ship-arc circle {
   fill: none;
-  stroke: #ffd200;
+  stroke: var(--ui-highlight);
   stroke-width: 1;
 }
 .refit-stats {
@@ -470,7 +450,7 @@ select:focus-visible {
   color: #97bfd0;
   background: transparent;
   font-size: calc(27 * var(--u)) !important;
-  font-family: StarsectorLatin !important;
+  font-family: "Segoe UI" !important;
   line-height: 1;
 }
 .native-help-button:after {
@@ -508,9 +488,9 @@ select:focus-visible {
     0 0 8px #268cff;
 }
 .native-op-bar strong {
-  font-family: StarsectorNumber;
+  font-family: "Cascadia Code";
   position: relative;
-  color: #ffd200;
+  color: var(--ui-highlight);
   font-size: calc(15 * var(--u));
   font-weight: 700;
   text-shadow:
@@ -519,7 +499,7 @@ select:focus-visible {
   line-height: 1;
 }
 .native-op-bar.over-budget strong {
-  color: #ff8050;
+  color: var(--ui-danger);
 }
 .native-op-bar.over-budget i {
   background: linear-gradient(#b43116, #661e13);
@@ -540,7 +520,7 @@ select:focus-visible {
 .native-stat-three small,
 .native-flux-row small,
 .refit-weapon-flux small {
-  font-family: StarsectorCN, StarsectorLatin, sans-serif;
+  font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif;
   font-size: calc(10 * var(--u));
   line-height: 1.1;
   color: #b7deea;
@@ -579,7 +559,7 @@ select:focus-visible {
     0 calc(100% - 7px),
     0 7px
   );
-  color: #aadeff;
+  color: var(--ui-text);
   background: #1c4d5c;
   line-height: 1;
   font-size: calc(22 * var(--u)) !important;
@@ -633,7 +613,7 @@ select:focus-visible {
 }
 .refit-weapon-flux b {
   font-size: calc(16 * var(--u));
-  color: #ffd200;
+  color: var(--ui-highlight);
 }
 .refit-hullmods {
   flex: 0 1 auto;
@@ -709,12 +689,12 @@ select:focus-visible {
 }
 .native-errors {
   font-size: 13px;
-  color: #ff8050;
+  color: var(--ui-danger);
   margin-top: 12px;
   line-height: 1.5;
 }
 .native-locked {
-  color: #ffd200;
+  color: var(--ui-highlight);
   padding: 10px 0;
   font-size: 15px;
 }
@@ -768,7 +748,7 @@ select:focus-visible {
   letter-spacing: 0.05em;
 }
 .refit-name small {
-  color: #ffd200;
+  color: var(--ui-highlight);
 }
 .refit-actions {
   display: grid;
@@ -819,7 +799,7 @@ select:focus-visible {
   z-index: 5;
   border: 1px solid #856326;
   background: #231b09ef;
-  color: #ffd200;
+  color: var(--ui-highlight);
   font-size: 13px;
   padding: 7px 10px;
 }
@@ -842,57 +822,16 @@ select:focus-visible {
   margin-left: auto;
   border: 0;
   background: none;
-  color: #aadeff;
+  color: var(--ui-text);
   cursor: pointer;
 }
-/* The refit dialogs keep native framing, fonts, controls, and compact density. */
-.ui-modal-backdrop {
-  background: #0009;
-  backdrop-filter: none;
-}
-.ui-modal {
-  border: 1px solid #86b1b8;
-  outline: 1px solid #123544;
-  border-top-color: #b4e1ed;
-  background: #030c10;
-  box-shadow:
-    inset 0 0 0 2px #153440,
-    0 3px 30px #000;
-  max-width: 820px;
-}
-.ui-modal--small {
-  max-width: 510px;
-}
-.ui-modal--wide {
-  max-width: 1100px;
-}
-.ui-modal-header {
-  background: #102e3a;
-  border-bottom: 1px solid #456b79;
-  padding: 11px 15px;
-}
-.ui-modal-header h2 {
-  font: 19px var(--ui-font);
-  color: #c7e2f0;
-}
-.ui-eyebrow {
-  font: 12px var(--ui-font);
-  color: #8eafb8;
-  letter-spacing: 0;
-}
-.ui-modal-footer {
-  background: #030a0f;
-  padding: 10px 15px;
-  gap: 5px;
-}
-.ui-modal-body {
-  padding: 15px;
-  scrollbar-color: #265562 #050d11;
-}
-.ui-section-heading h3 {
-  font-family: var(--ui-font);
-  font-weight: 400;
-}
+/* Retain the existing compact dialog geometry, but not a separate skin. */
+.ui-modal { max-width: 820px; }
+.ui-modal--small { max-width: 510px; }
+.ui-modal--wide { max-width: 1100px; }
+.ui-modal-header { padding: 11px 15px; }
+.ui-modal-footer { padding: 10px 15px; gap: 5px; }
+.ui-modal-body { padding: 15px; scrollbar-color: var(--ui-border) transparent; }
 .native-modal-note {
   font-size: 13px;
   line-height: 1.6;
@@ -907,11 +846,11 @@ select:focus-visible {
   line-height: 1.7;
 }
 .native-help label {
-  color: #aadeff;
+  color: var(--ui-text);
 }
 .native-help input {
   margin-right: 10px;
-  accent-color: #9bff00;
+  accent-color: var(--ui-success);
 }
 .native-hull-picker {
   display: flex;
@@ -932,7 +871,7 @@ select:focus-visible {
 }
 .native-hull-choice:hover,
 .native-hull-choice[aria-pressed="true"] {
-  border-color: #aadeff;
+  border-color: var(--ui-text);
   background: #173c48;
 }
 .native-hull-choice img {
@@ -949,7 +888,7 @@ select:focus-visible {
 }
 .native-hull-choice b {
   font: 14px var(--ui-mono);
-  color: #ffd200;
+  color: var(--ui-highlight);
 }
 .native-weapon-picker {
   display: grid;
@@ -1006,7 +945,7 @@ select:focus-visible {
 }
 .native-weapon-choice > b {
   font: 12px var(--ui-mono);
-  color: #ffd200;
+  color: var(--ui-highlight);
 }
 .native-weapon-details {
   border-left: 1px solid #245061;
@@ -1015,7 +954,7 @@ select:focus-visible {
 }
 .native-weapon-details h3 {
   font: 19px var(--ui-font);
-  color: #ffd200;
+  color: var(--ui-highlight);
 }
 .native-weapon-details dl {
   display: grid;
@@ -1027,7 +966,7 @@ select:focus-visible {
 .native-weapon-details dd {
   margin: 0;
   text-align: right;
-  color: #ffd200;
+  color: var(--ui-highlight);
   font-family: var(--ui-mono);
   font-size: 13px;
 }
@@ -1045,7 +984,7 @@ select:focus-visible {
 .native-weapon-details select,
 .native-group-weapons select {
   border: 1px solid #40768b;
-  color: #ffd200;
+  color: var(--ui-highlight);
   background: #0b2532;
   padding: 3px 10px;
   font-family: var(--ui-font);
@@ -1072,7 +1011,7 @@ select:focus-visible {
 }
 .native-mod-choice h3 b {
   font: 12px var(--ui-mono);
-  color: #ffd200;
+  color: var(--ui-highlight);
   white-space: nowrap;
   margin-left: 8px;
 }
@@ -1104,7 +1043,7 @@ select:focus-visible {
 .native-group-title {
   border: 0;
   border-bottom: 1px solid #507581;
-  color: #ffd200;
+  color: var(--ui-highlight);
   background: #163847;
   font: 18px var(--ui-font);
   padding: 6px;
@@ -1143,7 +1082,7 @@ select:focus-visible {
   white-space: nowrap;
 }
 .native-group-picker input {
-  accent-color: #9bff00;
+  accent-color: var(--ui-success);
   margin-right: 7px;
 }
 .native-design-library {
@@ -1199,7 +1138,7 @@ select:focus-visible {
   display: flex;
   gap: 7px;
   align-items: baseline;
-  color: #aadeff;
+  color: var(--ui-text);
   font: 14px var(--ui-font);
   pointer-events: none;
 }
@@ -1278,21 +1217,7 @@ select:focus-visible {
   }
 }
 
-.native-engine-idle {
-  position: absolute;
-  pointer-events: none;
-  z-index: 2;
-  transform-origin: 50% 20%;
-  background: radial-gradient(
-    ellipse at 50% 26%,
-    #f4ffff 0%,
-    #d4f9ff 10%,
-    #4fbfffaa 30%,
-    #1398ff44 50%,
-    #0088ff11 65%,
-    transparent 75%
-  );
-}
+/* Engine idle preview uses the shared textured exhaust renderer, below the hull. */
 
 .native-screen-close,
 .native-step,
@@ -1898,7 +1823,7 @@ select:focus-visible {
   line-height: 18px;
 }
 .source-group-header > b {
-  font-family: StarsectorLatin, sans-serif;
+  font-family: "Segoe UI", sans-serif;
   font-weight: 400;
 }
 .source-group-scroll {
@@ -2046,7 +1971,7 @@ select:focus-visible {
 }
 .source-group-summary-row b {
   text-align: center;
-  color: #ffe000;
+  color: var(--ui-highlight);
   font:
     14px "Microsoft YaHei",
     sans-serif;
@@ -2227,7 +2152,7 @@ select:focus-visible {
 }
 .source-mod-scroll .source-mod-row .source-mod-cost {
   color: #ff7900;
-  font-family: StarsectorLatin, sans-serif;
+  font-family: "Segoe UI", sans-serif;
 }
 .source-mod-scroll .source-mod-row.is-installed .source-mod-cost {
   color: #8d9092;
@@ -2237,7 +2162,7 @@ select:focus-visible {
   font-size: calc(12 * var(--u));
 }
 .source-mod-check {
-  color: #ffdf00;
+  color: var(--ui-highlight);
   font:
     calc(26 * var(--u))/1 Arial,
     sans-serif;
@@ -2435,7 +2360,7 @@ select:focus-visible {
   text-align: right;
 }
 .source-weapon-op b {
-  color: #ffe000;
+  color: var(--ui-highlight);
   font: 19px/20px var(--ui-mono);
 }
 .source-equipped-weapon .source-weapon-op b {
@@ -2528,7 +2453,7 @@ select:focus-visible {
 }
 .source-type-filters kbd,
 .source-ownership-filters kbd {
-  color: #ffdf00;
+  color: var(--ui-highlight);
   font: inherit;
 }
 .source-ownership-filters button:nth-child(2) {
@@ -2582,7 +2507,7 @@ select:focus-visible {
 }
 .source-weapon-details h3 em {
   font-style: normal;
-  color: #ffe000;
+  color: var(--ui-highlight);
 }
 .source-weapon-manufacturer {
   color: #8e9696;
@@ -2654,7 +2579,7 @@ select:focus-visible {
   object-fit: contain;
 }
 .source-damage-effect {
-  color: #ffe000;
+  color: var(--ui-highlight);
   text-align: right;
   margin-top: 3px;
   font-size: 13px;
@@ -2669,7 +2594,7 @@ select:focus-visible {
   cursor: pointer;
 }
 .source-weapon-codex kbd {
-  color: #ffe000;
+  color: var(--ui-highlight);
   font: inherit;
 }
 .source-weapon-encyclopedia {
@@ -2849,17 +2774,6 @@ select:focus-visible {
 .assembly-hit-regions { position:absolute; inset:0; width:100%; height:100%; z-index:2; pointer-events:none; overflow:visible; }
 .assembly-hit-regions polygon { pointer-events:all; cursor:pointer; fill:#58dbe00c; stroke:#8fdde055; stroke-width:1.5; vector-effect:non-scaling-stroke; }
 .assembly-hit-regions polygon:hover, .assembly-hit-regions polygon:focus-visible { fill:#6ce8ea40; stroke:#ecda6d; outline:none; }
-.assembly-editor { position:absolute; z-index:8; top:48px; left:12px; width:min(350px,48%); max-height:calc(100% - 170px); overflow:auto; padding:8px 10px; border:1px solid #385463; background:#07131ef2; color:#b5d9df; font-size:12px; pointer-events:auto; }
-.assembly-editor-heading { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
-.assembly-editor p { margin:6px 0; line-height:1.5; color:#8caab6; }
-.assembly-editor summary { cursor:pointer; padding:7px 0; color:#e1db9a; }
-.assembly-editor button { background:#102c39; color:#bfe5ed; border:1px solid #456271; padding:5px 7px; cursor:pointer; text-align:left; }
-.assembly-editor button:hover, .assembly-editor button:focus-visible { background:#244c5c; border-color:#e1db9a; }
-.assembly-editor button:disabled { opacity:.45; cursor:default; }
-.assembly-module-list { display:grid; gap:4px; max-height:180px; overflow:auto; }
-.assembly-module-list button[aria-pressed="true"] { border-color:#e1db9a; color:#ffebac; }
-.assembly-module-list span { display:inline-block; min-width:54px; }
-.assembly-restore { margin-top:6px; }
 
 /* Keep enlarged modules and their mount targets clear of the stats/actions. */
 .refit-vessel--assembly > .ship-stage { position:absolute; left:calc(85 * var(--u)); right:calc(310 * var(--u)); top:calc(205 * var(--u)); bottom:calc(155 * var(--u)); width:auto; height:auto; }
@@ -2869,10 +2783,6 @@ select:focus-visible {
 .assembly-hit-regions polygon.is-active-module { fill:#55ddd51c; stroke:#ffe36b; stroke-width:2; }
 .studio-ship--assembly .studio-mount { opacity:.75; }
 .studio-ship--assembly .studio-mount:not(.is-equipped) { opacity:.65; }
-.assembly-editor button[aria-pressed="true"] { color:#ffebac; border-color:#d7c578; }
-.assembly-editor-actions { display:flex; flex-wrap:wrap; gap:6px; margin:4px 0; }
-.assembly-editor-actions .assembly-restore { margin-top:0; }
-.assembly-editor small { color:#8caab6; }
 .native-refit-app .refit-grid.has-assembly .refit-vessel { left:0; }
 .refit-grid.has-assembly .refit-fighter-decks { top:calc(210 * var(--u)); }
 
@@ -2880,3 +2790,6 @@ select:focus-visible {
 .native-static-note { margin: 10px 0; max-width: 360px; color: #a6c8d2; font-size: 13px; line-height: 1.7; text-align: center; }
 .native-static-note a { color: #ffda67; text-decoration: underline; }
 .native-static-note a:focus-visible { outline: 2px solid #ffda67; outline-offset: 3px; }
+
+/* Web fourth weapon size; existing native sizes unchanged. */
+.studio-mount--extra_large { width: 38px; height: 38px; }
