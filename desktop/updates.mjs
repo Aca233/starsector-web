@@ -1,3 +1,4 @@
+import { UNINSTALLER_NAMES } from './branding.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app, dialog, shell } from 'electron';
@@ -13,7 +14,7 @@ const RELEASES = 'https://github.com/Aca233/starsector-web/releases/latest';
 export function desktopUpdater({ changed, install, log, enabled = true, contentStore = null }) {
   const supported = app.isPackaged && process.platform === 'win32'
     && fs.existsSync(path.join(process.resourcesPath, 'app-update.yml'))
-    && fs.existsSync(path.join(path.dirname(process.execPath), 'Uninstall Starsector Web.exe'));
+    && UNINSTALLER_NAMES.some(name => fs.existsSync(path.join(path.dirname(process.execPath), name)));
   let status = supported ? '尚未检查更新' : 'ZIP / 开发版：手动更新';
   let downloaded = false, checking = null, downloading = null, available = null, phase = '准备下载';
   let reason = '', detail = '', lastProgressLog = 0, contentReady = null;

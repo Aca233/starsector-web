@@ -25,7 +25,7 @@ export async function runtimeFingerprint(appOutDir, electronExecutable) {
   add('electron.exe', await hashFile(electronExecutable));
   for (const file of await filesIn(appOutDir)) {
     if (file.startsWith('resources/backend/') || file.startsWith('resources/licenses/')
-      || ['Starsector Web.exe', 'resources/' + CONTENT_MANIFEST, 'resources/desktop-guide.md', 'resources/app-update.yml'].includes(file)) continue;
+      || ['Starship Foundry.exe', 'Starsector Web.exe', 'resources/' + CONTENT_MANIFEST, 'resources/desktop-guide.md', 'resources/app-update.yml'].includes(file)) continue;
     if (file === 'resources/app.asar') {
       const archive = path.join(appOutDir, file);
       for (const name of asar.listPackage(archive).map(n => n.replaceAll('\\', '/').replace(/^\//, '')).sort()) {

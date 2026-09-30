@@ -30,7 +30,7 @@ try{
   const read=readLibrary();if(read.error||read.library.designs.length!==2)throw Error('Actual browser save/read failed');
   const {rocinanteShips}=await import('/src/engine/content/RocinantePack.ts');
   const {rocinanteWeapons}=await import('/src/engine/content/RocinanteArmory.ts');
-  return {id:'web_expanse_rocinante_pack',name:'罗西南特号',version:'1.0.0',author:'Local Web adaptation',description:'Requires the current Starsector Web host with Rocinante system/hullmod extensions. No other custom ship required.',ships:rocinanteShips(),weapons:rocinanteWeapons(),fits};
+  return {id:'web_expanse_rocinante_pack',name:'罗西南特号',version:'1.0.0',author:'Local Web adaptation',description:'Requires the current Starship Foundry host with Rocinante system/hullmod extensions. No other custom ship required.',ships:rocinanteShips(),weapons:rocinanteWeapons(),fits};
  });
  await fs.writeFile(out+'/package-data.json',JSON.stringify(delivery,null,2));
  await page.reload();await page.getByRole('region',{name:'已安装舰体插件'}).waitFor();

@@ -19,7 +19,7 @@ export function NativeHome({ onEnter, onSkills, onLan, onSteam, entryError, stat
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('presentation');
   const settingsId = useId();
-  useEffect(() => { document.title = '舰队指挥中心 · Starsector Web'; }, []);
+  useEffect(() => { document.title = '星舰工坊 · 舰队指挥中心'; }, []);
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
       if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || document.querySelector('[role="dialog"], [role="alertdialog"]') ||
@@ -37,7 +37,7 @@ export function NativeHome({ onEnter, onSkills, onLan, onSteam, entryError, stat
       <header className="fleet-masthead">
         <div className="fleet-wordmark">
           <span className="fleet-insignia" aria-hidden="true"><i /><i /><i /></span>
-          <div>STARSECTOR <span>WEB</span></div>
+          <div>STARSHIP <span>FOUNDRY</span></div>
         </div>
         <div className="fleet-masthead-right"><FullscreenButton /></div>
       </header>

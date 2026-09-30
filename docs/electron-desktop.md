@@ -54,8 +54,8 @@ npm run package:electron -- --version 0.2.0
 
 输出为 `artifacts/electron/<版本-时间戳>/`：
 
-- `Starsector-Web-Desktop-Setup-<版本>-x64.exe`：按用户安装的 NSIS 安装器，不默认请求提权。
-- `Starsector-Web-Desktop-<版本>-x64.zip`：完整解压后运行 `Starsector Web.exe`，不需要另装 Node。
+- `Starship-Foundry-Desktop-Setup-<版本>-x64.exe`：按用户安装的 NSIS 安装器，不默认请求提权。
+- `Starship-Foundry-Desktop-<版本>-x64.zip`：完整解压后运行 `Starship Foundry.exe`，不需要另装 Node。
 - `win-unpacked/`：可直接运行的打包目录。
 - `latest.yml` 与安装包 `.blockmap`：Electron 安装版更新元数据。
 
@@ -125,7 +125,7 @@ Electron **安装版**使用 `electron-updater` 的 GitHub Releases + NSIS 更�
 `package:electron` 在 `afterPack` 中从**实际打包后的后端目录**生成：
 
 1. `desktop-content.json`：协议、版本、构建号、运行环境 SHA-256 指纹、文件路径/大小/哈希/压缩区间。
-2. `Starsector-Web-Content-<version>-x64.bin`：各文件独立 gzip 块，按清单顺序连接。
+2. `Starship-Foundry-Content-<version>-x64.bin`：各文件独立 gzip 块，按清单顺序连接。
 3. 安装目录 `resources/desktop-content.json`：当前基础内容清单。
 
 Windows 发布工作流检查并一并上传这两个公共附件，仍先创建草稿，现有检查通过才公开。运行环境指纹覆盖实际 shell ASAR（仅归一化根 `package.json` 的版本号）、原始 Electron 可执行文件、运行库及后端依赖。electron-builder 每次重写产品版本/ASAR integrity 的品牌 EXE 不直接参与哈希，避免“只改版本号也被当成运行环境变化”。
@@ -147,3 +147,8 @@ Windows 发布工作流检查并一并上传这两个公共附件，仍先创建
 本次还对已安装的 0.2.11 发行内容做隔离的小改动模拟，使用真实 `DesktopBackend` / Electron utilityProcess 和隐藏页面验证新目录可启动、主菜单可渲染、构建号一致。模拟不包含工作区未完成生涯源码，不是正式发行包或公网下载测速。具体结果在本机 `artifacts/content-update-smoke/result.json`；真实 GitHub 发布、旧版到新版 NSIS 迁移、两台电脑实测仍待正式发布窗口验收。
 
 本机验证记录（2026-09-26）：14 项针对性测试通过，整体 TypeScript 检查及改动文件 lint 通过；额外核实了真实已安装 shell 的 ASAR 指纹解析（包含多层 Windows 依赖路径）。隔离小改动模拟复用 3,537/3,541 个文件、201,733,524 字节；变化文件的压缩传输为 2,691 字节，对应完整内容包 161,164,330 字节；本地准备 7,439 ms、确认切换校验 2,893 ms、首次选择校验 2,621 ms。Electron 44.4.2 隐藏窗口中真实 utilityProcess 启动与原有主菜单加载通过，正常退出后再次离线选择新版通过。这些耗时不包含真实公网下载，改动内容仅是三个版本/构建元数据文件和一个服务文件注释，不是对任意真实版本升级大小或耗时的保证。未打包或发布工作区内容，未修改本机已安装客户端。
+
+
+## v0.2.12 产品更名
+
+显示名称、安装器、快捷方式与发布附件使用「星舰工坊 / Starship Foundry」。GitHub 仓库、appId、Chromium profile 路径、浏览器存储键和便携更新协议的旧内部目录保持不变，避免丢失既有数据和旧启动器的升级能力。安装版更新同时识别新旧卸载程序及安装器名称。改名不代表第三方内容授权已解决。

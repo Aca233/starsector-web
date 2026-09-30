@@ -47,7 +47,7 @@ function transport(fixture, options = {}) {
   let active = 0, maximum = 0;
   return { calls, maximum: () => maximum, fetchImpl: async (url, request) => {
     if (url === CONTENT_LATEST) return new Response(options.manifestBytes ?? fixture.bytes);
-    assert.match(url, new RegExp(`/v${fixture.manifest.version}/Starsector-Web-Content-`));
+    assert.match(url, new RegExp(`/v${fixture.manifest.version}/Starship-Foundry-Content-`));
     assert.equal(request.redirect, 'manual');
     const [, start, end] = request.headers.Range.match(/^bytes=(\d+)-(\d+)$/).map(Number);
     calls.push({ start, end }); active++; maximum = Math.max(maximum, active);
@@ -204,7 +204,8 @@ test('runtime fingerprint ignores version branding but detects shell code, depen
   await asar.createPackage(source, archive);
   const first = await runtimeFingerprint(app, electron);
   await write(source, 'package.json', '{"name":"test","version":"1.0.1"}');
-  await write(app, 'Starsector Web.exe', 'version-stamped executable');
+  await write(app, 'Starship Foundry.exe', 'version-stamped executable');
+  await write(app, 'Starsector Web.exe', 'legacy version-stamped executable');
   await asar.createPackage(source, archive); asar.uncacheAll();
   assert.equal(await runtimeFingerprint(app, electron), first);
   await write(source, 'desktop/main.mjs', 'changed shell');
@@ -214,4 +215,16 @@ test('runtime fingerprint ignores version branding but detects shell code, depen
   const native = await runtimeFingerprint(app, electron); assert.notEqual(native, changed);
   await fs.writeFile(electron, 'changed Electron');
   assert.notEqual(await runtimeFingerprint(app, electron), native);
+});
+
+// Branding must not invalidate installation identities, profiles, or upgrade metadata.
+test('rebranding preserves legacy profiles and recognizes both installer generations', async () => {
+  const brand = await import('../desktop/branding.mjs');
+  assert.equal(brand.PRODUCT_NAME, 'Starship Foundry');
+  assert.equal(brand.PRODUCT_NAME_ZH, '星舰工坊');
+  assert.equal(brand.APP_ID, 'com.aca233.starsectorweb');
+  assert.equal(brand.PROFILE_FOLDER, 'Starsector Web');
+  assert.equal(brand.DEVELOPMENT_PROFILE_FOLDER, 'Starsector Web Development');
+  assert.deepEqual(brand.installerExecutableNames('0.2.12'), ['Starship-Foundry-Desktop-Setup-0.2.12-x64.exe', 'Starsector-Web-Desktop-Setup-0.2.12-x64.exe']);
+  assert.deepEqual(brand.UNINSTALLER_NAMES, ['Uninstall Starship Foundry.exe', 'Uninstall Starsector Web.exe']);
 });

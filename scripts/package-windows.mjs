@@ -59,11 +59,13 @@ if ([...externals].some(name => !['ws', '@msgpack/msgpack', 'yauzl', ...(steamMo
 
 const stamp = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai', dateStyle: 'short', timeStyle: 'medium' })
   .format(new Date()).replace(/\D/g, '');
-const id = `Starsector-Web-${steamMode ? "Steam" : "Multiplayer"}-${version}-win-x64-${stamp}`;
+const id = `Starship-Foundry-${steamMode ? "Steam" : "Multiplayer"}-${version}-win-x64-${stamp}`;
 const output = path.join(project, 'artifacts', 'releases');
 await fs.mkdir(output, { recursive: true });
 const stage = path.join(output, id);
 await fs.mkdir(stage); // A new release only: never delete or overwrite another package.
+// Legacy archive root is part of bootstrap v1's validated update protocol.
+// Keep it so already-installed launchers can safely upgrade to the rebranded app.
 const destination = path.join(stage, 'Starsector-Web');
 await fs.mkdir(destination);
 const zip = path.join(output, `${id}.zip`);
@@ -133,7 +135,7 @@ const maintenance = flag => launcher('lan').replace(' --lan %*', ' ' + flag + ' 
 await fs.writeFile(path.join(destination, '检查更新.cmd'), maintenance('--check-update'));
 await fs.writeFile(path.join(destination, '回退上一版.cmd'), maintenance('--rollback'));
 await fs.writeFile(path.join(destination, '离线启动.cmd'), launcher('lan').replace(' --lan %*', (steamMode ? ' --steam' : ' --lan') + ' --no-update %*'));
-let readme = `远行星号 Web · Windows 联机免安装包
+let readme = `星舰工坊 / Starship Foundry · Windows 联机免安装包
 
 【一起玩：先确定一位房主】
 1. 房主完整解压 ZIP，再双击“启动游戏.cmd”。不要在压缩包内直接运行。
@@ -184,7 +186,7 @@ Node.js 授权位于 runtime/LICENSE.txt；React、Lucide、ws 等授权位于 l
 版本：${id}
 Node：${process.version} / x64
 `;
-if (steamMode) readme = `远行星号 Web · Steam 浏览器联机开发测试包
+if (steamMode) readme = `星舰工坊 / Starship Foundry · Steam 浏览器联机开发测试包
 
 【Steam 联机：所有玩家都要拿一份相同版本】
 1. 每位玩家先打开并登录自己的 Steam 账号。
