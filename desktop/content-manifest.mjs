@@ -24,7 +24,7 @@ export function compareVersions(a, b) {
 }
 export function contentAsset(version) {
   compareVersions(version, version);
-  return `Starsector-Web-Content-${version}-x64.bin`;
+  return `Starship-Foundry-Content-${version}-x64.bin`;
 }
 export function safeRelative(file) {
   if (typeof file !== 'string' || file.length > 240 || !file || file.includes('\\') || file.startsWith('/')

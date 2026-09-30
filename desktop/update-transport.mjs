@@ -1,3 +1,4 @@
+import { installerExecutableNames } from './branding.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
@@ -67,7 +68,7 @@ export function reliableUpdaterClass(BaseUpdater, fetch) {
         const base = `${RELEASES}v${this.app.version}/`;
         const request = { headers: options.requestHeaders, cancellationToken: options.cancellationToken };
         const metadata = parseUpdateInfo((await this.httpExecutor.downloadToBuffer(new URL(base + 'latest.yml'), request)).toString(), 'latest.yml', base);
-        const old = metadata.files?.find(file => file.url === `Starsector-Web-Desktop-Setup-${this.app.version}-x64.exe`);
+        const old = metadata.files?.find(file => installerExecutableNames(this.app.version).includes(file.url));
         const installer = path.join(this.downloadedUpdateHelper.cacheDir, oldName);
         if (metadata.version !== this.app.version || !old?.sha512 || (await fs.stat(installer)).size !== old.size
           || await fileSha512(installer) !== old.sha512) throw Object.assign(Error('本地安装包不是该版本的 GitHub 原始包'), { code: 'ERR_UPDATE_BASELINE_MISMATCH' });

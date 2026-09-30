@@ -1,3 +1,4 @@
+import { PRODUCT_NAME, APP_ID, PROFILE_FOLDER, DEVELOPMENT_PROFILE_FOLDER, UNINSTALLER_NAMES } from './branding.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -15,14 +16,14 @@ import { contentSecurityPolicy, desktopOptions, isGameUrl, isProjectLink, reques
 
 const options = desktopOptions(process.argv);
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-app.setName('Starsector Web');
-app.setAppUserModelId('com.aca233.starsectorweb');
+app.setName(PRODUCT_NAME);
+app.setAppUserModelId(APP_ID);
 app.enableSandbox();
 if (options.profile) {
   if (!path.isAbsolute(options.profile)) throw Error('--profile 必须是绝对目录');
   fs.mkdirSync(options.profile, { recursive: true });
   app.setPath('userData', options.profile);
-} else app.setPath('userData', path.join(app.getPath('appData'), app.isPackaged ? 'Starsector Web' : 'Starsector Web Development'));
+} else app.setPath('userData', path.join(app.getPath('appData'), app.isPackaged ? PROFILE_FOLDER : DEVELOPMENT_PROFILE_FOLDER));
 const origin = `http://127.0.0.1:${options.port}`;
 const resumedLogFile = resumeNetworkSessionPath(app.getPath('userData'), process.argv);
 const networkLogFile = resumedLogFile ?? networkSessionPath(app.getPath('userData'));
@@ -62,7 +63,7 @@ function saveSettings() {
   } catch (error) { log('无法保存窗口设置：' + error.message); }
 }
 async function confirm(message, detail, action = '继续') {
-  const result = await dialog.showMessageBox(win, { type: 'question', title: 'Starsector Web', message, detail,
+  const result = await dialog.showMessageBox(win, { type: 'question', title: 'Starship Foundry', message, detail,
     buttons: ['取消', action], defaultId: 0, cancelId: 0, noLink: true });
   return result.response === 1;
 }
@@ -140,7 +141,7 @@ async function requestQuit({ install } = {}) {
 async function openProject(url) { if (isProjectLink(url)) await shell.openExternal(url); }
 function updateMenu() {
   if (!win || win.isDestroyed()) return;
-  win.setTitle(`Starsector Web ${gameVersion()} · ${modeNames[mode]}${switching ? ' · 正在准备后台服务' : ''}`);
+  win.setTitle(`Starship Foundry ${gameVersion()} · ${modeNames[mode]}${switching ? ' · 正在准备后台服务' : ''}`);
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: '游戏', submenu: [
       { label: '返回主菜单', enabled: !switching, click: () => void navigateHome() },
@@ -169,7 +170,7 @@ function updateMenu() {
       { label: '打开本次联机性能日志', click: async () => { await networkLog.flush(); if (fs.existsSync(networkLogFile)) shell.showItemInFolder(networkLogFile); else await dialog.showMessageBox(win, { title: '联机性能日志', message: '本次日志尚未写入，请检查磁盘空间。', detail: networkLogFile }); } },
       { label: '打开联机日志', click: () => { log('[desktop] diagnostic-log version=' + gameVersion()); shell.showItemInFolder(path.join(app.getPath('userData'), 'desktop.log')); } },
       { label: 'GitHub / 使用说明', click: () => void openProject('https://github.com/Aca233/starsector-web') },
-      { label: '关于', click: () => void dialog.showMessageBox(win, { title: '关于 Starsector Web', message: `Starsector Web ${gameVersion()}`,
+      { label: '关于', click: () => void dialog.showMessageBox(win, { title: '关于 Starship Foundry', message: `Starship Foundry ${gameVersion()}`,
         detail: `非官方舰船设计与战斗沙盒\n桌面运行环境 ${app.getVersion()}\nElectron ${process.versions.electron} · Chromium ${process.versions.chrome}\nSteam AppID ${options.appId}${options.appId === 480 ? '（仅开发测试）' : ''}\n素材权利属于原权利人，非官方发行。` }) },
     ] },
   ]));
@@ -252,7 +253,7 @@ async function backendFailed(message) {
 }
 function installSecurity() {
   const gameSession = session.defaultSession;
-  const userAgent = gameSession.getUserAgent() + ` StarsectorDesktop/${gameVersion()}`;
+  const userAgent = gameSession.getUserAgent() + ` StarshipFoundryDesktop/${gameVersion()}`;
   gameSession.setUserAgent(userAgent);
   // The first WebContents already exists; session defaults only affect new contents.
   win.webContents.setUserAgent(userAgent);
@@ -281,7 +282,7 @@ function windowBounds() {
 }
 async function ready() {
   fs.mkdirSync(app.getPath('userData'), { recursive: true });
-  if (app.isPackaged && process.platform === 'win32' && fs.existsSync(path.join(path.dirname(process.execPath), 'Uninstall Starsector Web.exe'))) {
+  if (app.isPackaged && process.platform === 'win32' && UNINSTALLER_NAMES.some(name => fs.existsSync(path.join(path.dirname(process.execPath), name)))) {
     try {
       contentStore = await openContentStore({ baseRoot: installedBackendRoot,
         storage: path.join(app.getPath('userData'), 'content-updates'), log });
@@ -293,7 +294,7 @@ async function ready() {
     port: options.port, appId: options.appId, log, failed: message => void backendFailed(message), quitRequested: () => void requestQuit() });
   if (pendingSteamInvite) { backend.receiveSteamInvite(pendingSteamInvite); pendingSteamInvite = null; }
   win = new BrowserWindow({ ...windowBounds(), minWidth: 800, minHeight: 600, show: false,
-    backgroundColor: '#090e16', title: 'Starsector Web',
+    backgroundColor: '#090e16', title: 'Starship Foundry',
     webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, nodeIntegrationInWorker: false,
       webviewTag: false, webSecurity: true, backgroundThrottling: false, devTools: !app.isPackaged } });
   installSecurity();
@@ -372,7 +373,7 @@ else {
   void app.whenReady().then(ready).catch(async error => {
     log(error.stack || error.message);
     try { if (await recoverContent()) return; } catch (rollbackError) { log('[content] 无法自动回退：' + rollbackError.message); }
-    if (!options.hidden) dialog.showErrorBox('Starsector Web 启动失败', error.message);
+    if (!options.hidden) dialog.showErrorBox('Starship Foundry 启动失败', error.message);
     quitting = true; await stopAll('startup-failed'); allowQuit = true; app.exit(1);
   });
 }

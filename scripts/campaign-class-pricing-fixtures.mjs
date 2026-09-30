@@ -1,9 +1,0 @@
-import { ORIGINAL_MARKET_ECONOMY as E } from '../src/campaign/rules/OriginalMarketEconomy.mjs';
-import { stat, mod, f } from './campaign-immigration-fixtures.mjs';
-export const rowKeys=['commodityId','maxSupply','maxDemand','available','availableWithoutTrade','shippingGlobal','shippingFaction','maxExportGlobal','stockpile','tradeMod','greedStat','playerModifiers'];
-export function classPriceInput(primary='luxury_goods'){
-  const ids=Object.values(E.commodities).filter(c=>c.demandClass===primary).map(c=>c.id).sort((a,b)=>Number(b===primary)-Number(a===primary));
-  return {marketId:'jangala',triggerCommodityId:primary,month:9,phase:'native-final-iteration',coverage:'complete-demand-class',demandStat:stat(17.25,[mod('before',0.125),mod('core',999),mod('after',1.75)],[mod('percent',13.75)],[mod('factor',1.125)]),commodities:ids.map((commodityId,i)=>({commodityId,maxSupply:i?2:7,maxDemand:5,available:i?2:6,availableWithoutTrade:i?2:6,shippingGlobal:4,shippingFaction:9,maxExportGlobal:commodityId===primary?7:null,stockpile:i?123.75:777,tradeMod:{both:0,plus:0,minus:0},greedStat:stat(3.75,[mod('core',57),mod('after',11)],[mod('percent',7.5)],[mod('factor',0.875)]),playerModifiers:{p:{supply:stat(0,[mod('supply',0.1)]).modifiers,demand:stat(0,[],[],[mod('skill',f(0.8)),mod('core',f(0.7))]).modifiers}}}))};
-}
-export function projectClassPrice(result){return {demandStat:result.demandStat,demandValue:result.demandValue,commodities:result.commodities.map(c=>Object.fromEntries(['commodityId','stockpile','greedStat','playerModifiers','demandPrice','supplyPrice'].map(k=>[k,c[k]])))};}
-export function nextClassInput(input,result){return {...input,demandStat:structuredClone(result.demandStat),commodities:result.commodities.map(c=>structuredClone(Object.fromEntries(rowKeys.map(k=>[k,c[k]]))))};}

@@ -16660,20 +16660,6 @@
     "hash": "57421d25cb5c524f1b9123353b3892dcea523a2f68c97874b9cdabfb2c9a34d0"
   },
   {
-    "id": "graphics/warroom/ship_arrow.png",
-    "path": "graphics/warroom/ship_arrow.png",
-    "type": "image",
-    "bytes": 1317,
-    "hash": "370e972c8e4a47907bd17e2df38ea7c95f535f4808a930d2965ba5f83f0d17f9",
-    "group": "graphics",
-    "sampler": {
-      "wrap": "clamp",
-      "minFilter": "linear",
-      "magFilter": "linear",
-      "mipmap": false
-    }
-  },
-  {
     "id": "graphics/warroom/taskicons/icon_assault.png",
     "path": "graphics/warroom/taskicons/icon_assault.png",
     "type": "image",

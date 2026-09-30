@@ -1431,13 +1431,6 @@
       "sha256": "57421d25cb5c524f1b9123353b3892dcea523a2f68c97874b9cdabfb2c9a34d0"
     },
     {
-      "path": "graphics/warroom/ship_arrow.png",
-      "width": 32,
-      "height": 32,
-      "source": "original-geometry-and-lucide-isc",
-      "sha256": "370e972c8e4a47907bd17e2df38ea7c95f535f4808a930d2965ba5f83f0d17f9"
-    },
-    {
       "path": "graphics/warroom/taskicons/icon_assault.png",
       "width": 64,
       "height": 64,

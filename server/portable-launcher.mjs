@@ -53,7 +53,7 @@ export async function launchPortable({ mode = 'lan', port, openBrowser = true } 
       console.log(`端口 ${candidate} 被其他程序占用，未关闭或修改该程序。`);
       continue;
     }
-    console.log(`\n远行星号 Web · Windows 联机版\n${mode === 'lan' ? '局域网模式（仅用于可信网络）' : '单机模式（只监听本机）'}\n\n本机打开：${url}`);
+    console.log(`\n星舰工坊 / Starship Foundry · Windows 联机版\n${mode === 'lan' ? '局域网模式（仅用于可信网络）' : '单机模式（只监听本机）'}\n\n本机打开：${url}`);
     if (mode === 'lan') {
       for (const address of app.addresses) console.log(`分享给同一局域网的朋友：${address}`);
       console.log('在网页内创建房间，再分享房间码。不要关闭房主战斗页面。\n异地朋友请先加入同一虚拟局域网，再分享虚拟网卡的 IP 链接，不要分享 127.0.0.1。\n若系统询问防火墙权限，仅按需允许专用网络；本程序不会自动修改防火墙。');

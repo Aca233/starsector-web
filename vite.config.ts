@@ -43,7 +43,7 @@ export default defineConfig(({ mode }) => {
   },
   build: {
     rollupOptions: {
-      input: { main: 'index.html', campaign: 'campaign.html' },
+      input: { main: 'index.html' },
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) return 'vendor'

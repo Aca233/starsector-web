@@ -83,7 +83,7 @@ export default function LanApp({ transport = "lan" }: { transport?: "lan" | "ste
     [available, setAvailable] = useState<boolean | null>(null),
     [addresses, setAddresses] = useState<string[]>([]);
   useEffect(() => {
-    document.title = transport === "steam" ? "远行星号 · Steam 联机" : "远行星号 · 局域网联机";
+    document.title = transport === "steam" ? "星舰工坊 · Steam 联机" : "星舰工坊 · 局域网联机";
     const abort = new AbortController();
     let steamTimer: ReturnType<typeof setInterval> | undefined;
     let triedResume = false;

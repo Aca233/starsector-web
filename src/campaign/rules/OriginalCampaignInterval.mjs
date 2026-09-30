@@ -1,9 +1,0 @@
-/** com.fs.starfarer.util.IntervalTracker; not api.util.IntervalUtil or a catch-up timer. */
-import {requireThat} from '../core/Values.mjs';
-const f=Math.fround,check=(ok,message)=>requireThat(ok,'UNSUPPORTED_NATIVE_INTERVAL_TRACKER',message);
-const scalar=value=>{check(typeof value==='number'&&Number.isFinite(value)&&Number.isFinite(f(value)),'Actual finite interval float required');return f(value);};
-function next(state,randomDouble){check(typeof randomDouble==='function','Actual interval Math.random source required');const random=randomDouble();check(typeof random==='number'&&random>=0&&random<1,'Actual Math.random double required');state.currInterval=f(state.minInterval+f(f(state.maxInterval-state.minInterval)*f(random)));state.elapsed=0;state.intervalElapsed=false;}
-export function createOriginalCampaignInterval(min,max,randomDouble){const state={scope:'native-campaign-interval-tracker',minInterval:0,maxInterval:0,currInterval:0,elapsed:0,intervalElapsed:false};setOriginalCampaignInterval(state,min,max,randomDouble);return state;}
-export function validateOriginalCampaignInterval(state){check(state?.scope==='native-campaign-interval-tracker','Actual util.IntervalTracker required');for(const key of ['minInterval','maxInterval','currInterval','elapsed'])check(scalar(state[key])===state[key],'Actual saved interval float required');check(typeof state.intervalElapsed==='boolean','Actual saved interval latch required');return state;}
-export function setOriginalCampaignInterval(state,min,max,randomDouble){state.minInterval=scalar(min);state.maxInterval=scalar(max);next(state,randomDouble);}
-export function advanceOriginalCampaignInterval(state,amount,randomDouble){amount=scalar(amount);if(state.intervalElapsed)next(state,randomDouble);state.elapsed=f(state.elapsed+amount);if(state.elapsed>=state.currInterval)state.intervalElapsed=true;}

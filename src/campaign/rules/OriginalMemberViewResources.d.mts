@@ -1,7 +1,0 @@
-import type {OriginalMemberViewTexture,OriginalMemberViewSprite,OriginalMemberViewServices} from './OriginalCampaignFleetMemberView.mjs';
-export interface OriginalViewSlot {id:string;type:string;mount:'TURRET'|'HARDPOINT'|'HIDDEN';size:string;angle:number;arc:number;location:[number,number]}
-export interface OriginalViewHull {moduleAnchor:[number,number]|null;slots:OriginalViewSlot[];sprite:{path:string;width:number;height:number;center:[number,number];collisionRadius:number};hullSize:string;station:boolean;[key:string]:unknown}
-export interface OriginalViewWeapon {id:string;specClass:'beam'|'projectile'|'pulse';hints:string[];turretSprite:string;hardpointSprite:string;turretGunSprite:string;hardpointGunSprite:string;turretOffsets:[number,number][];hardpointOffsets:[number,number][];turretAngles:number[];hardpointAngles:number[];missile:{path:string;center:[number,number]}|null}
-export const ORIGINAL_FLEET_VIEW_INPUTS:Readonly<{scope:'native-campaign-member-view-inputs';hulls:Record<string,OriginalViewHull>;wings:Record<string,{formation:string;numFighters:number}>;weapons:Record<string,OriginalViewWeapon>;textures:Record<string,OriginalMemberViewTexture>;assets:Record<string,string>}>;
-export function createOriginalMemberViewSprite(path:string,services?:OriginalMemberViewServices):OriginalMemberViewSprite;
-export function originalMemberViewHull(id:string,services?:OriginalMemberViewServices):OriginalViewHull;

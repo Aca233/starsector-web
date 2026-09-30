@@ -152,8 +152,8 @@ export function StudioApp({ homeNavigation }: { homeNavigation: HomeNavigation }
   }, []);
   useEffect(() => {
     document.title =
-      catalogOpen ? "远行星号 · 全量原版内容" : view === "home"
-        ? "远行星号 · 舰船设计"
+      catalogOpen ? "星舰工坊 · 内容目录" : view === "home"
+        ? "星舰工坊 · 舰船设计"
         : draft.name + (view === "combat" ? " · 模拟战斗" : view === "skills" ? " · 角色技能" : " · 舰队改装");
   }, [view, draft.name, catalogOpen]);
   const change = (next: Design) => {

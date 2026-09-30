@@ -89,7 +89,7 @@ jobs:
           }
           $desktop = Get-Content -LiteralPath (Join-Path $PWD 'artifacts/electron/latest-build.json') -Raw | ConvertFrom-Json
           if ($desktop.version -ne $env:RELEASE_VERSION) { throw 'Electron version does not match release' }
-          foreach ($name in @("Starsector-Web-Desktop-Setup-${env:RELEASE_VERSION}-x64.exe", "Starsector-Web-Desktop-Setup-${env:RELEASE_VERSION}-x64.exe.blockmap", "Starsector-Web-Desktop-${env:RELEASE_VERSION}-x64.zip", 'latest.yml', 'desktop-content.json', "Starsector-Web-Content-${env:RELEASE_VERSION}-x64.bin")) {
+          foreach ($name in @("Starship-Foundry-Desktop-Setup-${env:RELEASE_VERSION}-x64.exe", "Starship-Foundry-Desktop-Setup-${env:RELEASE_VERSION}-x64.exe.blockmap", "Starship-Foundry-Desktop-${env:RELEASE_VERSION}-x64.zip", 'latest.yml', 'desktop-content.json', "Starship-Foundry-Content-${env:RELEASE_VERSION}-x64.bin")) {
             $asset = Join-Path $desktop.output $name
             if (-not (Test-Path -LiteralPath $asset -PathType Leaf)) { throw "Missing Electron artifact: $name" }
             $files += $asset
@@ -99,7 +99,7 @@ jobs:
           $releaseOptions = @()
           $notes = Join-Path $PWD "docs/releases/$($env:RELEASE_TAG).md"
           if (Test-Path -LiteralPath $notes -PathType Leaf) { $releaseOptions += @('--notes-file', $notes) }
-          gh release create $env:RELEASE_TAG @files @releaseOptions --verify-tag --draft --generate-notes --title "Starsector Web $env:RELEASE_TAG"
+          gh release create $env:RELEASE_TAG @files @releaseOptions --verify-tag --draft --generate-notes --title "Starship Foundry $env:RELEASE_TAG"
           if ($LASTEXITCODE -ne 0) { throw 'Release creation/upload failed; inspect any draft before retrying' }
           if ($needsReview) {
             Write-Warning 'Steam gates did not all pass. Assets remain in a non-public draft for explicit review; no prerelease or stable update was published.'

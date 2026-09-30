@@ -59,7 +59,7 @@ for (const file of ['index.js', 'package.json', 'LICENSE', 'dist/win64']) {
   await copy(path.join(project, 'node_modules', 'steamworks.js', file), path.join(backend, 'node_modules', 'steamworks.js', file));
 }
 await copySteamMetricsRuntime(project, backend, copy);
-await fs.writeFile(path.join(backend, 'package.json'), JSON.stringify({ name: 'starsector-desktop-backend', version, private: true, type: 'module' }));
+await fs.writeFile(path.join(backend, 'package.json'), JSON.stringify({ name: 'starship-foundry-desktop-backend', version, private: true, type: 'module' }));
 await fs.writeFile(path.join(backend, 'desktop-build.json'), JSON.stringify({ version, build: buildId, serverFiles: inputs }, null, 2));
 const licenses = path.join(staging, 'licenses');
 for (const name of ['react', 'react-dom', 'scheduler', 'lucide-react', 'ws', 'steamworks.js', '@msgpack/msgpack', 'koffi']) {
@@ -68,7 +68,7 @@ for (const name of ['react', 'react-dom', 'scheduler', 'lucide-react', 'ws', 'st
 const electronDist = path.dirname(createRequire(import.meta.url)('electron'));
 const artifacts = await build({ projectDir: project, targets: Platform.WINDOWS.createTarget(args.includes('--dir') ? ['dir'] : ['nsis', 'zip'], Arch.x64),
   publish: 'never', config: {
-    appId: 'com.aca233.starsectorweb', productName: 'Starsector Web', electronVersion: pkg.devDependencies.electron, electronDist,
+    appId: 'com.aca233.starsectorweb', productName: 'Starship Foundry', electronVersion: pkg.devDependencies.electron, electronDist,
     directories: { output, buildResources: path.join(project, 'desktop') },
     extraMetadata: { version, main: 'desktop/main.mjs' }, asar: true, npmRebuild: false,
     asarUnpack: ['node_modules/koffi/**/*', 'node_modules/@koromix/koffi-win32-x64/**/*'],
@@ -98,13 +98,13 @@ const artifacts = await build({ projectDir: project, targets: Platform.WINDOWS.c
       await buildContentBundle({ backend: packagedBackend, output, version, build: buildId,
         runtime: await runtimeFingerprint(appOutDir, path.join(electronDist, 'electron.exe')), baseManifestPath: path.join(appOutDir, 'resources', 'desktop-content.json') });
     },
-    win: { artifactName: 'Starsector-Web-Desktop-${version}-${arch}.${ext}' },
-    nsis: { artifactName: 'Starsector-Web-Desktop-Setup-${version}-${arch}.${ext}', oneClick: false,
+    win: { artifactName: 'Starship-Foundry-Desktop-${version}-${arch}.${ext}' },
+    nsis: { artifactName: 'Starship-Foundry-Desktop-Setup-${version}-${arch}.${ext}', oneClick: false,
       perMachine: false, allowElevation: false, allowToChangeInstallationDirectory: true,
       deleteAppDataOnUninstall: false, createDesktopShortcut: true, runAfterFinish: false },
     publish: [{ provider: 'github', owner: 'Aca233', repo: 'starsector-web', releaseType: 'release' }],
   } });
-const report = { version, build: buildId, output, artifacts, executable: path.join(output, 'win-unpacked', 'Starsector Web.exe') };
+const report = { version, build: buildId, output, artifacts, executable: path.join(output, 'win-unpacked', 'Starship Foundry.exe') };
 await fs.writeFile(path.join(output, 'desktop-build-report.json'), JSON.stringify(report, null, 2) + '\n');
 await fs.mkdir(path.join(project, 'artifacts', 'electron'), { recursive: true });
 await fs.writeFile(path.join(project, 'artifacts', 'electron', 'latest-build.json'), JSON.stringify(report, null, 2) + '\n');
