@@ -2,21 +2,28 @@ import type { Ship } from '../Ship';
 import { modulePropulsionState } from './ModulePropulsion';
 import type { HullSize } from '../FluxTracker';
 import type { Vector2 } from '../../math/Vector2';
+import type { SystemModifiers } from '../../extensions/ship-systems/Types';
+import { advanceAngularVelocity } from './MotionKernel';
+export { advanceAngularVelocity } from './MotionKernel';
 
 // Data-command Worker permission only; never stores a ship or motion result.
 let workerOwnedMotionReads = false;
 export function enableWorkerOwnedMotionReads(): void { workerOwnedMotionReads = true; }
+export const motionReaders = ['getSpeedFlatBonus', 'getSpeedPercentBonus', 'getTurnAccelerationFlatBonus', 'getTurnAccelerationPercentBonus',
+  'getAccelerationFlatBonus', 'getAccelerationPercentBonus', 'getDecelerationFlatBonus', 'getDecelerationPercentBonus',
+  'getTurnRateFlatBonus', 'getTurnRatePercentBonus'] as const;
 
 /** ship/null.cfr_renamed_4(): hull-size-specific lateral acceleration. */
 export function strafeAccelerationMultiplier(size: HullSize | undefined): number {
   return size === 'CAPITAL_SHIP' ? .25 : size === 'CRUISER' ? .5 : size === 'DESTROYER' || size === 'FIGHTER' ? .75 : 1;
 }
 
-export function shipMotionStats(ship: Ship, excludedSystemSpeedFlat = 0) {
+export function shipMotionStats(ship: Ship, excludedSystemSpeedFlat = 0, sampledModifiers?: Readonly<SystemModifiers>) {
   const propulsion = modulePropulsionState(ship);
   const mult = ship.engineController.movementMultiplier * ship.terrainSpeedMult * ship.crMovementMultiplier;
   const boost = ship.flux.isEngineBoostActive;
-  const modifiers = workerOwnedMotionReads ? ship.system.readNativeMotionModifiers() : undefined;
+  const table = sampledModifiers ?? (import.meta.env?.VITE_COMBAT_STAT_TABLE !== 'false' ? ship.system.readModifierTable?.(motionReaders) : undefined);
+  const modifiers = table ?? (workerOwnedMotionReads ? ship.system.readNativeMotionModifiers() : undefined);
   let maxSpeed = (ship.spec.maxSpeed + ship.hullStats.speedBonus + (modifiers ? modifiers.speedFlat ?? 0 : ship.system.getSpeedFlatBonus()) - excludedSystemSpeedFlat + (boost ? 50 + ship.hullStats.zeroFluxSpeedBonus : 0)) * (1 + (ship.hullStats.speedPercent + ship.fleetSpeedBonusPercent + (modifiers ? modifiers.speedPercent ?? 0 : ship.system.getSpeedPercentBonus())) / 100) * ship.hullStats.speedMultiplier * mult * (propulsion?.speed ?? 1);
   if (ship.shield.type === 'PHASE' && ship.shield.isPhaseEngaged) {
     maxSpeed *= ship.shield.getPhaseSpeedMultiplier(ship.flux.maxFlux > 0 ? ship.flux.hardFlux / ship.flux.maxFlux : 0);
@@ -39,16 +46,6 @@ export function shipMotionStats(ship: Ship, excludedSystemSpeedFlat = 0) {
 export function reduceOverspeed(velocity: Vector2, limit: number, amount: number): void {
   const speed = velocity.length();
   if (speed > limit) velocity.scale((speed - Math.min(amount, speed - limit)) / speed);
-}
-
-export function advanceAngularVelocity(velocity: number, input: number, dt: number, acceleration: number, limit: number): number {
-  if (Math.abs(input) <= .01) {
-    return velocity - Math.sign(velocity) * Math.min(Math.abs(velocity), acceleration * .5 * dt);
-  }
-  const step = dt * Math.min(1, Math.abs(input)) * acceleration;
-  if (Math.abs(velocity) > limit) return velocity - Math.sign(velocity) * Math.min(Math.abs(velocity), step * 2);
-  const next = velocity + Math.sign(input) * step;
-  return Math.abs(next) > limit ? Math.sign(input) * limit : next;
 }
 
 /** Source command equations, with Web analog-input magnitudes retained. */

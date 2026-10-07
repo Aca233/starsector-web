@@ -24,6 +24,7 @@ export class CombatMulticore {
             reason: !status.workers && status.reason === 'not-started' ? this.budget.status.reason : status.reason };
     }
     prepare(engine: CombatEngine, playerAI: CapitalShipAI, dt: number): Promise<AIPhaseBatch> | null {
+        if (engine.usesPhasedWorld) return null;
         if (!this.enabled) return null;
         return this.owners.prepare(engine, dt, { ais: [playerAI, ...engine.getNativeAIs()],
             allowOwners: this.budget.allow(engine.capitalShips.length, performance.now()) });

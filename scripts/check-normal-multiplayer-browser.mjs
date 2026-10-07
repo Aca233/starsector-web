@@ -27,7 +27,7 @@ import {createLanServer} from '../server/lan-server.mjs';
 import {DesktopLanBridge} from '../server/desktop-lan-bridge.mjs';
 import {parseNetworkConsole} from '../desktop/network-diagnostic-record.mjs';
 import {measuredSamples,recordedStall} from './lib/multiplayer-measurement.mjs';
-const {chromium}=createRequire(import.meta.url)('playwright');
+const {chromium}=createRequire(import.meta.url)(process.env.MULTIPLAYER_PLAYWRIGHT_MODULE??'playwright');
 const measureMode=process.env.MULTIPLAYER_PRESENTATION_MEASURE??'';
 const postBlockTimeline=process.env.MULTIPLAYER_POST_BLOCK_TIMELINE==='true';
 if(postBlockTimeline)assert.equal(measureMode,'main','Post-block diagnosis is main-owner only');
@@ -44,6 +44,11 @@ if(presentationPage)assert.equal(process.env.VITE_LAN_PRESENTATION_WORKER,'true'
 const steady=process.env.MULTIPLAYER_STEADY_FIXTURE==='true';
 const commandHeld=process.env.MULTIPLAYER_COMMAND_HELD_FIXTURE==='true';
 assert.ok(!commandHeld||steady,'Command-held recovery fixture requires controlled startup');
+// Explicit test fit: charged/beam presets cannot prove conservative local repeats.
+// Refit through real room commands; do not patch production simulation/prediction.
+const heldWeapon=process.env.MULTIPLAYER_HELD_WEAPON??null;
+if(heldWeapon)assert.ok(process.env.MULTIPLAYER_BUNDLED_PRESETS==='true'&&process.env.MULTIPLAYER_WEAPON_FIXTURE==='true'&&!steady,'Held weapon requires the authored non-steady armed fixture');
+const heldGroup=heldWeapon?'Digit1':'Digit4';
 const styled=process.env.MULTIPLAYER_STYLED==='true';
 const compiledCss=process.env.MULTIPLAYER_COMPILED_CSS ? path.resolve(process.env.MULTIPLAYER_COMPILED_CSS) : null;
 let compiledCssHref=null;
@@ -73,7 +78,7 @@ assert.ok(aiHullCycle.length&&aiHullCycle.every(id=>typeof id==='string'&&id.len
 const aiFleet=Array.from({length:aiCount},(_,i)=>aiHullCycle[i%aiHullCycle.length]);
 const aiHulls=[aiFleet.slice(0,Math.floor(aiCount/2)),aiFleet.slice(Math.floor(aiCount/2))];
 await fs.mkdir(out,{recursive:true});
-await fs.writeFile(path.join(out,'fixture-roster.json'),JSON.stringify({players:count,playerDefault:roomCatalog.ships[0].id,aiHullCycle,aiHulls,battleSize:3200},null,2));
+await fs.writeFile(path.join(out,'fixture-roster.json'),JSON.stringify({players:count,playerDefault:roomCatalog.ships[0].id,aiHullCycle,aiHulls,battleSize:3200,heldWeapon,heldGroup},null,2));
 const fixtureSources=await inspectMultiplayerFixtureSources({frozenFile:process.env.MULTIPLAYER_FROZEN,requiredHulls:[...new Set([roomCatalog.ships[0].id,...aiFleet])],expectedAssetManifestSha256:process.env.MULTIPLAYER_EXPECTED_ASSET_MANIFEST_SHA256});
 await fs.writeFile(path.join(out,'fixture-sources.json'),JSON.stringify(fixtureSources,null,2));
 assert.ok(fixtureSources.pass,'Multiplayer fixture preflight failed before browser/server startup: '+JSON.stringify(fixtureSources.issues));
@@ -81,7 +86,7 @@ const dist=await fs.mkdtemp(path.join(tmpdir(),'normal-multiplayer-'));
 await fs.writeFile(path.join(dist,'lan-build.json'),' {"build":"normal-multiplayer"}');
 const hostLoad=hostLoadProbe();
 const assetResponses=new Map(),entityCounts=[];
-const errors=[],samples=[],pages=[],bridges=[],profilers=[],workerLoopProbes=[],viewerBrowsers=[];let relay,vite,browser,report;
+const errors=[],samples=[],pages=[],bridges=[],profilers=[],workerLoopProbes=[],coreSamples=[],acquisitionSamples=[],decisionSamples=[],rewriteSamples=[],viewerBrowsers=[];let relay,vite,browser,report;
 const until=async(fn,label,timeout=60000)=>{const end=Date.now()+timeout;while(Date.now()<end){if(await fn())return;await new Promise(r=>setTimeout(r,50));}throw Error('Timed out '+label);};
 let currentStage='init';
 const stage=s=>{currentStage=s;console.log('[multiplayer]',s);};
@@ -99,7 +104,27 @@ if(process.env.MULTIPLAYER_HEAP==='true'){
 const watchdog=setTimeout(()=>{console.error('Watchdog expired');void Promise.all(viewerBrowsers.map(b=>b.close().catch(()=>{}))).finally(()=>process.exit(1));setTimeout(()=>process.exit(1),5000).unref();},240000);watchdog.unref();
 try{
  relay=await createLanServer({host:'127.0.0.1',port:0,dist});const origin='http://127.0.0.1:'+relay.server.address().port;
- vite=await createServer({configFile:false,root:process.cwd(),esbuild:{jsx:'automatic'},optimizeDeps:{noDiscovery:true,entries:[],include:['react','react/jsx-runtime','react/jsx-dev-runtime','react-dom/client','react-dom','lucide-react']},define:{__LAN_BUILD_ID__:'"normal-multiplayer"',...(process.env.SPRITE_CULL==='false'?{'import.meta.env.VITE_CULL_SPRITES':'"false"'}:{}),...(process.env.DAMAGE_CULL==='false'?{'import.meta.env.VITE_CULL_DAMAGE_OVERLAYS':'"false"'}:{}),...(process.env.MULTI_TEXTURE_SHIPS==='false'?{'import.meta.env.VITE_MULTI_TEXTURE_SHIPS':'"false"'}:{}),...(process.env.DIRECT_AUTHORITY==='false'?{'import.meta.env.VITE_LAN_DIRECT_AUTHORITY':'"false"'}:{})},plugins:[lanRestoreStagePlugin(restoreStages),postBlockTimelinePlugin(postBlockTimeline),inputAdmissionProbePlugin(inputAdmissionProbe),presentationMeasurePlugin(measureMode),studioSummaryPlugin(),...(tailwind?tailwind():[]),frozenBrowserPlugin(process.env.MULTIPLAYER_FROZEN),steadyFixturePlugin(steady,commandHeld),publicationProbePlugin(process.env.MULTIPLAYER_PUBLICATION_PROBE==='true'),sameTickSkipPlugin(process.env.MULTIPLAYER_SAME_TICK_SKIP==='true'),{name:'test-only-initial-particles',enforce:'pre',transform(code,id){if(process.env.MULTIPLAYER_PARTICLE_FIXTURE!=='true'||!id.replaceAll('\\','/').split('?')[0].endsWith('/src/network/HostSnapshot.ts'))return;const marker='return new HostMuzzleEvents(engine.fxSystem';assert.ok(code.includes(marker));return code.replace(marker,'if (localParticles) engine.fxSystem.spawnSparks(engine.playerShip.pos, 60); '+marker);}},{name:'isolated-battle-check',configureServer(s){s.middlewares.use((req,res,next)=>{if(req.url==='/__frozen-battle.css'&&frozenCss){res.setHeader('Content-Type','text/css; charset=utf-8');res.end(frozenCss);return;}if(req.url!=='/__multiplayer.html')return next();res.setHeader('Cross-Origin-Opener-Policy','same-origin');res.setHeader('Cross-Origin-Embedder-Policy','require-corp');res.setHeader('Content-Type','text/html');res.end('<!doctype html><meta charset="utf-8"><title>Isolated multiplayer check</title><style>html,body,#root{margin:0;width:100%;height:100%;overflow:hidden}</style><div id="root"></div>');});}}],server:{host:'127.0.0.1',port:0,open:false,headers:{'Cross-Origin-Opener-Policy':'same-origin','Cross-Origin-Embedder-Policy':'require-corp'},watch:null},logLevel:'error'});
+ vite=await createServer({configFile:false,root:process.cwd(),esbuild:{jsx:'automatic'},optimizeDeps:{noDiscovery:true,entries:[],include:['react','react/jsx-runtime','react/jsx-dev-runtime','react-dom/client','react-dom','lucide-react']},define:{__LAN_BUILD_ID__:'"normal-multiplayer"',...(process.env.SPRITE_CULL==='false'?{'import.meta.env.VITE_CULL_SPRITES':'"false"'}:{}),...(process.env.DAMAGE_CULL==='false'?{'import.meta.env.VITE_CULL_DAMAGE_OVERLAYS':'"false"'}:{}),...(process.env.MULTI_TEXTURE_SHIPS==='false'?{'import.meta.env.VITE_MULTI_TEXTURE_SHIPS':'"false"'}:{}),...(process.env.DIRECT_AUTHORITY==='false'?{'import.meta.env.VITE_LAN_DIRECT_AUTHORITY':'"false"'}:{})},plugins:[{name:'test-only-numeric-acquisition-probe',enforce:'pre',transform(code,id){
+   if(process.env.MULTIPLAYER_NUMERIC_ACQUISITION_PROBE!=='true'||!id.replaceAll('\\','/').split('?')[0].endsWith('/src/network/host.worker.ts'))return;
+   assert.ok(code.includes('      samples++;'));
+   return "import {numericAcquisitionMetrics as acquisitionProbe} from '../engine/ai/NumericAcquisitionFrame';\n"+code.replace('      samples++;',`      samples++;
+      if(tick%120===0)console.info('[numeric-acquisition-probe] '+JSON.stringify({tick,...acquisitionProbe}));`);
+  }},{name:'test-only-decision-pipeline-probe',enforce:'pre',transform(code,id){
+   if(process.env.MULTIPLAYER_DECISION_PIPELINE_PROBE!=='true'||!id.replaceAll('\\','/').split('?')[0].endsWith('/src/network/host.worker.ts'))return;
+   assert.ok(code.includes('      samples++;'));
+   return "import {decisionSceneWork as decisionProbe} from '../engine/ai/CombatDecisionScene';\nimport {numericFleetWork as fleetProbe} from '../engine/ai/NumericalFleetPlanner';\n"+code.replace('      samples++;',`      samples++;
+      if(tick%120===0)console.info('[decision-pipeline-probe] '+JSON.stringify({tick,scene:{...decisionProbe},fleet:{...fleetProbe}}));`);
+  }},{name:'test-only-fire-flight-probe',enforce:'pre',transform(code,id){
+   if(process.env.MULTIPLAYER_FIRE_FLIGHT_PROBE!=='true'||!id.replaceAll('\\','/').split('?')[0].endsWith('/src/network/host.worker.ts'))return;
+   assert.ok(code.includes('      samples++;'));
+   return "import {fireRewriteWork as fireProbe} from '../engine/ai/NumericAcquisitionTree';\nimport {flightRewriteWork as flightProbe} from '../engine/simulation/systems/FlightDecisionRoster';\n"+code.replace('      samples++;',`      samples++;
+      if(tick%120===0)console.info('[fire-flight-probe] '+JSON.stringify({tick,fire:{...fireProbe},flight:{...flightProbe}}));`);
+  }},{name:'test-only-canonical-core-probe',enforce:'pre',transform(code,id){
+   if(process.env.MULTIPLAYER_STATE_CORE_PROBE!=='true'||!id.replaceAll('\\','/').split('?')[0].endsWith('/src/network/host.worker.ts'))return;
+   assert.ok(code.includes('      samples++;'));
+   return "import {existingStateCore as probeCore} from '../engine/simulation/CombatStateCore';\n"+code.replace('      samples++;',`      samples++;
+      if(tick%120===0){const core=probeCore(engine);console.info('[state-core-probe] '+JSON.stringify({tick,entities:core?.entityCount??0,...core?.counters}));}`);
+  }},lanRestoreStagePlugin(restoreStages),postBlockTimelinePlugin(postBlockTimeline),inputAdmissionProbePlugin(inputAdmissionProbe),presentationMeasurePlugin(measureMode),studioSummaryPlugin(),...(tailwind?tailwind():[]),frozenBrowserPlugin(process.env.MULTIPLAYER_FROZEN),steadyFixturePlugin(steady,commandHeld),publicationProbePlugin(process.env.MULTIPLAYER_PUBLICATION_PROBE==='true'),sameTickSkipPlugin(process.env.MULTIPLAYER_SAME_TICK_SKIP==='true'),{name:'test-only-initial-particles',enforce:'pre',transform(code,id){if(process.env.MULTIPLAYER_PARTICLE_FIXTURE!=='true'||!id.replaceAll('\\','/').split('?')[0].endsWith('/src/network/HostSnapshot.ts'))return;const marker='return new HostMuzzleEvents(engine.fxSystem';assert.ok(code.includes(marker));return code.replace(marker,'if (localParticles) engine.fxSystem.spawnSparks(engine.playerShip.pos, 60); '+marker);}},{name:'isolated-battle-check',configureServer(s){s.middlewares.use((req,res,next)=>{if(req.url==='/__frozen-battle.css'&&frozenCss){res.setHeader('Content-Type','text/css; charset=utf-8');res.end(frozenCss);return;}if(req.url!=='/__multiplayer.html')return next();res.setHeader('Cross-Origin-Opener-Policy','same-origin');res.setHeader('Cross-Origin-Embedder-Policy','require-corp');res.setHeader('Content-Type','text/html');res.end('<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,"><title>Isolated multiplayer check</title><style>html,body,#root{margin:0;width:100%;height:100%;overflow:hidden}</style><div id="root"></div>');});}}],server:{host:'127.0.0.1',port:0,open:false,headers:{'Cross-Origin-Opener-Policy':'same-origin','Cross-Origin-Embedder-Policy':'require-corp'},watch:null},logLevel:'error'});
  await vite.listen();const port=vite.httpServer.address().port;
  // Each real desktop owns its own helper. Do not put five clients behind one
  // helper or raise its deliberate four-connection safety cap for a benchmark.
@@ -107,7 +132,7 @@ try{
  vite.httpServer.on('upgrade',(req,socket,head)=>{if(req.url.startsWith('/desktop/lan/ws')){try{const client=Number(new URL(req.url,'http://127.0.0.1').searchParams.get('testClient'));assert.ok(Number.isInteger(client)&&client>=0&&client<count);bridges[client].upgrade(req,socket,head);}catch{socket.destroy();}}});
  // Use the direct pipe: launchServer + connect serialized every observed network
  // event twice and built an unbounded proxy backlog under this fixture.
- const launchViewerBrowser=()=>chromium.launch({headless:true,args:[...(process.env.MULTIPLAYER_ANGLE?['--use-angle='+process.env.MULTIPLAYER_ANGLE]:[]),'--enable-unsafe-swiftshader','--disable-background-timer-throttling','--disable-renderer-backgrounding']});
+ const launchViewerBrowser=()=>chromium.launch({headless:true,...(process.env.MULTIPLAYER_BROWSER_EXECUTABLE?{executablePath:process.env.MULTIPLAYER_BROWSER_EXECUTABLE}:{}),args:[...(process.env.MULTIPLAYER_ANGLE?['--use-angle='+process.env.MULTIPLAYER_ANGLE]:[]),'--enable-unsafe-swiftshader','--disable-background-timer-throttling','--disable-renderer-backgrounding']});
  browser=await launchViewerBrowser();viewerBrowsers.push(browser);
  for(let i=0;i<count;i++){
   const owner=process.env.MULTIPLAYER_BROWSER_PER_VIEWER==='true'&&i>0?await launchViewerBrowser():browser;
@@ -115,7 +140,7 @@ try{
   stage('joining '+i);const context=await owner.newContext({viewport:styled?{width:1280,height:720}:{width:640,height:360}}),page=await context.newPage();pages.push(page);
   page.on('pageerror',e=>errors.push({seat:i,error:e.message,stack:e.stack}));
   if(process.env.MULTIPLAYER_RECORD_ASSETS==='true')page.on('response',response=>{const url=new URL(response.url());if(url.pathname.startsWith('/game-assets/'))assetResponses.set(url.pathname+'|'+response.status(),{path:decodeURIComponent(url.pathname),status:response.status()});});
-  page.on('console',m=>{if(process.env.MULTIPLAYER_LOOP_PROBE==='true'&&m.text().startsWith('[host-loop-probe] ')){workerLoopProbes.push({seat:i,...JSON.parse(m.text().slice('[host-loop-probe] '.length))});return;}const row=parseNetworkConsole(m.text());if(row){samples.push({seat:i,...row});}else if(m.type()==='error')errors.push({seat:i,console:m.text()});});
+  page.on('console',m=>{if(m.text().startsWith('[fire-flight-probe] ')){rewriteSamples.push({seat:i,...JSON.parse(m.text().slice('[fire-flight-probe] '.length))});return;}if(m.text().startsWith('[decision-pipeline-probe] ')){decisionSamples.push({seat:i,...JSON.parse(m.text().slice('[decision-pipeline-probe] '.length))});return;}if(m.text().startsWith('[numeric-acquisition-probe] ')){acquisitionSamples.push({seat:i,...JSON.parse(m.text().slice('[numeric-acquisition-probe] '.length))});return;}if(m.text().startsWith('[state-core-probe] ')){coreSamples.push({seat:i,...JSON.parse(m.text().slice('[state-core-probe] '.length))});return;}if(process.env.MULTIPLAYER_LOOP_PROBE==='true'&&m.text().startsWith('[host-loop-probe] ')){workerLoopProbes.push({seat:i,...JSON.parse(m.text().slice('[host-loop-probe] '.length))});return;}const row=parseNetworkConsole(m.text());if(row){samples.push({seat:i,...row});}else if(m.type()==='error')errors.push({seat:i,console:m.text(),location:m.location()});});
   await page.goto(`http://127.0.0.1:${port}/__multiplayer.html`);
   await page.evaluate(async({origin,index,fixtureSeed,styled,compiledCssHref,frozenCssHref,steady,textureProbe,presentationPage,measureMode,controlMailboxCheck})=>{
    if(styled&&frozenCssHref){await new Promise((resolve,reject)=>{const link=document.createElement('link');link.rel='stylesheet';link.href=frozenCssHref;link.onload=resolve;link.onerror=()=>reject(Error('Frozen CSS failed'));document.head.append(link);});}
@@ -162,6 +187,35 @@ try{
 
  await pages[0].evaluate(({aiHulls,revision})=>connection.send({type:'options',baseRevision:revision,options:{assignment:'teams',battleSize:3200,aiHulls}}),{aiHulls,revision:room.options.aiRevision??0});
  await until(()=>room.options.aiHulls.flat().length===aiCount,'options');
+ // Empty runtime hulls are intentional. Heavy combat acceptance must explicitly
+ // equip the existing authored presets through real room configuration commands.
+ if(process.env.MULTIPLAYER_BUNDLED_PRESETS==='true'){
+  for(const [index,page]of pages.entries()){
+   await page.evaluate(async({hull,roomCode,revision,index,heldWeapon})=>{
+    const {createBundledPresetDesign}=await import('/src/studio/BundledPresetDesign.ts');
+    const design=createBundledPresetDesign(hull);
+    if(heldWeapon){
+     const {weapons}=await import('/src/studio/DesignModel.ts'),w=weapons.find(w=>w.id===heldWeapon);
+     if(!w||w.isBeam||w.isRocket||w.isGuided||w.everyFrameEffect||w.systemOnly||w.autoCharge&&(w.burstSize??1)!==1||(w.chargeTime??0)!==0
+      ||!['BALLISTIC','BALLISTIC_AS_BEAM','PLASMA'].includes(w.spawnType??'')||(w.burstSize??1)!==1||!(w.refireDelay>=.05))throw Error('Held repeat fixture requires an authored single-round, uncharged weapon');
+     const group=design.groups[0];
+     if(!group||group.mode!=='LINKED'||!group.weaponSlotIds.length)throw Error('Held fixture needs an existing linked group');
+     for(const slot of group.weaponSlotIds)design.weapons[slot]=heldWeapon;
+    }
+    connection.send({type:'configure',requestId:'preset-human-'+index,roomCode,baseRevision:revision,hull,design});
+   },{hull:roomCatalog.ships[0].id,roomCode:room.code,revision:room.peers[index].designRevision??0,index,heldWeapon});
+   await until(()=>!!room.peers[index].design,'human preset '+index);
+  }
+  for(const [team,hulls]of aiHulls.entries())for(const hull of new Set(hulls)){
+   const revision=room.options.aiRevision??0;
+   await pages[0].evaluate(async({team,hull,roomCode,revision})=>{
+    const {createBundledPresetDesign}=await import('/src/studio/BundledPresetDesign.ts');
+    connection.send({type:'ai',requestId:'preset-ai-'+team+'-'+revision,roomCode,baseRevision:revision,
+     assignment:'teams',operation:'refit',scope:'group',team,hull,design:createBundledPresetDesign(hull)});
+   },{team,hull,roomCode:room.code,revision});
+   await until(()=>room.options.aiRevision===revision+1,'AI preset '+team+'/'+hull);
+  }
+ }
  for(const page of pages.slice(1))await page.evaluate(()=>connection.send({type:'ready',ready:true}));
  await until(()=>room.peers.slice(1).every(p=>p.ready),'ready');stage('start');await pages[0].evaluate(()=>connection.send({type:'start'}));
  await until(()=>room.status==='running'&&room.peers.every(p=>p.loaded),'all real replicas loaded',90000);stage('loaded');if(!steady)await new Promise(r=>setTimeout(r,3000));
@@ -172,14 +226,14 @@ try{
   const cycle=()=>{for(const code of ['KeyW','KeyE','KeyX'])window.dispatchEvent(new KeyboardEvent('keyup',{code}));window.dispatchEvent(new KeyboardEvent('keydown',{code:['KeyW','KeyE','KeyX'][step++%3]}));};
   cycle();window.predictionInputTimer=setInterval(cycle,1500);
  });
- if(!steady&&process.env.MULTIPLAYER_WEAPON_FIXTURE==='true')for(const page of pages)await page.evaluate(()=>{
+ if(!steady&&process.env.MULTIPLAYER_WEAPON_FIXTURE==='true')for(const page of pages)await page.evaluate(heldGroup=>{
   const canvas=document.querySelector('canvas'),rect=canvas.getBoundingClientRect();
   const aim=()=>{const phase=performance.now()/900;canvas.dispatchEvent(new MouseEvent('mousemove',{clientX:rect.left+rect.width*(.5+.2*Math.sin(phase)),clientY:rect.top+rect.height*.15}));};
   const press=()=>canvas.dispatchEvent(new MouseEvent('mousedown',{button:0,clientX:rect.left+rect.width*.5,clientY:rect.top+rect.height*.15}));
   const group=code=>{window.dispatchEvent(new KeyboardEvent('keydown',{code}));window.dispatchEvent(new KeyboardEvent('keyup',{code}));};
-  aim();group('Digit4');setTimeout(press,300);window.weaponAimTimer=setInterval(aim,40);
+  aim();group(heldGroup);setTimeout(press,300);window.weaponAimTimer=setInterval(aim,40);
   setTimeout(()=>{window.dispatchEvent(new MouseEvent('mouseup',{button:0}));group('Digit1');setTimeout(press,300);},6000);
- });
+ },heldGroup);
  if(steady){
   stage('steady: replicas at tick 1');
   await until(async()=>Promise.all(pages.map(p=>p.evaluate(()=>window.rows.some(r=>r.tick===1)||window.steadyEvents.some(e=>e.phase==='checkpoint'&&e.tick===1)))).then(rows=>rows.every(Boolean)),'all replicas received tick 1');
@@ -291,6 +345,10 @@ try{
  const controlEvidence=controlMailboxCheck?await checkControlMailbox({guest:pages[1],until,stage,retain:evidence=>fs.writeFile(path.join(out,'control-mailbox.json'),JSON.stringify(evidence,null,2))}):null;
  const jsonEvidence=measureMode==='messages'?await checkPresentationJson({pages,room,until,stage}):null;
  const presentationEvidence=presentationPage?await checkPresentationPage({pages,room,until,stage}):null;
+ if(process.env.MULTIPLAYER_NUMERIC_ACQUISITION_PROBE==='true')assert.ok(acquisitionSamples.some(s=>s.preAim>0&&s.aimScans>0),'Actual browser host must execute numeric acquisition algorithms');
+ if(process.env.MULTIPLAYER_DECISION_PIPELINE_PROBE==='true')assert.ok(decisionSamples.some(s=>s.scene.scenes>0&&s.scene.modulePlans>0&&s.scene.spatialQueries>0&&s.fleet.plans>0),'Actual browser host must execute the root/module decision scene and numerical fleet planner');
+ if(process.env.MULTIPLAYER_FIRE_FLIGHT_PROBE==='true')assert.ok(rewriteSamples.some(s=>s.fire.queries>0&&s.fire.phaseReads>0&&s.flight.hostileQueries>0&&s.flight.permissionLists>0&&s.flight.steering>0),'Real browser must execute rewritten fire observations/acquisition and live flight/permission/steering algorithms');
+ if(process.env.MULTIPLAYER_STATE_CORE_PROBE==='true')assert.ok(coreSamples.some(s=>s.entities>0&&s.motionSteps>0),'Real browser host must execute canonical core, not silently fall back');
  stage('viewers');const loaded=room.peers.every(p=>p.loaded),tickAfter=room.lastTick;
  const viewers=await Promise.all(pages.map(p=>p.evaluate(()=>({canvas:(()=>{const c=document.querySelector('canvas'),r=c?.getBoundingClientRect();return c?{width:c.width,height:c.height,cssWidth:r.width,cssHeight:r.height,presentation:c.dataset.presentation}:null;})(),isolated:crossOriginIsolated,socket:connection.socket?.constructor.name,workerNotes:window.workerNotes,features:connection.networkFeatures,connected:connection.ready,returned:!!window.returned,errors:window.rows.filter(m=>['error','disconnected','roomClosed'].includes(m.type)),gpu:(()=>{const canvas=document.querySelector('.lan-canvas');if(canvas?.dataset.presentation==='worker')return {vendor:canvas.dataset.gpuVendor,renderer:canvas.dataset.gpuRenderer};const gl=canvas?.getContext('webgl2');const debug=gl?.getExtension('WEBGL_debug_renderer_info');return gl?{vendor:gl.getParameter(debug?.UNMASKED_VENDOR_WEBGL??gl.VENDOR),renderer:gl.getParameter(debug?.UNMASKED_RENDERER_WEBGL??gl.RENDERER)}:null;})(),text:document.body.innerText.slice(0,5000)}))));
  const measured=measuredSamples(samples,started,measuredUntil);
@@ -336,4 +394,4 @@ finally{
 }
 await fs.writeFile(path.join(out,'host-load.json'),JSON.stringify(hostLoad.stop(),null,2));
 if(process.env.MULTIPLAYER_LOOP_PROBE==='true')await fs.writeFile(path.join(out,'worker-loop.jsonl'),workerLoopProbes.map(r=>JSON.stringify(r)).join('\n')+'\n');
-report.cleanupCompleted=true;await fs.writeFile(path.join(out,'result.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
+report.rewriteSamples=rewriteSamples;report.decisionSamples=decisionSamples;report.acquisitionSamples=acquisitionSamples;report.coreSamples=coreSamples;report.cleanupCompleted=true;await fs.writeFile(path.join(out,'result.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));

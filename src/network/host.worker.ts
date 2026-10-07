@@ -6,6 +6,7 @@ import {SnapshotEncoderBroker} from './SnapshotEncoderBroker';
 import {attachAuthorityCompletion, readAuthorityCompletion} from './AuthorityLocalCompletion.mjs';
 import type {AuthorityCompletion} from './AuthorityLocalCompletion.mjs';
 import { CombatAuthority } from '../engine/runtime/CombatAuthority';
+import { WeaponThreatWorkers, type WeaponThreatWorkerStatus } from '../engine/ai/WeaponThreatWorkers';
 import { FireControlQueryRoster } from '../engine/ai/FireControlQueryBatch';
 import { enableWorkerOwnedPreAimRange } from '../engine/ai/AutofireController';
 import { withoutBulkProjectiles } from './ProjectileBulkVariant.mjs';
@@ -25,7 +26,7 @@ import { captureCriticalCombat } from "./CriticalCombatReplica";
 import { captureMotion } from "./CaptureMotion";
 import { captureBattleReport } from "./CaptureBattleReport";
 import { createLanWorld } from "./LanWorld";
-import type { Ship } from "../engine/simulation/Ship";
+import { enableWorkerOwnedPhaseReads, type Ship } from "../engine/simulation/Ship";
 import { CombatEngine } from "../engine/simulation/CombatEngine";
 import { Vector2 } from "../engine/math/Vector2";
 import { applyModuleWeaponInput, stopModuleFiring } from '../engine/runtime/ModuleFireControl';
@@ -48,8 +49,10 @@ const compactParticles = import.meta.env.VITE_LAN_PARTICLE_RECIPES !== 'false';
 const localParticles = compactParticles && import.meta.env.VITE_LAN_LOCAL_PARTICLES !== 'false';
 const multicore = import.meta.env.VITE_LAN_AI_WORKERS === 'true' ? new LanCombatMulticore() : null;
 const aiBudget = new HostAiBudget();
+const threatWorkers = new WeaponThreatWorkers();
 let lifecycle = 0;
 let steppingLifecycle: number | null = null;
+const deferredWorldMessages: any[] = [];
 let controlled = new Map<Seat, Ship>();
 interface Controls {
   input: PlayerInput;
@@ -250,11 +253,11 @@ function measureClock(now: number) {
   combatRate = (engine.combatTime - clockCombat) * 1000 / elapsed;
   clockAt = now; clockTick = tick; clockCombat = engine.combatTime;
 }
-function diagnostics(): HostPerformance & { io: { enabled: boolean; sharedCredit: boolean; sharedAdmission: boolean; preflightSkips: number; sharedCompletions: number; sent: number; skipped: number; inputs: number; inflight: number; displaySounds: number; flow: import("./SnapshotFlow.mjs").FlowSample }; multicore: LanCombatMulticore["status"] & { budget: HostAiBudget["status"] } } {
+function diagnostics(): HostPerformance & { weaponThreats: WeaponThreatWorkerStatus; io: { enabled: boolean; sharedCredit: boolean; sharedAdmission: boolean; preflightSkips: number; sharedCompletions: number; sent: number; skipped: number; inputs: number; inflight: number; displaySounds: number; flow: import("./SnapshotFlow.mjs").FlowSample }; multicore: LanCombatMulticore["status"] & { budget: HostAiBudget["status"] } } {
   const owners: LanCombatMulticore["status"] = multicore?.status ?? {
     mode: 'serial', tier: 'audited', reason: 'ai-workers-disabled', workers: 0, metrics: null,
   };
-  return { capturePlans: capturePlanDiagnostics(), captureReuse: { produced: captures, reused: captureReuses, encodedFragments: encodedFragmentReuses, retained: capturedFrame !== null }, serializer: serializerDiagnostics(), io: { enabled: !!directIo && directReady, sharedCredit: directCompletion !== null, sharedAdmission: directAdmission !== null, ...ioStats, inflight: Number(directInFlight !== null), displaySounds: sounds.length, flow: ioFlow.sample() }, flow: snapshotFlow.sample(), tick, callbackGapMs, lastStepMs, maxStepMs, backlogMs: accumulator,
+  return { weaponThreats: { ...threatWorkers.status }, capturePlans: capturePlanDiagnostics(), captureReuse: { produced: captures, reused: captureReuses, encodedFragments: encodedFragmentReuses, retained: capturedFrame !== null }, serializer: serializerDiagnostics(), io: { enabled: !!directIo && directReady, sharedCredit: directCompletion !== null, sharedAdmission: directAdmission !== null, ...ioStats, inflight: Number(directInFlight !== null), displaySounds: sounds.length, flow: ioFlow.sample() }, flow: snapshotFlow.sample(), tick, callbackGapMs, lastStepMs, maxStepMs, backlogMs: accumulator,
     simulationMs: samples ? elapsedCost / samples : lastStepMs, captureMs, encodeMs, realtimeRatio, combatRate, multicore: { ...owners, reason: owners.workers || owners.reason !== "not-started" ? owners.reason : aiBudget.status.reason, budget: aiBudget.status } };
 }
 function snapshot(final = false) {
@@ -365,6 +368,7 @@ function fail(error: unknown) {
   running = false;
   lifecycle++;
   multicore?.reset();
+  threatWorkers.reset(); deferredWorldMessages.length = 0;
   if (timer) clearInterval(timer);
   send({
     type: "error",
@@ -470,9 +474,11 @@ async function step() {
       let aiBatch: AIPhaseBatch | undefined;
       let usedOwners = false;
       try {
-        // Only pure AI proposals leave the authority. No fixedUpdate is suspended
-        // halfway through: physics, hits, spawning and destruction remain serial.
-        const allowOwners = multicore !== null && aiBudget.allow(authority.capitalShips.length, performance.now());
+        // Legacy whole-AI proposals are used only with the old live query path.
+        // The new path offloads its numerical observation stage separately.
+        const allowOwners = import.meta.env.VITE_COMBAT_THREAT_PHASE === 'false'
+          && !authority.usesPhasedWorld
+          && multicore !== null && aiBudget.allow(authority.capitalShips.length, performance.now());
         if (!allowOwners && multicore && multicore.status.workers > 0
           && ['small-fleet-serial', 'low-cost-serial'].includes(aiBudget.status.reason)) multicore?.reset();
         const pending = allowOwners && multicore ? multicore.prepare(authority, 1 / 60) : null;
@@ -486,10 +492,18 @@ async function step() {
       }
       try {
         if (!authorityRuntime || authorityRuntime.engine !== authority) throw new Error('Combat authority epoch mismatch');
-        authorityRuntime.advance(1 / 60, true, aiBatch);
+        if (import.meta.env.VITE_COMBAT_THREAT_PHASE !== 'false' && import.meta.env.VITE_COMBAT_THREAT_WORKERS === 'true') {
+          const completed = await authorityRuntime.advanceAsync(1 / 60, frame => threatWorkers.compute(frame),
+            () => generation === lifecycle && running && engine === authority);
+          if (!completed) return;
+        } else authorityRuntime.advance(1 / 60, true, aiBatch);
       }
       finally { aiBatch?.finish(); }
       tick++;
+      // Presence/deployment may arrive while the numeric stage is off-thread.
+      // Apply world writes only after the complete tick, before publication.
+      for (const message of deferredWorldMessages.splice(0)) handleMessage(message, true);
+      if (generation !== lifecycle || !running || engine !== authority) return;
       snapshotFlow.count('simulated');
       accumulator -= 1000 / 60;
       steps++;
@@ -507,6 +521,7 @@ async function step() {
         else send(finished);
         running = false;
         multicore?.reset();
+        threatWorkers.reset();
         if (timer) clearInterval(timer);
         timer = undefined;
         break;
@@ -553,7 +568,11 @@ async function step() {
     if (generation === lifecycle) lastCallbackFinishedAt = performance.now();
   }
 }
-function handleMessage(m: any) {
+function handleMessage(m: any, afterStep = false) {
+  if (!afterStep && steppingLifecycle === lifecycle && (m.type === 'presence' || m.type === 'deployment')) {
+    if (deferredWorldMessages.length >= 128) { fail(new Error('战斗世界指令积压过多')); return; }
+    deferredWorldMessages.push(m); return;
+  }
   // Inputs only enqueue controls; their world/ACK changes happen in step().
   // Everything else except pure consumption receipts conservatively invalidates,
   // including init, presence, deployment, start/stop and authority reconnects.
@@ -599,6 +618,7 @@ function handleMessage(m: any) {
       if (timer) clearInterval(timer);
       timer = undefined;
       multicore?.reset();
+      threatWorkers.reset(); deferredWorldMessages.length = 0;
       aiBudget.reset();
       background = m.hidden === true;
       serializerStartupFailed = false;
@@ -617,6 +637,9 @@ function handleMessage(m: any) {
       // This authority accepts cloned data only; no mutable ship or executable plugin escapes.
       // Register each new epoch, while retaining live per-ship hook/effect fallback checks.
       FireControlQueryRoster.ownForWorker(engine);
+      // Same closed cloned-data realm as local-combat.worker; no Ship escapes.
+      // Existing single-slot phase reads keep live callbacks and member snapshots.
+      if (import.meta.env.VITE_LAN_OWNED_PHASE_READS !== 'false') enableWorkerOwnedPhaseReads();
       // Experimental same-call stat composition, never a cross-step motion cache.
       if (import.meta.env.VITE_LAN_OWNED_MOTION_READS === 'true') enableWorkerOwnedMotionReads();
       if (import.meta.env.VITE_LAN_EARLY_PREAIM_RANGE === 'true') enableWorkerOwnedPreAimRange();
@@ -724,6 +747,7 @@ function handleMessage(m: any) {
       running = false;
       lifecycle++;
       multicore?.reset();
+      threatWorkers.reset(); deferredWorldMessages.length = 0;
       if (timer) clearInterval(timer);
       timer = undefined;
     }

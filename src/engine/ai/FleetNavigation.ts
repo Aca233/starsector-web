@@ -1,3 +1,4 @@
+import { queryMotionStats, type CombatQueryReads } from './CombatQueryReads';
 import { POLICY_TUNING, shipPolicyAction } from './learning/CombatPolicy';
 import type { Ship } from '../simulation/Ship';
 import { hasAttackOpportunity, type FleetAssignment } from './FleetTactics';
@@ -29,13 +30,13 @@ export function fleetEngagementRange(ship: Ship, target: Ship, gunRange: number,
 
 /** Gentle tangential lane correction, not a direct chord through the enemy's hull. */
 export function fleetApproachVelocity(ship: Ship, target: Ship, range: number, withdrawing: boolean,
-  assignment?: FleetAssignment): Vector2 {
-  const desired = rangeVelocity(ship, target, range, withdrawing);
+  assignment?: FleetAssignment, reads?: CombatQueryReads): Vector2 {
+  const desired = rangeVelocity(ship, target, range, withdrawing, reads);
   if (withdrawing || assignment?.approachBearing == null) return desired;
   const radial = ship.pos.clone().sub(target.pos), distance = radial.length();
   if (distance < 1 || distance > range * 2.5) return desired;
   const error = signedAngle(assignment.approachBearing - radial.heading());
-  const stats = ship.getMotionStats();
+  const stats = queryMotionStats(ship, reads);
   const laneSpeed = Math.min(stats.maxSpeed * (assignment.role === 'SKIRMISHER' ? .5 : .3),
     Math.sqrt(2 * stats.acceleration * stats.strafeMultiplier * Math.max(0, Math.abs(error) * distance - 20)));
   desired.addScaled(new Vector2(-radial.y / distance, radial.x / distance), Math.sign(error) * laneSpeed);
@@ -43,10 +44,10 @@ export function fleetApproachVelocity(ship: Ship, target: Ship, range: number, w
   return desired;
 }
 
-export function regroupVelocity(ship: Ship, anchor: Ship, target?: Ship): Vector2 {
+export function regroupVelocity(ship: Ship, anchor: Ship, target?: Ship, reads?: CombatQueryReads): Vector2 {
   const away = target ? anchor.pos.clone().sub(target.pos) : Vector2.fromAngle(anchor.facingRad + Math.PI);
   if (away.length() < 1) away.copy(Vector2.fromAngle(anchor.facingRad + Math.PI));
   const clearance = ship.spec.collisionRadius + anchor.spec.collisionRadius + 180;
   const station = anchor.pos.clone().addScaled(away, clearance / away.length());
-  return velocityToPosition(ship, station, anchor.vel, 60);
+  return velocityToPosition(ship, station, anchor.vel, 60, reads);
 }

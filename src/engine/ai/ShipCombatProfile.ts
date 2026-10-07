@@ -1,3 +1,4 @@
+import { querySourceModifiers, type CombatQueryReads } from './CombatQueryReads';
 import { signedAngle } from '../math/Angles';
 import type { Ship } from '../simulation/Ship';
 import type { WeaponMount } from '../simulation/Weapon';
@@ -5,6 +6,7 @@ import { combatWeaponRange } from '../simulation/WeaponRange';
 import { isPointDefense, predictWeaponIntercept } from './AutofireController';
 import { weaponMuzzle } from './FireControlGeometry';
 import { tacticalPolicy } from './TacticalWorld';
+import type { SystemModifiers } from '../extensions/ship-systems/Types';
 
 export interface CombatProfile { relativeBearing: number; range: number; firepower: number; weapons: number }
 export function weaponDps(m: WeaponMount): number {
@@ -13,14 +15,14 @@ export function weaponDps(m: WeaponMount): number {
   const cycle = (m.spec.chargeTime ?? 0) + (count - 1) * (m.spec.burstDelay ?? 0) + m.spec.refireDelay;
   return m.spec.damagePerShot * count / Math.max(1 / 60, cycle);
 }
-export function weaponRange(ship: Ship, m: WeaponMount): number {
-  return combatWeaponRange(ship, m.spec);
+export function weaponRange(ship: Ship, m: WeaponMount, modifiers?: Readonly<SystemModifiers>): number {
+  return combatWeaponRange(ship, m.spec, modifiers);
 }
 
 /** Pick the strongest overlapping authored firing arcs, then a DPS-weighted median range.
  * PD and disposable strike weapons cannot drag sustained main-battery stationkeeping around;
  * missile/PD-only ships fall back to their actual available weapons rather than a fake gun. */
-export function combatProfile(ship: Ship, target: Ship): CombatProfile {
+export function combatProfile(ship: Ship, target: Ship, reads?: CombatQueryReads): CombatProfile {
   const available = ship.weapons.filter(m => !m.isDisabled && m.ammo >= 1 && weaponDps(m) > 0);
   const offense = available.filter(m => !isPointDefense(m));
   const sustained = offense.filter(m => m.spec.weaponType !== 'MISSILE' && m.spec.spawnType !== 'MISSILE' && !m.spec.aiHints?.includes('STRIKE'));
@@ -30,12 +32,13 @@ export function combatProfile(ship: Ship, target: Ship): CombatProfile {
   const targetHeading = target.pos.clone().sub(ship.pos).heading();
   const current = signedAngle(targetHeading - ship.facingRad);
   if (!mounts.length) return { relativeBearing: current, range: ship.spec.collisionRadius + radius + tacticalPolicy.collisionMargin, firepower: 0, weapons: 0 };
+  const modifiers = querySourceModifiers(ship, reads);
   const arcs = mounts.map(m => {
     const fixed = m.mountType === 'HARDPOINT' || (m.spec.turnRateDegPerSec ?? 1) <= 0;
     // Hull steering must line up the muzzle/intercept, not the ship centres. Start
     // leading on approach; far outside acquisition range, simply face the contact.
-    const intercept = distance <= weaponRange(ship, m) * 1.5 + ship.spec.collisionRadius + radius
-      ? predictWeaponIntercept(ship, m, { kind: 'SHIP', entity: target }) : null;
+    const intercept = distance <= weaponRange(ship, m, modifiers) * 1.5 + ship.spec.collisionRadius + radius
+      ? predictWeaponIntercept(ship, m, { kind: 'SHIP', entity: target }, undefined, modifiers) : null;
     const aimHeading = (intercept?.point ?? target.pos).clone().sub(weaponMuzzle(ship, m)).heading();
     return { mount: m, weight: weaponDps(m),
       base: signedAngle(m.baseAngleDeg * Math.PI / 180 - signedAngle(aimHeading - targetHeading)),
@@ -75,7 +78,7 @@ export function combatProfile(ship: Ship, target: Ship): CombatProfile {
     }
   }
   const useful = at(best);
-  const ranges = useful.map(a => ({weight:a.weight, range: weaponRange(ship,a.mount)*tacticalPolicy.rangeFraction
+  const ranges = useful.map(a => ({weight:a.weight, range: weaponRange(ship,a.mount,modifiers)*tacticalPolicy.rangeFraction
     + a.mount.relativePos.x*Math.cos(best)+a.mount.relativePos.y*Math.sin(best)+radius})).sort((a,b)=>a.range-b.range);
   let accumulated = 0, range = ranges.at(-1)?.range ?? distance;
   for (const entry of ranges) { accumulated += entry.weight; if (accumulated >= power*.5) {range=entry.range;break;} }

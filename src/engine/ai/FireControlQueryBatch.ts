@@ -1,6 +1,8 @@
 import { FireTargetQualification } from './QualifiedFireTargets';
 import { PreAimRangeIndex } from './PreAimRangeIndex';
-import type { WeaponMount } from '../simulation/Weapon';
+import { AcquisitionRangeIndex } from './AcquisitionRangeIndex';
+import type { Projectile, WeaponMount } from '../simulation/Weapon';
+import type { SystemModifiers } from '../extensions/ship-systems/Types';
 import { FireControlBlockerIndex } from './FireControlBlockerIndex';
 import { Vector2 } from '../math/Vector2';
 import { hasNativeFireControlReaders, OwnedFireControlReadGuard, nativeFireControlPrototypes, type Ship } from '../simulation/Ship';
@@ -8,6 +10,7 @@ import type { CombatEngine } from '../simulation/CombatEngine';
 import { sameTeam } from '../simulation/CombatTeams';
 import { InFlightFireBudget } from './InFlightFireBudget';
 import type { FireControlWorld } from './AutofireController';
+import type { CombatFireFrame } from './CombatFireFrame';
 
 // Metadata qualification is not amortized in smaller battles; keep their original path.
 export const FIRE_CONTROL_QUERY_MIN_SHIPS = 100;
@@ -18,6 +21,9 @@ const workerOwnedEngines = new WeakSet<CombatEngine>();
 
 const budgetEstimate = InFlightFireBudget.prototype.estimate;
 const budgetPenalty = InFlightFireBudget.prototype.penalty;
+// Only an actual native roster can lend membership. A caller-supplied Set must
+// never turn a restricted flight world into the union fire frame's permissions.
+const stageMemberRosters = new WeakMap<FireControlQueryRoster, { ships: readonly Ship[]; members: ReadonlySet<Ship> }>();
 
 /** A transaction-local roster, NOT a fixed-step snapshot or a hit-result cache.
  * ShipWeaponControlSystem opens it after motion/shields/component repair and closes
@@ -35,12 +41,21 @@ export class FireControlQueryBatch {
   private flightBlockerIndex?: FireControlBlockerIndex;
   private readonly zeroTravel = new Vector2();
   private blockerIndex?: FireControlBlockerIndex;
+  private blockerSet?: ReadonlySet<Ship>;
   private readonly length: number;
+  private readonly members: ReadonlySet<Ship> | undefined;
   private readonly targetQualification?: FireTargetQualification;
   private preAimQueries = 0;
   private preAimIndex?: PreAimRangeIndex;
-  private constructor(private readonly shooter: Ship, private readonly ships: readonly Ship[], private readonly workerOwned = false) {
+  private sourceTable?: Readonly<SystemModifiers>;
+  private missileIndex?: AcquisitionRangeIndex<Projectile>;
+  private missileRoster?: readonly Projectile[];
+  private missileLength = 0;
+  private missileQueries = 0;
+  private constructor(private readonly shooter: Ship, private readonly ships: readonly Ship[], private readonly workerOwned = false,
+    public readonly stageObservation = false, private readonly fireFrame?: CombatFireFrame, members?: ReadonlySet<Ship>) {
     this.length = ships.length;
+    this.members = fireFrame ? members ?? new Set(ships) : undefined;
     this.targetQualification = workerOwned ? new FireTargetQualification(shooter, ships) : undefined;
   }
 
@@ -50,8 +65,10 @@ export class FireControlQueryBatch {
   }
 
   /** Called only by an audited native roster, with a fresh per-ship lifetime. */
-  public static fromRoster(ship: Ship, ships: readonly Ship[], workerOwned = false): FireControlQueryBatch {
-    return new FireControlQueryBatch(ship, ships, workerOwned);
+  public static fromRoster(ship: Ship, ships: readonly Ship[], workerOwned = false, stageObservation = false, fireFrame?: CombatFireFrame, roster?: FireControlQueryRoster): FireControlQueryBatch {
+    const bound = roster && stageMemberRosters.get(roster);
+    const members = bound?.ships === ships && roster?.matches(ships) ? bound.members : undefined;
+    return new FireControlQueryBatch(ship, ships, workerOwned, stageObservation, fireFrame, members);
   }
 
   public forShip(ship: Ship, ships: readonly Ship[]): FireControlQueryBatch | undefined {
@@ -84,12 +101,36 @@ export class FireControlQueryBatch {
    * checks and original roster ordering are still performed by the controller. */
   public preAimTargets(query: { origin: Vector2; range: number; speed: number; delay: number }, mount: WeaponMount): readonly Ship[] {
     if (!this.active) return this.ships;
+    if (this.fireFrame) return this.fireFrame.targets(query.origin, this.shooter.vel, query.range, query.speed, query.delay, !!mount.spec.isBeam)
+      .filter(other => this.members!.has(other) && this.readTarget(other, true));
     const targets = this.targets();
-    if (!this.workerOwned || targets.length < 16 || ++this.preAimQueries <= 1) return targets;
+    if (!(this.workerOwned || this.stageObservation) || targets.length < 16 || ++this.preAimQueries <= 1) return targets;
     this.preAimIndex ??= new PreAimRangeIndex(targets);
     const targetsInRange = this.preAimIndex.query(query.origin, this.shooter.vel, query.range, query.speed, query.delay, !!mount.spec.isBeam);
     this.targetQualification?.register(targetsInRange);
     return targetsInRange;
+  }
+
+  /** Values sampled only after this shooter's systems/motion/component updates.
+   * close() precedes actual emissions, where flux-sensitive damage stays live. */
+  public sourceModifiers(): Readonly<SystemModifiers> | undefined {
+    if (!this.active || !this.stageObservation || import.meta.env?.VITE_COMBAT_STAT_TABLE === 'false') return;
+    return this.sourceTable ??= this.shooter.system.readModifierTable?.(['getWeaponRangePercent', 'getProjectileSpeedPercent']);
+  }
+
+  public aimTargets(query: { origin: Vector2; range: number; speed: number; delay: number }, mount: WeaponMount): readonly Ship[] {
+    if (!this.stageObservation || import.meta.env?.VITE_COMBAT_ACQUISITION_INDEX === 'false') return this.targets();
+    return this.preAimTargets(query, mount);
+  }
+
+  public missileTargets(missiles: readonly Projectile[], query: { origin: Vector2; range: number; speed: number; delay: number }, mount: WeaponMount): readonly Projectile[] {
+    if (!this.active || !this.stageObservation || import.meta.env?.VITE_COMBAT_ACQUISITION_INDEX === 'false'
+      || missiles.length < 16 || ++this.missileQueries <= 1) return missiles;
+    if (this.missileRoster !== missiles || this.missileLength !== missiles.length) {
+      this.missileRoster = missiles; this.missileLength = missiles.length;
+      this.missileIndex = new AcquisitionRangeIndex(missiles, missile => missile.radius);
+    }
+    return this.missileIndex!.query(query.origin, this.shooter.vel, query.range, query.speed, query.delay, !!mount.spec.isBeam);
   }
 
   public canTarget(ship: Ship): boolean {
@@ -99,8 +140,9 @@ export class FireControlQueryBatch {
   private readTarget(ship: Ship, knownPresent: boolean): boolean {
     const cached = this.targetStatus.get(ship);
     if (cached !== undefined) return cached;
-    const allowed = (knownPresent || this.ships.includes(ship)) && !sameTeam(ship, this.shooter)
-      && !ship.hasVastBulk && !ship.isDead && ship.isVisibleTo(this.shooter.teamId) && !ship.isCollisionless;
+    const relation=this.fireFrame?.numeric?.targetAllowed(this.shooter,ship);
+    const allowed = (knownPresent || this.ships.includes(ship)) && (relation ?? (!sameTeam(ship, this.shooter)
+      && !ship.hasVastBulk && !ship.isDead && ship.isVisibleTo(this.shooter.teamId) && !ship.isCollisionless));
     this.targetStatus.set(ship, allowed);
     return allowed;
   }
@@ -109,6 +151,8 @@ export class FireControlQueryBatch {
     if (!this.blockerList) {
       this.blockerList = [];
       for (const other of this.ships) {
+        const relation=this.fireFrame?.numeric?.friendlyBlocker(this.shooter,other);
+        if(relation!==undefined){if(relation)this.blockerList.push(other);continue;}
         if (other === this.shooter || !sameTeam(other, this.shooter) || other.isDead || other.isPhased) continue;
         if (other.assemblyRoot === this.shooter.assemblyRoot && !other.spec.sourceHullTraits?.includes('do_not_fire_through')) continue;
         this.blockerList.push(other);
@@ -120,6 +164,10 @@ export class FireControlQueryBatch {
   public queryBlockers(origin: Vector2, travel: Vector2, delay: number, time: number): readonly Ship[] {
     const blockers = this.blockers();
     if (blockers.length < 8) return blockers;
+    if (this.fireFrame) {
+      this.blockerSet ??= new Set(blockers);
+      return this.fireFrame.queryBlockers(origin, travel, this.shooter.vel, delay, time).filter(other => this.blockerSet!.has(other));
+    }
     this.blockerIndex ??= new FireControlBlockerIndex(blockers);
     return this.blockerIndex.query(origin, travel, this.shooter.vel, delay, time);
   }
@@ -132,6 +180,8 @@ export class FireControlQueryBatch {
       this.flightBlockerList = this.ships.filter(other => !other.isCollisionless && other.isVisibleTo(this.shooter.teamId));
     }
     if (this.flightBlockerList.length < 8) return this.flightBlockerList;
+    if (this.fireFrame) return this.fireFrame.queryBlockers(origin, this.zeroTravel, velocity, 0, time)
+      .filter(other => this.members!.has(other) && !other.isCollisionless && other.isVisibleTo(this.shooter.teamId));
     this.flightBlockerIndex ??= new FireControlBlockerIndex(this.flightBlockerList);
     return this.flightBlockerIndex.query(origin, this.zeroTravel, velocity, 0, time);
   }
@@ -143,10 +193,14 @@ export class FireControlQueryBatch {
     this.targetStatus.clear();
     this.blockerList = undefined;
     this.blockerIndex = undefined;
+    this.blockerSet = undefined;
     this.flightBlockerList = undefined;
     this.flightRoster = undefined;
     this.flightBlockerIndex = undefined;
     this.preAimIndex = undefined;
+    this.sourceTable = undefined;
+    this.missileIndex = undefined;
+    this.missileRoster = undefined;
   }
 }
 
@@ -159,10 +213,12 @@ export class FireControlQueryRoster {
   private readonly rows;
   private readonly ownedRows: OwnedFireControlReadGuard[];
   private readonly length: number;
-  private constructor(private readonly ships: readonly Ship[], private readonly workerOwned = false) {
+  private constructor(private readonly ships: readonly Ship[], private readonly workerOwned = false, private readonly stageObservation = false) {
     this.length = ships.length;
     this.ownedRows = workerOwned ? ships.map(ship => new OwnedFireControlReadGuard(ship)) : [];
-    this.rows = workerOwned ? [] : ships.map(ship => ({ ship, spec: ship.spec, shield: ship.shield, flux: ship.flux,
+    if (stageObservation && import.meta.env?.VITE_COMBAT_QUERY_READS !== 'false')
+      stageMemberRosters.set(this, { ships, members: new Set(ships) });
+    this.rows = workerOwned || stageObservation ? [] : ships.map(ship => ({ ship, spec: ship.spec, shield: ship.shield, flux: ship.flux,
       system: ship.system, defense: ship.defenseSystem, armor: ship.armor,
       control: ship.weaponControl, damage: ship.armor.damageTakenModifiers, effective: ship.armor.dynamicEffectiveArmorMultiplier,
       cell: ship.armor.onCellDamage, overload: ship.flux.onOverloadStarted }));
@@ -180,6 +236,12 @@ export class FireControlQueryRoster {
     if (!nativeFireControlPrototypes() || !ships.every(hasNativeFireControlReaders)) return;
     return new FireControlQueryRoster(ships);
   }
+  /** New phase semantics: target availability is sampled once per shooter aim
+   * loop and source aim parameters once per mount scan. Composed systems are
+   * evaluated on the host; this does not certify old exact/pure owner callbacks. */
+  public static forStage(ships: readonly Ship[]): FireControlQueryRoster {
+    return new FireControlQueryRoster(ships, false, true);
+  }
   public matches(ships: readonly Ship[]): boolean {
     return this.active && ships === this.ships && ships.length === this.length;
   }
@@ -187,6 +249,7 @@ export class FireControlQueryRoster {
     // Native updates can install external effects or replace a component/definition.
     // These cheap live invalidators never turn a previous rejection into permission.
     if (!this.matches(world.ships) || !this.ships.includes(ship)) return;
+    if (this.stageObservation) return FireControlQueryBatch.fromRoster(ship, this.ships, false, true, world.fireFrame, this);
     const budget = world.fireBudget;
     if (budget && (Object.getPrototypeOf(budget) !== InFlightFireBudget.prototype
       || budget.estimate !== budgetEstimate || budget.penalty !== budgetPenalty)) return;
@@ -214,5 +277,40 @@ export class FireControlQueryRoster {
     }
     return FireControlQueryBatch.fromRoster(ship, this.ships);
   }
-  public close(): void { this.active = false; }
+  public close(): void { this.active = false; stageMemberRosters.delete(this); }
+}
+
+const numericBatchMethods = (['forShip','canTarget','preAimTargets','aimTargets','sourceModifiers','queryBlockers'] as const)
+  .map(key=>[key,FireControlQueryBatch.prototype[key]] as const);
+/** Numeric acquisition may bypass only the native query policy, never an
+ * injected permission/budget callback. Descriptor reads don't invoke getters. */
+export function hasNativeAcquisitionWorld(world:FireControlWorld,ship:Ship):boolean {
+  const frame=Object.getOwnPropertyDescriptor(world,'fireFrame');
+  if(!frame||!('value'in frame)||!Object.getOwnPropertyDescriptor(frame.value??{},'numeric')?.value)return false;
+  const ships=Object.getOwnPropertyDescriptor(world,'ships');if(!ships||!('value'in ships))return false;
+  const descriptor=Object.getOwnPropertyDescriptor(world,'queryBatch');
+  if(descriptor&&!('value'in descriptor))return false;
+  const batch=descriptor?.value as FireControlQueryBatch|undefined;
+  if(batch) {
+    if(Object.getPrototypeOf(batch)!==FireControlQueryBatch.prototype)return false;
+    if(!numericBatchMethods.every(([key,value])=> {
+      const own=Object.getOwnPropertyDescriptor(batch,key),current=Object.getOwnPropertyDescriptor(FireControlQueryBatch.prototype,key);
+      return (!own||'value'in own&&own.value===value)&&current?.value===value;
+    }))return false;
+    for(const key of ['active','shooter','ships','length','stageObservation']) {
+      const d=Object.getOwnPropertyDescriptor(batch,key);if(!d||!('value'in d))return false;
+    }
+    if(!batch.stageObservation||batch.forShip(ship,ships.value)!==batch)return false;
+  }
+  const bd=Object.getOwnPropertyDescriptor(world,'fireBudget');if(bd&&!('value'in bd))return false;
+  const budget=bd?.value as InFlightFireBudget|undefined;
+  if(budget) {
+    if(Object.getPrototypeOf(budget)!==InFlightFireBudget.prototype)return false;
+    for(const [key,value] of [['estimate',budgetEstimate],['penalty',budgetPenalty]] as const) {
+      const own=Object.getOwnPropertyDescriptor(budget,key),current=Object.getOwnPropertyDescriptor(InFlightFireBudget.prototype,key);
+      if(own&&(!('value'in own)||own.value!==value)||current?.value!==value)return false;
+    }
+    if(Object.getOwnPropertyNames(budget).some(key=>!('value'in Object.getOwnPropertyDescriptor(budget,key)!)))return false;
+  }
+  return true;
 }

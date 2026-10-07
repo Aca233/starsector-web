@@ -1,8 +1,9 @@
 /** Sequential wall-clock slices of the REAL scheduled simulation, not CPU usage.
  * Worker kernel time overlaps `wait` and must never be added to these slices. */
 export const COMBAT_STEP_PHASES = [
-  'input', 'dispatch', 'wait', 'sessionSetup', 'enginePrelude', 'fleetAI',
+  'input', 'dispatch', 'wait', 'sessionSetup', 'enginePrelude', 'fleetAI', 'ai:controls', 'ai:effects',
   'shipsWeapons', 'wingsDrones', 'terrainStatus', 'shipCollision',
+  'world:state', 'world:motion', 'world:weapon-state', 'world:fire-query', 'world:fire-commit', 'world:finish',
   'projectilesBeams', 'trailsMinesFX', 'aftermath', 'sessionRestore', 'finalize'
 ] as const;
 export type CombatStepPhase = typeof COMBAT_STEP_PHASES[number];

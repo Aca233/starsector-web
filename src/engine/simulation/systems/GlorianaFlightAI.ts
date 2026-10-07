@@ -1,3 +1,4 @@
+import { hasPublishedFireMembership } from '../PublishedFireMembership';
 import { glorianaCraftRole } from '../../content/GlorianaAviation';
 import type { FireControlWorld } from '../../ai/AutofireController';
 import { Vector2 } from '../../math/Vector2';
@@ -37,10 +38,16 @@ function shieldCovers(craft: Ship, target: Ship): boolean {
  * This prevents autonomous PD/retargeting from bypassing recall or the Starhawk's shield window. */
 function tacticalFireWorld(ctx: FlightContext, target: Ship | null, missile: Projectile | null): FireControlWorld {
   const roster = ctx.world?.ships ?? [...ctx.carrier.assemblyShips, ...ctx.crafts, ctx.craft, ctx.fallback];
-  const ships = [...new Set(roster.filter(s => sameTeam(s, ctx.craft) || s === target))];
-  if (!ships.includes(ctx.craft)) ships.push(ctx.craft);
-  if (target && !ships.includes(target)) ships.push(target);
-  return { ships, missiles: missile ? [missile] : [], asteroids: ctx.world?.asteroids ?? [] };
+  let ships: readonly Ship[] = ctx.world?.flightRoster?.fireShips(ctx.craft,target,roster) ?? [...new Set(roster.filter(s => sameTeam(s, ctx.craft) || s === target))];
+  if (!ships.includes(ctx.craft) || target && !ships.includes(target)) {
+    // Only actual native publications are shared/readonly. Unknown and legacy
+    // providers retain their original observable array mutation contract.
+    const local = hasPublishedFireMembership(ships) ? [...ships] : ships as Ship[];
+    if (!local.includes(ctx.craft)) local.push(ctx.craft);
+    if (target && !local.includes(target)) local.push(target);
+    ships = local;
+  }
+  return { ships, missiles: missile ? [missile] : [], asteroids: ctx.world?.asteroids ?? [], shipStepBatch: ctx.world?.shipStepBatch };
 }
 
 /** Special tactics choose permission/targets; common flight and native per-mount fire control execute them. */
@@ -131,7 +138,11 @@ export function advanceGlorianaCraft(ctx: FlightContext): boolean {
   craft.aiHoldOffensiveFire = !fireTarget && !fireMissile;
   if (craft.aiHoldOffensiveFire) craft.isFiringMain = false;
   craft.update(dt, fireTarget, ctx.spawnProj, ctx.spawnBeam, ctx.spawnFlash, tacticalFireWorld(ctx, fireTarget, fireMissile));
-  if (bomber && payloadNeedsRearm(launchers)) { bomber.hasTorpedo = false; bomber.state = 'RETURN_TO_REARM'; }
-  if (craft.hullHp <= 0 && !craft.isDead && fx.destructionSideEffectsEnabled()) fx.handleShipDestruction(craft);
+  const finishFlight = () => {
+    if (bomber && payloadNeedsRearm(launchers)) { bomber.hasTorpedo = false; bomber.state = 'RETURN_TO_REARM'; }
+    if (craft.hullHp <= 0 && !craft.isDead && fx.destructionSideEffectsEnabled()) fx.handleShipDestruction(craft);
+  };
+  if (ctx.world?.shipStepBatch) ctx.world.shipStepBatch.afterShip(craft, finishFlight);
+  else finishFlight();
   return true;
 }

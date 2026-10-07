@@ -1,3 +1,6 @@
+import { positionScorer } from './TacticalPositioningKernel';
+import { stageKernelWork,decisionReadsFor } from './DecisionReadPlane';
+import { queryMotionStats, querySourceModifiers, type CombatQueryReads } from './CombatQueryReads';
 import type { Ship } from '../simulation/Ship';
 import type { WeaponMount } from '../simulation/Weapon';
 import { tacticalPolicy, type TacticalWorld } from './TacticalWorld';
@@ -23,8 +26,8 @@ export interface CombatPositionChoice {
 const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
 
 /** Acceleration-limited forecast, not an instantaneous jump to the chosen station. */
-export function forecastCombatPosition(ship: Ship, desired: Vector2): Vector2 {
-  const stats = ship.getMotionStats(), pos = ship.pos.clone(), vel = ship.vel.clone();
+export function forecastCombatPosition(ship: Ship, desired: Vector2, reads?: CombatQueryReads): Vector2 {
+  const stats = queryMotionStats(ship, reads), pos = ship.pos.clone(), vel = ship.vel.clone();
   const c = Math.cos(ship.facingRad), s = Math.sin(ship.facingRad), dt = HORIZON / 6;
   for (let step = 0; step < 6; step++) {
     const dx = desired.x - vel.x, dy = desired.y - vel.y;
@@ -35,10 +38,10 @@ export function forecastCombatPosition(ship: Ship, desired: Vector2): Vector2 {
   }
   return pos;
 }
-function battery(ship: Ship, world: TacticalWorld, stationkeeping = false): Gun[] {
+function readBattery(ship: Ship, world: TacticalWorld, stationkeeping = false): Gun[] {
   const envelope = world.weaponThreatEnvelope?.get(ship);
   const guns = envelope ? envelope.mounts.map((mount, i) => ({ mount, range: envelope.ranges[i], power: envelope.dps[i] }))
-    : ship.weapons.filter(m => !m.isDisabled && m.ammo >= 1).map(mount => ({ mount, range: weaponRange(ship, mount), power: weaponDps(mount) }));
+    : ship.weapons.filter(m => !m.isDisabled && m.ammo >= 1).map(mount => ({ mount, range: weaponRange(ship, mount, querySourceModifiers(ship, world.queryReads)), power: weaponDps(mount) }));
   // A bounded advisory sample; actual firing still checks EVERY mount's exact geometry.
   const offense = guns.filter(g => !isPointDefense(g.mount) && g.power > 0 && Number.isFinite(g.range + g.power));
   // Match navigation's sustained battery. A long-range missile shot must not make
@@ -48,6 +51,11 @@ function battery(ship: Ship, world: TacticalWorld, stationkeeping = false): Gun[
     && g.mount.spec.spawnType !== 'MISSILE' && !g.mount.spec.aiHints?.includes('STRIKE')) : [];
   return (sustained.length ? sustained : offense)
     .sort((a, b) => b.power - a.power || a.mount.slotId.localeCompare(b.mount.slotId)).slice(0, 8);
+}
+function battery(ship: Ship, world: TacticalWorld, stationkeeping = false): Gun[] {
+  const plane=decisionReadsFor(world);
+  return plane?.active ? plane.battery(ship,world.weaponThreatEnvelope,stationkeeping,()=>readBattery(ship,world,stationkeeping))
+    : readBattery(ship,world,stationkeeping);
 }
 function intersects(start: Vector2, end: Vector2, center: Vector2, radius: number): boolean {
   const delta = end.clone().sub(start), length2 = delta.dot(delta);
@@ -64,37 +72,39 @@ function intersectsPrepared(start: Vector2, delta: Vector2, length2: number, cen
 export function chooseCombatVelocity(ship: Ship, target: Ship, desired: Vector2, profile: CombatProfile,
   world: TacticalWorld): CombatPositionChoice {
   const unchanged = (): CombatPositionChoice => ({ velocity: desired, adjusted: false, scoreGain: 0, clearFire: 0, reason: 'BASELINE' });
-  const stats = ship.getMotionStats();
+  const stats = queryMotionStats(ship, world.queryReads);
   if (ship.isPhased || ship.flux.isVenting || ship.flux.isOverloaded || ship.system.locksTurning
     || !target.isVisibleTo(ship.teamId) || !(stats.maxSpeed > 0) || !Number.isFinite(profile.range)
     || ship.pos.distanceTo(target.pos) > profile.range * 2.5) return unchanged();
   const guns = battery(ship, world, true), ownPower = guns.reduce((n, g) => n + g.power, 0);
   if (ownPower <= 0) return unchanged();
-  const targetPos = target.pos.clone().addScaled(target.vel, HORIZON);
-  const nearby = world.ships.filter(other => other !== ship && other !== target && !other.isDead && !other.isPhased
-    && other.spec.hullSize !== 'FIGHTER' && other.isVisibleTo(ship.teamId))
+  const plane=decisionReadsFor(world);
+  const predict=(s:Ship)=>plane?plane.predictedPosition(s):s.pos.clone().addScaled(s.vel,HORIZON);
+  const targetPos = predict(target);
+  const nearby = (plane?plane.positionBodies(world.ships,ship.teamId):world.ships).filter(other => other !== ship && other !== target && (plane || !other.isDead && !other.isPhased
+    && other.spec.hullSize !== 'FIGHTER' && other.isVisibleTo(ship.teamId)))
     .sort((a, b) => ship.pos.distanceTo(a.pos) - ship.pos.distanceTo(b.pos) || a.id.localeCompare(b.id)).slice(0, 12);
   // The owner-worker recorder must include fire-lane dependencies, which can lie
   // OUTSIDE the short collision corridor. Infinity deliberately records these reads.
   for (const other of [target, ...nearby]) world.noteNavigationObstacle?.(ship, other, Infinity);
-  const bodies: Body[] = nearby.map(other => ({ ship: other, pos: other.pos.clone().addScaled(other.vel, HORIZON),
+  const bodies: Body[] = nearby.map(other => ({ ship: other, pos: predict(other),
     radius: Math.max(other.spec.collisionRadius, other.shield.isActive && !(other.shield.voidShield && sameTeam(ship,other)) ? other.shield.radius : 0) + 8 }));
   for (const a of world.asteroids.filter(a => a.hp > 0).sort((a, b) => ship.pos.distanceTo(a.pos) - ship.pos.distanceTo(b.pos)).slice(0, 8))
     bodies.push({ pos: a.pos.clone().addScaled(a.vel, HORIZON), radius: a.radius + 8 });
   const foes = nearby.filter(s => !sameTeam(ship, s) && !s.flux.isVenting && !s.flux.isOverloaded && !s.system.blocksWeapons)
-    .slice(0, 4).map(s => ({ ship: s, pos: s.pos.clone().addScaled(s.vel, HORIZON), guns: battery(s, world) }));
+    .slice(0, 4).map(s => ({ ship: s, pos: predict(s), guns: battery(s, world) }));
   // Use phase-frozen fleet assignments, not another AI's mutable currentTargetShip.
   const lanes = nearby.filter(s => sameTeam(s, ship)).flatMap(ally => {
     const id = world.fleetPlan?.get(ally.id)?.targetId;
     const enemy = id ? world.ships.find(s => s.id === id && !s.isDead && !sameTeam(s, ship) && s.isVisibleTo(ship.teamId)) : undefined;
     if (!enemy) return [];
     world.noteNavigationObstacle?.(ship, enemy, Infinity);
-    return [{ start: ally.pos.clone().addScaled(ally.vel, HORIZON), end: enemy.pos.clone().addScaled(enemy.vel, HORIZON) }];
+    return [{ start: predict(ally), end: predict(enemy) }];
   });
   const radius = Math.max(ship.spec.collisionRadius, ship.shield.isActive ? ship.shield.radius : 0);
   const clearance = radius + target.spec.collisionRadius + 8;
-  const score = (velocity: Vector2): PositionScore => {
-    const pos = forecastCombatPosition(ship, velocity), toTarget = targetPos.clone().sub(pos), distance = toTarget.length();
+  const objectScore = (velocity: Vector2): PositionScore => {
+    const pos = forecastCombatPosition(ship, velocity, world.queryReads), toTarget = targetPos.clone().sub(pos), distance = toTarget.length();
     const wantedFacing = toTarget.heading() - profile.relativeBearing;
     const facing = ship.facingRad + clamp(signedAngle(wantedFacing - ship.facingRad), -stats.maxTurnRate * HORIZON, stats.maxTurnRate * HORIZON);
     let clearPower = 0, blockedPower = 0;
@@ -134,6 +144,24 @@ export function chooseCombatVelocity(ship: Ship, target: Ship, desired: Vector2,
     const deviation = velocity.distanceTo(desired) / Math.max(1, stats.maxSpeed);
     return { total: 3.2 * clearFire - 1.2 * alliedLane - .8 * danger - .5 * escape - (overlap ? 6 : 0)
       - .65 * rangeError - .18 * deviation, clearFire, blocked, alliedLane, danger, escape };
+  };
+  const scalar=plane?.canScore(world.asteroids)&&plane.canScoreVectors([ship.pos,ship.vel,desired,targetPos,
+    ...guns.map(g=>g.mount.relativePos),...bodies.map(b=>b.pos),...lanes.flatMap(l=>[l.start,l.end]),
+    ...foes.flatMap(f=>[f.pos,...f.guns.map(g=>g.mount.relativePos)])]);
+  const numericScore=scalar ? positionScorer({x:ship.pos.x,y:ship.pos.y,vx:ship.vel.x,vy:ship.vel.y,facing:ship.facingRad,
+    target:targetPos,targetRadius:target.spec.collisionRadius,radius,range:profile.range,relativeBearing:profile.relativeBearing,
+    ownPower,desired,...stats,
+    guns:guns.map(g=>({x:g.mount.relativePos.x,y:g.mount.relativePos.y,range:g.range,power:g.power,
+      fixed:g.mount.mountType==='HARDPOINT'||(g.mount.spec.turnRateDegPerSec??1)<=0,
+      halfArc:(g.mount.mountType==='HARDPOINT'||(g.mount.spec.turnRateDegPerSec??1)<=0)?0:g.mount.arcDeg*Math.PI/360,
+      turretReach:(g.mount.spec.turnRateDegPerSec??0)*Math.PI/180*HORIZON,angle:g.mount.currentAngleRad,base:g.mount.baseAngleDeg*Math.PI/180})),
+    bodies:bodies.map(b=>({x:b.pos.x,y:b.pos.y,radius:b.radius})),lanes,
+    foes:foes.flatMap(f=>f.guns.map(g=>{const c=Math.cos(f.ship.facingRad),s=Math.sin(f.ship.facingRad);
+      return {x:g.mount.relativePos.x*c-g.mount.relativePos.y*s+f.pos.x,y:g.mount.relativePos.x*s+g.mount.relativePos.y*c+f.pos.y,
+        range:g.range,power:g.power,facing:f.ship.facingRad,base:g.mount.baseAngleDeg*Math.PI/180,arc:g.mount.arcDeg*Math.PI/360+.15};}))}) : undefined;
+  const score=(v:Vector2)=>{
+    if(numericScore){if(ship.isAttachedModule)stageKernelWork.moduleScores++;else stageKernelWork.rootScores++;return numericScore(v);}
+    return objectScore(v);
   };
   const baseline = score(desired);
   const result: CombatPositionChoice = { ...unchanged(), clearFire: baseline.clearFire };

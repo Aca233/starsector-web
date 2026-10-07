@@ -12,6 +12,11 @@ function norm2(x: number, y: number): number {
   const ratio = (a > b ? b : a) / max;
   return normSqrt(1 + ratio * ratio) * max;
 }
+/** Same norm used by entity vectors, for numeric simulation kernels. */
+export function coordinateLength(x: number, y: number): number {
+  const math = Math, hypot = math.hypot;
+  return nativeNormIntrinsics && hypot === builtinHypot ? norm2(x, y) : applyNorm(hypot, math, [x, y]);
+}
 /**
  * 高性能 2D 向量计算工具类 (Vector2)
  * 支持纯函数计算与零垃圾回收 (Zero Allocation) 内存复用

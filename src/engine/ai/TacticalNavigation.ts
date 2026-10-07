@@ -1,26 +1,26 @@
+import { queryMotionStats, type CombatQueryReads } from './CombatQueryReads';
 import { sameTeam } from "../simulation/CombatTeams";
 import { Vector2 } from '../math/Vector2';
 import { signedAngle } from '../math/Angles';
 import { nativeGetMotionStats, type Ship } from '../simulation/Ship';
 import type { TacticalWorld } from './TacticalWorld';
 import { tacticalPolicy as policy } from './TacticalWorld';
-import { cursorTurnCommand } from '../runtime/PlayerControls';
+import { solveSteering, type SteeringCommand } from './SteeringKernel';
 
 /** Heading/translation are independent, like native BasicEngineAI's desiredFacing/desiredHeading. */
+export function planVelocity(ship: Ship, desired: Vector2, facing: number, reads?: CombatQueryReads): SteeringCommand {
+  const stats=queryMotionStats(ship, reads);
+  return solveSteering({ facing: ship.facingRad, angularVelocity: ship.angularVelRad,
+    velocityX: ship.vel.x, velocityY: ship.vel.y, acceleration: stats.acceleration,
+    deceleration: stats.deceleration, strafeMultiplier: stats.strafeMultiplier, turnDeceleration: stats.turnDeceleration,
+    locked: ship.system.locksTurning || ship.flux.isOverloaded }, desired.x, desired.y, facing, policy.steeringResponse);
+}
 export function driveVelocity(ship: Ship, desired: Vector2, facing: number): void {
-  const stats=ship.getMotionStats();
-  ship.turnInput=ship.system.locksTurning || ship.flux.isOverloaded ? 0
-    : cursorTurnCommand(ship.facingRad,ship.angularVelRad,facing,stats.turnDeceleration);
-  ship.brakeInput=desired.length()<1;
-  ship.throttle=0;ship.strafeInput=0;
-  if(ship.brakeInput)return;
-  const local=desired.clone().sub(ship.vel).rotate(-ship.facingRad);
-  ship.throttle=Math.max(-1,Math.min(1,local.x/((local.x>=0?stats.acceleration:stats.deceleration)*policy.steeringResponse)));
-  ship.strafeInput=Math.max(-1,Math.min(1,local.y/(stats.acceleration*stats.strafeMultiplier*policy.steeringResponse)));
+  Object.assign(ship, planVelocity(ship, desired, facing));
 }
 
-export function velocityToPosition(ship: Ship, point: Vector2, targetVelocity=new Vector2(), tolerance: number=policy.positionTolerance): Vector2 {
-  const stats=ship.getMotionStats(),delta=point.clone().sub(ship.pos),distance=delta.length();
+export function velocityToPosition(ship: Ship, point: Vector2, targetVelocity=new Vector2(), tolerance: number=policy.positionTolerance, reads?: CombatQueryReads): Vector2 {
+  const stats=queryMotionStats(ship, reads),delta=point.clone().sub(ship.pos),distance=delta.length();
   const speed=distance<=tolerance?0:Math.min(stats.maxSpeed,Math.sqrt(2*stats.deceleration*(distance-tolerance)));
   const desired=targetVelocity.clone();
   if(distance>0)desired.addScaled(delta,speed/distance);
@@ -40,11 +40,12 @@ function obstacles(ship: Ship,world: TacticalWorld,horizon:number): Obstacle[] {
   // system modifiers). Reuse it only for this read-only native scan, never across
   // AI calls/ticks: systems and phase/flux state may change between those calls.
   // Dependency/custom callbacks keep the original per-obstacle reads.
-  const reuseMotion = !world.noteNavigationObstacle && ship.getMotionStats === nativeGetMotionStats && ship.hasNativeThreatPhaseHooks;
+  const reuseMotion = !world.noteNavigationObstacle && ship.getMotionStats === nativeGetMotionStats
+    && (!!world.weaponThreatFrame || ship.hasNativeThreatPhaseHooks);
   let motion: { maxSpeed: number; speed: number } | undefined;
   const add=(pos:Vector2,vel:Vector2,radius:number)=>{
     const combined=ownRadius+radius+policy.collisionMargin;
-    const own = reuseMotion ? motion ??= { maxSpeed: ship.getMotionStats().maxSpeed, speed: ship.vel.length() } : undefined;
+    const own = reuseMotion ? motion ??= { maxSpeed: queryMotionStats(ship, world.queryReads).maxSpeed, speed: ship.vel.length() } : undefined;
     if (own && horizon >= 0 && ship.pos.distanceTo === nativeDistanceTo && vel.length === nativeVectorLength) {
       // L1 speed bounds Euclidean speed from above, while a coordinate gap
       // bounds distance from below. Far obstacles need neither exact hypot.
@@ -62,7 +63,7 @@ function obstacles(ship: Ship,world: TacticalWorld,horizon:number): Obstacle[] {
   const supplied = reuseMotion ? world.navigationObstacleIndex : undefined;
   const index = supplied && ship.pos.distanceTo === nativeDistanceTo && ship.vel.length === nativeVectorLength
     ? supplied : undefined;
-  if (index) motion ??= { maxSpeed: ship.getMotionStats().maxSpeed, speed: ship.vel.length() };
+  if (index) motion ??= { maxSpeed: queryMotionStats(ship, world.queryReads).maxSpeed, speed: ship.vel.length() };
   const candidates = index?.select(world.ships, ship.pos.x, ship.pos.y, ownRadius + policy.collisionMargin, motion!.maxSpeed, motion!.speed, horizon);
   for(const other of candidates ?? world.ships){
     // Attached parts cannot collide with their own assembly (same rule as ShipCollisionSystem).
@@ -77,8 +78,8 @@ function obstacles(ship: Ship,world: TacticalWorld,horizon:number): Obstacle[] {
 }
 
 /** Finite acceleration and braking, rather than assuming a requested sideways velocity appears instantly. */
-function collisionRisk(ship: Ship,desired: Vector2,nearby:Obstacle[],horizon:number): number {
-  const stats=ship.getMotionStats(),step=horizon/policy.avoidanceSteps;
+function collisionRisk(ship: Ship,desired: Vector2,nearby:Obstacle[],horizon:number,reads?:CombatQueryReads): number {
+  const stats=queryMotionStats(ship, reads),step=horizon/policy.avoidanceSteps;
   const c=Math.cos(ship.facingRad),s=Math.sin(ship.facingRad);
   let x=ship.pos.x,y=ship.pos.y,vx=ship.vel.x,vy=ship.vel.y,risk=0;
   for(let i=0;i<policy.avoidanceSteps;i++){
@@ -120,11 +121,11 @@ function collisionRisk(ship: Ship,desired: Vector2,nearby:Obstacle[],horizon:num
 
 export function avoidCollisions(ship: Ship,desired: Vector2,world:TacticalWorld): {velocity:Vector2;avoiding:boolean;risk:number} {
   if(ship.isPhased)return {velocity:desired,avoiding:false,risk:0};
-  const stats=ship.getMotionStats();
+  const stats=queryMotionStats(ship, world.queryReads);
   const horizon=Math.max(policy.avoidanceLookahead,ship.vel.length()/Math.max(1,stats.deceleration)+1);
   const nearby=obstacles(ship,world,horizon);
   if(!nearby.length)return {velocity:desired,avoiding:false,risk:0};
-  const originalRisk=collisionRisk(ship,desired,nearby,horizon);
+  const originalRisk=collisionRisk(ship,desired,nearby,horizon,world.queryReads);
   if(originalRisk<=1e-8)return {velocity:desired,avoiding:false,risk:0};
   const speed=Math.max(desired.length(),stats.maxSpeed*.5);
   const heading=desired.length()>1?desired.heading():ship.facingRad;
@@ -133,7 +134,7 @@ export function avoidCollisions(ship: Ship,desired: Vector2,world:TacticalWorld)
   for(const angle of [30,-30,60,-60,90,-90,135,-135,180])candidates.push(Vector2.fromAngle(heading+angle*Math.PI/180,Math.min(speed,stats.maxSpeed)));
   let best=desired,bestRisk=originalRisk,bestDeviation=0;
   for(const candidate of candidates){
-    const risk=collisionRisk(ship,candidate,nearby,horizon);
+    const risk=collisionRisk(ship,candidate,nearby,horizon,world.queryReads);
     // A pure velocity-difference cost rewards two capital ships stopping face-to-face forever.
     // Prefer a safe moving detour over losing all progress; braking still wins if moving is unsafe.
     const deviation=desired.length()>1
@@ -156,20 +157,20 @@ export function forwardPathClear(ship:Ship,world:TacticalWorld,speed:number,hori
   return true;
 }
 
-export function rangeVelocity(ship:Ship,target:Ship,range:number,withdrawing:boolean):Vector2{
+export function rangeVelocity(ship:Ship,target:Ship,range:number,withdrawing:boolean,reads?:CombatQueryReads):Vector2{
   const toward=target.pos.clone().sub(ship.pos);
   if(toward.length()<1e-6)toward.copy(Vector2.fromAngle(ship.facingRad));
   const unit=toward.clone().normalize();
-  if(withdrawing)return unit.scale(-ship.getMotionStats().maxSpeed);
+  if(withdrawing)return unit.scale(-queryMotionStats(ship, reads).maxSpeed);
   const destination=target.pos.clone().addScaled(unit,-range);
   // Match the target's velocity for close stationkeeping, not the entire approach.
   // Two closing AIs otherwise feed each other's opposite velocity into their thrust
   // requests and settle at roughly half speed despite being well outside gun range.
-  const stats=ship.getMotionStats();
+  const stats=queryMotionStats(ship, reads);
   const brakingDistance=Math.max(64,stats.maxSpeed*stats.maxSpeed/(2*Math.max(1,stats.deceleration)));
   const gap=Math.max(0,toward.length()-range-policy.positionTolerance);
   const follow=Math.max(0,1-gap/brakingDistance);
-  return velocityToPosition(ship,destination,target.vel.clone().scale(follow));
+  return velocityToPosition(ship,destination,target.vel.clone().scale(follow),undefined,reads);
 }
 export const facingError=(ship:Ship,facing:number)=>signedAngle(facing-ship.facingRad);
 /** Local cooperation: if this hull is the obstruction in an ally's current firing lane,
@@ -194,8 +195,8 @@ export function yieldFireLane(ship:Ship,desired:Vector2,world:TacticalWorld):{ve
       const normal=new Vector2(-unit.y,unit.x),offset=relative.dot(normal);
       const radius=Math.max(ship.spec.collisionRadius,ship.shield.isActive&&ship.shield.type!=='PHASE'?ship.shield.radius:0)+policy.collisionMargin;
       if(Math.abs(offset)>=radius)continue;
-      const velocity=desired.clone().addScaled(normal,(offset<0?-1:1)*ship.getMotionStats().maxSpeed*.5);
-      if(velocity.length()>ship.getMotionStats().maxSpeed)velocity.scale(ship.getMotionStats().maxSpeed/velocity.length());
+      const velocity=desired.clone().addScaled(normal,(offset<0?-1:1)*queryMotionStats(ship,world.queryReads).maxSpeed*.5);
+      if(velocity.length()>queryMotionStats(ship,world.queryReads).maxSpeed)velocity.scale(queryMotionStats(ship,world.queryReads).maxSpeed/velocity.length());
       return {velocity,yielding:true};
     }
   }

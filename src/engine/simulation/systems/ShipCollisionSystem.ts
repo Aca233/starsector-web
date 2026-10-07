@@ -31,7 +31,7 @@ interface ShipPairCollisionContact {
 const immutableHullRadii = new WeakMap<object, number>();
 
 /** Enclosing radius only, never a substitute for the authored contact surface. */
-function contactBroadphaseRadius(ship: Ship): number {
+export function contactBroadphaseRadius(ship: Ship): number {
   const bounds = ship.spec.bounds;
   let hullRadius = 0;
   if (bounds && bounds.length >= 3) {
@@ -107,8 +107,8 @@ function findShipPairCollisionContact(s1: Ship, s2: Ship): ShipPairCollisionCont
  * Web 质量加权碰撞适配；冲量和撞伤系数尚未完成原版逐项核验。
  */
 export class ShipCollisionSystem {
-  public resolveShipToShipCollision(s1: Ship, s2: Ship, fx: CollisionFXCallbacks, _dt: number) {
-    if (s1.assemblyRoot === s2.assemblyRoot || s1.isDead || s2.isDead || s1.isCollisionless || s2.isCollisionless) return;
+  public resolveShipToShipCollision(s1: Ship, s2: Ship, fx: CollisionFXCallbacks, _dt: number): boolean {
+    if (s1.assemblyRoot === s2.assemblyRoot || s1.isDead || s2.isDead || s1.isCollisionless || s2.isCollisionless) return false;
 
     const contact = findShipPairCollisionContact(s1, s2);
     if (contact) {
@@ -218,6 +218,9 @@ export class ShipCollisionSystem {
         fx.spawnDebris(contactPoint, 16, [130, 115, 100], 120);
         fx.addCameraShake(Math.min(30, impactSpeed * 0.25), 0.35);
       }
+      return true;
     }
+    return false;
   }
 }
+export const nativeResolveShipCollision = ShipCollisionSystem.prototype.resolveShipToShipCollision;

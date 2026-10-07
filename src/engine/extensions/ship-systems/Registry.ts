@@ -58,6 +58,16 @@ const rocinanteStatDefinitions = new WeakSet(rocinanteSystems.map(d => shipSyste
 // OwnedNativeSystemModifiers also keeps its separate lifecycle-only allowlist:
 // Eclipse depends on live flux and MUST NOT be cached solely by effectLevel.
 const originalStatDefinitions = new WeakSet([shipSystemDefinitions.require(eclipseProtocol.id), shipSystemDefinitions.require(glorianaEdict.id), shipSystemDefinitions.require(hyperionYamato.id), shipSystemDefinitions.require(hyperionJump.id), ...adunArkSystems.map(d=>shipSystemDefinitions.require(d.id))]);
+// Consumer dependencies are certified ONLY for these registered immutable definitions.
+// A replacement/copy/external registration never inherits this permission. Propulsion
+// callbacks (offensiveManeuverAllowed/advanceJetsAI) remain on the complete input path.
+const nativeAIInputDependencies = new WeakMap<ShipSystemDefinition, Readonly<{ forwardClear: false }>>(
+  [eclipseProtocol.id, glorianaEdict.id, hyperionYamato.id, hyperionJump.id]
+    .map(id => [shipSystemDefinitions.require(id), Object.freeze({ forwardClear: false as const })])
+);
+export function nativeSystemAIInputDependencies(definition: ShipSystemDefinition): Readonly<{ forwardClear: false }> | undefined {
+  return nativeAIInputDependencies.get(definition);
+}
 // Native advanceAI/canActivate/selectTarget only change ships/system state here;
 // projectile effects are deferred to dispatchEvents, outside the AI phase.
 export function hasNativeThreatPhaseAI(definition: ShipSystemDefinition): boolean {

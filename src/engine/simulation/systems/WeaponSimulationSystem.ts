@@ -10,6 +10,9 @@ import { WeaponSimContext } from './weapon/WeaponSimContext';
 import { MissileGuidanceHandler } from './weapon/MissileGuidanceHandler';
 import { ProjectileCollisionHandler } from './weapon/ProjectileCollisionHandler';
 import { BeamSimulationHandler } from './weapon/BeamSimulationHandler';
+import type { CombatEngine } from '../CombatEngine';
+import { isNativeWeaponSimulationContext } from '../CombatEngine';
+import { beginStage, bindStage, numericDecisionCoreEnabled } from '../../ai/batch/StageProducer';
 
 // 向后兼容导出
 export type { WeaponSimContext } from './weapon/WeaponSimContext';
@@ -38,15 +41,17 @@ export class WeaponSimulationSystem {
     this.explosions.active = [];
   }
 
-  public update(dt: number, ctx: WeaponSimContext) {
+  public update(dt: number, ctx: WeaponSimContext, owner?: CombatEngine) {
     for (const ship of ctx.ships ?? [ctx.playerShip,ctx.enemyShip,...ctx.fighters]) if (!ship.isDead) for (const mount of ship.weapons) {
       if (mount.spec.everyFrameEffect) requireWeaponEffect(mount.spec.everyFrameEffect, 'advance', mount.spec.id).advance!(ship, mount, dt, ctx);
     }
-    this.updateProjectiles(dt, ctx);
+    this.updateProjectiles(dt, ctx, owner);
     this.updateBeams(dt, ctx);
   }
 
-  public updateProjectiles(dt: number, ctx: WeaponSimContext) {
+  public updateProjectiles(dt: number, ctx: WeaponSimContext, owner?: CombatEngine) {
+    const nativeContext = owner && isNativeWeaponSimulationContext(ctx, owner);
+    this.collisionHandler.closeShipCollisionFrame();
     const interceptionIndex = new ProjectileInterceptionIndex();
     const removeProjectileAt = (index: number) => {
       const removed = this.projectiles.splice(index, 1);
@@ -56,14 +61,21 @@ export class WeaponSimulationSystem {
       // Contacts can run arbitrary on-hit effects before reaching this boundary.
       // Explosions can also remove missiles or spawn further entities.
       interceptionIndex.invalidate();
+      if (p.projectileExplosionSpec) this.collisionHandler.invalidateShipCollisionFrame();
       this.explosions.spawn(p, point, ctx, shipId, asteroidId);
     } };
     this.explosions.update(dt, ctx);
     const allShips = ctx.ships ?? [ctx.playerShip, ctx.enemyShip, ...ctx.fighters];
     const hasMissiles = this.projectiles.some(projectile => projectile.isRocket);
-    this.collisionHandler.prepareShipCollisionFrame(allShips);
+    // Contact is captured AFTER every-frame hooks, active explosions, terrain,
+    // ship collision and module sync, never from the AI/fire observation.
+    const contactStage = nativeContext && this.hasNativeContactBoundary() && this.collisionHandler.hasNativeContactBoundary()
+      ? beginStage(owner, 'PROJECTILE_CONTACT', { ships: allShips, projectiles: this.projectiles, beams: this.beams }) : undefined;
+    bindStage(ctx, contactStage);
+    this.collisionHandler.prepareShipCollisionFrame(allShips, contactStage);
+    try {
+    // Frozen multirate baseline batching; opt-in keeps ordered single contacts.
     const batchedCollisionProjectiles: Projectile[] = [];
-    // 射程在本帧耗尽的弹丸必须先把最后一段位移交给碰撞检测，再决定是否移除。
     const expiredProjectileIds = new Set<number>();
     const flushBatchedCollisions = () => {
       if (batchedCollisionProjectiles.length === 0) return;
@@ -73,13 +85,7 @@ export class WeaponSimulationSystem {
         ctx
       );
       batchedCollisionProjectiles.length = 0;
-      // Missile checks may flush a single shot at a time. A miss with no range
-      // expiry has nothing to remove; avoid rescanning the entire live array.
       if (consumedIds.size === 0 && expiredProjectileIds.size === 0) return;
-
-      // Pending batches contain only already-visited (higher-index) projectiles,
-      // so removing them here preserves the descending iteration cursor while
-      // restoring the original collision/damage ordering before a special shot.
       for (let j = this.projectiles.length - 1; j >= 0; j--) {
         const candidate = this.projectiles[j];
         if (!consumedIds.has(candidate.id) && !expiredProjectileIds.has(candidate.id)) continue;
@@ -89,7 +95,6 @@ export class WeaponSimulationSystem {
       }
       expiredProjectileIds.clear();
     };
-
     let previousProjectile: Projectile | undefined;
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       // Publish the preceding missile's final pose, including fading impact
@@ -97,7 +102,7 @@ export class WeaponSimulationSystem {
       if (previousProjectile) interceptionIndex.update(previousProjectile);
       const p = this.projectiles[i];
       previousProjectile = p;
-      if (!this.collisionHandler.canBatchShipCollision(p)) flushBatchedCollisions();
+      if (!numericDecisionCoreEnabled && !this.collisionHandler.canBatchShipCollision(p)) flushBatchedCollisions();
       if (p.isMine) continue; // Interceptable missile, lifecycle owned by MineSystem.
       p.elapsedTime += dt;
       p.prevPos.copy(p.pos);
@@ -189,6 +194,7 @@ export class WeaponSimulationSystem {
         const burst = this.collisionHandler.checkProximityFuse(p, ctx, this.projectiles,
           interceptionIndex.queryRadius(p.pos, p.proximityFuse.range, this.projectiles));
         if (burst) {
+          this.collisionHandler.invalidateShipCollisionFrame();
           interceptionIndex.invalidate(); // Fuse damage may splice several other missiles.
           if (p.isRocket) ctx.contrailEngine?.detach(p.id);
 
@@ -207,11 +213,11 @@ export class WeaponSimulationSystem {
       // Source projectile/missile swept contacts; TPC may pierce several missiles.
       let intercepted = false;
       if ((!p.isRocket || p.interceptsMissiles || p.targetProjectileId !== undefined) && hasMissiles) {
-        flushBatchedCollisions();
         interceptionIndex.update(p); // A rocket pursuing a flare queries after its own movement.
         for (let remaining = this.projectiles.length; remaining > 0; remaining--) {
           const hit = this.collisionHandler.checkMissileInterception(p, ctx, interceptionIndex.query(p, this.projectiles));
           if (!hit) break;
+          if (p.onHitEffect) this.collisionHandler.invalidateShipCollisionFrame();
           interceptionIndex.invalidate(); // Damage hooks/explosions may mutate other missiles.
           if (hit.targetDestroyed) {
             const targetIndex = this.projectiles.findIndex(candidate => candidate.id === hit.targetProjectileId);
@@ -227,15 +233,17 @@ export class WeaponSimulationSystem {
       }
       if (intercepted) continue;
 
+      const canBatch = !numericDecisionCoreEnabled && this.collisionHandler.canBatchShipCollision(p);
       // Every continuation queries the remainder of the SAME swept segment.
       // A pierced pebble cannot hide a second obstacle or ship crossed this frame.
-      const canBatch = this.collisionHandler.canBatchShipCollision(p);
+      // Opt-in commits immediately; default flushes the baseline ballistic run
+      // before terrain contact and then queries the remaining segment again.
       let solidConsumed = false;
       while (true) {
         let hulkImpact = this.collisionHandler.queryHulkCollision(p, ctx);
         let asteroidImpact = ctx.queryAsteroidImpact?.(p) ?? null;
         if (!hulkImpact && !asteroidImpact) break;
-        flushBatchedCollisions();
+        if (!numericDecisionCoreEnabled) flushBatchedCollisions();
         hulkImpact = this.collisionHandler.queryHulkCollision(p, ctx);
         asteroidImpact = ctx.queryAsteroidImpact?.(p) ?? null;
         const shipT = this.collisionHandler.findShipHitParameter(p, allShips) ?? Infinity;
@@ -255,6 +263,7 @@ export class WeaponSimulationSystem {
             cost = terrainPenetrationCost(p, 'asteroid', asteroid.radius, asteroid.hp);
           }
           ctx.commitAsteroidImpact?.(p, asteroidImpact);
+          this.collisionHandler.invalidateShipCollisionFrame();
           if (!asteroid || asteroid.hp > 0) cost = undefined; // Never pierce an intact rock.
           this.collisionHandler.applyEnvironmentImpact(p, asteroidImpact.point, velocity ?? p.vel.clone().scale(0), ctx, asteroidId);
         } else break; // A real ship/shield is closer; keep its normal collision semantics.
@@ -272,13 +281,13 @@ export class WeaponSimulationSystem {
       }
       if (solidConsumed) continue;
 
-      // 5. 与敌对舰船碰撞判定 (护盾与装甲)
       if (canBatch) {
         batchedCollisionProjectiles.push(p);
         if (isRangeExpired) expiredProjectileIds.add(p.id);
         continue;
       }
 
+      // 5. 与敌对舰船碰撞判定 (护盾与装甲)
       const hit = this.collisionHandler.checkShipCollision(p, allShips, ctx);
       if (hit) {
         if (p.isRocket) ctx.contrailEngine?.detach(p.id);
@@ -295,14 +304,32 @@ export class WeaponSimulationSystem {
     }
 
     if (previousProjectile) interceptionIndex.update(previousProjectile);
+    if (!numericDecisionCoreEnabled) flushBatchedCollisions();
 
-    // Flush the final contiguous ordinary-ballistic run. Damage/effects are
-    // still applied in the same descending projectile order as the legacy loop.
-    flushBatchedCollisions();
+    } finally {
+      this.collisionHandler.closeShipCollisionFrame();
+    }
   }
 
+  /** Stage-boundary qualification only. Unknown simulation overrides retain the
+   * complete ordered generic loop; no entity or weapon class is silently omitted. */
+  private hasNativeContactBoundary(): boolean {
+    return Object.getPrototypeOf(this) === WeaponSimulationSystem.prototype
+      && this.update === nativeWeaponSimulationUpdate && this.updateProjectiles === nativeProjectileUpdate
+      && Object.getPrototypeOf(this.missileGuidance) === MissileGuidanceHandler.prototype
+      && nativeGuidanceDescriptors.every(([key, descriptor]) => {
+        const current = Object.getOwnPropertyDescriptor(MissileGuidanceHandler.prototype, key);
+        return !Object.hasOwn(this.missileGuidance, key) && current?.value === descriptor.value
+          && current?.get === descriptor.get && current?.set === descriptor.set;
+      });
+  }
 
   public updateBeams(dt: number, ctx: WeaponSimContext) {
     this.beamHandler.update(dt, { ...ctx, projectiles: this.projectiles }, this.beams);
   }
 }
+
+const nativeWeaponSimulationUpdate = WeaponSimulationSystem.prototype.update;
+const nativeProjectileUpdate = WeaponSimulationSystem.prototype.updateProjectiles;
+const nativeGuidanceDescriptors = Object.entries(Object.getOwnPropertyDescriptors(MissileGuidanceHandler.prototype))
+  .filter(([key]) => key !== 'constructor');

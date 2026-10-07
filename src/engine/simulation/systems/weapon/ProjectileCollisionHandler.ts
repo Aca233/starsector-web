@@ -4,7 +4,7 @@ import { damageToMissiles } from './DamageToMissiles';
 import { segmentCircleEntry } from '../../../math/Geometry';
 import { distanceToSegment, segmentHullHit } from '../../../visual/HulkGeometry';
 import { Vector2 } from '../../../math/Vector2';
-import { Ship } from '../../Ship';
+import { Ship, hasNativeCoreCollisionHooks } from '../../Ship';
 import { Projectile } from '../../Weapon';
 import { combatAudio as sound } from '../../../audio/CombatAudioEvents';
 import { requireWeaponEffect, weaponEffects } from '../../../extensions/weapon-effects/Registry';
@@ -22,6 +22,26 @@ import { shieldHitGlowDamage } from '../../../visual/HitGlowVisuals';
 import { distanceToDeployedShield, isShieldCollisionActive } from '../../collision/ShieldCollisionGeometry';
 import { getShipExplosionContact } from '../../collision/ExplosionContact';
 import { distanceToShipHull, mayBeWithinShipHullDistance } from '../../collision/HullGeometry';
+import { ContactKernel, type ContactHit } from '../../../ai/batch/ContactKernel';
+import type { StageView } from '../../../ai/batch/StageProtocol';
+import type { CombatEngine } from '../../CombatEngine';
+import { numericDecisionCoreEnabled } from '../../../ai/batch/StageProducer';
+
+export interface ContactCoverageCounts {
+  numericQueries: number;
+  genericQueries: number;
+  numericHits: number;
+  localRefreshes: number;
+  invalidations: number;
+  rejectedStages: number;
+  callbackFallbackQueries: number;
+}
+export interface ContactCoverage extends ContactCoverageCounts { numericFraction: number | null }
+/** D: actual executed contact-query coverage, cumulative since engine creation.
+ * null fraction means unexecuted, never "100% supported". */
+export function contactCoverageFor(owner: CombatEngine): ContactCoverage {
+  return owner.weaponSystem.collisionHandler.actualCoverage;
+}
 
 export interface ProjectileInterceptionResult {
   targetProjectileId: number;
@@ -43,6 +63,88 @@ export interface ProjectileInterceptionResult {
 export class ProjectileCollisionHandler {
   private readonly spatialIndex = new SpatialShipIndex();
   public readonly runtimeCollisionKernel = new RuntimeCollisionKernel();
+  private readonly contactKernel = new ContactKernel();
+  private contactStage?: StageView;
+  private contactShips?: Ship[];
+  /** Actual executed query coverage, not a declaration of scene equivalence. */
+  public readonly contactCoverage: ContactCoverageCounts = {
+    numericQueries: 0, genericQueries: 0, numericHits: 0,
+    localRefreshes: 0, invalidations: 0, rejectedStages: 0, callbackFallbackQueries: 0
+  };
+  public get actualCoverage(): ContactCoverage {
+    const counts = this.contactCoverage, total = counts.numericQueries + counts.genericQueries;
+    return { ...counts, numericFraction: total ? counts.numericQueries / total : null };
+  }
+  public get hasNumericShipContacts(): boolean { return !!this.contactStage?.active; }
+  public closeShipCollisionFrame(): void {
+    this.contactStage?.close(); this.contactStage = undefined;
+    this.contactShips = undefined;
+  }
+  public invalidateShipCollisionFrame(): void {
+    if (!this.contactStage?.active) return;
+    this.contactCoverage.invalidations++; this.contactStage.invalidate();
+  }
+  /** Only called at the owned stage boundary, never inside a query. */
+  public hasNativeContactBoundary(): boolean {
+    return Object.getPrototypeOf(this) === ProjectileCollisionHandler.prototype
+      && nativeContactDescriptors.every(([key, descriptor]) => {
+        const current = Object.getOwnPropertyDescriptor(ProjectileCollisionHandler.prototype, key);
+        return !Object.hasOwn(this, key) && current?.value === descriptor.value
+          && current?.get === descriptor.get && current?.set === descriptor.set;
+      });
+  }
+  private numericContact(p: Projectile, allShips: Ship[]): ContactHit | null | undefined {
+    const view = this.contactStage;
+    if (!view?.active || this.contactShips !== allShips) return undefined;
+    if (p.onHitEffect && !nativeContactEffects.has(weaponEffects.get(p.onHitEffect)!)) {
+      // Unknown effect registrations retain the COMPLETE generic query for this
+      // projectile only, not whole-scene fallback. Its commit invalidates below.
+      this.contactCoverage.callbackFallbackQueries++;
+      return undefined;
+    }
+    if (!view.valid) view.recapture();
+    if (!view.active) return undefined;
+    const row = view.refreshProjectile(p);
+    this.contactCoverage.numericQueries++;
+    const hit = this.contactKernel.findHit(view, row);
+    if (hit) this.contactCoverage.numericHits++;
+    return hit;
+  }
+  private findShipHit(p: Projectile, allShips: Ship[]): RuntimeCollisionHit | null {
+    const contact = this.numericContact(p, allShips);
+    if (contact !== undefined) {
+      if (!contact) return null;
+      // The only row -> Ship transition: final output to ordered damage commit.
+      return {
+        projectile: p, ship: this.contactStage!.ships[contact.shipRow], kind: contact.kind, t: contact.t,
+        worldPoint: new Vector2(contact.x, contact.y), localPoint: new Vector2(contact.localX, contact.localY)
+      };
+    }
+    return this.findGenericShipHit(p, allShips);
+  }
+  private findGenericShipHit(p: Projectile, allShips: Ship[]): RuntimeCollisionHit | null {
+    this.contactCoverage.genericQueries++;
+    // Default uses the baseline frame-prepared grid. Opt-in callback fallback
+    // rebuilds so an unknown callback cannot hide a moved ship.
+    if (numericDecisionCoreEnabled) this.spatialIndex.rebuild(allShips);
+    else if (!this.spatialIndex.isPrepared) this.prepareShipCollisionFrame(allShips);
+    return this.runtimeCollisionKernel.findHits([this.createRuntimeQuery(p, allShips)])[0];
+  }
+  private refreshAfterShipHit(hit: RuntimeCollisionHit, localDamageBoundary: boolean): void {
+    const view = this.contactStage;
+    if (!view?.active) return;
+    const p = hit.projectile, ship = hit.ship;
+    // Arbitrary hit listeners, AoE and destruction may write any object. The next
+    // ordered projectile MUST recapture (and requalify), not read a frozen batch.
+    if (p.onHitEffect || p.projectileExplosionSpec || ship.hullHp <= 0 || !localDamageBoundary) {
+      this.invalidateShipCollisionFrame(); return;
+    }
+    if (view.valid) {
+      const epoch = view.epoch;
+      view.refreshChanged(ship.assemblyRoot.assemblyShips);
+      if (view.epoch === epoch) this.contactCoverage.localRefreshes++;
+    }
+  }
 
   private spawnMissileDestructionVisual(
     projectile: Projectile,
@@ -57,8 +159,9 @@ export class ProjectileCollisionHandler {
     }
   }
 
-  public prepareShipCollisionFrame(allShips: Ship[]): void {
-    this.spatialIndex.rebuild(allShips);
+  public prepareShipCollisionFrame(allShips: Ship[], view?: StageView): void {
+    this.contactStage = view; this.contactShips = allShips;
+    if (!view) { this.contactCoverage.rejectedStages++; this.spatialIndex.rebuild(allShips); }
   }
 
   public canBatchShipCollision(p: Projectile): boolean {
@@ -67,38 +170,35 @@ export class ProjectileCollisionHandler {
 
   public checkShipCollisionsBatch(projectiles: Projectile[], allShips: Ship[], ctx: WeaponSimContext): Set<number> {
     if (projectiles.length === 0) return new Set<number>();
-    if (!this.spatialIndex.isPrepared) this.prepareShipCollisionFrame(allShips);
-
-    const queries = projectiles.map((projectile) => this.createRuntimeQuery(projectile, allShips));
-    const hits = this.runtimeCollisionKernel.findHits(queries);
-    const consumed = new Set<number>();
-
-    for (let index = 0; index < queries.length; index++) {
-      let hit = hits[index];
-      if (!hit) continue;
-
-      // Earlier impacts can destroy a target or overload its snapshotted shield.
-      // Resolve that shot again along its original segment: it may hit the hull,
-      // reach a ship behind it, or miss entirely. Keep batching unaffected hits.
-      if (hit.ship.isDead || hit.ship.isCollisionless
-        || (hit.kind === 'SHIELD' && !isShieldCollisionActive(hit.ship))) {
-        const surviving: RuntimeCollisionQuery = {
-          projectile: queries[index].projectile,
-          candidates: queries[index].candidates.filter((ship) => !ship.isDead && !ship.isCollisionless)
-        };
-        hit = this.runtimeCollisionKernel.findHitTypeScript(surviving);
-      }
-
-      if (hit) {
-        const end = hit.projectile.pos.clone();
-        if (this.applyShipCollisionHit(hit, ctx)) consumed.add(hit.projectile.id);
-        else if (hit.kind === 'SHIELD' && hit.ship.shield.voidShield) {
-          hit.projectile.pos.copy(end);
-          if (this.checkShipCollision(hit.projectile, allShips, ctx)) consumed.add(hit.projectile.id);
+    if (!numericDecisionCoreEnabled) {
+      if (!this.spatialIndex.isPrepared) this.prepareShipCollisionFrame(allShips);
+      const queries = projectiles.map(projectile => this.createRuntimeQuery(projectile, allShips));
+      const hits = this.runtimeCollisionKernel.findHits(queries);
+      const consumed = new Set<number>();
+      for (let index = 0; index < queries.length; index++) {
+        let hit = hits[index];
+        if (!hit) continue;
+        if (hit.ship.isDead || hit.ship.isCollisionless || hit.kind === 'SHIELD' && !isShieldCollisionActive(hit.ship)) {
+          const surviving = {
+            projectile: queries[index].projectile,
+            candidates: queries[index].candidates.filter(ship => !ship.isDead && !ship.isCollisionless)
+          };
+          hit = this.runtimeCollisionKernel.findHitTypeScript(surviving);
+        }
+        if (hit) {
+          const end = hit.projectile.pos.clone();
+          if (this.applyShipCollisionHit(hit, ctx)) consumed.add(hit.projectile.id);
+          else if (hit.kind === 'SHIELD' && hit.ship.shield.voidShield) {
+            hit.projectile.pos.copy(end);
+            if (this.checkShipCollision(hit.projectile, allShips, ctx)) consumed.add(hit.projectile.id);
+          }
         }
       }
+      return consumed;
     }
-
+    const consumed = new Set<number>();
+    // Compatibility callers also commit immediately in supplied semantic order.
+    for (const projectile of projectiles) if (this.checkShipCollision(projectile, allShips, ctx)) consumed.add(projectile.id);
     return consumed;
   }
 
@@ -392,7 +492,8 @@ export class ProjectileCollisionHandler {
   }
 
   public findShipHitParameter(p: Projectile, allShips: Ship[]): number | null {
-    return this.runtimeCollisionKernel.findHits([this.createRuntimeQuery(p, allShips)])[0]?.t ?? null;
+    const contact = this.numericContact(p, allShips);
+    return contact !== undefined ? contact?.t ?? null : this.findGenericShipHit(p, allShips)?.t ?? null;
   }
 
   /** Same authored contact material on rocks and wrecks; damage/explosion payload stays authoritative. */
@@ -409,6 +510,7 @@ export class ProjectileCollisionHandler {
     if (p.onHitEffect) weaponEffects.require(p.onHitEffect).hitEnvironment?.(p, point, velocity, ctx);
     ctx.spawnProjectileExplosion?.(p, point, undefined, asteroidId);
     ctx.addCameraShake(visual.cameraShake, .1);
+    if (p.onHitEffect || p.projectileExplosionSpec) this.invalidateShipCollisionFrame();
   }
 
   public checkHulkCollision(p: Projectile, ctx: WeaponSimContext): boolean {
@@ -425,12 +527,17 @@ export class ProjectileCollisionHandler {
    * @returns 是否命中舰船 (护盾或舰体)
    */
   public checkShipCollision(p: Projectile, allShips: Ship[], ctx: WeaponSimContext): boolean {
-    if (!this.spatialIndex.isPrepared) this.prepareShipCollisionFrame(allShips);
     const end = p.pos.clone();
     for (let remaining = allShips.length; remaining > 0; remaining--) {
-      const hit = this.runtimeCollisionKernel.findHits([this.createRuntimeQuery(p, allShips)])[0];
+      const hit = this.findShipHit(p, allShips);
       if (!hit) return false;
-      if (this.applyShipCollisionHit(hit, ctx)) return true;
+      // Damage-hook admission belongs to the REAL output/callback boundary,
+      // never to contact queries or an all-ship armor/mount preparation pass.
+      const localDamageBoundary = hasNativeCoreCollisionHooks(hit.ship);
+      let consumed: boolean;
+      try { consumed = this.applyShipCollisionHit(hit, ctx); }
+      finally { this.refreshAfterShipHit(hit, localDamageBoundary); }
+      if (consumed) return true;
       p.pos.copy(end);
       if (!(hit.kind === 'SHIELD' && hit.ship.shield.voidShield && !hit.ship.shield.isActive) && !p.damagedTargetIds?.includes(hit.ship.id)) return false;
     }
@@ -551,3 +658,8 @@ export class ProjectileCollisionHandler {
     return true;
   }
 }
+
+const nativeContactDescriptors = Object.entries(Object.getOwnPropertyDescriptors(ProjectileCollisionHandler.prototype))
+  .filter(([key]) => key !== 'constructor');
+// Immutable in-tree definitions imported by Registry, never later plugin copies.
+const nativeContactEffects = new Set(weaponEffects.all());

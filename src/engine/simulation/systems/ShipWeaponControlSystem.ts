@@ -1,3 +1,4 @@
+import { bindNativeFireQueries } from '../../ai/AutofireController';
 import { advanceGlorianaTorpedoLoad, clearGlorianaTorpedoRail } from '../../visual/GlorianaTorpedoVisuals';
 import { updateGravityTractorInput, releaseGravityTractor } from './GravityTractor';
 import { isImmutableMetadata } from '../../extensions/Immutable';
@@ -19,13 +20,59 @@ import { combatAudio as sound } from '../../audio/CombatAudioEvents';
 import type { Ship } from '../Ship';
 import { contentRegistry } from '../../content/ContentRegistry';
 import { SimulationRandom } from '../SimulationRandom';
+import { stageFor, type StageView } from '../../ai/batch/StageProducer';
+import { publishFireInputs, fireScope, fireMissileScope } from '../../ai/batch/FireInputs';
+import { FireProgram, type FireCoverage, type FireTargetKind } from '../../ai/batch/FireProgram';
+import { FireGroups } from '../../ai/batch/FireGroups';
+import { InFlightFireBudget } from '../../ai/InFlightFireBudget';
+import { WeaponFlag } from '../../ai/batch/StageProtocol';
 
 /**
  * 战舰武器挂点、火控散布、交替射击与弹道发射控制子系统 (ShipWeaponControlSystem)
  * 纯粹负责管理各挂点旋转、火控散布衰减、自动火控解算与多管射击偏移。
  */
+export interface WeaponControlStep {
+  readonly owner: ShipWeaponControlSystem; readonly ship: Ship; readonly dt: number;
+  readonly manualControl: boolean; readonly canShipFire: boolean; readonly serial: number;
+}
+export interface WeaponFirePlan extends WeaponControlStep {
+  readonly activeSlotSet: ReadonlySet<string>; readonly fireRequests: Set<string>;
+  readonly suspendedAutofire: ReadonlySet<string>; readonly automaticStarts: ReadonlyMap<string, WeaponGroup>;
+  readonly tractorRequests: readonly { mount: WeaponMount; world: FireControlWorld; trigger: boolean }[];
+  /** Numerical decisions are final; the consumer may only recheck live resources. */
+  readonly numericFire?: boolean;
+}
+
+const weaponStepSerial = new WeakMap<ShipWeaponControlSystem, number>();
+const consumedPlans = new WeakSet<WeaponFirePlan>();
+const numericalFirePlans = new WeakSet<WeaponFirePlan>();
+// Transient scratch/diagnostics must not become enumerable authority fields.
+const firePrograms = new WeakMap<ShipWeaponControlSystem, FireProgram>();
+const fireCoverages = new WeakMap<ShipWeaponControlSystem, FireCoverage>();
+
 export class ShipWeaponControlSystem {
   private readonly autofire = new AutofireController();
+  private get fireProgram(): FireProgram {
+    let program = firePrograms.get(this);
+    if (!program) { program = new FireProgram(); firePrograms.set(this, program); }
+    return program;
+  }
+  /** Actual dispatch coverage of the latest plan, not sampled/perf instrumentation. */
+  public get actualFireCoverage(): FireCoverage {
+    let coverage = fireCoverages.get(this);
+    if (!coverage) {
+      coverage = { numericMounts: 0, genericMounts: 0,
+        specialForceMounts: 0, customBudgetCalls: 0, stageEpoch: -1 };
+      fireCoverages.set(this, coverage);
+    }
+    return coverage;
+  }
+  public set actualFireCoverage(coverage: FireCoverage) { fireCoverages.set(this, coverage); }
+  public getFireDomainCoverage(): FireDomainCoverage {
+    return { plan: { ...this.actualFireCoverage,
+      unsupportedMechanisms: this.actualFireCoverage.unsupportedMechanisms?.slice() },
+      legacyCalls: { ...this.autofire.legacyCalls } };
+  }
   public static hasNativeQueryLoop(control: ShipWeaponControlSystem): boolean {
     // Mount specs are mutable by design; do not freeze/refit them for this cache.
     // Reject accessors and unregistered nested metadata instead of assuming purity.
@@ -42,6 +89,15 @@ export class ShipWeaponControlSystem {
     return Object.getPrototypeOf(ai) === AutofireController.prototype
       && nativeAutofireReaders.every(([key, value]) => ai[key] === value);
   }
+  /** Cheap identity gate ONLY inside the existing private cloned-command host.
+   * Generic callers still require the full mutable-metadata audit above. */
+  public static hasNativePlanLoop(control:ShipWeaponControlSystem):boolean {
+    const ai=control.autofire;
+    return control.planFire===nativePlanFire&&Object.getPrototypeOf(ai)===AutofireController.prototype
+      && control.planNumericFire === nativeNumericPlanFire && control.programFluxBudget === nativeProgramFluxBudget
+      &&nativeAutofireReaders.every(([key,value])=>ai[key]===value)
+      &&nativeSampledAutofireReaders.every(([key,value])=>ai[key]===value);
+  }
   private previousHullFacingRad = 0;
   public weapons: WeaponMount[] = [];
   public weaponGroups: WeaponGroup[] = [];
@@ -52,6 +108,8 @@ export class ShipWeaponControlSystem {
   constructor(private readonly random = new SimulationRandom()) {}
 
   public init(spec: ShipSpec, initialFacingRad: number, healthMultiplier = 1) {
+    firePrograms.delete(this);
+    fireCoverages.delete(this);
     this.autofire.reset();
     this.previousHullFacingRad = initialFacingRad;
     this.weapons = [];
@@ -194,7 +252,14 @@ export class ShipWeaponControlSystem {
     spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec, underHullShipId?: string) => void,
     fireControlWorld?: FireControlWorld
   ) {
-    const world: FireControlWorld = fireControlWorld ?? { ships: targetShip ? [ship, targetShip] : [ship], missiles: [], asteroids: [] };
+    const state = this.advanceState(dt, ship);
+    if (ship.hullHp <= 0) return;
+    const plan = this.planFire(state, cursorAngle, targetShip, fireControlWorld);
+    this.commitFire(plan, spawnProjectile, spawnBeam, spawnMuzzleFlash);
+  }
+
+  /** Cooldown, repair and malfunction writes finish globally before fire queries. */
+  public advanceState(dt: number, ship: Ship): WeaponControlStep {
     const manualControl = ship.fireControlMode === 'MANUAL' && !ship.system.forcesAutofire;
     const hullTurn = signedAngle(ship.facingRad - this.previousHullFacingRad);
     this.previousHullFacingRad = ship.facingRad;
@@ -257,8 +322,40 @@ export class ShipWeaponControlSystem {
       if (healthEvent.repaired) this.justRepairedMounts.push(mount);
     }
 
-    if (ship.hullHp <= 0) return;
+    const serial = (weaponStepSerial.get(this) ?? 0) + 1;
+    weaponStepSerial.set(this, serial);
+    return { owner: this, ship, dt, manualControl, canShipFire, serial };
 
+  }
+
+  /** No projectile/beam creation or shot resource debit. Writes this controller's intent only. */
+  public planFire(state: WeaponControlStep, cursorAngle: number, targetShip: Ship | null, fireControlWorld?: FireControlWorld): WeaponFirePlan {
+    if (state.owner !== this) throw new Error('Weapon state belongs to another controller');
+    const { dt, ship, manualControl, canShipFire } = state;
+    const world: FireControlWorld = fireControlWorld ?? { ships: targetShip ? [ship, targetShip] : [ship], missiles: [], asteroids: [] };
+    // The producer's private lease certifies this exact post-motion stage.
+    // Exit BEFORE old QueryBatch/NativeAcquisitionFrame binding, not after an
+    // acquisition fast path that still calls old aim/preAim/decide to finish.
+    const nativeLoop = ShipWeaponControlSystem.hasNativePlanLoop(this);
+    const numerical = stageFor(world);
+    const nativeSystem = !!numerical && ship.system.hasNativeStats && ship.defenseSystem.hasNativeStats;
+    const budget = world.fireBudget;
+    // Unknown estimators/prioritization callbacks keep their complete original
+    // branch and invocation order. Never synthesize a zero penalty/no-fire result.
+    const nativeBudget = !budget || Object.getPrototypeOf(budget) === InFlightFireBudget.prototype
+      && budget.estimate === nativeBudgetEstimate && budget.penalty === nativeBudgetPenalty
+      && budget.needsDetailedPenalty === nativeBudgetNeedsDetailed
+      && !Object.hasOwn(budget, 'canOmitUncontestedPenalty');
+    let incompleteBudget = false;
+    if (nativeLoop && nativeSystem && nativeBudget && numerical?.kind === 'FIRE_QUERY' && numerical.rowOf.has(ship)) {
+      incompleteBudget = !publishFireInputs(numerical, world).budgetComplete;
+      if (!incompleteBudget) return this.planNumericFire(state, world, numerical);
+    }
+    this.actualFireCoverage = { numericMounts: 0, genericMounts: this.weapons.length,
+      specialForceMounts: 0, customBudgetCalls: 0, stageEpoch: numerical?.epoch ?? -1,
+      fallbackReason: !nativeLoop ? 'custom-controller' : !numerical || numerical.kind !== 'FIRE_QUERY'
+        ? 'unbound-stage' : !nativeSystem ? 'custom-system' : !nativeBudget ? 'custom-budget'
+          : incompleteBudget ? 'incomplete-budget-stage' : 'missing-owner' };
     const activeGroup = this.weaponGroups[this.selectedGroupIndex];
     const activeSlotSet = new Set(activeGroup ? activeGroup.weaponSlotIds : []);
     const autofireGroupMap = new Map<string, WeaponGroup>();
@@ -294,14 +391,25 @@ export class ShipWeaponControlSystem {
     const manualSlots = manualFireSlots(ship, this.weapons, activeSlotSet, alternatingSlotId);
     const fireRequests = new Set<string>();
     const suspendedAutofire = new Set<string>();
+    const tractorRequests: { mount: WeaponMount; world: FireControlWorld; trigger: boolean }[] = [];
     const queryBatch = FireControlQueryBatch.create(ship, world);
     const aimWorld = queryBatch ? { ...world, queryBatch } : world;
+    const nativePlanLoop = ShipWeaponControlSystem.hasNativePlanLoop(this);
+    const closeNativeQueries = nativePlanLoop ? bindNativeFireQueries(ship, aimWorld) : undefined;
     const sampleRule = world.sampledAutofire;
     const root = sampleRule ? ship.assemblyRoot : undefined;
+    const multirate = sampleRule?.cadence === 'multirate';
     const sampleShip = sampleRule && dt > 0 && Number.isFinite(dt) && !manualControl && ship.fireControlMode === 'AI'
-      && root !== sampleRule.playerShip && !sampleRule.fullRateShipIds.has(root!.id) && ship.spec.hullSize !== 'FIGHTER'
-      && ShipWeaponControlSystem.hasNativeQueryLoop(this)
-      && nativeSampledAutofireReaders.every(([key, value]) => this.autofire[key] === value);
+      && root !== sampleRule.playerShip.assemblyRoot && root!.fireControlMode === 'AI'
+      // The world owner includes externally controlled roots in fullRateShipIds.
+      // Check both IDs as a fail-safe when an individual module is excluded.
+      && !sampleRule.fullRateShipIds.has(root!.id) && !sampleRule.fullRateShipIds.has(ship.id) && ship.spec.hullSize !== 'FIGHTER'
+      // A successful binding earned this exact sealed native stage, not a
+      // permanent spec certificate. hasNativePlanLoop also excludes replaced
+      // aim/decision callbacks. Unbound and legacy callers keep the full audit.
+      && ((multirate && nativePlanLoop && closeNativeQueries !== undefined)
+        || (ShipWeaponControlSystem.hasNativeQueryLoop(this)
+          && nativeSampledAutofireReaders.every(([key, value]) => this.autofire[key] === value)));
     try {
       for (const mount of this.weapons) {
         mount.triggerHeld = false;
@@ -368,9 +476,11 @@ export class ShipWeaponControlSystem {
           const tractorAim = !manualControl && ship.currentTargetShip ? ship.currentTargetShip.pos : ship.aimTargetWorld;
           const held = mount.gravityTractor;
           aimTurret(held?.phase === 'HOLD' ? new Vector2(held.contactX, held.contactY) : tractorAim);
-          updateGravityTractorInput(dt, ship, mount, world, canShipFire && (manualControl
+          const trigger = canShipFire && (manualControl
             ? isInActiveGroup && ship.isFiringMain
-            : !!ship.currentTargetShip && ship.flux.fluxPercent < .65));
+            : !!ship.currentTargetShip && ship.flux.fluxPercent < .65);
+          if (world.fireFrame) tractorRequests.push({ mount, world, trigger });
+          else updateGravityTractorInput(dt, ship, mount, world, trigger);
           continue;
         }
         if (mount.spec.gravityDeflector) {
@@ -406,10 +516,15 @@ export class ShipWeaponControlSystem {
         // AI owns all mounts; a manual pilot owns the selected group and opts others into autofire.
         else if (!manualControl || isAutofireSlot) {
           const spec = sampleShip ? mount.spec : undefined;
-          const sampleMount = spec && mount.mountType === 'TURRET' && (spec.mountSize === 'SMALL' || spec.mountSize === 'MEDIUM')
+          // Multirate admits native large and fixed mounts too. Guided/rocket/
+          // missile launchers retain the full live path: decideSampled cannot
+          // safely authorize their launch geometry/lifetime semantics.
+          const sampleMount = spec && (multirate || mount.mountType === 'TURRET' && (spec.mountSize === 'SMALL' || spec.mountSize === 'MEDIUM'))
             && !spec.isGuided && !spec.isRocket && spec.weaponType !== 'MISSILE' && spec.spawnType !== 'MISSILE'
             && !ship.system.autofirePolicy(mount);
-          if (sampleRule && !sampleMount) this.autofire.dropAimSample(mount);
+          // Also reset when the world rule disappears or control returns to a
+          // human/root, rather than keeping a sample for a later mode switch.
+          if (!sampleMount) this.autofire.dropAimSample(mount);
           const sample = sampleMount ? this.autofire.sampledAim(dt, ship, mount, aimWorld) : undefined;
           const solution = sample ? null : this.autofire.aim(dt, ship, mount, aimWorld);
           if (ship.system.autofirePolicy(mount)?.suspended) {
@@ -439,7 +554,7 @@ export class ShipWeaponControlSystem {
 
       }
 
-    } finally { queryBatch?.close(); }
+    } finally { closeNativeQueries?.(); queryBatch?.close(); }
 
     // Resolve every mount before choosing an automatic group member: an out-of-arc,
     // empty or obstructed first gun must not starve the rest of the group.
@@ -457,16 +572,219 @@ export class ShipWeaponControlSystem {
         if (slotId !== chosen && !committed) fireRequests.delete(slotId);
       }
     }
+    return { ...state, activeSlotSet, fireRequests, suspendedAutofire, automaticStarts, tractorRequests };
+  }
+
+  /** Complete stage consumer. Only publication, per-mount controller memory,
+   * explicit system callbacks and ordered output touch the old object model. */
+  private planNumericFire(state: WeaponControlStep, world: FireControlWorld, v: StageView): WeaponFirePlan {
+    const { ship, dt, manualControl, canShipFire } = state;
+    const own = v.rowOf.get(ship)!;
+    const input = publishFireInputs(v, world), scope = fireScope(v, input, world);
+    const missileScope = fireMissileScope(v, input, world);
+    const coverage: FireCoverage = this.actualFireCoverage = { numericMounts: 0, genericMounts: 0,
+      specialForceMounts: 0, customBudgetCalls: 0, stageEpoch: v.epoch, unsupportedMechanisms: [],
+      postTurnBoreChecks: 0, orderedFluxRechecks: 0, numericAimCalls: 0, numericAcquisitionScans: 0 };
+    const slots = new Map<string, number>();
+    // Mount/slot binding and clocks are input publication, never hot target reads.
+    for (const mount of this.weapons) {
+      const row = v.mountRowOf.get(mount);
+      if (row === undefined) throw new Error('FIRE_QUERY did not publish a firing mount');
+      slots.set(mount.slotId, row);
+      const c = input.weapons[row], rate = this.weaponClockRate(mount, ship), spec = mount.spec;
+      c.cooldownRate = rate;
+      let cycle = spec.isBeam
+        ? (spec.beamDuration ?? 0) + (spec.beamBurstDelay ?? 0) + (spec.beamSourceChargeupTime ?? 0) + (spec.beamSourceChargedownTime ?? 0)
+        : (spec.burstSize ?? 1) > 50 ? 3
+          : Math.max(0, (spec.burstSize ?? 1) - 1) * (spec.burstDelay ?? 0) + spec.refireDelay + (spec.chargeTime ?? 0);
+      if (spec.isBeam) { if (!(cycle > 0)) cycle = 3; cycle -= (spec.beamBurstDelay ?? 0) * (1 - 1 / rate); }
+      else cycle /= rate;
+      c.cycle = cycle;
+    }
+    const groups = new FireGroups(v, input, this.weaponGroups, this.selectedGroupIndex, slots, own, dt, manualControl, canShipFire);
+    groups.writebackManual(this.weaponGroups);
+    const requests = new Uint8Array(v.weaponCount);
+    const activeSlotSet = new Set<string>(), fireRequests = new Set<string>(), suspendedAutofire = new Set<string>();
+    const automaticStarts = new Map<string, WeaponGroup>();
+    const tractorRequests: { mount: WeaponMount; world: FireControlWorld; trigger: boolean }[] = [];
+    const budget = world.fireBudget;
+    const nativeBudget = !budget || Object.getPrototypeOf(budget) === InFlightFireBudget.prototype
+      && budget.estimate === nativeBudgetEstimate && budget.penalty === nativeBudgetPenalty
+      && !Object.hasOwn(budget, 'canOmitUncontestedPenalty');
+    this.fireProgram.bind(v, input, scope, missileScope, own, !!budget, nativeBudget, coverage,
+      budget ? (row, arrival) => budget.penalty(ship, v.ships[row], arrival) : undefined);
+    const program = this.fireProgram, w = v.weapons, sample = world.sampledAutofire;
+    const root = sample ? ship.assemblyRoot : undefined;
+    const sampleShip = sample && dt > 0 && Number.isFinite(dt) && !manualControl && input.autonomous[own]
+      && root !== sample.playerShip.assemblyRoot && root!.fireControlMode === 'AI'
+      && !sample.fullRateShipIds.has(root!.id) && !sample.fullRateShipIds.has(ship.id)
+      && ship.spec.hullSize !== 'FIGHTER';
+    for (const mount of this.weapons) {
+      const row = slots.get(mount.slotId)!;
+      const c = input.weapons[row], flags = w.flags[row];
+      if (groups.active[row]) activeSlotSet.add(mount.slotId);
+      mount.triggerHeld = false;
+      if (w.disabled[row]) {
+        if (c.tractor) releaseGravityTractor(mount, '发射器离线');
+        this.autofire.clear(mount);
+        mount.burstRemaining = 0; mount.burstFluxReserved = false;
+        mount.firingState = 'IDLE'; mount.firingStateTimer = 0;
+        coverage.numericMounts++;
+        continue;
+      }
+      program.configureMount(row, dt);
+      if (c.tractor) {
+        // Builtin force/contact state machine is intentionally not a weapon-shot
+        // solver. Preserve its real input/ordered force pass, report it separately.
+        const held = mount.gravityTractor;
+        const target = input.currentTarget[own];
+        program.turn(true, held?.phase === 'HOLD' ? held.contactX : !manualControl && target >= 0 ? v.bodies.x[target] : input.aimX[own],
+          held?.phase === 'HOLD' ? held.contactY : !manualControl && target >= 0 ? v.bodies.y[target] : input.aimY[own]);
+        mount.currentAngleRad = program.angle; mount.aimIdleSeconds = program.idle;
+        const trigger = canShipFire && (manualControl ? !!groups.active[row] && !!input.mainTrigger[own]
+          : target >= 0 && v.bodies.fluxPercent[own] < .65);
+        tractorRequests.push({ mount, world, trigger }); coverage.specialForceMounts++;
+        if (!coverage.unsupportedMechanisms!.includes('gravity-tractor-contact'))
+          coverage.unsupportedMechanisms!.push('gravity-tractor-contact');
+        continue;
+      }
+      if (c.deflector) {
+        coverage.specialForceMounts++;
+        if (!coverage.unsupportedMechanisms!.includes('gravity-deflector-force'))
+          coverage.unsupportedMechanisms!.push('gravity-deflector-force');
+        continue;
+      }
+      if (manualControl && groups.active[row]) {
+        this.autofire.clear(mount);
+        program.turn(true, input.aimX[own], input.aimY[own]);
+        mount.currentAngleRad = program.angle; mount.aimIdleSeconds = program.idle;
+        if (groups.manualRequest(row)) requests[row] = 1;
+        coverage.numericMounts++; continue;
+      }
+      if (manualControl && !groups.automatic[row]) {
+        this.autofire.clear(mount);
+        const b = v.bodies, cos = Math.cos(b.facing[own]), sin = Math.sin(b.facing[own]);
+        const pivotX = c.relativeX * cos - c.relativeY * sin + b.x[own];
+        const pivotY = c.relativeX * sin + c.relativeY * cos + b.y[own];
+        const near = Math.abs(signedAngle(Math.atan2(input.aimY[own] - pivotY, input.aimX[own] - pivotX) - w.baseAngle[row]))
+          <= (c.arc + 30) * Math.PI / 360;
+        program.turn(!!input.player[own] && !(flags & WeaponFlag.HARDPOINT)
+          && (near || !!(flags & WeaponFlag.ALWAYS_FIRE)), input.aimX[own], input.aimY[own]);
+        mount.currentAngleRad = program.angle; mount.aimIdleSeconds = program.idle;
+        coverage.numericMounts++; continue;
+      }
+      // Exactly one automatic-controller memory read. The target ref is mapped
+      // once here and never enters the numerical candidate traversal.
+      let memory = this.autofire.fireProgramMemory(ship, mount);
+      let kind: FireTargetKind = 0, targetRow = -1;
+      // Preserve a lost target's kind even when its row is absent. aim() must
+      // advance clocks before invalidating it and waking held cadence intent.
+      if (memory.target?.kind === 'SHIP') {
+        targetRow = v.rowOf.get(memory.target.entity) ?? -1; kind = 1;
+      } else if (memory.target?.kind === 'MISSILE') {
+        targetRow = v.projectileRowOf.get(memory.target.entity) ?? -1; kind = 2;
+      }
+      program.setMemory(memory, kind, targetRow);
+      // Do not move dynamic policy callbacks into a global snapshot. They run
+      // in the original per-mount positions (admission, aim, suspension, decide).
+      const sampleAdmission = sampleShip && !c.missileBody && !(flags & (WeaponFlag.GUIDED | WeaponFlag.MISSILE))
+        && (sample!.cadence === 'multirate' || mount.mountType === 'TURRET'
+          && (mount.spec.mountSize === 'SMALL' || mount.spec.mountSize === 'MEDIUM'));
+      const sampled = sampleAdmission && !ship.system.autofirePolicy(mount);
+      if ((!sampled && (memory.sampledAim || memory.numericCadence))
+        || sampled && memory.sampledAim && memory.sampledAim.cadence !== (sample!.cadence === 'multirate' ? 'multirate' : undefined)) {
+        this.autofire.dropAimSample(mount);
+        // dropAimSample may delete the previous tracker. Fetching the replacement
+        // is a memory-boundary operation, never a target/world query.
+        memory = this.autofire.fireProgramMemory(ship, mount);
+        const held = memory.target;
+        const heldRow = held?.kind === 'SHIP' ? v.rowOf.get(held.entity)
+          : held?.kind === 'MISSILE' ? v.projectileRowOf.get(held.entity) : undefined;
+        program.setMemory(memory, held?.kind === 'SHIP' ? 1 : held?.kind === 'MISSILE' ? 2 : 0, heldRow ?? -1);
+      }
+      const tracker = memory;
+      let salt = 2166136261;
+      for (const char of ship.id + '/' + mount.slotId) salt = Math.imul(salt ^ char.charCodeAt(0), 16777619);
+      const policy = ship.system.autofirePolicy(mount);
+      program.aim(policy, sampled ? sample!.cadence === 'multirate' ? 'multirate' : '20hz' : undefined, salt);
+      tracker.sampledAim = undefined; tracker.acquisitionCadence = undefined;
+      const target = program.targetKind === 1 ? { kind: 'SHIP' as const, entity: v.ships[program.targetRow] }
+        : program.targetKind === 2 ? { kind: 'MISSILE' as const, entity: v.projectileRefs[program.targetRow] } : undefined;
+      tracker.target = target;
+      mount.fireControlTargetShipId = target?.kind === 'SHIP' ? target.entity.id : undefined;
+      mount.fireControlTargetProjectileId = target?.kind === 'MISSILE' ? target.entity.id : undefined;
+      mount.fireControl = { targetId: target?.entity.id, targetKind: target?.kind,
+        reason: policy?.suspended ? 'REASSIGNING' : program.hasTarget() ? 'ALIGNING' : 'NO_TARGET' };
+      if (ship.system.autofirePolicy(mount)?.suspended) {
+        suspendedAutofire.add(mount.slotId);
+        program.turn(false);
+        mount.currentAngleRad = program.angle; mount.aimIdleSeconds = program.idle;
+        coverage.numericMounts++; continue;
+      }
+      // Actual write precedes the final input refresh. The bore check cannot
+      // accidentally consume FIRE_QUERY's pre-turn angle or barrel position.
+      mount.currentAngleRad = program.turn();
+      mount.aimIdleSeconds = program.idle;
+      program.refreshBore(mount.currentAngleRad);
+      const decidePolicy = ship.system.autofirePolicy(mount);
+      const canWeaponFire = !decidePolicy?.suspended && program.hasTarget() && program.available()
+        ? ship.system.canFireWeapon(mount) : false;
+      let decision = program.decide(canWeaponFire, !!decidePolicy?.suspended);
+      if (decision === 'FIRE' && !this.programFluxBudget(ship, mount, dt)) decision = 'FLUX_BUDGET';
+      mount.fireControl.reason = decision;
+      if (decision === 'FIRE' && canShipFire && w.cooldown[row] <= 0) requests[row] = 1;
+      coverage.numericMounts++;
+    }
+    groups.scheduleAutomatic(requests);
+    groups.writeback(this.weaponGroups);
+    for (const [slot, row] of slots) {
+      if (requests[row]) fireRequests.add(slot);
+      const group = groups.starts.get(row);
+      if (group !== undefined) automaticStarts.set(slot, this.weaponGroups[group]);
+    }
+    const plan: WeaponFirePlan = { ...state, activeSlotSet, fireRequests, suspendedAutofire, automaticStarts, tractorRequests, numericFire: true };
+    numericalFirePlans.add(plan);
+    return plan;
+  }
+
+  /** Ordered resource boundary, not a second aim/decide. No pre-deduction:
+   * every mount sees current flux and its current committed-cycle/ammo state. */
+  private programFluxBudget(ship: Ship, mount: WeaponMount, dt: number): boolean {
+    const spec = mount.spec;
+    const active = mount.burstRemaining > 0 || mount.firingState === 'CHARGING' || mount.firingState === 'ACTIVE';
+    const cost = spec.isBeam ? (spec.fluxPerSecond ?? 0) * Math.max(dt, !active && spec.beamVisualMode === 'BURST'
+      ? (spec.beamSourceChargeupTime ?? 0) + (spec.beamDuration ?? 0) : dt)
+      : mount.burstFluxReserved || active ? 0 : spec.fluxPerShot * (spec.interruptibleBurst ? 1 : Math.max(1, spec.burstSize ?? 1));
+    const pd = spec.isPointDefense || spec.aiHints?.includes('PD') || spec.aiHints?.includes('PD_ONLY');
+    const ceiling = ship.fireControlMode === 'AI' && !pd && !active ? .95 : 1;
+    return !(cost > 0 && ship.flux.totalFlux + cost * ship.system.getWeaponFluxCostMultiplier(spec.weaponType) > ship.flux.maxFlux * ceiling);
+  }
+
+  /** Ordered resource/lifecycle submission; intent is consumed exactly once. */
+  public commitFire(plan: WeaponFirePlan, spawnProjectile: (p: Projectile) => void, spawnBeam: (b: Beam) => void,
+    spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec, underHullShipId?: string) => void): void {
+    if (plan.owner !== this || plan.serial !== weaponStepSerial.get(this) || consumedPlans.has(plan)) throw new Error('Invalid or already committed fire plan');
+    consumedPlans.add(plan);
+    // The report flag is NOT a capability. Only this module's real private-stage
+    // producer may select the numerical resource boundary for this exact plan.
+    const numericPlan = numericalFirePlans.has(plan);
+    const { dt, ship, manualControl, canShipFire, activeSlotSet, fireRequests, suspendedAutofire, automaticStarts } = plan;
+    if (ship.isDead || ship.isRetreated || ship.hullHp <= 0) return;
+    const liveCanShipFire = canShipFire && !ship.flux.isOverloaded && !ship.flux.isVenting && !ship.system.blocksWeapons && !ship.isPhased;
+    for (const request of plan.tractorRequests)
+      updateGravityTractorInput(dt, ship, request.mount, request.world, request.trigger && liveCanShipFire);
     // Keep emission/lifecycle in authored mount order for flux and deterministic replays.
     for (const mount of this.weapons) {
       if (mount.isDisabled) continue;
       if (mount.spec.gravityTractor || mount.spec.gravityDeflector) continue;
-      if (fireRequests.has(mount.slotId) && (!manualControl || !activeSlotSet.has(mount.slotId))
-        && !this.autofire.hasFluxBudget(ship, mount, dt)) {
-        fireRequests.delete(mount.slotId);
-        mount.fireControl = { ...mount.fireControl, reason: 'FLUX_BUDGET' };
+      if (fireRequests.has(mount.slotId) && (!manualControl || !activeSlotSet.has(mount.slotId))) {
+        if (numericPlan) this.actualFireCoverage.orderedFluxRechecks = (this.actualFireCoverage.orderedFluxRechecks ?? 0) + 1;
+        if (!(numericPlan ? this.programFluxBudget(ship, mount, dt) : this.autofire.hasFluxBudget(ship, mount, dt))) {
+          fireRequests.delete(mount.slotId);
+          mount.fireControl = { ...mount.fireControl, reason: 'FLUX_BUDGET' };
+        }
       }
-      if (fireRequests.has(mount.slotId) && this.requestWeaponFire(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash)) {
+      if (liveCanShipFire && fireRequests.has(mount.slotId) && this.requestWeaponFire(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash)) {
         const group = automaticStarts.get(mount.slotId);
         if (group) {
           group.alternatingIndex = group.weaponSlotIds.indexOf(mount.slotId);
@@ -477,8 +795,8 @@ export class ShipWeaponControlSystem {
       }
       // Reassignment holds an in-flight firing cycle, not its cooldown/ammo clock.
       // Only opted-in ordinary PDCs use this path; no new round or refund is emitted.
-      if (suspendedAutofire.has(mount.slotId) && canShipFire && ship.system.canFireWeapon(mount)) continue;
-      this.advanceWeaponLifecycle(mount.lifecycleDt ?? dt, mount, ship, canShipFire && ship.system.canFireWeapon(mount), spawnProjectile, spawnBeam, spawnMuzzleFlash);
+      if (suspendedAutofire.has(mount.slotId) && liveCanShipFire && ship.system.canFireWeapon(mount)) continue;
+      this.advanceWeaponLifecycle(mount.lifecycleDt ?? dt, mount, ship, liveCanShipFire && ship.system.canFireWeapon(mount), spawnProjectile, spawnBeam, spawnMuzzleFlash);
     }
   }
 
@@ -1136,4 +1454,20 @@ export class ShipWeaponControlSystem {
     }
     return true;
   }
+}
+
+const nativePlanFire=ShipWeaponControlSystem.prototype.planFire;
+const nativeNumericPlanFire = ShipWeaponControlSystem.prototype['planNumericFire'];
+const nativeProgramFluxBudget = ShipWeaponControlSystem.prototype['programFluxBudget'];
+const nativeBudgetEstimate = InFlightFireBudget.prototype.estimate;
+const nativeBudgetPenalty = InFlightFireBudget.prototype.penalty;
+const nativeBudgetNeedsDetailed = InFlightFireBudget.prototype.needsDetailedPenalty;
+
+export interface FireDomainCoverage {
+  readonly plan: Readonly<FireCoverage>;
+  readonly legacyCalls: Readonly<{ aim: number; preAim: number; decide: number; hasFluxBudget: number; sampledAim: number; decideSampled: number }>;
+}
+/** D's acceptance boundary: read before/after step; no UI/table/sampling switch. */
+export function readFireDomainCoverage(control: ShipWeaponControlSystem): FireDomainCoverage {
+  return control.getFireDomainCoverage();
 }

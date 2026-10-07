@@ -1,0 +1,13 @@
+# Fused native friendly obstruction — source notes (2026-10-04)
+
+## Original evidence and limits
+Target original version remains 0.98a-RC8. Checked C:/starsector-core and C:/decompiled: both missing. No original screenshot relevant to this internal numerical calculation is available in this turn; original source/runtime/UI equivalence is unverified. No desktop access, no UI/controls or gameplay changes are proposed. This is a strict implementation substitution against current Web behavior, not a new Starsector rule.
+
+## Minimal comparison before implementation
+- Current Web evidence: AutofireController.shotObstruction computes ship-relative start/end, skips same-assembly friendly hulls unless do_not_fire_through, skips pass-through fighters, traces hull/deployed shield (ignoring void shield), then checks asteroids/fragments in their existing order.
+- FireControlQueryBatch.queryBlockers builds a per-shooter friendly list/Set; CombatFireFrame.queryBlockers builds an object moving BVH, allocates candidate orders, sorts, maps to Ships, filters again, then Autofire traces numeric segments.
+- NumericAcquisitionFrame already owns a sealed native post-motion Float64 plane with positions, velocities, geometry and target scopes. Existing admitted native queries only allow original batch/budget identities; callbacks and generic worlds keep live original evaluation.
+- Expected: same yes/no friendly obstruction result, same relative-motion arithmetic, same pass-through/assembly/shield rules. Fuse conservative moving broadphase, source membership, team/assembly rules and exact segment geometry. A boolean any-hit native result does not need candidate sorting because no callback/side-effect occurs in the admitted numerical geometry; obstacle ordering remains untouched.
+- Difference to remove: repeated object roster traversal, allocating/sorting candidate arrays, translating candidates back to Ships and re-entering a separate narrow phase. No permanent mutable-spec cache and no getter wrapper.
+- Validation: existing seed917 270-step raw/dual-RNG/AI-defense/tracker replay; same-scene exclusive150warm120timed ABBA including frame/build/all admission costs; directed native-versus-generic geometry/permission/pass-through tests if needed; app typecheck + changed-file lint once after this implementation block.
+- Boundary: use only existing native bound queries from sealed compiled plane; closed/restricted/team-changed/unknown callback/nonplain pass-through spec inputs return undefined and execute old path. No worker DTO or lossy/cadence path; no reduction in entities/dt/steps. Any extra capture/build cost is part of whole-step measurement.

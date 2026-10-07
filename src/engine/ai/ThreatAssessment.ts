@@ -41,6 +41,8 @@ function weaponReadiness(m: import('../simulation/Weapon').WeaponMount): number 
  * plausible follow-up shots from every hostile, including recovery/turn/closing times. */
 export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number, defenseWindow: number, weaponHorizon = horizon): ThreatAssessment {
   const threats: IncomingThreat[] = [];
+  const decisionScene=world.decisionScene?.matches(world.ships)?world.decisionScene:undefined;
+  const sourceShip=(id:string)=>decisionScene?decisionScene.source(id):world.ships.find(s=>s.id===id);
   // Scratch space is assessment-local: no cross-ship/frame cache or stale live state.
   const forecastEnd = new Vector2();
   const forecastDelta = new Vector2();
@@ -57,7 +59,7 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
   const projectiles = world.projectileThreatIndex?.query(world.projectiles, ship, center, radius, horizon) ?? world.projectiles;
   const lifetimeOf = world.projectileLifetime ?? remainingProjectileLifetime;
   for (const p of projectiles) {
-    const owner = combatTeam(p) ?? world.ships.find(s => s.id === p.sourceShipId)?.teamId;
+    const owner = combatTeam(p) ?? sourceShip(p.sourceShipId)?.teamId;
     if (owner === undefined || owner === ship.teamId || p.isFlare || p.isDisarmed || p.collisionDisabled || p.didDamage || !(p.damage > 0)) continue;
     const lifetime = Math.min(horizon, lifetimeOf(p));
     if (!(lifetime > 0)) continue;
@@ -86,18 +88,27 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
   const activeBeams = new Set<string>();
   const beams = world.beamThreatIndex?.query(world.beams, world.ships, ship, center, radius) ?? world.beams;
   for (const b of beams) {
-    const source = world.ships.find(s=>s.id===b.sourceShipId);
+    const source = sourceShip(b.sourceShipId);
     if (!source || sameTeam(source, ship) || source.isDead || b.damageActive===false || b.duration<=0) continue;
     if (segmentCircleEntry(b.startPos,b.endPos,center,radius) === null) continue;
     activeBeams.add(b.sourceShipId+'/'+b.slotId);
     const duration = Math.min(defenseWindow,b.duration);
     add('BEAM',b.sourceShipId,0,b.damagePerSec*duration,b.damageType,b.startPos);
   }
+  const stageRows = world.weaponThreatFrame?.forShip(ship, weaponHorizon);
+  if (stageRows) {
+    const frame = world.weaponThreatFrame!;
+    for (let i = 0; i < stageRows.length; i += 2) {
+      const mount = stageRows[i], eta = stageRows[i + 1], sourceId = frame.sourceId(mount);
+      if (eta > weaponHorizon || activeBeams.has(sourceId + '/' + frame.slotIds[mount])) continue;
+      add('WEAPON', sourceId, eta, frame.damage(mount, defenseWindow), frame.damageTypes[mount], frame.origin(mount, forecastMuzzle));
+    }
+  }
   const weaponEnvelopes = Number.isFinite(weaponHorizon) && weaponHorizon >= 0
     ? world.weaponThreatEnvelope && ship.hasNativeThreatPhaseHooks ? world.weaponThreatEnvelope
       : world.exactWeaponThreatEnvelope?.permitsExactObserver(ship) ? world.exactWeaponThreatEnvelope : undefined
     : undefined;
-  for (const enemy of world.ships) {
+  for (const enemy of stageRows ? [] : world.ships) {
     if (enemy===ship || enemy.isDead || !enemy.isVisibleTo(ship.teamId) || sameTeam(enemy, ship)) continue;
     const recovery = Math.max(enemy.flux.isOverloaded ? enemy.flux.overloadTimer : 0,
       enemy.flux.isVenting ? enemy.flux.getTimeToVent() : 0,

@@ -282,6 +282,15 @@ export class ShipSystem {
     return !this.blocksWeapons && (!this.available || this.definition.weaponEnabled?.(this, mount) !== false)
       && (!this.auxiliary || this.auxiliary.canFireWeapon(mount));
   }
+  /** One query's composed values. Call again after any lifecycle/owner write;
+   * consumers must not retain this table across AI, update or emission stages. */
+  public readModifierTable(readers: readonly (keyof ShipSystem)[] = []): Readonly<SystemModifiers> | undefined {
+    // Definitions may compose arbitrary authored systems. A scalar-method override
+    // is a different extension API, and must keep its original live getter path.
+    if (Object.getPrototypeOf(this) !== ShipSystem.prototype) return;
+    for (const key of readers) if (Object.hasOwn(this, key) || this[key] !== composedScalarReaders.get(key)) return;
+    return this.modifiers();
+  }
   public get blocksVenting(): boolean { return (this.owner?.runtimeModifiers.value.disableVenting ?? 0) > 0 || (this.controlsActive && (!!this.definition.controls?.blockVenting || this.definition.canVent?.(this) === false)) || !!this.auxiliary?.blocksVenting; }
   public get preventsAIVenting(): boolean { return (this.available && this.definition.preventAIVenting?.(this) === true) || !!this.auxiliary?.preventsAIVenting; }
   public getSightRadiusFlat(): number { return this.modifiers().sightRadiusFlat ?? 0; }
@@ -323,3 +332,9 @@ export class ShipSystem {
     return weaponType ? this.modifiers().weapons?.[weaponType]?.fluxCostMultiplier ?? 1 : 1;
   }
 }
+const composedScalarReaders = new Map<keyof ShipSystem, unknown>(Object.entries(Object.getOwnPropertyDescriptors(ShipSystem.prototype))
+  .filter(([, descriptor]) => typeof descriptor.value === 'function')
+  .map(([key, descriptor]) => [key as keyof ShipSystem, descriptor.value]));
+
+/** Identity used by synchronous query leases; overridden readers stay live. */
+export const nativeReadModifierTable = ShipSystem.prototype.readModifierTable;

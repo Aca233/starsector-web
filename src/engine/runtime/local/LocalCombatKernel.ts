@@ -117,6 +117,9 @@ export class LocalCombatKernel {
     return this.tickHost.run({
       prepare: () => {
         applyCombatControlSample(this.engine, this.playerAI, 1 / 60, accepted);
+        // The new observation stage replaces legacy whole-AI predictions in
+        // large worlds; do not calculate a batch that the engine cannot consume.
+        if (import.meta.env?.VITE_COMBAT_THREAT_PHASE !== 'false' && this.engine.ships.length >= 8) return null;
         return this.multicore.prepare(this.engine, this.playerAI, 1 / 60);
       },
       commit: batch => {

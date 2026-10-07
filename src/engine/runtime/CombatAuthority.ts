@@ -1,10 +1,13 @@
+import { disposeStateCore } from '../simulation/CombatStateCore';
 import type { CombatEngine } from '../simulation/CombatEngine';
 import type { AIPhaseBatch } from '../ai/multicore/Types';
 import type { CombatStepSpan } from '../diagnostics/CombatStepProfiler';
+import type { WeaponThreatFrame } from '../ai/WeaponThreatFrame';
 
 /** Shared single-player / LAN authoritative tick owner. No renderer, wall clock or browser dependencies.
  * This is not a restorable checkpoint; engine access remains a legacy edit adapter.
- * Fixed-step ordering and damage-lab semantics are deliberately unchanged.
+ * Owns complete tick commits, including the numeric observation boundary.
+ * Damage-lab restoration remains confined to the synchronous entry.
  */
 export class CombatAuthority {
   private advancing = false;
@@ -17,6 +20,7 @@ export class CombatAuthority {
   /** Call only after the host has discarded its in-flight prediction. */
   beginEpoch(engine = this._engine): void {
     if (this.advancing) throw new Error('Cannot replace a running combat authority');
+    if (engine !== this._engine) disposeStateCore(this._engine);
     this._engine = engine; this._tick = 0; this._epoch++;
   }
   advance(dt: number, damageEnabled = true, aiBatch?: AIPhaseBatch, trace?: CombatStepSpan): void {
@@ -26,6 +30,18 @@ export class CombatAuthority {
     try {
       this.advanceEngine(dt, damageEnabled, aiBatch, trace);
       this._tick++;
+    } finally { this.advancing = false; }
+  }
+  /** A network tick commits only after its observation and full simulation complete. */
+  async advanceAsync(dt: number, compute: (frame: WeaponThreatFrame) => Promise<void> | void,
+    keepRunning: () => boolean, trace?: CombatStepSpan): Promise<boolean> {
+    if (this.advancing) throw new Error('Reentrant authoritative combat tick');
+    if (!(dt > 0) || !Number.isFinite(dt)) throw new Error('Invalid combat timestep');
+    this.advancing = true;
+    try {
+      const completed = await this._engine.fixedUpdateAsync(dt, compute, keepRunning, { trace });
+      if (completed) this._tick++;
+      return completed;
     } finally { this.advancing = false; }
   }
   private advanceEngine(dt: number, damageEnabled: boolean, aiBatch?: AIPhaseBatch, trace?: CombatStepSpan): void {

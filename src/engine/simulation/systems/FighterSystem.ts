@@ -171,7 +171,7 @@ export class FighterSystem {
 
   private returnReserve(craft: Ship, carrier: Ship, dt: number, target: Ship,
     spawnProj: (p: Projectile) => void, spawnBeam: (b: Beam) => void,
-    spawnFlash: (pos: Vector2, angleRad: number, size: number, color: [number, number, number]) => void): boolean {
+    spawnFlash: (pos: Vector2, angleRad: number, size: number, color: [number, number, number]) => void, world?: FireControlWorld): boolean {
     const left = this.reserveCraft.get(craft);
     if (left === undefined || left > 0 || (carrier.isDead || carrier.isRetreated)) return false;
     craft.isFiringMain = false;
@@ -185,7 +185,7 @@ export class FighterSystem {
     craft.throttle = Math.abs(turn) < .8 ? 1 : .25;
     craft.strafeInput = 0;
     craft.brakeInput = false;
-    craft.update(dt, target, spawnProj, spawnBeam, spawnFlash);
+    craft.update(dt, target, spawnProj, spawnBeam, spawnFlash, world);
     if (delta.length() <= carrier.spec.collisionRadius + 35) {
       this.dockedReserve.add(craft);
       carrier.deployedWingCraft.delete(craft);
@@ -348,7 +348,7 @@ export class FighterSystem {
       const friendlyCapital = this.carrierFor(ftr, isPlayer ? playerShip : enemyShip);
       const index = stations.get(friendlyCapital) ?? 0;
       stations.set(friendlyCapital, index + 1);
-      if (this.returnReserve(ftr, friendlyCapital, dt, isPlayer ? enemyShip : playerShip, spawnProj, spawnBeam, spawnFlash)) continue;
+      if (this.returnReserve(ftr, friendlyCapital, dt, isPlayer ? enemyShip : playerShip, spawnProj, spawnBeam, spawnFlash, world)) continue;
       let modeData = this.fighterAIModes.get(ftr.id);
       if (!modeData) {
         modeData = { state: 'ESCORT', timer: 0 };
@@ -418,6 +418,7 @@ export class FighterSystem {
         ships: [friendlyCapital, ...crafts, ...(fireTarget ? [fireTarget] : [])], missiles: projectiles, asteroids: []
       });
 
+      const finishFlight = () => {
       // 战机尾气推进火焰粒子
       if (!isArkCraft(ftr) && Math.abs(ftr.throttle) > 0.1 && this.visualRandom.next() < 0.6) {
         for (const slot of ftr.spec.engineSlots) {
@@ -444,6 +445,9 @@ export class FighterSystem {
           fx.addRadioMessage('点防火控', 'PLAYER', '敌方拦截机已被击坠！目标已消灭！', [120, 255, 160]);
         }
       }
+      };
+      if (world?.shipStepBatch) world.shipStepBatch.afterShip(ftr, finishFlight);
+      else finishFlight();
     }
   }
 
@@ -472,7 +476,7 @@ export class FighterSystem {
       const friendlyCapital = this.carrierFor(bmr, bmr.isPlayer ? playerShip : enemyShip);
       const index = stations.get(friendlyCapital) ?? 0;
       stations.set(friendlyCapital, index + 1);
-      if (!bmr.isDocked && this.returnReserve(bmr, friendlyCapital, dt, bmr.isPlayer ? enemyShip : playerShip, spawnProj, spawnBeam, spawnFlash)) continue;
+      if (!bmr.isDocked && this.returnReserve(bmr, friendlyCapital, dt, bmr.isPlayer ? enemyShip : playerShip, spawnProj, spawnBeam, spawnFlash, world)) continue;
       let mode = this.bomberAIModes.get(bmr.id);
       if (!mode) {
         mode = { state: 'ESCORT', timer: 0, hasTorpedo: true };
@@ -546,6 +550,7 @@ export class FighterSystem {
 
       const before = payload.map(mount => ({ mount, ammo: mount.ammo, cycle: mount.firingCycleId }));
       bmr.update(dt, hostile, spawnProj, spawnBeam, spawnFlash, world);
+      const finishFlight = () => {
       const launched = before.some(({ mount, ammo, cycle }) => mount.ammo < ammo || mount.firingCycleId > cycle);
       if (payloadNeedsRearm(payload)) {
         mode.hasTorpedo = false;
@@ -574,6 +579,9 @@ export class FighterSystem {
       if (bmr.hullHp <= 0 && !bmr.isDead && fx.destructionSideEffectsEnabled()) {
         fx.handleShipDestruction(bmr);
       }
+      };
+      if (world?.shipStepBatch) world.shipStepBatch.afterShip(bmr, finishFlight);
+      else finishFlight();
     }
   }
 }

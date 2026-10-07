@@ -1,3 +1,4 @@
+import { isOwnedCombatNumber } from './OwnedCombatNumbers';
 import type { ShipSurfaceFeedback } from '../visual/ShipSurfaceFeedback';
 import { ADUN_ARK_ID } from '../content/AdunArkIds';
 import { voidShieldContact } from './VoidShield';
@@ -44,7 +45,7 @@ import {
 } from './CombatReadiness';
 
 // Identity, not a caller-writable "pure" flag; no new serialized combat state.
-const nativeArmorReaders = new WeakMap<Ship, { damage: ArmorGrid['damageTakenModifiers']; effective: ArmorGrid['dynamicEffectiveArmorMultiplier']; cell: ArmorGrid['onCellDamage']; overload: FluxTracker['onOverloadStarted'] }>();
+const nativeArmorReaders = new WeakMap<Ship, { damage: ArmorGrid['damageTakenModifiers']; effective: ArmorGrid['dynamicEffectiveArmorMultiplier']; cell: ArmorGrid['onCellDamage']; cells: PropertyDescriptor; overload: FluxTracker['onOverloadStarted'] }>();
 const nativeShieldReaders = new WeakMap<Ship, () => number>();
 const nativeShieldDamageFor = Shield.prototype.damageTakenMultiplierFor;
 
@@ -54,6 +55,13 @@ let workerOwnedPhaseReads = false;
 export function enableWorkerOwnedPhaseReads(): void { workerOwnedPhaseReads = true; }
 
 export type { EngineStatus } from './systems/EngineController';
+
+export interface ShipStepState {
+  dt: number; effectiveDt: number; tacticalDt: number; target: Ship | null;
+  jetVelocity?: Vector2; jetAngularVelocity: number; jetFacing: number;
+  aimAngle: number; engineCommands: { accelerating: boolean; spreading: boolean };
+  maneuver?: [number, number, number];
+}
 
 export interface PhaseGhost {
   pos: Vector2;
@@ -482,7 +490,7 @@ export class Ship {
     // ship_data.csv: phase cost / phase upkeep 是基础幅能容量的比例 (厄运 0.05/0.05)。
     this.shield.externalDamageTakenMultiplier = () => this.externalDamageTakenMultiplier;
     nativeShieldReaders.set(this, this.shield.externalDamageTakenMultiplier);
-    nativeArmorReaders.set(this, { damage: this.armor.damageTakenModifiers, effective: this.armor.dynamicEffectiveArmorMultiplier, cell: this.armor.onCellDamage, overload: this.flux.onOverloadStarted });
+    nativeArmorReaders.set(this, { damage: this.armor.damageTakenModifiers, effective: this.armor.dynamicEffectiveArmorMultiplier, cell: this.armor.onCellDamage, cells: Object.getOwnPropertyDescriptor(this.armor,'cells')!, overload: this.flux.onOverloadStarted });
     this.shield.phaseMinSpeedFluxThresholdMultiplier = 1 + refit.phaseMinSpeedFluxThresholdPercent / 100;
     this.shield.unfoldRateMultiplier = 1 + refit.shieldUnfoldRatePercent / 100;
     this.shield.turnRateMultiplier = 1 + refit.shieldTurnRatePercent / 100;
@@ -907,6 +915,19 @@ export class Ship {
     spawnMuzzleFlash?: (pos: Vector2, angleRad: number, size: number, color: [number, number, number], spec?: MuzzleFlashSpec, shipVel?: Vector2, launcherSmokeSpec?: LauncherSmokeSpec, underHullShipId?: string) => void,
     fireControlWorld?: FireControlWorld
   ) {
+    if (fireControlWorld?.shipStepBatch) {
+      fireControlWorld.shipStepBatch.enqueue(this, dt, targetShip, spawnProjectile, spawnBeam, spawnMuzzleFlash, fireControlWorld);
+      return;
+    }
+    const state = this.prepareStep(dt, targetShip, fireControlWorld);
+    if (!state) return;
+    this.integrateStep(state);
+    this.weaponControl.update(state.effectiveDt, this, state.aimAngle, targetShip, spawnProjectile, spawnBeam, spawnMuzzleFlash, fireControlWorld);
+    this.finishStep(state);
+  }
+
+  /** State writes only. The world owner finishes this for every entity before motion. */
+  public prepareStep(dt: number, targetShip: Ship | null, fireControlWorld?: FireControlWorld): ShipStepState | undefined {
     // Ship.advance advances listeners before weapons; use the Web combat step.
     // A notification does not alter the triggering pulse or later beams this tick.
     if (dt > 0) for (const [id, effect] of this.statusEffects) {
@@ -1014,20 +1035,28 @@ export class Ship {
     }
     this.advanceHullModFlux(tacticalDt);
 
+    return { dt, effectiveDt, tacticalDt, target: targetShip, jetVelocity, jetAngularVelocity, jetFacing,
+      aimAngle: 0, engineCommands: { accelerating: false, spreading: false } };
+  }
+
+  /** No weapon emission: all entities integrate before the shared fire observation. */
+  public integrateStep(state: ShipStepState, numericMotion?: { accelerating: boolean; spreading: boolean }): void {
+    const { effectiveDt, jetVelocity, jetAngularVelocity, jetFacing } = state;
+    this.syncModulePose();
     // 2. 物理运动推力与转向 (相位下机动时限加速)
-    const engineCommands = this.updateMotion(effectiveDt);
+    state.engineCommands = numericMotion ?? this.updateMotion(effectiveDt);
     // Capture before weapon recoil, after accepted motion and hullmod compensation.
     const jetDelta = jetVelocity ? this.vel.clone().sub(jetVelocity) : undefined;
     const jetCos = Math.cos(jetFacing), jetSin = Math.sin(jetFacing);
     const jetScale = Math.max(.000001, effectiveDt * this.spec.acceleration);
-    const maneuver: [number, number, number] | undefined = jetDelta ? [
+    state.maneuver = jetDelta ? [
       (jetDelta.x*jetCos + jetDelta.y*jetSin)/jetScale,
       (-jetDelta.x*jetSin + jetDelta.y*jetCos)/jetScale,
       (this.angularVelRad - jetAngularVelocity) / Math.max(.000001,effectiveDt*this.spec.turnAccelerationDeg*Math.PI/180)
     ] : undefined;
 
     // 3. 护盾朝向与展开
-    const aimAngle = Math.atan2(this.aimTargetWorld.y - this.pos.y, this.aimTargetWorld.x - this.pos.x);
+    const aimAngle = state.aimAngle = Math.atan2(this.aimTargetWorld.y - this.pos.y, this.aimTargetWorld.x - this.pos.x);
     let shieldAimAngle = aimAngle;
     if (this.shield.type === 'OMNI') {
       // Shield arcs rotate around their own pivot, which can be offset from the hull.
@@ -1038,9 +1067,10 @@ export class Ship {
     if(this.shield.voidShield) this.shield.voidShield.suppressed = !this.canUseShields();
     this.shield.update(effectiveDt, this.facingRad, (this.fireControlMode === 'AI' || this.isAttachedModule) ? this.defenseFacingRad ?? shieldAimAngle : shieldAimAngle);
 
-    // 4. 武器挂点瞄准与开火解算
-    this.weaponControl.update(effectiveDt, this, aimAngle, targetShip, spawnProjectile, spawnBeam, spawnMuzzleFlash, fireControlWorld);
+  }
 
+  public finishStep(state: ShipStepState): void {
+    const { dt, effectiveDt, engineCommands, maneuver } = state;
     // 5. 更新战损贴花的红热余辉；冷却后焦痕本体仍持续保留
     this.updateScorchMarks(dt);
 
@@ -1113,6 +1143,25 @@ const nativeLocalShieldUpdate = Shield.prototype.update;
 const nativeLocalWeaponUpdate = ShipWeaponControlSystem.prototype.update;
 const nativeLocalEngineAdvance = EngineController.prototype.advance;
 const nativeLocalSystemUpdate = ShipSystem.prototype.update;
+const nativeIntegrateStep = Ship.prototype.integrateStep;
+const nativeMotionStep = (Ship.prototype as unknown as {updateMotion: unknown}).updateMotion;
+const nativePoseSync = Ship.prototype.syncModulePose;
+const nativeModuleTreeSync = Ship.prototype.syncModuleTree;
+const nativeApplyHullDamage = Ship.prototype.applyHullDamage;
+const numericVectorMethods = (['set','addScaled','scale','length'] as const).map(key=>[key,Vector2.prototype[key]] as const);
+/** Modules keep their parent-relative and independent-rotation owner. Unknown
+ * whole motion/vector overrides retain their original execution contract. */
+export function hasNativeMotionBoundary(ship: Ship): boolean {
+  return ship.integrateStep === nativeIntegrateStep
+    && (ship as unknown as {updateMotion: unknown}).updateMotion === nativeMotionStep
+    && ship.syncModulePose === nativePoseSync
+    && ship.system.hasNativeStats && ship.defenseSystem.hasNativeStats
+    && Object.getPrototypeOf(ship.pos) === Vector2.prototype && Object.getPrototypeOf(ship.vel) === Vector2.prototype
+    && numericVectorMethods.every(([key,method])=>ship.pos[key]===method && ship.vel[key]===method);
+}
+export function hasNumericMotionBoundary(ship: Ship): boolean {
+  return !ship.isAttachedModule && !ship.isStation && hasNativeMotionBoundary(ship);
+}
 const shieldCenterRotations = new WeakMap<Ship, { facing: number; cos: number; sin: number }>();
 /** Identity gate for read-only geometry memoization; overridden callbacks stay uncached. */
 export const nativeGetShieldCenter = Ship.prototype.getShieldCenter;
@@ -1134,18 +1183,53 @@ export function nativeFireControlPrototypes(): boolean {
     return now?.get === d.get && now?.set === d.set && now?.value === d.value;
   }));
 }
+/** Descriptor boundary for owned numeric state, not an AI eligibility claim.
+ * Parent/carrier relationships and native live modifiers remain rule adapters. */
+export function hasNativeCoreCollisionHooks(ship: Ship): boolean {
+  const armor = nativeArmorReaders.get(ship);
+  return ship.damageTakenModifiers.size === 0 && ship.externalPhaseEffects.size === 0
+    && !Object.hasOwn(ship,'externalDamageTakenMultiplier')
+    && ship.shield.externalDamageTakenMultiplier === nativeShieldReaders.get(ship)
+    && ship.shield.damageTakenMultiplierFor === nativeShieldDamageFor && !Object.hasOwn(ship.shield,'damageTakenMultiplier')
+    && ship.system.hasNativeStats && ship.defenseSystem.hasNativeStats
+    && ship.syncModuleTree === nativeModuleTreeSync && ship.applyHullDamage === nativeApplyHullDamage
+    && ship.hullDamageInterceptors.size === 0 && ship.runtimeModifiers.empty
+    && ship.armor.damageTakenModifiers === armor?.damage && ship.armor.dynamicEffectiveArmorMultiplier === armor?.effective
+    && ship.armor.onCellDamage === armor?.cell && ship.flux.onOverloadStarted === armor?.overload;
+}
+export function hasNativeStateCoreReaders(ship: Ship): boolean {
+  if (Object.getPrototypeOf(ship) !== Ship.prototype) return false;
+  // Inspect before reading component properties, so custom getters are not run.
+  for (const key of Object.getOwnPropertyNames(ship)) {
+    const d = Object.getOwnPropertyDescriptor(ship,key)!;
+    if (fireControlReaderTypes[0].keys.has(key) || (!('value' in d) && !isOwnedCombatNumber(ship,key))) return false;
+  }
+  const objects = [ship,ship.shield,ship.flux,ship.system,ship.armor,ship.runtimeModifiers,ship.weaponControl];
+  for (let i=1;i<objects.length;i++) {
+    const object=objects[i], {prototype,keys}=fireControlReaderTypes[i];
+    if (Object.getPrototypeOf(object)!==prototype) return false;
+    for (const key of Object.getOwnPropertyNames(object)) {
+      const d=Object.getOwnPropertyDescriptor(object,key)!;
+      const cells = i===4 && key==='cells' ? nativeArmorReaders.get(ship)?.cells : undefined;
+      const nativeCells = cells && d.get===cells.get && d.set===cells.set && d.enumerable===cells.enumerable && d.configurable===cells.configurable;
+      if (keys.has(key) || (!('value' in d) && !isOwnedCombatNumber(object,key) && !nativeCells)) return false;
+    }
+  }
+  return true;
+}
+
 export function hasNativeFireControlReaders(ship: Ship): boolean {
   if (Object.getPrototypeOf(ship) !== Ship.prototype) return false;
   // Do not invoke a custom component getter merely to decide to fall back.
   for (const key of Object.getOwnPropertyNames(ship)) {
-    if (fireControlReaderTypes[0].keys.has(key) || !('value' in Object.getOwnPropertyDescriptor(ship, key)!)) return false;
+    if (fireControlReaderTypes[0].keys.has(key) || (!('value' in Object.getOwnPropertyDescriptor(ship, key)!) && !isOwnedCombatNumber(ship, key))) return false;
   }
   const objects = [ship, ship.shield, ship.flux, ship.system, ship.armor, ship.runtimeModifiers, ship.weaponControl];
   for (let i = 1; i < objects.length; i++) {
     const object = objects[i], { prototype, keys } = fireControlReaderTypes[i];
     if (Object.getPrototypeOf(object) !== prototype) return false;
     for (const key of Object.getOwnPropertyNames(object)) {
-      if (keys.has(key) || !('value' in Object.getOwnPropertyDescriptor(object, key)!)) return false;
+      if (keys.has(key) || (!('value' in Object.getOwnPropertyDescriptor(object, key)!) && !isOwnedCombatNumber(object, key))) return false;
     }
   }
   if (!isImmutableMetadata(ship.spec) || ship.system.auxiliary !== ship.defenseSystem || ship.defenseSystem.auxiliary || ship.systems.length > 1 || Object.getPrototypeOf(ship.defenseSystem) !== ShipSystem.prototype) return false;

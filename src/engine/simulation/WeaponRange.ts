@@ -3,6 +3,7 @@ import { fighterWeaponRangeFlat, hullModRangePercent, hullModRangeFlat, hullModR
 import type { ShipSpec } from '../content/ShipSpec';
 import type { Ship } from './Ship';
 import type { WeaponSpec } from './Weapon';
+import type { SystemModifiers } from '../extensions/ship-systems/Types';
 
 interface RangeEntry {
   range: number; weaponType: WeaponSpec['weaponType']; mountSize: WeaponSpec['mountSize'];
@@ -24,12 +25,16 @@ export function effectiveWeaponRange(ship: ShipSpec, weapon: WeaponSpec): number
   return resolveWeaponRange(ship, weapon, 1, 0);
 }
 /** Dynamic combat modifiers are never memoized against shared content definitions. */
-export function combatWeaponRange(ship: Ship, weapon: WeaponSpec): number {
-  return resolveWeaponRange(ship.spec, weapon, 1 - ship.ecmRangePenalty / 100, ship.system.getWeaponRangePercent(weapon.weaponType), ship.sourceCarrier ? fighterWeaponRangeFlat(ship.sourceCarrier.spec, weapon) : 0);
+export function combatWeaponRange(ship: Ship, weapon: WeaponSpec, modifiers?: Readonly<SystemModifiers>): number {
+  const percent = modifiers ? weapon.weaponType ? modifiers.weapons?.[weapon.weaponType]?.rangePercent ?? 0 : 0
+    : ship.system.getWeaponRangePercent(weapon.weaponType);
+  return resolveWeaponRange(ship.spec, weapon, 1 - ship.ecmRangePenalty / 100, percent, ship.sourceCarrier ? fighterWeaponRangeFlat(ship.sourceCarrier.spec, weapon) : 0);
 }
-export function combatProjectileSpeed(ship: Ship, weapon: WeaponSpec): number {
+export function combatProjectileSpeed(ship: Ship, weapon: WeaponSpec, modifiers?: Readonly<SystemModifiers>): number {
   const basePercent = weapon.projectileSpeedBonusPercent ?? 0;
-  return weapon.projSpeed * (1 + (basePercent + ship.system.getProjectileSpeedPercent(weapon.weaponType)) / 100) / (1 + basePercent / 100);
+  const percent = modifiers ? weapon.weaponType ? modifiers.weapons?.[weapon.weaponType]?.projectileSpeedPercent ?? 0 : 0
+    : ship.system.getProjectileSpeedPercent(weapon.weaponType);
+  return weapon.projSpeed * (1 + (basePercent + percent) / 100) / (1 + basePercent / 100);
 }
 function resolveWeaponRange(ship: ShipSpec, weapon: WeaponSpec, runtimeMultiplier: number, runtimePercent: number, runtimeFlat = 0): number {
   const dynamic = runtimeMultiplier !== 1 || runtimePercent !== 0 || runtimeFlat !== 0;

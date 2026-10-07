@@ -1,3 +1,6 @@
+import { numericFlightSteering, numericFlightThreatScore } from './FlightNumericalKernel';
+import { usesNumericFlight, flightRewriteWork } from './FlightDecisionRoster';
+import { coordinateLength } from '../../math/Vector2';
 import { isPointDefense, predictWeaponIntercept, solveWeaponAim, type FireControlTarget } from '../../ai/AutofireController';
 import { Vector2 } from '../../math/Vector2';
 import { cursorTurnCommand } from '../../runtime/PlayerControls';
@@ -18,6 +21,10 @@ export function wingCanReach(carrier: Ship, range: number, point: Vector2, radiu
 
 /** Velocity-aware arrival; brake against relative closing speed rather than orbiting a moving deck. */
 export function steerFlight(craft: Ship, point: Vector2, velocity = new Vector2(), stopDistance = 35): void {
+  if(usesNumericFlight(craft)) {
+    const control=numericFlightSteering(craft.pos.x,craft.pos.y,craft.vel.x,craft.vel.y,craft.facingRad,craft.angularVelRad,craft.getMotionStats().turnDeceleration,point.x,point.y,velocity.x,velocity.y,stopDistance);
+    craft.turnInput=control.turn;craft.brakeInput=control.brake;craft.throttle=control.throttle;craft.strafeInput=0;flightRewriteWork.steering++;return;
+  }
   const delta = point.clone().sub(craft.pos), distance = delta.length();
   const angle = Math.atan2(Math.sin(delta.heading() - craft.facingRad), Math.cos(delta.heading() - craft.facingRad));
   craft.turnInput = cursorTurnCommand(craft.facingRad, craft.angularVelRad, delta.heading(), craft.getMotionStats().turnDeceleration);
@@ -93,6 +100,18 @@ export function attackFlight(craft: Ship, target: Ship, index: number, bomber = 
 
 /** Score incoming trajectories, not array order. Receding shots and decoys cannot drag wings away. */
 export function incomingFlightThreat(craft: Ship, carrier: Ship, range: number, projectiles: readonly Projectile[]): Projectile | undefined {
+  if(usesNumericFlight(craft)) {
+    let best:Projectile|undefined,bestScore=Infinity;const operational=carrierOperational(carrier);
+    const body=(s:Ship)=>({x:s.pos.x,y:s.pos.y,vx:s.vel.x,vy:s.vel.y,radius:s.spec.collisionRadius});
+    const protectedShips=operational?[body(carrier),body(craft)]:[body(craft)];flightRewriteWork.missileQueries++;
+    for(const p of projectiles){flightRewriteWork.missileRows++;
+      if(!p.isRocket||p.isDisarmed||p.isFlare||p.isFighterDecoy||p.collisionDisabled||p.didDamage||p.rangeRemaining<=0||(p.hitpoints!==undefined&&p.hitpoints<=0)||(p.missileFizzleTime!==undefined&&!p.armedWhileFizzling)||sameTeam(p,craft))continue;
+      const distance=coordinateLength(p.pos.x-craft.pos.x,p.pos.y-craft.pos.y);
+      if(distance>900||(operational&&!wingCanReach(carrier,range,p.pos,p.radius)))continue;
+      for(const protectedShip of protectedShips){const score=numericFlightThreatScore(p.pos.x,p.pos.y,p.vel.x,p.vel.y,p.radius,protectedShip,distance);if(score<bestScore){best=p;bestScore=score;}}
+    }
+    return best;
+  }
   let best: Projectile | undefined, bestScore = Infinity;
   for (const p of projectiles) {
     if (!p.isRocket || p.isDisarmed || p.isFlare || p.isFighterDecoy || p.collisionDisabled || p.didDamage
