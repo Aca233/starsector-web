@@ -109,6 +109,8 @@ export const KEY_CODES = [
   "KeyE",
   "ShiftLeft",
   "KeyX",
+  "GravityField",
+  "GravityPush",
 ] as const;
 export const blankInput = (): PlayerInput => ({
   seq: 0,

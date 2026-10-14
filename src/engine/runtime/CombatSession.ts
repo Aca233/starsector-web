@@ -1,10 +1,11 @@
 import { JumpTargeting } from './JumpTargeting';
-import { copyReplayCheckpoint, type CombatReplayCheckpoint } from './local/CombatReplayCheckpoint';
+import { runtimeShipPacks } from '../modding/ShipPackCatalog';
+import { copyReplayCheckpoint, sameBackendIdentity, type CombatReplayCheckpoint } from './local/CombatReplayCheckpoint';
 import { LOCAL_COMBAT_PROTOCOL } from './local/LocalCombatProtocol';
 import { localCombatContentSignature } from './local/LocalCombatContent';
 import { combatHudView, liveCombatHudView, type CombatHudView } from './CombatHudView';
 import { LocalWorkerHost, type LocalCombatFrame } from './local/LocalWorkerHost';
-import type { LocalCombatConfig } from './local/LocalCombatKernel';
+import type { LocalCombatConfig } from './local/LocalCombatContracts';
 import type { CombatRequest, CombatOutcome } from '../game/GameState';
 import { CombatHandoff } from '../game/CombatHandoff';
 import { sound } from '../audio/SoundManager';
@@ -19,7 +20,7 @@ import { CombatTickHost } from './CombatTickHost';
 import { CombatStepProfiler, type CombatStepSpan, type StepProfileOptions } from '../diagnostics/CombatStepProfiler';
 import { CombatMulticore } from '../ai/multicore/CombatMulticore';
 import type { AIPhaseBatch } from '../ai/multicore/Types';
-import { DEFAULT_PLAYER_HULL, DEFAULT_ENEMY_HULL } from '../data/SandboxDefaults';
+import { defaultPlayerHull, defaultOpponent } from '../data/SandboxDefaults';
 import { CapitalShipAI } from '../ai/CapitalShipAI';
 import type { ICombatRenderer } from '../render/ICombatRenderer';
 import { WebGLCombatRenderer, type WebGLRendererLifecycle } from '../render/webgl/WebGLCombatRenderer';
@@ -64,6 +65,7 @@ let nextSessionId = 1;
 export class CombatSession {
   private readonly authority: CombatAuthority;
   private workerEnabled = false;
+  private workerBackend: NonNullable<LocalCombatConfig['backend']> = 'typescript';
   private workerHost?: LocalWorkerHost;
   private workerStep?: Promise<void | false>;
   private stagedRestore?: LocalWorkerHost;
@@ -90,9 +92,11 @@ export class CombatSession {
       ships:view.ships.filter(ship=>ship.isVisibleTo(view.playerShip.teamId)),asteroids:view.asteroids
     });
   }
-  public enableWorker(): void {
-    if (this.authority.tick !== 0) throw new Error('Worker migration requires a new encounter, not a display checkpoint');
+  public enableWorker(backend: NonNullable<LocalCombatConfig['backend']> = 'typescript'): void {
+    if (this.authority.tick !== 0 || this.workerHost || this.stagedRestore || this.workerStep)
+      throw new Error('Worker migration requires a new encounter, not a display checkpoint');
     this.workerEnabled = true;
+    this.workerBackend = backend;
   }
   private closeWorker(): void { this.jumpTargeting.cancel(); this.stagedRestore?.dispose(); this.stagedRestore = undefined; this.restorePending = false; this.controlGeneration++; this.pilotIntent = undefined; this.pilotRequest++; this.inputSerial++; this.pendingReleases.clear(); this.acceptedWorkerSequence = 0; this.telemetrySequence = 0; this.workerHost?.dispose(); this.workerHost = undefined; this.workerStep = undefined; }
   public loadEncounter(request: CombatRequest, handoff = new CombatHandoff(request)): void {
@@ -115,9 +119,9 @@ export class CombatSession {
     if (!this.workerEnabled) return;
     if (!this.workerHost) {
       const engine = this.authority.engine;
-      const config: LocalCombatConfig = {playerHull: engine.playerShip.spec.id, enemyHull: engine.enemyShip.spec.id,
+      const config: LocalCombatConfig = {backend:this.workerBackend, playerHull: engine.playerShip.spec.id, enemyHull: engine.enemyShip.spec.id,
         seed: this.workerConfigSeed, encounter: this.encounter, simulationPointLimit: this.simulationPointLimit,
-        presentation:'render', content:{ships:contentRegistry.getAllShips(), weapons:contentRegistry.getAllWeapons()}};
+        presentation:'render', content:{ships:contentRegistry.getAllShips(), weapons:contentRegistry.getAllWeapons(), packs:structuredClone([...runtimeShipPacks()])}};
       const created = new LocalWorkerHost(config);
       this.workerHost = created;
       created.subscribeFailure(error => this.failAuthority(created, error));
@@ -130,7 +134,9 @@ export class CombatSession {
     if (this.workerHost !== host || this.state === 'disposed' || frame.sequence <= this.acceptedWorkerSequence) return;
     this.acceptedWorkerSequence = frame.sequence;
     for (const event of frame.audio) {
-      if (event.position) sound.playAtPos(event.key, new Vector2(...event.position), this.read.playerShip.pos, event.volume, event.rate);
+      if ('active' in event) { if (event.active) sound.startLoop(event.key, event.volume); else sound.stopLoop(event.key); }
+      else if ('value' in event) sound.setMuffled(event.value);
+      else if (event.position) sound.playAtPos(event.key, new Vector2(...event.position), event.listener ? new Vector2(...event.listener) : this.read.playerShip.pos, event.volume, event.rate, event.maxDistance);
       else sound.play(event.key, event.volume, event.rate);
     }
     const report = frame.presentation.hud.battleResult;
@@ -175,6 +181,8 @@ export class CombatSession {
         || checkpoint.config.seed !== this.workerConfigSeed || checkpoint.config.simulationPointLimit !== this.simulationPointLimit
         || JSON.stringify(checkpoint.config.encounter) !== JSON.stringify(this.encounter))
         throw new Error('中场点的内容或遭遇与当前战斗不符。');
+      if (this.workerHost?.latest && !sameBackendIdentity(checkpoint.authority,this.workerHost.latest.authority))
+        throw new Error('中场点的战斗后端或内核指纹与当前战斗不符。');
     } catch (error) { return {accepted:false, reason:String(error)}; }
     const previous = this.workerHost, canvas = this.canvas, generation = this.controlGeneration;
     const previousPresentation = this.presentationState;
@@ -183,8 +191,11 @@ export class CombatSession {
     this.state = 'paused'; this.visualClock.setPaused(true); this.scheduler.resync();
     let candidate: LocalWorkerHost | undefined;
     try {
+      if (previous?.status === 'starting') await previous.ready;
       if (previous?.status === 'ready') await this.barrier();
       if (generation !== this.controlGeneration) throw new Error('恢复期间战斗已更换。');
+      if (previous?.latest && !sameBackendIdentity(checkpoint.authority,previous.latest.authority))
+        throw new Error('中场点的战斗后端或内核指纹与当前战斗不符。');
       candidate = new LocalWorkerHost(checkpoint.config, 90_000, checkpoint);
       this.stagedRestore = candidate;
       this.setPresentationState({status:'restoring', errorCode:'authority-failed', errorMessage:null});
@@ -237,7 +248,8 @@ export class CombatSession {
     this.discardPendingTick(); this.authority.beginEpoch(engine);
   }
   public getAuthorityStatus() {
-    if (this.workerEnabled) return {epoch:this.workerHost?.epoch ?? this.controlGeneration, tick:this.workerHost?.latest?.tick ?? 0, pending:!!this.workerStep, backend:'worker-render'};
+    if (this.workerEnabled) return {epoch:this.workerHost?.epoch ?? this.controlGeneration, tick:this.workerHost?.latest?.tick ?? 0, pending:!!this.workerStep, backend:'worker-render',
+      requestedBackend:this.workerBackend, authority:this.workerHost?.latest?.authority, startupFallback:this.workerHost?.startupFallback};
     return { epoch: this.authority.epoch, tick: this.authority.tick, pending: this.tickHost.hasPendingTick,
       backend: this.multicore.status.mode === 'serial' ? 'inline' : 'inline-with-ai-workers' };
   }
@@ -248,6 +260,8 @@ export class CombatSession {
   public readonly hudVisuals = new CombatHudVisuals();
   public readonly visualRandom: VisualRandom;
   public readonly performance = new PerformanceMetrics();
+  /** Actual renderer submissions, excluding frame-cap skips and loading frames. */
+  public renderedFrames = 0;
   public readonly cameraController = new CameraController();
   public readonly sessionId: string;
   public state: CombatSessionState = 'created';
@@ -324,8 +338,8 @@ export class CombatSession {
   }
 
   constructor(
-    playerShipId = DEFAULT_PLAYER_HULL,
-    enemyShipId = DEFAULT_ENEMY_HULL,
+    playerShipId = defaultPlayerHull(),
+    enemyShipId = defaultOpponent(playerShipId),
     seed = 0x51f15e,
     private readonly rendererFactory: CombatRendererFactory = (canvas, gl, lifecycle) => new WebGLCombatRenderer(canvas, gl, lifecycle)
   ) {
@@ -717,6 +731,7 @@ export class CombatSession {
     const submitStart = performance.now();
     const rendered = this.renderer.render(this.renderView, alpha, cameraPos, zoom, { ...frame, jumpTarget: this.jumpTargeting.preview });
     if (!rendered) return;
+    this.renderedFrames++;
     this.performance.recordTiming('drawSubmitMs', performance.now() - submitStart);
     const resourceStats = this.renderer.getResourceStats();
     if (this.workerHost?.latest) {

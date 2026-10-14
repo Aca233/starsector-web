@@ -1,0 +1,11 @@
+.ship-pack-panel { color: var(--color-text, var(--ds-palette-ink-soft)); max-height: 65vh; overflow-y: auto; padding: 12px; }
+.ship-pack-panel > p { line-height: 1.6; margin: 0 0 16px; }
+.ship-pack-panel ul { list-style: none; padding: 0; margin: 16px 0; }
+.ship-pack-panel li { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid color-mix(in srgb, var(--ds-palette-cyan-frame) 33.333333%, transparent); }
+.ship-pack-panel li > div { flex: 1; }
+.ship-pack-panel li span { display: block; font-size: 12px; color: var(--ds-palette-muted); margin-top: 5px; }
+.ship-pack-panel li p { margin: 5px 0 0; font-size: 13px; }
+.ship-pack-panel button, .ship-pack-import { padding: 8px 14px; color: inherit; background: var(--ds-palette-green-depth); border: 1px solid var(--ds-palette-cyan-frame); cursor: pointer; }
+.ship-pack-panel button:disabled { opacity: .5; cursor: wait; }
+.ship-pack-import { display: inline-flex; align-items: center; gap: 12px; }
+.ship-pack-panel [role=alert] { color: var(--ds-palette-red-muted); }

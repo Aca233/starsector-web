@@ -1,0 +1,798 @@
+/* Combat presentation owner. HUD foundation first, then deployment, console, map and menus.
+ * This sheet owns presentation only; it never changes combat rules, input or transport. */
+
+
+.hud-overlay {
+  --hud-panel-scale: 1;
+  --hud-tag-scale: 1;
+  --hud-safe-inset: 14px;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: 0;
+}
+
+.hud-overlay[data-hud-density='compact'] {
+  --hud-panel-scale: 1;
+  --hud-tag-scale: 1;
+  --hud-safe-inset: 10px;
+}
+
+.hud-overlay[data-hud-density='expanded'] {
+  --hud-panel-scale: 1;
+  --hud-tag-scale: 1;
+  --hud-safe-inset: 18px;
+}
+
+.hud-console-anchor {
+  left: var(--hud-safe-inset);
+  bottom: var(--hud-safe-inset);
+  scale: var(--hud-panel-scale);
+  transform-origin: left bottom;
+  text-shadow: 0 1px 1px var(--ds-palette-black);
+}
+
+.hud-radar-anchor {
+  right: var(--hud-safe-inset);
+  bottom: calc(var(--hud-safe-inset) + 18px);
+  scale: var(--hud-panel-scale);
+  transform-origin: right bottom;
+  opacity: 0.88;
+  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--ds-palette-cyan) 16%, transparent));
+}
+
+.hud-perf-anchor {
+  right: var(--hud-safe-inset);
+  bottom: calc(var(--hud-safe-inset) * 0.4);
+  scale: var(--hud-panel-scale);
+  transform-origin: right bottom;
+}
+
+/* Floating labels keep their world-to-screen coordinates; only their own glyph footprint scales. */
+.hud-floating-tag {
+  scale: var(--hud-tag-scale);
+  transform-origin: 0 0;
+}
+
+.hud-glyph-sample {
+  display: grid;
+  grid-template-columns: repeat(16, 1.05em);
+  gap: 1px;
+  width: max-content;
+  padding: 3px;
+  color: var(--ds-palette-lime);
+  background: color-mix(in srgb, var(--ds-palette-night) 90%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ds-palette-lime) 35%, transparent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 11px;
+  line-height: 1.05em;
+  text-align: center;
+}
+
+.hud-glyph-cell {
+  width: 1.05em;
+  height: 1.05em;
+  overflow: hidden;
+  border-right: 1px solid color-mix(in srgb, var(--ds-palette-lime) 6%, transparent);
+}
+
+.hud-overlay button,
+.hud-overlay input,
+.hud-overlay select {
+  text-shadow: 0 1px 1px var(--ds-palette-black);
+}
+
+.hud-overlay * { letter-spacing: 0; }
+.visual-lab-panel { max-width: calc(100vw - 24px); max-height: calc(100dvh - 470px); }
+.combat-console-body { min-width: 0; }
+
+@media (max-width: 700px) {
+  .combat-paperdoll { display: none; }
+  .combat-console-body { width: min(320px, calc(100vw - 24px)); }
+  .hud-console-anchor { max-height: 44dvh; overflow-y: auto; overflow-x: hidden; }
+  .hud-radar-anchor { top: 48px; bottom: auto; scale: 0.55; transform-origin: right top; }
+  .visual-lab-panel { top: 48px; max-width: calc(100vw - 148px); max-height: 42dvh; }
+  .visual-lab-panel input[type='range'] { display: block; width: 100%; margin-left: 0; }
+  .visual-lab-panel select { min-width: 0; max-width: 100%; }
+  .visual-lab-panel > div { flex-wrap: wrap; }
+}
+
+@media (max-height: 650px) and (min-width: 701px) {
+  .visual-lab-panel { max-height: 40dvh; width: 310px; }
+  .hud-console-anchor { max-height: 48dvh; overflow-y: auto; }
+}
+
+/* Readability is an intentional exception to original-game typography. */
+.hud-text {
+  font-family: var(--ds-font-body);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 15px;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: auto;
+  text-rendering: optimizeLegibility;
+}
+.hud-floating-tag .hud-text { font-size: 11px; line-height: 13px; }
+.hud-meter { display: inline-block; position: relative; flex: none; filter: drop-shadow(1px 1px 0 var(--ds-palette-black)); }
+.hud-meter-fill { position: absolute; inset: 0 auto 0 0; width: var(--meter-fill); background: currentColor; }
+.hud-meter-cap { position: absolute; inset: 0 0 0 auto; width: 1px; background: currentColor; }
+.hud-meter-minimum { position: absolute; left: var(--meter-minimum); top: -1px; bottom: -1px; width: 3px; border-top: 1px solid; border-bottom: 1px solid; }
+.hud-console-meter-row { display: grid; grid-template-columns: 45px 83px 104px; align-items: center; height: 15px; }
+.hud-console-meter-row > .hud-meter { margin-left: 3px; transform: translateY(1px); }
+.hud-console-meter-row .hud-meter-number { text-align: right; }
+.hud-floating-content { line-height: 13px; }
+.hud-floating-meter-row { display: grid; grid-template-columns: 25px 60px; column-gap: 3px; align-items: center; height: 13px; }
+.hud-floating-meter-row > .hud-meter { transform: translateY(2px); }
+.hud-floating-status-row { display: grid; grid-template-columns: 50px 65px; margin-top: 1px; height: 13px; }
+
+.hud-autofire-indicator { display: inline-block; width: 7px; height: 7px; border: 1px solid currentColor; }
+.hud-autofire-indicator[data-active="true"] { background: currentColor; }
+
+.hud-meter-ink { position: absolute; inset: 0; }
+
+/* F.java stacks groups diagonally by half of the previous group's height. */
+.hud-weapon-groups { min-height: 50px; }
+.hud-weapon-heading { height: 18px; }
+.hud-weapon-group { position: relative; transform: translateX(calc(-1 * var(--group-shift))); color: var(--ds-palette-lime); }
+.hud-weapon-select { display: grid; grid-template-columns: 15px minmax(0, 224px); text-align: left; width: 239px; height: 100%; opacity: var(--group-opacity); cursor: pointer; }
+.hud-group-number { align-self: start; }
+.hud-weapon-entry { display: grid; grid-template-columns: 26px minmax(0, 1fr); grid-template-rows: 15px 15px; column-gap: 3px; height: 30px; }
+.hud-weapon-icon { grid-row: 1 / 3; display: flex; align-items: center; justify-content: center; }
+.hud-weapon-icon img { object-fit: contain; }
+.hud-weapon-name, .hud-weapon-damage { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.hud-weapon-damage { padding-left: 16px; }
+.hud-group-mode, .hud-group-autofire { position: absolute; left: 239px; white-space: nowrap; cursor: pointer; }
+.hud-group-mode { top: 0; opacity: var(--group-opacity); }
+.hud-group-autofire { top: 15px; display: inline-flex; align-items: center; gap: 3px; }
+.hud-weapon-group .hud-autofire-indicator { width: 9px; height: 9px; border: 0; background: currentColor; }
+.hud-weapon-group .hud-autofire-indicator[data-active="false"] { opacity: 0.5; }
+.hud-weapon-group button:focus-visible { outline: 1px solid currentColor; outline-offset: 2px; }
+.hud-weapon-group button:hover:not(:disabled) { opacity: 1; }
+@media (min-width: 901px) {
+  .hud-console-anchor { left: 3px; bottom: 3px; }
+  .combat-paperdoll { width: 135px; flex: none; margin-right: calc(var(--console-pivot) - 135px); }
+}
+/* Small-screen adaptation: no diagonal overlap or offscreen controls. */
+@media (max-width: 900px) {
+  .combat-paperdoll { display: none; }
+  .combat-console-body { width: min(340px, calc(100vw - 24px)); }
+  .hud-weapon-group { transform: none; }
+  .hud-weapon-select { width: calc(100% - 88px); grid-template-columns: 15px minmax(0, 1fr); }
+  .hud-group-mode, .hud-group-autofire { left: calc(100% - 88px); }
+}
+
+.hud-weapon-layout { position: relative; }
+.hud-mount-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.hud-mount-readout { flex: none; white-space: nowrap; }
+@media (min-width: 1201px) {
+  /* oOOO is rightOfBottom(F, 13), not a truncated list below the groups. */
+  .combat-console-body { margin-right: 313px; }
+  .hud-mount-status { position: absolute; left: 353px; bottom: 0; width: 300px; margin: 0; padding: 0; border: 0; }
+}
+/* ===== simulation-deployment.css ===== */
+/* Simulator silhouettes share the native chrome; selection and budgets cover both sides. */
+@layer ds-pages {
+ .ui-modal.simulation-deployment { --ds-modal-panel-width: 680px; --ds-modal-panel-height: 720px; --ds-modal-panel-max-width: calc(100vw - 24px); --ds-modal-panel-max-height: calc(100dvh - 24px); --ds-modal-panel-padding-top: 0; --ds-modal-panel-padding-right: 0; --ds-modal-panel-padding-bottom: 0; --ds-modal-panel-padding-left: 0; --ds-modal-header-display: none; --ds-modal-body-padding-top: 14px; --ds-modal-body-padding-right: 16px; --ds-modal-body-padding-bottom: 0; --ds-modal-body-padding-left: 16px; --ds-modal-body-flex: 1; --ds-modal-body-min-height: 0; --ds-modal-body-display: flex; --ds-modal-body-flex-direction: column; --ds-modal-body-overflow-x: hidden; --ds-modal-body-overflow-y: hidden; --ds-modal-footer-padding-top: 8px; --ds-modal-footer-padding-right: 16px; --ds-modal-footer-padding-bottom: 14px; --ds-modal-footer-padding-left: 16px; --ds-modal-footer-display: flex; --ds-modal-footer-gap: 8px; --ds-modal-footer-justify-content: flex-end; } }
+.ui-modal.simulation-deployment { display: flex; flex-direction: column; color: var(--ds-palette-accent-muted); }
+.simulation-deployment > .ui-modal-footer { border: 0; }
+.simulation-deployment > .ui-modal-footer > button { min-width: 104px; height: 30px; min-height: 0; padding: 0 10px; }
+.sim-deployment-tabs { display: flex; flex-shrink: 0; min-height: 24px; border-bottom: 1px solid var(--ds-palette-blue-frame); gap: 4px; }
+.sim-deployment-tabs > .native-button { min-height: 24px; padding: 0 9px; width: 126px; font-size: 13px; }
+.sim-deployment-tabs > [aria-selected='true'] { background: var(--ds-palette-cyan-frame); color: var(--ds-palette-cyan-ink); }
+.sim-deployment-intro { height: 135px; flex-shrink: 0; position: relative; padding-top: 12px; text-align: center; }
+.sim-deployment-intro h2 { margin: 0; font-size: 17px; line-height: 24px; font-weight: normal; color: var(--ds-palette-bronze); }
+.sim-deployment-intro h2[data-side='ally'] { color: var(--ds-palette-green); }
+.sim-deployment-hint { margin: 12px 10px; font-size: 12px; line-height: 20px; color: var(--ds-palette-dim); }
+.sim-deployment-detail { max-height: 92px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; padding: 9px 8px 0; font-size: 12px; line-height: 16px; }
+.sim-deployment-detail strong { color: var(--ds-palette-blue-ink); font-weight: normal; }
+.sim-deployment-detail small,.sim-deployment-detail details { color: var(--ds-palette-brass); font-size: 11px; }
+.sim-deployment-detail summary { cursor: pointer; }
+.sim-deployment-detail ul { padding-left: 20px; text-align: left; }
+.sim-deployment-filters { display: grid; grid-template-columns: minmax(90px,1fr) 95px 128px; gap: 6px; flex-shrink: 0; }
+.sim-deployment-filters input,.sim-deployment-filters select { min-width: 0; width: 100%; height: 28px; border: 1px solid var(--ds-palette-blue-raised); background: var(--ds-palette-teal-depth); color: var(--ds-palette-blue-ink); padding: 3px 5px; font-size: 12px; }
+.sim-deployment-roster { display: grid; grid-template-columns: repeat(10,minmax(0,1fr)); align-content: start; padding: 10px 0; overflow-y: auto; flex: 1; min-height: 64px; scrollbar-color: var(--ds-palette-blue-raised) var(--ds-palette-night); }
+.sim-deployment-ship { position: relative; display: grid; place-items: center; background: transparent; border: 1px solid transparent; padding: 0; min-width: 0; cursor: pointer; }
+.sim-deployment-ship :is(img, .ship-assembly-thumbnail) { object-fit: contain; max-width: 100%; max-height: 54px; pointer-events: none; }
+.sim-deployment-ship b { position: absolute; right: 2px; top: 0; color: var(--ds-palette-cyan); font-size: 12px; font-weight: normal; text-shadow: 1px 1px var(--ds-palette-black); pointer-events: none; }
+.sim-deployment-ship:hover,.sim-deployment-ship:focus-visible { outline: 0; border-color: var(--ds-palette-dim); background: color-mix(in srgb, var(--ds-palette-blue-frame) 33.333333%, transparent); }
+.sim-deployment-ship[aria-pressed='true'] { border-color: var(--ds-palette-lime-muted); background: color-mix(in srgb, var(--ds-palette-green) 20%, transparent); }
+.sim-deployment-ship[aria-pressed='true']::after { content: ''; position: absolute; inset: 3px; border: 1px solid color-mix(in srgb, var(--ds-palette-lime-muted) 40%, transparent); pointer-events: none; }
+.sim-deployment-ship[data-unavailable='true'] :is(img, .ship-assembly-thumbnail) { opacity: .3; }
+.sim-deployment-pages { display: flex; align-items: center; gap: 7px; font-size: 11px; flex-shrink: 0; padding: 4px 0 7px; }
+.sim-deployment-pages > span:first-child { margin-right: auto; }
+.sim-deployment-pages button { border: 1px solid var(--ds-palette-blue-raised); color: var(--ds-palette-blue-ink); background: var(--ds-palette-teal-depth); padding: 2px 6px; cursor: pointer; }
+.sim-deployment-pages button:disabled { opacity: .4; cursor: default; }
+.sim-deployment-budgets { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex-shrink: 0; }
+.sim-deployment-meter { height: 28px; min-width: 0; border: 1px solid var(--ds-palette-cyan-muted); background: linear-gradient(var(--ds-palette-green-depth),var(--ds-palette-blue-raised) 75%,var(--ds-palette-inset)); position: relative; box-shadow: inset 0 0 0 2px var(--ds-palette-inset); color: var(--ds-palette-ink-soft); font-size: 12px; text-align: center; line-height: 26px; }
+.sim-deployment-meter i { position: absolute; inset: 3px auto 3px 3px; background: color-mix(in srgb, var(--ds-palette-cyan-frame) 30.196078%, transparent); max-width: calc(100% - 6px); }
+.sim-deployment-meter span { position: relative; text-shadow: 1px 1px var(--ds-palette-black); }
+.sim-deployment-meter[data-over='true'] { border-color: var(--ds-palette-coral); color: var(--ds-palette-highlight); }
+.sim-deployment-feedback { flex-shrink: 0; min-height: 36px; max-height: 58px; overflow-y: auto; padding: 6px 0 0; color: var(--ds-palette-brass); font-size: 12px; line-height: 16px; }
+.sim-empty { grid-column: 1/-1; text-align: center; color: var(--ds-palette-dim); }
+@media(max-width:520px) { @layer ds-pages {
+  .ui-modal.simulation-deployment { --ds-modal-body-padding-left: 10px; --ds-modal-body-padding-right: 10px; --ds-modal-footer-padding-left: 10px; --ds-modal-footer-padding-right: 10px; --ds-modal-footer-gap: 5px; } } .simulation-deployment > .ui-modal-footer > button { min-width: 0; flex: 1; } .sim-deployment-tabs > .native-button { width: auto; padding: 0 7px; } .sim-deployment-filters { grid-template-columns: minmax(90px,1fr) 78px 105px; } .sim-deployment-roster { grid-template-columns: repeat(6,minmax(0,1fr)); } .sim-deployment-budgets { gap: 5px; } }
+@media(max-height:520px) { .sim-deployment-intro { height: 100px; padding-top: 4px; } .sim-deployment-detail { max-height: 68px; } @layer ds-pages {
+  .ui-modal.simulation-deployment { --ds-modal-body-padding-top: 8px; } } }
+.simulation-deployment.native-chrome[data-native-surface="glass"]::before { background: repeating-linear-gradient(0deg,color-mix(in srgb, var(--ds-palette-black) 65.882353%, transparent) 0 1px,color-mix(in srgb, var(--ds-palette-black) 75.294118%, transparent) 1px 2px); }
+.simulation-deployment > .native-chrome-material::after { opacity: .018; }
+
+/* One hull per tile; detailed fits live in an anchored, interactive flyout. */
+.sim-deployment-roster { grid-auto-rows: 74px; }
+.sim-deployment-ship { padding-bottom: 14px; }
+.sim-deployment-ship[aria-expanded='true'] { border-color: var(--ds-palette-dim); background: color-mix(in srgb, var(--ds-palette-blue-frame) 53.333333%, transparent); }
+.sim-hull-fits { position: absolute; bottom: 2px; left: 0; right: 0; font-size: 11px; color: var(--ds-palette-muted); text-align: center; pointer-events: none; }
+.sim-deployment-ship[aria-pressed='true'] .sim-hull-fits { color: var(--ds-palette-lime-muted); }
+/* DP is an inline control, not a second settings panel layered over the roster. */
+.sim-deployment-limit { display: grid; grid-template-columns: auto minmax(48px,1fr) 88px; align-items: center; gap: 8px; flex-shrink: 0; padding: 7px 0; border-top: 1px solid var(--ds-palette-blue-frame); }
+.sim-deployment-limit label { display: flex; color: var(--ds-palette-blue-ink); }
+.sim-deployment-limit input { width: 100%; min-width: 0; margin: 0; accent-color: var(--ds-palette-dim); cursor: pointer; }
+.sim-deployment-limit select { width: 100%; min-width: 0; height: 26px; border: 1px solid var(--ds-palette-blue-raised); color: var(--ds-palette-blue-ink); background: var(--ds-palette-teal-depth); padding: 2px 5px; font-family: var(--ds-font-body); font-size: 12px; }
+.sim-inspection-note { border: 0; padding: 0; background: transparent; color: inherit; font: inherit; text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
+.sim-deployment-meter.refit-inspect-trigger { cursor: help; }
+
+/* ===== fleet-deployment.css ===== */
+.fleet-deployment-team { align-items: center; gap: 18px; padding-bottom: 5px; }
+.fleet-deployment-team > span:last-child { margin-left: auto; color: var(--ds-palette-dim); font-size: 11px; }
+.fleet-deployment-budget { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; padding: 8px 0 0; border-top: 1px solid var(--ds-palette-blue-frame); flex-shrink: 0; font-size: 13px; }
+.fleet-deployment .sim-deployment-ship:disabled { cursor: wait; }
+
+/* ===== void-shield.css ===== */
+.hud-void-shield { color: var(--ds-palette-blue-ink); border-bottom: 1px solid var(--ds-palette-blue); padding: 3px 0 5px; margin-bottom: 4px; font-size: 11px; line-height: 1.35; }
+.hud-void-layers { display: flex; gap: 4px; height: 6px; margin: 3px 0; }
+.hud-void-layers > span { flex: 1; border: 1px solid var(--ds-palette-cyan-frame); background: var(--ds-palette-panel); }
+.hud-void-layers i { display: block; height: 100%; background: var(--ds-palette-blue-ink); }
+
+/* ===== combat-interface.css ===== */
+/* Combat presentation only. No generated labels, invented telemetry or gameplay rules. */
+.hud-overlay {
+  color: var(--ds-hud-text);
+}
+.hud-overlay .hud-console-anchor { left: 16px; bottom: 14px; max-height: none; overflow: visible; width: min(536px, calc(100vw - 216px)); scale: 1; text-shadow: none; filter: none; }
+.hud-overlay .combat-console { position: relative; isolation: isolate; display: grid; grid-template-columns: minmax(218px, .92fr) minmax(230px, 1.08fr); align-items: end; gap: 14px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--ds-hud-text); font: 12px/1.45 var(--ds-font-body); pointer-events: auto; max-height: none; overflow: visible; user-select: none; text-shadow: 0 1px 2px var(--ds-palette-black), 0 0 6px color-mix(in srgb, var(--ds-palette-black) 72%, transparent); }
+.hud-overlay .combat-console::before { content: ""; display: block; position: absolute; inset: -18px -28px -14px -16px; background: radial-gradient(ellipse 96% 94% at 26% 84%, color-mix(in srgb, var(--ds-palette-night) 76%, transparent) 0%, color-mix(in srgb, var(--ds-palette-night) 42%, transparent) 58%, transparent 100%); pointer-events: none; z-index: -1; }
+.hud-overlay .combat-console .hud-text { color: inherit; font-size: 12px; line-height: 1.45; font-family: var(--ds-font-body); }
+.hud-overlay .combat-console [class*="text-[#9bff00]"] { color: var(--ds-hud-text); }
+.hud-overlay .combat-console :is(button, input, select) { text-shadow: none; }
+.hud-overlay .combat-console button { cursor: pointer; }
+.hud-overlay .combat-console button:disabled { cursor: default; opacity: .55; }
+.hud-overlay .combat-console button:focus-visible { outline: 2px solid var(--ds-control-focus); outline-offset: 2px; }
+.hud-overlay .combat-console-body { min-width: 0; width: auto; margin: 0; padding: 0; border: 0; display: grid; grid-template-columns: 78px minmax(132px, 1fr); column-gap: 10px; row-gap: 0; align-items: center; overflow: visible; max-height: none; }
+.hud-overlay .combat-console-body > :is(.hud-void-shield, [aria-label="内置插件状态"]) { grid-column: 1 / -1; }
+.hud-overlay .hud-ship-portrait { grid-column: 1; grid-row: span 3; align-self: center; justify-self: center; flex-shrink: 0; margin: 0; width: 78px; height: 78px; border: 1px solid color-mix(in srgb, var(--ds-palette-cyan-frame) 28%, transparent); background: radial-gradient(circle, color-mix(in srgb, var(--ds-palette-teal-depth) 58%, transparent) 0%, color-mix(in srgb, var(--ds-palette-inset) 22%, transparent) 72%, transparent 100%); border-radius: 2px; box-shadow: inset 0 0 10px color-mix(in srgb, var(--ds-palette-black) 45%, transparent); }
+.hud-overlay .hud-ship-portrait canvas { width: 76px; height: 76px; }
+.hud-overlay .hud-console-meter-row { grid-column: 2; height: auto; display: grid; grid-template-columns: auto 1fr; row-gap: 3px; margin: 0 0 6px; color: var(--ds-palette-cyan); }
+.hud-overlay .hud-console-meter-row[data-meter="hull"] { color: var(--ds-palette-green); }
+.hud-overlay .hud-console-meter-row[data-critical="true"] { color: var(--ds-hud-danger); }
+.hud-overlay .hud-console-meter-row > .hud-text { color: var(--ds-palette-accent-muted); font-size: 11px; line-height: 1.25; }
+.hud-overlay .hud-console-meter-row .hud-meter-number { grid-column: 2; grid-row: 1; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--ds-palette-ink); }
+.hud-overlay .hud-console-meter-row .hud-meter-number .hud-text { font-size: 11.5px; line-height: 1.25; font-weight: 500; }
+.hud-overlay .hud-meter-number small { color: var(--ds-palette-dim); font-size: 10.5px; font-weight: 400; }
+.hud-overlay .hud-console-meter-row > .hud-meter { grid-column: 1 / -1; grid-row: 2; height: 5px !important; margin: 0; transform: none; background: color-mix(in srgb, var(--ds-palette-cyan-frame) 22%, transparent); border-radius: 1px; filter: none; }
+.hud-overlay .hud-console-meter-row .hud-meter-cap { opacity: .5; }
+.hud-overlay .hud-console-meter-row .hud-meter-minimum { border-color: var(--ds-palette-highlight-ink); background: var(--ds-palette-highlight-ink); width: 2px; }
+.hud-overlay .hud-ship-speed { grid-column: 2; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0; padding-top: 2px; border-top: 1px dashed color-mix(in srgb, var(--ds-palette-dim) 20%, transparent); color: var(--ds-palette-accent-muted); white-space: nowrap; }
+.hud-overlay .hud-ship-speed > .hud-text { font-size: 11px; line-height: 1.3; }
+.hud-overlay .hud-speed-readout { display: inline-flex; align-items: baseline; gap: 4px; color: var(--ds-palette-ink); font-weight: 500; font-variant-numeric: tabular-nums; }
+.hud-overlay .hud-speed-readout small { color: var(--ds-palette-dim); font: 10.5px/1.3 var(--ds-font-mono); font-weight: 400; }
+.hud-overlay .hud-system-list { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 4px; max-height: none; overflow: visible; margin-top: 8px; flex-shrink: 0; }
+.hud-overlay .hud-system-button { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 1px 8px; background: linear-gradient(90deg, color-mix(in srgb, var(--ds-palette-panel) 62%, transparent), color-mix(in srgb, var(--ds-palette-panel) 20%, transparent)); border: 1px solid color-mix(in srgb, var(--ds-palette-cyan-frame) 20%, transparent); border-left: 2px solid color-mix(in srgb, var(--ds-palette-cyan) 58%, transparent); color: var(--ds-palette-ink-soft); border-radius: 1px; padding: 4px 8px; margin: 0; min-height: 34px; font: 11px/1.35 var(--ds-font-body); }
+.hud-overlay .hud-system-button .hud-system-name { min-width: 0; display: flex; align-items: center; font-weight: 500; white-space: normal; overflow-wrap: anywhere; }
+.hud-overlay .hud-system-button .ship-system-icon { flex: 0 0 16px; width: 16px; height: 16px; margin-right: 6px; }
+.hud-overlay .hud-system-button .hud-system-status { grid-column: 1 / -1; text-align: left; white-space: normal; color: var(--ds-palette-muted); font-size: 10.5px; padding-left: 22px; }
+.hud-overlay .hud-system-button kbd { align-self: center; font: 10.5px/1.2 var(--ds-font-mono); color: var(--ds-palette-brass); background: color-mix(in srgb, var(--ds-palette-night) 55%, transparent); padding: 2px 5px; border: 1px solid color-mix(in srgb, var(--ds-palette-highlight) 32%, transparent); border-radius: 2px; white-space: nowrap; }
+.hud-overlay .hud-system-button:hover:not(:disabled), .hud-overlay .hud-system-button[aria-current="true"] { background: linear-gradient(90deg, color-mix(in srgb, var(--ds-palette-blue-frame) 48%, transparent), color-mix(in srgb, var(--ds-palette-panel) 28%, transparent)); border-color: color-mix(in srgb, var(--ds-palette-highlight) 55%, transparent); border-left-color: var(--ds-palette-highlight); }
+.hud-overlay .hud-system-button[data-active="true"] { border-color: color-mix(in srgb, var(--ds-palette-green) 42%, transparent); border-left-color: var(--ds-palette-lime); background: linear-gradient(90deg, color-mix(in srgb, var(--ds-palette-green-depth) 65%, transparent), color-mix(in srgb, var(--ds-palette-panel) 22%, transparent)); }
+.hud-overlay .hud-system-button[data-active="true"] .hud-system-status { color: var(--ds-palette-mint); }
+.hud-overlay .hud-system-button[data-cooling="true"] { border-left-color: var(--ds-palette-amber); }
+.hud-overlay .hud-system-button[data-cooling="true"] .hud-system-status { color: var(--ds-palette-highlight); }
+.hud-overlay .hud-console-alerts { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 4px; order: 2; }
+.hud-overlay .hud-console-alerts:not(:empty) { margin-top: 6px; padding: 0; border-top: 0; }
+.hud-overlay .hud-console-alerts > div { padding: 2px 7px; border-left: 2px solid currentColor; background: linear-gradient(90deg, color-mix(in srgb, var(--ds-palette-panel) 55%, transparent), transparent 92%); border-radius: 0 1px 1px 0; }
+.hud-overlay .hud-console-alerts .hud-text { font-size: 11px; line-height: 1.35; }
+.hud-overlay .combat-console-armament { min-width: 0; padding: 0 0 0 14px; border-left: 1px solid color-mix(in srgb, var(--ds-palette-cyan-frame) 24%, transparent); overflow: visible; max-height: none; }
+.hud-overlay .hud-weapon-groups { min-height: 0; }
+.hud-overlay .hud-weapon-heading { height: auto; padding: 0 0 3px; margin-bottom: 4px; border-bottom: 1px solid color-mix(in srgb, var(--ds-palette-cyan-frame) 20%, transparent); color: var(--ds-palette-accent-muted); font-size: 11px; font-weight: 500; }
+.hud-overlay .hud-weapon-list { display: flex; flex-direction: column; gap: 3px; max-height: none; overflow: visible; }
+.hud-overlay .hud-weapon-group { display: grid; grid-template-columns: minmax(0,1fr) 46px; gap: 6px; height: auto; min-height: 36px; transform: none; color: var(--ds-hud-text); border: 0; border-left: 2px solid color-mix(in srgb, var(--ds-palette-dim) 24%, transparent); border-radius: 0 2px 2px 0; padding: 3px 5px; margin: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--ds-palette-panel) 38%, transparent), transparent 92%); }
+.hud-overlay .hud-weapon-group[data-selected="true"] { border-left-color: var(--ds-palette-highlight); background: linear-gradient(90deg, color-mix(in srgb, var(--ds-palette-brass) 16%, var(--ds-palette-panel) 58%), color-mix(in srgb, var(--ds-palette-panel) 20%, transparent) 95%); }
+.hud-overlay .hud-weapon-select { position: static; display: grid; grid-template-columns: 18px minmax(0,1fr); gap: 6px; width: 100%; height: auto; opacity: 1; background: transparent; border: 0; padding: 0; color: inherit; text-align: left; }
+.hud-overlay .hud-group-number { align-self: center; width: 18px; height: 18px; color: var(--ds-palette-muted); font: 11px/16px var(--ds-font-mono); border: 1px solid color-mix(in srgb, var(--ds-palette-muted) 28%, transparent); background: color-mix(in srgb, var(--ds-palette-night) 45%, transparent); text-align: center; border-radius: 2px; }
+.hud-overlay .hud-weapon-group[data-selected="true"] .hud-group-number { color: var(--ds-palette-highlight-ink); border-color: color-mix(in srgb, var(--ds-palette-brass) 58%, transparent); background: color-mix(in srgb, var(--ds-palette-brown-depth) 65%, transparent); }
+.hud-overlay .hud-weapon-entry { display: grid; grid-template-columns: 24px minmax(0,1fr); grid-template-rows: auto auto; gap: 1px 6px; height: auto; min-height: 30px; align-items: center; }
+.hud-overlay .hud-weapon-entry + .hud-weapon-entry { margin-top: 4px; padding-top: 3px; border-top: 1px dashed color-mix(in srgb, var(--ds-palette-dim) 15%, transparent); }
+.hud-overlay .hud-weapon-icon { grid-row: 1 / 3; }
+.hud-overlay .hud-weapon-icon img { width: 22px; height: 26px; object-fit: contain; filter: drop-shadow(0 1px 2px var(--ds-palette-black)); }
+.hud-overlay .hud-weapon-name { font-size: 12px; line-height: 1.3; font-weight: 500; color: var(--ds-palette-ink-soft); overflow: visible; white-space: normal; overflow-wrap: anywhere; }
+.hud-overlay .hud-weapon-damage { grid-column: 2; padding: 0; color: var(--ds-palette-dim); font-size: 10.5px; line-height: 1.25; overflow: visible; white-space: normal; overflow-wrap: anywhere; }
+.hud-overlay .hud-group-controls { display: flex; flex-direction: column; justify-content: center; gap: 3px; }
+.hud-overlay .hud-group-mode, .hud-overlay .hud-group-autofire { position: static; width: 100%; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 1px 0; border: 1px solid color-mix(in srgb, var(--ds-palette-accent-muted) 22%, transparent); border-radius: 2px; color: var(--ds-palette-muted); background: color-mix(in srgb, var(--ds-palette-night) 42%, transparent); font: 10.5px/1.3 var(--ds-font-body); opacity: 1; }
+.hud-overlay .hud-group-autofire[aria-checked="true"] { color: var(--ds-palette-cyan-ink); border-color: color-mix(in srgb, var(--ds-palette-cyan) 42%, transparent); background: color-mix(in srgb, var(--ds-palette-teal-depth) 65%, transparent); }
+.hud-overlay .hud-group-mode:hover:not(:disabled), .hud-overlay .hud-group-autofire:hover:not(:disabled) { border-color: var(--ds-hud-accent); color: var(--ds-palette-highlight-ink); }
+.hud-overlay .hud-weapon-group .hud-autofire-indicator { width: 5px; height: 5px; border-radius: 50%; border: 1px solid currentColor; background: transparent; }
+.hud-overlay .hud-weapon-group .hud-autofire-indicator[data-active="true"] { background: var(--ds-palette-cyan); border-color: var(--ds-palette-cyan); box-shadow: 0 0 4px var(--ds-palette-cyan); }
+.hud-overlay .hud-weapon-group .hud-autofire-indicator[data-active="false"] { opacity: .45; }
+.hud-overlay .hud-mount-details, .hud-overlay .hud-target-armament { margin-top: 7px; font-size: 11px; color: var(--ds-palette-muted); }
+.hud-overlay .hud-detail-heading { display: flex; align-items: center; justify-content: space-between; margin: 0 0 4px; padding: 0 0 3px; border-bottom: 1px solid color-mix(in srgb, var(--ds-palette-cyan-frame) 20%, transparent); font: 500 11px/1.3 var(--ds-font-body); color: var(--ds-palette-accent-muted); }
+.hud-overlay .hud-mount-details .hud-detail-heading > span { margin-left: 6px; padding: 0 5px; border-radius: 2px; background: color-mix(in srgb, var(--ds-palette-panel) 65%, transparent); color: var(--ds-palette-brass); font: 10.5px/1.4 var(--ds-font-mono); }
+.hud-overlay .hud-mount-status { position: static; width: auto; max-height: none; overflow: visible; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 6px; padding: 0; margin: 0; border: 0; }
+.hud-overlay .hud-mount-status[data-mount-count="1"] { grid-template-columns: minmax(0, 180px); }
+.hud-overlay .hud-mount-status > div { gap: 2px 6px; flex-wrap: wrap; padding: 2px 6px; background: color-mix(in srgb, var(--ds-palette-panel) 46%, transparent); border-left: 2px solid color-mix(in srgb, var(--ds-palette-green) 52%, transparent); border-radius: 0 1px 1px 0; }
+.hud-overlay .hud-mount-status > div[data-state="cooling"] { border-left-color: var(--ds-palette-amber); }
+.hud-overlay .hud-mount-status > div[data-state="disabled"] { border-left-color: var(--ds-palette-red); background: color-mix(in srgb, var(--ds-palette-danger-depth) 52%, transparent); }
+.hud-overlay .hud-mount-status .hud-text { font-size: 10.5px; line-height: 1.35; }
+.hud-overlay .hud-mount-name { color: var(--ds-palette-ink-soft); overflow: visible; white-space: normal; overflow-wrap: anywhere; }
+.hud-overlay .hud-mount-readout { color: var(--ds-palette-friendly-muted); flex-wrap: wrap; white-space: normal; font-variant-numeric: tabular-nums; }
+.hud-overlay .hud-mount-status > div[data-state="cooling"] .hud-mount-readout { color: var(--ds-palette-highlight); }
+.hud-overlay .hud-empty-weapons { color: var(--ds-palette-dim); font-size: 12px; margin: 8px 0; }
+.hud-overlay .hud-carrier-deck { border-top: 1px solid color-mix(in srgb, var(--ds-palette-cyan-frame) 20%, transparent); padding-top: 6px; margin-top: 7px; display: flex; flex-direction: column; gap: 2px; }
+.hud-overlay .hud-carrier-deck .hud-text { font-size: 11px; }
+.hud-overlay .hud-void-shield { margin: 0 0 8px; padding: 0 0 6px; border-color: var(--ds-hud-divider); }
+.hud-overlay .hud-radar-anchor { right: 14px; bottom: 14px; top: auto; scale: .78; transform-origin: right bottom; opacity: .9; filter: none; }
+.hud-overlay .combat-radar { border: 0; border-radius: 0; background: none; box-shadow: none; }
+.hud-overlay .combat-notifications { font: 12px/1.6 var(--ds-font-body); color: var(--ds-palette-accent-muted); }
+.hud-overlay .combat-notification-friendly, .hud-overlay .combat-control-notice { color: var(--ds-palette-friendly-muted); }
+.hud-overlay .combat-pause-status { color: var(--ds-palette-ink-soft); background: color-mix(in srgb, var(--ds-palette-panel) 90.980392%, transparent); border-color: color-mix(in srgb, var(--ds-palette-brass) 53.333333%, transparent); border-radius: 2px; text-shadow: none; }
+
+/* Lock brackets stay in world space; the read-only details no longer spill across combat. */
+.hud-overlay .hud-target-inspection { inset: 0; font: 12px/1.5 var(--ds-font-body); color: var(--ds-hud-danger); text-shadow: none; pointer-events: none; }
+.hud-overlay .hud-target-lines { left: 0; top: 0; stroke: var(--ds-palette-red-muted); opacity: .8; }
+.hud-overlay .hud-target-card { position: absolute; top: 54px; right: 16px; width: 220px; max-height: none; overflow: visible; pointer-events: auto; padding: 0; border: 0; border-radius: 0; background: none; color: var(--ds-hud-text); box-shadow: none; text-shadow: 0 1px 3px var(--ds-palette-black), 0 0 5px var(--ds-palette-black); }
+.hud-overlay .hud-target-heading { display: flex; justify-content: space-between; margin-bottom: 10px; color: var(--ds-palette-highlight); }
+.hud-overlay .hud-target-heading strong { font-size: 11px; font-weight: 500; }
+.hud-overlay .hud-target-heading kbd { font: 11px var(--ds-font-mono); color: var(--ds-palette-brass); }
+.hud-overlay .hud-target-identity { position: static; width: auto; display: flex; flex-direction: column; gap: 3px; padding-bottom: 6px; border-bottom: 1px solid var(--ds-hud-divider); }
+.hud-overlay .hud-target-identity strong { font-size: 14px; font-weight: 500; }
+.hud-overlay .hud-target-identity > span { color: var(--ds-hud-muted); font-size: 11px; }
+.hud-overlay .hud-target-summary { position: static; display: grid; grid-template-columns: minmax(0,1fr) 66px; gap: 12px; align-items: center; width: auto; padding: 8px 0; }
+.hud-overlay .hud-target-meter { display: grid; grid-template-columns: 29px minmax(0,1fr); gap: 7px; height: 22px; color: var(--ds-hud-flux); }
+.hud-overlay .hud-target-meter + .hud-target-meter { color: var(--ds-palette-brass); }
+.hud-overlay .hud-target-meter > span:first-child { color: var(--ds-palette-muted); font-size: 11px; }
+.hud-overlay .hud-target-meter .hud-meter { background: color-mix(in srgb, var(--ds-palette-cyan-frame) 14.901961%, transparent); filter: none; }
+.hud-overlay .hud-target-data { display: flex; justify-content: space-between; font-size: 11px; color: var(--ds-palette-muted); line-height: 1.8; }
+.hud-overlay .hud-target-data b { font-weight: 400; color: var(--ds-palette-gray-ink); }
+.hud-overlay .hud-target-state { min-height: 0; color: var(--ds-palette-highlight); font-size: 11px; }
+.hud-overlay .hud-target-state:not(:empty) { padding-bottom: 9px; }
+.hud-overlay .hud-target-weapons { position: static; width: auto; max-height: none; overflow: visible; border-top: 1px solid var(--ds-hud-divider); }
+.hud-overlay .hud-target-weapon { min-height: 42px; display: grid; grid-template-columns: 15px minmax(0,1fr) auto; align-items: center; column-gap: 6px; padding: 7px 0; border-bottom: 1px solid color-mix(in srgb, var(--ds-palette-dim) 10.588235%, transparent); }
+.hud-overlay .hud-target-group { color: var(--ds-palette-muted); font: 11px var(--ds-font-mono); }
+.hud-overlay .hud-target-weapon-name { font-size: 11px; overflow: visible; white-space: normal; overflow-wrap: anywhere; }
+.hud-overlay .hud-target-weapon-state { grid-column: 3; grid-row: 1; color: var(--ds-palette-muted); font-size: 11px; }
+.hud-overlay .hud-target-weapon-type { grid-column: 2 / -1; color: var(--ds-palette-dim); font-size: 11px; overflow: visible; white-space: normal; overflow-wrap: anywhere; }
+
+/* Tactical map: keep commands, map transforms and authority wiring, replace noisy chrome. */
+.hud-overlay .tactical-map { --tac-blue: var(--ds-palette-accent-muted); --tac-muted: var(--ds-palette-dim); }
+.hud-overlay .tactical-map-shade { background: color-mix(in srgb, var(--ds-palette-shell) 93.72549%, transparent); }
+.hud-overlay .tactical-map-commands { background: none; border: 0; border-radius: 0; padding: 8px; right: 14px; top: 14px; }
+.hud-overlay .tactical-map-action { height: 43px; gap: 8px; }
+.hud-overlay .tactical-map-action > span { height: 31px; line-height: 29px; border: 1px solid color-mix(in srgb, var(--ds-palette-dim) 30.196078%, transparent); border-radius: 2px; background: color-mix(in srgb, var(--ds-palette-green-depth) 60%, transparent); text-align: left; padding-left: 10px; font-size: 12px; }
+.hud-overlay .tactical-map-action > span::before { display: none; }
+.hud-overlay .tactical-map-action > img { width: 29px; height: 29px; border: 0; background: none; opacity: .75; }
+.hud-overlay .tactical-map-action:hover:not(:disabled) > span, .hud-overlay .tactical-map-action[aria-pressed="true"] > span { color: var(--ds-palette-highlight); border-color: color-mix(in srgb, var(--ds-palette-brass) 50.196078%, transparent); background: color-mix(in srgb, var(--ds-palette-brass) 9.411765%, transparent); }
+.hud-overlay .tactical-map em { color: var(--ds-palette-highlight); }
+.hud-overlay .tactical-map-counter { background: color-mix(in srgb, var(--ds-palette-green-depth) 50.196078%, transparent); border: 1px solid color-mix(in srgb, var(--ds-palette-dim) 17.647059%, transparent); border-radius: 2px; }
+.hud-overlay .tactical-map-counter > div { background: transparent; }
+.hud-overlay .tactical-map-counter b { color: var(--ds-palette-gray-ink); }
+.hud-overlay .tactical-map-counter b[data-tone="yellow"] { color: var(--ds-palette-highlight); }
+.hud-overlay .tactical-command-tile { --cut: none; border-radius: 2px; background: color-mix(in srgb, var(--ds-palette-dim) 40%, transparent); }
+.hud-overlay .tactical-command-tile-face { background: color-mix(in srgb, var(--ds-palette-panel) 96.078431%, transparent); }
+.hud-overlay .tactical-command-tile[aria-pressed="true"] { background: var(--ds-palette-highlight); }
+.hud-overlay .tactical-command-tile[aria-pressed="true"] .tactical-command-tile-face { background: var(--ds-palette-green-depth); }
+.hud-overlay .tactical-command-tile:hover, .hud-overlay .tactical-command-tile:focus-visible { background: var(--ds-palette-highlight); }
+.hud-overlay .tactical-command-tooltip { background: color-mix(in srgb, var(--ds-palette-panel) 98.039216%, transparent); border-color: color-mix(in srgb, var(--ds-palette-brass) 40%, transparent); color: var(--ds-palette-accent-muted); }
+.ui-modal.simulation-deployment.native-chrome { border: 1px solid var(--ds-control-border); border-radius: 0; background: transparent; }
+.simulation-deployment .sim-deployment-tabs > [aria-selected="true"] { border-color: var(--ds-palette-brass); background: color-mix(in srgb, var(--ds-palette-brass) 14.117647%, transparent); color: var(--ds-palette-highlight-ink); }
+.simulation-deployment .sim-deployment-ship[aria-pressed="true"] { border-color: var(--ds-palette-brass); background: color-mix(in srgb, var(--ds-palette-brass) 12.54902%, transparent); }
+.simulation-deployment .sim-deployment-ship[aria-pressed="true"]::after { border-color: color-mix(in srgb, var(--ds-palette-brass) 20%, transparent); }
+.simulation-deployment .sim-deployment-meter { border-color: color-mix(in srgb, var(--ds-palette-dim) 40%, transparent); background: var(--ds-palette-panel); box-shadow: none; border-radius: 2px; }
+.simulation-deployment .sim-deployment-meter i { background: color-mix(in srgb, var(--ds-palette-dim) 20%, transparent); }
+/* Portraits are scaled rather than downsampled, preserving their module hit testing.
+ * CSS-sized portraits retain the bitmap resolution and module hit testing. */
+.hud-overlay .hud-target-summary canvas { width: 66px; height: 66px; }
+/* Dense loadouts use available width instead of clipping or creating nested
+ * scroll areas. The status/weapon columns keep their widths without the removed identity gutter. */
+@media (min-width: 1100px) {
+  .hud-overlay .hud-console-anchor:has([data-expanded-loadout="true"]) { width: min(860px, calc(100vw - 216px)); }
+  .hud-overlay:has(.hud-target-card[data-many-weapons="true"]) .hud-console-anchor:has([data-expanded-loadout="true"]) { width: min(860px, calc(100vw - 464px)); }
+  .hud-overlay .combat-console[data-expanded-loadout="true"] { grid-template-columns: minmax(218px, .68fr) minmax(340px, 1.32fr); }
+  .hud-overlay .combat-console[data-expanded-loadout="true"] .hud-weapon-layout { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); align-items: start; gap: 12px; }
+  .hud-overlay .combat-console[data-expanded-loadout="true"] .hud-mount-details { margin-top: 0; }
+  .hud-overlay .hud-target-card[data-many-weapons="true"] { width: 420px; }
+  .hud-overlay .hud-target-card[data-many-weapons="true"] .hud-target-weapons { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 14px; }
+  .hud-overlay .hud-target-card[data-many-weapons="true"] .hud-target-weapon { min-height: 36px; padding: 3px 0; }
+}
+@media (max-width: 1220px) {
+  .hud-overlay .hud-console-anchor { width: min(520px,calc(100vw - 210px)); left: 12px; bottom: 12px; }
+  .hud-overlay .combat-console { grid-template-columns: minmax(196px,.9fr) minmax(205px,1.1fr); gap: 10px; }
+  .hud-overlay .combat-console-body { grid-template-columns: 70px minmax(116px, 1fr); column-gap: 8px; }
+  .hud-overlay .hud-ship-portrait { width: 70px; height: 70px; }
+  .hud-overlay .hud-ship-portrait canvas { width: 68px; height: 68px; }
+  .hud-overlay .hud-radar-anchor { right: 12px; bottom: 12px; }
+}
+@media (max-width: 900px) {
+  .hud-overlay .hud-console-anchor { width: calc(100vw - 24px); max-height: none; }
+  .hud-overlay .combat-console { grid-template-columns: minmax(170px,.85fr) minmax(215px,1.15fr); }
+  .hud-overlay .combat-console-body { grid-template-columns: minmax(0, 1fr); }
+  .hud-overlay .hud-ship-portrait { display: none; }
+  .hud-overlay .hud-console-meter-row, .hud-overlay .hud-ship-speed { grid-column: 1 / -1; }
+  .hud-overlay .hud-radar-anchor, .hud-overlay:has(.hud-target-inspection) .hud-radar-anchor { top: 46px; bottom: auto; scale: .6; right: 12px; transform-origin: right top; }
+  .hud-overlay .hud-target-card { top: 46px; right: 146px; }
+}
+@media (max-width: 560px) {
+  .hud-overlay .combat-console { grid-template-columns: minmax(120px,.8fr) minmax(0,1.2fr); gap: 8px; }
+  .hud-overlay .combat-console-body, .hud-overlay .combat-console-armament { max-height: none; overflow: visible; }
+  .hud-overlay .combat-console-armament { padding-left: 8px; }
+  .hud-overlay .hud-weapon-group { grid-template-columns: minmax(0,1fr); gap: 3px; }
+  .hud-overlay .hud-group-controls { flex-direction: row; }
+  .hud-overlay .hud-mount-status { grid-template-columns: minmax(0, 1fr); }
+  .hud-overlay .hud-target-card { width: min(220px,calc(100vw - 126px)); right: 12px; top: 46px; }
+  .hud-overlay:has(.hud-target-inspection) .hud-radar-anchor { display: block; left: 12px; right: auto; top: 46px; scale: .42; transform-origin: left top; }
+}
+/* Page-owned presentation, including its Vanguard skin. Core owns control behavior. */
+:root[data-ui-theme="vanguard"] .combat-console {
+  background: none;
+  box-shadow: none;
+}
+:root[data-ui-theme="vanguard"] .combat-console .hud-text { text-shadow: 0 1px 2px var(--ds-palette-black), 0 0 6px color-mix(in srgb, var(--ds-palette-black) 72%, transparent); }
+:root[data-ui-theme="vanguard"] :is(.studio-combat-identity, .local-combat-status, .hud-perf-anchor) {
+  background: var(--ds-surface-floating);
+  box-shadow: 0 0 0 4px var(--ds-surface-floating);
+  color: var(--ds-hud-text);
+}
+:root[data-ui-theme="vanguard"] .hud-overlay .combat-radar {
+  background: radial-gradient(circle, color-mix(in srgb, var(--ds-palette-tooltip) 94.901961%, transparent) 68%, transparent 70%);
+}
+
+/* ===== target-ship-hud.css ===== */
+.hud-target-inspection {
+  position: absolute; top: 0; left: 0; z-index: 21; color: var(--ds-palette-red);
+  pointer-events: none; user-select: none; font-family: var(--ds-font-body);
+  font-size: 11px; line-height: 13px; font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 2px var(--ds-palette-black), 1px 0 1px var(--ds-palette-black);
+}
+.hud-target-lines { position: absolute; overflow: visible; width: 1px; height: 1px; fill: none; stroke: currentColor; stroke-width: 1; opacity: .85; }
+.hud-target-weapons, .hud-target-summary, .hud-target-identity { position: absolute; }
+.hud-target-weapons { width: 286px; overflow: hidden; }
+.hud-target-weapon { display: grid; grid-template-columns: 14px minmax(0, 1fr) 42px; position: relative; min-height: 39px; }
+.hud-target-weapon-name, .hud-target-weapon-type { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.hud-target-weapon-type { grid-column: 2; }
+.hud-target-weapon-state { grid-column: 3; grid-row: 2 / 4; font-size: 11px; }
+.hud-target-summary { width: 158px; }
+.hud-target-meter { display: grid; grid-template-columns: 29px 76px; align-items: center; height: 13px; }
+.hud-target-state { min-height: 14px; }
+.hud-target-identity { width: 164px; overflow-wrap: anywhere; }
+@media (max-width: 700px) {
+  /* The locked summary uses the upper-right corner on narrow screens. */
+  .hud-overlay:has(.hud-target-inspection) .hud-radar-anchor { top: auto; bottom: 12px; }
+}
+
+/* ===== tactical-map.css ===== */
+/* Tactical controls retain their layout; textures are newly authored and text uses OS fonts. */
+.tactical-map { --tac-blue: var(--ds-palette-blue-ink); --tac-muted: var(--ds-palette-cyan-frame); --tac-sidebar: 260px; position: absolute; inset: 0; z-index: 40; pointer-events: auto; color: var(--tac-blue); font: 15px/1.4 var(--font-ui, 'Microsoft YaHei', sans-serif); outline: none; }
+.tactical-map-shade { position: absolute; inset: 0; background: color-mix(in srgb, var(--ds-palette-black) 72%, transparent); pointer-events: none; }
+.tactical-map-state { position: absolute; color: var(--ds-palette-gray-ink); font-size: 15px; letter-spacing: 1px; text-shadow: 1px 1px var(--ds-palette-black); }
+.tactical-map-state small { display: block; color: var(--ds-palette-dim); font-size: 12px; margin-top: 6px; letter-spacing: 0; }
+.tactical-map-square { position: absolute; left: 11%; right: 11%; top: 0; bottom: 0; }
+.tactical-map-square canvas { display: block; width: 100%; height: 100%; border: 0; outline: 1px solid var(--ds-palette-blue-raised); cursor: crosshair; touch-action: none; }
+.tactical-map-scale { display: flex; justify-content: space-between; gap: 12px; color: var(--ds-palette-dim); font: 11px/22px monospace; position: absolute; left: 5px; right: 5px; top: 0; opacity: 0; transition: opacity .15s; pointer-events: none; }
+.tactical-map-scale span { font-family: 'Microsoft YaHei', sans-serif; opacity: .7; }
+.tactical-map-transport { position: absolute; top: calc(50% - 42px); left: 0; width: 49px; padding: 2px 0 2px 15px; background: url('/game-assets/graphics/warroom/ui_pauseplay.png') left top / 128px 128px no-repeat; }
+.tactical-map button { cursor: pointer; color: inherit; font: inherit; }
+.tactical-map button:disabled { cursor: not-allowed; opacity: .35; }
+.tactical-map button:focus-visible { outline: 1px solid var(--ds-palette-native-yellow); outline-offset: 3px; }
+.tactical-map-transport button { width: 34px; height: 34px; display: block; padding: 0; border: 0; margin-bottom: 7px; background: var(--ds-palette-night); border-radius: 3px; opacity: .45; }
+.tactical-map-transport button[aria-pressed='true'] { opacity: 1; }
+.tactical-map-transport button:hover { opacity: 1; }
+.tactical-map-transport img { width: 34px; height: 34px; }
+.tactical-map-commands { position: absolute; top: 16px; right: 0; width: var(--tac-sidebar); max-height: calc(100% - 44px); overflow: visible; scrollbar-width: thin; scrollbar-color: var(--ds-palette-blue-frame) transparent; padding: 0 18px 0 0; }
+.tactical-map-command-head { position: relative; display: flex; justify-content: flex-end; height: 135px; }
+.tactical-map-reinforce { position: absolute; top: 14px; right: 98px; border: 0; padding: 0; background: none; white-space: nowrap; }
+.tactical-map em { font-style: normal; color: var(--ds-palette-native-yellow); font-size: .9em; }
+.tactical-map-counters { width: 92px; }
+.tactical-map-counter { position: relative; height: 43px; background: url('/game-assets/graphics/warroom/topright_widget_large.png') 0 4px / 103px 41px no-repeat; }
+.tactical-map-counter > span { display: block; font-size: 11px; line-height: 11px; text-align: center; position: relative; z-index: 1; color: var(--ds-palette-blue-ink); }
+.tactical-map-counter > div { height: 29px; display: flex; align-items: center; background: var(--ds-palette-night); margin: 0 4px 0 7px; padding: 0 4px; gap: 4px; }
+.tactical-map-counter img { width: 21px; height: 21px; object-fit: contain; }
+.tactical-map-counter b { color: var(--ds-palette-cyan-glow); font-weight: normal; }
+.tactical-map-counter b[data-tone='yellow'] { color: var(--ds-palette-native-yellow); }
+.tactical-map-action { border: none; display: flex; align-items: center; width: 100%; height: 41px; padding: 0; background: none; gap: 0; }
+.tactical-map-action > span { flex: 1; min-width: 0; height: 26px; border-block: 1px solid var(--ds-palette-blue-raised); background: color-mix(in srgb, var(--ds-palette-night) 90%, transparent); text-align: center; position: relative; }
+.tactical-map-action > span::before { content: ''; position: absolute; left: -4px; top: -1px; height: 26px; width: 7px; background: var(--ds-palette-night); border-left: 1px solid var(--ds-palette-steel); clip-path: polygon(100% 0, 0 20%, 0 80%, 100% 100%); }
+.tactical-map-action > img { object-fit: contain; width: 36px; height: 36px; border: 1px solid var(--ds-palette-steel); background: var(--ds-palette-inset); padding: 2px; }
+.tactical-map-action:hover:not(:disabled) > span, .tactical-map-action[aria-pressed='true'] > span { color: var(--ds-palette-native-yellow); border-color: var(--ds-palette-lime-muted); background: var(--ds-palette-panel); }
+
+.tactical-map-square:hover .tactical-map-scale { opacity: .65; }
+.tactical-map-unavailable { position: absolute; right: 18px; font-size: 11px; color: var(--ds-palette-steel); opacity: 0; }
+.tactical-map-commands:hover .tactical-map-unavailable { opacity: .9; }
+.tactical-map-state { z-index: 1; top: 27px; left: 26px; }
+.tactical-map-state small { opacity: 0; transition: opacity .15s; }
+.tactical-map-state:hover small { opacity: .8; }
+.tactical-map-help { position: absolute; bottom: 20px; left: max(230px, 12vw); right: 650px; color: var(--ds-palette-gray-ink); font-size: 12px; text-shadow: 1px 1px var(--ds-palette-black); pointer-events: none; }
+.tactical-ship-status { position: absolute; bottom: 18px; left: 20px; width: 190px; color: var(--ds-palette-blue-ink); font: 12px/13px 'Microsoft YaHei',sans-serif; }
+.tactical-status-meter { display: flex; align-items: center; height: 12px; gap: 1px; }
+.tactical-status-meter > span:first-child { width: 48px; flex-shrink: 0; }
+.tactical-status-meter b { font-weight: normal; margin-left: auto; min-width: 58px; text-align: right; }
+.tactical-status-meter .hud-meter { color: var(--ds-palette-cyan-glow); }
+.tactical-ship-status > canvas { display: block; width: 190px; height: 166px; margin-bottom: -6px; }
+.tactical-ship-status > strong,.tactical-ship-status > span { display: block; font-weight: normal; }
+.tactical-ship-status > span:last-child { font-size: 11px; line-height: 14px; }
+.tactical-command-dock { position: absolute; right: 20px; bottom: 18px; display: flex; align-items: flex-end; gap: 14px; z-index: 2; }
+.tactical-command-group { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.tactical-command-dock[data-groups="3"] > .tactical-command-group:first-of-type { position: absolute; right: 0; bottom: 94px; }
+.tactical-command-tiles { display: flex; gap: 3px; }
+.tactical-command-group-title { color: var(--ds-palette-blue-ink); font-size: 15px; padding-right: 2px; height: 20px; }
+.tactical-command-tile { --cut: polygon(13% 0,87% 0,100% 13%,100% 87%,87% 100%,13% 100%,0 87%,0 13%); width: 64px; height: 64px; border: 0; background: var(--ds-palette-cyan-frame); padding: 1px; position: relative; clip-path: var(--cut); }
+.tactical-command-tile-face { display: grid; place-items: center; width: 100%; height: 100%; background: color-mix(in srgb, var(--ds-palette-teal-depth) 94%, transparent); clip-path: var(--cut); }
+.tactical-command-tile img { width: 58px; height: 58px; object-fit: contain; opacity: .8; }
+.tactical-command-tile kbd { position: absolute; top: -2px; right: 7px; color: var(--ds-palette-dim); text-shadow: 1px 1px var(--ds-palette-black); font: 17px/20px monospace; }
+.tactical-command-tile[aria-disabled='true'] img { opacity: .28; }
+.tactical-command-tile[aria-disabled='true'] { background: var(--ds-palette-blue-raised); cursor: not-allowed; }
+.tactical-command-tile:hover, .tactical-command-tile:focus-visible { background: var(--ds-palette-cyan-ink); }
+/* Outranks `.tactical-map button:focus-visible`; the tile face colour is the focus indicator. */
+.tactical-map button.tactical-command-tile:is(:hover, :focus-visible) { outline: none; }
+.tactical-command-tile:hover img,.tactical-command-tile:focus-visible img { opacity: 1; }
+.tactical-command-tile[aria-pressed='true'] { background: var(--ds-palette-lime-muted); }
+.tactical-command-tile[aria-pressed='true'] .tactical-command-tile-face { background: var(--ds-palette-green-depth); }
+.tactical-command-tooltip { position: absolute; bottom: calc(100% + 12px); right: 0; width: 315px; padding: 12px 15px; border: 1px solid var(--ds-palette-cyan-frame); color: var(--ds-palette-accent-muted); background: color-mix(in srgb, var(--ds-palette-inset) 97%, transparent); font-size: 13px; pointer-events: none; z-index: 5; }
+.tactical-command-dock[data-groups="3"] .tactical-command-tooltip { bottom: calc(100% + 106px); }
+.tactical-command-tooltip strong { font-weight: normal; color: var(--ds-palette-cyan-ink); }
+.tactical-command-tooltip p { margin: 8px 0 0; }
+.tactical-command-tooltip small { color: var(--ds-palette-brass); }
+.tactical-map-info { position: absolute; right: 20px; bottom: 245px; width: 355px; z-index: 4; padding: 15px; border: 1px solid var(--ds-palette-steel); background: color-mix(in srgb, var(--ds-palette-night) 98%, transparent); font-size: 13px; color: var(--ds-palette-accent-muted); }
+.tactical-map-info p { margin-top: 9px; }
+.tactical-map-info button { background: transparent; border: 1px solid var(--ds-palette-steel); padding: 4px 14px; margin-top: 12px; }
+[data-view="combat"]:has(.tactical-map) .studio-combat-identity { visibility: hidden; }
+@media (max-width: 1400px), (max-height: 800px) {
+ .tactical-map { --tac-sidebar: 225px; }
+ .tactical-ship-status { transform: scale(.8); transform-origin: bottom left; left: 14px; bottom: 12px; }
+ .tactical-command-dock { transform: scale(.8); transform-origin: bottom right; right: 14px; bottom: 12px; }
+ .tactical-map-state { top: 20px; left: 18px; font-size: 13px; }
+ .tactical-map-help { left: 175px; right: 450px; font-size: 11px; bottom: 14px; }
+}
+@media (max-width: 1000px) {
+ .tactical-map-square { left: 13%; right: 8%; }
+ .tactical-map-commands { transform: scale(.8); transform-origin: top right; }
+ .tactical-map-help { bottom: 204px; right: 24px; left: 180px; }
+ .tactical-command-dock { transform: scale(.7); }
+ .tactical-map-info { bottom: 190px; right: 12px; max-width: calc(100vw - 200px); }
+}
+@media (max-width: 650px) {
+ .tactical-command-dock { transform: scale(.55); right: 8px; bottom: 8px; }
+ .tactical-ship-status { transform: scale(.6); left: 8px; bottom: 8px; }
+ .tactical-map-commands { transform: scale(.65); }
+ .tactical-map-state { font-size: 11px; max-width: 200px; left: 12px; }
+ .tactical-map-help { left: 130px; bottom: 166px; }
+}
+
+/* ===== combat-notifications.css ===== */
+/* Native-style compact text feed; never intercept flight/map pointer input. */
+.combat-notifications {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 25;
+  width: min(620px, 48vw);
+  pointer-events: none;
+  color: var(--ds-palette-accent-muted);
+  font: 18px/1.4 var(--ds-font-body, var(--ds-font-body));
+  text-shadow: 0 1px 3px var(--ds-palette-black), 1px 0 2px var(--ds-palette-black);
+}
+.combat-notification { padding: 2px 6px; background: linear-gradient(90deg, color-mix(in srgb, var(--ds-palette-panel) 50.196078%, transparent), transparent); overflow-wrap: anywhere; }
+.combat-control-notice { color: var(--ds-palette-lime); margin-bottom: 6px; }
+.combat-notification-friendly { color: var(--ds-palette-lime); }
+.combat-notification-hostile { color: var(--ds-palette-red); }
+.combat-observer-hint, .combat-observation-bar {
+  position: absolute; top: 18px; right: 18px;
+  z-index: 26; color: var(--ds-palette-accent-muted); background: color-mix(in srgb, var(--ds-palette-panel) 90.196078%, transparent); padding: 8px 12px;
+  font: 13px/1.5 var(--ds-font-body); max-width: min(600px, 44vw);
+}
+.combat-observation-bar { display: flex; align-items: center; gap: 12px; }
+.combat-observation-bar button { border: 1px solid var(--ds-palette-steel); padding: 4px 9px; color: var(--ds-palette-lime); white-space: nowrap; cursor: pointer; }
+.combat-observation-bar button:focus-visible { outline: 2px solid var(--ds-palette-lime); outline-offset: 2px; }
+@media (max-width: 1366px) { .combat-notifications { top: 12px; left: 12px; font-size: 15px; width: min(500px, 48vw); } }
+
+@media (max-width: 800px) { .combat-observation-bar { top: auto; bottom: 230px; max-width: calc(100vw - 36px); } }
+
+/* Real pause state, independent of simulation time; above the tactical map, below dialogs. */
+.combat-pause-status {
+  position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 45;
+  display: flex; align-items: center; gap: 14px; padding: 7px 16px;
+  border-block: 1px solid var(--ds-palette-cyan-frame); background: color-mix(in srgb, var(--ds-palette-teal-depth) 90.980392%, transparent); color: var(--ds-palette-ink-soft);
+  font: 14px/1.4 var(--ds-font-body, var(--ds-font-body)); text-shadow: 0 1px 2px var(--ds-palette-black);
+  pointer-events: none; white-space: nowrap;
+}
+.combat-pause-status strong { color: var(--ds-palette-highlight-ink); font-weight: normal; }
+.combat-pause-status span { font-size: 12px; color: var(--ds-palette-muted); }
+@media (max-width: 520px) { .combat-pause-status { top: 8px; gap: 8px; padding: 5px 9px; } }
+
+/* ===== gravity-tractor-hud.css ===== */
+.gravity-tractor-hud { position:absolute; inset:0; z-index:22; pointer-events:none; user-select:none; color:var(--ds-palette-cyan-ink); font:12px/1.3 var(--ds-font-body, sans-serif); font-variant-numeric:tabular-nums; }
+.gravity-tractor-hud[data-gravity-polarity="repulsion"] { color:var(--ds-palette-warning); }
+.gravity-tractor-hud[data-gravity-phase="CAPTURE"] { color:var(--ds-palette-warning); }
+.gravity-tractor-hud[data-gravity-phase="IDLE"] { color:var(--ds-palette-gray-ink); }
+.gravity-grab-lines { position:absolute; inset:0; width:100%; height:100%; overflow:hidden; fill:none; stroke:currentColor; stroke-width:2; filter:drop-shadow(0 1px 2px var(--ds-palette-black)); }
+.gravity-grab-bracket { stroke-width:2.5; }
+[data-gravity-phase="CAPTURE"] .gravity-grab-bracket { stroke-dasharray:5 3; }
+.gravity-grab-tether { opacity:.7; stroke-width:1.5; stroke-dasharray:6 5; }
+.gravity-grab-label { position:absolute; top:0; left:0; width:max-content; max-width:120px; white-space:nowrap; padding:2px 5px; border-left:2px solid currentColor; background:color-mix(in srgb, var(--ds-palette-shell) 65%, transparent); text-shadow:0 1px 2px var(--ds-palette-black); }
+.gravity-grab-title { font-weight:700; }
+.gravity-grab-meter { height:3px; margin:2px 0; background:color-mix(in srgb, var(--ds-palette-ink) 20%, transparent); }
+.gravity-grab-meter > div { height:100%; background:currentColor; }
+
+.gravity-area-hud { position:absolute; inset:0; z-index:21; pointer-events:none; user-select:none; font:12px/1.3 var(--ds-font-body,sans-serif); font-variant-numeric:tabular-nums; }
+.gravity-area-lines { position:absolute; inset:0; width:100%; height:100%; overflow:hidden; fill:none; stroke:currentColor; stroke-width:1; stroke-linecap:round; }
+.gravity-area-label { position:absolute; left:0; top:0; white-space:nowrap; padding:1px 4px; border-left:1px solid currentColor; background:color-mix(in srgb, var(--ds-palette-shell) 35%, transparent); text-shadow:0 1px 2px var(--ds-palette-black); }
+
+/* ===== combat-status.css ===== */
+.local-combat-status {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 55;
+  max-width: calc(100% - 20px);
+  color: var(--ds-menu-accent);
+  font: 12px/1.7 var(--ds-font-body);
+  text-align: right;
+  text-shadow: 0 1px 2px var(--ds-palette-black);
+  pointer-events: none;
+}
+.local-combat-teams {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  column-gap: 12px;
+}
+.combat-status-metrics {
+  color: var(--ds-palette-muted);
+  font-size: 11px;
+}
+/* Reserve space above map commands for the new local status, rather than
+   drawing through existing deployment/command controls. */
+[data-view="combat"]:has(> .local-combat-status) .tactical-map-commands,
+[data-view="visual-lab"]:has(> .local-combat-status) .tactical-map-commands {
+  top: 72px;
+}
+@media (max-width: 640px) {
+  .local-combat-status { font-size: 11px; }
+  .local-combat-teams { column-gap: 8px; }
+  .local-combat-status[data-map-open="true"] { top: 62px; }
+  [data-view="combat"]:has(> .local-combat-status) .tactical-map-commands,
+  [data-view="visual-lab"]:has(> .local-combat-status) .tactical-map-commands { top: 112px; }
+}
+
+/* ===== combat-pause-menu.css ===== */
+/* Combat/E.java + class/I.java: native 500x293 panel, 7px inner border,
+ * 10px content inset, 220x30 actions, orbitron24aabold and 12condensed atlases.
+ * Typography, borders and materials are shared through NativeChrome. */
+.ui-modal-backdrop:has(.combat-pause-layout) {
+  background: var(--ds-scrim);
+  backdrop-filter: none;
+}
+@layer ds-pages {
+  .ui-modal:has(.combat-pause-layout) {
+  --ds-modal-panel-width: 500px;
+  --ds-modal-panel-height: 293px;
+  --ds-modal-panel-max-width: calc(100vw - 24px);
+  --ds-modal-panel-max-height: calc(100dvh - 24px);
+  --ds-modal-panel-padding-top: 17px;
+  --ds-modal-panel-padding-right: 17px;
+  --ds-modal-panel-padding-bottom: 17px;
+  --ds-modal-panel-padding-left: 17px;
+  --ds-modal-panel-overflow-x: visible;
+  --ds-modal-panel-overflow-y: visible;
+  --ds-modal-header-display: none;
+  --ds-modal-body-padding-top: 0;
+  --ds-modal-body-padding-right: 0;
+  --ds-modal-body-padding-bottom: 0;
+  --ds-modal-body-padding-left: 0;
+  --ds-modal-body-height: 100%;
+  --ds-modal-body-overflow-x: visible;
+  --ds-modal-body-overflow-y: visible;
+  }
+  .ui-modal:has(.combat-settings) {
+  --ds-modal-panel-width: 500px;
+  --ds-modal-panel-max-width: calc(100vw - 28px);
+  }
+}
+.ui-modal:has(.combat-pause-layout) {
+  position: relative;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  box-shadow: none;
+  background: transparent;
+  isolation: isolate;
+  animation: none;
+}
+.combat-pause-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 10px;
+  height: 100%;
+  color: var(--ds-menu-text);
+  font: 16px/16px var(--ds-font-body);
+}
+.combat-pause-ship { position: relative; min-width: 0; height: 100%; }
+.combat-pause-ship-name { position: relative; z-index: 2; }
+.combat-pause-ship-name > span {
+  display: block;
+  height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.combat-pause-portrait { position: absolute; inset: 0; pointer-events: none; }
+.combat-pause-portrait .studio-ship {
+  width: min(90cqw, 190px * var(--ship-ratio), 80cqh * var(--ship-ratio));
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  transform: none;
+  pointer-events: none;
+}
+.combat-pause-portrait .studio-hull-image { object-fit: contain; }
+.combat-pause-portrait::after {
+  content: "";
+  position: absolute;
+  inset: 32px 0 4px;
+  pointer-events: none;
+  background: none;
+}
+.combat-pause-actions { display: flex; flex-direction: column; justify-content: space-between; }
+.native-button.combat-pause-button {
+  display: flex;
+  flex: 0 0 30px;
+  width: 100%;
+  height: 30px;
+  padding: 0 15px;
+}
+.combat-pause-end-actions { display: flex; flex-direction: column; gap: 3px; }
+.combat-settings {
+  color: var(--ds-menu-text);
+  font: 13px/1.5 var(--ds-font-body);
+}
+.ui-modal .combat-settings h3 {
+  background: transparent;
+  font: 500 13px var(--ds-font-body);
+  padding: 4px 8px;
+  margin: 12px 0 8px;
+  color: var(--ds-menu-text);
+}
+.ui-modal .combat-settings h3:first-child {
+  margin-top: 0;
+}
+.combat-settings label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.combat-settings input {
+  accent-color: var(--ds-menu-accent);
+  width: 16px;
+  height: 16px;
+}
+.combat-settings p {
+  color: var(--ds-menu-muted);
+  font-size: 13px;
+  padding: 0 8px;
+  margin: 4px 0 16px;
+}
+.combat-settings .system-wheel-settings p {
+  color: var(--ds-menu-muted);
+  font-size: 13px;
+  padding: 0 8px;
+  margin: 4px 0 16px;
+}
+.combat-settings-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+@media (max-width: 520px) {
+  .combat-pause-layout { grid-template-columns: minmax(0, 1fr) minmax(140px, 48%); gap: 8px; }
+  .combat-pause-button { padding-inline: 10px; }
+}

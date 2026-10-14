@@ -3,6 +3,13 @@ import type { CombatEngine } from '../simulation/CombatEngine';
 import type { ShipSpec } from '../content/ShipSpec';
 import type { DeploymentRow } from '../simulation/CombatDeployment';
 import { immutableCopy, isImmutableMetadata } from '../extensions/Immutable';
+import { knownProjectionKeys } from './local/RenderShipProjection';
+
+const deploymentViewKeys = [
+  'generation', 'playerShipId', 'playerTeam', 'available', 'battleEnded', 'fleetEnabled',
+  'fleetLimit', 'fleetUsage', 'members', 'simulation', 'simulationLimit', 'allyUsed', 'enemyUsed',
+];
+const deploymentMemberKeys = ['id', 'teamId', 'cost', 'status', 'spec', 'hullHp', 'maxHullHp', 'currentCR'];
 
 /** World reads needed for deployment projection, not the published DeploymentViewSource.
  * Only the replica's read API is required; deployment writes stay on the authority. */
@@ -65,11 +72,82 @@ class DefinitionSnapshots {
  * Unregistered mutable specs are sampled each capture, never frozen in their owner's world. */
 export class DeploymentViewProjector {
   private readonly definitions = new DefinitionSnapshots();
+  private readonly shipsById = new Map<string, DeploymentSource['allCapitalShips'][number]>();
+  private readonly copies = new Map<ShipSpec, ShipSpec>();
+  private readonly readonlyView: Record<string, unknown> = {};
+  private readonly readonlyMembers: DeploymentMemberView[] = [];
+  private readonly readonlyRows = new Map<string, Record<string, unknown>>();
+  private readonly readonlyUsage: Record<string, number> = {};
   private engine?: DeploymentSource;
   private flagship?: DeploymentSource['playerShip'];
   private epoch = -1;
   private generation = 0;
   private previous?: DeploymentView;
+  constructor() {
+    knownProjectionKeys.set(this.readonlyView, deploymentViewKeys);
+  }
+  captureReadonly(engine: DeploymentSource, epoch = 0, available = true): DeploymentView {
+    if (this.engine !== engine || this.flagship !== engine.playerShip || this.epoch !== epoch) {
+      this.engine = engine; this.flagship = engine.playerShip; this.epoch = epoch;
+      this.generation++; this.previous = undefined;
+    }
+    const snapshot = engine.deployment.snapshot();
+    const ships = this.shipsById;
+    ships.clear();
+    if (snapshot.rows.length) {
+      const capitals = engine.allCapitalShips;
+      for (let i = 0; i < capitals.length; i++) ships.set(capitals[i].id, capitals[i]);
+    }
+    const copies = this.copies;
+    copies.clear();
+    const members = this.readonlyMembers;
+    const usage = this.readonlyUsage;
+    for (const key in usage) delete usage[key];
+    let write = 0;
+    for (let i = 0; i < snapshot.rows.length; i++) {
+      const row = snapshot.rows[i];
+      if (row.status === 'deployed' || row.status === 'retreating') {
+        usage[row.teamId] = (usage[row.teamId] ?? 0) + row.cost;
+      }
+      const ship = ships.get(row.id);
+      if (!ship) continue;
+      let spec = ship.spec;
+      if (!isImmutableMetadata(spec)) {
+        let copied = copies.get(spec);
+        if (!copied) { copied = this.definitions.copy(spec); copies.set(spec, copied); }
+        spec = copied;
+      }
+      let rec = this.readonlyRows.get(row.id);
+      if (!rec) {
+        rec = {
+          id: row.id, teamId: row.teamId, cost: row.cost, status: row.status,
+          spec, hullHp: ship.hullHp, maxHullHp: ship.maxHullHp, currentCR: ship.currentCR,
+        };
+        knownProjectionKeys.set(rec, deploymentMemberKeys);
+        this.readonlyRows.set(row.id, rec);
+      } else {
+        rec.teamId = row.teamId; rec.cost = row.cost; rec.status = row.status;
+        rec.spec = spec; rec.hullHp = ship.hullHp; rec.maxHullHp = ship.maxHullHp; rec.currentCR = ship.currentCR;
+      }
+      members[write++] = rec as unknown as DeploymentMemberView;
+    }
+    members.length = write;
+    const view = this.readonlyView;
+    view.generation = this.generation;
+    view.playerShipId = engine.playerShip.id;
+    view.playerTeam = engine.playerShip.teamId;
+    view.available = available;
+    view.battleEnded = !!engine.battleResult;
+    view.fleetEnabled = engine.deployment.enabled;
+    view.fleetLimit = snapshot.limit;
+    view.fleetUsage = usage;
+    view.members = members;
+    view.simulation = engine.isSimulation;
+    view.simulationLimit = engine.simulationPointLimit;
+    view.allyUsed = engine.isSimulation ? engine.simulationDeployedPoints(true) : 0;
+    view.enemyUsed = engine.isSimulation ? engine.simulationDeployedPoints(false) : 0;
+    return view as unknown as DeploymentView;
+  }
   capture(engine: DeploymentSource, epoch = 0, available = true): DeploymentView {
     if (this.engine !== engine || this.flagship !== engine.playerShip || this.epoch !== epoch) {
       this.engine = engine; this.flagship = engine.playerShip; this.epoch = epoch;

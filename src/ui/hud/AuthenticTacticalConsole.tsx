@@ -1,7 +1,6 @@
+import { isDirectionalGravitySystem } from '../../engine/simulation/systems/GravityControlInput';
 import { HYPERION_JUMP_ID } from '../../engine/content/HyperionIds';
 import { jumpTargetingEntryFailure } from '../../engine/content/HyperionJumpTarget';
-import './void-shield.css';
-import './combat-interface.css';
 import { assemblyShipIds } from '../../engine/content/ModuleGeometry';
 import { SystemIcon } from '../SystemIcon';
 import { readSystemBindings, selectedSystemSlot, systemBindingLabel } from '../../engine/runtime/SystemBindings';
@@ -48,8 +47,9 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
 
   // 战术系统名称与状态
   const systemStatus = (system: typeof player.system) => !system.available ? '未接入 · 不可激活' : player.isDead || system.disabled ? '离线'
+    : system.gravityPolarity !== undefined ? `极性：${system.gravityPolarity===-1?'排斥':'吸引'} / 右键切换`
     : system.state === 'IN' ? '启动中' : system.state === 'OUT' ? '关闭中' : system.isActive ? system.statusText ?? '运行中'
-    : system.isCoolingDown ? '冷却中 (' + system.cooldownTimer.toFixed(1) + 's)' : systemEntryFailure(system) ?? system.statusText ?? (system.type === HYPERION_JUMP_ID ? '选择位置 / 朝向' : '就绪');
+    : system.isCoolingDown ? '冷却中 (' + system.cooldownTimer.toFixed(1) + 's)' : systemEntryFailure(system) ?? system.statusText ?? (isDirectionalGravitySystem(system.type)?system.passiveStatusText:undefined) ?? (system.type === HYPERION_JUMP_ID ? '选择位置 / 朝向' : '就绪');
 
   // 原版参考战备与敌情感知 (RepairTracker.java & C.java)
   const hasEnemiesInRange = player.significantEnemiesInRange;
@@ -161,6 +161,10 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
           )}
         </div>
 
+        <div className="hud-ship-portrait relative flex items-center justify-center">
+          <ShipPaperDoll cssSized ship={player} isEnemy={false} size={135} selectedModuleId={player.spec.modules?.length ? weaponPlayer.id : undefined} onSelectModule={canSelectModule && player.spec.modules?.length ? onSelectModule : undefined} />
+        </div>
+
         {/* _return: 45px labels, 3px gap, 80x7 meters, 104px right-aligned values. */}
         <div className="hud-console-meter-row" data-meter="flux" data-critical={fluxRatio > .85}>
           <span className="hud-text">载荷</span>
@@ -189,10 +193,6 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
           {player.defenseSystem.type !== 'NONE' && <div className="hud-system-button" title={player.defenseSystem.isActive ? player.defenseSystem.statusText ?? player.defenseSystem.description : player.defenseSystem.activationFailureReason ?? player.defenseSystem.description}><span className="hud-system-name"><SystemIcon systemId={player.defenseSystem.type} />{player.defenseSystem.name}</span><kbd>右键</kbd><span className="hud-system-status">{player.defenseSystem.definition.charges !== undefined ? `${player.defenseSystem.charges}/${player.defenseSystem.maxCharges} · ` : ''}{systemStatus(player.defenseSystem)}</span></div>}
           {player.defenseSystem.type !== 'NONE' && player.shield.type !== 'NONE' && <div className="hud-system-button"><span className="hud-system-name">{player.shield.type === 'PHASE' ? '相位潜航' : '舰体护盾'}</span><kbd>Shift + 右键</kbd><span className="hud-system-status">{player.shield.isRaiseRequested ? '开启' : '关闭'}</span></div>}
         </div>
-
-        <div className="hud-ship-portrait relative flex items-center justify-center">
-          <ShipPaperDoll ship={player} isEnemy={false} size={135} selectedModuleId={player.spec.modules?.length ? weaponPlayer.id : undefined} onSelectModule={canSelectModule && player.spec.modules?.length ? onSelectModule : undefined} />
-        </div>
       </div>
       <div className="combat-console-armament">
         {!!player.spec.modules?.length && <div className="flex items-center justify-between gap-2 text-[10px] pb-1" data-testid="module-fire-control" data-weapon-owner={weaponPlayer.id}>
@@ -207,14 +207,14 @@ export const AuthenticTacticalConsole: React.FC<AuthenticTacticalConsoleProps> =
         {activeMounts.length > 0 && (
           <section className="hud-mount-details" aria-label="武器状态">
           <h3 className="hud-detail-heading">武器状态 <span>{activeMounts.length}</span></h3>
-          <div className="hud-mount-status" role="list" aria-label="选中组武器状态">
+          <div className="hud-mount-status" role="list" aria-label="选中组武器状态" data-mount-count={activeMounts.length}>
             {activeMounts.map((m) => {
               const name = i18n.t(m.spec.nameKey).split(' (')[0];
               const isCooling = m.cooldownTimer > 0;
               const limitedAmmo = Number.isFinite(m.ammo);
               const maxAmmo = m.spec.maxAmmo ?? m.ammo;
               return (
-                <div key={m.slotId} role="listitem" data-slot-id={m.slotId} title={`${name} · ${m.slotId}`} className="flex items-center justify-between text-[10px]">
+                <div key={m.slotId} role="listitem" data-slot-id={m.slotId} data-state={m.isDisabled ? 'disabled' : isCooling ? 'cooling' : 'ready'} title={`${name} · ${m.slotId}`} className="flex items-center justify-between text-[10px]">
                   <span className="hud-mount-name text-[#9bff00]/90"><span className="hud-text">{name}</span></span>
                   <span className="hud-mount-readout flex items-center gap-1.5">
                     {limitedAmmo && (

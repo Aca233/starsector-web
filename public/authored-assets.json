@@ -3,6 +3,54 @@
   "policy": "authored-subset; retained original combat media is listed separately in retained-combat-media.json",
   "records": [
     {
+      "path": "authored/terrain/nebula-soft-veil-01/nebula.png",
+      "sha256": "f5756814e9dd0935ffcf4c597e8e997f15c494042ec64cf53203201e9115aa56",
+      "source": "built-in/image_gen:text-to-image",
+      "createdAt": "2026-10-01T03:30:52.439773+00:00",
+      "master": "output/imagegen/nebula-standalone-01-topdown-20261001/generated.png",
+      "masterSha256": "6e4eefb3ffb3195a667dc875b892a261fd5699562b5ec6929decf2803c1518f3",
+      "actualMaster": {
+        "format": "PNG",
+        "width": 1254,
+        "height": 1254,
+        "mode": "RGBA"
+      },
+      "prompt": "output/imagegen/nebula-standalone-01-topdown-20261001/prompt.txt",
+      "promptSha256": "8fd4c8b4db6c885c80c3ea6590623dc4d060333140e4c48a52299635841d53cc",
+      "referenceImagesSent": false,
+      "width": 1024,
+      "height": 1024,
+      "mode": "RGBA",
+      "atlasGrid": null,
+      "processing": "entire generated orthographic overhead image fitted in premultiplied alpha to 896x896 and centered in 1024x1024 with 64px transparent margins; no painted pixels, noise or reconstructed perspective",
+      "viewpoint": "orthographic top-down",
+      "review": "top-down art visually inspected; game verification recorded separately",
+      "previousSha256": "231c2e0b68db8cca3c267e787c6d6130fe486f0c31562b3d32387d221cb971bc",
+      "supersedes": {
+        "path": "authored/terrain/nebula-soft-veil-01/nebula.png",
+        "sha256": "231c2e0b68db8cca3c267e787c6d6130fe486f0c31562b3d32387d221cb971bc",
+        "source": "built-in/image_gen:text-to-image",
+        "createdAt": "2026-10-01T03:20:08.153216+00:00",
+        "master": "output/imagegen/nebula-standalone-01-20261001/generated.png",
+        "masterSha256": "cfa653b62426f168cdd052064ec500376ab082d673f9a15e74582a5da9918cd1",
+        "actualMaster": {
+          "format": "PNG",
+          "width": 1254,
+          "height": 1254,
+          "mode": "RGBA"
+        },
+        "prompt": "output/imagegen/nebula-standalone-01-20261001/prompt.txt",
+        "promptSha256": "5af2565ad193be0acd6ec755f699e23f02afa02d1d86af017e368f2ca3863317",
+        "referenceImagesSent": false,
+        "width": 1024,
+        "height": 1024,
+        "mode": "RGBA",
+        "atlasGrid": null,
+        "processing": "whole-image premultiplied-alpha fit to 896x896, centered in 1024x1024 with 64px transparent margins; no cuts, noise, original pixels or synthesized cloud shapes",
+        "review": "generated whole-cloud art visually inspected; runtime validation recorded separately"
+      }
+    },
+    {
       "path": "graphics/asteroids/asteroid1.png",
       "sha256": "77fa3451e227978f09133b84bdb7f097af767bbe02cac7103f7c847af0ec18c1",
       "source": "local-proxy/gpt-image-2.5:text-to-image",
@@ -13621,62 +13669,815 @@
     },
     {
       "path": "graphics/terrain/nebula.png",
-      "sha256": "e8d16b9e59aeeb56d4a82c4728703bf7bda4f9cb1d17890108fa658b22d95512",
-      "source": "local-proxy/gpt-image-2.5:text-to-image",
-      "createdAt": "2026-09-29T04:37:07.824404+00:00",
+      "sha256": "ea78946a1205fda26d684ab75bc5145c2daae9ffb80e3dd086ec219989d57828",
+      "source": "built-in/image_gen:image-edit",
+      "createdAt": "2026-10-01T03:02:51.234477+00:00",
       "originalSha256": "67acd40a29833917222ba3504316adc1f47f65c1e87f0dbc4da51bb225f0d59a",
-      "master": "output/imagegen/visual-revision-20260929/nebula-soft-veils-master.png",
-      "masterSha256": "3aa5bed6976fd0a9201da8a30b36c11106b4e63ccd8da78ba3fa242567e0c844",
+      "master": "output/imagegen/nebula-soft-gradient-20261001/nebula-diverse-prepared.png",
+      "masterSha256": "b6b336d40dbab0d3bcf509cd40866ff9cd99a52d98dba5971b5aa8b56be1f5ec",
       "actualMaster": {
         "format": "PNG",
-        "width": 1254,
-        "height": 1254,
+        "width": 512,
+        "height": 512,
         "mode": "RGBA"
       },
-      "alphaNoiseFloor": 3,
-      "prompt": "output/imagegen/visual-revision-20260929/prompts/nebula-soft-veils.txt",
-      "promptSha256": "ff20a36bd2fde557ddfc2de158b38ef53f240c941069f5900d2d94e45a06c4d7",
+      "alphaNoiseFloor": 0,
+      "prompt": "output/imagegen/nebula-soft-gradient-20261001/prompt.txt",
+      "promptSha256": "9428da4b5bced43135a0f7f5de565139aee6189505436a9cadc1c09791007c2c",
       "width": 512,
       "height": 512,
       "mode": "RGBA",
-      "processing": "4x4 atlas resampled without crop to original size; alpha <= 3 cleared; all cell edges verified transparent; no original pixels used",
+      "processing": "4x4 atlas resampled without crop to original size; alpha <= 0 cleared; all cell edges verified transparent; no original pixels used",
+      "preservedAlphaCeiling": null,
       "atlasGrid": [
         4,
         4
       ],
-      "referenceImagesSent": false,
+      "referenceImagesSent": true,
       "review": "master visually inspected; runtime validation recorded separately",
       "rightsNote": "Generated replacement is not a legal clearance or a cure for other EULA issues.",
+      "preparation": {
+        "path": "output/imagegen/nebula-soft-gradient-20261001/preparation.json",
+        "sha256": "838aad88ddd00e740402e5795955c45acbfe173dd549bc902cef6deae7f76efb",
+        "generatedImage": "output/imagegen/nebula-soft-gradient-20261001/nebula-diverse-master.png",
+        "generatedSha256": "7af37f8bfda8f3b4a4ff2645b0682715b79ed916db010f72fe505a285f046546",
+        "preparedSha256": "b6b336d40dbab0d3bcf509cd40866ff9cd99a52d98dba5971b5aa8b56be1f5ec",
+        "generatedSize": [
+          1254,
+          1254
+        ],
+        "preparedSize": [
+          512,
+          512
+        ],
+        "processing": "Independent rounded 4x4 crops; alpha <=8 cleared; small disconnected components touching source cell boundary removed (under 3% cell area); smoothstep feather over 12 source edge pixels; premultiplied-alpha resample to 104x104; centered in 128x128 cells with 12px transparent gutters; no original pixels or synthesized cloud shapes",
+        "preparer": "output/imagegen/nebula-soft-gradient-20261001/prepare-atlas.py",
+        "preparerSha256": "0a22f911a82208284357f9ef501eda038419fafa02b5ae08f424be48ac59c893",
+        "cells": [
+          {
+            "cell": [
+              0,
+              0
+            ],
+            "sourceCrop": [
+              0,
+              0,
+              314,
+              314
+            ],
+            "neighborFragmentPixelsRemoved": 0,
+            "alphaBounds": [
+              6,
+              9,
+              103,
+              103
+            ],
+            "alphaMax": 253
+          },
+          {
+            "cell": [
+              1,
+              0
+            ],
+            "sourceCrop": [
+              314,
+              0,
+              627,
+              314
+            ],
+            "neighborFragmentPixelsRemoved": 728,
+            "alphaBounds": [
+              14,
+              3,
+              99,
+              103
+            ],
+            "alphaMax": 253
+          },
+          {
+            "cell": [
+              2,
+              0
+            ],
+            "sourceCrop": [
+              627,
+              0,
+              940,
+              314
+            ],
+            "neighborFragmentPixelsRemoved": 0,
+            "alphaBounds": [
+              7,
+              16,
+              97,
+              101
+            ],
+            "alphaMax": 253
+          },
+          {
+            "cell": [
+              3,
+              0
+            ],
+            "sourceCrop": [
+              940,
+              0,
+              1254,
+              314
+            ],
+            "neighborFragmentPixelsRemoved": 0,
+            "alphaBounds": [
+              7,
+              9,
+              102,
+              103
+            ],
+            "alphaMax": 253
+          },
+          {
+            "cell": [
+              0,
+              1
+            ],
+            "sourceCrop": [
+              0,
+              314,
+              314,
+              627
+            ],
+            "neighborFragmentPixelsRemoved": 89,
+            "alphaBounds": [
+              6,
+              8,
+              101,
+              103
+            ],
+            "alphaMax": 253
+          },
+          {
+            "cell": [
+              1,
+              1
+            ],
+            "sourceCrop": [
+              314,
+              314,
+              627,
+              627
+            ],
+            "neighborFragmentPixelsRemoved": 7,
+            "alphaBounds": [
+              12,
+              7,
+              92,
+              103
+            ],
+            "alphaMax": 253
+          },
+          {
+            "cell": [
+              2,
+              1
+            ],
+            "sourceCrop": [
+              627,
+              314,
+              940,
+              627
+            ],
+            "neighborFragmentPixelsRemoved": 0,
+            "alphaBounds": [
+              4,
+              13,
+              101,
+              99
+            ],
+            "alphaMax": 253
+          },
+          {
+            "cell": [
+              3,
+              1
+            ],
+            "sourceCrop": [
+              940,
+              314,
+              1254,
+              627
+            ],
+            "neighborFragmentPixelsRemoved": 223,
+            "alphaBounds": [
+              8,
+              19,
+              101,
+              98
+            ],
+            "alphaMax": 253
+          },
+          {
+            "cell": [
+              0,
+              2
+            ],
+            "sourceCrop": [
+              0,
+              627,
+              314,
+              940
+            ],
+            "neighborFragmentPixelsRemoved": 271,
+            "alphaBounds": [
+              4,
+              28,
+              103,
+              78
+            ],
+            "alphaMax": 253
+          },
+          {
+            "cell": [
+              1,
+              2
+            ],
+            "sourceCrop": [
+              314,
+              627,
+              627,
+              940
+            ],
+            "neighborFragmentPixelsRemoved": 3521,
+            "alphaBounds": [
+              16,
+              9,
+              103,
+              93
+            ],
+            "alphaMax": 253
+          },
+          {
+            "cell": [
+              2,
+              2
+            ],
+            "sourceCrop": [
+              627,
+              627,
+              940,
+              940
+            ],
+            "neighborFragmentPixelsRemoved": 76,
+            "alphaBounds": [
+              9,
+              6,
+              102,
+              103
+            ],
+            "alphaMax": 253
+          },
+          {
+            "cell": [
+              3,
+              2
+            ],
+            "sourceCrop": [
+              940,
+              627,
+              1254,
+              940
+            ],
+            "neighborFragmentPixelsRemoved": 1168,
+            "alphaBounds": [
+              12,
+              5,
+              101,
+              98
+            ],
+            "alphaMax": 253
+          },
+          {
+            "cell": [
+              0,
+              3
+            ],
+            "sourceCrop": [
+              0,
+              940,
+              314,
+              1254
+            ],
+            "neighborFragmentPixelsRemoved": 0,
+            "alphaBounds": [
+              10,
+              1,
+              102,
+              84
+            ],
+            "alphaMax": 253
+          },
+          {
+            "cell": [
+              1,
+              3
+            ],
+            "sourceCrop": [
+              314,
+              940,
+              627,
+              1254
+            ],
+            "neighborFragmentPixelsRemoved": 0,
+            "alphaBounds": [
+              25,
+              1,
+              101,
+              99
+            ],
+            "alphaMax": 253
+          },
+          {
+            "cell": [
+              2,
+              3
+            ],
+            "sourceCrop": [
+              627,
+              940,
+              940,
+              1254
+            ],
+            "neighborFragmentPixelsRemoved": 582,
+            "alphaBounds": [
+              8,
+              2,
+              101,
+              94
+            ],
+            "alphaMax": 252
+          },
+          {
+            "cell": [
+              3,
+              3
+            ],
+            "sourceCrop": [
+              940,
+              940,
+              1254,
+              1254
+            ],
+            "neighborFragmentPixelsRemoved": 0,
+            "alphaBounds": [
+              8,
+              1,
+              98,
+              99
+            ],
+            "alphaMax": 253
+          }
+        ]
+      },
+      "referenceImage": {
+        "path": "output/imagegen/nebula-diversity-20261001-builtin/nebula-diverse-master.png",
+        "sha256": "841146ace35d0ed12062fafb7d2ba540bf7cb1ec1f10f99385032a071c8a27ef",
+        "actualSize": [
+          1254,
+          1254
+        ],
+        "mode": "RGBA"
+      },
       "supersedes": {
         "path": "graphics/terrain/nebula.png",
-        "sha256": "5e27163d7e8986cc6cac88ae8865985bac91adc12678ae7e62bf9f542a7a12cc",
-        "source": "local-proxy/gpt-image-2.5:text-to-image",
-        "createdAt": "2026-09-29T03:55:26.494825+00:00",
+        "sha256": "39bdab17131baedda74b1586b30e896de043494e6670abea164032aa329e1444",
+        "source": "built-in/image_gen:text-to-image",
+        "createdAt": "2026-10-01T02:05:12.041871+00:00",
         "originalSha256": "67acd40a29833917222ba3504316adc1f47f65c1e87f0dbc4da51bb225f0d59a",
-        "master": "output/imagegen/original-media-replacement-20260929/nebula-atlas-v2-master.png",
-        "masterSha256": "c2933160b2f88e9c626ea4d433cba71a576e1962c3e6bb1493bf3ac5bf87d7fe",
+        "master": "output/imagegen/nebula-diversity-20261001-builtin/nebula-diverse-prepared.png",
+        "masterSha256": "9cfb3c0b931a51a26f03c74401f01513fa6ff668bc800a4d6fc75f3f33bbcece",
         "actualMaster": {
           "format": "PNG",
-          "width": 1254,
-          "height": 1254,
+          "width": 512,
+          "height": 512,
           "mode": "RGBA"
         },
-        "alphaNoiseFloor": 2,
-        "prompt": "output/imagegen/original-media-replacement-20260929/prompts/nebula-atlas-v2.txt",
-        "promptSha256": "4fb4fec160ea07ed44315b24ea476e82e698fb482d0fb078b9fc3a42c7d65829",
+        "alphaNoiseFloor": 8,
+        "prompt": "output/imagegen/nebula-diversity-20261001-builtin/prompt.txt",
+        "promptSha256": "018a1a8d1c0cfb5a3a4492772af05709adebacb594ef95dfd27442949dd601fb",
         "width": 512,
         "height": 512,
         "mode": "RGBA",
-        "processing": "4x4 atlas resampled without crop to original size; alpha <= 2 cleared; all cell edges verified transparent; no original pixels used",
+        "processing": "4x4 atlas resampled without crop to original size; alpha <= 8 cleared; all cell edges verified transparent; no original pixels used; original alpha maximum 251/255 retained as multiplier",
+        "preservedAlphaCeiling": 251,
         "atlasGrid": [
           4,
           4
         ],
         "referenceImagesSent": false,
         "review": "master visually inspected; runtime validation recorded separately",
-        "rightsNote": "Generated replacement is not a legal clearance or a cure for other EULA issues."
+        "rightsNote": "Generated replacement is not a legal clearance or a cure for other EULA issues.",
+        "preparation": {
+          "path": "output/imagegen/nebula-diversity-20261001-builtin/preparation.json",
+          "sha256": "b1e8d5ba199ff8237e33b691d2d33bf2e333e71972ae9e5db2ecd4b9abd98c15",
+          "generatedImage": "output/imagegen/nebula-diversity-20261001-builtin/nebula-diverse-master.png",
+          "generatedSha256": "841146ace35d0ed12062fafb7d2ba540bf7cb1ec1f10f99385032a071c8a27ef",
+          "preparedSha256": "9cfb3c0b931a51a26f03c74401f01513fa6ff668bc800a4d6fc75f3f33bbcece",
+          "generatedSize": [
+            1254,
+            1254
+          ],
+          "preparedSize": [
+            512,
+            512
+          ],
+          "processing": "Independent rounded 4x4 crops; alpha <=8 cleared; small disconnected components touching source cell boundary removed (under 3% cell area); smoothstep feather over 12 source edge pixels; premultiplied-alpha resample to 112x112; centered in 128x128 cells with 8px transparent gutters; no original pixels or synthesized cloud shapes",
+          "preparer": "output/imagegen/nebula-diversity-20261001-builtin/prepare-atlas.py",
+          "preparerSha256": "a7cb91c3db0940f3f2c702105dff6ed9a07f3beb5e707923a76632f6340f03fe",
+          "cells": [
+            {
+              "cell": [
+                0,
+                0
+              ],
+              "sourceCrop": [
+                0,
+                0,
+                314,
+                314
+              ],
+              "neighborFragmentPixelsRemoved": 0,
+              "alphaBounds": [
+                4,
+                13,
+                111,
+                111
+              ],
+              "alphaMax": 252
+            },
+            {
+              "cell": [
+                1,
+                0
+              ],
+              "sourceCrop": [
+                314,
+                0,
+                627,
+                314
+              ],
+              "neighborFragmentPixelsRemoved": 1920,
+              "alphaBounds": [
+                21,
+                3,
+                105,
+                111
+              ],
+              "alphaMax": 251
+            },
+            {
+              "cell": [
+                2,
+                0
+              ],
+              "sourceCrop": [
+                627,
+                0,
+                940,
+                314
+              ],
+              "neighborFragmentPixelsRemoved": 0,
+              "alphaBounds": [
+                7,
+                14,
+                106,
+                108
+              ],
+              "alphaMax": 253
+            },
+            {
+              "cell": [
+                3,
+                0
+              ],
+              "sourceCrop": [
+                940,
+                0,
+                1254,
+                314
+              ],
+              "neighborFragmentPixelsRemoved": 0,
+              "alphaBounds": [
+                2,
+                14,
+                110,
+                111
+              ],
+              "alphaMax": 254
+            },
+            {
+              "cell": [
+                0,
+                1
+              ],
+              "sourceCrop": [
+                0,
+                314,
+                314,
+                627
+              ],
+              "neighborFragmentPixelsRemoved": 86,
+              "alphaBounds": [
+                7,
+                7,
+                110,
+                111
+              ],
+              "alphaMax": 252
+            },
+            {
+              "cell": [
+                1,
+                1
+              ],
+              "sourceCrop": [
+                314,
+                314,
+                627,
+                627
+              ],
+              "neighborFragmentPixelsRemoved": 613,
+              "alphaBounds": [
+                12,
+                2,
+                96,
+                111
+              ],
+              "alphaMax": 253
+            },
+            {
+              "cell": [
+                2,
+                1
+              ],
+              "sourceCrop": [
+                627,
+                314,
+                940,
+                627
+              ],
+              "neighborFragmentPixelsRemoved": 175,
+              "alphaBounds": [
+                3,
+                12,
+                111,
+                106
+              ],
+              "alphaMax": 253
+            },
+            {
+              "cell": [
+                3,
+                1
+              ],
+              "sourceCrop": [
+                940,
+                314,
+                1254,
+                627
+              ],
+              "neighborFragmentPixelsRemoved": 359,
+              "alphaBounds": [
+                3,
+                18,
+                109,
+                103
+              ],
+              "alphaMax": 252
+            },
+            {
+              "cell": [
+                0,
+                2
+              ],
+              "sourceCrop": [
+                0,
+                627,
+                314,
+                940
+              ],
+              "neighborFragmentPixelsRemoved": 1200,
+              "alphaBounds": [
+                3,
+                31,
+                111,
+                84
+              ],
+              "alphaMax": 253
+            },
+            {
+              "cell": [
+                1,
+                2
+              ],
+              "sourceCrop": [
+                314,
+                627,
+                627,
+                940
+              ],
+              "neighborFragmentPixelsRemoved": 3965,
+              "alphaBounds": [
+                18,
+                7,
+                111,
+                111
+              ],
+              "alphaMax": 253
+            },
+            {
+              "cell": [
+                2,
+                2
+              ],
+              "sourceCrop": [
+                627,
+                627,
+                940,
+                940
+              ],
+              "neighborFragmentPixelsRemoved": 546,
+              "alphaBounds": [
+                10,
+                1,
+                110,
+                111
+              ],
+              "alphaMax": 251
+            },
+            {
+              "cell": [
+                3,
+                2
+              ],
+              "sourceCrop": [
+                940,
+                627,
+                1254,
+                940
+              ],
+              "neighborFragmentPixelsRemoved": 951,
+              "alphaBounds": [
+                7,
+                6,
+                107,
+                104
+              ],
+              "alphaMax": 252
+            },
+            {
+              "cell": [
+                0,
+                3
+              ],
+              "sourceCrop": [
+                0,
+                940,
+                314,
+                1254
+              ],
+              "neighborFragmentPixelsRemoved": 0,
+              "alphaBounds": [
+                6,
+                1,
+                111,
+                102
+              ],
+              "alphaMax": 252
+            },
+            {
+              "cell": [
+                1,
+                3
+              ],
+              "sourceCrop": [
+                314,
+                940,
+                627,
+                1254
+              ],
+              "neighborFragmentPixelsRemoved": 1048,
+              "alphaBounds": [
+                30,
+                1,
+                108,
+                109
+              ],
+              "alphaMax": 253
+            },
+            {
+              "cell": [
+                2,
+                3
+              ],
+              "sourceCrop": [
+                627,
+                940,
+                940,
+                1254
+              ],
+              "neighborFragmentPixelsRemoved": 231,
+              "alphaBounds": [
+                11,
+                2,
+                111,
+                101
+              ],
+              "alphaMax": 250
+            },
+            {
+              "cell": [
+                3,
+                3
+              ],
+              "sourceCrop": [
+                940,
+                940,
+                1254,
+                1254
+              ],
+              "neighborFragmentPixelsRemoved": 40,
+              "alphaBounds": [
+                3,
+                1,
+                109,
+                108
+              ],
+              "alphaMax": 252
+            }
+          ]
+        },
+        "supersedes": {
+          "path": "graphics/terrain/nebula.png",
+          "sha256": "e8d16b9e59aeeb56d4a82c4728703bf7bda4f9cb1d17890108fa658b22d95512",
+          "source": "local-proxy/gpt-image-2.5:text-to-image",
+          "createdAt": "2026-09-29T04:37:07.824404+00:00",
+          "originalSha256": "67acd40a29833917222ba3504316adc1f47f65c1e87f0dbc4da51bb225f0d59a",
+          "master": "output/imagegen/visual-revision-20260929/nebula-soft-veils-master.png",
+          "masterSha256": "3aa5bed6976fd0a9201da8a30b36c11106b4e63ccd8da78ba3fa242567e0c844",
+          "actualMaster": {
+            "format": "PNG",
+            "width": 1254,
+            "height": 1254,
+            "mode": "RGBA"
+          },
+          "alphaNoiseFloor": 3,
+          "prompt": "output/imagegen/visual-revision-20260929/prompts/nebula-soft-veils.txt",
+          "promptSha256": "ff20a36bd2fde557ddfc2de158b38ef53f240c941069f5900d2d94e45a06c4d7",
+          "width": 512,
+          "height": 512,
+          "mode": "RGBA",
+          "processing": "4x4 atlas resampled without crop to original size; alpha <= 3 cleared; all cell edges verified transparent; no original pixels used",
+          "atlasGrid": [
+            4,
+            4
+          ],
+          "referenceImagesSent": false,
+          "review": "master visually inspected; runtime validation recorded separately",
+          "rightsNote": "Generated replacement is not a legal clearance or a cure for other EULA issues.",
+          "supersedes": {
+            "path": "graphics/terrain/nebula.png",
+            "sha256": "5e27163d7e8986cc6cac88ae8865985bac91adc12678ae7e62bf9f542a7a12cc",
+            "source": "local-proxy/gpt-image-2.5:text-to-image",
+            "createdAt": "2026-09-29T03:55:26.494825+00:00",
+            "originalSha256": "67acd40a29833917222ba3504316adc1f47f65c1e87f0dbc4da51bb225f0d59a",
+            "master": "output/imagegen/original-media-replacement-20260929/nebula-atlas-v2-master.png",
+            "masterSha256": "c2933160b2f88e9c626ea4d433cba71a576e1962c3e6bb1493bf3ac5bf87d7fe",
+            "actualMaster": {
+              "format": "PNG",
+              "width": 1254,
+              "height": 1254,
+              "mode": "RGBA"
+            },
+            "alphaNoiseFloor": 2,
+            "prompt": "output/imagegen/original-media-replacement-20260929/prompts/nebula-atlas-v2.txt",
+            "promptSha256": "4fb4fec160ea07ed44315b24ea476e82e698fb482d0fb078b9fc3a42c7d65829",
+            "width": 512,
+            "height": 512,
+            "mode": "RGBA",
+            "processing": "4x4 atlas resampled without crop to original size; alpha <= 2 cleared; all cell edges verified transparent; no original pixels used",
+            "atlasGrid": [
+              4,
+              4
+            ],
+            "referenceImagesSent": false,
+            "review": "master visually inspected; runtime validation recorded separately",
+            "rightsNote": "Generated replacement is not a legal clearance or a cure for other EULA issues."
+          },
+          "previousSha256": "5e27163d7e8986cc6cac88ae8865985bac91adc12678ae7e62bf9f542a7a12cc"
+        },
+        "previousSha256": "e8d16b9e59aeeb56d4a82c4728703bf7bda4f9cb1d17890108fa658b22d95512",
+        "metadataBackup": "artifacts/original-media-replacement-20260928/e8d16b9e59aeeb56d4a82c4728703bf7bda4f9cb1d17890108fa658b22d95512"
       },
-      "previousSha256": "5e27163d7e8986cc6cac88ae8865985bac91adc12678ae7e62bf9f542a7a12cc"
+      "previousSha256": "39bdab17131baedda74b1586b30e896de043494e6670abea164032aa329e1444",
+      "metadataBackup": "artifacts/original-media-replacement-20260928/39bdab17131baedda74b1586b30e896de043494e6670abea164032aa329e1444"
     },
     {
       "path": "graphics/ui/armor_plate.png",

@@ -1,3 +1,5 @@
+import { Picker } from '../ui/core/Picker';
+import { SearchInput, EmptyState } from '../ui/core/ListControls';
 import { HullInspection } from './HullInspection';
 import { RefitHint } from './RefitHint';
 import { useLayoutEffect, useMemo, useRef } from 'react';
@@ -45,7 +47,7 @@ export function HullRoster({ draft, spec, filter, onFilter, readScrollPosition, 
     <div className="refit-roster-filters">
       <div className="refit-filter-heading"><label htmlFor="refit-hull-search">选择舰船</label><span role="status">{shown.length} / {hulls.length} 艘</span></div>
       <div className="refit-search-field">
-        <input ref={search} id="refit-hull-search" type="search" autoComplete="off" placeholder="搜索舰船名称 / ID" value={filter.query}
+        <SearchInput ref={search} id="refit-hull-search" placeholder="搜索舰船名称 / ID" value={filter.query}
           onChange={e => changeFilter({...filter, query: e.target.value})}
           onKeyDown={e => {
             if (e.key === 'Escape' && filter.query) { e.preventDefault(); e.stopPropagation(); changeFilter({...filter, query: ''}); }
@@ -70,11 +72,11 @@ export function HullRoster({ draft, spec, filter, onFilter, readScrollPosition, 
         {(filter.query || filter.hullClass || filter.faction) && <button type="button" onClick={() => changeFilter({query: '', hullClass: '', faction: ''})}>重置筛选</button>}
       </div>
     </div>
-    <div className="refit-roster-results" ref={list} onScroll={e => {if (!inert) writeScrollPosition(e.currentTarget.scrollTop);}}>
+    <Picker className="refit-roster-results" aria-label="可选舰船" ref={list} onScroll={e => {if (!inert) writeScrollPosition(e.currentTarget.scrollTop);}}>
       {(inert ? [spec] : shown).map(h => {
         const active = h.id === draft.hullId;
         const unavailable = unavailableReason?.(h);
-        return <HullInspection key={h.id} spec={h} enabled={!inert} unavailable={unavailable}><button type="button" data-hull-id={h.id} className={'refit-roster-ship ' + (active ? 'is-current' : '')}
+        return <HullInspection key={h.id} spec={h} enabled={!inert} unavailable={unavailable}><button type="button" data-picker-item data-hull-id={h.id} className={'refit-roster-ship ' + (active ? 'is-current' : '')}
           disabled={!!unavailable}
           aria-pressed={active} aria-label={'改装' + data.ships[h.id].name + '级'} onClick={() => {if (!active) onHull(h.id);}}>
           {/* Keep one assembly viewport and sizing rule across selection; equipment stays on the central stage. */}
@@ -86,7 +88,7 @@ export function HullRoster({ draft, spec, filter, onFilter, readScrollPosition, 
           </span>
         </button></HullInspection>;
       })}
-      {!inert && !shown.length && <div className="refit-filter-empty"><strong>没有找到舰船</strong><p>试试其他名称、舰级或势力。</p><NativeButton onClick={() => changeFilter({query: '', hullClass: '', faction: ''})}>清除筛选</NativeButton></div>}
-    </div>
+      {!inert && !shown.length && <EmptyState className="refit-filter-empty" title="没有找到舰船" action={<NativeButton onClick={() => changeFilter({query: '', hullClass: '', faction: ''})}>清除筛选</NativeButton>}>试试其他名称、舰级或势力。</EmptyState>}
+    </Picker>
   </aside>;
 }

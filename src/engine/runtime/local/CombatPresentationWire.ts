@@ -20,7 +20,7 @@ export const forbidden = new Set(['__proto__', 'prototype', 'constructor']);
 /** Both names now select the display-only contract. No simulation prototype mode. */
 export type CombatPresentationMode = 'render' | 'render-strict';
 export const simulationTypes = new Set([1,2,3,4,5,6,7,8,9]); // Retired protocol IDs are always rejected.
-export interface Shape { type: number; keys: string[] }
+export interface Shape { type: number; keys: readonly string[] }
 export interface CombatPresentationGraphPacket {
   epoch: number; revision: number; tick: number;
   buffer: ArrayBuffer; length: number; nodeCount: number; liveNodeCount: number; removed: number[]; strings: string[]; shapes: Shape[];
@@ -36,6 +36,7 @@ export interface DetachedCombatPresentation {
     tactical: { readonly commandPoints: number; readonly selectedUnitId: string | null; readonly isTacticalMap: boolean; readonly orders: ReadonlyMap<string, Readonly<import('../../simulation/CombatTypes').TacticalOrder>> };
     battleResult: CombatEngine['battleResult']; isBattleResultReady: boolean;
     floatingTexts: CombatEngine['floatingTexts']; shipLossNotifications: CombatEngine['shipLossNotifications']; notificationTime: number;
+    radio?: CombatEngine['radioMessages'];
   };
 }
 /** Validate immutable dictionary entries before copying/freezing; no executable values. */
@@ -58,5 +59,4 @@ export function metadataUnits(value: unknown): number {
   }
   return units;
 }
-
 

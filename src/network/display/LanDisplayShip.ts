@@ -60,6 +60,7 @@ export class DisplaySystem extends ProjectedRenderSystem {
   declare name: HudSystem['name'];
   declare description: HudSystem['description'];
   declare isCoolingDown: HudSystem['isCoolingDown'];
+  declare activeTimer: HudSystem['activeTimer'];
   declare cooldownTimer: HudSystem['cooldownTimer'];
   declare activationFailureReason: HudSystem['activationFailureReason'];
   declare charges: HudSystem['charges'];

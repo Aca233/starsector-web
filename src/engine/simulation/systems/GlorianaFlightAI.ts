@@ -33,6 +33,7 @@ function shieldCovers(craft: Ship, target: Ship): boolean {
   return target.isShieldPointBlocked(center.addScaled(direction, shield.radius / Math.max(.001, direction.length())));
 }
 
+const EMPTY_MISSILES: readonly Projectile[] = [];
 /** Only approved enemies enter acquisition; all allies/terrain still block a shot.
  * Do not forward full-roster query certificates: they would reopen forbidden targets.
  * This prevents autonomous PD/retargeting from bypassing recall or the Starhawk's shield window. */
@@ -47,7 +48,7 @@ function tacticalFireWorld(ctx: FlightContext, target: Ship | null, missile: Pro
     if (target && !local.includes(target)) local.push(target);
     ships = local;
   }
-  return { ships, missiles: missile ? [missile] : [], asteroids: ctx.world?.asteroids ?? [], shipStepBatch: ctx.world?.shipStepBatch };
+  return { ships, missiles: missile ? [missile] : EMPTY_MISSILES, asteroids: ctx.world?.asteroids ?? [], shipStepBatch: ctx.world?.shipStepBatch };
 }
 
 /** Special tactics choose permission/targets; common flight and native per-mount fire control execute them. */

@@ -48,7 +48,7 @@ export class WebGLTextureManager {
       wrap: forceRepeat ? 'repeat' : (sampler?.wrap ?? 'clamp'),
       minFilter: sampler?.minFilter ?? 'linear',
       magFilter: sampler?.magFilter ?? 'linear',
-      mipmap: sampler?.mipmap ?? false
+      mipmap: sampler?.mipmap ?? (sampler?.minFilter ?? 'linear') === 'linear'
     };
   }
 
@@ -167,7 +167,9 @@ export class WebGLTextureManager {
   private bindAndConfigure(tex: WebGLTexture, sampler: Required<NonNullable<AssetManifestEntry['sampler']>>, upload: () => void): void {
     const gl = this.gl;
     const wrap = sampler.wrap === 'repeat' ? gl.REPEAT : gl.CLAMP_TO_EDGE;
-    const minFilter = sampler.minFilter === 'nearest' ? gl.NEAREST : gl.LINEAR;
+    const minFilter = sampler.minFilter === 'nearest'
+      ? (sampler.mipmap ? gl.NEAREST_MIPMAP_NEAREST : gl.NEAREST)
+      : (sampler.mipmap ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR);
     const magFilter = sampler.magFilter === 'nearest' ? gl.NEAREST : gl.LINEAR;
     gl.bindTexture(gl.TEXTURE_2D, tex);
     upload();

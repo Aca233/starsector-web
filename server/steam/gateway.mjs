@@ -57,6 +57,7 @@ class SteamPeer extends EventEmitter {
     this.inflight = new Map(); this.inflightBytes = 0; this.binarySnapshots = binarySnapshots; this.snapshotSender = binarySnapshots ? new SteamBinarySnapshotSender() : new SteamSnapshotSender(); this.snapshotWindow = new SnapshotSendWindow();
     this.sentStates = 0; this.skippedStates = 0; this.ackedStates = 0; this.ackMs = null;
     this.lastSnapshot = null; this.lastSnapshotSkip = null; this.snapshotEpoch = null;
+    this.terminalControls = null; this.terminalControlBytes = 0;
     this.preparation = { attempts: 0, discarded: 0, totalMs: 0, discardedMs: 0, maxMs: 0 };
     this.componentsEnabled = false;
     this.components = components && supportsConsumption && motion ? new SteamComponentSender(connection, gateway.componentBudget,
@@ -117,11 +118,28 @@ class SteamPeer extends EventEmitter {
   sendSnapshot(snapshot) { return this.send(null, snapshot); }
   resetSnapshots() { this.components?.reset(); this.emit('components-reset'); this.motion?.reset(); this.snapshotSender.reset(); this.gateway.snapshotPreparer?.reset(this); }
   sendPrepared(candidate) { return this.send(null, null, candidate); }
-  send(encoded, snapshot = null, candidate = null) {
+  send(encoded, snapshot = null, candidate = null, afterDrain = false) {
     if (this.readyState !== 1) return;
     try {
       if (snapshot?.metadataOnly && !this.relayBinaryOnly) throw Error("Relay metadata requires binary preparation Worker");
       const state = candidate !== null || snapshot !== null || encoded.startsWith('{"type":"state",');
+      if (!state && !afterDrain && (this.terminalControls || encoded.startsWith('{"type":"ended",') && this.gateway.snapshotPreparer)) {
+        this.terminalControls ??= [];
+        if (this.terminalControls.length >= 32 || this.terminalControlBytes >= protocol.maxSnapshotBytes * 2) throw Error('Steam terminal control queue full');
+        this.terminalControls.push(encoded); this.terminalControlBytes += Buffer.byteLength(encoded);
+        if (!this.gateway.snapshotPreparer?.drain(this, () => {
+          const controls = this.terminalControls; this.terminalControls = null; this.terminalControlBytes = 0;
+          // Clear the barrier before ordinary send, but avoid re-entering it for
+          // the terminal control that caused this same drain.
+          for (const control of controls ?? []) this.send(control, null, null, true);
+        })) throw Error('Steam terminal preparation unavailable');
+        return true;
+      }
+      if (state && !candidate && this.terminalControls) {
+        // A host may already be loading its next match. That replaceable state
+        // must not overwrite the previous match's admitted terminal proposal.
+        this.lastSnapshotSkip = 'terminal-drain'; this.skippedStates++; return false;
+      }
       if (state && !candidate && this.gateway.snapshotPreparer) {
         if (!this.snapshotWritable) { this.lastSnapshotSkip = this.snapshotBlockReason; this.gateway.snapshotBudget.remove(this); this.skippedStates++; return false; }
         return this.gateway.snapshotPreparer.offer(this, snapshot ?? encoded);
@@ -202,6 +220,7 @@ class SteamPeer extends EventEmitter {
     this.gateway.snapshotPreparer?.retire(this);
     this.components?.reset(); this.componentsEnabled = false; this.motion?.reset(); this.gateway.motionBudget.forget(this.connection);
     this.readyState = 3; this.inputAck = null; this.inflight.clear(); this.inflightBytes = 0; this.snapshotSender.reset(); this.consumption?.clear();
+    this.terminalControls = null; this.terminalControlBytes = 0;
     try { this.gateway.transmit(this.remote, this.connection, 'close', { code, reason }); } catch { /* already disconnected */ }
     this.emit('close');
     if (this.gateway.peers.get(this.remote) === this) this.gateway.peers.delete(this.remote);

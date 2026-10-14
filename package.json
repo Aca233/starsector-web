@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "typecheck": "tsc -b --pretty false",
+    "build": "npm run typecheck && vite build",
+    "typecheck": "tsc -b --pretty false && npm run typecheck:foundation && npm run architecture:check",
     "network:check": "node scripts/check-native-fields.mjs && node scripts/check-one-pass-snapshot.mjs && node scripts/check-native-dto-restore.mjs && node scripts/check-snapshot-scanner.mjs && node scripts/check-local-turret-prediction.mjs && node scripts/check-motion-prediction.mjs && node scripts/check-native-capture-plans.mjs && node --test scripts/check-authority-local-completion.mjs scripts/check-projection-encoding-cache.mjs scripts/check-authority-capture-reuse.mjs scripts/check-snapshot-encoder-worker.mjs scripts/check-lan-socket-close.mjs scripts/check-multiplayer-measurement.mjs scripts/check-render-network-diagnostics.mjs scripts/check-authority-io.mjs scripts/check-relay-projection.mjs scripts/check-network-activation.mjs scripts/check-network-diagnostics.mjs scripts/check-network-session-log.mjs scripts/check-network-session-integration.mjs scripts/check-network-n2n.mjs scripts/check-network-runtime-diagnostics.mjs scripts/check-snapshot-pipeline.mjs scripts/check-background-heartbeat.mjs scripts/check-network-publication.mjs scripts/check-lan-binary-delta.mjs scripts/check-lan-delta-relay.mjs scripts/check-lan-delta-client.mjs scripts/check-lan-delta-worker.mjs scripts/check-lan-ordered-websocket.mjs scripts/check-snapshot-broadcast-order.mjs scripts/check-snapshot-delivery-window.mjs scripts/check-snapshot-motion-reference.mjs scripts/check-lan-motion-reference.mjs scripts/check-lan-congestion.mjs scripts/check-lan-diagnostics.mjs scripts/check-lan-broadcast-compression.mjs scripts/check-lan-delta-continuity.mjs scripts/check-lan-control-lane.mjs scripts/check-layered-motion.mjs scripts/check-motion-wire.mjs scripts/check-critical-combat.mjs scripts/check-snapshot-chunks.mjs scripts/check-realtime-send-policy.mjs scripts/check-server-authority-lifecycle.mjs scripts/check-motion-authority.mjs scripts/check-projectile-events.mjs scripts/check-projectile-visuals.mjs scripts/check-anchored-projectile-visuals.mjs scripts/check-lan-projectile-visuals.mjs scripts/check-weapon-component.mjs scripts/check-motion-display.mjs scripts/check-particle-motion-reference.mjs && node scripts/check-weapon-replica.mjs && node scripts/check-local-fire-prediction.mjs && node scripts/check-projectile-flight.mjs && node scripts/check-local-particle-events.mjs && node --test scripts/check-hull-overlay-visibility.mjs",
     "network:check:shared": "node scripts/check-native-capture.mjs && node --test scripts/check-shared-snapshot-codec.mjs scripts/check-relay-projection.mjs && node scripts/check-shared-authority-transports.mjs && node --test scripts/check-network-publication.mjs scripts/check-snapshot-pipeline.mjs scripts/check-snapshot-delivery-window.mjs scripts/check-snapshot-broadcast-order.mjs scripts/check-steam-binary-host.mjs scripts/check-steam-binary-gateway.mjs scripts/check-steam-snapshot-prepare.mjs",
     "lint": "oxlint",
@@ -46,7 +46,19 @@
     "network:check:ship-view": "node scripts/check-ship-network-view.mjs",
     "network:benchmark:ship-view": "node scripts/benchmark-ship-network-view.mjs",
     "network:check:scanner": "node scripts/check-snapshot-scanner.mjs",
-    "network:benchmark:scanner": "node scripts/benchmark-snapshot-scanner.mjs"
+    "network:benchmark:scanner": "node scripts/benchmark-snapshot-scanner.mjs",
+    "architecture:check": "node scripts/check-architecture.mjs",
+    "checks:catalog": "node scripts/check-affected.mjs --catalog",
+    "check:affected": "node scripts/check-affected.mjs",
+    "typecheck:foundation": "tsc -p tsconfig.foundation.json --pretty false && tsc -p tsconfig.stage-contracts.json --pretty false && node scripts/generate-foundation-declarations.mjs --check",
+    "typecheck:combat": "tsc -p tsconfig.combat.json --pretty false",
+    "typecheck:campaign": "tsc -p tsconfig.campaign-dev.json --pretty false && tsc -p tsconfig.campaign.json --pretty false",
+    "foundation:check": "npm run architecture:check && npm run typecheck:foundation && node --test scripts/check-foundation-tools.mjs scripts/check-versioned-migrations.mjs scripts/check-game-save-boundary.mjs && node scripts/check-ui-contracts.mjs && node scripts/check-development-targets.mjs",
+    "dev:combat": "vite --config vite.combat.config.ts",
+    "dev:campaign": "vite --config vite.campaign-dev.config.ts",
+    "build:combat": "npm run typecheck:combat && npm run architecture:check && vite build --config vite.combat.config.ts",
+    "build:campaign:dev": "npm run typecheck:campaign && vite build --config vite.campaign-dev.config.ts",
+    "replay:combat": "node scripts/replay-local-combat.mjs"
   },
   "dependencies": {
     "@msgpack/msgpack": "3.1.3",

@@ -10,6 +10,7 @@ export class SnapshotPrepareBroker {
   }), timeoutMs = 8000 } = {}) {
     this.deliver = deliver; this.onFault = onFault; this.workerFactory = workerFactory; this.timeoutMs = timeoutMs;
     this.records = new Map(); this.owners = new Map(); this.serial = 0; this.keySerial = 0;
+    this.drains = new Map();
     this.worker = null; this.ready = false; this.closed = false; this.failed = false;
     this.active = null; this.latest = null; this.scheduled = null; this.timer = null;
     this.metrics = { offered: 0, replaced: 0, prepared: 0, accepted: 0, stale: 0, faults: 0,
@@ -21,6 +22,19 @@ export class SnapshotPrepareBroker {
       active: !!this.active, pending: !!this.latest, ready: this.ready, failed: this.failed };
   }
   peerDiagnostics(owner) { return this.owners.get(owner)?.stats ?? null; }
+  // Terminal controls wait for this peer's already-admitted state proposals.
+  // Credits/admission are unchanged; no old world is retained for a retry.
+  drain(owner, done) {
+    if (this.closed) return false;
+    this.drains.set(owner, done); this.flushDrains(); return true;
+  }
+  flushDrains() {
+    for (const [owner, done] of this.drains) {
+      const record = this.owners.get(owner);
+      if (record && (this.latest?.peers.has(record.key) || this.active?.peers.has(record.key))) continue;
+      this.drains.delete(owner); done();
+    }
+  }
   ensureWorker() {
     if (this.worker || this.closed) return;
     try {
@@ -68,7 +82,7 @@ export class SnapshotPrepareBroker {
       const r = this.records.get(p.key);
       return r && r.epoch === p.epoch && r.owner.snapshotWritable;
     });
-    if (!peers.length) return;
+    if (!peers.length) { this.flushDrains(); return; }
     const value = job.value, binary = typeof value !== 'string';
     // Never detach relay/shared codec bytes. Only this bounded copy is moved.
     const input = binary ? { kind: 'binary', data: Uint8Array.from(value.bytes).buffer } : { kind: 'json', data: value };
@@ -118,7 +132,7 @@ export class SnapshotPrepareBroker {
         const record = this.records.get(stat.key);
         if (record?.epoch === stat.epoch) record.stats = stat.delta;
       }
-      clearTimeout(this.timer); this.active = null; this.schedule(); return;
+      clearTimeout(this.timer); this.active = null; this.flushDrains(); this.schedule(); return;
     }
     throw Error('Unexpected preparation reply');
   }
@@ -129,6 +143,7 @@ export class SnapshotPrepareBroker {
     try { if (this.worker) this.post({ op: 'reset', key: r.key, epoch: r.epoch }); } catch { this.fail(); }
   }
   retire(owner) {
+    this.drains.delete(owner);
     const r = this.owners.get(owner); if (!r) return;
     this.owners.delete(owner); this.records.delete(r.key); this.latest?.peers.delete(r.key);
     if (this.latest && !this.latest.peers.size) this.latest = null;
@@ -143,7 +158,7 @@ export class SnapshotPrepareBroker {
   async close() {
     if (this.closed) return this.termination;
     this.closed = true; clearTimeout(this.timer); clearImmediate(this.scheduled);
-    this.latest = null; this.active = null; this.records.clear(); this.owners.clear();
+    this.latest = null; this.active = null; this.drains.clear(); this.records.clear(); this.owners.clear();
     this.termination = this.worker?.terminate().catch(() => {});
     return this.termination;
   }

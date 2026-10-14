@@ -1,6 +1,7 @@
 import type { CombatRenderView } from '../CombatRenderView';
 import type { WebGLPassContext } from './WebGLPassContext';
 import { WebGLShaderUtil } from './WebGLShaderUtil';
+import { gravityFieldEffect, gravityTractorEffect, gravityPushEffect, type GravityLensGeometry } from '../GravityEffectGeometry';
 
 const vertex=`#version 300 es
 out vec2 uv;
@@ -10,7 +11,7 @@ precision highp float;
 in vec2 uv;out vec4 color;
 uniform sampler2D scene;
 uniform vec2 camera,worldSize,center,endPoint;
-uniform float radius,power,clock,progress;
+uniform float radius,power,clock,progress,forceSign;
 uniform int kind;
 void main(){
  vec2 world=camera+(uv-.5)*worldSize*vec2(1.,-1.);
@@ -21,32 +22,31 @@ void main(){
   float along=dot(d,dir)/len,perp=dot(d,side),t=clamp(along,0.,1.);
   float width=R*(.35+.65*sin(t*3.141593));
   mask=exp(-pow(perp/max(width,1.),2.))*smoothstep(0.,.07,along)*(1.-smoothstep(.9,1.04,along));
-  offset=side*sin(perp/max(width,1.)*3.)*mask*8.*power;
-  offset+=dir*mask*3.*power*sin(clock*5.-t*11.);
-  dim=mask*.035*power;
- }else if(kind==2){
+  offset=side*sin(perp/max(width,1.)*3.)*mask*3.*power;
+  offset+=dir*mask*1.5*power*sin(clock*5.-t*11.);
+  dim=mask*.01*power;
+ }else if(kind==2 || kind==4){
   float band=(r-R)/max(24.,R*.045);
   mask=exp(-band*band)*power;
-  offset=normal*mask*12.;light=mask*.025;
+  offset=normal*mask*(kind==4?9.:6.);light=mask*.016;
  }else{
   float q=r/R;mask=(1.-smoothstep(.72,1.,q))*power;
   float core=kind==0?.11:mix(.16,.025,progress);
   float ridge=exp(-pow((q-core)/.022,2.));
-  offset=-normal*mask*(kind==0?7.:20.)*(.3+.7*exp(-pow((q-core)/.22,2.)));
-  offset+=vec2(-normal.y,normal.x)*mask*(kind==0?2.:6.)*sin(clock*.9+q*5.);
-  dim=exp(-pow(q/max(core,.02),4.))*power*(kind==0?.35:.5);
-  light=ridge*power*.035;
+  offset=-normal*mask*(kind==0?3.:14.)*(.3+.7*exp(-pow((q-core)/.22,2.)));
+  offset+=vec2(-normal.y,normal.x)*mask*(kind==0?.8:2.)*sin(clock*.9+q*5.);
+  dim=exp(-pow(q/max(core,.02),4.))*power*(kind==0?.025:.09);
+  light=ridge*power*.018;
  }
  if(mask<.001){color=vec4(0.);return;}
- vec2 bend=offset/worldSize*vec2(1.,-1.);
+ vec2 bend=offset*forceSign/worldSize*vec2(1.,-1.);
  vec2 safe=clamp(uv+bend,vec2(.001),vec2(.999));
  vec3 sampleColor=texture(scene,safe).rgb;
  // Small chromatic shear, not a luminous laser or a colored screen wash.
- sampleColor.r=texture(scene,clamp(safe+bend*.08,vec2(.001),vec2(.999))).r;
+ sampleColor.r=texture(scene,clamp(safe+bend*.015,vec2(.001),vec2(.999))).r;
  sampleColor.b=texture(scene,clamp(safe-bend*.08,vec2(.001),vec2(.999))).b;
- color=vec4(sampleColor*(1.-dim)+vec3(.55,.7,.78)*light,min(.88,mask));
+ color=vec4(sampleColor*(1.-dim)+vec3(.82,.84,.8)*light,min(.88,mask));
 }`;
-interface Lens {x:number;y:number;endX:number;endY:number;radius:number;power:number;progress:number;kind:number}
 
 /** Copies the real combat image once, then refracts bounded regions before HUD.
  * All geometry and timing are authority state; this pass never alters simulation. */
@@ -73,21 +73,14 @@ export class GravityLensPass {
   }
  }
  render(engine:CombatRenderView,ctx:WebGLPassContext):void{
-  this.drawCalls=0;const lenses:Lens[]=[];
+  this.drawCalls=0;const lenses:GravityLensGeometry[]=[];
   for(const ship of engine.ships){
    if(ship.isDead||ship.hullHp<=0||ship.isDocked||ship.isRetreated||!ship.isVisibleTo(engine.playerShip.teamId))continue;
    for(const system of ship.allSystems){
-    const f=system.gravityField;if(!f||system.disabled||!system.isActive||system.state==='OUT')continue;
-    const kind=f.kind==='WELL'?0:f.kind==='COLLAPSE'?1:2;
-    const power=f.kind==='REPULSOR'?Math.max(0,1-(f.age/(f.duration??.4))**2):f.kind==='COLLAPSE'&&system.state==='ACTIVE'?Math.max(0,1-f.age/(f.duration??.35)):system.effectLevel;
-    lenses.push({x:f.x,y:f.y,endX:f.x,endY:f.y,radius:f.radius,power,kind,progress:system.state==='IN'?system.effectLevel:1});
+    const field=gravityFieldEffect(system),push=gravityPushEffect(system);
+    if(field)lenses.push(field);if(push)lenses.push(push);
    }
-   const pos=ship.interpolatedPos(ctx.alpha),facing=ship.interpolatedFacing(ctx.alpha);
-   for(const mount of ship.weapons){
-    const s=mount.gravityTractor;if(!s||s.phase==='IDLE'||mount.isDisabled)continue;
-    const p=pos.clone().add(mount.relativePos.clone().rotate(facing));
-    lenses.push({x:p.x,y:p.y,endX:s.contactX,endY:s.contactY,radius:32,power:s.phase==='HOLD'?1:Math.min(.7,s.capture/.22),kind:3,progress:0});
-   }
+   for(const mount of ship.weapons){const drag=gravityTractorEffect(ship,mount,ctx.alpha);if(drag)lenses.push(drag);}
   }
   const rows=lenses.filter(f=>f.power>.005&&f.radius>0).sort((a,b)=>b.kind-a.kind).filter(f=>{
    const pad=f.radius+30;return Math.max(f.x,f.endX)+pad>=ctx.viewport.left&&Math.min(f.x,f.endX)-pad<=ctx.viewport.right&&Math.max(f.y,f.endY)+pad>=ctx.viewport.bottom&&Math.min(f.y,f.endY)-pad<=ctx.viewport.top;
@@ -109,6 +102,7 @@ export class GravityLensPass {
    const y0=Math.max(0,Math.floor((ctx.viewport.top-Math.max(f.y,f.endY)-pad)/ctx.viewport.height*h));
    const y1=Math.min(h,Math.ceil((ctx.viewport.top-Math.min(f.y,f.endY)+pad)/ctx.viewport.height*h));
    if(x1<=x0||y1<=y0)continue;gl.scissor(x0,y0,x1-x0,y1-y0);
+   gl.uniform1f(uniform('forceSign'),f.forceSign??1);
    gl.uniform2f(uniform('center'),f.x,f.y);gl.uniform2f(uniform('endPoint'),f.endX,f.endY);
    gl.uniform1f(uniform('radius'),f.radius);gl.uniform1f(uniform('power'),f.power);gl.uniform1f(uniform('progress'),f.progress);gl.uniform1i(uniform('kind'),f.kind);
    gl.drawArrays(gl.TRIANGLES,0,3);this.drawCalls++;

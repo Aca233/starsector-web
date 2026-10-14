@@ -1,15 +1,11 @@
+import { packageRefit, packageHullBaseline } from '../engine/modding/ShipPackCatalog';
+import { upgradeGravityControlSpec } from '../engine/content/GravityControls';
 import { bundledHullTemplate } from '../engine/content/BundledHullTemplates';
-import { zhefengHulls, zhefengRefit } from '../engine/content/ZhefengPack';
-import { zhefengArmoryRefit } from '../engine/content/ZhefengArmory';
+import { extensionVariantsForHull } from './ExtensionVariantCatalog';
+import { nativeVariantsForHull } from './NativeVariantCatalog';
+import { importNativeVariant } from './NativeVariantImport';
 import { removeRetiredAdunWeapons } from './RetiredAdunWeapons';
 import { migrateGlorianaWeaponTiers } from './GlorianaTierMigration';
-import { gravityHulls, gravityRefit } from '../engine/content/GravityPack';
-import { gravityArmoryRefit } from '../engine/content/GravityArmory';
-import { rocinanteHulls, rocinanteRefit } from '../engine/content/RocinantePack';
-import { rocinanteArmoryRefit } from '../engine/content/RocinanteArmory';
-import { arkHulls, arkRefit } from '../engine/content/AdunArkPack';
-import { arkArmoryRefit } from '../engine/content/AdunArkArmory';
-import { arkWings } from '../engine/content/AdunArkAviation';
 import { ADUN_HULL_ID as RETIRED_ADUN_HULL_ID } from '../engine/content/SpearOfAdunIds';
 import { ADUN_ARK_ID } from '../engine/content/AdunArkIds';
 import { WEAPON_SIZE_LABELS, WEAPON_SIZE_RANK, weaponFitsSlotSize } from '../engine/content/WeaponSizes';
@@ -21,12 +17,7 @@ import { validCaptainProfile, type CaptainProfile } from "./CaptainProfile";
 import { combatSkillErrors } from "../engine/extensions/CombatSkills";
 import type { CombatSkillLoadout } from "../engine/extensions/CombatSkills";
 import { weaponFitsSlotType } from "../engine/content/WeaponCompatibility";
-import { hyperionArmoryRefit } from '../engine/content/HyperionArmory';
-import { hyperionHulls, hyperionRefit } from '../engine/content/HyperionPack';
-import { glorianaAviationRefit } from '../engine/content/GlorianaAviation';
-import { glorianaArmoryRefit } from '../engine/content/GlorianaArmory';
-import { zhuYuanHulls, zhuYuanRefit } from "../engine/content/ZhuYuanPack";
-import { GLORIANA_HULL_ID, glorianaHulls, glorianaRefit } from "../engine/content/GlorianaPack";
+import { GLORIANA_HULL_ID } from "../engine/content/GlorianaPack";
 import sourceShips from "../engine/data/generated/ships.json";
 import refitData from "./refit-data.json";
 import importedRefit from "../engine/data/generated/refit-source.json";
@@ -48,13 +39,14 @@ export interface RefitWing {
   displayName?: string; sourceRole?: string; roleDescription?: string; range?: number | null; formation?: string; category?: 'INTERCEPTOR' | 'FIGHTER' | 'BOMBER';
 }
 export interface ImportStatus { level: 'supported' | 'approximate' | 'unsupported'; reasons: string[]; }
+const packRefit = packageRefit();
 export const nativeRefit = {
   ...importedRefit,
-  ships: { ...importedRefit.ships, ...zhuYuanRefit.ships, ...glorianaRefit.ships, ...hyperionRefit.ships, ...arkRefit.ships, ...rocinanteRefit.ships, ...zhefengRefit.ships, ...gravityRefit.ships },
-  weapons: { ...importedRefit.weapons, ...zhuYuanRefit.weapons, ...glorianaArmoryRefit.weapons, ...glorianaAviationRefit.weapons, ...hyperionArmoryRefit.weapons, ...arkArmoryRefit.weapons, ...rocinanteArmoryRefit.weapons, ...zhefengArmoryRefit.weapons, ...gravityArmoryRefit.weapons },
-  wings: { ...importedRefit.wings, ...glorianaAviationRefit.wings, ...arkWings },
-  shipStatus: { ...importedRefit.shipStatus, ...zhuYuanRefit.shipStatus, ...glorianaRefit.shipStatus, ...hyperionRefit.shipStatus, ...arkRefit.shipStatus, ...rocinanteRefit.shipStatus, ...zhefengRefit.shipStatus, ...gravityRefit.shipStatus },
-  weaponStatus: { ...importedRefit.weaponStatus, ...zhuYuanRefit.weaponStatus, ...glorianaArmoryRefit.weaponStatus, ...hyperionArmoryRefit.weaponStatus, ...arkArmoryRefit.weaponStatus, ...rocinanteArmoryRefit.weaponStatus, ...zhefengArmoryRefit.weaponStatus, ...gravityArmoryRefit.weaponStatus },
+  ships: {...importedRefit.ships, ...packRefit.ships},
+  weapons: {...importedRefit.weapons, ...packRefit.weapons},
+  wings: {...importedRefit.wings, ...packRefit.wings},
+  shipStatus: {...importedRefit.shipStatus, ...packRefit.shipStatus},
+  weaponStatus: {...importedRefit.weaponStatus, ...packRefit.weaponStatus},
 } as unknown as {
   hullmods?: Record<string, {name: string; implemented: boolean; support?: HullModSupport}>;
   sourceBuiltInMods?: Record<string, string[]>;
@@ -86,11 +78,24 @@ export const data = { ...refitData, ships: {...nativeRefit.ships, ...refitData.s
   >;
 };
 export const hulls = Object.keys(data.ships).map((id) =>
-  modManager.requireShip(id),
-).filter(h => h.hullSize !== "FIGHTER" && !h.isModuleHull);
+  modManager.getShip(id),
+).filter((h): h is ShipSpec => !!h && h.hullSize !== "FIGHTER" && !h.isModuleHull);
 export const weapons = contentRegistry
   .getAllWeapons()
   .filter((w) => data.weapons[w.id] && w.id !== "tpc" && !nativeRefit.weapons[w.id]?.builtInOnly);
+/** Worker bootstrap installs package metadata before resolving deployment IDs. */
+export function refreshShipPackStudioCatalog(): void {
+  const next = packageRefit();
+  nativeRefit.ships = {...importedRefit.ships, ...next.ships};
+  nativeRefit.weapons = {...importedRefit.weapons, ...next.weapons};
+  nativeRefit.wings = {...importedRefit.wings, ...next.wings};
+  nativeRefit.shipStatus = {...importedRefit.shipStatus, ...next.shipStatus};
+  nativeRefit.weaponStatus = {...importedRefit.weaponStatus, ...next.weaponStatus};
+  data.ships = {...nativeRefit.ships, ...refitData.ships};
+  data.weapons = {...nativeRefit.weapons, ...refitData.weapons};
+  hulls.splice(0, hulls.length, ...Object.keys(data.ships).map(id => modManager.getShip(id)).filter((h): h is ShipSpec => !!h && h.hullSize !== 'FIGHTER' && !h.isModuleHull));
+  weapons.splice(0, weapons.length, ...contentRegistry.getAllWeapons().filter(w => data.weapons[w.id] && w.id !== 'tpc' && !nativeRefit.weapons[w.id]?.builtInOnly));
+}
 // One catalog drives installation UI, import validation, OP and battle effects.
 export const editableMods = hullModDefinitions.all()
   .filter(mod => mod.status === "implemented" && mod.refit && !mod.refit.builtInOnly)
@@ -173,7 +178,7 @@ export const baseHull = (id: string): ShipSpec | undefined => {
   return hull?.hullSize === 'FIGHTER' ? undefined : hull;
 };
 export const nativeHull = (id: string): ShipSpec =>
-  (sourceShips as unknown as Record<string, ShipSpec>)[id] ?? zhuYuanHulls[id] ?? glorianaHulls[id] ?? hyperionHulls[id] ?? arkHulls[id] ?? rocinanteHulls[id] ?? zhefengHulls[id] ?? gravityHulls[id];
+  (sourceShips as unknown as Record<string, ShipSpec>)[id] ?? packageHullBaseline(id)!;
 export const isBuiltIn = (hullId: string, slotId: string) =>
   !!nativeHull(hullId)?.weaponSlots.find((s) => s.slotId === slotId)
     ?.defaultWeaponId;
@@ -247,14 +252,21 @@ export function budget(d: Design) {
     wingOP,
   };
 }
-/** New hulls never inherit a preset. Legacy mode arguments both mean empty.
- * This only creates new drafts; saved designs/imports keep their explicit equipment. */
+/** New drafts use the first catalogue fit. Empty is reserved for clearing and import factories.
+ * Saved designs keep their explicit equipment. */
 export function createDesign(
-  hullId = "web_zhuyuan",
-  _mode: "standard" | "empty" = "empty",
+  hullId = baseHull('web_zhuyuan') ? 'web_zhuyuan' : hulls[0]?.id ?? '',
+  mode: "standard" | "empty" = "standard",
 ): Design {
   const hull = baseHull(hullId);
   if (!hull) throw new Error("当前舰体不支持改装。");
+  if (mode === 'standard' && !hull.isModuleHull) {
+    const native = nativeVariantsForHull(hullId)[0];
+    if (native) return importNativeVariant(native.raw).design;
+    const extension = extensionVariantsForHull(hullId)[0];
+    if (extension) return extension.create();
+    throw new Error('该舰体缺少默认装配模板：' + hullId);
+  }
   const d: Design = {
     version: 1, id: randomId(), name: `${data.ships[hullId].name} · 方案 01`, hullId,
     weapons: Object.fromEntries(hull.weaponSlots.map(slot => [slot.slotId,
@@ -325,6 +337,7 @@ function evaluateAssembly(d: Design, template: ShipSpec | undefined, state: { co
   spec.sourceVariantId = d.sourceVariantId;
   if (d.systemTypes !== undefined) spec.systemTypes = [...d.systemTypes];
   if (d.rightClickSystemType !== undefined) spec.rightClickSystemType = d.rightClickSystemType;
+  upgradeGravityControlSpec(spec);
   if (!template && spec.moduleSlots?.length && d.sourceVariantId) {
     try { spec.modules = nativeModules(d.hullId, d.sourceVariantId); }
     catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }

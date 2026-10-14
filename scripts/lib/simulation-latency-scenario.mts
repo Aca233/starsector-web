@@ -3,15 +3,27 @@ import { CombatPresentationEncoder } from '../../src/engine/runtime/local/Combat
 import { CombatPresentationDecoder } from '../../src/engine/runtime/local/CombatPresentationDecoder';
 import { captureCombat } from '../../src/network/AuthorityCombatSnapshot';
 import { encodeProjectedBinaryFrame } from '../../src/network/BinarySnapshot.mjs';
-export function scenario(count: number, hull: string, enemyHull = hull) {
+import { isImmutableMetadata } from '../../src/engine/extensions/Immutable';
+import { enableLocalCombatReadDomain } from '../../src/engine/runtime/local/LocalCombatReadDomain';
+export function scenario(count: number, hull: string, enemyHull = hull, workerOwned = false) {
   const kernel = new LocalCombatKernel({ playerHull: hull, enemyHull, seed: 917, multicore: false,
     additionalShips: Array.from({ length: count - 2 }, (_, i) => ({ hull: i % 2 === 0 ? hull : enemyHull, isPlayer: i % 2 === 0,
       position: [((i >> 1) % 8 - 3.5) * 700, (i % 2 ? 1 : -1) * (1300 + Math.floor(i / 16) * 650)] as [number, number],
       facing: i % 2 ? -Math.PI / 2 : Math.PI / 2 })) });
+  if (workerOwned) enableLocalCombatReadDomain(kernel.engine);
   const encoder = new CombatPresentationEncoder(1), decoder = new CombatPresentationDecoder(1, 'render-strict');
   const sample = { autopilot: true, blocked: false, keys: {}, aim: [0, 0] as [number, number], firing: false, mouseSteering: false, pointerActive: false };
   let recycle: ArrayBuffer | undefined, recycleVisuals: ArrayBuffer | undefined;
   return {
+    initialTerrain: { asteroids: kernel.engine.asteroids.length, openBattlefield: kernel.engine.openBattlefield },
+    // Diagnostics are outside the measured tick and intentionally differ by arm.
+    metadataCounts() {
+      const ships = [...new Set([...kernel.engine.allCapitalShips, ...kernel.engine.ships])];
+      return { ships: ships.length, immutableSpecs: ships.filter(s => isImmutableMetadata(s.spec)).length,
+        bounds: ships.filter(s => s.spec.bounds?.length).length,
+        deeplyFrozenBounds: ships.filter(s => s.spec.bounds?.length && Object.isFrozen(s.spec.bounds)
+          && s.spec.bounds.every(point => Object.isFrozen(point))).length };
+    },
     advance() {
       const start = performance.now();
       // Same kernel as local-combat.worker, without IPC, pacing or AI Workers.

@@ -97,15 +97,19 @@ export function policyAction(policy: CombatPolicy, state: number | null): Policy
 
 // Serial offline training only: WeakMap entries cannot leak between encounters or worker realms.
 // Live workers all import the SAME immutable, bundled JSON; never fetch a policy mid-battle.
+let trainingActionCount = 0;
 const trainingActions = new WeakMap<Ship, PolicyAction>();
 export function setTrainingAction(ship: Ship, action: PolicyAction | null): void {
-  if (action === null) trainingActions.delete(ship);
-  else {
+  if (action === null) {
+    if (trainingActions.delete(ship) && trainingActionCount > 0) trainingActionCount--;
+  } else {
     if (!POLICY_ACTIONS.includes(action)) throw new Error('Unknown combat learning action');
+    if (!trainingActions.has(ship)) trainingActionCount++;
     trainingActions.set(ship, action);
   }
 }
 export function shipPolicyAction(ship: Ship, target: Ship | null = ship.currentTargetShip): PolicyAction {
+  if (trainingActionCount === 0 && !deployedPolicy.enabled) return 'BALANCED';
   if (ship.fireControlMode !== 'AI' || !validContact(ship, target)) return 'BALANCED';
   const action = trainingActions.get(ship);
   if (action !== undefined) return action;

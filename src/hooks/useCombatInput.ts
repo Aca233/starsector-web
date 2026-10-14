@@ -1,3 +1,4 @@
+import { GRAVITY_HOLD_KEY, GRAVITY_PUSH_KEY, isDirectionalGravitySystem, isCursorGravitySystem } from '../engine/simulation/systems/GravityControlInput';
 import { pickModuleFireControl } from '../engine/runtime/ModuleFireControl';
 import { HYPERION_JUMP_ID } from '../engine/content/HyperionIds';
 import { HYPERION_REACTOR, jumpTargetingEntryFailure } from '../engine/content/HyperionJumpTarget';
@@ -11,6 +12,9 @@ import { CombatSession } from '../engine/runtime/CombatSession';
 import { clientToCombatWorld, zoomCombatView } from '../engine/runtime/PlayerControls';
 import { isCombatTextEntry, isCombatPointerUi, hasCombatModal, hasCombatInputFocus } from '../engine/runtime/CombatInputFocus';
 import { flightKey, shipCommandForKey, shipCommandForMouse, type ShipCommand } from '../engine/runtime/CombatCommands';
+
+const backingZoom = (canvas: HTMLCanvasElement, cssZoom: number) =>
+  cssZoom * (canvas.clientWidth > 0 ? canvas.width / canvas.clientWidth : 1);
 
 export interface UseCombatInputParams {
   sessionRef: React.MutableRefObject<CombatSession>;
@@ -67,6 +71,8 @@ export function useCombatInput({
   }, [commandNotice]);
   const ownershipRequest = useRef(0);
   const heldCodes = useRef(new Set<string>());
+  const gravityHeldCodes = useRef(new Set<string>());
+  const pushHeldCodes = useRef(new Set<string>());
   const pointerHeld = useRef(false);
   const inputGeneration = useRef(0);
   const [takeoverNotice, setTakeoverNotice] = useState<{ ship: Ship } | null>(null);
@@ -90,6 +96,7 @@ export function useCombatInput({
     const session = sessionRef.current, epoch = session.controlEpoch, ship = session.read.playerShip;
     const request = ++ownershipRequest.current;
     resetHeldInput(keysPressed, isMouseDown);
+    if (enabled) { gravityHeldCodes.current.clear(); pushHeldCodes.current.clear(); }
     const result = await session.dispatchControl({kind:'pilot',autopilot:enabled});
     if (!result.accepted || sessionRef.current !== session || session.controlEpoch !== epoch || request !== ownershipRequest.current) return false;
     isAutopilotRef.current = enabled; setIsAutopilot(enabled);
@@ -107,7 +114,7 @@ export function useCombatInput({
       const reason = jumpTargetingEntryFailure(session.read.playerShip.systems[action.value ?? 0]);
       if (reason) { setCommandNotice(reason); return; }
     }
-    const aim = clientToCombatWorld(mouseScreenPos.current, canvas, cameraPosRef.current, zoomRef.current);
+    const aim = clientToCombatWorld(mouseScreenPos.current, canvas, cameraPosRef.current, backingZoom(canvas, zoomRef.current));
     const pointerActive = mouseAimActiveRef.current;
     if (!await takeManualControl() || session.controlEpoch !== epoch || generation !== inputGeneration.current || inputBlockedRef.current || !hasCombatInputFocus()) return;
     if (jump && action.kind === 'system') {
@@ -138,7 +145,7 @@ export function useCombatInput({
 
     const clearTransientInput = () => {
       sessionRef.current.jumpTargeting.cancel();
-      inputGeneration.current++; heldCodes.current.clear(); pointerHeld.current = false;
+      inputGeneration.current++; heldCodes.current.clear(); gravityHeldCodes.current.clear(); pushHeldCodes.current.clear(); pointerHeld.current = false;
       resetInputState(keysPressed, isMouseDown, sessionRef.current);
     };
 
@@ -175,6 +182,12 @@ export function useCombatInput({
       if (mouseAimActiveRef.current) sessionRef.current.cameraController.samplePointer(e.clientX, e.clientY);
     };
 
+    const pressDirectionalPush=async(code:string)=>{
+      const session=sessionRef.current,generation=inputGeneration.current,epoch=session.controlEpoch;
+      pushHeldCodes.current.add(code);
+      if(await takeManualControl()&&pushHeldCodes.current.has(code)&&generation===inputGeneration.current&&epoch===session.controlEpoch
+        &&session.state==='running'&&!inputBlockedRef.current&&hasCombatInputFocus())keysPressed.current[GRAVITY_PUSH_KEY]=true;
+    };
     const onMouseDown = async (e: MouseEvent) => {
       if (blocked(e.target, true) || e.target !== canvas || e.ctrlKey || e.altKey || e.metaKey) return;
       canvas.focus({ preventScroll: true });
@@ -193,7 +206,7 @@ export function useCombatInput({
       if (session.jumpTargeting.active && (e.button === 0 || e.button === 2)) {
         e.preventDefault(); isMouseDown.current = false; pointerHeld.current = false;
         if (e.button === 2) { session.jumpTargeting.cancel(); return; }
-        session.updateJumpTargeting(clientToCombatWorld(mouseScreenPos.current, curCanvas, cameraPosRef.current, zoomRef.current));
+        session.updateJumpTargeting(clientToCombatWorld(mouseScreenPos.current, curCanvas, cameraPosRef.current, backingZoom(curCanvas, zoomRef.current)));
         const target = session.jumpTargeting.preview, selection = session.jumpTargeting.selection;
         if (!target?.valid || !selection) return;
         if (!session.jumpTargeting.choosingFacing) { session.jumpTargeting.lockPosition(); return; }
@@ -207,7 +220,7 @@ export function useCombatInput({
       }
       if (jumpConfirmPending.current) { e.preventDefault(); return; }
       if (e.button === 0) {
-        const point = clientToCombatWorld(mouseScreenPos.current, curCanvas, cameraPosRef.current, zoomRef.current);
+        const point = clientToCombatWorld(mouseScreenPos.current, curCanvas, cameraPosRef.current, backingZoom(curCanvas, zoomRef.current));
         const module = !engine.battleResult ? pickModuleFireControl(engine.playerShip, engine.ships, point,
           session.state === 'running' ? session.scheduler.alpha : 1) : undefined;
         if (module !== undefined) {
@@ -224,16 +237,27 @@ export function useCombatInput({
         isMouseDown.current = true;
       } else if (e.button === 2) {
         e.preventDefault();
-        command({ kind: e.shiftKey ? 'hullShield' : 'shield' });
+        if(!e.shiftKey&&isDirectionalGravitySystem(engine.playerShip.defenseSystem?.type??''))await pressDirectionalPush('Mouse2');
+        else command({ kind: e.shiftKey ? 'hullShield' : 'shield' });
       } else {
         // The browser gesture guard already prevents side-button navigation;
         // defaultPrevented must not suppress the game's binding here.
         const action = shipCommandForMouse(e, engine.playerShip);
-        if (action) { e.preventDefault(); command(action); }
+        if (action) {
+          e.preventDefault();
+          const field = action.kind === 'system' && isCursorGravitySystem(engine.playerShip.systems[action.value ?? 0]?.type ?? '');
+          const code = `Mouse${e.button}`;
+          if (field) gravityHeldCodes.current.add(code);
+          await command(action);
+          if (field && gravityHeldCodes.current.has(code) && hasCombatInputFocus()) keysPressed.current[GRAVITY_HOLD_KEY] = true;
+        }
       }
     };
 
     const onMouseUp = (e: MouseEvent) => {
+      pushHeldCodes.current.delete(`Mouse${e.button}`);keysPressed.current[GRAVITY_PUSH_KEY]=pushHeldCodes.current.size>0;
+      gravityHeldCodes.current.delete(`Mouse${e.button}`);
+      keysPressed.current[GRAVITY_HOLD_KEY] = gravityHeldCodes.current.size > 0;
       if (e.button !== 0) return;
       pointerHeld.current = false; isMouseDown.current = false;
       sessionRef.current.dispatchControl({ kind: 'stop-firing' });
@@ -283,7 +307,13 @@ export function useCombatInput({
       }
       if (action) {
         e.preventDefault();
-        if (!e.repeat) command(action);
+        if(action.kind==='shield'&&isDirectionalGravitySystem(engine.playerShip.defenseSystem?.type??'')){if(!e.repeat)await pressDirectionalPush(e.code);return;}
+        if (!e.repeat) {
+          const field = action.kind === 'system' && isCursorGravitySystem(engine.playerShip.systems[action.value ?? 0]?.type ?? '');
+          if (field) gravityHeldCodes.current.add(e.code);
+          await command(action);
+          if (field && gravityHeldCodes.current.has(e.code) && hasCombatInputFocus()) keysPressed.current[GRAVITY_HOLD_KEY] = true;
+        }
         return;
       }
       if (flightKey(e.code)) {
@@ -298,10 +328,14 @@ export function useCombatInput({
       }
     };
 
-    const onKeyUp = (e: KeyboardEvent) => { heldCodes.current.delete(e.code); keysPressed.current[e.code] = false; };
+    const onKeyUp = (e: KeyboardEvent) => {
+      heldCodes.current.delete(e.code); keysPressed.current[e.code] = false;
+      pushHeldCodes.current.delete(e.code);keysPressed.current[GRAVITY_PUSH_KEY]=pushHeldCodes.current.size>0;
+      gravityHeldCodes.current.delete(e.code); keysPressed.current[GRAVITY_HOLD_KEY] = gravityHeldCodes.current.size > 0;
+    };
     const onVisibility = () => { if (document.hidden) loseFocus(); };
     const onFocus = (event: FocusEvent) => { if (isCombatTextEntry(event.target) || hasCombatModal()) loseFocus(); };
-    const onPointerLeave = () => { pointerHeld.current = false; mouseAimActiveRef.current = false; sessionRef.current.cameraController.suspendPointer(); isMouseDown.current = false; sessionRef.current.dispatchControl({ kind: 'stop-firing' }); };
+    const onPointerLeave = () => { pushHeldCodes.current.clear();keysPressed.current[GRAVITY_PUSH_KEY]=false;gravityHeldCodes.current.clear(); keysPressed.current[GRAVITY_HOLD_KEY] = false; pointerHeld.current = false; mouseAimActiveRef.current = false; sessionRef.current.cameraController.suspendPointer(); isMouseDown.current = false; sessionRef.current.dispatchControl({ kind: 'stop-firing' }); };
 
     document.addEventListener('focusin', onFocus);
     canvas.addEventListener('mouseleave', onPointerLeave);

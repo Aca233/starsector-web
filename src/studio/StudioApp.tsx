@@ -417,7 +417,7 @@ export function StudioApp({ homeNavigation }: { homeNavigation: HomeNavigation }
         </Suspense>
       ) : (
         <NativeRefit
-          key={editorKey}
+          openRevision={editorKey}
           hullFilter={hullFilter}
           onHullFilter={setHullFilter}
           readHullScroll={readHullScroll}
@@ -468,8 +468,8 @@ export function StudioApp({ homeNavigation }: { homeNavigation: HomeNavigation }
           }
           onNew={() =>
             guard(
-              () => open(withDesignCaptain(createDesign(draft.hullId, "empty"), draft)),
-              "新建空白方案？",
+              () => open(withDesignCaptain(createDesign(draft.hullId), draft)),
+              "使用首个模板新建方案？",
             )
           }
           onDelete={remove}

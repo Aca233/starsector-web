@@ -2,20 +2,26 @@ import { PresentationSettingsPanel } from '../ui/PresentationSettingsPanel';
 import { SystemBindingSettings } from '../ui/SystemBindingSettings';
 import { MotionPresence } from '../ui/core/MotionPresence';
 import { FullscreenButton } from '../ui/FullscreenButton';
-import { useEffect, useId, useState } from 'react';
+import { lazy, Suspense, useEffect, useId, useState } from 'react';
 import { Modal } from '../ui/core/UI';
 import { LocalBattleSizeSettings } from '../ui/BattleSizeControl';
-import { hullCount, weaponCount } from 'virtual:studio-summary';
+import { bundledShipPacks } from '../engine/modding/BundledShipPacks';
+import { selectShipPacks } from '../engine/modding/ShipPackSelection';
 import './native-home.css';
+const ShipPackPanel = lazy(() => import('./ShipPackPanel').then(module => ({default: module.ShipPackPanel})));
 
 const settingsSections = [
   { id: 'presentation', label: '声音与画面', number: '01' },
   { id: 'battle', label: '战斗规模', number: '02' },
   { id: 'bindings', label: '快捷键', number: '03' },
+  { id: 'packs', label: '舰船包', number: '04' },
 ] as const;
 type SettingsSection = typeof settingsSections[number]['id'];
 
 export function NativeHome({ onEnter, onSkills, onLan, onSteam, entryError, staticHosted, lanLabel }: { onEnter: () => void; onSkills: () => void; onLan?: () => void; onSteam?: () => void; entryError?: string; staticHosted?: boolean; lanLabel?: string }) {
+  const activePacks = selectShipPacks(bundledShipPacks);
+  const hullCount = activePacks.length;
+  const weaponCount = activePacks.flatMap(pack => pack.weapons).filter(weapon => !weapon.systemOnly && !activePacks.some(pack => pack.refit.weapons[weapon.id]?.builtInOnly)).length;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('presentation');
   const settingsId = useId();
@@ -91,6 +97,7 @@ export function NativeHome({ onEnter, onSkills, onLan, onSteam, entryError, stat
         <div className="fleet-settings-section" role="tabpanel" id={`${settingsId}-presentation-panel`} aria-labelledby={`${settingsId}-presentation-tab`} hidden={settingsSection !== 'presentation'}><PresentationSettingsPanel /></div>
         <div className="fleet-settings-section" role="tabpanel" id={`${settingsId}-battle-panel`} aria-labelledby={`${settingsId}-battle-tab`} hidden={settingsSection !== 'battle'}><LocalBattleSizeSettings /></div>
         <div className="fleet-settings-section" role="tabpanel" id={`${settingsId}-bindings-panel`} aria-labelledby={`${settingsId}-bindings-tab`} hidden={settingsSection !== 'bindings'}><SystemBindingSettings /></div>
+        {settingsSection === 'packs' && <div className="fleet-settings-section" role="tabpanel" id={`${settingsId}-packs-panel`} aria-labelledby={`${settingsId}-packs-tab`}><Suspense fallback={<p role="status">正在读取舰船包…</p>}><ShipPackPanel /></Suspense></div>}
       </Modal>}</MotionPresence>
     </main>
   );

@@ -1,3 +1,4 @@
+import type { CombatWorkerBudgetStatus } from '../../contracts/CombatTelemetry';
 /** Session-local wall-cost guard, not a simulation-rate controller.
  * Every probe/trial still executes one full 1/60 authority step. A losing owner
  * path is retired instead of making a low-load room pay worker overhead forever.
@@ -20,7 +21,7 @@ export class CombatWorkerBudget {
   private lastRejectedParallelMs = 0;
   private pausedUntil = 0;
   private reasonValue = 'warming-up';
-  get status() { return { reason: this.reasonValue, serialMs: this.serialMs,
+  get status(): CombatWorkerBudgetStatus { return { reason: this.reasonValue, serialMs: this.serialMs,
     parallelMs: this.parallelMs, lastRejectedParallelMs: this.lastRejectedParallelMs, serialSamples: this.serialCount, parallelSamples: this.parallelCount, serialProbeSamples: this.serialProbeCount, lastRejectedSerialMs: this.lastRejectedSerialMs, lastRejectedShips: this.lastRejectedShips }; }
   allow(ships: number, now: number): boolean {
     this.observedShips = ships;

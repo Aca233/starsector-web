@@ -21,7 +21,10 @@ export async function loadCombatLab({ autofireBaseline, ownedAdmissionBaseline, 
   await build({ entryPoints: ['scripts/ai/CombatLab.ts'], outfile, bundle: true, platform: 'node',
     define: { 'import.meta.env.BASE_URL': JSON.stringify('/') },
     format: 'esm', target: 'node22', logLevel: 'warning',
-    plugins: autofireBaseline || referenceAdmission || fleetTacticsBaseline || publisherBaseline ? [{ name: 'combat-references', setup(b) {
+    plugins: [{ name: 'raw-variants', setup(b) {
+      b.onLoad({ filter: /simulation-variants\.json$/ }, async info => ({
+        contents: await readFile(info.path, 'utf8'), loader: 'text' }));
+    } }, ...(autofireBaseline || referenceAdmission || fleetTacticsBaseline || publisherBaseline ? [{ name: 'combat-references', setup(b) {
       b.onLoad({ filter: /[/\\]CombatLab\.ts$/ }, async info => ({ loader: 'ts', resolveDir: path.dirname(info.path),
         contents: await readFile(info.path, 'utf8')
           + (autofireBaseline ? '\nexport { AutofireController as BeforeAutofireController } from "autofire-before";\n' : '')
@@ -46,7 +49,7 @@ export async function loadCombatLab({ autofireBaseline, ownedAdmissionBaseline, 
       // Same module, same native callback WeakMaps: do not instantiate a second Ship class.
       if (referenceAdmission) b.onLoad({ filter: /[/\\]simulation[/\\]Ship\.ts$/ }, async info => ({ loader: 'ts',
         resolveDir: path.dirname(info.path), contents: await readFile(info.path, 'utf8') + '\n' + referenceAdmission + '\n' }));
-    } }] : [] });
+    } }] : [])] });
   const engineBundleSha256 = createHash('sha256').update(await readFile(outfile)).digest('hex');
   return { ...await import(pathToFileURL(outfile).href), engineBundleSha256, engineBundlePath: outfile };
 }

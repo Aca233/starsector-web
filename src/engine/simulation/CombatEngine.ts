@@ -1,5 +1,5 @@
 import { publishNativeFireMembership } from './PublishedFireMembership';
-import { beginStage, bindStage, stageFor, closeStageFor } from '../ai/batch/StageProducer';
+import { beginStage, bindStage, stageFor, closeStageFor, type StageView } from '../ai/batch/StageProducer';
 import { aiStage } from '../ai/batch/AIInputs';
 import { solveAIHostile } from '../ai/batch/AIBatch';
 import { FlightDecisionRoster } from './systems/FlightDecisionRoster';
@@ -23,7 +23,8 @@ import type { ShipLossNotification } from './CombatNotifications';
 import { sameTeam } from "./CombatTeams";
 import type { AIPhaseBatch } from '../ai/multicore/Types';
 import { shipExplosionPayload } from './systems/ShipExplosion';
-import { DEFAULT_PLAYER_HULL, DEFAULT_ENEMY_HULL, defaultOpponent } from '../data/SandboxDefaults';
+import { defaultPlayerHull, defaultOpponent } from '../data/SandboxDefaults';
+import { defaultShipFit } from '../content/DefaultShipFit';
 import { clearEffectState } from '../extensions/EffectState';
 import { FIRE_CONTROL_QUERY_MIN_SHIPS, FireControlQueryRoster } from '../ai/FireControlQueryBatch';
 import { NavigationObstacleIndex } from '../ai/NavigationObstacleIndex';
@@ -85,7 +86,7 @@ import { WeaponSimulationSystem, type WeaponSimContext } from './systems/WeaponS
 import { ShipCollisionSystem, nativeResolveShipCollision } from './systems/ShipCollisionSystem';
 import { advanceGravityFields } from './systems/GravityFieldPhysics';
 import { advanceGravityDamage } from './systems/GravityDamage';
-import { advanceGravityTerrain } from './systems/GravityTerrain';
+import { advanceGravityTerrain, resolveHulkCollisions } from './systems/GravityTerrain';
 import { CombatShipStatusSystem } from './systems/CombatShipStatusSystem';
 import { CombatStatsTracker } from './systems/CombatStatsTracker';
 import { BattleResult } from './CombatStatistics';
@@ -150,6 +151,8 @@ export class CombatEngine {
     if (!Number.isInteger(pointLimit) || pointLimit <= 0 || pointLimit > 20000 || flagshipCost > pointLimit) throw new Error("旗舰部署点超过本方额度，请在游戏设置提高战斗规模。");
     if (this.combatTime !== 0 || this.reinforcements.length) throw new Error('只能在新模拟战斗中初始化部署。');
     this.isSimulation = true;
+    // Restart/deployment must retain the public, distance-independent visibility.
+    this.openBattlefield = true;
     this.simulationPointLimit = pointLimit;
     this.primaryEnemyDeployed = false;
     // Retain a non-participating target sentinel for legacy two-ship APIs. It is
@@ -186,7 +189,7 @@ export class CombatEngine {
     if (!this.isSimulation || this.battleResult) throw new Error('当前战斗不能继续部署。');
     if (!entries.length) throw new Error('请先选择舰船。');
     if (entries.some(entry => typeof entry.isPlayer !== 'boolean' || !Number.isFinite(entry.cost) || entry.cost <= 0)) throw new Error('舰船阵营或部署点无效。');
-    const specs = entries.map(entry => typeof entry.specId === 'string' ? modManager.requireShip(entry.specId) : entry.specId);
+    const specs = entries.map(entry => typeof entry.specId === 'string' ? defaultShipFit(entry.specId) : entry.specId);
     for (const spec of specs) modManager.validateShipDefinition(spec);
     if (specs.some((spec,index) => entries[index].cost !== deploymentCost(spec))) throw new Error('舰船部署点与内容定义不一致。');
     const counts = [0,0], costs = [0,0];
@@ -240,7 +243,7 @@ export class CombatEngine {
   }
 
   public addShip(specId: string | ShipSpec, isPlayer: boolean, pos: Vector2, facingRad = 0, teamId = isPlayer ? 0 : 1): Ship {
-    const spec = typeof specId === 'string' ? modManager.getShip(specId) : specId;
+    const spec = typeof specId === 'string' ? defaultShipFit(specId) : specId;
     if (!spec) throw new Error(`Unknown ship: ${specId}`);
     const ship = new Ship(this.random.nextId('ship'), spec, isPlayer, pos, facingRad, this.random, this.visualRandom);
     ship.teamId = teamId;
@@ -255,14 +258,16 @@ export class CombatEngine {
     return findCombatHostile(ship, targetId, roster);
   }
 
-  public planFleetAI(): FleetPlan {
+  public planFleetAI(roster?: readonly Ship[], onlyTeam?: number): FleetPlan {
     const manual = new Set(this.externallyControlledShipIds);
     if (this.playerShip.fireControlMode !== 'AI') manual.add(this.playerShip.id);
-    const ships=this.ships;
+    const ships=roster??this.ships;
+    const phased=import.meta.env?.VITE_COMBAT_PHASED_WORLD!=='false'
+      &&ships.every(ship=>ship.update===nativeShipUpdate&&ship.weaponControl.update===nativeWeaponUpdate);
     const numeric=import.meta.env?.VITE_COMBAT_DECISION_PIPELINE!=='false'&&FireControlQueryRoster.isWorkerOwned(this)
-      &&this.usesPhasedWorld&&import.meta.env?.VITE_COMBAT_AI_INTENTS!=='false'&&ships.every(ship=>ship.hasExactThreatPhaseHooks)
-      ?planFleetTacticsNumerically(ships,this.orders,manual,this):undefined;
-    return numeric??planFleetTactics(ships, this.orders, manual);
+      &&phased&&import.meta.env?.VITE_COMBAT_AI_INTENTS!=='false'&&ships.every(ship=>ship.hasExactThreatPhaseHooks)
+      ?planFleetTacticsNumerically(ships,this.orders,manual,this,onlyTeam):undefined;
+    return numeric??planFleetTactics(ships, this.orders, manual, onlyTeam);
   }
 
   public updateShipAI(ai: CapitalShipAI, dt: number, projectileThreatIndex?: ProjectileThreatIndex, weaponThreatEnvelope?: WeaponThreatEnvelope, fleetPlan?: FleetPlan, phaseShips?: readonly Ship[], friendlyFireLaneIndex?: FriendlyFireLaneIndex, beamThreatIndex?: BeamThreatIndex, navigationObstacleIndex?: NavigationObstacleIndex, hostileQueries?: HostileQueryBatch, exactWeaponThreatEnvelope?: WeaponThreatEnvelope, aiIntents?: CombatAIPhase, compactThreatForecastEligible = !!weaponThreatEnvelope, weaponThreatFrameEligible = false): void {
@@ -276,6 +281,34 @@ export class CombatEngine {
         dt = elapsed;
       }
     }
+    const ownedSingleShipPhase = !phaseShips && !aiIntents && ai.ship === this.playerShip
+      && ai.update === nativeCapitalAIUpdate && FireControlQueryRoster.isWorkerOwned(this)
+      && Object.getPrototypeOf(this) === CombatEngine.prototype
+      && this.findHostile === nativeFindHostile && this.planFleetAI === nativePlanFleetAI
+      && nativeRosterReaders.every(([key, getter]) => !Object.hasOwn(this, key)
+        && Object.getOwnPropertyDescriptor(CombatEngine.prototype, key)?.get === getter);
+    const singleShips = ownedSingleShipPhase ? this.ships : undefined;
+    const ownedExactSingle = !!singleShips && singleShips.length >= 8 && singleShips.every(s => s.hasExactThreatPhaseHooks);
+    if (ownedExactSingle) phaseShips = singleShips;
+    let ownSingleIntents: CombatAIPhase | undefined;
+    if (ownedExactSingle && this.playerShip.fireControlMode === 'AI'
+      && import.meta.env?.VITE_COMBAT_PHASED_WORLD !== 'false'
+      && import.meta.env?.VITE_COMBAT_AI_INTENTS !== 'false'
+      && this.updateShipAI === nativeUpdateShipAI
+      && ai.plan === nativeCapitalAIPlan && ai.commitControls === nativeAIControls
+      && ai.commitEffects === nativeAIEffects && ai.sampleDecision === nativeSampleDecision
+      && singleShips!.every(ship => ship.update === nativeShipUpdate && ship.weaponControl.update === nativeWeaponUpdate)) {
+      beginStage(this, 'AI_PLAN', { ships: singleShips!, projectiles: this.projectiles, beams: this.beams });
+      ownSingleIntents = new CombatAIPhase(this, singleShips!, ai.ship.teamId);
+      if (ownSingleIntents.numericEnabled) {
+        aiIntents = ownSingleIntents;
+        if (import.meta.env?.VITE_COMBAT_PLANNING_PRODUCERS !== 'false') nativePlanningPhases.set(this, ownSingleIntents);
+      } else {
+        ownSingleIntents.closeObservation();
+        closeStageFor(this);
+        ownSingleIntents = undefined;
+      }
+    }
     if (!aiIntents?.numericEnabled) {
       const targetId = order?.type === 'ENGAGE' || order?.type === 'AVOID' ? order.targetShipId : undefined;
       const queries = phaseShips ? hostileQueries?.forShip(ai.ship, phaseShips) : undefined;
@@ -286,22 +319,44 @@ export class CombatEngine {
     }
     // The player's pre-tick autopilot call is outside the native fleet phase. Include that
     // caller even on the MANUAL -> AI transition, without granting control of other manual ships.
-    fleetPlan ??= aiIntents?.numericFleetPlan ?? planFleetTactics(phaseShips ?? this.ships, this.orders, new Set([...this.externallyControlledShipIds,
-      ...(ai.ship !== this.playerShip && this.playerShip.fireControlMode !== 'AI' ? [this.playerShip.id] : [])]));
+    fleetPlan ??= aiIntents?.numericFleetPlan ?? (ownedExactSingle && this.playerShip.fireControlMode === 'AI'
+      ? this.planFleetAI(singleShips, ai.ship.teamId)
+      : planFleetTactics(phaseShips ?? this.ships, this.orders, new Set([...this.externallyControlledShipIds,
+        ...(ai.ship !== this.playerShip && this.playerShip.fireControlMode !== 'AI' ? [this.playerShip.id] : [])])));
+    const ownExactEnvelope = !aiIntents?.numericEnabled && ownedExactSingle && !exactWeaponThreatEnvelope && singleShips!.length >= 512 ? WeaponThreatEnvelope.forExactPhase(singleShips!) : undefined;
+    const ownProjectileIndex = !aiIntents?.numericEnabled && ownedExactSingle && !projectileThreatIndex && this.projectiles.length >= 256 ? new ProjectileThreatIndex(this.projectiles) : undefined;
+    const ownBeamIndex = !aiIntents?.numericEnabled && ownedExactSingle && !beamThreatIndex && this.beams.length >= 128 ? BeamThreatIndex.create(singleShips!, this.beams) : undefined;
+    const ownObstacleIndex = !aiIntents?.numericEnabled && ownedExactSingle && !navigationObstacleIndex && singleShips!.length >= 512 ? new NavigationObstacleIndex(singleShips!) : undefined;
+    const ownFriendlyLaneIndex = !aiIntents?.numericEnabled && ownedExactSingle && !friendlyFireLaneIndex && singleShips!.length >= 512 ? new FriendlyFireLaneIndex(singleShips!) : undefined;
+    const ownCompactForecast = compactThreatForecastEligible || (ownedExactSingle && ai.ship.hasNativeThreatPhaseHooks && singleShips!.every(s => s.hasNativeThreatPhaseHooks));
     const root = ai.ship.assemblyRoot;
     const multiratePlanning = this.usesMultirateCombat && ai.update === nativeCapitalAIUpdate
       && ai.plan === nativeCapitalAIPlan && ai.commitControls === nativeAIControls && ai.commitEffects === nativeAIEffects
       && root !== this.playerShip.assemblyRoot && !this.fullRateAIShipIds.has(root.id) && !this.fullRateAIShipIds.has(ai.ship.id)
       && !this.externallyControlledShipIds.has(root.id) && !this.externallyControlledShipIds.has(ai.ship.id);
-    const world = { fleetPlan, ships: phaseShips ?? this.ships, projectiles: this.projectiles, beams: this.beams, asteroids: this.asteroids, hulkFragments:this.hulkFragments, projectileThreatIndex, weaponThreatEnvelope, exactWeaponThreatEnvelope, friendlyFireLaneIndex, beamThreatIndex, navigationObstacleIndex, weaponThreatFrame:this.threatFrame, compactThreatForecastEligible, weaponThreatFrameEligible,
+    const world = { fleetPlan, ships: phaseShips ?? this.ships, projectiles: this.projectiles, beams: this.beams, asteroids: this.asteroids, hulkFragments:this.hulkFragments, projectileThreatIndex: projectileThreatIndex ?? ownProjectileIndex, weaponThreatEnvelope, exactWeaponThreatEnvelope: exactWeaponThreatEnvelope ?? ownExactEnvelope, friendlyFireLaneIndex: friendlyFireLaneIndex ?? ownFriendlyLaneIndex, beamThreatIndex: beamThreatIndex ?? ownBeamIndex, navigationObstacleIndex: navigationObstacleIndex ?? ownObstacleIndex, weaponThreatFrame:this.threatFrame, compactThreatForecastEligible: ownCompactForecast, weaponThreatFrameEligible,
       ...(multiratePlanning ? { multiratePlanning: true } : {}) };
-    if (aiIntents) {
-      if (nativePlanningPhases.get(this) === aiIntents) nativePlanningWorlds.set(world,this);
-      const numericStage = stageFor(this);
-      if (numericStage?.kind === 'AI_PLAN') bindStage(world, numericStage);
-      aiIntents.plan(ai, dt, order ?? null, world);
+    try {
+      if (aiIntents) {
+        if (nativePlanningPhases.get(this) === aiIntents) nativePlanningWorlds.set(world,this);
+        const numericStage = stageFor(this);
+        if (numericStage?.kind === 'AI_PLAN') bindStage(world, numericStage);
+        aiIntents.plan(ai, dt, order ?? null, world);
+        if (ownSingleIntents) ownSingleIntents.execute();
+      }
+      else ai.update(dt, order ?? null, world);
+    } finally {
+      if (ownSingleIntents) {
+        ownSingleIntents.closeObservation();
+        nativePlanningPhases.delete(this);
+        closeStageFor(this);
+      }
+      ownExactEnvelope?.close();
+      ownProjectileIndex?.close();
+      ownBeamIndex?.close();
+      ownObstacleIndex?.close();
+      ownFriendlyLaneIndex?.close();
     }
-    else ai.update(dt, order ?? null, world);
   }
   private readonly combatEffects = new Set<(dt: number) => boolean>();
   private readonly transientCombatShips = new WeakSet<Ship>();
@@ -329,8 +384,8 @@ export class CombatEngine {
   public get notificationTime(): number { return this.combatTime + this.aftermathTime; }
   /** LAN elimination is decided across every team, even after the host flagship dies. */
   public multiTeamBattle = false;
-  /** Three-or-more-team LAN skirmishes are public arenas; ordinary combat keeps sensors. */
-  public openBattlefield = false;
+  /** All Web combat is public: no sensor-distance limit (user request, 2026-09-30). */
+  public openBattlefield = true;
   public winningTeam: number | null = null;
 
   public get isBattleResultReady(): boolean {
@@ -384,7 +439,7 @@ export class CombatEngine {
   public get isTacticalMap(): boolean { return this.commandSystem.isTacticalMap; }
   public set isTacticalMap(v: boolean) { this.commandSystem.isTacticalMap = v; }
 
-  constructor(playerShipId = DEFAULT_PLAYER_HULL, enemyShipId = DEFAULT_ENEMY_HULL, seed = 0x51a7e5ed, public readonly aiDecisionProfile: AIDecisionProfile = 'standard') {
+  constructor(playerShipId = defaultPlayerHull(), enemyShipId = defaultOpponent(playerShipId), seed = 0x51a7e5ed, public readonly aiDecisionProfile: AIDecisionProfile = 'standard') {
     this.random = new SimulationRandom(seed);
     this.visualRandom = new SimulationRandom((seed ^ 0x9e3779b9) >>> 0);
     this.fxSystem = new CombatFXSystem(this.visualRandom);
@@ -394,8 +449,8 @@ export class CombatEngine {
     this.droneSystem = new DroneSystem(this.random, this.visualRandom);
     this.mineSystem = new MineSystem(this.random, this.visualRandom);
     this.commandSystem = new FleetCommandSystem(this.visualRandom);
-    const playerSpec = modManager.requireShip(playerShipId);
-    const enemySpec = modManager.requireShip(enemyShipId);
+    const playerSpec = defaultShipFit(playerShipId);
+    const enemySpec = defaultShipFit(enemyShipId);
 
     // 我方从下方朝上接敌，敌方从上方朝下接敌（世界坐标 +Y 向下）。
     this.playerShip = new Ship('player_ship', playerSpec, true, new Vector2(0, 600), -Math.PI / 2, this.random, this.visualRandom);
@@ -426,9 +481,9 @@ export class CombatEngine {
 
   public switchPlayerShip(newPlayerShipId: string | ShipSpec, opponentId?: string | ShipSpec) {
     // Resolve before any reset: a missing content ID must not destroy the live battle.
-    const playerSpec = typeof newPlayerShipId === 'string' ? modManager.requireShip(newPlayerShipId) : newPlayerShipId;
+    const playerSpec = typeof newPlayerShipId === 'string' ? defaultShipFit(newPlayerShipId) : newPlayerShipId;
     const enemySpec = typeof opponentId === 'object' ? opponentId
-      : modManager.requireShip(opponentId ?? defaultOpponent(playerSpec.id));
+      : defaultShipFit(opponentId ?? defaultOpponent(playerSpec.id));
     this.aftermathTime = 0;
     this.shipLossNotifications = [];
     this.encounterEffects = { emergencyPhaseDiveUsed: false };
@@ -442,7 +497,7 @@ export class CombatEngine {
 
     this.isSimulation = false;
     this.multiTeamBattle = false;
-    this.openBattlefield = false;
+    this.openBattlefield = true;
     this.deployment.clear();
     this.primaryEnemyDeployed = true;
     this.simulationCosts.clear();
@@ -840,15 +895,22 @@ export class CombatEngine {
     };
 
     for (const effect of this.combatEffects) if (effect(dt)) this.combatEffects.delete(effect);
-    updateCombatVisibility(this.ships, this.openBattlefield);
-    updateElectronicWarfare(this.ships);
+    const nativeRosters = Object.getPrototypeOf(this) === CombatEngine.prototype
+      && nativeRosterReaders.every(([key, getter]) => !Object.hasOwn(this, key)
+        && Object.getOwnPropertyDescriptor(CombatEngine.prototype, key)?.get === getter);
+    const initialShips = nativeRosters ? this.ships : undefined;
+    updateCombatVisibility(initialShips ?? this.ships, this.openBattlefield);
+    updateElectronicWarfare(initialShips ?? this.ships);
 
     // Capture actual composed-system values once; workers need no whole-object
     // AI ownership gate. Every consumer observes the same stage-start weapons.
-    const observedShips = this.ships;
+    const observedShips = initialShips ?? this.ships;
     // Resident motion is experimental: the paired mixed battle did not improve
     // step cost. Keep default object integration until the data path earns it.
-    const phased = this.usesPhasedWorld;
+    const phased = nativeRosters
+      ? import.meta.env?.VITE_COMBAT_PHASED_WORLD !== 'false'
+        && observedShips.every(ship => ship.update === nativeShipUpdate && ship.weaponControl.update === nativeWeaponUpdate)
+      : this.usesPhasedWorld;
     const stateCore = phased && import.meta.env?.VITE_COMBAT_STATE_CORE === 'true' ? stateCoreForWorld(this) : undefined;
     if (!stateCore) disposeStateCore(this);
     else stateCore.reconcile(observedShips);
@@ -860,22 +922,21 @@ export class CombatEngine {
     const nativeIntentAI = (ai: CapitalShipAI) => ai.update === nativeCapitalAIUpdate
       && ai.plan === nativeCapitalAIPlan && ai.commitControls === nativeAIControls && ai.commitEffects === nativeAIEffects
       && ai.sampleDecision === nativeSampleDecision;
-    const planningOwner=this.findHostile===nativeFindHostile&&this.planFleetAI===nativePlanFleetAI
-      &&Object.getPrototypeOf(this)===CombatEngine.prototype
-      &&nativeRosterReaders.every(([key,getter])=>!Object.hasOwn(this,key)&&Object.getOwnPropertyDescriptor(CombatEngine.prototype,key)?.get===getter)
-      ?this:undefined;
+    const planningOwner = nativeRosters && this.findHostile === nativeFindHostile && this.planFleetAI === nativePlanFleetAI
+      ? this : undefined;
     if (shipStepBatch && planningOwner && this.updateShipAI === nativeUpdateShipAI
       && ais.every(nativeIntentAI)) beginStage(planningOwner, 'AI_PLAN', {
         ships: observedShips, projectiles: this.projectiles, beams: this.beams
       });
+    const observedCombatShips = nativeRosters ? this.combatShips : undefined;
     const aiIntents = shipStepBatch && import.meta.env?.VITE_COMBAT_AI_INTENTS !== 'false'
       && this.updateShipAI === nativeUpdateShipAI && ais.every(nativeIntentAI)
-      && this.combatShips.every(ship => { const ai = this.moduleAI.get(ship); return !ai || nativeIntentAI(ai); })
+      && (observedCombatShips ?? this.combatShips).every(ship => { const ai = this.moduleAI.get(ship); return !ai || nativeIntentAI(ai); })
       ? new CombatAIPhase(planningOwner,observedShips) : undefined;
     // Preserve legacy observer eligibility without constructing its producer
     // for numeric AI. This controls arithmetic, independently of cadence.
     const weaponFrameObservers = import.meta.env?.VITE_COMBAT_THREAT_PHASE !== 'false' && observedShips.length >= 8
-      ? this.combatShips.filter(ship => !ship.isDead && !ship.isRetreated && !ship.isDocked
+      ? (observedCombatShips ?? this.combatShips).filter(ship => !ship.isDead && !ship.isRetreated && !ship.isDocked
         && (ship.isAttachedModule || !this.externallyControlledShipIds.has(ship.id) && ship !== this.playerShip)) : [];
     const weaponFrameMembership = new Set(weaponFrameObservers);
     if (!aiIntents?.numericEnabled) {
@@ -896,52 +957,88 @@ export class CombatEngine {
     const nativeThreatSceneEligible = ais.length >= 4
       && this.updateShipAI === nativeUpdateShipAI
       && ais.every(ai => ai.update === nativeCapitalAIUpdate && ai.ship.hasNativeThreatPhaseHooks)
-      && this.ships.every(ship => ship.hasNativeThreatPhaseHooks);
+      && (nativeRosters ? observedShips : this.ships).every(ship => ship.hasNativeThreatPhaseHooks);
     const nativeThreatPhase = !aiIntents?.numericEnabled && nativeThreatSceneEligible;
+    const exactThreatPhase = nativeThreatPhase || (!!aiIntents && !aiIntents.numericEnabled
+      && this.updateShipAI === nativeUpdateShipAI
+      && ais.every(ai => ai.update === nativeCapitalAIUpdate && ai.ship.hasExactThreatPhaseHooks)
+      && observedShips.every(ship => ship.hasExactThreatPhaseHooks));
     // Validate AFTER the real prephase. Commands received while owners were busy invalidate the
     // prediction; the entire native phase then runs serially exactly once, with the latest input.
-    const fleetPlan = aiIntents?.numericFleetPlan ?? this.planFleetAI();
+    const fleetPlan = aiIntents?.numericFleetPlan ?? this.planFleetAI(nativeRosters ? observedShips : undefined);
     const reuseOwnedPhaseRosters = import.meta.env?.VITE_LAN_OWNED_PHASE_ROSTERS === 'true';
     // Separate exact authored reuse from the native forecast/index/parallel gates.
     // Explicit experimental switch stays off until differential + paired acceptance.
     const exactThreatEnvelope = !aiIntents?.numericEnabled && import.meta.env?.VITE_AI_EXACT_AUTHORED_THREATS === 'true'
       && !nativeThreatPhase && FireControlQueryRoster.isWorkerOwned(this)
-      && Object.getPrototypeOf(this) === CombatEngine.prototype && this.updateShipAI === nativeUpdateShipAI
+      && nativeRosters && this.updateShipAI === nativeUpdateShipAI
       && this.findHostile === nativeFindHostile && this.planFleetAI === nativePlanFleetAI
       && ais.every(ai => ai.update === nativeCapitalAIUpdate)
-      && nativeRosterReaders.every(([key, getter]) => !Object.hasOwn(this, key)
-        && Object.getOwnPropertyDescriptor(CombatEngine.prototype, key)?.get === getter)
-      ? WeaponThreatEnvelope.forExactPhase(this.ships) : undefined;
+      ? WeaponThreatEnvelope.forExactPhase(observedShips) : undefined;
     let batch: AIPhaseBatch | undefined;
     try { if (!this.usesMultirateCombat && !shipStepBatch && !this.threatFrame && this.aiDecisionProfile === 'standard' && nativeThreatPhase && options.aiBatch?.matches(this, ais, dt, fleetPlan)) batch = options.aiBatch; }
     catch { /* Codec/gate failure is recoverable before any AI result has been committed. */ }
-    const projectileThreatIndex = nativeThreatPhase && this.projectiles.length >= 128
+    const projectileThreatIndex = exactThreatPhase && this.projectiles.length >= 128
       ? new ProjectileThreatIndex(this.projectiles) : undefined;
     const weaponThreatEnvelope = nativeThreatPhase ? new WeaponThreatEnvelope() : undefined;
     // Native AI only changes live ship/system state here; deployment, destruction,
     // spawning and module detachment advance outside this synchronous phase. Share
     // membership/order here; the stricter Worker-only query transaction below
     // additionally qualifies stable hostility/visibility, never targets or positions.
-    const phaseShips = nativeThreatPhase && !batch && this.findHostile === nativeFindHostile
-      && this.planFleetAI === nativePlanFleetAI && Object.getPrototypeOf(this) === CombatEngine.prototype
-      && nativeRosterReaders.every(([key, getter]) => !Object.hasOwn(this, key)
-        && Object.getOwnPropertyDescriptor(CombatEngine.prototype, key)?.get === getter) ? this.ships : undefined;
+    const phaseShips = exactThreatPhase && !batch && planningOwner ? (intentShips ?? observedShips) : undefined;
     const hostileQueries = phaseShips ? createOwnedHostileQueries(this, phaseShips) : undefined;
     const navigationObstacleIndex = phaseShips && phaseShips.length >= 64 && FireControlQueryRoster.isWorkerOwned(this)
       ? new NavigationObstacleIndex(phaseShips) : undefined;
     const friendlyFireLaneIndex = phaseShips ? new FriendlyFireLaneIndex(phaseShips) : undefined;
     const beamThreatIndex = phaseShips && this.beams.length >= 64 ? BeamThreatIndex.create(phaseShips, this.beams) : undefined;
     try {
-      for (const ai of ais) {
-        if (!this.externallyControlledShipIds.has(ai.ship.id)) {
-          if (batch) batch.commit(ai, projectileThreatIndex, weaponThreatEnvelope, fleetPlan);
-          else this.updateShipAI(ai, dt, projectileThreatIndex, weaponThreatEnvelope, fleetPlan, intentShips ?? phaseShips ?? (reuseOwnedPhaseRosters ? exactThreatEnvelope?.phaseShips() : undefined), friendlyFireLaneIndex, beamThreatIndex, navigationObstacleIndex, hostileQueries, exactThreatEnvelope, aiIntents, nativeThreatSceneEligible, weaponFrameMembership.has(ai.ship));
-          weaponThreatEnvelope?.invalidate(ai.ship);
-          exactThreatEnvelope?.invalidate(ai.ship);
-          navigationObstacleIndex?.invalidate(ai.ship);
+      try {
+        for (const ai of ais) {
+          if (!this.externallyControlledShipIds.has(ai.ship.id)) {
+            if (batch) batch.commit(ai, projectileThreatIndex, weaponThreatEnvelope, fleetPlan);
+            else this.updateShipAI(ai, dt, projectileThreatIndex, weaponThreatEnvelope, fleetPlan, intentShips ?? phaseShips ?? (reuseOwnedPhaseRosters ? exactThreatEnvelope?.phaseShips() : undefined), friendlyFireLaneIndex, beamThreatIndex, navigationObstacleIndex, hostileQueries, exactThreatEnvelope, aiIntents, nativeThreatSceneEligible, weaponFrameMembership.has(ai.ship));
+            if (!aiIntents) {
+              weaponThreatEnvelope?.invalidate(ai.ship);
+              exactThreatEnvelope?.invalidate(ai.ship);
+              navigationObstacleIndex?.invalidate(ai.ship);
+            }
+          }
         }
+      } catch(error) {aiIntents?.closeObservation();throw error;} finally {
+        if(options.aiBatch)nativePlanningPhases.delete(this);
+        options.aiBatch?.finish();
       }
-    } catch(error) {aiIntents?.closeObservation();throw error;} finally {
+
+      if (aiIntents) {
+        try {
+        for (const ship of observedCombatShips ?? this.combatShips) if (ship.isAttachedModule) {
+          let ai = this.moduleAI.get(ship);
+          if (!ai) { ai = new CapitalShipAI(ship, this.enemyShip); this.moduleAI.set(ship, ai); }
+          const manual = isManualWeaponModule(ship);
+          const firing = ship.isFiringMain, aimX = ship.aimTargetWorld.x, aimY = ship.aimTargetWorld.y;
+          this.updateShipAI(ai, dt, projectileThreatIndex, undefined, fleetPlan, intentShips,
+            aiIntents.scene ? undefined : friendlyFireLaneIndex, beamThreatIndex, undefined, undefined, exactThreatEnvelope, aiIntents, false, weaponFrameMembership.has(ship));
+          // Sampled modules keep held controls on skipped steps. Only registered
+          // decisions have effects to receipt; manual control is restored afterward.
+          if (manual && aiIntents.has(ship)) aiIntents.afterShip(ship, () => {
+            ship.fireControlMode = 'MANUAL'; ship.isFiringMain = firing;
+            ship.aimTargetWorld.set(aimX, aimY); ship.playerTargetId = ship.assemblyRoot.playerTargetId;
+            ship.currentTargetShip = lockedCombatTarget(intentShips!, ship); ship.aiHoldOffensiveFire = false;
+            if (ship.spec.sourceHullTraits?.includes('INDEPENDENT_ROTATION'))
+              ship.turnInput = ship.system.locksTurning || ship.flux.isOverloaded ? 0 : cursorTurnCommand(ship.facingRad, ship.angularVelRad, Math.atan2(aimY-ship.pos.y,aimX-ship.pos.x), ship.getMotionStats().turnDeceleration);
+          });
+        }
+        projectileThreatIndex?.close();
+        weaponThreatEnvelope?.close();
+        exactThreatEnvelope?.close();
+        friendlyFireLaneIndex?.close();
+        navigationObstacleIndex?.close();
+        hostileQueries?.close();
+        beamThreatIndex?.close();
+        aiIntents.execute(stage => trace?.mark(stage));
+        } finally {aiIntents.closeObservation();closeStageFor(this);}
+      }
+    } finally {
       projectileThreatIndex?.close();
       weaponThreatEnvelope?.close();
       exactThreatEnvelope?.close();
@@ -949,31 +1046,6 @@ export class CombatEngine {
       navigationObstacleIndex?.close();
       hostileQueries?.close();
       beamThreatIndex?.close();
-      if(options.aiBatch)nativePlanningPhases.delete(this);
-      options.aiBatch?.finish();
-    }
-
-    if (aiIntents) {
-      try {
-      for (const ship of this.combatShips) if (ship.isAttachedModule) {
-        let ai = this.moduleAI.get(ship);
-        if (!ai) { ai = new CapitalShipAI(ship, this.enemyShip); this.moduleAI.set(ship, ai); }
-        const manual = isManualWeaponModule(ship);
-        const firing = ship.isFiringMain, aimX = ship.aimTargetWorld.x, aimY = ship.aimTargetWorld.y;
-        this.updateShipAI(ai, dt, undefined, undefined, fleetPlan, intentShips,
-          undefined, undefined, undefined, undefined, undefined, aiIntents, false, weaponFrameMembership.has(ship));
-        // Sampled modules keep held controls on skipped steps. Only registered
-        // decisions have effects to receipt; manual control is restored afterward.
-        if (manual && aiIntents.has(ship)) aiIntents.afterShip(ship, () => {
-          ship.fireControlMode = 'MANUAL'; ship.isFiringMain = firing;
-          ship.aimTargetWorld.set(aimX, aimY); ship.playerTargetId = ship.assemblyRoot.playerTargetId;
-          ship.currentTargetShip = lockedCombatTarget(intentShips!, ship); ship.aiHoldOffensiveFire = false;
-          if (ship.spec.sourceHullTraits?.includes('INDEPENDENT_ROTATION'))
-            ship.turnInput = ship.system.locksTurning || ship.flux.isOverloaded ? 0 : cursorTurnCommand(ship.facingRad, ship.angularVelRad, Math.atan2(aimY-ship.pos.y,aimX-ship.pos.x), ship.getMotionStats().turnDeceleration);
-        });
-      }
-      aiIntents.execute(stage => trace?.mark(stage));
-      } finally {aiIntents.closeObservation();closeStageFor(this);}
     }
 
     this.commandSystem.advance(dt, !this.playerShip.isDead && !this.playerShip.isRetreated ? this.playerShip.hullStats.commandPointRateFlat : 0);
@@ -991,8 +1063,9 @@ export class CombatEngine {
         child.moduleHardFluxFraction = child.moduleFluxBonus / Math.max(1, child.hullStats.fluxDissipation + child.moduleFluxBonus) * .2;
       }
     }
-    fireBudget = new InFlightFireBudget(this.ships, this.projectiles, this.asteroids);
-    const fireControlWorld = { fireBudget, ships: this.ships, projectiles: this.projectiles, hulkFragments: this.hulkFragments, missiles: this.projectiles.filter(p => p.isRocket || p.spawnType === 'MISSILE' || p.isMine || p.isFlare), asteroids: this.asteroids,
+    const fireShips = this.ships;
+    fireBudget = new InFlightFireBudget(fireShips, this.projectiles, this.asteroids);
+    const fireControlWorld = { fireBudget, ships: fireShips, projectiles: this.projectiles, hulkFragments: this.hulkFragments, missiles: this.projectiles.filter(p => p.isRocket || p.spawnType === 'MISSILE' || p.isMine || p.isFlare), asteroids: this.asteroids,
       ...(this.usesMultirateCombat
         ? { sampledAutofire: { fullRateShipIds: new Set([...this.fullRateAIShipIds, ...this.externallyControlledShipIds]), playerShip: this.playerShip, cadence: 'multirate' as const } }
         : this.aiDecisionProfile === 'large-battle-v3' ? { sampledAutofire: { fullRateShipIds: this.fullRateAIShipIds, playerShip: this.playerShip } } : {}) };
@@ -1017,7 +1090,7 @@ export class CombatEngine {
     // Plans/effects already closed their observations. The deferred Ship.update
     // enqueue loop needs live post-effect target selection, not old Engine/Scene
     // queries or an expired AI_PLAN. No ship state/motion runs before batch.execute.
-    let shipSelection: ReturnType<typeof aiStage>;
+    let shipSelection: (StageView & NonNullable<ReturnType<typeof aiStage>>);
     // A NEW write-certified span, not a longer root-AI cache lifetime. Keep the
     // dynamic roster and live projectile/beam reads used by each module AI.
     let interleavedThreats = import.meta.env?.VITE_AI_INTERLEAVED_THREATS === 'true'
@@ -1097,6 +1170,11 @@ export class CombatEngine {
     const fighterFX = this.getFighterFXCallbacks();
     this.fighterSystem.updateDecks(dt, this.playerShip, this.enemyShip, fighterFX);
     const wingShips=this.ships;
+    if(shipStepBatch && import.meta.env?.VITE_COMBAT_PLANNING_PRODUCERS !== 'false'
+      && FireControlQueryRoster.isWorkerOwned(this) && Object.getPrototypeOf(this) === CombatEngine.prototype
+      && nativeRosterReaders.every(([key,getter]) => !Object.hasOwn(this,key)
+        && Object.getOwnPropertyDescriptor(CombatEngine.prototype,key)?.get === getter))
+      publishNativeFireMembership(wingShips);
     const flightRoster=shipStepBatch&&this.findHostile===nativeFindHostile&&Object.getPrototypeOf(this)===CombatEngine.prototype
       &&nativeRosterReaders.every(([key,getter])=>!Object.hasOwn(this,key)&&Object.getOwnPropertyDescriptor(CombatEngine.prototype,key)?.get===getter)
       ?FlightDecisionRoster.create(this,wingShips):undefined;
@@ -1161,6 +1239,7 @@ export class CombatEngine {
       recordDamage: (owner, target, amount, area) => this.statsTracker.recordDamageDealt(owner.isPlayer, 'ENERGY', amount, area, 0, target.isPlayer),
     });
     advanceGravityTerrain(dt,allShips,this.hulkFragments,asteroidFX);
+    resolveHulkCollisions(dt,allShips,this.hulkFragments,asteroidFX);
     this.asteroidSystem.update(dt);
     this.asteroidSystem.resolveShipCollisions(allShips, asteroidFX);
 

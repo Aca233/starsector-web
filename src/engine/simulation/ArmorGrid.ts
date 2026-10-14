@@ -48,7 +48,7 @@ export class ArmorGrid {
   public dynamicEffectiveArmorMultiplier?: () => number;
   public maxDamageReduction = .85;
   public minArmorFractionMultiplier = 1;
-  public onCellDamage?: (c: number, r: number, damage: number) => void;
+  public onCellDamage?: (c: number, r: number, damage: number, dirtyDelta?: number) => void;
 
   constructor(
     cols = 16,
@@ -91,6 +91,14 @@ export class ArmorGrid {
 
   /** Owned copy for snapshots/handoffs, not an escaping mutable engine view. */
   public copyCells(): Float32Array { return this.#readCells().slice(); }
+
+  /** Copies cells into an existing owned Float32Array when lengths match, avoiding allocation. */
+  public copyCellsInto(target?: Float32Array): Float32Array {
+    const src = this.#readCells();
+    if (!target || target.length !== src.length) return src.slice();
+    target.set(src);
+    return target;
+  }
 
   /** Tracked bulk write. Callers retain their existing dirtyVersion policy. */
   public replaceCells(values: ArrayLike<number>): void {
@@ -267,8 +275,9 @@ export class ArmorGrid {
         const nextArmor = Math.max(0, curArmor - cellDmg);
         const overflow = Math.max(0, cellDmg - curArmor);
 
+        const prevDirty = this.dirtyVersion;
         this.setCell(c + dx, r + dy, nextArmor);
-        if (cellDmg > 0) this.onCellDamage?.(c + dx, r + dy, cellDmg);
+        if (cellDmg > 0) this.onCellDamage?.(c + dx, r + dy, cellDmg, this.dirtyVersion - prevDirty);
         totalArmorDamage += (curArmor - nextArmor);
         // 单元格装甲完全被击穿后，剩余溢出的伤害直接击入船体 HP
         totalHullDamage += overflow * hullFactor;

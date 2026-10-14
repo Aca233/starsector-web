@@ -50,6 +50,8 @@ A Starsector installation is **not** required to build, preview, or play the pac
 
 ## Install, build and run
 
+开发定位与工程入口：[当前架构索引](docs/architecture-current.md) · [按改动检查、领域开发与 Worker 回放](docs/foundation-development-guide.md) · [2026-10-08 底层改造交付](docs/foundation-development-results-2026-10-08.md)。
+
 ```powershell
 npm ci
 npm run typecheck
@@ -85,6 +87,8 @@ The main menu, ship designer (`?view=design`), character skills (`?view=skills`)
 A simulation launched inside the studio keeps its launching screen URL. Refresh returns to that screen instead of starting a fresh battle; live combat progress is not restored. Browser navigation out of a running simulation asks for confirmation. Explicit developer combat URLs and LAN connection/recovery behavior are unchanged.
 
 ## Modular ships and stations
+
+单舰包管理：指挥中心 → 游戏设置 → 舰船包，可安装 `.ship-pack`、启停内置包和卸载文件，刷新后激活。荣光女王与罗西南特已用独立包验证设计、保存和真实 Worker 模拟；自选内容的 LAN/Steam 包协商暂未接入。开发生成命令和兼容范围见 [单舰包 ABI 1](docs/ship-pack-host-2026-10-01.md)。
 
 Native modular assemblies are now deployable: the ancient Onslaught, the three station technology lines (tiers 1–3), the Remnant station (standard/damaged fits), the derelict survey mothership and the module test hull. The 13 parent hulls expose 15 source assemblies in the refit/simulation catalog. Module hulls are not separate fleet choices.
 

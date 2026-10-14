@@ -26,6 +26,11 @@ import { LauncherSmokeSpec, MissileExplosionVisualSpec, MuzzleFlashSpec, Project
 import { createProjectileHitGlows, type HitGlowDamageResult } from '../../visual/HitGlowVisuals';
 import { SimulationRandom } from '../SimulationRandom';
 import { createExplosionPuffs, hitParticleDuration } from '../../visual/ExplosionVisuals';
+import { knownProjectionKeys } from '../../runtime/local/RenderShipProjection';
+
+const floatingTextProjectionKeys = Object.freeze([
+  'id', 'pos', 'text', 'color', 'size', 'life', 'maxLife', 'vel'
+]);
 
 function fastRemoveAt<T>(arr: T[], index: number) {
   const last = arr.pop();
@@ -640,6 +645,7 @@ export class CombatFXSystem {
       maxLife: life,
       vel: new Vector2((this.random.next() - 0.5) * 12, -32 - this.random.next() * 14)
     });
+    knownProjectionKeys.set(this.floatingTexts[this.floatingTexts.length - 1], floatingTextProjectionKeys);
   }
 
   public addFloatingText(
@@ -659,6 +665,7 @@ export class CombatFXSystem {
       maxLife,
       vel: new Vector2(0, -25)
     });
+    knownProjectionKeys.set(this.floatingTexts[this.floatingTexts.length - 1], floatingTextProjectionKeys);
   }
 
   /**

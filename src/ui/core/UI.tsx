@@ -124,7 +124,7 @@ export function Modal({ title, eyebrow = '', description, onClose, children, foo
     if (exiting || !panel || modalRoots.at(-1) !== root || panel.contains(document.activeElement)) return;
     (initialFocus === 'panel' ? panel : modalControls(panel)[0] ?? panel).focus();
   }, [exiting, initialFocus]);
-  return createPortal(<div ref={rootRef} className="ui-modal-backdrop" data-motion-state={exiting ? "exiting" : "present"} style={{ "--ui-exit-duration": UI_EXIT_MS + "ms" } as React.CSSProperties} data-combat-input-block>
+  return createPortal(<div ref={rootRef} className="ui-modal-backdrop" data-motion-state={exiting ? "exiting" : "present"} style={{ "--ds-motion-exit-duration": UI_EXIT_MS + "ms" } as React.CSSProperties} data-combat-input-block>
     <div ref={panelRef} inert={exiting} role={role} aria-modal="true" aria-labelledby={`${id}-title`} aria-describedby={description ? `${id}-description` : undefined}
       tabIndex={-1} className={`ui-modal native-chrome ui-modal--${width} ${className}`} data-native-surface={surface}>
       <NativeBorder /><NativeMaterial />

@@ -34,3 +34,10 @@ artifacts/
 
 # Portable updater state (never part of source or release packages)
 .updates/
+
+# Agent session data and generated scratch/build artifacts
+.workbuddy/
+__pycache__/
+output/
+tmp/
+native/combat-core/target/

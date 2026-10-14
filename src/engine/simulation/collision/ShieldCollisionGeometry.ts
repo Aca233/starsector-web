@@ -205,13 +205,14 @@ export function getShieldCircleContact(
   if (!isShieldCollisionActive(ship)) return null;
 
   const center = ship.getShieldCenter();
-  const radial = circleCenter.clone().sub(center);
-  const distance = radial.length();
+  const dx = circleCenter.x - center.x;
+  const dy = circleCenter.y - center.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
   const penetration = ship.shield.radius + Math.max(0, circleRadius) - distance;
   if (penetration <= 0) return null;
 
   const fallbackFacing = ship.shield.type === 'FRONT' ? ship.facingRad : ship.shield.facingAngleRad;
-  const normal = distance > EPSILON ? radial.scale(1 / distance) : Vector2.fromAngle(fallbackFacing);
+  const normal = distance > EPSILON ? new Vector2(dx / distance, dy / distance) : Vector2.fromAngle(fallbackFacing);
   const point = center.clone().addScaled(normal, ship.shield.radius);
   if (!ship.isShieldPointBlocked(point)) return null;
 

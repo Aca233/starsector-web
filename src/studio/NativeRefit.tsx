@@ -1,3 +1,6 @@
+import { RefitActions, type RefitAction } from './RefitActions';
+import { Stepper } from '../ui/core/Stepper';
+import { ResponsiveRefitStats } from './ResponsiveRefitStats';
 import { WEAPON_SIZE_RANK } from '../engine/content/WeaponSizes';
 import { SystemLoadoutEditor } from './SystemLoadoutEditor';
 import { defenseSystemId, tacticalSystemIds } from '../engine/extensions/ship-systems/Loadout';
@@ -9,7 +12,7 @@ import { RefitExplanationText } from './RefitHoverTerms';
 import { RefitHint, RefitInfoHover } from './RefitHint';
 import { RefitStatHover } from "./RefitHoverTerms";
 import { MotionPresence } from '../ui/core/MotionPresence';
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { NativeButton, NativeFrame } from "../ui/NativeChrome";
 export { NativeButton, NativeFrame } from "../ui/NativeChrome";
 import { Modal } from "../ui/core/UI";
@@ -59,6 +62,8 @@ const SourceVariantPicker = lazy(() => import("./SourceVariantPicker").then(modu
 type Panel =
   "weapons" | "groups" | "mods" | "designs" | "help" | "wings" | "clearModule" | null;
 interface Props {
+  /** Incremented when opening a new hull or saved design so transient UI resets without remounting the DOM. */
+  openRevision?: number;
   /** Context-specific presentation; the normal single-player editor keeps its defaults. */
   embedded?: { title: string; backLabel: string; primaryLabel: string; disabledReason?: string };
   hullUnavailableReason?: (spec: ShipSpec) => string | null;
@@ -90,6 +95,7 @@ interface Props {
   writeHullScroll: (value: number) => void;
 }
 interface ModuleEditorContext {
+  identity: string;
   path: string[];
   draft: Design;
   template?: ShipSpec;
@@ -98,10 +104,11 @@ interface ModuleEditorContext {
   select: (path: string[]) => void;
 }
 export function NativeRefit(props: Props) {
-  const identity = [props.draft.id, props.draft.hullId, props.draft.sourceVariantId ?? ''].join(':');
+  const editorIdentity = [props.openRevision ?? 0, props.draft.id, props.draft.hullId].join(':');
+  const selectionIdentity = [editorIdentity, props.draft.sourceVariantId ?? ''].join(':');
   const rootPath = useMemo<string[]>(() => [], []);
-  const [selection, setSelection] = useState<{identity: string; path: string[]}>({identity, path: []});
-  const candidate = selection.identity === identity ? selection.path : rootPath;
+  const [selection, setSelection] = useState<{identity: string; path: string[]}>({identity: selectionIdentity, path: []});
+  const candidate = selection.identity === selectionIdentity ? selection.path : rootPath;
   const context = useMemo(() => moduleDesignContext(props.draft, candidate), [props.draft, candidate]);
   const path = context ? candidate : rootPath;
   const rootEvaluation = useMemo(() => evaluate(props.draft), [props.draft]);
@@ -117,9 +124,9 @@ export function NativeRefit(props: Props) {
     visit(rootEvaluation.spec, []);
     return result;
   }, [rootEvaluation.spec]);
-  return <RefitEditor {...props} key={identity} moduleContext={{
-    path, ...(context ?? {draft: props.draft}), rootEvaluation, options,
-    select: next => setSelection({identity, path: next}),
+  return <RefitEditor {...props} moduleContext={{
+    identity: editorIdentity, path, ...(context ?? {draft: props.draft}), rootEvaluation, options,
+    select: next => setSelection({identity: selectionIdentity, path: next}),
   }} />;
 }
 function RefitEditor(props: Props & {moduleContext: ModuleEditorContext}) {
@@ -128,17 +135,29 @@ function RefitEditor(props: Props & {moduleContext: ModuleEditorContext}) {
   const editingModule = path.length > 0;
   const onChange = (next: Design) => props.onChange(editingModule ? withModuleDesign(props.draft, path, next) : next);
   const clear = () => editingModule ? setPanel('clearModule') : props.onClear();
+  const defaultZoom = moduleContext.options.length ? 1 : props.roomLayout ? 0.95 : 0.65;
+  const [activeIdentity, setActiveIdentity] = useState(moduleContext.identity);
   const [panel, setPanel] = useState<Panel>(null);
   const modDetails = useHullModTooltip(panel === null);
   const [slotId, setSlotId] = useState("");
   const [deckIndex, setDeckIndex] = useState(0);
-  const [zoom, setZoom] = useState(moduleContext.options.length ? 1 : props.roomLayout ? 0.95 : 0.65);
+  const [zoom, setZoom] = useState(defaultZoom);
   const [pan, setPan] = useState({x: 0, y: 0});
   const suppressPanClick = useRef(false);
   const drag = useRef<{pointerId: number; x: number; y: number; pan: {x: number; y: number}} | null>(null);
   const [groupHighlight, setGroupHighlight] = useState<number | null>(null);
   const [showMounts, setShowMounts] = useState(false);
   const [feedback, setFeedback] = useState("");
+  if (activeIdentity !== moduleContext.identity) {
+    setActiveIdentity(moduleContext.identity);
+    setPanel(null);
+    setSlotId("");
+    setDeckIndex(0);
+    setZoom(defaultZoom);
+    setPan({x: 0, y: 0});
+    setGroupHighlight(null);
+    setFeedback("");
+  }
   const mainRef = useRef<HTMLDivElement>(null);
   const evaluation = useMemo(() => editingModule ? evaluate(draft, template) : rootEvaluation, [draft, template, editingModule, rootEvaluation]);
   const { spec, op } = evaluation;
@@ -150,6 +169,14 @@ function RefitEditor(props: Props & {moduleContext: ModuleEditorContext}) {
   const campaignBuiltins = (spec.builtInHullMods ?? []).filter(id => hullModDefinitions.get(id)?.support?.scope === "campaign-only");
   const info = data.ships[draft.hullId];
   const weaponDetails = useRefitWeaponTooltip(draft, spec, panel === null && !props.roomLayout?.locked);
+  const { hide: hideWeaponDetails } = weaponDetails;
+  const { hide: hideModDetails } = modDetails;
+  useLayoutEffect(() => {
+    drag.current = null;
+    suppressPanClick.current = false;
+    hideWeaponDetails();
+    hideModDetails();
+  }, [moduleContext.identity, hideWeaponDetails, hideModDetails]);
   useEffect(() => {
     if (!feedback) return;
     const timer = window.setTimeout(() => setFeedback(""), 3200);
@@ -413,7 +440,7 @@ function RefitEditor(props: Props & {moduleContext: ModuleEditorContext}) {
               pan={moduleContext.options.length ? pan : undefined}
             />
           </div>
-          <aside className="refit-stats" aria-label="舰船装配参数">
+          <ResponsiveRefitStats>
             <SystemLoadoutEditor draft={draft} spec={spec} disabled={props.roomLayout?.locked} onChange={onChange}/>
             {systems.filter(s => s.definition.id !== 'NONE').map(({ definition: tacticalSystem, label, key }) => <RefitInfoHover key={label} enabled={panel === null} className="refit-system-readiness" available={!tacticalSystem.unavailable}
               title={`${label}：${tacticalSystem.name.replace(/^未适配[:：]\s*/, "")} · ${tacticalSystem.unavailable ? "未接入" : "可用"}`}>
@@ -495,31 +522,8 @@ function RefitEditor(props: Props & {moduleContext: ModuleEditorContext}) {
             ).map((item) => (
               <div className="native-flux-row" key={item.key}>
                 <RefitHint text={item.label + "：每点投资消耗 1 OP，上限由舰体决定。"}><label htmlFor={"refit-" + item.key}>{item.label}</label></RefitHint>
-                <button
-                  className="native-step"
-                  aria-label={"减少" + item.label}
-                  disabled={draft[item.key] === 0}
-                  onClick={() => setFlux(item.key, draft[item.key] - 1)}
-                >
-                  −
-                </button>
-                <input
-                  id={"refit-" + item.key}
-                  aria-label={item.label}
-                  type="number"
-                  min={0}
-                  max={fluxCeiling(item.key)}
-                  value={draft[item.key]}
-                  onChange={(e) => setFlux(item.key, e.target.valueAsNumber)}
-                />
-                <button
-                  className="native-step"
-                  aria-label={"增加" + item.label}
-                  disabled={draft[item.key] >= fluxCeiling(item.key)}
-                  onClick={() => setFlux(item.key, draft[item.key] + 1)}
-                >
-                  +
-                </button>
+                <Stepper id={"refit-" + item.key} label={item.label} value={draft[item.key]}
+                  max={fluxCeiling(item.key)} onChange={value => setFlux(item.key, value)} />
                 <div>
                   <RefitStatHover term={item.key === "vents" ? "dissipation" : "capacity"} value={item.value} enabled={panel === null}>
                   <small>{item.stat}</small>
@@ -602,7 +606,7 @@ function RefitEditor(props: Props & {moduleContext: ModuleEditorContext}) {
                 ))}
               </div>
             )}
-          </aside>
+          </ResponsiveRefitStats>
           <div className="refit-bottom" inert={panel === "mods"}>
             <div className="refit-role">
               <span>突击</span>
@@ -618,46 +622,17 @@ function RefitEditor(props: Props & {moduleContext: ModuleEditorContext}) {
               <span>{data.ships[props.draft.hullId].name}-级{editingModule ? " · 模块编辑中" : ""}</span>
               <RefitHint text={props.status}><small >{dirty ? " *" : ""}</small></RefitHint>
             </div>
-            <div className="refit-actions">
-              <NativeButton shortcut="W" onClick={() => setPanel("groups")}>
-                武器组...
-              </NativeButton>
-              <NativeButton shortcut="V" onClick={() => setPanel("designs")}>
-                装配方案...
-              </NativeButton>
-              <NativeButton
-                shortcut="U"
-                disabled={!props.canUndo}
-                onClick={props.onUndo}
-              >
-                撤消
-              </NativeButton>
-              <NativeButton shortcut="T" onClick={clear}>
-                {editingModule ? "清空此模块" : "清空装配"}
-              </NativeButton>
-              <RefitHint text="当前舰体没有需要修复的 D-插件；试战损伤不写回设计。"><NativeButton
-                shortcut="G"
-                disabled
-
-              >
-                修复...
-              </NativeButton></RefitHint>
-              {!props.roomLayout && <RefitHint text={props.embedded?.disabledReason}><NativeButton
-                shortcut="N"
-                disabled={!!errors.length || !!props.embedded?.disabledReason}
-
-                onClick={() => props.onLaunch()}
-              >
-                {props.embedded?.primaryLabel ?? "模拟战斗"}
-              </NativeButton></RefitHint>}
-              <NativeButton
-                shortcut="X"
-                className="refit-next"
-                onClick={nextHull}
-              >
-                {props.roomLayout ? "更换舰船" : "下一艘/空闲装配点"}
-              </NativeButton>
-            </div>
+            <RefitActions actions={[
+              { shortcut: 'W', label: '武器组...', onClick: () => setPanel('groups') },
+              { shortcut: 'V', label: '装配方案...', onClick: () => setPanel('designs') },
+              { shortcut: 'U', label: '撤消', disabled: !props.canUndo, onClick: props.onUndo },
+              { shortcut: 'T', label: editingModule ? '清空此模块' : '清空装配', onClick: clear },
+              { shortcut: 'G', label: '修复...', disabled: true, hint: '当前舰体没有需要修复的 D-插件；试战损伤不写回设计。' },
+              ...(!props.roomLayout ? [{ shortcut: 'N', label: props.embedded?.primaryLabel ?? '模拟战斗',
+                disabled: !!errors.length || !!props.embedded?.disabledReason, hint: props.embedded?.disabledReason,
+                onClick: () => props.onLaunch() } satisfies RefitAction] : []),
+              { shortcut: 'X', label: props.roomLayout ? '更换舰船' : '下一艘/空闲装配点', className: 'refit-next', onClick: nextHull },
+            ]} />
           </div>
           {props.warning && (
             <div className="refit-warning" role="alert">

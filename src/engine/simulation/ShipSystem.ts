@@ -2,7 +2,7 @@ import { hasExactThreatPhaseAI, hasNativeThreatPhaseAI, hasNativeSystemStats, re
 import type { SystemWorld, ShipSystemDefinition, SystemWeaponType, SystemModifiers } from '../extensions/ship-systems/Types';
 import type { Ship } from './Ship';
 import type { Vector2 } from '../math/Vector2';
-import { combineSystemModifiers } from '../extensions/ship-systems/Modifiers';
+import { combineSystemModifiers, emptySystemModifiers } from '../extensions/ship-systems/Modifiers';
 import { OwnedNativeSystemModifiers } from './OwnedNativeSystemModifiers';
 
 const ownedModifierSystems = new WeakSet<ShipSystem>();
@@ -13,6 +13,9 @@ export type ShipSystemState = 'IDLE' | 'IN' | 'ACTIVE' | 'OUT' | 'COOLDOWN';
 
 /** Shared lifecycle only. Timing, effects, AI, presentation and controls belong to definitions. */
 export class ShipSystem {
+  private static readonly nativeModifierReader = ShipSystem.prototype.modifiers;
+  private static readonly nativeRangeReader = ShipSystem.prototype.getWeaponRangePercent;
+  private static readonly nativeProjectileSpeedReader = ShipSystem.prototype.getProjectileSpeedPercent;
   /** Internal opt-in for a runtime that never exports mutable Ship/System objects.
    * Install once, without adding a branch/cache lookup to legacy stat queries. */
   public enableOwnedNativeModifiers(): boolean {
@@ -44,6 +47,9 @@ export class ShipSystem {
     serial: number; destination: Vector2; destinationFacing: number;
     origin?: Vector2; originFacing?: number;
   };
+  declare public gravityPolarity?: 1 | -1;
+  declare public gravityPush?: import('./GravityPushState').GravityPushState;
+  public gravityControlHeld = false;
   declare public gravityField?: import('./GravityFieldState').GravityFieldState;
   declare public gravityManeuver?: import('./GravityManeuverState').GravityManeuverState;
   public activationSerial = 0;
@@ -130,7 +136,24 @@ export class ShipSystem {
   public get engineVisualLevel(): number { return Math.max(this.definition.visuals?.engineBoost ? this.effectLevel : 0, this.auxiliary?.engineVisualLevel ?? 0); }
   public get fortressVisualLevel(): number { return Math.max(this.definition.visuals?.fortressShield ? this.effectLevel : 0, this.auxiliary?.fortressVisualLevel ?? 0); }
 
+  /** Only natural expiry; explicit deactivate()/interruption never detonates. */
+  public expire(): void {
+    const spec=this.definition.gravityAutoCollapse,field=this.gravityField,ship=this.owner;
+    if(spec&&this.state==='ACTIVE'&&field?.kind==='WELL'&&ship&&!ship.isDead&&ship.hullHp>0&&!ship.isDocked&&!ship.isRetreated&&!ship.retreating&&!ship.isPhased&&!ship.isAttachedModule
+      &&!this.disabled&&(ship.runtimeModifiers.value.disableSystems??0)<=0&&!ship.flux.isVenting&&!ship.flux.isOverloaded
+      &&Math.hypot(ship.pos.x-field.x,ship.pos.y-field.y)<=this.definition.gravityField!.placementRange
+      &&ship.flux.totalFlux+this.pendingActivationFlux+spec.fluxCost<=ship.flux.maxFlux){
+      ship.flux.increaseFlux(spec.fluxCost,false);
+      this.gravityControlHeld=false;this.activationSerial++;
+      this.gravityField={kind:'COLLAPSE',serial:this.activationSerial,x:field.x,y:field.y,age:0,duration:spec.active,radius:this.definition.gravityCollapse!.radius,
+        shipBudgetRemaining:0,projectileBudgetRemaining:0,shipHits:[],projectileHits:[],collapseApplied:false};
+      this.state='IN';this.isActive=true;this.effectLevel=0;this.stageTimer=this.activeTimer=spec.chargeUp;
+      return;
+    }
+    this.beginOut();
+  }
   public reset(): void {
+    this.gravityControlHeld = false;
     this.definition.onReset?.(this,this.owner);
     this.state = 'IDLE'; this.effectLevel = 0; this.isActive = false; this.isCoolingDown = false;
     this.activationTarget = undefined; this.activationInput = undefined; this.teleportVisual = undefined; this.activationSerial++;
@@ -145,6 +168,13 @@ export class ShipSystem {
     if (ship && (ship.isDead || ship.hullHp <= 0 || ship.isRetreated || ship.isDocked)) return '舰船不在战斗状态';
     if (this.disabled || (ship?.runtimeModifiers.value.disableSystems ?? 0) > 0) return '系统离线';
     if (this.state === 'COOLDOWN' || this.isCoolingDown) return '冷却中（' + this.cooldownTimer.toFixed(1) + 's）';
+    if (this.gravityField?.kind==='COLLAPSE' && this.definition.gravityAutoCollapse) return '区域正在自动坍缩';
+    if (this.isActive && this.definition.gravityField?.cursorSpeed && (this.state === 'IN' || this.state === 'ACTIVE')) {
+      if (ship?.retreating || ship?.flux.isOverloaded || ship?.flux.isVenting) return '当前不能接管区域场';
+      const reason = ship && this.definition.activationReason?.(ship,this);
+      if (reason) return reason;
+      return undefined;
+    }
     if (this.isActive) return this.definition.toggle && this.state !== 'OUT' ? (ship ? this.definition.deactivationReason?.(ship, this) : undefined) : this.state === 'OUT' ? '关闭中' : '系统正在运行';
     if (ship?.retreating) return '撤退中';
     if (ship?.flux.isOverloaded) return '载荷过载';
@@ -159,6 +189,7 @@ export class ShipSystem {
   }
   public activate(): boolean {
     if (this.activationFailureReason) return false;
+    if (this.isActive && this.definition.gravityField?.cursorSpeed) return true;
     if (this.isActive) { this.beginOut(); return true; }
     const target = this.owner && this.definition.selectTarget?.(this.owner);
     if (this.definition.selectTarget && !target) return false;
@@ -195,6 +226,7 @@ export class ShipSystem {
     this.definition.onAdvance?.(ship, dt, world, this);
   }
   public deactivate(): void {
+    this.gravityControlHeld = false;
     this.definition.onInterrupt?.(this, this.owner);
     this.pendingActiveEvents = this.pendingActivationEvents = 0;
     if (this.state === 'IN' || this.state === 'ACTIVE') this.beginOut();
@@ -209,11 +241,14 @@ export class ShipSystem {
       this.stageTimer = Math.max(0, this.stageTimer - used); remaining -= used;
       if (this.state === 'COOLDOWN') this.cooldownTimer = this.stageTimer;
       else this.activeTimer = this.stageTimer;
-      if (this.state === 'IN') this.effectLevel = this.chargeUpDuration ? 1 - this.stageTimer / this.chargeUpDuration : 1;
+      if (this.state === 'IN') {
+        const duration=this.gravityField?.kind==='COLLAPSE'?this.definition.gravityAutoCollapse?.chargeUp??this.chargeUpDuration:this.chargeUpDuration;
+        this.effectLevel=duration?1-this.stageTimer/duration:1;
+      }
       else if (this.state === 'OUT') this.effectLevel = this.chargeDownDuration ? this.stageTimer / this.chargeDownDuration : 0;
       if (this.stageTimer > 1e-9) break;
       if (this.state === 'IN') this.beginActive();
-      else if (this.state === 'ACTIVE') this.beginOut();
+      else if (this.state === 'ACTIVE') this.expire();
       else if (this.state === 'OUT') this.finishOut();
       else { this.state = 'IDLE'; this.isCoolingDown = false; this.cooldownTimer = 0; }
     }
@@ -226,7 +261,7 @@ export class ShipSystem {
   }
   private beginActive(): void {
     this.state = 'ACTIVE'; this.effectLevel = 1; this.isActive = true;
-    this.stageTimer = this.activeDuration;
+    this.stageTimer = this.gravityField?.kind==='COLLAPSE' && this.definition.gravityAutoCollapse ? this.definition.gravityAutoCollapse.active : this.activeDuration;
     this.activeTimer = Number.isFinite(this.stageTimer) ? this.stageTimer : this.maxDuration;
     this.pendingActiveEvents++;
     if (this.activeDuration === 0) this.beginOut();
@@ -251,27 +286,64 @@ export class ShipSystem {
     return hasExactThreatPhaseAI(this.definition) && (!this.auxiliary || this.auxiliary.hasExactThreatPhaseAI);
   }
   public get hasNativeStats(): boolean {
-    return hasNativeSystemStats(this.definition) && (!this.auxiliary || this.auxiliary.hasNativeStats)
-      && (this.owner?.system !== this || !this.owner.parentShip || this.owner.parentShip.allSystems.every(s => s.hasNativeStats));
+    if (!hasNativeSystemStats(this.definition) || (this.auxiliary && !this.auxiliary.hasNativeStats)) return false;
+    if (this.owner?.system === this && this.owner.parentShip) {
+      const parent = this.owner.parentShip;
+      if (!Object.hasOwn(parent, 'allSystems') && parent.systems.length <= 1 && (!parent.systems.length || parent.systems[0] === parent.system)) {
+        return parent.system.hasNativeStats && parent.defenseSystem.hasNativeStats;
+      }
+      return parent.allSystems.every(s => s.hasNativeStats);
+    }
+    return true;
+  }
+  /** Read-only acquisition permission, NOT a threat-AI or cross-update lease.
+   * Own accessors are rejected before dispatch; unknown modifier chains keep
+   * their original per-candidate range/projectile-speed callback sequence. */
+  public get hasNativeAimQueryStats(): boolean {
+    if (ownedModifierSystems.has(this)) return this.hasNativeStats;
+    return !Object.hasOwn(this, 'getWeaponRangePercent') && !Object.hasOwn(this, 'getProjectileSpeedPercent')
+      && this.getWeaponRangePercent === ShipSystem.nativeRangeReader
+      && this.getProjectileSpeedPercent === ShipSystem.nativeProjectileSpeedReader
+      && this.hasUnshadowedMotionModifierChain() && this.hasNativeStats;
   }
   /** Borrowed only for one synchronous owned motion query. No cached values or
    * lifecycle shortcuts: unknown definitions/effect sources retain scalar calls. */
   public readNativeMotionModifiers(): SystemModifiers | undefined {
-    if ((this.owner && !this.owner.runtimeModifiers.empty)
+    if (!this.hasUnshadowedMotionModifierChain()
+      || (this.owner && !this.owner.runtimeModifiers.empty)
       || (this.owner?.parentShip && !this.owner.parentShip.runtimeModifiers.empty)
       || !this.hasNativeStats) return undefined;
     return this.modifiers();
   }
+  /** Do not suppress custom dictionary dispatch even inside the owned realm.
+   * The explicitly installed native cache is nonconfigurable and already audited.
+   * Check the entire auxiliary chain without touching shadowed getter properties. */
+  private hasUnshadowedMotionModifierChain(): boolean {
+    if (ownedModifierSystems.has(this)) return true;
+    if (Object.hasOwn(this, 'modifiers') || this.modifiers !== ShipSystem.nativeModifierReader) return false;
+    return !this.auxiliary || this.auxiliary.hasUnshadowedMotionModifierChain();
+  }
   private modifiers(capacity = this.baseFluxCapacity) {
-    const own = this.available ? (this.isActive ? this.definition.modifiers?.(this, capacity, this.owner) : this.definition.passiveModifiers?.(this, this.owner)) ?? {} : {};
+    const own = this.available ? (this.isActive ? this.definition.modifiers?.(this, capacity, this.owner) : this.definition.passiveModifiers?.(this, this.owner)) ?? emptySystemModifiers : emptySystemModifiers;
     let composed = this.auxiliary?.available ? combineSystemModifiers(own, this.auxiliary.modifiers(capacity)) : own;
     const owner = this.owner, parent = owner?.parentShip;
     if (owner?.system === this) {
       if (!owner.runtimeModifiers.empty) composed = combineSystemModifiers(composed, owner.runtimeModifiers.value);
       if (parent && !parent.isDead && parent.hullHp > 0 && !parent.isRetreated && !owner.isDead && owner.hullHp > 0 && !owner.isRetreated) {
-        for (const system of parent.allSystems) {
-          if (system.available && !system.disabled && system.isActive && system.definition.moduleModifiers) {
-            composed = combineSystemModifiers(composed, system.definition.moduleModifiers(system, owner));
+        if (!Object.hasOwn(parent, 'allSystems') && parent.systems.length <= 1 && (!parent.systems.length || parent.systems[0] === parent.system)) {
+          const pSys = parent.system;
+          if (pSys.available && !pSys.disabled && pSys.isActive && pSys.definition.moduleModifiers) {
+            composed = combineSystemModifiers(composed, pSys.definition.moduleModifiers(pSys, owner));
+          }
+          const pDef = parent.defenseSystem;
+          if (pDef.available && !pDef.disabled && pDef.isActive && pDef.definition.moduleModifiers) {
+            composed = combineSystemModifiers(composed, pDef.definition.moduleModifiers(pDef, owner));
+          }
+        } else {
+          for (const system of parent.allSystems) {
+            if (system.available && !system.disabled && system.isActive && system.definition.moduleModifiers) {
+              composed = combineSystemModifiers(composed, system.definition.moduleModifiers(system, owner));
+            }
           }
         }
       }
@@ -282,13 +354,27 @@ export class ShipSystem {
     return !this.blocksWeapons && (!this.available || this.definition.weaponEnabled?.(this, mount) !== false)
       && (!this.auxiliary || this.auxiliary.canFireWeapon(mount));
   }
+  public get hasAutofirePolicy(): boolean {
+    if (Object.hasOwn(this, 'autofirePolicy') || this.autofirePolicy !== nativeAutofirePolicy) return true;
+    if (this.available && !this.disabled && this.definition.autofirePolicy) return true;
+    return !!this.auxiliary?.hasAutofirePolicy;
+  }
+  public get hasPerMountWeaponGate(): boolean {
+    if (Object.hasOwn(this, 'canFireWeapon') || this.canFireWeapon !== nativeCanFireWeapon) return true;
+    if (this.available && this.definition.weaponEnabled) return true;
+    return !!this.auxiliary?.hasPerMountWeaponGate;
+  }
   /** One query's composed values. Call again after any lifecycle/owner write;
    * consumers must not retain this table across AI, update or emission stages. */
   public readModifierTable(readers: readonly (keyof ShipSystem)[] = []): Readonly<SystemModifiers> | undefined {
+    if (ownedModifierSystems.has(this)) return this.modifiers();
     // Definitions may compose arbitrary authored systems. A scalar-method override
     // is a different extension API, and must keep its original live getter path.
     if (Object.getPrototypeOf(this) !== ShipSystem.prototype) return;
-    for (const key of readers) if (Object.hasOwn(this, key) || this[key] !== composedScalarReaders.get(key)) return;
+    for (let i = 0; i < readers.length; i++) {
+      const key = readers[i];
+      if (Object.hasOwn(this, key) || this[key] !== composedScalarReaderObj[key]) return;
+    }
     return this.modifiers();
   }
   public get blocksVenting(): boolean { return (this.owner?.runtimeModifiers.value.disableVenting ?? 0) > 0 || (this.controlsActive && (!!this.definition.controls?.blockVenting || this.definition.canVent?.(this) === false)) || !!this.auxiliary?.blocksVenting; }
@@ -332,9 +418,13 @@ export class ShipSystem {
     return weaponType ? this.modifiers().weapons?.[weaponType]?.fluxCostMultiplier ?? 1 : 1;
   }
 }
-const composedScalarReaders = new Map<keyof ShipSystem, unknown>(Object.entries(Object.getOwnPropertyDescriptors(ShipSystem.prototype))
-  .filter(([, descriptor]) => typeof descriptor.value === 'function')
-  .map(([key, descriptor]) => [key as keyof ShipSystem, descriptor.value]));
+const nativeAutofirePolicy = ShipSystem.prototype.autofirePolicy;
+const nativeCanFireWeapon = ShipSystem.prototype.canFireWeapon;
+const composedScalarReaderObj: Partial<Record<keyof ShipSystem, unknown>> = Object.create(null);
+for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(ShipSystem.prototype))) {
+  if (typeof descriptor.value === 'function') composedScalarReaderObj[key as keyof ShipSystem] = descriptor.value;
+}
 
 /** Identity used by synchronous query leases; overridden readers stay live. */
 export const nativeReadModifierTable = ShipSystem.prototype.readModifierTable;
+

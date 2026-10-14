@@ -108,7 +108,11 @@ for (const group of groups) for (const file of await walk(path.join(assets,'grap
     ||group==='warroom'&&/widget|pauseplay/.test(name);
   const begin=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
   let body;
-  if (name==='ship_arrow.png'||group==='cursors') {
+  if (group==='cursors') {
+    // A pointer has a top-left tip; ship heading arrows use a different convention.
+    // CombatView places the 32px cursor hotspot at this tip (2, 2).
+    body=`<g transform="scale(${width/32} ${height/32})"><path d="M 2 2 L 2 25 L 8 19 L 13 29 L 18 26.5 L 13 17 L 23 17 Z" fill="#c9e1eb" stroke="#0c1b29" stroke-width="1.5" stroke-linejoin="round"/></g>`;
+  } else if (name==='ship_arrow.png') {
     body=`<path d="M ${width*.9} ${height*.5} L ${width*.15} ${height*.15} L ${width*.32} ${height*.5} L ${width*.15} ${height*.85} Z" fill="#c9e1eb" stroke="#0c1b29" stroke-width="1.5"/>`;
   } else if (/^(bar_|weapons_bar|line8)/.test(name)) {
     body=`<rect width="${width}" height="${height}" rx="${Math.min(2,height/3)}" fill="${/armor/.test(name)?'#d9b77b':'#8fcbd8'}"/>`;

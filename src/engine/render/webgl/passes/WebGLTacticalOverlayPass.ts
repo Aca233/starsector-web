@@ -30,6 +30,22 @@ export class WebGLTacticalOverlayPass {
     const target = lockedCombatTarget(engine.ships, engine.playerShip);
     const weaponShip = manualWeaponShip(engine.playerShip, engine.ships);
     const weaponPos = weaponShip.interpolatedPos(ctx.alpha);
+    if (!weaponShip.isDead) {
+      const mark = (x:number,y:number,repel:boolean,size=12) => {
+        const r=repel?1:.55,g=repel?.76:.86,b=repel?.48:1;
+        batcher.drawSprite(whiteTex,x,y,size,1.2,0,0,0,r,g,b,.8);
+        batcher.drawSprite(whiteTex,x,y,1.2,size,0,0,0,r,g,b,.8);
+      };
+      for (const mount of weaponShip.weapons) {
+        const grip=mount.gravityTractor;
+        const pushed=weaponShip.allSystems.some(s=>s.gravityPush?.target&&s.gravityPush.target.kind===grip?.target?.kind&&s.gravityPush.target.id===grip.target.id);
+        if (grip?.phase==='HOLD'&&!pushed) mark(grip.anchorX,grip.anchorY,grip.polarity===-1);
+      }
+      for (const system of weaponShip.allSystems) {
+        const field=system.gravityField;
+        if(field?.cursorControlled && system.isActive && system.state!=='OUT') mark(field.x,field.y,field.polarity===-1,18);
+      }
+    }
 
     // 1.1 射击前置量指示星标 (Target Lead Pip)
     if (!weaponShip.isDead && target) {

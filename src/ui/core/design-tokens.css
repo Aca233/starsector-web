@@ -1,6 +1,8 @@
+@import "./palette.css";
 /* Compact transparent UI contract. See docs/ui-design-system-2026-09-26.md.
  * Single palette for shared controls, page themes and portaled dialogs.
  * Component files own geometry; no theme-specific bitmap panels. */
+@layer ds-tokens {
 :root {
   --ds-font-body: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
   --ds-font-mono: "Cascadia Code", Consolas, "Microsoft YaHei UI", monospace;
@@ -34,38 +36,52 @@
   --ds-z-dialog: 100;
   --ds-z-toast: 120;
 
+  --ds-surface-app: var(--ds-palette-shell);
   --ds-surface-none: transparent;
-  --ds-surface-hover: #b4cad00c;
-  --ds-control-border: #b8cbd642;
-  --ds-control-hover: #c6dde022;
-  --ds-control-pressed: #b7cdd536;
-  --ds-control-selected: #adc9ce1f;
-  --ds-control-focus: #d0e5e6;
-  --ds-control-highlight: #b7cdd580;
+  --ds-surface-hover: color-mix(in srgb, var(--ds-palette-accent-muted) 4.705882%, transparent);
+  --ds-border-page: var(--ds-control-border);
+  --ds-control-border: color-mix(in srgb, var(--ds-palette-accent-muted) 25.882353%, transparent);
+  --ds-control-hover: color-mix(in srgb, var(--ds-palette-gray-ink) 13.333333%, transparent);
+  --ds-control-pressed: color-mix(in srgb, var(--ds-palette-accent-muted) 21.176471%, transparent);
+  --ds-control-selected: color-mix(in srgb, var(--ds-palette-accent-muted) 12.156863%, transparent);
+  --ds-control-focus: var(--ds-palette-ink-soft);
+  --ds-control-highlight: color-mix(in srgb, var(--ds-palette-accent-muted) 50.196078%, transparent);
   --ds-control-sheen: none;
-  --ds-surface-tooltip: #101b25f2;
-  --ds-surface-floating: #101b25e8;
-  --ds-surface-input: #a9c2ce08;
-  --ds-surface-track: #a9c2ce24;
-  --ds-shadow-floating: 0 8px 28px #0004;
+  --ds-surface-tooltip: color-mix(in srgb, var(--ds-palette-panel) 94.901961%, transparent);
+  --ds-surface-floating: color-mix(in srgb, var(--ds-palette-panel) 90.980392%, transparent);
+  --ds-surface-input: color-mix(in srgb, var(--ds-palette-muted) 3.137255%, transparent);
+  --ds-surface-track: color-mix(in srgb, var(--ds-palette-muted) 14.117647%, transparent);
+  --ds-shadow-floating: 0 8px 28px color-mix(in srgb, var(--ds-palette-black) 26.666667%, transparent);
   --ds-surface-dialog: transparent;
-  --ds-scrim: #080f18d9;
-  --ds-menu-text: #dbe3e7;
-  --ds-menu-muted: #9cabb5;
-  --ds-menu-dim: #8c9da7;
-  --ds-menu-accent: #b7cdd5;
-  --ds-menu-highlight: #dfc394;
-  --ds-menu-success: #89b8a8;
-  --ds-menu-warning: #dbb77d;
-  --ds-menu-danger: #ed998f;
-  --ds-menu-border: #b1c5ce30;
-  --ds-menu-divider: #b1c5ce20;
+  --ds-scrim: color-mix(in srgb, var(--ds-palette-shell) 85.098039%, transparent);
+  --ds-menu-text: var(--ds-palette-ink-soft);
+  --ds-menu-muted: var(--ds-palette-dim);
+  --ds-menu-dim: var(--ds-palette-dim);
+  --ds-menu-accent: var(--ds-palette-accent-muted);
+  --ds-menu-highlight: var(--ds-palette-highlight);
+  --ds-menu-success: var(--ds-palette-friendly-muted);
+  --ds-menu-warning: var(--ds-palette-highlight);
+  --ds-menu-danger: var(--ds-palette-red-muted);
+  --ds-menu-border: color-mix(in srgb, var(--ds-palette-accent-muted) 18.823529%, transparent);
+  --ds-menu-divider: color-mix(in srgb, var(--ds-palette-accent-muted) 12.54902%, transparent);
   --ds-menu-button-text: var(--ds-menu-text);
   --ds-hud-text: var(--ds-menu-text);
   --ds-hud-muted: var(--ds-menu-muted);
-  --ds-hud-divider: #8197a833;
+  --ds-hud-divider: color-mix(in srgb, var(--ds-palette-dim) 20%, transparent);
   --ds-hud-accent: var(--ds-menu-highlight);
-  --ds-hud-flux: #7dbacc;
-  --ds-hud-hull: #95baa8;
-  --ds-hud-danger: #efa48c;
+  --ds-hud-flux: var(--ds-palette-muted);
+  --ds-hud-hull: var(--ds-palette-friendly-muted);
+  --ds-hud-danger: var(--ds-palette-red-muted);
+
+  /* Workbench-specific semantic colours. Keep existing values during migration;
+   * these are independent of the vanguard menu palette. */
+  --ds-workbench-text: var(--ds-palette-ink-soft);
+  --ds-workbench-highlight: var(--ds-palette-highlight);
+  --ds-workbench-success: var(--ds-palette-friendly-muted);
+  --ds-workbench-installed: var(--ds-palette-highlight);
+  --ds-workbench-danger: var(--ds-palette-red-muted);
+  --ds-workbench-border: color-mix(in srgb, var(--ds-palette-dim) 30.196078%, transparent);
+  --ds-workbench-track: color-mix(in srgb, var(--ds-palette-accent-muted) 14.117647%, transparent);
+  --ds-workbench-hover: color-mix(in srgb, var(--ds-palette-accent-muted) 4.705882%, transparent);
+}
 }

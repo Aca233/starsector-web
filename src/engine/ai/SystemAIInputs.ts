@@ -16,6 +16,14 @@ const dataValue = (object: object, key: PropertyKey) => {
   return !d ? undefined : 'value' in d ? d.value : unknownDescriptor;
 };
 
+const hasOnlyDataProperties = (object: object): boolean => {
+  for (const key of Object.keys(object)) {
+    const d = Object.getOwnPropertyDescriptor(object, key);
+    if (d && !('value' in d)) return false;
+  }
+  return true;
+};
+
 /** Separate effects permission, NEVER a geometry/phase/stat snapshot. Only the
  * actual private Worker native decision phase can bind worlds. Native callbacks
  * may change phase/resources freely: an actual query always reads the LIVE world.
@@ -31,7 +39,7 @@ export class SystemAIInputSpan {
   }
   bind(world: TacticalWorld, original: TacticalWorld): void {
     if (this.stage !== 'planning' || dataValue(world, 'ships') !== this.ships
-      || Object.values(Object.getOwnPropertyDescriptors(original)).some(d => !('value' in d))
+      || !hasOnlyDataProperties(original)
       || dataValue(original, 'noteNavigationObstacle') !== undefined) return;
     inputWorlds.set(world, { span: this, ships: this.ships,
       asteroids: dataValue(world, 'asteroids'), hulks: dataValue(world, 'hulkFragments') });

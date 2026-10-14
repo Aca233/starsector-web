@@ -23,6 +23,8 @@ export { PHASE_MIN_SPEED_MULT, PHASE_BASE_FLUX_LEVEL_FOR_MIN_SPEED } from '../re
  * 4. 分段受击亮度与恢复 (Segment hit state)。
  * 5. 相位线圈进出阶段与冷却、开启/维持硬幅能成本、硬幅能减速 (Phase Cloak)。
  */
+const uninitializedPresentationHitLevels = new Map<number, Float32Array>();
+
 export class Shield {
   /** Separate from efficiency: Graviton modifies all incoming shield damage,
    * not upkeep or the flux-to-damage conversion used by native hit glows. */
@@ -30,7 +32,13 @@ export class Shield {
   public externalDamageTakenMultiplier = () => 1;
   public energyDamageTakenMultiplier = 1;
   public damageTakenMultiplierFor(type: DamageType): number { return this.damageTakenMultiplier * (type === "ENERGY" ? this.energyDamageTakenMultiplier : 1); }
-  public get damageTakenMultiplier(): number { return [...this.damageTakenModifiers.values()].reduce((a, b) => a * b, 1) * this.externalDamageTakenMultiplier(); }
+  public get damageTakenMultiplier(): number {
+    let mult = 1;
+    if (this.damageTakenModifiers.size > 0) {
+      for (const v of this.damageTakenModifiers.values()) mult *= v;
+    }
+    return mult * this.externalDamageTakenMultiplier();
+  }
   /** Actual shield contact age, separate from cosmetic hit levels. Advanced by Ship. */
   public sinceLastDamageTaken = Number.POSITIVE_INFINITY;
 
@@ -94,7 +102,12 @@ export class Shield {
     if (this.hitRadius === this.radius && this.hitArcDeg === this.maxArcDeg) return this.hitLevels;
     const arcLength = 2 * Math.PI * Math.max(0, this.radius) * this.maxArcDeg / 360;
     const count = Math.max(2, Math.floor(arcLength / 20) + 1, Math.floor(this.maxArcDeg / 5) + 1);
-    return new Float32Array(count).fill(100);
+    let levels = uninitializedPresentationHitLevels.get(count);
+    if (!levels) {
+      levels = new Float32Array(count).fill(100);
+      uninitializedPresentationHitLevels.set(count, levels);
+    }
+    return levels;
   }
 
   /** Five degrees of visual fringe at each full-deployment arc endpoint. */
@@ -465,8 +478,8 @@ export class Shield {
     }
 
     // G.advance restores the 100-point visual meter over five seconds, even while off.
-    if (this.type === 'FRONT' || this.type === 'OMNI') {
-      const levels = this.hitSegmentLevels;
+    if ((this.type === 'FRONT' || this.type === 'OMNI') && this.hitRadius === this.radius && this.hitArcDeg === this.maxArcDeg) {
+      const levels = this.hitLevels;
       for (let i = 0; i < levels.length; i++) levels[i] = Math.min(100, levels[i] + 20 * dt);
     }
   }

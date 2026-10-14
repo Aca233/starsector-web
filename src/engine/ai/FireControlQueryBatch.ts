@@ -25,6 +25,9 @@ const budgetPenalty = InFlightFireBudget.prototype.penalty;
 // never turn a restricted flight world into the union fire frame's permissions.
 const stageMemberRosters = new WeakMap<FireControlQueryRoster, { ships: readonly Ship[]; members: ReadonlySet<Ship> }>();
 
+const zeroTravel = new Vector2();
+const freshNativeBatches = new WeakSet<FireControlQueryBatch>();
+
 /** A transaction-local roster, NOT a fixed-step snapshot or a hit-result cache.
  * ShipWeaponControlSystem opens it after motion/shields/component repair and closes
  * it before emissions. Native aiming only changes mount/tracker state in between.
@@ -33,13 +36,12 @@ const stageMemberRosters = new WeakMap<FireControlQueryRoster, { ships: readonly
 export class FireControlQueryBatch {
   private active = true;
   private targetList?: Ship[];
-  private readonly targetStatus = new Map<Ship, boolean>();
+  private targetStatus?: Map<Ship, boolean>;
   private blockerList?: Ship[];
   private flightQueries = 0;
   private flightBlockerList?: Ship[];
   private flightRoster?: readonly Ship[];
   private flightBlockerIndex?: FireControlBlockerIndex;
-  private readonly zeroTravel = new Vector2();
   private blockerIndex?: FireControlBlockerIndex;
   private blockerSet?: ReadonlySet<Ship>;
   private readonly length: number;
@@ -57,6 +59,7 @@ export class FireControlQueryBatch {
     this.length = ships.length;
     this.members = fireFrame ? members ?? new Set(ships) : undefined;
     this.targetQualification = workerOwned ? new FireTargetQualification(shooter, ships) : undefined;
+    freshNativeBatches.add(this);
   }
 
   public static create(ship: Ship, world: FireControlWorld): FireControlQueryBatch | undefined {
@@ -138,12 +141,15 @@ export class FireControlQueryBatch {
   }
 
   private readTarget(ship: Ship, knownPresent: boolean): boolean {
-    const cached = this.targetStatus.get(ship);
+    const present = knownPresent || (this.members ? this.members.has(ship) : this.ships.includes(ship));
+    if (!present) return false;
+    const relation = this.fireFrame?.numeric?.targetAllowed(this.shooter, ship);
+    if (relation !== undefined) return relation;
+    const cached = this.targetStatus?.get(ship);
     if (cached !== undefined) return cached;
-    const relation=this.fireFrame?.numeric?.targetAllowed(this.shooter,ship);
-    const allowed = (knownPresent || this.ships.includes(ship)) && (relation ?? (!sameTeam(ship, this.shooter)
-      && !ship.hasVastBulk && !ship.isDead && ship.isVisibleTo(this.shooter.teamId) && !ship.isCollisionless));
-    this.targetStatus.set(ship, allowed);
+    const allowed = !sameTeam(ship, this.shooter)
+      && !ship.hasVastBulk && !ship.isDead && ship.isVisibleTo(this.shooter.teamId) && !ship.isCollisionless;
+    (this.targetStatus ??= new Map()).set(ship, allowed);
     return allowed;
   }
 
@@ -180,17 +186,17 @@ export class FireControlQueryBatch {
       this.flightBlockerList = this.ships.filter(other => !other.isCollisionless && other.isVisibleTo(this.shooter.teamId));
     }
     if (this.flightBlockerList.length < 8) return this.flightBlockerList;
-    if (this.fireFrame) return this.fireFrame.queryBlockers(origin, this.zeroTravel, velocity, 0, time)
+    if (this.fireFrame) return this.fireFrame.queryBlockers(origin, zeroTravel, velocity, 0, time)
       .filter(other => this.members!.has(other) && !other.isCollisionless && other.isVisibleTo(this.shooter.teamId));
     this.flightBlockerIndex ??= new FireControlBlockerIndex(this.flightBlockerList);
-    return this.flightBlockerIndex.query(origin, this.zeroTravel, velocity, 0, time);
+    return this.flightBlockerIndex.query(origin, zeroTravel, velocity, 0, time);
   }
 
   public close(): void {
     this.active = false;
     this.targetQualification?.close();
     this.targetList = undefined;
-    this.targetStatus.clear();
+    this.targetStatus?.clear();
     this.blockerList = undefined;
     this.blockerIndex = undefined;
     this.blockerSet = undefined;
@@ -248,7 +254,9 @@ export class FireControlQueryRoster {
   public begin(ship: Ship, world: FireControlWorld): FireControlQueryBatch | undefined {
     // Native updates can install external effects or replace a component/definition.
     // These cheap live invalidators never turn a previous rejection into permission.
-    if (!this.matches(world.ships) || !this.ships.includes(ship)) return;
+    if (!this.matches(world.ships)) return;
+    const bound = stageMemberRosters.get(this);
+    if (!(bound?.ships === this.ships ? bound.members.has(ship) : this.ships.includes(ship))) return;
     if (this.stageObservation) return FireControlQueryBatch.fromRoster(ship, this.ships, false, true, world.fireFrame, this);
     const budget = world.fireBudget;
     if (budget && (Object.getPrototypeOf(budget) !== InFlightFireBudget.prototype
@@ -280,37 +288,47 @@ export class FireControlQueryRoster {
   public close(): void { this.active = false; stageMemberRosters.delete(this); }
 }
 
+import { isOwnData } from './NumericAcquisitionFrame';
+
 const numericBatchMethods = (['forShip','canTarget','preAimTargets','aimTargets','sourceModifiers','queryBlockers'] as const)
   .map(key=>[key,FireControlQueryBatch.prototype[key]] as const);
-/** Numeric acquisition may bypass only the native query policy, never an
- * injected permission/budget callback. Descriptor reads don't invoke getters. */
-export function hasNativeAcquisitionWorld(world:FireControlWorld,ship:Ship):boolean {
-  const frame=Object.getOwnPropertyDescriptor(world,'fireFrame');
-  if(!frame||!('value'in frame)||!Object.getOwnPropertyDescriptor(frame.value??{},'numeric')?.value)return false;
-  const ships=Object.getOwnPropertyDescriptor(world,'ships');if(!ships||!('value'in ships))return false;
-  const descriptor=Object.getOwnPropertyDescriptor(world,'queryBatch');
-  if(descriptor&&!('value'in descriptor))return false;
-  const batch=descriptor?.value as FireControlQueryBatch|undefined;
-  if(batch) {
-    if(Object.getPrototypeOf(batch)!==FireControlQueryBatch.prototype)return false;
-    if(!numericBatchMethods.every(([key,value])=> {
-      const own=Object.getOwnPropertyDescriptor(batch,key),current=Object.getOwnPropertyDescriptor(FireControlQueryBatch.prototype,key);
-      return (!own||'value'in own&&own.value===value)&&current?.value===value;
-    }))return false;
-    for(const key of ['active','shooter','ships','length','stageObservation']) {
-      const d=Object.getOwnPropertyDescriptor(batch,key);if(!d||!('value'in d))return false;
-    }
-    if(!batch.stageObservation||batch.forShip(ship,ships.value)!==batch)return false;
-  }
-  const bd=Object.getOwnPropertyDescriptor(world,'fireBudget');if(bd&&!('value'in bd))return false;
-  const budget=bd?.value as InFlightFireBudget|undefined;
-  if(budget) {
-    if(Object.getPrototypeOf(budget)!==InFlightFireBudget.prototype)return false;
-    for(const [key,value] of [['estimate',budgetEstimate],['penalty',budgetPenalty]] as const) {
-      const own=Object.getOwnPropertyDescriptor(budget,key),current=Object.getOwnPropertyDescriptor(InFlightFireBudget.prototype,key);
-      if(own&&(!('value'in own)||own.value!==value)||current?.value!==value)return false;
-    }
-    if(Object.getOwnPropertyNames(budget).some(key=>!('value'in Object.getOwnPropertyDescriptor(budget,key)!)))return false;
+function hasNativeBatchPrototype(): boolean {
+  for (let i = 0; i < numericBatchMethods.length; i++) {
+    const [key, value] = numericBatchMethods[i];
+    if (!isOwnData(FireControlQueryBatch.prototype, key) || FireControlQueryBatch.prototype[key] !== value) return false;
   }
   return true;
 }
+/** Numeric acquisition may bypass only the native query policy, never an
+ * injected permission/budget callback. Descriptor reads don't invoke getters. */
+export function hasNativeAcquisitionWorld(world:FireControlWorld,ship:Ship):boolean {
+  if(!isOwnData(world,'fireFrame')||!world.fireFrame||!isOwnData(world.fireFrame,'numeric')||!world.fireFrame.numeric)return false;
+  if(!isOwnData(world,'ships'))return false;
+  if(Object.hasOwn(world,'queryBatch')&&!isOwnData(world,'queryBatch'))return false;
+  const batch=world.queryBatch;
+  if(batch) {
+    if(Object.getPrototypeOf(batch)!==FireControlQueryBatch.prototype || !hasNativeBatchPrototype())return false;
+    if(!freshNativeBatches.has(batch)) {
+      for(let i=0;i<numericBatchMethods.length;i++) {
+        const [key,value]=numericBatchMethods[i];
+        if(Object.hasOwn(batch,key)&&(!isOwnData(batch,key)||batch[key]!==value))return false;
+      }
+      for(const key of ['active','shooter','ships','length','stageObservation']) {
+        if(!isOwnData(batch,key))return false;
+      }
+    }
+    if(!batch.stageObservation||batch.forShip(ship,world.ships)!==batch)return false;
+  }
+  if(Object.hasOwn(world,'fireBudget')&&!isOwnData(world,'fireBudget'))return false;
+  const budget=world.fireBudget;
+  if(budget) {
+    if(Object.getPrototypeOf(budget)!==InFlightFireBudget.prototype)return false;
+    for(const [key,value] of [['estimate',budgetEstimate],['penalty',budgetPenalty]] as const) {
+      if((Object.hasOwn(budget,key)&&(!isOwnData(budget,key)||budget[key]!==value))
+        ||!isOwnData(InFlightFireBudget.prototype,key)||InFlightFireBudget.prototype[key]!==value)return false;
+    }
+    for(const key in budget) if(Object.hasOwn(budget,key)&&!isOwnData(budget,key))return false;
+  }
+  return true;
+}
+

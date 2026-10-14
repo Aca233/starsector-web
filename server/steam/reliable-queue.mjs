@@ -33,7 +33,7 @@ export function replaceableInput(text) {
   try {
     const m = JSON.parse(text), i = m?.input;
     if (m?.type !== 'input' || typeof m.matchId !== 'string' || typeof m.syncId !== 'string' ||
-        !i || !Number.isSafeInteger(i.seq) || i.seq < 0 || !Number.isInteger(i.keys) || i.keys < 0 || i.keys > 255 ||
+        !i || !Number.isSafeInteger(i.seq) || i.seq < 0 || !Number.isInteger(i.keys) || i.keys < 0 || i.keys > 1023 ||
         typeof i.firing !== 'boolean' || typeof i.pointerActive !== 'boolean' ||
         !Array.isArray(i.aim) || i.aim.length !== 2 || !i.aim.every(n => Number.isFinite(n) && Math.abs(n) <= 100000) ||
         !Array.isArray(i.actions) || i.actions.length !== 0) return null;

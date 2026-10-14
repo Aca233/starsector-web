@@ -1,2 +1,2 @@
-import { createContext } from 'react';
-export const DwellContext = createContext<{ ownerId: string; depth: number; locked: boolean; native?: boolean; linked?: boolean } | null>(null);
+// Compatibility import for existing inspection panels and contracts.
+export * from '../ui/core/dwell-context';

@@ -67,6 +67,9 @@ export class ProjectedRenderShip implements ShipRenderState {
  }
 }
 export class ProjectedRenderSystem implements RenderSystem {
+ declare gravityControlHeld: RenderSystem['gravityControlHeld'];
+ declare gravityPolarity: RenderSystem['gravityPolarity'];
+ declare gravityPush: RenderSystem['gravityPush'];
  declare activationSerial: RenderSystem['activationSerial'];
  declare available: RenderSystem['available'];
  declare disabled: RenderSystem['disabled'];

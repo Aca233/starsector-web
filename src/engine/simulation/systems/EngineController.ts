@@ -139,22 +139,39 @@ export class EngineController {
   public advance(amount: number, context: EngineControlContext): void {
     this.cooldown = Math.max(0, this.cooldown - amount);
     const flamingOut = this.state === 'FLAMING_OUT';
+    const canRepair = context.canRepair && !flamingOut;
+    const repairTimeMultiplier = context.repairTimeMultiplier;
+    const canRepairUnderFire = context.canRepairUnderFire;
+    const hasMalfunction = (context.malfunctionChance ?? 0) > 0 && (context.accelerating || context.spreading);
+    let currentIndex = 0;
+    let currentEngine: EngineStatus | undefined;
+    const sharedOptions = {
+      canRepair,
+      repairTimeMultiplier,
+      canRepairUnderFire,
+      flamingOut,
+      malfunction: undefined as import('./ComponentHealth').ComponentMalfunctionPolicy | undefined,
+      disable: () => {
+        currentEngine!.temporaryMalfunction = false;
+        return this.disable(currentIndex, context);
+      },
+    };
+    const sharedMalfunction: import('./ComponentHealth').ComponentMalfunctionPolicy | undefined = hasMalfunction ? {
+      chance: context.malfunctionChance!,
+      criticalChance: context.criticalMalfunctionChance ?? 0,
+      canPermanentlyDisable: () => this.permanentlyDisabledFraction + currentEngine!.contribution <= .66,
+      disable: (critical, permanent) => {
+        const onset = this.malfunction(currentIndex, context, permanent);
+        if (critical) context.onCriticalMalfunction?.(currentIndex);
+        return onset;
+      },
+    } : undefined;
     for (let index = 0; index < this.engines.length; index++) {
       const engine = this.engines[index];
-      advanceComponentHealth(engine, engine.healthTracker, amount, this.random, {
-        canRepair: context.canRepair && !flamingOut, repairTimeMultiplier: context.repairTimeMultiplier,
-        canRepairUnderFire: context.canRepairUnderFire, flamingOut,
-        malfunction: !engine.systemActivated && (context.malfunctionChance ?? 0) > 0 && (context.accelerating || context.spreading) ? {
-          chance: context.malfunctionChance!, criticalChance: context.criticalMalfunctionChance ?? 0,
-          canPermanentlyDisable: () => this.permanentlyDisabledFraction + engine.contribution <= .66,
-          disable: (critical, permanent) => {
-            const onset = this.malfunction(index, context, permanent);
-            if (critical) context.onCriticalMalfunction?.(index);
-            return onset;
-          }
-        } : undefined,
-        disable: () => { engine.temporaryMalfunction = false; return this.disable(index, context); }
-      });
+      currentIndex = index;
+      currentEngine = engine;
+      sharedOptions.malfunction = !engine.systemActivated ? sharedMalfunction : undefined;
+      advanceComponentHealth(engine, engine.healthTracker, amount, this.random, sharedOptions);
       // The native component advances presentation after health, not in applyDamage.
       if (engine.isDisabled && !engine.glowDisabled) {
         engine.glowDisabled = true;

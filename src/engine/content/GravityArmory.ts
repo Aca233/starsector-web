@@ -8,12 +8,12 @@ const common = {isBeam:false,burstSize:1,burstDelay:0,minSpread:0,maxSpread:0,sp
 export function gravityWeapons(): WeaponSpec[] {
   const media = (kind:keyof typeof GRAVITY_WEAPONS) => ({...art[kind],displayIconUrl:art[kind].turretSpriteUrl});
   return [
-    {...common,id:GRAVITY_WEAPONS.tractor,nameKey:'潮汐引力投射器',mountSize:'EXTRA_LARGE',range:1450,turnRateDegPerSec:180,ordnancePointCost:60,
+    {...common,id:GRAVITY_WEAPONS.tractor,nameKey:'潮汐引力投射器',mountSize:'EXTRA_LARGE',range:2000,turnRateDegPerSec:180,ordnancePointCost:60,
       // Real continuous entity interaction; this mount never emits a fake projectile.
       type:'ENERGY',displayIconUrl:'/game-assets/graphics/gravity/field-core-v8.png',hardpointUsesHullSprite:true,
       spriteWidth:124.26,spriteHeight:124.26,spritePivotX:.5,spritePivotY:.5,
       turretOffsets:[0,0],hardpointOffsets:[0,0],
-      gravityTractor:{captureTime:.22,projectileCaptureTime:.08,holdTime:5,recovery:1,anchorSpeed:650,strength:650,damping:1.6,fluxPerSecond:350,tidalDamagePerSecond:1200,tidalFluxPerSecond:600}},
+      gravityTractor:{selfTow:true,captureTime:.22,projectileCaptureTime:.08,holdTime:5,recovery:1,anchorSpeed:650,strength:650,damping:1.6,fluxPerSecond:350,tidalDamagePerSecond:1200,tidalFluxPerSecond:600}},
     {...common,...media('calibrator'),id:GRAVITY_WEAPONS.calibrator,nameKey:'质量校准炮',mountSize:'MEDIUM',range:1150,turnRateDegPerSec:100,ordnancePointCost:12,
       damagePerShot:180,damagePerSecond:120,fluxPerShot:175,refireDelay:1.5,projSpeed:700,projRadius:1.3,gravityCoupling:'MASS_DRIVER',
       projSpriteUrl:'/game-assets/graphics/missiles/shell_gauss_cannon.png',projLength:23,projWidth:2,fadeTime:.15,soundKey:'railgun_fire',
@@ -29,8 +29,8 @@ export function gravityWeapons(): WeaponSpec[] {
   ];
 }
 const descriptions = {
-  tractor:'内置XL潮汐场投射器。第1组左键抓实体：对敌舰持续1200能量伤害/秒，盾弧/装甲正常结算；友舰、弹体和障碍仅受牵引。射程1450、最长5秒、恢复1秒。固定结构反牵本舰，右键可反投。无假弹体，不默认穿盾。',
-  calibrator:'M质量校准炮：180动能、175软幅能，1.5秒/发，射程1150。自己发射的弹体能受F校准，最多0.65秒/45°；右键或G能推动弹体，伤害不增加。普通友军火力不受场影响。',
+  tractor:'内置XL潮汐场投射器。第1组左键抓实体：对敌舰持续1200能量伤害/秒，盾弧/装甲正常结算；友舰、弹体和障碍仅受牵引；点住本舰真实舰体可自牵引，无自伤，松开保留惯性。射程2000、最长5秒、恢复1秒。固定结构反牵本舰；按住右键定向推送当前对象不松抓，G紧急排斥可释放。按住F时单体锚点暂停跟随鼠标。无假弹体，不默认穿盾。',
+  calibrator:'M质量校准炮：180动能、175软幅能，1.5秒/发，射程1150。自己发射的弹体能受F校准，最多0.65秒/45°；F排斥态或G能推动弹体，伤害不增加。普通友军火力不受场影响。',
   deflector:'S自动偏转。有限冲量改变逼近本舰的实弹/导弹路径，不接管阵营。0.3秒间隔、每次35软幅能，重弹更难偏转；激光、已失效弹体和地雷不受影响。不能代替装甲或全向护盾。',
   pdc:'S双联近防：12破片×12发/秒，射程520；72发弹匣，每秒补8发。先拦截弹体，与偏转阵列互补。',
 };

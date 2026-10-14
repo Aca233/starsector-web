@@ -1,0 +1,812 @@
+{
+  "schema": 1,
+  "recorded": "2026-10-08",
+  "scope": "Current development workspace; exceptions are exact edges, not directory wildcards.",
+  "exceptions": [
+    {
+      "from": "src/campaign/rules/OriginalEncounterLoot.mjs",
+      "to": "src/campaign/rules/OriginalEncounterPlayerLoot.mjs",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/campaign/rules/OriginalEncounterPlayerLoot.mjs",
+      "to": "src/campaign/rules/OriginalEncounterLoot.mjs",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/campaign/rules/OriginalFleetData.mjs",
+      "to": "src/campaign/rules/OriginalFleetEffects.mjs",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/campaign/rules/OriginalFleetData.mjs",
+      "to": "src/campaign/rules/OriginalNativeFleetCounts.mjs",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/campaign/rules/OriginalFleetData.mjs",
+      "to": "src/campaign/rules/OriginalNativeLogistics.mjs",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/campaign/rules/OriginalFleetEffects.mjs",
+      "to": "src/campaign/rules/OriginalTowCable.mjs",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/campaign/rules/OriginalFleetEffects.mjs",
+      "to": "src/campaign/rules/OriginalFleetData.mjs",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/campaign/rules/OriginalNativeFleetCounts.mjs",
+      "to": "src/campaign/rules/OriginalFleetEffects.mjs",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/campaign/rules/OriginalNativeLogistics.mjs",
+      "to": "src/campaign/rules/OriginalFleetData.mjs",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/campaign/rules/OriginalTowCable.mjs",
+      "to": "src/campaign/rules/OriginalFleetData.mjs",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/AttachedModuleMotion.ts",
+      "to": "src/engine/simulation/CombatEngine.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/AutofireController.ts",
+      "to": "src/engine/ai/FireControlQueryBatch.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/AutofireController.ts",
+      "to": "src/engine/ai/NumericAcquisitionFrame.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/AutofireController.ts",
+      "to": "src/engine/extensions/HullMods.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/AutofireController.ts",
+      "to": "src/engine/simulation/WeaponRange.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/AutofireController.ts",
+      "to": "src/engine/simulation/collision/ShieldCollisionGeometry.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/CapitalShipAI.ts",
+      "to": "src/engine/ai/AttachedModuleMotion.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/CombatAIPhase.ts",
+      "to": "src/engine/ai/AttachedModuleMotion.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/CombatAIPhase.ts",
+      "to": "src/engine/ai/CapitalShipAI.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/CombatDecisionScene.ts",
+      "to": "src/engine/ai/DecisionReadPlane.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/CombatDecisionScene.ts",
+      "to": "src/engine/ai/FireControlQueryBatch.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/CombatFireFrame.ts",
+      "to": "src/engine/simulation/ShipStepBatch.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/CombatFireFrame.ts",
+      "to": "src/engine/ai/NumericAcquisitionFrame.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/CombatFireFrame.ts",
+      "to": "src/engine/ai/FireControlQueryBatch.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/CombatFireFrame.ts",
+      "to": "src/engine/simulation/collision/ShieldCollisionGeometry.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/CombatQueryReads.ts",
+      "to": "src/engine/simulation/Ship.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/CombatQueryReads.ts",
+      "to": "src/engine/simulation/ShipSystem.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/DecisionReadPlane.ts",
+      "to": "src/engine/ai/CombatDecisionScene.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/DecisionReadPlane.ts",
+      "to": "src/engine/ai/CombatQueryReads.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/FireControlQueryBatch.ts",
+      "to": "src/engine/ai/PreAimRangeIndex.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/FireControlQueryBatch.ts",
+      "to": "src/engine/simulation/Ship.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/FleetColumnSolver.ts",
+      "to": "src/engine/ai/FleetTactics.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/FleetTactics.ts",
+      "to": "src/engine/ai/FleetColumnSolver.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/FleetTactics.ts",
+      "to": "src/engine/ai/NumericalFleetPlanner.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/NumericAcquisitionFrame.ts",
+      "to": "src/engine/simulation/ShipStepBatch.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/NumericAcquisitionFrame.ts",
+      "to": "src/engine/ai/DecisionReadPlane.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/NumericAcquisitionFrame.ts",
+      "to": "src/engine/ai/FireControlQueryBatch.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/NumericAcquisitionFrame.ts",
+      "to": "src/engine/simulation/Ship.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/NumericAcquisitionFrame.ts",
+      "to": "src/engine/simulation/systems/ShipWeaponControlSystem.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/NumericAcquisitionFrame.ts",
+      "to": "src/engine/simulation/collision/ShieldCollisionGeometry.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/NumericalFleetPlanner.ts",
+      "to": "src/engine/ai/FleetTactics.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/PreAimRangeIndex.ts",
+      "to": "src/engine/simulation/collision/ShieldCollisionGeometry.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/ShipCombatProfile.ts",
+      "to": "src/engine/ai/CombatQueryReads.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/ShipCombatProfile.ts",
+      "to": "src/engine/simulation/WeaponRange.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/ShipCombatProfile.ts",
+      "to": "src/engine/ai/AutofireController.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/batch/StageAIProducer.ts",
+      "to": "src/engine/simulation/Ship.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/batch/StageAIProducer.ts",
+      "to": "src/engine/extensions/HullMods.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/batch/StageProducer.ts",
+      "to": "src/engine/simulation/Ship.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/batch/StageProducer.ts",
+      "to": "src/engine/ai/FireControlQueryBatch.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/batch/StageProducer.ts",
+      "to": "src/engine/ai/ShipCombatProfile.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/batch/StageProducer.ts",
+      "to": "src/engine/simulation/WeaponRange.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/batch/StageProducer.ts",
+      "to": "src/engine/extensions/HullMods.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/ai/batch/StageProducer.ts",
+      "to": "src/engine/ai/batch/StageAIProducer.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/content/ContentRegistry.ts",
+      "to": "src/engine/modding/ContentValidation.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/extensions/HullMods.ts",
+      "to": "src/engine/content/ContentRegistry.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/extensions/ship-systems/EclipseProtocol.ts",
+      "to": "src/engine/extensions/ship-systems/Requirements.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/extensions/ship-systems/EclipseProtocol.ts",
+      "to": "src/engine/extensions/ship-systems/SystemAI.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/extensions/ship-systems/GravitySystems.ts",
+      "to": "src/engine/simulation/systems/GravityTractor.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/extensions/ship-systems/HyperionSystems.ts",
+      "to": "src/engine/extensions/ship-systems/SystemProjectile.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/extensions/ship-systems/Loadout.ts",
+      "to": "src/engine/extensions/ship-systems/Registry.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/extensions/ship-systems/Registry.ts",
+      "to": "src/engine/extensions/ship-systems/GravitySystems.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/extensions/ship-systems/Registry.ts",
+      "to": "src/engine/extensions/ship-systems/ZhefengSystem.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/extensions/ship-systems/Registry.ts",
+      "to": "src/engine/extensions/ship-systems/RocinanteSystems.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/extensions/ship-systems/Registry.ts",
+      "to": "src/engine/extensions/ship-systems/HyperionSystems.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/extensions/ship-systems/Registry.ts",
+      "to": "src/engine/extensions/ship-systems/EclipseProtocol.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/extensions/ship-systems/Requirements.ts",
+      "to": "src/engine/extensions/HullMods.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/extensions/ship-systems/RocinanteSystems.ts",
+      "to": "src/engine/ai/AutofireController.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/extensions/ship-systems/SystemAI.ts",
+      "to": "src/engine/simulation/WeaponRange.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/extensions/ship-systems/SystemProjectile.ts",
+      "to": "src/engine/content/ContentRegistry.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/extensions/ship-systems/SystemProjectile.ts",
+      "to": "src/engine/extensions/HullMods.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/extensions/ship-systems/SystemProjectile.ts",
+      "to": "src/engine/simulation/WeaponRange.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/extensions/ship-systems/ZhefengSystem.ts",
+      "to": "src/engine/ai/AutofireController.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/modding/ContentValidation.ts",
+      "to": "src/engine/extensions/ship-systems/Loadout.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/modding/ContentValidation.ts",
+      "to": "src/engine/extensions/HullMods.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/modding/ContentValidation.ts",
+      "to": "src/engine/extensions/ship-systems/Registry.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/modding/ContentValidation.ts",
+      "to": "src/engine/content/ContentRegistry.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/modding/ModManager.ts",
+      "to": "src/engine/modding/ShipPackCatalog.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/modding/ModManager.ts",
+      "to": "src/engine/content/ContentRegistry.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/modding/ModManager.ts",
+      "to": "src/engine/modding/ContentValidation.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/modding/ModManager.ts",
+      "to": "src/engine/modding/ShipPackCapabilities.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/modding/ShipPackCapabilities.ts",
+      "to": "src/engine/extensions/ship-systems/Registry.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/modding/ShipPackCapabilities.ts",
+      "to": "src/engine/extensions/HullMods.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/modding/ShipPackCatalog.ts",
+      "to": "src/engine/modding/ShipPackCapabilities.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/CombatEngine.ts",
+      "to": "src/engine/ai/CapitalShipAI.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/CombatEngine.ts",
+      "to": "src/engine/ai/CombatAIPhase.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/CombatEngine.ts",
+      "to": "src/engine/simulation/systems/WeaponSimulationSystem.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/OwnedNativeSystemModifiers.ts",
+      "to": "src/engine/extensions/ship-systems/Registry.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/Ship.ts",
+      "to": "src/engine/simulation/WeaponRange.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/Ship.ts",
+      "to": "src/engine/extensions/ship-systems/Registry.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/Ship.ts",
+      "to": "src/engine/extensions/ship-systems/Loadout.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/Ship.ts",
+      "to": "src/engine/extensions/HullMods.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/Ship.ts",
+      "to": "src/engine/simulation/ShipSystem.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/Ship.ts",
+      "to": "src/engine/modding/ModManager.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/Ship.ts",
+      "to": "src/engine/simulation/systems/ShipWeaponControlSystem.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/ShipStepBatch.ts",
+      "to": "src/engine/simulation/systems/ShipWeaponControlSystem.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/ShipStepBatch.ts",
+      "to": "src/engine/ai/FireControlQueryBatch.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/ShipStepBatch.ts",
+      "to": "src/engine/ai/CombatFireFrame.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/ShipStepBatch.ts",
+      "to": "src/engine/simulation/Ship.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/ShipStepBatch.ts",
+      "to": "src/engine/ai/batch/StageProducer.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/ShipSystem.ts",
+      "to": "src/engine/extensions/ship-systems/Registry.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/ShipSystem.ts",
+      "to": "src/engine/simulation/OwnedNativeSystemModifiers.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/WeaponRange.ts",
+      "to": "src/engine/extensions/HullMods.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/collision/ShieldCollisionGeometry.ts",
+      "to": "src/engine/simulation/Ship.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/systems/GravityTractor.ts",
+      "to": "src/engine/simulation/WeaponRange.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/systems/ShipWeaponControlSystem.ts",
+      "to": "src/engine/ai/AutofireController.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/systems/ShipWeaponControlSystem.ts",
+      "to": "src/engine/simulation/systems/GravityTractor.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/systems/ShipWeaponControlSystem.ts",
+      "to": "src/engine/ai/FireControlQueryBatch.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/systems/ShipWeaponControlSystem.ts",
+      "to": "src/engine/extensions/HullMods.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/systems/ShipWeaponControlSystem.ts",
+      "to": "src/engine/simulation/WeaponRange.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/systems/ShipWeaponControlSystem.ts",
+      "to": "src/engine/modding/ModManager.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/systems/ShipWeaponControlSystem.ts",
+      "to": "src/engine/content/ContentRegistry.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/systems/ShipWeaponControlSystem.ts",
+      "to": "src/engine/ai/batch/StageProducer.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/engine/simulation/systems/WeaponSimulationSystem.ts",
+      "to": "src/engine/simulation/CombatEngine.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/studio/DesignModel.ts",
+      "to": "src/studio/NativeVariantImport.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    },
+    {
+      "from": "src/studio/NativeVariantImport.ts",
+      "to": "src/studio/DesignModel.ts",
+      "kind": "runtime",
+      "rule": "runtime-cycle",
+      "reason": "Existing runtime cycle: move data or composition to an explicit boundary before removing this exception."
+    }
+  ]
+}

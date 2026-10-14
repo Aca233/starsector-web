@@ -35,6 +35,15 @@ import { wireDesign, MAX_DESIGN_BYTES } from "../src/network/design-wire.mjs";
 import { roomStartBlockReason } from "../src/network/room-start.mjs";
 // Room presets and AI share the selected, independently deployable root hulls.
 const aiHullIds = new Set(protocol.ships.map(hull => hull.id));
+const combatAuthorityIdentity = value => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('无效战斗后端身份');
+  if (value.kind === 'rust-wasm' && typeof value.sha256 === 'string' && /^[0-9a-f]{64}$/.test(value.sha256) && Object.keys(value).every(key => key === 'kind' || key === 'sha256'))
+    return { kind: value.kind, sha256: value.sha256 };
+  if (value.kind === 'typescript' && (value.fallbackReason === undefined || typeof value.fallbackReason === 'string' && value.fallbackReason.length > 0 && value.fallbackReason.length <= 500)
+      && Object.keys(value).every(key => key === 'kind' || key === 'fallbackReason'))
+    return { kind: value.kind, ...(value.fallbackReason === undefined ? {} : { fallbackReason: value.fallbackReason }) };
+  throw Error('无效战斗后端身份');
+};
 const project = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
@@ -618,7 +627,7 @@ export async function createLanServer({
   const receiveAuthority = (r, matchId, message) => {
     if (rooms.get(r.code) !== r || r.match?.id !== matchId || !["loading","running"].includes(r.status)) return;
     try {
-      if (message.type === "ready") { r.authorityReady = true; launchReady(r); }
+      if (message.type === "ready") { r.authorityReady = true;r.authorityBackend=message.authority?structuredClone(message.authority):null; launchReady(r); }
       else if (message.type === 'projectile-visual') {
         try {
           if (r.status !== 'running') return;
@@ -653,6 +662,8 @@ export async function createLanServer({
         r.authorityPerformance = message;
         broadcast(r, {type:"authority-performance", matchId, performance:message});
       } else if (message.type === "recovered") {
+        if(message.authority&&JSON.stringify(message.authority)!==JSON.stringify(r.authorityBackend))throw Error('服务器恢复使用了不同的战斗后端');
+        r.authorityRecovery={pauseMs:message.pauseMs,authority:r.authorityBackend};
         for (const member of r.peers) if (connected(member) && member.assetsLoaded) beginSync(r, member);
         publish(r);
       } else if (message.type === "deployment-result") {
@@ -1284,7 +1295,7 @@ export async function createLanServer({
           r.authorityProgressAt = r.authorityDemandSince = now;
           r.lastSeq = -1;
           r.lastTick = -1; r.lastMotionTick = -1; r.relayDecode = null;
-          r.frame = null;
+          r.frame = null;r.authorityBackend=null;r.authorityRecovery=null;
           r.result = null;
           for (const member of r.peers) {
             member.loaded = false;
@@ -1306,7 +1317,7 @@ export async function createLanServer({
           if(m.type==='deployment-result'||m.type==='finish')return;
           throw Error("已过期的对局消息");
         }
-        if (authorityFactory && ["state", "motion", "combat-state", "finish", "deployment-result", "host-recovered"].includes(m.type))
+        if (authorityFactory && ["state", "motion", "combat-state", "finish", "deployment-result", "host-recovered", "host-authority"].includes(m.type))
           throw Error("此房间由服务器计算，客户端不能提交权威状态或结果。");
         if (m.type === "end") {
           isHost(p, r);
@@ -1324,6 +1335,14 @@ export async function createLanServer({
               message: reason + "。你已退出房间，已开始的战斗由 AI 接管舰船。",
             });
           }
+          return;
+        }
+        if (m.type === 'host-authority') {
+          isHost(p, r);
+          if (!['loading', 'running'].includes(r.status) || m.matchId !== r.match?.id) throw Error('战斗后端初始化不属于当前对局');
+          const identity = combatAuthorityIdentity(m.authority);
+          if (r.authorityBackend && JSON.stringify(identity) !== JSON.stringify(r.authorityBackend)) throw Error('已初始化的战斗不能切换后端');
+          r.authorityBackend = identity;
           return;
         }
         if (m.type === "loaded") {
@@ -1360,6 +1379,10 @@ export async function createLanServer({
         if (m.type === "host-recovered") {
           isHost(p, r);
           if (r.status !== "running") return;
+          if (r.authorityBackend) {
+            if (m.matchId !== r.match.id || JSON.stringify(combatAuthorityIdentity(m.authority)) !== JSON.stringify(r.authorityBackend)) throw Error('房主恢复使用了不同的战斗后端');
+            r.authorityRecovery = { pauseMs: m.pauseMs, authority: r.authorityBackend };
+          }
           for (const member of r.peers) if (connected(member) && member.assetsLoaded) beginSync(r, member);
           publish(r);
           return;
@@ -1391,7 +1414,7 @@ export async function createLanServer({
             i.seq < 0 ||
             !Number.isInteger(i.keys) ||
             i.keys < 0 ||
-            i.keys > 255 ||
+            i.keys > 1023 ||
             typeof i.firing !== "boolean" ||
             typeof i.pointerActive !== "boolean" ||
             !Array.isArray(i.aim) ||

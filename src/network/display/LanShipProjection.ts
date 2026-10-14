@@ -14,7 +14,7 @@ import { weaponPresentationAngle } from '../../engine/visual/WeaponPresentation'
 const shipKeys = ['shipName','isPlayer','currentCR','maxHullHp','retreating','sightRadius','fireControlMode','isFiringMain',
  'throttle','brakeInput','strafeInput','turnInput','peakPerformanceRemaining','combatWeaponRepairTimeMultiplier','fighterRecall',
  'teleportCameraOffset','teleportSequence','subjectiveTimeMultiplier','aimTargetWorld','flightDeckWingId','defenseFacingRad','aiHoldOffensiveFire','isSystemDrone'] as const;
-const systemKeys = ['name','type','description','state','available','disabled','isActive','isCoolingDown','cooldownTimer',
+const systemKeys = ['activeTimer','gravityPush','gravityPolarity','gravityControlHeld','name','type','description','state','available','disabled','isActive','isCoolingDown','cooldownTimer',
  'activationFailureReason','charges','maxCharges','statusText','passiveStatusText','activationSerial','effectLevel','fortressVisualLevel','teleportVisual',
  'forcesAutofire','blocksWeapons','forcesForward','locksTurning','forcesBraking','blocksAcceleration','blocksStrafing','isPhased'] as const;
 const shieldKeys = ['voidShield','type','phaseState','radius','maxArcDeg','currentArcDeg','facingAngleRad','targetFacingAngleRad','isActive',
@@ -59,9 +59,10 @@ export class LanShipProjection {
   const system=(value:ShipSystem)=>{
    const prior=systems.get(value);if(prior)return prior;
    const row=this.pick(value,systemKeys,['definitionData','pulseOffset','fluxCosts','fireRates','fireSlots']);
+   if (value.definition.gravityDirectionalPush) row.gravityPush = value.gravityPush;
    if (value.definition.gravityField || value.definition.gravityCollapse) row.gravityField = value.gravityField;
    if (value.definition.gravityManeuver) row.gravityManeuver = value.gravityManeuver;
-   Object.assign(row,{definitionData:this.definition(this.pick(value.definition,['visuals','audio','charges'])),
+   Object.assign(row,{definitionData:this.definition(this.pick(value.definition,['gravityField','gravityCollapse','visuals','audio','charges'])),
     pulseOffset:pulsePusherOffset(value),
     fluxCosts:Object.fromEntries(weaponTypes.map(type=>[type,value.getWeaponFluxCostMultiplier(type)])),
     fireRates:Object.fromEntries(weaponTypes.map(type=>[type,value.getWeaponRateOfFireMultiplier(type)])),

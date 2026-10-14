@@ -2,9 +2,19 @@ import { Vector2 } from '../math/Vector2';
 import type { SimulationRandom } from '../simulation/SimulationRandom';
 import type { Ship } from '../simulation/Ship';
 import type { EmpArc } from '../simulation/CombatTypes';
+import { knownProjectionKeys } from '../runtime/local/ProjectionArrays';
+
+const nativeEmpArcProjectionKeys: readonly string[] = [
+  'anchor', 'fromLocal', 'toLocal', 'length', 'points', 'fringe', 'core',
+  'period', 'elapsed', 'level', 'peak', 'brightness',
+];
+const empArcProjectionKeys: readonly string[] = [
+  'startPos', 'endPos', 'life', 'maxLife', 'thickness', 'coreColor',
+  'glowColor', 'segments', 'branches', 'native',
+];
 
 export interface NativeEmpArcVisual {
-  anchor: Ship;
+  anchor: Pick<Ship, 'pos' | 'facingRad'>;
   fromLocal: Vector2;
   toLocal: Vector2;
   points: Vector2[];
@@ -58,9 +68,12 @@ export function createNativeEmpArc(from: Vector2, to: Vector2, anchor: Ship,
   resetFlicker(state, random);
   state.brightness = Math.min(1, state.level * state.peak * 1.5);
   state.points = createEmpArcPoints(state.length, random);
-  return { startPos: from.clone(), endPos: to.clone(), life: 1, maxLife: 1,
+  const arc: EmpArc = { startPos: from.clone(), endPos: to.clone(), life: 1, maxLife: 1,
     thickness: width, coreColor: [core[0], core[1], core[2]],
     glowColor: [fringe[0], fringe[1], fringe[2]], segments: [], branches: [], native: state };
+  knownProjectionKeys.set(state, nativeEmpArcProjectionKeys);
+  knownProjectionKeys.set(arc, empArcProjectionKeys);
+  return arc;
 }
 
 /** EmpArcEntity + damage/oooo_1: simulate flicker; never redraw randomness. */

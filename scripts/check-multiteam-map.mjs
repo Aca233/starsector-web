@@ -57,25 +57,25 @@ try {
     }
     for (const n of [2, 3, 4, 5, 8, 10, 33]) {
       const e = createLanWorld(matchFor(Array.from({length: n}, (_, i) => i))).engine;
-      // LAN uses public visibility even with two teams; sensor-mode checks below remain independent.
+      // LAN uses public visibility even with two teams; legacy visibility callers also remain public.
       check(e.openBattlefield === true, `${n} teams: LAN uses public battlefield policy`);
       check(e.capitalShips.every(s => e.capitalShips.every(t => t.isVisibleTo(s.teamId))), `${n} teams: first frame reveals all active teams`);
-      // The sensor path remains available to ordinary combat, including numerical edge cases.
+      // Legacy callers cannot re-enable sensor-distance gating.
       updateCombatVisibility(e.ships);
       const ships = e.capitalShips;
-      check(ships.every((s, i) => ships[(i + 1) % n].isVisibleTo(s.teamId) && ships[(i + n - 1) % n].isVisibleTo(s.teamId)), `${n} teams: sensor mode: boundary neighbours visible symmetrically`);
-      if (n > 3) check(!ships[Math.floor(n / 2)].isVisibleTo(ships[0].teamId), `${n} teams: sensor mode: genuinely distant opponent stays hidden`);
+      check(ships.every((s, i) => ships[(i + 1) % n].isVisibleTo(s.teamId) && ships[(i + n - 1) % n].isVisibleTo(s.teamId)), `${n} teams: legacy caller: boundary neighbours visible symmetrically`);
+      if (n > 3) check(ships[Math.floor(n / 2)].isVisibleTo(ships[0].teamId), `${n} teams: legacy caller: distant opponent remains visible`);
     }
     const reused = createLanWorld(match).engine;
     reused.switchPlayerShip('wolf');
-    check(!reused.openBattlefield && !reused.multiTeamBattle, 'switching to ordinary combat clears LAN presentation policy');
-    // Empty observer list must not silently switch an eliminated guest to the host's vision.
+    check(reused.openBattlefield && !reused.multiTeamBattle, 'switching to ordinary combat keeps public visibility and clears LAN team mode');
+    // An empty observer list does not restrict public battle contacts.
     const hostShip = engine.allCapitalShips.find(s => s.teamId === 0);
-    check(!tacticalContactVisible(hostShip, [], 2), 'no living observers: team 2 does not inherit team 0 map contacts');
+    check(tacticalContactVisible(hostShip, [], 2), 'no living observers: public contacts remain visible');
     setLanPerspective(engine, world.controlled, 0);
     const target = engine.enemyShip;
     target.pos.copy(engine.playerShip.pos); target.pos.x += engine.playerShip.sightRadius + 0.01;
-    check(!contactVisible(target, [engine.playerShip], 0), 'sensor tolerance does not reveal genuinely out-of-range contacts');
+    check(contactVisible(target, [engine.playerShip], 0), 'distance does not hide a public contact');
     // Roster allocation cannot depend on whether a human-only team has an AI row.
     const sparse = createLanWorld(matchFor([0, 2, 32], [[]])).engine;
     check(sparse.allCapitalShips.every(s => Number.isFinite(s.pos.x) && Number.isFinite(s.pos.y)), 'human-only/sparse teams get finite spawn positions');

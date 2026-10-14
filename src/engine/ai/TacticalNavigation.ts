@@ -33,6 +33,7 @@ const collisionMax = Math.max, collisionMin = Math.min, collisionAbs = Math.abs,
 const nativeCollisionMath = [[collisionMax, 'max'], [collisionMin, 'min'], [collisionAbs, 'abs'], [collisionHypot, 'hypot']]
   .every(([fn, name]) => typeof fn === 'function' && Function.prototype.toString.call(fn) === `function ${name}() { [native code] }`);
 interface Obstacle { x:number;y:number;vx:number;vy:number;radius:number;rejectRadius:number }
+const avoidanceAngles = [30, -30, 60, -60, 90, -90, 135, -135, 180] as const;
 function obstacles(ship: Ship,world: TacticalWorld,horizon:number): Obstacle[] {
   const result:Obstacle[]=[];
   const ownRadius=Math.max(ship.spec.collisionRadius,ship.shield.isActive && ship.shield.type!=='PHASE'?ship.shield.radius:0);
@@ -41,39 +42,54 @@ function obstacles(ship: Ship,world: TacticalWorld,horizon:number): Obstacle[] {
   // AI calls/ticks: systems and phase/flux state may change between those calls.
   // Dependency/custom callbacks keep the original per-obstacle reads.
   const reuseMotion = !world.noteNavigationObstacle && ship.getMotionStats === nativeGetMotionStats
-    && (!!world.weaponThreatFrame || ship.hasNativeThreatPhaseHooks);
-  let motion: { maxSpeed: number; speed: number } | undefined;
+    && (!!world.weaponThreatFrame || ship.hasNativeThreatPhaseHooks || ship.hasExactThreatPhaseHooks);
+  // Authored systems already have a separate exact-statistics audit. Reuse only
+  // maxSpeed inside THIS synchronous scan, not a whole tick or an AI phase.
+  // This does not admit authored ships to the native obstacle index/pruning path.
+  const reuseExactSpeed = !reuseMotion && !world.noteNavigationObstacle && ship.getMotionStats === nativeGetMotionStats
+    && Object.getPrototypeOf(ship.pos) === Vector2.prototype && !Object.hasOwn(ship.pos, 'distanceTo')
+    && Object.getPrototypeOf(ship.vel) === Vector2.prototype && !Object.hasOwn(ship.vel, 'length')
+    && Vector2.prototype.distanceTo === nativeDistanceTo && Vector2.prototype.length === nativeVectorLength
+    && ship.hasExactThreatPhaseHooks;
+  let exactMaxSpeed: number | undefined;
+  let motion: { maxSpeed: number; speed: number } | undefined = reuseMotion
+    ? { maxSpeed: queryMotionStats(ship, world.queryReads).maxSpeed, speed: ship.vel.length() } : undefined;
+  const nativeOwnPos = ship.pos.distanceTo === nativeDistanceTo;
+  const shipX = ship.pos.x, shipY = ship.pos.y, ownRoot = ship.assemblyRoot;
   const add=(pos:Vector2,vel:Vector2,radius:number)=>{
     const combined=ownRadius+radius+policy.collisionMargin;
-    const own = reuseMotion ? motion ??= { maxSpeed: queryMotionStats(ship, world.queryReads).maxSpeed, speed: ship.vel.length() } : undefined;
-    if (own && horizon >= 0 && ship.pos.distanceTo === nativeDistanceTo && vel.length === nativeVectorLength) {
+    const own = motion;
+    if (own && horizon >= 0 && nativeOwnPos && vel.length === nativeVectorLength) {
       // L1 speed bounds Euclidean speed from above, while a coordinate gap
       // bounds distance from below. Far obstacles need neither exact hypot.
       // Keep rounding slack and fail open on non-finite bounds; near obstacles
       // retain the original expression and its exact distance/radius comparison.
       const reach = combined + (own.maxSpeed + own.speed + Math.abs(vel.x) + Math.abs(vel.y)) * horizon;
-      const gap = Math.max(Math.abs(ship.pos.x - pos.x), Math.abs(ship.pos.y - pos.y));
+      const gap = Math.max(Math.abs(shipX - pos.x), Math.abs(shipY - pos.y));
       if (gap > reach + 1e-12 * Math.max(1, Math.abs(reach))) return;
     }
-    if(ship.pos.distanceTo(pos)>combined+((own?.maxSpeed ?? ship.getMotionStats().maxSpeed)+(own?.speed ?? ship.vel.length())+vel.length())*horizon)return;
+    if(ship.pos.distanceTo(pos)>combined+((own?.maxSpeed ?? (reuseExactSpeed ? exactMaxSpeed ??= ship.getMotionStats().maxSpeed : ship.getMotionStats().maxSpeed))+(own?.speed ?? ship.vel.length())+vel.length())*horizon)return;
     result.push({x:pos.x,y:pos.y,vx:vel.x,vy:vel.y,radius:combined,rejectRadius:combined+1e-12*Math.max(1,Math.abs(combined))});
   };
   // The owner supplies a conservative phase index only when no mutable engine
   // references escape. Observer callbacks / replaced math retain the old scan.
   const supplied = reuseMotion ? world.navigationObstacleIndex : undefined;
-  const index = supplied && ship.pos.distanceTo === nativeDistanceTo && ship.vel.length === nativeVectorLength
+  const index = supplied && nativeOwnPos && ship.vel.length === nativeVectorLength
     ? supplied : undefined;
-  if (index) motion ??= { maxSpeed: queryMotionStats(ship, world.queryReads).maxSpeed, speed: ship.vel.length() };
-  const candidates = index?.select(world.ships, ship.pos.x, ship.pos.y, ownRadius + policy.collisionMargin, motion!.maxSpeed, motion!.speed, horizon);
-  for(const other of candidates ?? world.ships){
+  const candidates = index?.select(world.ships, shipX, shipY, ownRadius + policy.collisionMargin, motion!.maxSpeed, motion!.speed, horizon);
+  const shipList = candidates ?? world.ships;
+  for(let i=0;i<shipList.length;i++){
+    const other = shipList[i];
     // Attached parts cannot collide with their own assembly (same rule as ShipCollisionSystem).
     // Treating them as obstacles permanently blocks system AI behind a false avoidance flag.
-    if(other.assemblyRoot===ship.assemblyRoot||other.isDead||other.isPhased||other.spec.hullSize==='FIGHTER')continue;
+    if(other.assemblyRoot===ownRoot||other.isDead||other.isPhased||other.spec.hullSize==='FIGHTER')continue;
     world.noteNavigationObstacle?.(ship, other, horizon);
     add(other.pos,other.vel,Math.max(other.spec.collisionRadius,other.shield.isActive&&other.shield.type!=='PHASE'&&!(other.shield.voidShield&&sameTeam(ship,other))?other.shield.radius:0));
   }
-  for(const asteroid of world.asteroids)if(asteroid.hp>0)add(asteroid.pos,asteroid.vel,asteroid.radius);
-  for(const hulk of world.hulkFragments??[])if(hulk.gravityManaged || hulk.gravityFixed)add(hulk.pos,hulk.vel,hulk.collisionRadius);
+  const asteroids = world.asteroids;
+  for(let i=0;i<asteroids.length;i++){const asteroid=asteroids[i];if(asteroid.hp>0)add(asteroid.pos,asteroid.vel,asteroid.radius);}
+  const hulks = world.hulkFragments;
+  if(hulks)for(let i=0;i<hulks.length;i++){const hulk=hulks[i];if(hulk.gravityManaged || hulk.gravityFixed)add(hulk.pos,hulk.vel,hulk.collisionRadius);}
   return result;
 }
 
@@ -81,6 +97,7 @@ function obstacles(ship: Ship,world: TacticalWorld,horizon:number): Obstacle[] {
 function collisionRisk(ship: Ship,desired: Vector2,nearby:Obstacle[],horizon:number,reads?:CombatQueryReads): number {
   const stats=queryMotionStats(ship, reads),step=horizon/policy.avoidanceSteps;
   const c=Math.cos(ship.facingRad),s=Math.sin(ship.facingRad);
+  const maxAy=stats.acceleration*stats.strafeMultiplier;
   let x=ship.pos.x,y=ship.pos.y,vx=ship.vel.x,vy=ship.vel.y,risk=0;
   for(let i=0;i<policy.avoidanceSteps;i++){
     const beforeX=x,beforeY=y,time=i*step;
@@ -88,7 +105,7 @@ function collisionRisk(ship: Ship,desired: Vector2,nearby:Obstacle[],horizon:num
     else{
       const ex=(desired.x-vx)*c+(desired.y-vy)*s,ey=-(desired.x-vx)*s+(desired.y-vy)*c;
       const ax=Math.max(-stats.deceleration,Math.min(stats.acceleration,ex/policy.steeringResponse));
-      const ay=Math.max(-stats.acceleration*stats.strafeMultiplier,Math.min(stats.acceleration*stats.strafeMultiplier,ey/policy.steeringResponse));
+      const ay=Math.max(-maxAy,Math.min(maxAy,ey/policy.steeringResponse));
       vx+=(ax*c-ay*s)*step;vy+=(ax*s+ay*c)*step;
     }
     x+=vx*step;y+=vy*step;
@@ -96,9 +113,11 @@ function collisionRisk(ship: Ship,desired: Vector2,nearby:Obstacle[],horizon:num
     // function keeps the old sequence; no callbacks occur in a native sweep.
     const sweptBounds = nativeCollisionMath && Math.max === collisionMax && Math.min === collisionMin
       && Math.abs === collisionAbs && Math.hypot === collisionHypot;
-    for(const o of nearby){
+    const stepDx = x - beforeX, stepDy = y - beforeY;
+    for(let k=0;k<nearby.length;k++){
+      const o = nearby[k];
       const rx=beforeX-o.x-o.vx*time,ry=beforeY-o.y-o.vy*time;
-      const dx=x-beforeX-o.vx*step,dy=y-beforeY-o.vy*step;
+      const dx=stepDx-o.vx*step,dy=stepDy-o.vy*step;
       // For t in [0,1], rounded rx+dx*t lies between rx and rx+dx.
       // Strict same-side endpoints therefore imply the EXISTING coordinate
       // rejection below. Keep the exact closest-point formula for all others.
@@ -127,18 +146,21 @@ export function avoidCollisions(ship: Ship,desired: Vector2,world:TacticalWorld)
   if(!nearby.length)return {velocity:desired,avoiding:false,risk:0};
   const originalRisk=collisionRisk(ship,desired,nearby,horizon,world.queryReads);
   if(originalRisk<=1e-8)return {velocity:desired,avoiding:false,risk:0};
-  const speed=Math.max(desired.length(),stats.maxSpeed*.5);
-  const heading=desired.length()>1?desired.heading():ship.facingRad;
+  const desiredLen=desired.length();
+  const speed=Math.max(desiredLen,stats.maxSpeed*.5);
+  const heading=desiredLen>1?desired.heading():ship.facingRad;
   // Starboard candidate first breaks head-on symmetry: both ships pass on their own right.
   const candidates=[desired.clone().scale(.5),new Vector2()];
-  for(const angle of [30,-30,60,-60,90,-90,135,-135,180])candidates.push(Vector2.fromAngle(heading+angle*Math.PI/180,Math.min(speed,stats.maxSpeed)));
+  const candidateSpeed=Math.min(speed,stats.maxSpeed);
+  for(let i=0;i<avoidanceAngles.length;i++)candidates.push(Vector2.fromAngle(heading+avoidanceAngles[i]*Math.PI/180,candidateSpeed));
   let best=desired,bestRisk=originalRisk,bestDeviation=0;
-  for(const candidate of candidates){
+  for(let i=0;i<candidates.length;i++){
+    const candidate=candidates[i];
     const risk=collisionRisk(ship,candidate,nearby,horizon,world.queryReads);
     // A pure velocity-difference cost rewards two capital ships stopping face-to-face forever.
     // Prefer a safe moving detour over losing all progress; braking still wins if moving is unsafe.
-    const deviation=desired.length()>1
-      ? Math.abs(signedAngle(candidate.heading()-heading))*speed*.5+Math.abs(candidate.length()-desired.length())*2
+    const deviation=desiredLen>1
+      ? Math.abs(signedAngle(candidate.heading()-heading))*speed*.5+Math.abs(candidate.length()-desiredLen)*2
       : candidate.length();
     if(risk<bestRisk-1e-8||(Math.abs(risk-bestRisk)<1e-8&&deviation<bestDeviation-1e-8)){best=candidate;bestRisk=risk;bestDeviation=deviation;}
   }
@@ -181,7 +203,7 @@ export function yieldFireLane(ship:Ship,desired:Vector2,world:TacticalWorld):{ve
   // Preserve roster/mount order and the uncached path for custom AI or owner probes.
   for(let i=0;i<(lanes?.length ?? world.ships.length);i++){
     const ally=lanes ? lanes[i].ally : world.ships[i];
-    if(ally===ship||ally.isDead||!sameTeam(ally, ship))continue;
+    if(ally.assemblyRoot===ship.assemblyRoot||ally.isDead||!sameTeam(ally, ship))continue;
     for(const mount of lanes ? lanes[i].mounts : ally.weapons){
       if(mount.fireControl?.reason!=='FRIENDLY_BLOCKED'||mount.fireControl.targetKind!=='SHIP')continue;
       const target=lanes ? world.friendlyFireLaneIndex!.findTarget(mount.fireControlTargetShipId)

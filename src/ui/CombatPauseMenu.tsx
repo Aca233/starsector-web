@@ -14,7 +14,6 @@ import { ShipStage } from "../studio/ShipStage";
 import { Modal } from "./core/UI";
 import { TacticalHelpPanel } from "./TacticalHelpPanel";
 import { NativeBitmapText } from "./NativeBitmapText";
-import "./combat-pause-menu.css";
 
 /** Native simulation menu: ship on the left; settings/end/resume on the right. */
 export function CombatPauseMenu({
@@ -44,9 +43,9 @@ export function CombatPauseMenu({
         <section className="combat-pause-ship" aria-label="当前舰船">
           <div className="combat-pause-ship-name">
             <span title={shipName ?? i18n.t(spec.nameKey)}>
-              <NativeBitmapText font="caption" color="var(--ui-muted)">{shipName ?? i18n.t(spec.nameKey)}</NativeBitmapText>
+              <NativeBitmapText font="caption" color="var(--ds-menu-muted)">{shipName ?? i18n.t(spec.nameKey)}</NativeBitmapText>
             </span>
-            <span><NativeBitmapText font="caption" color="var(--ui-muted)">{i18n.t(spec.designationKey)}</NativeBitmapText></span>
+            <span><NativeBitmapText font="caption" color="var(--ds-menu-muted)">{i18n.t(spec.designationKey)}</NativeBitmapText></span>
           </div>
           <div className="combat-pause-portrait">
             <ShipStage spec={spec} home />

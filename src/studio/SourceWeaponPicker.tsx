@@ -1,3 +1,5 @@
+import { Picker } from '../ui/core/Picker';
+import { SearchInput } from '../ui/core/ListControls';
 import { WEAPON_SIZES, isWeaponSize, weaponFitsSlotSize, type WeaponSize } from '../engine/content/WeaponSizes';
 import { RefitHint } from './RefitHint';
 import { useDwellHover } from './useDwellHover';
@@ -235,6 +237,7 @@ export function SourceWeaponPicker({
             ? (locked ? "内置武器" : "卸下") + weaponName(w.id)
             : "安装" + weaponName(w.id)
         }
+        data-picker-item={current ? undefined : true}
         data-weapon-choice={current ? undefined : w.id}
         data-inspect-weapon={w.id}
         aria-disabled={disabled}
@@ -316,7 +319,7 @@ export function SourceWeaponPicker({
           </div>}
           {!locked && advanced && <div className="refit-weapon-filters">
             <div className="refit-search-field">
-              <input ref={searchRef} aria-label="搜索可安装武器" type="search" autoComplete="off" value={search}
+              <SearchInput ref={searchRef} aria-label="搜索可安装武器" value={search}
                 onChange={e => {setSearch(e.target.value); hidePreview();}} placeholder="搜索武器名称 / ID"
                 onKeyDown={e => {if (e.key === "ArrowDown") {e.preventDefault(); ref.current?.querySelector<HTMLButtonElement>('[data-weapon-choice]')?.focus();}}} />
               {search && <button type="button" className="refit-search-clear" aria-label="清空武器搜索" onClick={() => {setSearch("");hidePreview();searchRef.current?.focus();}}>×</button>}
@@ -337,7 +340,7 @@ export function SourceWeaponPicker({
             </div>
           </div>}
           {!locked && <p className="refit-weapon-result-count" role="status">仅接受{sizes[selected.slotSize]}武器 · {available.length} 种兼容武器 · 当前可用 {budgetHere} OP</p>}
-          <div className="source-weapon-list">
+          <Picker className="source-weapon-list" aria-label="兼容武器">
             {!locked && available.map((w) => row(w))}
             {(locked || !available.length) && (
               <p className="source-weapon-empty">
@@ -347,7 +350,7 @@ export function SourceWeaponPicker({
               </p>
             )}
             {!locked && !available.length && (search || enabledSize !== "ALL" || enabledType !== "ALL" || affordableOnly || faction) && <NativeButton font="caption" className="refit-weapon-empty-reset" onClick={resetFilters}>清除筛选，显示兼容武器</NativeButton>}
-          </div>
+          </Picker>
           {!locked && <div className="source-weapon-search-toggle">
             <button onClick={() => setAdvanced(value => !value)} aria-expanded={advanced}>搜索 / 势力筛选 [F]{(search || faction || affordableOnly || enabledSize !== "ALL") ? " · 已筛选" : ""}</button>
             <span>{available.length} 种 · {budgetHere} OP</span>

@@ -7,7 +7,6 @@ import costs from '../engine/data/generated/deployment-costs.json';
 import type { OpenWeaponCodex } from '../studio/useInspectionCodex';
 import { LanHullThumbnail } from './LanHullThumbnail';
 import { NativeBitmapText } from '../ui/NativeBitmapText';
-import './lan-ai-inspection.css';
 import { teamName } from './protocol';
 
 interface AiInspectionData {

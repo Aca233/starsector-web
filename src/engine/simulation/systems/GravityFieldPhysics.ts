@@ -1,16 +1,20 @@
+import { updateDirectionalGravity } from './GravityDirectionalPush';
+import { sameGravityTarget } from './GravityTractor';
+import { gravityPolarity } from './GravityControlInput';
 import { Vector2 } from '../../math/Vector2';
-import type { Ship } from '../Ship';
+import { readShipSystems, type Ship } from '../Ship';
 import type { ShipSystem } from '../ShipSystem';
 import type { Projectile } from '../Weapon';
 import type { GravityFieldSpec, GravityFieldState } from '../GravityFieldState';
 import type { GravityManeuverSpec, GravityManeuverState } from '../GravityManeuverState';
 import { sameTeam, combatTeam } from '../CombatTeams';
 import type { Asteroid, HulkFragment } from '../CombatTypes';
-import { resolveGravityBody, releaseGravityTractor, gravityProjectileSupported, projectileGravityMass, gravityLineClear } from './GravityTractor';
+import { resolveGravityBody, releaseGravityTractor, gravityProjectileSupported, projectileGravityMass, gravityLineClear, gravitySelfTowAllowed, asteroidGravityBody, hulkGravityBody, projectileGravityBody } from './GravityTractor';
 import { weaponMuzzle, shipSegmentEntry } from '../../ai/FireControlGeometry';
 import { combatWeaponRange } from '../WeaponRange';
 import { signedAngle } from '../../math/Angles';
 import { advanceTurretAim } from './weapon/WeaponAim';
+import { knownProjectionKeys } from '../../runtime/local/ProjectionArrays';
 
 /** Caps concern NEW external force, never an unconditional overwrite of velocity. */
 export const GRAVITY_LIMITS = { shipAcceleration: 260, shipImpulse: 240, shipOverspeed: 240, projectileAcceleration: 1400, projectileImpulse: 750, projectileSpeed: 2400 } as const;
@@ -82,46 +86,108 @@ function stop(system: ShipSystem): void { system.gravityField = undefined; syste
  * lives on serializable ShipSystem state, including on an actual Dedicated Worker. */
 export function advanceGravityFields(dt: number, ships: readonly Ship[], projectiles: readonly Projectile[], asteroids: readonly Asteroid[] = [], hulkFragments: readonly HulkFragment[] = []): void {
   if (!Number.isFinite(dt) || dt <= 0) return;
-  const emitters: { owner: Ship; system: ShipSystem; spec: GravityFieldSpec; field: GravityFieldState }[] = [];
-  for (const owner of ships) for (const system of owner.allSystems) {
-    const spec = system.definition.gravityField, field = system.gravityField;
-    if (!spec || !field) continue;
-    if (!live(owner) || owner.isAttachedModule || owner.retreating || system.disabled || owner.flux.isOverloaded || owner.flux.isVenting || (owner.runtimeModifiers.value.disableSystems ?? 0) > 0) { stop(system); continue; }
-    if (spec.kind === 'WELL' && (system.state === 'OUT' || !system.isActive || Math.hypot(owner.pos.x - field.x, owner.pos.y - field.y) > spec.placementRange)) { stop(system); continue; }
-    if (spec.kind==='REPULSOR' && !system.definition.gravityRemoteRelease && field.age===0) {field.x=owner.pos.x;field.y=owner.pos.y;}
-    if (system.state === 'IN') continue;
-    emitters.push({ owner, system, spec, field });
+  let emitters: { owner: Ship; system: ShipSystem; spec: GravityFieldSpec; field: GravityFieldState }[] | undefined;
+  for (let i = 0; i < ships.length; i++) {
+    const owner = ships[i];
+    const systems = readShipSystems(owner);
+    for (let j = 0; j < systems.length; j++) {
+      const system = systems[j];
+      const spec = system.definition.gravityField, field = system.gravityField;
+      if (!spec || !field) continue;
+      if (!live(owner) || owner.isAttachedModule || owner.retreating || system.disabled || owner.flux.isOverloaded || owner.flux.isVenting || (owner.runtimeModifiers.value.disableSystems ?? 0) > 0) { stop(system); continue; }
+      if(field.kind==='COLLAPSE')continue;
+      if (spec.kind === 'WELL' && (system.state === 'OUT' || !system.isActive || Math.hypot(owner.pos.x - field.x, owner.pos.y - field.y) > spec.placementRange)) { stop(system); continue; }
+      if (spec.kind==='REPULSOR' && !system.definition.gravityRemoteRelease && field.age===0) {field.x=owner.pos.x;field.y=owner.pos.y;}
+      if (spec.cursorSpeed) {
+        field.polarity = systems.some(s=>s.definition.gravityPolaritySwitch) ? gravityPolarity(owner)
+          : systems.some(s=>s.definition.gravityDirectionalPush && s.gravityControlHeld && s.state==='ACTIVE' && !s.disabled) ? -1 : 1;
+        if (system.state === 'ACTIVE' && system.gravityControlHeld && field.cursorControlled) {
+          const desired = owner.aimTargetWorld.clone().sub(owner.pos); clampLength(desired,spec.placementRange); desired.add(owner.pos);
+          const offset = desired.sub(new Vector2(field.x,field.y)); clampLength(offset,spec.cursorSpeed*dt);
+          field.x += offset.x; field.y += offset.y;
+        }
+        if (system.state === 'ACTIVE' && field.cursorControlled) {
+          field.lingerRemaining = system.gravityControlHeld ? spec.lingerSeconds ?? 3 : Math.max(0,(field.lingerRemaining ?? spec.lingerSeconds ?? 3)-dt);
+          if (field.lingerRemaining <= 0) { system.expire(); continue; }
+        }
+      }
+      if (system.state === 'IN') continue;
+      (emitters ??= []).push({ owner, system, spec, field });
+    }
   }
-  const maneuvers: { owner: Ship; system: ShipSystem; spec: GravityManeuverSpec; state: GravityManeuverState }[] = [];
-  for (const owner of ships) for (const system of owner.allSystems) {
-    const spec = system.definition.gravityManeuver, state = system.gravityManeuver;
-    if (!spec || !state) continue;
-    if (!live(owner) || owner.isAttachedModule || owner.retreating || system.disabled || owner.flux.isOverloaded || owner.flux.isVenting || (owner.runtimeModifiers.value.disableSystems ?? 0) > 0 || system.state !== 'ACTIVE') { system.deactivate(); continue; }
-    maneuvers.push({ owner, system, spec, state });
+  let maneuvers: { owner: Ship; system: ShipSystem; spec: GravityManeuverSpec; state: GravityManeuverState }[] | undefined;
+  for (let i = 0; i < ships.length; i++) {
+    const owner = ships[i];
+    const systems = readShipSystems(owner);
+    for (let j = 0; j < systems.length; j++) {
+      const system = systems[j];
+      const spec = system.definition.gravityManeuver, state = system.gravityManeuver;
+      if (!spec || !state) continue;
+      if (!live(owner) || owner.isAttachedModule || owner.retreating || system.disabled || owner.flux.isOverloaded || owner.flux.isVenting || (owner.runtimeModifiers.value.disableSystems ?? 0) > 0 || system.state !== 'ACTIVE') { system.deactivate(); continue; }
+      (maneuvers ??= []).push({ owner, system, spec, state });
+    }
   }
-  const controllers = ships.flatMap(owner=>owner.weapons.filter(m=>m.spec.gravityTractor || m.spec.gravityDeflector).map(mount=>({owner,mount})));
-  if (!emitters.length && !maneuvers.length && !controllers.length) return;
+  let world: { ships: readonly Ship[]; projectiles: readonly Projectile[]; asteroids: readonly Asteroid[]; hulkFragments: readonly HulkFragment[] } | undefined;
+  let pushes: { owner: Ship; system: ShipSystem; body: NonNullable<ReturnType<typeof updateDirectionalGravity>> }[] | undefined;
+  let controllers: { owner: Ship; mount: Ship['weapons'][number] }[] | undefined;
+  for (let i = 0; i < ships.length; i++) {
+    const owner = ships[i];
+    const systems = readShipSystems(owner);
+    for (let j = 0; j < systems.length; j++) {
+      const system = systems[j];
+      if (!system.definition.gravityDirectionalPush) continue;
+      world ??= { ships, projectiles, asteroids, hulkFragments };
+      const body = updateDirectionalGravity(owner, system, world, dt);
+      if (body) (pushes ??= []).push({ owner, system, body });
+    }
+    const weapons = owner.weapons;
+    for (let j = 0; j < weapons.length; j++) {
+      const mount = weapons[j];
+      if (mount.spec.gravityTractor || mount.spec.gravityDeflector) (controllers ??= []).push({ owner, mount });
+    }
+  }
+  if (!emitters?.length && !maneuvers?.length && !controllers?.length && !pushes?.length) return;
+  emitters ??= []; maneuvers ??= []; pushes ??= []; controllers ??= []; world ??= { ships, projectiles, asteroids, hulkFragments };
   emitters.sort((a, b) => order(a.owner.id, b.owner.id) || order(a.system.type, b.system.type));
   const bodies = new Map<Ship, Body>();
-  for (const ship of ships) {
-    const root = ship.assemblyRoot;
-    if (!live(ship) || !live(root)) continue;
-    let body = bodies.get(root);
-    if (!body) { body = { root, members: [], mass: 0 }; bodies.set(root, body); }
-    if (!body.members.includes(ship)) { body.members.push(ship); body.mass += Math.max(1, ship.spec.mass); }
+  if (emitters.length > 0) {
+    for (const ship of ships) {
+      const root = ship.assemblyRoot;
+      if (!live(ship) || !live(root)) continue;
+      let body = bodies.get(root);
+      if (!body) { body = { root, members: [], mass: 0 }; bodies.set(root, body); }
+      if (!body.members.includes(ship)) { body.members.push(ship); body.mass += Math.max(1, ship.spec.mass); }
+    }
   }
   const shipDeltas = new Map<Ship, Delta>(), projectileDeltas = new Map<Projectile, Delta>(), environmentDeltas = new Map<Vector2, Delta>();
-  const world = {ships,projectiles,asteroids,hulkFragments};
-  const environments = [...asteroids.map(a=>resolveGravityBody({kind:'ASTEROID',id:a.id},world)), ...hulkFragments.map(h=>resolveGravityBody({kind:'HULK',id:h.id},world))].filter(b=>!!b);
+  for(const {owner,system,body} of pushes){
+    if(!body)continue;
+    const spec=system.definition.gravityDirectionalPush!,state=system.gravityPush!;
+    const cost=spec.fluxPerSecond*dt*Math.min(2,Math.max(.75,body.mass/(body.projectile?6:3000)));
+    if(owner.flux.totalFlux+cost>owner.flux.maxFlux){system.deactivate();continue;}
+    owner.flux.increaseFlux(cost,false);
+    const delta=new Vector2(state.dx,state.dy).scale((body.projectile?spec.projectileStrength*Math.min(2,6/body.mass):spec.shipStrength*massResponse(body.mass))*dt);
+    if(body.ship)addBudgeted([{target:body.ship,delta}],delta.length(),shipDeltas,false);
+    else if(body.projectile)addBudgeted([{target:body.projectile,delta}],delta.length(),projectileDeltas,false);
+    else addBudgeted([{target:body.vel,delta}],delta.length(),environmentDeltas,false);
+  }
+  const environments = emitters.length > 0
+    ? [...asteroids.map(asteroidGravityBody), ...hulkFragments.map(hulkGravityBody)].filter(b=>!!b)
+    : [];
   for (const { owner, system, spec, field } of emitters) {
     field.serial ??= system.activationSerial;
     const impulse = spec.kind === 'REPULSOR';
+    // Direct LMB dragging wins over this owner's continuous field, not enemy
+    // fields or the explicit G release impulse. Match assembly roots and all body kinds.
+    const held=owner.weapons.flatMap(m=>m.gravityTractor?.phase==='HOLD' && m.gravityTractor.target ? [m.gravityTractor.target] : []);
+    const directlyHeld=(target: import('../GravityTractorState').GravityTarget)=>!impulse && held.some(t=>sameGravityTarget(t,target));
     const step = Math.min(dt, Math.max(0, spec.duration - field.age));
     const oldRadius = field.radius;
     field.age += step;
     field.radius = impulse ? spec.radius * Math.min(1, field.age / spec.duration) : spec.radius;
     const shipRows: Contribution<Ship>[] = [], projectileRows: Contribution<Projectile>[] = [];
     const eligibleBodies = [...bodies.values()].filter(b => b.root !== owner.assemblyRoot && !b.root.spec.sourceHullTraits?.includes('GRAVITY_FIXED')
+      && !directlyHeld({kind:'SHIP',id:b.root.id})
       && (!sameTeam(owner, b.root) || field.releaseTargets?.some(t=>t.kind==='SHIP' && t.id===b.root.id)))
       .map(body => ({ body, distance: bodyDistance(body, field) }))
       .sort((a, b) => a.distance - b.distance || order(a.body.root.id, b.body.root.id));
@@ -136,11 +202,12 @@ export function advanceGravityFields(dt: number, ships: readonly Ship[], project
         contact = Vector2.lerp(hit.member.prevPos, hit.member.pos, hit.time!);
       }
       const falloff = impulse ? 1 - .55 * Math.min(1, distance / spec.radius) : Math.max(0, 1 - (distance / spec.radius) ** 2) * Math.min(1, Math.hypot(body.root.pos.x - field.x, body.root.pos.y - field.y) / 70);
-      const delta = direction(field, contact, impulse, owner.facingRad).scale(spec.shipStrength * massResponse(body.mass) * falloff * (impulse ? 1 : step));
+      const delta = direction(field, contact, impulse || field.polarity === -1, owner.facingRad).scale(spec.shipStrength * massResponse(body.mass) * falloff * (impulse ? 1 : step));
       shipRows.push({ target: body.root, delta });
       if (impulse) field.shipHits.push(body.root.id);
     }
     const eligibleProjectiles = projectiles.filter(p => supportedProjectile(p) && combatTeam(p) !== undefined
+      && !directlyHeld({kind:'PROJECTILE',id:p.id})
       && (!sameTeam(owner, p) || (p.sourceShipId===owner.id && p.gravityCoupling==='MASS_DRIVER') || field.releaseTargets?.some(t=>t.kind==='PROJECTILE' && t.id===p.id)))
       .map(p => ({ p, distance: Math.hypot(p.pos.x - field.x, p.pos.y - field.y) }))
       .sort((a, b) => a.distance - b.distance || a.p.id - b.p.id);
@@ -158,12 +225,13 @@ export function advanceGravityFields(dt: number, ships: readonly Ship[], project
         if (sameTeam(owner,p)) {
           const binding=p.gravityWellBinding;
           if (binding && (binding.ownerId!==owner.id || binding.serial!==field.serial || binding.age>=.65 || binding.turn>=Math.PI/4)) continue;
+          if (!p.gravityWellBinding) knownProjectionKeys.delete(p);
           p.gravityWellBinding ??= {ownerId:owner.id,serial:field.serial??system.activationSerial,age:0,turn:0};
           p.gravityWellBinding.age += step;
         }
       }
       const falloff = impulse ? 1 - .35 * Math.min(1, distance / spec.radius) : Math.max(0, 1 - (distance / spec.radius) ** 2) * Math.min(1, distance / 70);
-      const delta=direction(field, contact, impulse, owner.facingRad).scale(spec.projectileStrength * falloff * Math.min(2,4/projectileGravityMass(p)) * (impulse ? 1 : step));
+      const delta=direction(field, contact, impulse || field.polarity === -1, owner.facingRad).scale(spec.projectileStrength * falloff * Math.min(2,4/projectileGravityMass(p)) * (impulse ? 1 : step));
       if (!impulse && sameTeam(owner,p) && p.gravityWellBinding) {
         // Keep friendly calibration shots useful; no permanent orbit or free speed boost.
         const before=p.vel.heading(), rotated=p.vel.clone().add(delta);
@@ -181,12 +249,12 @@ export function advanceGravityFields(dt: number, ships: readonly Ship[], project
     const environmentRows: Contribution<Vector2>[]=[];
     const envHits=field.environmentHits ??= [];
     for (const body of environments.sort((a,b)=>a!.pos.distanceTo(new Vector2(field.x,field.y))-b!.pos.distanceTo(new Vector2(field.x,field.y)))) {
-      if (!body || body.fixed) continue;
+      if (!body || body.fixed || directlyHeld(body.target)) continue;
       const key=`${body.target.kind}:${body.target.id}`, distance=Math.max(0,body.pos.distanceTo(new Vector2(field.x,field.y))-body.radius);
       if (environmentRows.length>=spec.maxShips || (impulse && envHits.length>=spec.maxShips)) break;
       if (impulse ? envHits.includes(key) || !crossesGravityWave(body.pos,body.pos.clone().addScaled(body.vel,step),field,oldRadius,field.radius,body.radius) : distance>spec.radius) continue;
       const falloff=impulse?1-.55*Math.min(1,distance/spec.radius):Math.max(0,1-(distance/spec.radius)**2);
-      environmentRows.push({target:body.vel,delta:direction(field,body.pos,impulse,owner.facingRad).scale(spec.shipStrength*massResponse(body.mass)*falloff*(impulse?1:step))});
+      environmentRows.push({target:body.vel,delta:direction(field,body.pos,impulse || field.polarity === -1,owner.facingRad).scale(spec.shipStrength*massResponse(body.mass)*falloff*(impulse?1:step))});
       if(body.hulk)body.hulk.gravityManaged=true;
       if (impulse) envHits.push(key);
     }
@@ -201,14 +269,17 @@ export function advanceGravityFields(dt: number, ships: readonly Ship[], project
     if (!usable) { if(state?.phase!=='IDLE') releaseGravityTractor(mount,'装置中断');continue; }
     if (spec && state?.phase==='HOLD' && state.target) {
       const body=resolveGravityBody(state.target,world), muzzle=weaponMuzzle(owner,mount);
-      if (!body || muzzle.distanceTo(body.pos)-body.radius>combatWeaponRange(owner,mount.spec) || !gravityLineClear(owner,body,muzzle,world)) {releaseGravityTractor(mount,'连接中断');continue;}
+      if (!body || (body.ship===owner.assemblyRoot && !gravitySelfTowAllowed(owner,mount,body)) || muzzle.distanceTo(body.pos)-body.radius>combatWeaponRange(owner,mount.spec) || !gravityLineClear(owner,body,muzzle,world)) {releaseGravityTractor(mount,'连接中断');continue;}
       const cost=spec.fluxPerSecond*dt*Math.min(2,Math.max(.75,body.mass/(body.projectile?6:3000)));
       if (owner.flux.totalFlux+cost>owner.flux.maxFlux) {releaseGravityTractor(mount,'幅能不足');continue;}
       owner.flux.increaseFlux(cost,false);
-      const delta=new Vector2(state.anchorX-body.pos.x,state.anchorY-body.pos.y).scale(2.4).sub(body.vel.clone().sub(owner.vel).scale(spec.damping));
+      // A self anchor is a world point, not a co-moving owner: self-self velocity
+      // would erase damping and turn self propulsion into an undamped spring.
+      const velocity=body.ship===owner.assemblyRoot?body.vel.clone():body.vel.clone().sub(owner.vel);
+      const delta=new Vector2(state.anchorX-body.pos.x,state.anchorY-body.pos.y).scale(2.4*gravityPolarity(owner)).sub(velocity.scale(spec.damping));
       clampLength(delta,spec.strength);
       if (body.fixed) {
-        const pull=body.pos.clone().sub(owner.pos).normalize().scale(spec.strength*massResponse(owner.spec.mass)*dt);
+        const pull=body.pos.clone().sub(owner.pos).normalize().scale(spec.strength*gravityPolarity(owner)*massResponse(owner.spec.mass)*dt);
         addBudgeted([{target:owner.assemblyRoot,delta:pull}],pull.length(),shipDeltas,false);
       } else {
         delta.scale((body.projectile?Math.min(2,6/body.mass):massResponse(body.mass))*dt);
@@ -233,7 +304,7 @@ export function advanceGravityFields(dt: number, ships: readonly Ship[], project
     const angle=threat.p.pos.clone().sub(muzzle).heading(), base=owner.facingRad+mount.baseAngleDeg*Math.PI/180;
     mount.currentAngleRad=advanceTurretAim(mount.currentAngleRad,base,angle,mount.arcDeg,(mount.spec.turnRateDegPerSec??180)*Math.PI/180,owner.angularVelRad,dt);
     if (mount.cooldownTimer>0 || Math.abs(signedAngle(angle-mount.currentAngleRad))>.16 || owner.flux.totalFlux+pd.fluxPerUse>owner.flux.maxFlux) continue;
-    const body=resolveGravityBody({kind:'PROJECTILE',id:threat.p.id},world);
+    const body=projectileGravityBody(threat.p);
     if (!body || !gravityLineClear(owner,body,muzzle,world)) continue;
     const v=threat.p.vel.clone().sub(owner.vel), side=new Vector2(-v.y,v.x).normalize();
     const away=threat.p.pos.clone().sub(owner.pos);
@@ -267,6 +338,7 @@ export function advanceGravityFields(dt: number, ships: readonly Ship[], project
   }
   for (const [projectile, delta] of projectileDeltas) {
     if (apply(projectile.vel, delta, GRAVITY_LIMITS.projectileAcceleration, GRAVITY_LIMITS.projectileImpulse, GRAVITY_LIMITS.projectileSpeed, dt)) {
+      if (!projectile.gravityDeflected) knownProjectionKeys.delete(projectile);
       projectile.gravityDeflected = true;
       // Rockets keep their nose/turn inertia and can reacquire. Solid shots face their new path.
       if (!projectile.isRocket && !projectile.angularVelocityRad) projectile.facingRad = projectile.vel.heading();

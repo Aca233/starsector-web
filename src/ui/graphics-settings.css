@@ -1,31 +1,31 @@
-.presentation-settings-tabs { display: flex; gap: 4px; margin: 0 0 10px; border-bottom: 1px solid var(--ui-divider); }
-.presentation-settings-tabs button { padding: 6px 16px; font: 12px var(--ui-font, sans-serif); color: var(--ui-muted); background: transparent; border: 0; border-bottom: 2px solid transparent; cursor: pointer; }
-.presentation-settings-tabs button[aria-selected="true"] { color: var(--ui-text); border-bottom-color: var(--ui-highlight); background: var(--ds-control-selected); }
+.presentation-settings-tabs { display: flex; gap: 4px; margin: 0 0 10px; border-bottom: 1px solid var(--ds-menu-divider); }
+.presentation-settings-tabs button { padding: 6px 16px; font: 12px var(--ds-font-body, sans-serif); color: var(--ds-menu-muted); background: transparent; border: 0; border-bottom: 2px solid transparent; cursor: pointer; }
+.presentation-settings-tabs button[aria-selected="true"] { color: var(--ds-menu-text); border-bottom-color: var(--ds-menu-highlight); background: var(--ds-control-selected); }
 .presentation-settings-tabs button:hover { background: var(--ds-control-hover); }
 .presentation-settings-tabs button:focus-visible { outline: 2px solid var(--ds-control-focus); outline-offset: -2px; }
-.graphics-settings { border: 0; background: transparent; padding: 16px; margin: 0 0 20px; color: var(--ui-text); font-family: var(--ui-font, sans-serif); }
+.graphics-settings { border: 0; background: transparent; padding: 16px; margin: 0 0 20px; color: var(--ds-menu-text); font-family: var(--ds-font-body, sans-serif); }
 .graphics-settings .graphics-settings-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
-.graphics-settings .graphics-settings-heading h3 { display: flex; align-items: center; gap: 8px; margin: 0; padding: 0; background: none; font-size: var(--ds-type-body); color: var(--ui-text); }
-.graphics-settings-heading > span, .graphics-settings small { color: var(--ui-muted); font-size: 12px; line-height: 1.6; }
+.graphics-settings .graphics-settings-heading h3 { display: flex; align-items: center; gap: 8px; margin: 0; padding: 0; background: none; font-size: var(--ds-type-body); color: var(--ds-menu-text); }
+.graphics-settings-heading > span, .graphics-settings small { color: var(--ds-menu-muted); font-size: 12px; line-height: 1.6; }
 .graphics-settings small { display: block; margin-top: 3px; }
-.graphics-settings .graphics-settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 0; margin: 0; border-bottom: 1px solid var(--ui-divider); font-size: 12px; }
+.graphics-settings .graphics-settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 0; margin: 0; border-bottom: 1px solid var(--ds-menu-divider); font-size: 12px; }
 .graphics-settings-row > span { min-width: 0; }
-.graphics-settings select { flex: 0 1 190px; min-width: 120px; max-width: 55%; color: var(--ui-text); background: var(--ds-surface-input); border: 1px solid var(--ui-border); padding: 7px; font: 12px var(--ui-font, sans-serif); cursor: pointer; }
-.graphics-settings input[type="checkbox"] { flex-shrink: 0; width: 18px; height: 18px; accent-color: var(--ui-accent); cursor: pointer; }
+.graphics-settings select { flex: 0 1 190px; min-width: 120px; max-width: 55%; color: var(--ds-menu-text); background: var(--ds-surface-input); border: 1px solid var(--ds-border-page); padding: 7px; font: 12px var(--ds-font-body, sans-serif); cursor: pointer; }
+.graphics-settings input[type="checkbox"] { flex-shrink: 0; width: 18px; height: 18px; accent-color: var(--ds-menu-accent); cursor: pointer; }
 .graphics-settings-shake { margin-top: 16px; }
 .graphics-settings-shake > div { display: flex; align-items: center; justify-content: space-between; }
 .graphics-settings .graphics-settings-shake label { padding: 0; margin: 0; font-size: 12px; }
-.graphics-settings output { font: 14px var(--ui-mono, monospace); color: var(--ui-text); }
+.graphics-settings output { font: 14px var(--ds-font-mono, monospace); color: var(--ds-menu-text); }
 .graphics-settings input[type="range"] { appearance: none; width: 100%; height: 24px; padding: 0; margin: 3px 0 2px; background: transparent; cursor: pointer; }
-.graphics-settings input[type="range"]::-webkit-slider-runnable-track { height: 5px; border-radius: 3px; background: linear-gradient(to right, var(--ui-accent) var(--graphics-level), var(--ds-surface-track) var(--graphics-level)); }
-.graphics-settings input[type="range"]::-moz-range-track { height: 5px; border-radius: 3px; background: linear-gradient(to right, var(--ui-accent) var(--graphics-level), var(--ds-surface-track) var(--graphics-level)); }
-.graphics-settings input[type="range"]::-webkit-slider-thumb { appearance: none; width: 14px; height: 18px; margin-top: -6.5px; background: var(--ui-text); border: 2px solid var(--ui-accent); border-radius: 2px; }
-.graphics-settings input[type="range"]::-moz-range-thumb { width: 10px; height: 14px; background: var(--ui-text); border: 2px solid var(--ui-accent); border-radius: 2px; }
+.graphics-settings input[type="range"]::-webkit-slider-runnable-track { height: 5px; border-radius: 3px; background: linear-gradient(to right, var(--ds-menu-accent) var(--graphics-level), var(--ds-surface-track) var(--graphics-level)); }
+.graphics-settings input[type="range"]::-moz-range-track { height: 5px; border-radius: 3px; background: linear-gradient(to right, var(--ds-menu-accent) var(--graphics-level), var(--ds-surface-track) var(--graphics-level)); }
+.graphics-settings input[type="range"]::-webkit-slider-thumb { appearance: none; width: 14px; height: 18px; margin-top: -6.5px; background: var(--ds-menu-text); border: 2px solid var(--ds-menu-accent); border-radius: 2px; }
+.graphics-settings input[type="range"]::-moz-range-thumb { width: 10px; height: 14px; background: var(--ds-menu-text); border: 2px solid var(--ds-menu-accent); border-radius: 2px; }
 .graphics-settings-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
-.graphics-settings-actions > button { border: 1px solid var(--ui-border); padding: 7px 10px; color: var(--ui-text); background: var(--ds-surface-input); font: 12px var(--ui-font, sans-serif); cursor: pointer; }
+.graphics-settings-actions > button { border: 1px solid var(--ds-border-page); padding: 7px 10px; color: var(--ds-menu-text); background: var(--ds-surface-input); font: 12px var(--ds-font-body, sans-serif); cursor: pointer; }
 .graphics-settings-actions > button:hover { background: var(--ds-control-hover); }
 .graphics-settings :is(input, select, button):focus-visible { outline: 2px solid var(--ds-control-focus); outline-offset: 3px; }
-.graphics-settings p[role="status"] { margin: 12px 0 0; padding: 0; color: var(--ui-muted); font-size: 12px; line-height: 1.6; }
+.graphics-settings p[role="status"] { margin: 12px 0 0; padding: 0; color: var(--ds-menu-muted); font-size: 12px; line-height: 1.6; }
 @media (max-width: 520px) {
   .graphics-settings { padding: 12px; }
   .graphics-settings .graphics-settings-heading { align-items: flex-start; flex-direction: column; gap: 5px; }

@@ -6,6 +6,7 @@ import type { WeaponThreatEnvelope } from '../WeaponThreatEnvelope';
 import type { WeaponMount } from "../../simulation/Weapon";
 import type { Ship } from '../../simulation/Ship';
 import type { CombatEngine } from '../../simulation/CombatEngine';
+export type { MulticoreMetrics } from '../../contracts/CombatTelemetry';
 export type Scalar = undefined | null | number | boolean | string;
 /** Reflection is confined to the audited codec. These are not arbitrary serialized Ships. */
 export type Fields = Record<string, any>;
@@ -75,19 +76,6 @@ export interface AIPhaseBatch {
     matches(engine: CombatEngine, ais: CapitalShipAI[], dt: number, fleetPlan?: FleetPlan): boolean;
     commit(ai: CapitalShipAI, projectileIndex?: ProjectileThreatIndex, envelope?: WeaponThreatEnvelope, fleetPlan?: FleetPlan): void;
     finish(): void;
-}
-export interface MulticoreMetrics {
-    packMs: number;
-    waitMs: number;
-    validateMs: number;
-    mergeMs: number;
-    recomputeMs: number;
-    commits: number;
-    fallbacks: number;
-    authority: number;
-    invalidated: boolean;
-    kernelMaxMs: number;
-    syncMaxMs: number;
 }
 export type OwnerRequest = {
     id: number;

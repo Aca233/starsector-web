@@ -5,7 +5,6 @@ import { InstalledWeaponArt } from './InstalledWeaponArt';
 import { WEAPON_SIZE_MARKERS } from '../engine/content/WeaponSizes';
 import { useMountTargets } from './useMountTargets';
 import { ShipModuleTargets } from './ShipModuleTargets';
-import './ship-targets.css';
 import { assemblyParts } from '../engine/content/ModuleGeometry';
 import React from "react";
 import type { ShipSpec } from "../engine/content/ShipSpec";
@@ -109,7 +108,7 @@ export function ShipStage({
         <b>+</b>
       </div>
       <div
-        key={spec.id}
+        data-ship-id={spec.id}
         ref={stageRef}
         className={"studio-ship " + (onSelectModule && parts.length > 1 ? "studio-ship--assembly" : "")}
         data-active-module-path={activePath}

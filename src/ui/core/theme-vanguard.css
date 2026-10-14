@@ -1,0 +1,2 @@
+/* Compatibility entry; shared rules are owned by core/components.css. */
+@import "./components.css";

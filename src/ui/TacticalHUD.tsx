@@ -43,6 +43,8 @@ export interface TacticalHUDProps {
   shipActionLabel?: string;
   cameraPosRef?: React.MutableRefObject<Vector2>;
   zoomRef?: React.MutableRefObject<number>;
+  /** Backing-pixel zoom for world-anchored contact overlays; defaults to zoomRef. */
+  contactZoomRef?: React.MutableRefObject<number>;
   canvasRef?: React.RefObject<HTMLCanvasElement | null>;
   onHelpChange?: (open: boolean) => void;
   inputBlocked?: boolean;
@@ -71,6 +73,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
   shipActionLabel,
   cameraPosRef,
   zoomRef,
+  contactZoomRef,
   canvasRef,
   onHelpChange,
   inputBlocked = false,
@@ -154,7 +157,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
 
       {!engine.isTacticalMap && <>
       {/* 2. 近空战况标牌（易读字体、阵营颜色和仪表尺寸） */}
-      <CombatContacts engine={engine} cameraPosRef={cameraPosRef} zoomRef={zoomRef} canvasRef={canvasRef}
+      <CombatContacts engine={engine} cameraPosRef={cameraPosRef} zoomRef={contactZoomRef ?? zoomRef} canvasRef={canvasRef}
         scheduler={scheduler} paused={paused} blocked={inputBlocked || showHelpDrawer} />
 
       {/* 3. 左下角：战术武器控制台（完整布局仍需原版对照） */}

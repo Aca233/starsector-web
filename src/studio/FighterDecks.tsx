@@ -7,7 +7,6 @@ import { contentRegistry } from '../engine/content/ContentRegistry';
 import { runtimeAssetUrl } from '../engine/runtime/RuntimePaths';
 import { builtInWingIds, designWingSlots, nativeRefit } from './DesignModel';
 import type { Design } from './DesignModel';
-import './fighter-decks.css';
 
 /** Show each craft in the wing using its actual imported hull sprite. */
 export function WingFormation({ id }: { id: string }) {

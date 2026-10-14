@@ -12,7 +12,13 @@ export function updateElectronicWarfare(ships: readonly Ship[]): void {
   for (const ship of ships) {
     const own = teams.get(ship.teamId) ?? {ecm:0,nav:0};
     // Apply the strongest hostile fleet's penalty; do not multiply the two-team cap.
-    const raw = Math.max(0,...[...teams].filter(([id])=>id!==ship.teamId).map(([,rating])=>penalty(own.ecm,rating.ecm)));
+    let raw = 0;
+    for (const [id, rating] of teams) {
+      if (id !== ship.teamId) {
+        const p = penalty(own.ecm, rating.ecm);
+        if (p > raw) raw = p;
+      }
+    }
     const inactive = ship.isDead || ship.isRetreated || ship.spec.hullSize === 'FIGHTER';
     ship.fleetSpeedBonusPercent = inactive ? 0 : Math.min(20,own.nav);
     ship.ecmRangePenalty = inactive ? 0 : Math.max(0,Math.min(10,raw * ship.hullStats.ecmPenaltyMultiplier));

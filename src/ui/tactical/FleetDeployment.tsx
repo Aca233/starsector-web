@@ -13,8 +13,6 @@ import { DwellScope } from '../../studio/DwellTooltip';
 import { useDeploymentPicker } from './useDeploymentPicker';
 import { FleetShipInspection } from './FleetShipInspection';
 import { fleetDeploymentRoster, fleetStatusLabels, fleetShipCondition } from './FleetDeploymentRoster';
-import './simulation-deployment.css';
-import './fleet-deployment.css';
 
 const PAGE_SIZE = 80;
 export function FleetDeployment({ source, team, onClose, onDeployed, onDeploy }: {

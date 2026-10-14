@@ -1,16 +1,17 @@
 import { ADUN_ARK_ID } from './engine/content/AdunArkIds';
 import { assemblySpriteLayout } from './engine/content/ModuleGeometry';
 import { MotionPresence } from './ui/core/MotionPresence';
-import { DEFAULT_PLAYER_HULL } from "./engine/data/SandboxDefaults";
+import { defaultPlayerHull } from "./engine/data/SandboxDefaults";
 import { readBattleSize } from "./engine/runtime/BattleSizeSettings";
 import { battleTeamLimit } from "./shared/battle-size.mjs";
 import { readMouseSteering, saveMouseSteering } from "./engine/runtime/CombatControlSettings";
 import { stopSystemAudio } from "./engine/audio/SystemAudio";
-import React, { useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { Vector2 } from "./engine/math/Vector2";
 import { FleetDeployment } from "./ui/tactical/FleetDeployment";
 import { SimulationDeployment } from "./ui/tactical/SimulationDeployment";
 import { TacticalHUD } from "./ui/TacticalHUD";
+import { LocalCombatStatus } from './ui/hud/LocalCombatStatus';
 import { ModManagerModal } from "./ui/ModManagerModal";
 import { CombatResultsModal } from "./ui/CombatResultsModal";
 import { i18n } from "./engine/i18n/LocalizationManager";
@@ -50,8 +51,8 @@ export const CombatView: React.FC<{
     prototypeId ||
     (typeof window !== "undefined"
       ? new URLSearchParams(window.location.search).get("ship") ||
-        DEFAULT_PLAYER_HULL
-      : DEFAULT_PLAYER_HULL);
+        defaultPlayerHull()
+      : defaultPlayerHull());
   const isVisualLab =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("view") === "visual-lab";
@@ -70,7 +71,8 @@ export const CombatView: React.FC<{
         isVisualLab || isDesignTrial,
       );
       if (isDesignTrial) next.combat.beginSimulationDeployment(deploymentCost, battleTeamLimit(readBattleSize()));
-      if (!isVisualLab && new URLSearchParams(window.location.search).get("combat") !== "inline") next.combat.enableWorker();
+      const backend = new URLSearchParams(window.location.search).get('combat');
+      if (!isVisualLab && backend !== 'inline') next.combat.enableWorker(backend === 'rust' ? 'rust-wasm' : 'typescript');
       return next;
     },
   );
@@ -89,6 +91,15 @@ export const CombatView: React.FC<{
     return Math.min(.65,Math.max(.18,height*.68/Math.max(layout.height,layout.width)));
   });
   const zoomRef = useRef<number>(initialZoom);
+  // zoomRef is CSS pixels per world unit; the renderer and contact HUDs work in backing pixels.
+  const backingZoomRef = useMemo<React.MutableRefObject<number>>(() => ({
+    get current() {
+      const canvas = canvasRef.current;
+      const ratio = canvas && canvas.clientWidth > 0 ? canvas.width / canvas.clientWidth : 1;
+      return zoomRef.current * ratio;
+    },
+    set current(_value: number) { /* derived */ }
+  }), []);
   const keysPressed = useRef<{ [key: string]: boolean }>({});
   const mouseScreenPos = useRef<Vector2>(
     new Vector2(
@@ -250,8 +261,9 @@ export const CombatView: React.FC<{
       session.getPerformanceReport();
 
     const resizeCanvas = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      const ratio = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+      canvas.width = Math.round(window.innerWidth * ratio);
+      canvas.height = Math.round(window.innerHeight * ratio);
     };
     resizeCanvas();
     window.addEventListener("resize", resizeCanvas);
@@ -350,7 +362,7 @@ export const CombatView: React.FC<{
     sessionRef: stableSessionRef,
     canvasRef,
     cameraPosRef,
-    zoomRef,
+    zoomRef: backingZoomRef,
     isAutopilotRef,
     keysPressed,
     mouseScreenPos,
@@ -394,7 +406,7 @@ export const CombatView: React.FC<{
         tabIndex={0}
         style={{
           outline: "none",
-          cursor: `url('${runtimeAssetUrl("graphics/cursors/cursor_green.png")}') 16 16, crosshair`,
+          cursor: `url('${runtimeAssetUrl("graphics/cursors/cursor_green.png")}') 2 2, crosshair`,
         }}
         className="w-full h-full block"
       />
@@ -474,6 +486,7 @@ export const CombatView: React.FC<{
         onDeploy={async ids => { const result = await session.dispatchDeployment({ kind: 'fleet', ids }); if (!result.accepted) throw new Error(result.reason ?? '部署未获确认。'); }}
         onClose={()=>setIsDeploymentOpen(false)} onDeployed={()=>{if(session.read.isTacticalMap)session.dispatchControl({ kind: 'toggle-map' });setIsDeploymentOpen(false);session.refreshPresentationAssets();}} />}
 
+      <LocalCombatStatus session={session} simulation={isDesignTrial || session.read.isSimulation} paused={pauseRequested} />
       <TacticalHUD mapSource={session.tacticalMapView}
         paused={pauseRequested}
         onPausedChange={setIsPaused}
@@ -497,6 +510,7 @@ export const CombatView: React.FC<{
         canRestart={game.mode !== "fleet" || !!game.getSnapshot().pendingCombat}
         cameraPosRef={cameraPosRef}
         zoomRef={zoomRef}
+        contactZoomRef={backingZoomRef}
         canvasRef={canvasRef}
         onHelpChange={setIsHelpOpen}
         onOpenDeployment={isDesignTrial || session.read.deploymentEnabled ? () => setIsDeploymentOpen(true) : undefined}

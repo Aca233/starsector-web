@@ -353,8 +353,8 @@
     "id": "graphics/cursors/cursor_green.png",
     "path": "graphics/cursors/cursor_green.png",
     "type": "image",
-    "bytes": 1317,
-    "hash": "370e972c8e4a47907bd17e2df38ea7c95f535f4808a930d2965ba5f83f0d17f9",
+    "bytes": 721,
+    "hash": "00ea25ef9152f8a8cddc17757fb58b01b8b22e493539b298e91998912b9fa098",
     "group": "graphics",
     "sampler": {
       "wrap": "clamp",
@@ -13968,8 +13968,8 @@
       "magFilter": "linear",
       "mipmap": false
     },
-    "bytes": 255726,
-    "hash": "e8d16b9e59aeeb56d4a82c4728703bf7bda4f9cb1d17890108fa658b22d95512"
+    "bytes": 220581,
+    "hash": "ea78946a1205fda26d684ab75bc5145c2daae9ffb80e3dd086ec219989d57828"
   },
   {
     "id": "graphics/ui/armor_plate.png",
@@ -39343,6 +39343,20 @@
       "minFilter": "linear",
       "magFilter": "linear",
       "mipmap": false
+    }
+  },
+  {
+    "id": "nebula-soft-veil-01",
+    "path": "authored/terrain/nebula-soft-veil-01/nebula.png",
+    "type": "image",
+    "group": "terrain",
+    "bytes": 839086,
+    "hash": "f5756814e9dd0935ffcf4c597e8e997f15c494042ec64cf53203201e9115aa56",
+    "sampler": {
+      "wrap": "clamp",
+      "minFilter": "linear",
+      "magFilter": "linear",
+      "mipmap": true
     }
   }
 ]

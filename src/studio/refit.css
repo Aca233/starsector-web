@@ -1,0 +1,2432 @@
+/* Refit page owner. Sections retain their original cascade sequence.
+ * Shared controls live in ui/core/components.css; picker windows own their own styles. */
+
+/* ===== refit-workbench ===== */
+
+
+/* Shared palette comes from ui/core/components.css; this file owns studio geometry. */
+
+.native-refit-app,
+.native-home {
+  --u: clamp(0.85px, min(0.12642dvh, 0.09615vw), 1.35px);
+  width: 100%;
+  height: 100dvh;
+  position: relative;
+  isolation: isolate;
+  font-family: var(--ds-font-body);
+  font-size: calc(15 * var(--u));
+  color: var(--ds-menu-text);
+  background: var(--ds-palette-night) url("/game-assets/graphics/original-ui/observatory.png")
+    center/cover;
+}
+
+.native-refit-app *,
+.native-home * {
+  box-sizing: border-box;
+}
+
+.native-refit-app button,
+.native-refit-app input,
+.native-refit-app select,
+.native-home button {
+  font: inherit;
+}
+
+.native-refit-app button,
+.native-home button {
+  cursor: pointer;
+}
+
+.native-refit-app button:disabled {
+  cursor: default;
+}
+
+.native-refit-app h2,
+.native-refit-app p {
+  margin: 0;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 1px solid var(--ds-menu-highlight);
+  outline-offset: 2px;
+}
+
+.native-numeric,
+.native-stat-three b,
+.native-flux-row b,
+.native-flux-row input,
+.refit-weapon-flux b,
+.refit-mod-row b {
+  font-family: "Cascadia Code", monospace;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--ds-menu-highlight);
+}
+
+.native-shortcut {
+  color: var(--ds-menu-highlight);
+  font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  white-space: nowrap;
+  margin-left: 0.35em;
+}
+
+/* Shared native frames/buttons are implemented in ui/core/components.css. */
+
+.ui-button--primary {
+  background-color: var(--ds-palette-blue-raised);
+  border: 0;
+  color: var(--ds-palette-blue-ink);
+}
+
+.ui-button--primary:hover:not(:disabled) {
+  background-color: var(--ds-palette-steel);
+}
+
+.ui-keycap {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ds-menu-highlight);
+}
+
+.ui-keycap:before {
+  content: "[";
+}
+
+.ui-keycap:after {
+  content: "]";
+}
+
+.ui-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Legacy geometry below is overridden by the explicitly requested original menu skin. */
+
+.native-home {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--ds-palette-black) 46.666667%, transparent), color-mix(in srgb, var(--ds-palette-black) 20%, transparent)),
+    url("/game-assets/graphics/original-ui/observatory.png");
+}
+
+.native-loading {
+  height: 100dvh;
+  background: var(--ds-palette-night);
+  display: grid;
+  place-content: center;
+  gap: 20px;
+  color: var(--ds-menu-text);
+  font: 20px var(--ds-font-body);
+}
+
+/* Screenshot reference coordinates are based on the original 1040 x 791 window. */
+
+.native-screen-tab {
+  position: absolute;
+  left: 10px;
+  top: calc(9 * var(--u));
+  height: calc(22 * var(--u));
+  min-width: calc(179 * var(--u));
+  padding: calc(3 * var(--u)) calc(31 * var(--u));
+  color: var(--ds-palette-ink);
+  background:
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--ds-palette-steel) 33.333333%, transparent) 0,
+      color-mix(in srgb, var(--ds-palette-steel) 33.333333%, transparent) 1px,
+      transparent 1px,
+      transparent 2px
+    ),
+    var(--ds-palette-blue-raised);
+  clip-path: polygon(8px 0, calc(100% - 20px) 0, 100% 100%, 0 100%, 0 8px);
+  font-size: calc(14 * var(--u));
+  line-height: 1.15;
+}
+
+.native-screen-close {
+  position: absolute;
+  right: calc(15 * var(--u));
+  top: calc(9 * var(--u));
+  height: calc(22 * var(--u));
+  width: calc(30 * var(--u));
+  padding: 0;
+  border: 0;
+  clip-path: polygon(8px 0, 100% 0, 100% 100%, 0 100%, 0 8px);
+  background: var(--ds-palette-blue-frame);
+  color: var(--ds-menu-text);
+  line-height: 1;
+}
+
+.native-refit-app button.native-screen-close {
+  font-family: Arial, sans-serif;
+  font-size: calc(27 * var(--u));
+}
+
+.refit-shell {
+  position: absolute;
+  inset: calc(31 * var(--u)) 12px calc(14 * var(--u)) 6px;
+  display: flex;
+  padding: 7px;
+  min-height: 0;
+}
+
+.refit-roster {
+  position: relative;
+  flex: 0 0 calc(208 * var(--u));
+  border-right: 1px solid var(--ds-palette-blue-raised);
+  background: var(--ds-palette-black);
+  padding-right: 7px;
+  min-width: 0;
+}
+
+.refit-roster-ship {
+  width: 100%;
+  display: block;
+  position: relative;
+  text-align: left;
+  color: var(--ds-palette-ink);
+  border: 0;
+  padding: 0;
+  overflow: visible;
+  text-shadow:
+    1px 1px var(--ds-palette-black),
+    -1px -1px var(--ds-palette-black);
+}
+
+.refit-roster-ship:before,
+.refit-roster-ship:after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  top: 2px;
+  height: 19px;
+  width: 1px;
+  background: var(--ds-palette-inset);
+}
+
+.refit-roster-ship:after {
+  right: 7px;
+}
+
+.refit-roster-ship > img {
+  position: absolute;
+  max-width: 70%;
+  height: 100%;
+  object-fit: contain;
+  top: 0;
+  left: 16%;
+}
+
+.refit-roster-ship > span {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  font-size: calc(14 * var(--u));
+  line-height: 1.05;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.refit-roster-ship strong {
+  font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  font-weight: 400;
+  font-size: calc(13 * var(--u));
+  white-space: nowrap;
+}
+
+.refit-roster-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 2px;
+  right: 7px;
+  font-size: calc(11 * var(--u));
+  color: var(--ds-palette-steel);
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.refit-roster:hover .refit-roster-hint {
+  opacity: 1;
+}
+
+.refit-grid {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background-color: var(--ds-palette-shell);
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--ds-palette-teal-frame) 40%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--ds-palette-teal-frame) 40%, transparent) 1px, transparent 1px);
+  background-size: calc(25 * var(--u)) calc(25 * var(--u));
+}
+
+.refit-cr {
+  position: absolute;
+  left: calc(6 * var(--u));
+  top: calc(7 * var(--u));
+  width: calc(275 * var(--u));
+  height: calc(35 * var(--u));
+  z-index: 2;
+  display: flex;
+  gap: calc(10 * var(--u));
+  align-items: flex-start;
+}
+
+.native-cr-meter {
+  position: relative;
+  width: calc(213 * var(--u));
+  height: calc(12 * var(--u));
+  border: 1px solid var(--ds-palette-turquoise);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 70% 80%, 70% 100%, 0 100%);
+  box-shadow:
+    inset 2px 0 var(--ds-palette-white),
+    inset -2px 0 var(--ds-palette-cyan-frame);
+  padding: 1px 3px;
+  background: var(--ds-palette-shell);
+}
+
+.native-cr-meter > i {
+  display: block;
+  width: 70%;
+  height: 100%;
+  background: linear-gradient(var(--ds-palette-white), var(--ds-palette-accent-muted) 45%, var(--ds-palette-cyan-frame));
+  box-shadow: 0 0 5px var(--ds-palette-cyan-muted);
+}
+
+.native-cr-meter > b {
+  position: absolute;
+  left: 70%;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: var(--ds-palette-shell);
+}
+
+.refit-cr > span {
+  font-size: calc(12 * var(--u));
+  padding-top: 1px;
+}
+
+.refit-cr > label {
+  position: absolute;
+  top: calc(15 * var(--u));
+  left: 0;
+  color: var(--ds-palette-accent-muted);
+  font-size: calc(15 * var(--u));
+}
+
+.refit-vessel {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.ship-stage {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  position: relative;
+  container-type: size;
+}
+
+.ship-stage-rings {
+  display: none;
+}
+
+.studio-ship {
+  position: relative;
+  width: min(42cqw, 50cqh * var(--ship-ratio));
+  transform: scale(var(--ship-zoom));
+  transform-origin: center;
+  pointer-events: auto;
+  isolation: isolate;
+}
+
+.studio-hull-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+.studio-weapon-image {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+  max-width: none;
+  height: auto;
+  z-index: 1;
+}
+
+.studio-mount {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 15px;
+  height: 15px;
+  border: 1px solid color-mix(in srgb, var(--ds-palette-cyan-muted) 62.745098%, transparent);
+  padding: 0;
+  z-index: 3;
+  opacity: 0;
+  color: var(--ds-menu-highlight);
+  pointer-events: auto;
+}
+
+.studio-mount--medium {
+  width: 22px;
+  height: 22px;
+}
+
+.studio-mount--large {
+  width: 29px;
+  height: 29px;
+}
+
+.studio-mount > span {
+  display: none;
+}
+
+.studio-ship:hover .studio-mount,
+.show-all-mounts .studio-mount {
+  opacity: 0.55;
+}
+
+/* Outranks assembly and show-all opacity states (0,3,0). */
+
+:root .studio-mount.studio-mount:is(:hover, :focus-visible, .is-selected) {
+  opacity: 1;
+}
+
+.studio-mount:hover,
+.studio-mount:focus-visible,
+.studio-mount.is-selected {
+  border: 1px solid var(--ds-menu-highlight);
+  box-shadow: 0 0 0 1px var(--ds-palette-tooltip);
+  background: color-mix(in srgb, var(--ds-palette-panel) 66.666667%, transparent);
+}
+
+.studio-mount.is-grouped {
+  opacity: 1;
+  background: color-mix(in srgb, var(--ds-palette-lime) 25.098039%, transparent);
+  border-color: var(--ds-menu-success);
+}
+
+.ship-arc {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0.45;
+}
+
+.ship-arc path {
+  fill: color-mix(in srgb, var(--ds-palette-muted) 9.803922%, transparent);
+  stroke: var(--ds-palette-cyan-ink);
+  stroke-width: 0.65;
+  stroke-dasharray: 3 3;
+}
+
+.ship-arc circle {
+  fill: none;
+  stroke: var(--ds-menu-highlight);
+  stroke-width: 1;
+}
+
+.refit-stats {
+  position: absolute;
+  top: calc(3 * var(--u));
+  right: calc(5 * var(--u));
+  width: calc(294 * var(--u));
+  bottom: calc(160 * var(--u));
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: visible;
+  z-index: 4;
+}
+
+.refit-stats > * {
+  flex-shrink: 0;
+}
+
+/* Validation messages must not push the hullmod controls into the footer either. */
+
+.refit-stats > .native-errors {
+  max-height: calc(54 * var(--u));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+}
+
+.refit-op-heading {
+  position: relative;
+}
+
+.native-help-button {
+  position: absolute;
+  right: calc(100% + 5 * var(--u));
+  top: calc(3 * var(--u));
+  width: calc(24 * var(--u));
+  height: calc(25 * var(--u));
+  padding: 0;
+  border: 0;
+  color: var(--ds-palette-muted);
+  background: transparent;
+  line-height: 1;
+}
+
+.native-refit-app button.native-help-button {
+  font-family: "Segoe UI";
+}
+
+.native-help-button:after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border: 1px solid var(--ds-palette-dim);
+  border-radius: 2px;
+}
+
+.native-op-bar {
+  position: relative;
+  height: calc(30 * var(--u));
+  border: 1px solid var(--ds-palette-cyan-muted);
+  background: linear-gradient(var(--ds-palette-green-depth), var(--ds-palette-tooltip));
+  box-shadow:
+    inset 3px 0 var(--ds-palette-blue),
+    inset -3px 0 var(--ds-palette-cyan),
+    0 0 0 2px var(--ds-palette-tooltip);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.native-op-bar i {
+  position: absolute;
+  inset: 1px auto 1px 3px;
+  background: linear-gradient(
+    var(--ds-palette-blue-frame),
+    var(--ds-palette-cyan-glow) 35%,
+    var(--ds-palette-blue) 52%,
+    var(--ds-palette-blue-raised) 88%,
+    var(--ds-palette-blue-depth)
+  );
+  box-shadow:
+    inset 0 1px var(--ds-palette-cyan-ink),
+    0 0 8px var(--ds-palette-blue);
+}
+
+.native-op-bar strong {
+  font-family: "Cascadia Code";
+  position: relative;
+  color: var(--ds-menu-highlight);
+  font-size: calc(15 * var(--u));
+  font-weight: 700;
+  text-shadow:
+    1px 1px var(--ds-palette-shell),
+    -1px -1px var(--ds-palette-shell);
+  line-height: 1;
+}
+
+.native-op-bar.over-budget strong {
+  color: var(--ds-menu-danger);
+}
+
+.native-op-bar.over-budget i {
+  background: linear-gradient(var(--ds-palette-red-frame), var(--ds-palette-danger-dark));
+}
+
+.native-stat-three {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: calc(4 * var(--u));
+  text-align: right;
+  margin: calc(4 * var(--u)) 0;
+}
+
+.native-stat-three > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+}
+
+.native-stat-three small,
+.native-flux-row small,
+.refit-weapon-flux small {
+  font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif;
+  font-size: max(var(--ds-type-meta), calc(10 * var(--u)));
+  line-height: 1.1;
+  color: var(--ds-palette-blue-ink);
+  white-space: nowrap;
+}
+
+.native-stat-three b {
+  font-size: calc(16 * var(--u));
+}
+
+.native-flux-row {
+  display: grid;
+  grid-template-columns:
+    1fr calc(23 * var(--u)) calc(32 * var(--u)) calc(23 * var(--u))
+    calc(87 * var(--u));
+  align-items: center;
+  gap: calc(3 * var(--u));
+  margin-top: calc(6 * var(--u));
+}
+
+.native-flux-row > label {
+  text-align: right;
+  font-size: calc(16 * var(--u));
+  color: var(--ds-palette-accent-muted);
+  white-space: nowrap;
+}
+
+.native-step {
+  width: calc(23 * var(--u));
+  height: calc(25 * var(--u));
+  padding: 0;
+  border: 0;
+  clip-path: polygon(
+    6px 0,
+    calc(100% - 6px) 0,
+    100% 7px,
+    100% calc(100% - 7px),
+    calc(100% - 6px) 100%,
+    6px 100%,
+    0 calc(100% - 7px),
+    0 7px
+  );
+  color: var(--ds-menu-text);
+  background: var(--ds-palette-blue-frame);
+  line-height: 1;
+}
+
+.native-step:hover:not(:disabled) {
+  background: var(--ds-palette-steel);
+  color: var(--ds-palette-ink);
+}
+
+.native-step:disabled {
+  background: var(--ds-palette-teal-frame);
+  color: var(--ds-palette-gray);
+}
+
+.native-flux-row input {
+  width: 100%;
+  min-width: 0;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: center;
+  font-size: calc(16 * var(--u));
+  appearance: textfield;
+}
+
+.native-flux-row input::-webkit-inner-spin-button,
+.native-flux-row input::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.native-flux-row > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+}
+
+.native-flux-row b {
+  font-size: calc(16 * var(--u));
+}
+
+.refit-shields {
+  margin-top: calc(5 * var(--u));
+}
+
+.refit-shields > div:first-child {
+  padding-left: calc(16 * var(--u));
+}
+
+.refit-shields small {
+  font-size: max(var(--ds-type-meta), calc(9 * var(--u)));
+}
+
+.refit-weapon-flux {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-top: calc(3 * var(--u));
+}
+
+.refit-weapon-flux b {
+  font-size: calc(16 * var(--u));
+  color: var(--ds-menu-highlight);
+}
+
+.refit-hullmods {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  margin-top: calc(12 * var(--u));
+  padding-left: calc(5 * var(--u));
+}
+
+/* Only the installed list scrolls; the heading and install/back action stay put. */
+
+.refit-hullmods > :not(.refit-hullmod-list) {
+  flex-shrink: 0;
+}
+
+.refit-hullmod-list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ds-palette-steel) var(--ds-palette-shell);
+  scrollbar-gutter: stable;
+  pointer-events: auto;
+}
+
+.refit-hullmods h2 {
+  text-align: right;
+  color: var(--ds-palette-accent-muted);
+  font-size: calc(17 * var(--u));
+  font-weight: 400;
+  margin-bottom: calc(4 * var(--u));
+}
+
+.refit-mod-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: calc(5 * var(--u));
+  height: calc(36 * var(--u));
+  font-size: calc(15 * var(--u));
+  white-space: nowrap;
+  text-shadow: 1px 1px var(--ds-palette-black);
+}
+
+.refit-mod-row > span {
+  color: var(--ds-palette-gray-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.refit-mod-row.builtin > span {
+  color: var(--ds-palette-dim);
+}
+
+.refit-mod-row > img {
+  height: calc(33 * var(--u));
+  width: calc(33 * var(--u));
+  object-fit: contain;
+  margin-left: calc(2 * var(--u));
+}
+
+.refit-mod-row > b {
+  font-size: calc(15 * var(--u));
+  font-weight: 500;
+}
+
+.refit-mod-row > small {
+  position: absolute;
+  right: calc(37 * var(--u));
+  bottom: 0;
+  font-size: max(var(--ds-type-meta), calc(8 * var(--u)));
+  color: var(--ds-palette-bronze);
+}
+
+.refit-hullmods > .native-button {
+  align-self: flex-end;
+  margin-top: calc(6 * var(--u));
+  font-size: calc(16 * var(--u));
+  min-height: calc(25 * var(--u));
+  padding: 2px 7px;
+}
+
+.native-errors {
+  font-size: 13px;
+  color: var(--ds-menu-danger);
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
+.refit-bottom {
+  position: absolute;
+  left: calc(10 * var(--u));
+  bottom: calc(8 * var(--u));
+  right: calc(10 * var(--u));
+  z-index: 4;
+  pointer-events: none;
+}
+
+.refit-bottom > * {
+  pointer-events: auto;
+}
+
+.refit-role {
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  height: calc(24 * var(--u));
+  width: max-content;
+  font-size: calc(16 * var(--u));
+  margin-bottom: calc(7 * var(--u));
+}
+
+.refit-role > span {
+  width: calc(161 * var(--u));
+  height: calc(23 * var(--u));
+  line-height: calc(23 * var(--u));
+  text-align: center;
+  background: color-mix(in srgb, var(--ds-palette-green-depth) 78.823529%, transparent);
+  color: var(--ds-palette-blue-ink);
+  border: 1px solid var(--ds-palette-teal-frame);
+}
+
+.refit-name {
+  height: calc(28 * var(--u));
+  display: flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  color: var(--ds-palette-ink-soft);
+  font-size: calc(15 * var(--u));
+}
+
+.refit-name input {
+  background: none;
+  border: 0;
+  color: inherit;
+  max-width: calc(255 * var(--u));
+  width: auto;
+  field-sizing: content;
+  min-width: 60px;
+  padding: 0;
+  outline-offset: 0;
+  letter-spacing: 0.05em;
+}
+
+.refit-name small {
+  color: var(--ds-menu-highlight);
+}
+
+.refit-actions {
+  display: grid;
+  grid-template-columns: repeat(3, calc(190 * var(--u)));
+  grid-template-rows: repeat(3, calc(25 * var(--u)));
+  gap: calc(3 * var(--u));
+  width: max-content;
+}
+
+.refit-actions .native-button {
+  font-size: calc(16 * var(--u));
+  height: 100%;
+  padding: 0 calc(5 * var(--u));
+  min-height: 0;
+}
+
+.refit-actions > .native-button:nth-child(1) {
+  grid-row: 1;
+  grid-column: 1;
+}
+
+.refit-actions > .native-button:nth-child(2) {
+  grid-row: 1;
+  grid-column: 2;
+}
+
+.refit-actions > .native-button:nth-child(3) {
+  grid-row: 2;
+  grid-column: 1;
+}
+
+.refit-actions > .native-button:nth-child(4) {
+  grid-row: 2;
+  grid-column: 2;
+}
+
+.refit-actions > .native-button:nth-child(5) {
+  grid-row: 3;
+  grid-column: 1;
+}
+
+.refit-actions > .native-button:nth-child(6) {
+  grid-row: 3;
+  grid-column: 2;
+}
+
+.refit-next {
+  grid-row: 3;
+  grid-column: 3;
+}
+
+.refit-warning {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: calc(156 * var(--u));
+  z-index: 5;
+  border: 1px solid var(--ds-palette-brown);
+  background: color-mix(in srgb, var(--ds-palette-danger-depth) 93.72549%, transparent);
+  color: var(--ds-menu-highlight);
+  font-size: 13px;
+  padding: 7px 10px;
+}
+
+.native-error-toast {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(680px, 95vw);
+  background: color-mix(in srgb, var(--ds-palette-warm-depth) 96.078431%, transparent);
+  border: 1px solid var(--ds-palette-orange);
+  color: var(--ds-palette-warning);
+  z-index: 180;
+  padding: 10px 14px;
+  display: flex;
+  gap: 15px;
+  font: 15px var(--ds-font-body);
+}
+
+.native-error-toast button {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  color: var(--ds-menu-text);
+  cursor: pointer;
+}
+
+/* Page-owned presentation, including its Vanguard skin. Core owns control behavior. */
+.native-refit-app .native-screen-tab {
+  left: 18px; top: 10px; height: 26px; min-width: 0; padding: 3px 0;
+  border: 0; border-radius: 0; clip-path: none; background: transparent; color: var(--ds-workbench-text); letter-spacing: 0; font-size: 14px;
+}
+.native-refit-app .native-screen-close { top: 9px; right: 14px; width: 28px; height: 28px; background: transparent; color: var(--ds-palette-muted); }
+.native-refit-app .refit-skills-entry { top: 9px; right: 52px; height: 28px; }
+.native-refit-app .refit-skills-entry .native-button { font-size: 12px; border-color: transparent; }
+.native-refit-app .refit-shell { inset: 46px 18px 14px; padding: 0; gap: 18px; }
+.native-refit-app .refit-roster.refit-roster-filtered { flex-basis: 220px; background: transparent; border-color: var(--ds-menu-divider); padding-right: 12px; }
+.native-refit-app .refit-roster-filters { background: transparent; gap: 7px; padding-top: 0; padding-right: 0; border-color: var(--ds-menu-divider); }
+.native-refit-app .refit-filter-heading { font-size: 12px; }
+.native-refit-app .refit-filter-heading > span { color: var(--ds-menu-dim); font-size: 11px; }
+.native-refit-app .refit-search-field input[type="search"] { height: 31px; padding-block: 5px; font-size: 12px; }
+.native-refit-app .refit-search-field input[type="search"] {
+  background: transparent; border-color: transparent; border-bottom-color: var(--ds-control-border); border-radius: 0;
+  transition: background-color var(--ds-motion-feedback) var(--ds-motion-ease), border-color var(--ds-motion-feedback) var(--ds-motion-ease);
+}
+.native-refit-app .refit-search-field input[type="search"]:hover:not(:disabled) { background-color: var(--ds-surface-hover); }
+.native-refit-app .refit-search-field input[type="search"]:focus-visible { outline: var(--ds-focus-width) solid var(--ds-control-focus); outline-offset: var(--ds-focus-offset); }
+.native-refit-app .refit-search-field::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; pointer-events: none;
+  background: var(--ds-control-focus); transform: scaleX(0); transform-origin: left;
+  transition: transform var(--ds-motion-feedback) var(--ds-motion-ease);
+}
+.native-refit-app .refit-search-field:focus-within::after { transform: scaleX(1); }
+.native-refit-app .refit-faction-filter select { min-height: 29px; padding-block: 4px; }
+.native-refit-app :is(.refit-class-chips, .refit-assembly-chips) .native-button { padding-inline: 2px; min-height: 28px; font-size: 11px; }
+.native-refit-app .refit-roster-results { scrollbar-color: var(--ds-workbench-border) transparent; }
+.native-refit-app .refit-roster-filtered .refit-roster-ship { height: 84px; min-height: 84px; background: transparent; border-color: var(--ds-menu-divider); text-shadow: none; }
+.native-refit-app .refit-roster-ship::before, .native-refit-app .refit-roster-ship::after { display: none; }
+.native-refit-app .refit-roster-ship.is-current { background: linear-gradient(90deg, var(--ds-control-selected), transparent); box-shadow: inset 2px 0 var(--ds-menu-accent); }
+.native-refit-app .refit-roster-ship:hover:not(.is-current):not(:disabled) { background: var(--ds-control-hover); }
+.native-refit-app .refit-roster-filtered .refit-roster-ship > span { top: 16px; bottom: auto; left: 10px; right: 68px; }
+.native-refit-app .refit-roster-filtered .refit-roster-ship strong { font-size: 12px; }
+.native-refit-app .refit-roster-filtered .refit-roster-ship small { font-size: 11px; color: var(--ds-menu-dim); }
+.native-refit-app .refit-roster-filtered .refit-roster-ship > .refit-roster-thumbnail { width: 58px; height: 66px; top: 8px; right: 6px; }
+.native-refit-app .refit-grid {
+  background-color: transparent; background-image: linear-gradient(color-mix(in srgb, var(--ds-palette-muted) 3.137255%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--ds-palette-muted) 3.137255%, transparent) 1px, transparent 1px);
+  background-size: 40px 40px; border-radius: 0;
+}
+.native-refit-app .refit-stats { width: 276px; top: 0; right: 0; bottom: 150px; background: transparent; border: 0; border-left: 1px solid var(--ds-menu-divider); border-radius: 0; padding-left: 14px; }
+.native-refit-app .refit-cr { top: 5px; left: 2px; width: 205px; gap: 8px; }
+.native-refit-app .native-cr-meter { width: 156px; height: 4px; padding: 0; border: 0; background: color-mix(in srgb, var(--ds-palette-accent-muted) 12.54902%, transparent); border-radius: 0; box-shadow: none; margin-top: 5px; }
+.native-refit-app .native-cr-meter > i { background: var(--ds-palette-muted); box-shadow: none; }
+.native-refit-app .refit-cr > label { top: 17px; font-size: 11px; color: var(--ds-menu-dim); }
+.native-refit-app .native-op-bar { height: 28px; background: transparent; border: 0; border-bottom: 2px solid color-mix(in srgb, var(--ds-palette-accent-muted) 14.901961%, transparent); border-radius: 0; box-shadow: none; }
+.native-refit-app .native-op-bar i { top: auto; bottom: 0; left: 0; height: 2px; background: var(--ds-palette-dim); box-shadow: none; }
+.native-refit-app .native-op-bar strong { font-size: 13px; font-weight: 500; color: var(--ds-palette-gray-ink); text-shadow: none; }
+.native-refit-app .native-op-bar.over-budget strong { color: var(--ds-workbench-danger); }
+.native-refit-app .native-op-bar.over-budget i { background: var(--ds-workbench-danger); }
+.native-refit-app .native-help-button { top: 2px; width: 22px; height: 22px; color: var(--ds-menu-dim); }
+.native-refit-app button.native-help-button { font-size: 17px; }
+.native-refit-app .native-help-button::after { border: 0; }
+.native-refit-app .native-stat-three { margin-block: 9px; }
+.native-refit-app :is(.native-stat-three, .native-flux-row) b { font-size: 14px; font-weight: 500; color: var(--ds-palette-gray-ink); }
+.native-refit-app :is(.native-stat-three, .native-flux-row, .refit-weapon-flux) small { font-size: 11px; color: var(--ds-palette-dim); line-height: 1.6; }
+.native-refit-app .native-flux-row { grid-template-columns: 1fr 22px 26px 22px 70px; gap: 3px; margin-top: 8px; }
+.native-refit-app .native-flux-row > label { font-size: 12px; color: var(--ds-palette-accent-muted); }
+.native-refit-app .native-flux-row input { font-size: 13px; color: var(--ds-workbench-highlight); }
+.native-refit-app .native-step { width: 22px; height: 24px; clip-path: none; border: 1px solid var(--ds-border-page); border-radius: 2px; background: transparent; color: var(--ds-palette-accent-muted); }
+.native-refit-app button.native-step { font-size: 16px; }
+.native-refit-app .native-step:hover:not(:disabled) { background: color-mix(in srgb, var(--ds-palette-accent-muted) 7.058824%, transparent); }
+.native-refit-app .native-step:disabled { opacity: .35; background: var(--ds-palette-teal-frame); color: var(--ds-palette-gray); }
+.native-refit-app .refit-weapon-flux b { font-size: 13px; font-weight: 500; color: var(--ds-workbench-highlight); }
+.native-refit-app .refit-hullmods { margin-top: 16px; padding-left: 0; }
+.native-refit-app .refit-hullmods h2 { font-size: 12px; color: var(--ds-palette-muted); padding-bottom: 8px; border-bottom: 1px solid var(--ds-menu-divider); }
+.native-refit-app .refit-mod-row { height: 30px; font-size: 12px; gap: 5px; text-shadow: none; }
+.native-refit-app .refit-mod-row > img { width: 22px; height: 22px; border-radius: 0; opacity: .75; }
+.native-refit-app .refit-mod-row > b { font-size: 12px; }
+.native-refit-app .refit-hullmods > .native-button { font-size: 12px; }
+.native-refit-app :is(.refit-system-readiness, .refit-missing-mods) { background: transparent; border: 0; border-bottom: 1px solid var(--ds-menu-divider); padding: 5px 0; font-size: 11px; }
+.native-refit-app .refit-bottom { left: 2px; right: 2px; bottom: 0; }
+.native-refit-app .refit-role { font-size: 12px; height: 21px; margin-bottom: 3px; }
+.native-refit-app .refit-role > span { width: auto; height: auto; line-height: 1.5; border: 0; background: transparent; padding-right: 10px; border-right: 1px solid var(--ds-border-page); }
+.native-refit-app .refit-name { font-size: 13px; height: 28px; }
+.native-refit-app .refit-name small { font-size: 11px; color: var(--ds-menu-dim); }
+.native-refit-app .refit-actions { grid-template-columns: repeat(3, 148px); grid-template-rows: repeat(3, 28px); gap: 4px; }
+.native-refit-app .refit-actions .native-button { font-size: 12px; }
+.native-refit-app .refit-warning { background: color-mix(in srgb, var(--ds-palette-danger-depth) 81.176471%, transparent); border: 0; border-left: 2px solid var(--ds-palette-highlight); }
+
+@media (max-width: 1100px) and (min-width: 850px) {
+  .native-refit-app .refit-roster.refit-roster-filtered { flex-basis: 192px; padding-right: 8px; }
+}
+
+@media (max-width: 1100px) and (min-width: 850px) {
+  .native-refit-app .refit-shell { gap: 12px; inset-inline: 12px; }
+}
+
+@media (max-width: 1100px) and (min-width: 850px) {
+  .native-refit-app .refit-stats { width: 260px; padding-left: 10px; }
+}
+
+@media (max-width: 1100px) and (min-width: 850px) {
+  .native-refit-app .refit-actions { grid-template-columns: repeat(3, 132px); }
+}
+@media (max-width: 849px) {
+  .native-refit-app .refit-shell { inset: 44px 8px 8px; gap: 8px; }
+}
+@media (max-width: 849px) {
+  .native-refit-app .refit-roster.refit-roster-filtered { flex-basis: 170px; }
+}
+@media (max-width: 849px) {
+  .native-refit-app .refit-actions { grid-template-columns: repeat(3, 132px); }
+}
+.native-refit-app .refit-mod-row > :is(button, b, img) { flex-shrink: 0; }
+.native-refit-app .refit-mod-row .refit-smod-toggle { width: 47px; padding: 2px; white-space: nowrap; }
+.native-refit-app .refit-mod-row button.refit-smod-toggle { font-size: 11px; }
+.native-refit-app .source-mod-picker { right: 302px; color: var(--ds-palette-accent-muted); font-size: 12px; }
+.native-refit-app .source-mod-heading button { background: transparent; border: 0; border-bottom: 1px solid var(--ds-border-page); }
+.native-refit-app .source-mod-scroll { border: 0; scrollbar-color: var(--ds-workbench-border) transparent; }
+.native-refit-app .source-mod-scroll > .source-mod-row { border-bottom: 1px solid var(--ds-menu-divider); }
+.native-refit-app .source-mod-scroll > .source-mod-row.is-installed { background: color-mix(in srgb, var(--ds-palette-accent-muted) 3.137255%, transparent); }
+.native-refit-app .source-mod-row.is-installed .source-mod-select { color: var(--ds-workbench-installed); }
+.native-refit-app .source-mod-scroll > .source-mod-row[data-unavailable="true"] { background: color-mix(in srgb, var(--ds-palette-muted) 3.921569%, transparent); }
+.native-refit-app .source-mod-scroll .source-mod-row .source-mod-cost { color: var(--ds-palette-brass); }
+.native-refit-app .source-mod-select img { width: 24px; height: 24px; }
+.native-refit-app .source-mod-check { color: var(--ds-workbench-success); font-size: 18px; }
+:root[data-ui-theme="vanguard"] .refit-roster {
+  border-right-color: color-mix(in srgb, var(--ds-palette-cyan) 30.196078%, transparent);
+  background: linear-gradient(90deg, var(--ds-palette-night), var(--ds-palette-tooltip) 85%, var(--ds-palette-panel));
+  box-shadow: 1px 0 0 color-mix(in srgb, var(--ds-palette-cyan) 10.196078%, transparent), 8px 0 24px -12px color-mix(in srgb, var(--ds-palette-cyan-glow) 25.098039%, transparent);
+}
+:root[data-ui-theme="vanguard"] .refit-stats {
+  background: var(--vg-corners), var(--vg-glass);
+  box-shadow: var(--vg-glow);
+  backdrop-filter: blur(3px);
+}
+:root[data-ui-theme="vanguard"] .refit-op-heading { color: var(--vg-ink); font-family: var(--vg-display); letter-spacing: .1em; text-shadow: 0 0 10px color-mix(in srgb, var(--ds-palette-cyan) 50.196078%, transparent); }
+:root[data-ui-theme="vanguard"] .native-op-bar {
+  box-shadow: inset 3px 0 var(--ds-palette-cyan-glow), inset -3px 0 var(--vg-cyan), 0 0 0 2px var(--ds-palette-inset), 0 0 16px color-mix(in srgb, var(--ds-palette-cyan-glow) 34.901961%, transparent);
+}
+:root[data-ui-theme="vanguard"] .native-op-bar i {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 9px, color-mix(in srgb, var(--ds-palette-inset) 40%, transparent) 9px 10px),
+    linear-gradient(var(--ds-palette-blue-raised), var(--ds-palette-cyan-glow) 35%, var(--ds-palette-cyan-glow) 52%, var(--ds-palette-blue-raised) 88%, var(--ds-palette-blue-frame));
+  box-shadow: inset 0 1px var(--ds-palette-cyan-ink), 0 0 12px var(--ds-palette-cyan-glow);
+}
+:root[data-ui-theme="vanguard"] .native-op-bar strong { font-family: var(--vg-display); text-shadow: 0 0 8px var(--ds-palette-black), 0 0 12px color-mix(in srgb, var(--ds-palette-amber) 65.098039%, transparent); }
+:root[data-ui-theme="vanguard"] :is(.native-stat-three b, .native-flux-row b) {
+  font-family: var(--vg-display);
+  color: var(--vg-ink);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--ds-palette-cyan) 45.098039%, transparent);
+}
+:root[data-ui-theme="vanguard"] .native-cr-meter { box-shadow: 0 0 14px color-mix(in srgb, var(--ds-palette-cyan-glow) 20%, transparent); }
+.native-refit-app:not(.lan-entry-page) { --u: 1px; font-size: 13px; }
+
+/* ===== refit-dialogs ===== */
+/* Retain the existing compact dialog geometry, but not a separate skin. */
+
+@layer ds-pages {
+
+ .ui-modal { --ds-modal-panel-max-width: 820px; --ds-modal-header-padding-top: 11px; --ds-modal-header-padding-right: 15px; --ds-modal-header-padding-bottom: 11px; --ds-modal-header-padding-left: 15px; --ds-modal-footer-padding-top: 10px; --ds-modal-footer-padding-right: 15px; --ds-modal-footer-padding-bottom: 10px; --ds-modal-footer-padding-left: 15px; --ds-modal-footer-gap: 5px; --ds-modal-body-padding-top: 15px; --ds-modal-body-padding-right: 15px; --ds-modal-body-padding-bottom: 15px; --ds-modal-body-padding-left: 15px; } }
+
+.ui-modal--small { max-width: 510px; }
+
+.ui-modal--wide { max-width: 1100px; }
+
+.ui-modal-body { scrollbar-color: var(--ds-border-page) transparent; }
+
+.native-modal-note {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ds-palette-dim);
+  margin: 15px 0 0;
+}
+
+.native-help {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.native-help label {
+  color: var(--ds-menu-text);
+}
+
+.native-help input {
+  margin-right: 10px;
+  accent-color: var(--ds-menu-success);
+}
+
+/* Combat returns to the existing original-style tactical HUD. */
+
+.studio-combat-identity {
+  position: absolute;
+  left: 18px;
+  top: 18px;
+  max-width: 32vw;
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+  color: var(--ds-menu-text);
+  font: 14px var(--ds-font-body);
+  pointer-events: none;
+}
+
+.studio-combat-identity > span {
+  color: var(--ds-palette-muted);
+  font-size: 12px;
+}
+
+.studio-combat-identity > strong {
+  font-weight: 400;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.studio-combat-identity > small {
+  display: none;
+}
+
+@media (max-width: 1000px) {
+  .native-refit-app {
+    --u: clamp(0.78px, 0.118dvh, 1.1px);
+  }
+  .refit-actions {
+    grid-template-columns: repeat(3, calc(175 * var(--u)));
+  }
+  .refit-stats {
+    width: calc(280 * var(--u));
+  }
+  .refit-roster {
+    flex-basis: calc(175 * var(--u));
+  }
+}
+
+@media (max-width: 760px) {
+  .native-refit-app {
+    overflow: auto;
+    min-width: 0;
+  }
+  .refit-shell {
+    min-height: 600px;
+    min-width: 700px;
+    width: calc(100% - 18px);
+    right: auto;
+  }
+  .native-screen-close {
+    right: 16px;
+  }
+}
+
+/* Engine idle preview uses the shared textured exhaust renderer, below the hull. */
+
+.native-screen-close,
+.native-step,
+.native-help-button {
+  display: grid;
+  place-items: center;
+}
+
+.native-refit-app button:is(.native-screen-close, .native-step, .native-help-button) {
+  line-height: 1;
+}
+
+.native-refit-app .native-button {
+  line-height: 1.15;
+}
+
+/* Refit interactions: all editing entry points remain visible, never behind a hover-only hint. */
+
+.native-refit-app,
+.native-home {
+  font-synthesis: none;
+}
+
+.native-refit-app strong {
+  font-weight: 400;
+}
+
+.refit-roster {
+  flex-direction: column;
+}
+
+.refit-roster-ship > span {
+  font-family: var(--ds-font-body);
+}
+
+.refit-roster-tools {
+  display: flex;
+  gap: 4px;
+  padding: 11px 2px 7px;
+}
+
+.refit-roster-tools .native-button {
+  flex: 1;
+  min-width: 0;
+  font-size: calc(12 * var(--u));
+  padding: 5px 3px;
+}
+
+.refit-roster-heading {
+  margin: 4px 0;
+  padding: 4px 2px;
+  font: calc(12 * var(--u)) / 1.2 var(--ds-font-body);
+  color: var(--ds-palette-muted);
+  border-bottom: 1px solid var(--ds-palette-green-depth);
+}
+
+.refit-roster-heading span {
+  float: right;
+  color: var(--ds-palette-highlight);
+}
+
+.refit-mount-list {
+  flex: 1;
+  min-height: 80px;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ds-palette-blue-raised) var(--ds-palette-night);
+}
+
+.refit-mount-list button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: calc(25 * var(--u));
+  padding: 4px 3px;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--ds-palette-panel);
+  background: transparent;
+  color: var(--ds-palette-muted);
+  text-align: left;
+  font-size: calc(12 * var(--u));
+}
+
+.refit-mount-list button:hover,
+.refit-mount-list button[aria-pressed="true"] {
+  color: var(--ds-palette-ink);
+  background: var(--ds-palette-green-depth);
+}
+
+.refit-mount-list small {
+  white-space: nowrap;
+  color: var(--ds-palette-gray);
+  font-size: max(var(--ds-type-meta), calc(10 * var(--u)));
+}
+
+.refit-mount-list i {
+  font-style: normal;
+  color: var(--ds-palette-highlight);
+  margin-left: 3px;
+}
+
+.refit-mount-list i[data-type="ENERGY"] {
+  color: var(--ds-palette-lilac);
+}
+
+.refit-mount-list i[data-type="MISSILE"] {
+  color: var(--ds-palette-lime-muted);
+}
+
+.refit-mount-list em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--ds-palette-brown);
+}
+
+.refit-storage-status {
+  flex-shrink: 0;
+  border-top: 1px solid var(--ds-palette-teal-frame);
+  padding: 9px 4px 4px;
+  min-height: 43px;
+  color: var(--ds-palette-lime-muted);
+  font-size: calc(12 * var(--u));
+}
+
+.refit-storage-status small {
+  display: block;
+  color: var(--ds-palette-gray);
+  margin-top: 3px;
+  font-size: max(var(--ds-type-meta), calc(10 * var(--u)));
+}
+
+.refit-edit-hint {
+  position: absolute;
+  left: calc(7 * var(--u));
+  top: calc(44 * var(--u));
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: max(var(--ds-type-meta), calc(10 * var(--u)));
+  color: var(--ds-palette-cyan-frame);
+}
+
+.refit-edit-hint button {
+  background: var(--ds-palette-green-depth);
+  border: 1px solid var(--ds-palette-blue-raised);
+  color: var(--ds-palette-accent-muted);
+  padding: 3px 6px;
+  width: max-content;
+}
+
+.refit-edit-hint button[aria-pressed="true"] {
+  border-color: var(--ds-palette-dim);
+}
+
+.refit-hover-info {
+  position: absolute;
+  top: calc(105 * var(--u));
+  left: calc(10 * var(--u));
+  z-index: 5;
+  background: color-mix(in srgb, var(--ds-palette-night) 92.941176%, transparent);
+  border: 1px solid var(--ds-palette-blue-raised);
+  padding: 10px 12px;
+  font-size: calc(13 * var(--u));
+  max-width: calc(240 * var(--u));
+  pointer-events: none;
+}
+
+.refit-hover-info span,
+.refit-hover-info small {
+  display: block;
+  color: var(--ds-palette-dim);
+  margin-top: 5px;
+  font-size: calc(11 * var(--u));
+}
+
+.studio-mount {
+  border-radius: 50%;
+  border-color: var(--ds-palette-violet);
+  background: color-mix(in srgb, var(--ds-palette-tooltip) 40%, transparent);
+}
+
+.studio-mount[data-type="BALLISTIC"] {
+  border-color: var(--ds-palette-brass);
+}
+
+.studio-mount[data-type="MISSILE"] {
+  border-color: var(--ds-palette-friendly-muted);
+}
+
+.studio-mount[data-type="UNIVERSAL"] {
+  border-color: var(--ds-palette-accent-muted);
+}
+
+.studio-mount:not(.is-equipped) {
+  border-style: dashed;
+}
+
+.show-all-mounts .studio-mount {
+  opacity: 0.45;
+}
+
+.show-all-mounts .studio-mount:not(.is-equipped) {
+  opacity: 0.85;
+}
+
+.studio-ship:hover .studio-mount {
+  opacity: 0.8;
+}
+
+.studio-mount:hover {
+  background: color-mix(in srgb, var(--ds-palette-blue-raised) 46.666667%, transparent);
+}
+
+.studio-mount--small {
+  min-width: 19px;
+  min-height: 19px;
+}
+
+@layer ds-pages {
+
+ .ui-modal { --ds-modal-body-min-height: 0; --ds-modal-body-overflow-x: auto; --ds-modal-body-overflow-y: auto; } }
+
+@media (max-width: 760px) {
+  .native-refit-app {
+    --u: 0.85px;
+  }
+  .refit-edit-hint span {
+    max-width: 140px;
+    line-height: 1.5;
+  }
+}
+
+/* Transparent statistic rows must not intercept the right-hand weapon mounts. */
+
+.refit-stats {
+  pointer-events: none;
+}
+
+.refit-stats button,
+.refit-stats input,
+.refit-stats .native-op-bar,
+.refit-mod-row > span,
+.refit-mod-row > img {
+  pointer-events: auto;
+}
+
+.refit-roster-ship .ship-stage {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.refit-roster-ship .studio-ship {
+  width: calc(153 * var(--u) * var(--ship-ratio));
+  transform: none;
+  pointer-events: none;
+}
+
+.refit-roster-ship > span {
+  z-index: 2;
+}
+
+/* Source reference: refit/Q.java, WeaponPickerDialog.java, wgd2/WeaponGroupDialogV2.java. */
+
+.refit-roster {
+  display: block;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.refit-roster-ship {
+  height: calc(153 * var(--u));
+  flex: none;
+  background: var(--ds-palette-black);
+  margin-bottom: 3px;
+}
+
+.refit-roster-ship.is-current {
+  background: var(--ds-palette-green-depth);
+}
+
+.refit-roster-ship:hover:not(.is-current) {
+  background: var(--ds-palette-panel);
+}
+
+.refit-roster-ship .studio-ship {
+  max-width: 75%;
+}
+
+.studio-mount:not(.is-equipped) {
+  opacity: 0;
+}
+
+.studio-ship:hover .studio-mount:not(.is-equipped),
+.show-all-mounts .studio-mount:not(.is-equipped) {
+  opacity: 0.8;
+}
+
+@layer ds-pages {
+
+ .ui-modal:has(.source-variant-current) { --ds-modal-panel-width: 560px; } }
+
+.source-variant-current {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+}
+
+.source-variant-current label {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.source-variant-current input {
+  min-width: 0;
+  width: 100%;
+  background: var(--ds-palette-panel);
+  border: 1px solid var(--ds-palette-steel);
+  padding: 5px;
+  color: var(--ds-palette-blue-ink);
+  font: 12px var(--ds-font-body);
+}
+
+.source-variant-current .native-button {
+  font-size: 12px;
+  padding: 5px 8px;
+}
+
+.ui-modal:has(.source-variant-current) .native-design-row {
+  min-height: 29px;
+  padding: 3px 0;
+  gap: 4px;
+}
+
+.ui-modal:has(.source-variant-current) .native-design-row button {
+  font-size: 12px;
+  min-height: 24px;
+  padding: 3px 7px;
+}
+
+.ui-modal:has(.source-variant-current) .native-design-row small {
+  display: inline;
+  color: var(--ds-palette-cyan-frame);
+  margin-left: 5px;
+}
+
+/* WeaponGroupDialogV2 — user reference: 842px frame, 21px rows, 7 square columns. */
+
+.source-group-assignments {
+  min-width: 0;
+}
+
+.source-group-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(7, 23px);
+  align-items: center;
+  height: 21px;
+  gap: 0;
+}
+
+.source-group-autofire {
+  margin-bottom: 3px;
+}
+
+.source-group-autofire > span {
+  text-align: right;
+  padding-right: 7px;
+  font-size: 16px;
+}
+
+.source-group-header {
+  height: 20px;
+  margin-bottom: 2px;
+}
+
+.source-group-header > * {
+  margin-right: 3px;
+  border: 1px solid var(--ds-palette-teal-frame);
+  height: 20px;
+  text-align: center;
+  line-height: 18px;
+}
+
+.source-group-header > b {
+  font-family: "Segoe UI", sans-serif;
+  font-weight: 400;
+}
+
+.source-group-scroll {
+  overflow-y: auto;
+  max-height: calc(100dvh - 200px);
+  scrollbar-width: thin;
+  scrollbar-color: var(--ds-palette-dim) var(--ds-palette-teal-depth);
+}
+
+.source-group-weapon,
+.source-group-summary-row {
+  --row: var(--ds-palette-green-depth);
+  --arc: var(--ds-palette-cyan-frame);
+}
+
+.source-group-weapon[data-type="BALLISTIC"],
+.source-group-summary-row[data-type="BALLISTIC"] {
+  --row: var(--ds-palette-olive-depth);
+  --arc: var(--ds-palette-warning-muted);
+}
+
+.source-group-weapon[data-type="MISSILE"],
+.source-group-summary-row[data-type="MISSILE"] {
+  --row: var(--ds-palette-olive-depth);
+  --arc: var(--ds-palette-lime-mid);
+}
+
+.source-group-weapon {
+  background: var(--row);
+  border-bottom: 1px solid var(--ds-palette-black);
+}
+
+.source-group-weapon-label {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  padding: 0 3px;
+  white-space: nowrap;
+  color: var(--ds-palette-gray-ink);
+  text-shadow: 1px 1px var(--ds-palette-black);
+}
+
+.source-group-weapon-label > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.source-group-weapon-label em {
+  font-style: normal;
+  color: var(--ds-palette-native-yellow);
+  flex: none;
+}
+
+.source-group-arc {
+  width: 17px;
+  height: 17px;
+  flex: none;
+}
+
+.source-group-arc circle {
+  fill: color-mix(in srgb, var(--arc) 55%, var(--ds-palette-black));
+  stroke: var(--arc);
+  stroke-width: 0.5px;
+}
+
+.source-group-arc path {
+  fill: var(--arc);
+}
+
+.source-group-row .source-group-cell {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin: 0 auto;
+  border: 3px double var(--ds-palette-accent-muted);
+  border-radius: 2px;
+  background: repeating-linear-gradient(
+    0deg,
+    var(--ds-palette-brown-depth) 0px,
+    var(--ds-palette-brown-depth) 1px,
+    var(--ds-palette-charcoal) 1px,
+    var(--ds-palette-charcoal) 2px
+  );
+  box-shadow: 0 0 0 1px var(--ds-palette-gray-frame);
+  cursor: pointer;
+}
+
+.source-group-row .source-group-cell[aria-pressed="true"],
+.source-group-row .source-group-cell[aria-checked="true"] {
+  background: repeating-linear-gradient(
+    0deg,
+    var(--ds-palette-cyan-muted) 0px,
+    var(--ds-palette-cyan-muted) 1px,
+    var(--ds-palette-cyan-glow) 1px,
+    var(--ds-palette-cyan-glow) 2px
+  );
+  border-color: var(--ds-palette-ink);
+  box-shadow:
+    0 0 0 1px var(--ds-palette-steel),
+    inset 0 0 2px 1px var(--ds-palette-blue-raised);
+}
+
+.source-group-cell:hover {
+  filter: brightness(1.35);
+}
+
+.source-group-cell:focus-visible {
+  outline: 1px solid var(--ds-palette-native-yellow);
+  outline-offset: 1px;
+}
+
+.source-group-summary {
+  padding-top: 24px;
+}
+
+.source-group-summary-row {
+  display: grid;
+  grid-template-columns: minmax(0, 130fr) minmax(0, 100fr) minmax(0, 61fr);
+  align-items: center;
+  height: 21px;
+  font: 14px/20px var(--ds-font-body);
+}
+
+.source-group-summary-header {
+  margin-bottom: 2px;
+  height: 20px;
+  text-align: center;
+}
+
+.source-group-summary-header > span {
+  border: 1px solid var(--ds-palette-teal-frame);
+  margin-right: 3px;
+  height: 20px;
+}
+
+.source-group-summary-header > span:last-child {
+  margin-right: 0;
+}
+
+.source-group-summary-table {
+  border: 1px solid var(--ds-palette-teal-frame);
+  padding: 0 3px 3px;
+}
+
+.source-group-summary-table .source-group-summary-row {
+  background: var(--row);
+  border-bottom: 1px solid var(--ds-palette-black);
+}
+
+.source-group-summary-table .source-group-summary-row > span {
+  padding-left: 7px;
+}
+
+.source-group-summary-row button {
+  color: var(--ds-palette-native-yellow);
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.source-group-summary-row button:hover:not(:disabled) {
+  text-shadow: 0 0 5px color-mix(in srgb, var(--ds-palette-native-yellow) 33.333333%, transparent);
+  text-decoration: underline;
+}
+
+.source-group-summary-row b {
+  text-align: center;
+  color: var(--ds-menu-highlight);
+  font:
+    14px "Microsoft YaHei",
+    sans-serif;
+}
+
+.source-group-summary-row[data-type="EMPTY"] {
+  background: var(--ds-palette-black);
+  color: var(--ds-palette-gray);
+}
+
+.source-group-summary-row[data-type="EMPTY"] button,
+.source-group-summary-row[data-type="EMPTY"] b {
+  color: var(--ds-palette-steel);
+  cursor: default;
+}
+
+.source-group-summary dl {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  margin: 14px 23px;
+  gap: 0;
+  font: 14px/18px var(--ds-font-body);
+  color: var(--ds-palette-gray-ink);
+}
+
+.source-group-summary dt,
+.source-group-summary dd {
+  margin: 0;
+}
+
+.source-group-summary dd {
+  text-align: right;
+  color: var(--ds-palette-native-yellow);
+  font-family: "Microsoft YaHei", sans-serif;
+}
+
+/* ===== refit-hullmods ===== */
+/* ModPickerDialogV3 — left-side refit expansion; the right stats are not a modal background. */
+
+.mods-expanded .refit-roster {
+  opacity: 0.16;
+}
+
+.mods-expanded .refit-roster-ship:not(.is-current) {
+  visibility: hidden;
+}
+
+.mods-expanded .refit-vessel {
+  opacity: 0.25;
+}
+
+.mods-expanded .refit-vessel,
+.mods-expanded .refit-vessel * {
+  pointer-events: none;
+}
+
+.mods-expanded .refit-cr,
+.mods-expanded .refit-bottom,
+.mods-expanded .refit-hover-info {
+  visibility: hidden;
+}
+
+.mods-expanded .refit-grid {
+  background-color: var(--ds-palette-night);
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--ds-palette-green-depth) 26.666667%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--ds-palette-green-depth) 26.666667%, transparent) 1px, transparent 1px);
+}
+
+.source-mod-picker {
+  position: absolute;
+  top: calc(10 * var(--u));
+  left: calc(11 * var(--u));
+  right: calc(337 * var(--u) + 7px);
+  bottom: 7px;
+  z-index: 6;
+  outline: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  color: var(--ds-palette-blue-ink);
+  font: calc(14 * var(--u))/1.2 var(--ds-font-body);
+}
+
+.source-mod-table {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.source-mod-row {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 300fr) minmax(0, 180fr) minmax(0, 60fr)
+    minmax(0, 120fr);
+}
+
+.source-mod-heading {
+  gap: 3px;
+  flex: none;
+  height: calc(21 * var(--u));
+  margin-bottom: 2px;
+}
+
+.source-mod-heading > div {
+  min-width: 0;
+}
+
+.source-mod-heading button {
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--ds-palette-teal-frame);
+  padding: 0 calc(15 * var(--u)) 0 0;
+  background: color-mix(in srgb, var(--ds-palette-black) 73.333333%, transparent);
+  color: var(--ds-palette-blue-ink);
+  font: inherit;
+  position: relative;
+}
+
+.source-mod-heading i {
+  position: absolute;
+  top: calc(6 * var(--u));
+  right: calc(3 * var(--u));
+  width: calc(13 * var(--u));
+  height: calc(9 * var(--u));
+  clip-path: polygon(0 0, 100% 0, 100% 30%, 60% 100%, 40% 100%, 0 30%);
+  background: linear-gradient(var(--ds-palette-blue-ink), var(--ds-palette-steel));
+}
+
+.source-mod-heading i.ascending-arrow {
+  transform: rotate(180deg);
+}
+
+.source-mod-heading button:hover {
+  background: var(--ds-palette-teal-frame);
+}
+
+.source-mod-scroll {
+  height: calc(510 * var(--u));
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ds-palette-muted) var(--ds-palette-panel);
+  border: 1px solid var(--ds-palette-green-depth);
+}
+
+.source-mod-scroll > .source-mod-row {
+  position: relative;
+  min-height: calc(36 * var(--u));
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Native ModPicker row: showBG = !enabled. Blue is an unavailable marker,
+   not a stripe on every uninstalled mod. Keep unavailable rows inspectable. */
+
+.source-mod-scroll > .source-mod-row[data-unavailable="true"] {
+  background: color-mix(in srgb, var(--ds-palette-panel) 60%, transparent);
+  cursor: default;
+}
+
+.source-mod-row[data-unavailable="true"] .source-mod-select {
+  cursor: default;
+}
+
+.source-mod-scroll > .source-mod-row.is-installed {
+  background: color-mix(in srgb, var(--ds-palette-black) 60%, transparent);
+}
+
+.source-mod-scroll > .source-mod-row:not([data-unavailable="true"]):is(:hover, :focus-within) {
+  background: color-mix(in srgb, var(--ds-palette-white) 3.921569%, transparent);
+}
+
+.source-mod-scroll > .source-mod-row > div {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ds-palette-gray);
+}
+
+.source-mod-select {
+  display: flex;
+  align-items: center;
+  gap: calc(9 * var(--u));
+  width: 100%;
+  height: calc(36 * var(--u));
+  padding: 0 calc(4 * var(--u));
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--ds-palette-blue-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.source-mod-select img {
+  width: calc(32 * var(--u));
+  height: calc(32 * var(--u));
+  object-fit: contain;
+  flex: none;
+}
+
+.source-mod-select > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.source-mod-row.is-installed .source-mod-select {
+  color: var(--ds-palette-native-yellow);
+}
+
+.source-mod-scroll .source-mod-row .source-mod-cost {
+  color: var(--ds-palette-orange);
+  font-family: "Segoe UI", sans-serif;
+}
+
+.source-mod-scroll .source-mod-row.is-installed .source-mod-cost {
+  color: var(--ds-palette-gray);
+}
+
+.source-mod-status {
+  padding: 0 3px;
+  font-size: calc(12 * var(--u));
+}
+
+.source-mod-check {
+  color: var(--ds-menu-highlight);
+  font:
+    calc(26 * var(--u))/1 Arial,
+    sans-serif;
+}
+
+.source-mod-empty {
+  padding: 16px;
+  color: var(--ds-palette-gray);
+}
+
+.source-mod-filters {
+  flex: none;
+  padding: calc(10 * var(--u)) calc(7 * var(--u));
+}
+
+.source-mod-design-filters,
+.source-mod-type-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(3 * var(--u));
+}
+
+.source-mod-design-filters {
+  margin-bottom: calc(10 * var(--u));
+}
+
+.source-mod-design-filters button {
+  width: calc(98 * var(--u));
+}
+
+.source-mod-design-filters button:first-child,
+.source-mod-type-filters button:first-child {
+  width: calc(129 * var(--u));
+}
+
+.source-mod-type-filters button {
+  width: calc(94 * var(--u));
+}
+
+.source-mod-type-filters button:last-child {
+  width: calc(128 * var(--u));
+}
+
+.source-mod-type-filters {
+  max-width: calc(625 * var(--u));
+}
+
+.source-mod-filters button {
+  min-height: calc(24 * var(--u));
+  padding: calc(2 * var(--u)) calc(15 * var(--u));
+  background: var(--ds-palette-green-depth);
+  color: var(--ds-palette-blue-ink);
+  border: 1px solid var(--ds-palette-steel);
+  outline: 1px solid var(--ds-palette-black);
+  box-shadow: inset 0 0 0 1px var(--ds-palette-black);
+  font: calc(14 * var(--u))/1.2 var(--ds-font-body);
+  text-shadow: 1px 1px var(--ds-palette-black);
+  white-space: nowrap;
+}
+
+.source-mod-filters button:hover:not(:disabled),
+.source-mod-filters button[aria-pressed="true"] {
+  background: var(--ds-palette-blue-frame);
+  border-color: var(--ds-palette-muted);
+}
+
+.source-mod-filters button:disabled {
+  color: var(--ds-palette-steel);
+  border-color: var(--ds-palette-teal-frame);
+  background: var(--ds-palette-panel);
+  cursor: default;
+}
+
+.source-mod-availability {
+  display: block;
+  color: var(--ds-palette-steel);
+  font-size: calc(11 * var(--u));
+  margin-top: calc(13 * var(--u));
+}
+
+@media (max-height: 680px) {
+  .source-mod-scroll {
+    height: calc(100dvh - 235px);
+  }
+}
+
+.mods-expanded .native-screen-tab,
+.mods-expanded .native-screen-close {
+  opacity: 0.55;
+}
+
+.refit-hullmods > .native-button {
+  width: calc(150 * var(--u));
+  background: var(--ds-palette-teal-frame);
+}
+
+.source-mod-select {
+  font-size: calc(15 * var(--u));
+}
+
+.source-mod-heading {
+  font-size: calc(15 * var(--u));
+}
+
+/* ===== refit-weapon-selector ===== */
+/* Native WeaponPickerDialog reference: mount-anchored list plus the separate left tooltip. */
+
+.source-damage-icon {
+  width: 90px;
+  height: 90px;
+  object-fit: contain;
+}
+
+@media (max-width: 849px) {
+  .source-damage-icon {
+    width: 65px;
+    height: 65px;
+  }
+}
+
+.ship-arc.ship-arc-picker {
+  opacity: 0.7;
+}
+
+.ship-arc-picker path {
+  fill: none;
+  stroke: var(--ds-palette-accent-muted);
+  stroke-dasharray: none;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.ship-arc-picker circle {
+  stroke: var(--ds-palette-white);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+/* ===== refit-navigation ===== */
+/* Full native-content navigation. Keep heavy mount previews on the selected hull only. */
+
+.refit-catalog-tools { position: sticky; top: 0; z-index: 5; display: grid; gap: 7px; background: color-mix(in srgb, var(--ds-palette-teal-depth) 96.078431%, transparent); padding: 10px; border-bottom: 1px solid var(--ds-palette-blue-raised); }
+
+.refit-catalog-tools label { color: var(--ds-palette-accent-muted); font-size: 13px; }
+
+.refit-catalog-tools small { color: var(--ds-palette-cyan-frame); font-size: 11px; }
+
+.refit-catalog-tools input, .refit-catalog-tools select, .refit-opponent-select select, .refit-weapon-search input { width: 100%; min-width: 0; padding: 7px; border: 1px solid var(--ds-palette-green-frame); background: var(--ds-palette-teal-depth); color: var(--ds-palette-ink); font: inherit; font-size: 13px; border-radius: 2px; }
+
+.refit-catalog-tools .native-button { width: 100%; min-height: 30px; font-size: 12px; padding: 6px; }
+
+.refit-roster-ship > .refit-roster-thumbnail { position: absolute; inset: 8px auto 8px 8px; width: 65%; height: calc(100% - 16px); object-fit: contain; opacity: .9; }
+
+.refit-roster-ship .refit-approx-label { display: block; margin-top: 5px; color: var(--ds-palette-brass); font-size: 11px; }
+
+.refit-import-warning { font-size: 12px; line-height: 1.55; color: var(--ds-palette-highlight); border-left: 2px solid var(--ds-palette-bronze); background: color-mix(in srgb, var(--ds-palette-danger-depth) 80.784314%, transparent); padding: 6px 8px; margin: 6px 0; overflow-wrap: anywhere; }
+
+.refit-import-warning summary { cursor: pointer; }
+
+.refit-import-warning ul { padding-left: 16px; max-height: 150px; overflow-y: auto; }
+
+.refit-import-warning p { margin: 6px 0; }
+
+.refit-opponent-select { display: grid; gap: 8px; color: var(--ds-palette-accent-muted); }
+
+.refit-opponent-preview { display: flex; align-items: center; gap: 24px; margin: 16px 0; }
+
+.refit-opponent-preview img { width: 100px; height: 125px; object-fit: contain; }
+
+.refit-weapon-search { display: grid; gap: 4px; padding: 5px 10px; color: var(--ds-palette-muted); font-size: 12px; }
+
+.refit-catalog-tools input:focus-visible, .refit-catalog-tools select:focus-visible, .refit-opponent-select select:focus-visible, .refit-weapon-search input:focus-visible { outline: 2px solid var(--ds-palette-muted); outline-offset: 1px; }
+
+.ui-modal-header .ui-muted { white-space: pre-line; max-height: 35vh; overflow-y: auto; overflow-wrap: anywhere; }
+
+.refit-wing-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--ds-palette-teal-frame); padding: 10px 0; color: var(--ds-palette-ink-soft); }
+
+/* Refit filtering: direct choices, readable controls, and a stable results list. */
+
+.refit-roster.refit-roster-filtered { display: flex; flex-direction: column; flex-basis: clamp(218px, calc(232 * var(--u)), 280px); overflow: hidden; }
+
+.refit-roster-filters { flex: none; display: grid; gap: 9px; padding: 10px 6px 10px 0; background: var(--ds-palette-inset); border-bottom: 1px solid var(--ds-palette-gray-frame); }
+
+.refit-filter-heading { display: flex; align-items: baseline; justify-content: space-between; color: var(--ds-palette-ink-soft); font-size: 15px; gap: 8px; }
+
+.refit-filter-heading > span { color: var(--ds-palette-dim); font-size: 12px; white-space: nowrap; }
+
+.refit-search-field { position: relative; display: flex; min-width: 0; }
+
+.refit-search-field input[type="search"] { width: 100%; min-width: 0; height: 37px; padding: 8px 30px 8px 9px; border: 1px solid var(--ds-palette-blue-raised); border-radius: 0; background: var(--ds-palette-panel); color: var(--ds-palette-ink); font: 14px/1.3 var(--ds-font-body); appearance: none; }
+
+.refit-search-field input[type="search"]::-webkit-search-cancel-button { display: none; }
+
+.refit-search-field input::placeholder { color: var(--ds-palette-dim); opacity: 1; }
+
+.refit-search-field input:focus-visible { outline: 1px solid var(--ds-palette-accent-muted); outline-offset: 1px; border-color: var(--ds-palette-accent-muted); }
+
+.refit-search-clear { position: absolute; right: 1px; top: 1px; bottom: 1px; width: 29px; border: 0; background: transparent; color: var(--ds-palette-ink-soft); font: 21px/1 Arial, sans-serif; cursor: pointer; }
+
+.refit-class-chips { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; }
+
+.refit-class-chips .native-button { min-width: 0; min-height: 33px; width: 100%; padding: 6px 2px; font-size: 12px; }
+
+.refit-class-chips .native-button[aria-pressed="true"], .refit-type-chips .native-button[aria-pressed="true"] { background: var(--ds-palette-blue-frame); color: var(--ds-palette-white); box-shadow: inset 0 -2px 0 var(--ds-palette-accent-muted); }
+
+.refit-filter-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+
+.refit-filter-actions button, .refit-weapon-filter-meta > button { padding: 2px 0; border: 0; background: transparent; color: var(--ds-palette-accent-muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font: 12px/1.5 var(--ds-font-body); }
+
+.refit-roster-filters > .native-button { min-height: 30px; padding: 4px; }
+
+.refit-roster-results { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: var(--ds-palette-steel) var(--ds-palette-teal-depth); overscroll-behavior: contain; }
+
+.refit-roster-filtered .refit-roster-ship { height: 111px; min-height: 111px; margin: 0; border-bottom: 1px solid var(--ds-palette-green-depth); overflow: hidden; }
+
+.refit-roster-filtered .refit-roster-ship > span { left: 8px; right: 6px; bottom: 8px; line-height: 1.4; }
+
+.refit-roster-filtered .refit-roster-ship strong { display: block; font-size: 15px; }
+
+.refit-roster-filtered .refit-roster-ship small { display: block; font-size: 12px; color: var(--ds-palette-accent-muted); }
+
+.refit-roster-filtered .refit-roster-ship small.refit-approx-label { display: inline; margin: 0; font-size: 11px; color: var(--ds-palette-brass); }
+
+.refit-roster-filtered .refit-roster-ship > .refit-roster-thumbnail { left: auto; right: 4px; top: 5px; width: 64%; height: 92px; opacity: .72; }
+
+.refit-roster-filtered .refit-roster-ship.is-current > .refit-roster-thumbnail { opacity: 1; }
+
+.refit-filter-empty { padding: 24px 12px; text-align: center; color: var(--ds-palette-accent-muted); font-size: 13px; }
+
+.refit-filter-empty p { color: var(--ds-palette-dim); line-height: 1.6; }
+
+.refit-filter-empty .native-button { min-width: 0; width: 100%; }
+
+.refit-weapon-filters { display: grid; gap: 8px; padding: 10px; background: var(--ds-palette-teal-depth); }
+
+.refit-type-chips .native-button { flex: 1; min-width: 0; padding: 6px; min-height: 31px; }
+
+.refit-weapon-filter-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--ds-palette-accent-muted); }
+
+.refit-weapon-filter-meta label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+
+.refit-weapon-filter-meta input { margin: 0; accent-color: var(--ds-palette-muted); width: 15px; height: 15px; }
+
+.refit-weapon-result-count { margin: 0; font-size: 12px; color: var(--ds-palette-muted); }
+
+.refit-class-chips button:focus-visible, .refit-filter-actions button:focus-visible, .refit-search-clear:focus-visible { outline: 2px solid var(--ds-palette-accent-muted); outline-offset: -2px; }
+
+.mods-expanded .refit-roster-filters { display: none; }
+
+.mods-expanded .refit-roster-results { overflow: hidden; }
+
+@media (max-width: 849px) { .refit-roster.refit-roster-filtered { flex-basis: 218px; } }
+
+/* Let the results shrink to the viewport instead of running under the frame. */
+
+.refit-weapon-empty-reset.native-button { margin: 0 10px 12px; width: calc(100% - 20px); min-width: 0; min-height: 33px; }
+
+.refit-faction-filter { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--ds-palette-accent-muted); font: 13px/1.4 var(--ds-font-body); }
+
+.refit-faction-filter > span { flex: none; }
+
+.refit-faction-filter select { flex: 1; min-width: 0; width: 100%; min-height: 35px; padding: 5px 23px 5px 8px; color: var(--ds-palette-ink-soft); background: var(--ds-palette-panel); border: 1px solid var(--ds-palette-blue-raised); border-radius: 0; font: inherit; color-scheme: dark; cursor: pointer; }
+
+.refit-faction-filter select:focus-visible { outline: 2px solid var(--ds-palette-accent-muted); outline-offset: 1px; }
+
+.refit-system-readiness, .refit-missing-mods { margin: 5px 0; padding: 6px 8px; border: 1px solid var(--ds-palette-blue-raised); background: var(--ds-palette-panel); color: var(--ds-palette-accent-muted); font: 12px/1.5 var(--ds-font-body); }
+
+.refit-system-readiness summary, .refit-missing-mods summary { cursor: pointer; }
+
+.refit-system-readiness p, .refit-missing-mods p { margin: 6px 0; }
+
+.refit-system-readiness[data-available="false"], .refit-missing-mods { color: var(--ds-palette-brass); border-color: var(--ds-palette-brown); }
+
+.refit-missing-mods ul { margin: 5px 0; padding-left: 18px; }
+
+.refit-mod-search { display: flex; align-items: center; gap: 12px; flex: none; padding: 8px 0; font-size: 12px; color: var(--ds-palette-accent-muted); }
+
+.refit-mod-search > .refit-search-field { width: min(340px, 55%); }
+
+.refit-mod-search > button { color: var(--ds-palette-blue-ink); cursor: pointer; background: transparent; border: 0; text-decoration: underline; }
+
+/* Keep the workbench edge-to-edge; only the native title strip reserves space. */
+
+@media (min-width: 850px) {
+  .native-refit-app { --u: clamp(.9px, min(.12642dvh, .09615vw), 1.35px); }
+  .native-refit-app .refit-shell { inset: calc(31 * var(--u)) 6px 6px; width: auto; height: auto; }
+  .native-refit-app .native-screen-tab { left: 10px; top: calc(9 * var(--u)); }
+  .native-refit-app .native-screen-close { right: 10px; top: calc(9 * var(--u)); }
+}
+
+.refit-campaign-mods { color: var(--ds-palette-muted); font: 11px/1.5 var(--ds-font-body); margin: 5px 0; pointer-events: auto; text-align: right; }
+
+.refit-campaign-mods summary { cursor: pointer; }
+
+.refit-campaign-mods p { padding: 6px; background: color-mix(in srgb, var(--ds-palette-teal-depth) 92.156863%, transparent); text-align: left; }
+
+/* Character skills are a separate studio page, with a persistent refit entry. */
+
+.refit-skills-entry { position: absolute; right: calc(52 * var(--u)); top: calc(7 * var(--u)); height: calc(24 * var(--u)); }
+
+.refit-skills-entry .native-button { height: 100%; min-height: 0; padding: 0 12px; font-size: calc(14 * var(--u)); }
+
+.assembly-details { position:absolute; z-index:8; top:8px; left:12px; max-width:min(420px,90%); padding:6px 10px; background:color-mix(in srgb, var(--ds-palette-tooltip) 91.764706%, transparent); border:1px solid var(--ds-palette-blue-raised); color:var(--ds-palette-accent-muted); font-size:12px; }
+
+.assembly-details summary { cursor:pointer; }
+
+.assembly-details p { max-width:360px; line-height:1.5; }
+
+.assembly-details ul { max-height:150px; overflow:auto; padding-left:18px; }
+
+.refit-assembly-chips { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; }
+
+.refit-assembly-chips .native-button { min-width:0; min-height:29px; padding:4px 2px; }
+
+.refit-assembly-chips .native-button[aria-pressed="true"] { color:var(--ds-palette-highlight-ink); background-color:var(--ds-palette-blue-frame); }
+
+.refit-assembly-label { color:var(--ds-palette-accent-muted); }
+
+/* Module hit testing follows hull polygons, not overlapping transparent sprite rectangles. */
+
+.assembly-hit-regions { position:absolute; inset:0; width:100%; height:100%; z-index:2; pointer-events:none; overflow:visible; }
+
+.assembly-hit-regions polygon { pointer-events:all; cursor:pointer; fill:color-mix(in srgb, var(--ds-palette-turquoise) 4.705882%, transparent); stroke:color-mix(in srgb, var(--ds-palette-cyan-muted) 33.333333%, transparent); stroke-width:1.5; vector-effect:non-scaling-stroke; }
+
+.assembly-hit-regions polygon:hover, .assembly-hit-regions polygon:focus-visible { fill:color-mix(in srgb, var(--ds-palette-cyan) 25.098039%, transparent); stroke:var(--ds-palette-lime-muted); outline:none; }
+
+/* Keep enlarged modules and their mount targets clear of the stats/actions. */
+
+.refit-vessel--assembly > .ship-stage { position:absolute; left:calc(85 * var(--u)); right:calc(310 * var(--u)); top:calc(205 * var(--u)); bottom:calc(155 * var(--u)); width:auto; height:auto; }
+
+.refit-vessel--assembly > .ship-stage .studio-ship { width:min(85cqw, 90cqh * var(--ship-ratio)); }
+
+/* Selection changes the editing context, never the assembly camera or geometry. */
+
+.assembly-hit-regions polygon.is-active-module { fill:color-mix(in srgb, var(--ds-palette-turquoise) 10.980392%, transparent); stroke:var(--ds-palette-native-yellow); stroke-width:2; }
+
+.studio-ship--assembly .studio-mount { opacity:.75; }
+
+.studio-ship--assembly .studio-mount:not(.is-equipped) { opacity:.65; }
+
+.native-refit-app .refit-grid.has-assembly .refit-vessel { left:0; }
+
+.refit-grid.has-assembly .refit-fighter-decks { top:calc(210 * var(--u)); }
+
+/* The Pages edition cannot run a native or LAN backend. */
+
+.native-static-note { margin: 10px 0; max-width: 360px; color: var(--ds-palette-accent-muted); font-size: 13px; line-height: 1.7; text-align: center; }
+
+.native-static-note a { color: var(--ds-palette-warning); text-decoration: underline; }
+
+.native-static-note a:focus-visible { outline: 2px solid var(--ds-palette-warning); outline-offset: 3px; }
+
+/* Web fourth weapon size; existing native sizes unchanged. */
+
+.studio-mount--extra_large { width: 38px; height: 38px; }
+
+/* ===== responsive-refit-stats ===== */
+.native-refit-app .refit-stats-trigger { position: fixed; right: 12px; bottom: 12px; z-index: 12; min-height: 44px; background: var(--ds-surface-floating); }
+@layer ds-pages {
+ .ui-modal.refit-stats-drawer { --ds-modal-panel-width: min(380px, calc(100vw - 24px)); } }
+.ui-modal.refit-stats-drawer { --u: 1px; background: var(--ds-surface-floating); }
+.refit-stats-drawer-content { display: flex; flex-direction: column; gap: 8px; color: var(--ds-menu-text); }
+.refit-stats-drawer-content .native-step { min-width: 44px; min-height: 44px; }
+.refit-stats-drawer-content .refit-op-heading { position: relative; }
+.refit-stats-drawer-content .native-help-button { position: static; min-width: 44px; min-height: 44px; }
+.refit-stats-drawer-content .native-flux-row { grid-template-columns: minmax(0, 1fr) 44px 40px 44px; gap: 4px; }
+.refit-stats-drawer-content .native-step { clip-path: none; border: 1px solid var(--ds-control-border); border-radius: var(--ds-radius-control); background: var(--ds-surface-input); color: var(--ds-menu-text); font: 16px/1 var(--ds-font-body); }
+.refit-stats-drawer-content .native-help-button { border: 0; background: transparent; font: 16px/1 var(--ds-font-body); color: var(--ds-menu-muted); }
+.refit-stats-drawer-content :is(.native-stat-three, .native-flux-row, .refit-weapon-flux) small { font-size: 11px; line-height: 1.5; }
+.refit-stats-drawer-content .refit-hullmods { max-height: none; overflow: visible; }
+
+/* ===== ship-targets ===== */
+/* The marker retains its original size. Only the transparent, nearest-target hit area grows. */
+.studio-ship .studio-mount { --mount-visual-size: 19px; width: 28px; height: 28px; min-width: 0; min-height: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; outline: none; }
+.studio-ship .studio-mount--medium { --mount-visual-size: 22px; }
+.studio-ship .studio-mount--large { --mount-visual-size: 29px; }
+.studio-ship .studio-mount::before { content: ''; position: absolute; left: 50%; top: 50%; width: var(--mount-visual-size); height: var(--mount-visual-size); box-sizing: border-box; transform: translate(-50%, -50%); border: 1px solid var(--ds-palette-violet); border-radius: 50%; background: color-mix(in srgb, var(--ds-palette-tooltip) 40%, transparent); pointer-events: none; }
+.studio-ship .studio-mount[data-type="BALLISTIC"]::before { border-color: var(--ds-palette-brass); }
+.studio-ship .studio-mount[data-type="MISSILE"]::before { border-color: var(--ds-palette-friendly-muted); }
+.studio-ship .studio-mount[data-type="UNIVERSAL"]::before { border-color: var(--ds-palette-accent-muted); }
+.studio-ship .studio-mount:not(.is-equipped)::before { border-style: dashed; }
+.studio-ship .studio-mount.is-grouped::before { border-color: var(--ds-palette-lime); background: color-mix(in srgb, var(--ds-palette-lime) 25.098039%, transparent); }
+.studio-ship .studio-mount:hover::before, .studio-ship .studio-mount.is-selected::before { border-color: var(--ds-palette-native-yellow); background: color-mix(in srgb, var(--ds-palette-blue-raised) 46.666667%, transparent); box-shadow: 0 0 0 1px var(--ds-palette-tooltip); }
+.studio-ship .studio-mount:focus-visible::before { border-color: var(--ds-palette-native-yellow); outline: 2px solid var(--ds-palette-native-yellow); outline-offset: -3px; background: color-mix(in srgb, var(--ds-palette-panel) 66.666667%, transparent); }
+/* Fixed screen-pixel edge tolerance, underneath the actual module surfaces. */
+.assembly-hit-regions .assembly-module-padding { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; vector-effect: non-scaling-stroke; }
+.assembly-hit-regions .assembly-module-padding:hover { fill: none; stroke: transparent; }
+.assembly-hit-regions [data-module-path][data-module-hovered="true"] { fill: color-mix(in srgb, var(--ds-palette-cyan) 25.098039%, transparent); stroke: var(--ds-palette-lime-muted); }
+
+.studio-ship .studio-mount:is(:hover, :focus-visible, .is-selected, .is-grouped, :not(.is-equipped)) { border: 0; background: transparent; box-shadow: none; }
+
+/* Web fourth weapon size; existing native sizes unchanged. */
+.studio-ship .studio-mount--extra_large { --mount-visual-size: 36px; }
+
+/* ===== refit-weapon-tooltip ===== */
+/* Native-style weapon rings stay visible without painting over fitted sprites. */
+.refit-vessel .studio-mount, .refit-vessel .ship-arc { --mount-color: var(--ds-palette-cyan-glow); }
+.refit-vessel [data-type="BALLISTIC"] { --mount-color: var(--ds-palette-warning); }
+.refit-vessel [data-type="MISSILE"] { --mount-color: var(--ds-palette-lime-mid); }
+.refit-vessel [data-type="UNIVERSAL"] { --mount-color: var(--ds-palette-ink-soft); }
+.refit-vessel [data-type="HYBRID"] { --mount-color: var(--ds-palette-lilac); }
+.refit-vessel [data-type="SYNERGY"] { --mount-color: var(--ds-palette-turquoise); }
+.refit-vessel [data-type="COMPOSITE"] { --mount-color: var(--ds-palette-lime-muted); }
+.refit-vessel .studio-ship .studio-mount {
+  --mount-size: 22px;
+  width: calc(var(--mount-size) / var(--ship-zoom)); height: calc(var(--mount-size) / var(--ship-zoom)); min-width: 0; min-height: 0;
+  opacity: .85; border: calc(1.5px / var(--ship-zoom)) solid var(--mount-color); border-radius: 50%;
+  background: transparent; color: var(--mount-color); cursor: pointer;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ds-palette-night) 78.823529%, transparent), inset 0 0 0 1px color-mix(in srgb, var(--ds-palette-night) 50.196078%, transparent);
+}
+.refit-vessel .studio-ship .studio-mount--medium { --mount-size: 30px; }
+.refit-vessel .studio-ship .studio-mount--large { --mount-size: 40px; }
+.refit-vessel .studio-ship .studio-mount[data-mount="HARDPOINT"] { border-radius: 4px; }
+.refit-vessel .studio-ship .studio-mount:not(.is-equipped) {
+  border-style: dashed; background: color-mix(in srgb, var(--ds-palette-tooltip) 50.196078%, transparent);
+}
+.refit-vessel .studio-ship .studio-mount:not(.is-equipped) > span {
+  display: block; color: var(--mount-color); font: 11px/1 var(--ds-font-mono); text-shadow: 0 1px 2px var(--ds-palette-black);
+}
+.refit-vessel .studio-ship .studio-mount.is-grouped { border-color: var(--ds-palette-lime); background: color-mix(in srgb, var(--ds-palette-lime-mid) 20%, transparent); opacity: 1; }
+.refit-vessel .studio-ship .studio-mount:hover,
+.refit-vessel .studio-ship .studio-mount:focus-visible,
+.refit-vessel .studio-ship .studio-mount.is-selected {
+  opacity: 1; border: calc(2px / var(--ship-zoom)) solid var(--mount-color); background: color-mix(in srgb, var(--ds-palette-cyan-frame) 10.196078%, transparent);
+  box-shadow: 0 0 0 1px var(--ds-palette-inset), 0 0 0 3px color-mix(in srgb, var(--ds-palette-cyan-ink) 33.333333%, transparent), 0 0 9px color-mix(in srgb, var(--ds-palette-cyan-glow) 53.333333%, transparent);
+  outline: none; z-index: 4;
+}
+.refit-vessel .ship-arc { opacity: .9; }
+.refit-vessel .ship-arc path {
+  fill: color-mix(in srgb, var(--ds-palette-cyan-glow) 3.137255%, transparent); stroke: var(--mount-color); stroke-width: 1.25;
+  stroke-dasharray: none; vector-effect: non-scaling-stroke;
+}
+.refit-vessel .ship-arc circle { display: none; }
+.equipment-tooltip.source-weapon-details.refit-weapon-tooltip {
+  z-index: 220; width: min(420px, calc(100vw - 16px)); max-height: calc(100dvh - 16px);
+  padding: 8px 10px; background: color-mix(in srgb, var(--ds-palette-inset) 96.078431%, transparent); font: 14px/17px var(--ds-font-body);
+}
+.refit-weapon-tooltip .source-weapon-description { font-style: normal; }
+.refit-weapon-tooltip .source-weapon-stat-gap { height: 9px; }
+.refit-weapon-tooltip .refit-weapon-mount-info { margin-top: 5px; padding-top: 6px; border-top: 1px solid var(--ds-palette-blue-frame); color: var(--ds-palette-accent-muted); font-size: 12px; }
+.refit-weapon-encyclopedia.source-weapon-details { position: static; width: auto; max-width: none; max-height: none; overflow: visible; border: 0; box-shadow: none; }
+
+/* Keep the short native description in the hover card; the full lore stays in F2. */
+.refit-weapon-tooltip .source-weapon-attribution { display: none; }
+.refit-weapon-tooltip .source-weapon-primary > .source-weapon-icon { width: 44px; height: 44px; align-self: center; justify-self: center; }
+.refit-weapon-tooltip .source-weapon-manufacturer span { color: var(--ds-palette-accent-muted); }
+
+.refit-vessel .studio-ship--assembly .studio-mount { --mount-size:12px; }
+.refit-vessel .studio-ship--assembly .studio-mount--medium { --mount-size:18px; }
+.refit-vessel .studio-ship--assembly .studio-mount--large { --mount-size:24px; }
+
+/* Web fourth weapon size; existing native sizes unchanged. */
+.refit-vessel .studio-ship .studio-mount--extra_large { --mount-size: 50px; }
+.refit-vessel .studio-ship--assembly .studio-mount--extra_large { --mount-size: 30px; }
+
+.refit-weapon-size-filter { display: flex; align-items: center; gap: 8px; color: var(--ds-palette-accent-muted); }
+.refit-weapon-size-filter select { min-width: 0; flex: 1; background: var(--ds-palette-tooltip); color: var(--ds-palette-ink-soft); border: 1px solid var(--ds-palette-blue-raised); padding: 4px 6px; font: inherit; }
+
+/* ===== fighter-decks ===== */
+/* Flight decks are part of the refit grid, not the ship selection sidebar. */
+.refit-fighter-decks { position: absolute; left: calc(9 * var(--u)); top: 27%; bottom: calc(150 * var(--u)); z-index: 3; display: flex; flex-direction: column; min-height: 90px; width: calc(83 * var(--u)); }
+.refit-fighter-decks h2 { flex: none; color: var(--ds-palette-cyan-ink); font: calc(15 * var(--u))/1.5 var(--ds-font-body); white-space: nowrap; }
+.refit-deck-slots { display: flex; flex-direction: column; gap: calc(8 * var(--u)); overflow-y: auto; min-height: 0; padding: 3px; scrollbar-width: thin; scrollbar-color: var(--ds-palette-blue-raised) transparent; }
+.refit-deck-slot { flex: none; position: relative; width: calc(66 * var(--u)); height: calc(66 * var(--u)); border: 1px solid var(--ds-palette-blue-raised); background: var(--ds-palette-inset); color: var(--ds-palette-accent-muted); padding: calc(12 * var(--u)) calc(6 * var(--u)) calc(7 * var(--u)); }
+.refit-deck-slot:hover { background: var(--ds-palette-green-depth); border-color: var(--ds-palette-blue-ink); }
+.refit-deck-slot[aria-pressed="true"] { border-color: var(--ds-palette-native-yellow); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ds-palette-native-yellow) 33.333333%, transparent); }
+.refit-deck-op { position: absolute; right: 3px; top: 1px; color: var(--ds-palette-native-yellow); font: calc(12 * var(--u))/1.1 var(--ds-font-mono); }
+.refit-deck-index { position: absolute; left: 3px; bottom: 2px; font: 11px var(--ds-font-mono); color: var(--ds-palette-steel); }
+.refit-deck-empty { display: grid; height: 100%; place-items: center; font: 25px var(--ds-font-body); color: var(--ds-palette-steel); }
+.wing-formation { display: grid; grid-template-columns: repeat(var(--wing-columns), minmax(0, 1fr)); align-content: center; align-items: center; justify-items: center; gap: 1px; width: 100%; height: 100%; min-width: 0; overflow: hidden; pointer-events: none; }
+.wing-formation img { display: block; max-width: 100%; max-height: 23px; object-fit: contain; }
+.wing-formation[data-count="3"] img:first-child { grid-column: 1 / -1; max-width: 50%; }
+.wing-formation[data-count="1"] img { max-height: 40px; }
+.wing-no-sprite { display: block; text-align: center; }
+.mods-expanded .refit-fighter-decks { visibility: hidden; }
+.refit-grid.has-flight-decks .refit-vessel { left: calc(85 * var(--u)); }
+@media (max-height: 700px) { .refit-fighter-decks { top: calc(62 * var(--u)); } }

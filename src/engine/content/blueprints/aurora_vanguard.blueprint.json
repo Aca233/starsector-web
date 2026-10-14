@@ -1,0 +1,124 @@
+{
+  "schemaVersion": "2.0",
+  "id": "aurora_vanguard_mk2",
+  "name": "极光先锋 Mk.II",
+  "designation": "高速突击巡洋舰",
+  "description": "采用 Foundry 2.0 单一自包含声明蓝图构建的高机动突击巡洋舰，内置连续扇区装甲场与相位冲量跃迁机制。",
+  "author": "Foundry AI Blueprint Pipeline",
+  "hullSize": "CRUISER",
+  "deploymentPoints": 24,
+  "visual": {
+    "spriteUrl": "/assets/ships/hyperion.png",
+    "spriteWidth": 140,
+    "spriteHeight": 190,
+    "pivotX": 0.5,
+    "pivotY": 0.5,
+    "bounds": [
+      [75, 0],
+      [42, 48],
+      [-28, 56],
+      [-78, 34],
+      [-78, -34],
+      [-28, -56],
+      [42, -48]
+    ],
+    "explosionColor": [100, 210, 255],
+    "overloadColor": [140, 180, 255]
+  },
+  "kinematics": {
+    "mass": 1450,
+    "collisionRadius": 98,
+    "maxSpeed": 135,
+    "acceleration": 115,
+    "deceleration": 85,
+    "maxTurnRateDeg": 48,
+    "turnAccelerationDeg": 90
+  },
+  "defense": {
+    "hitpoints": 7800,
+    "armorRating": 880,
+    "continuousArmorSectors": [1.2, 1.1, 1.0, 0.9, 0.85, 0.9, 1.0, 1.1],
+    "minArmorResidualRatio": 0.05,
+    "shieldType": "FRONT",
+    "shieldArcDeg": 240,
+    "shieldRadius": 115,
+    "shieldEfficiency": 0.65,
+    "shieldUpkeep": 120
+  },
+  "flux": {
+    "maxFlux": 13500,
+    "fluxDissipation": 680,
+    "peakCRSec": 210,
+    "crLossPerSec": 0.22
+  },
+  "systems": {
+    "primarySystem": "PHASE_SURGE_DRIVE"
+  },
+  "weaponSlots": [
+    {
+      "slotId": "WS_MAIN_L",
+      "mountType": "TURRET",
+      "slotSize": "MEDIUM",
+      "weaponType": "ENERGY",
+      "x": 28,
+      "y": -24,
+      "baseAngleDeg": 0,
+      "arcDeg": 210
+    },
+    {
+      "slotId": "WS_MAIN_R",
+      "mountType": "TURRET",
+      "slotSize": "MEDIUM",
+      "weaponType": "ENERGY",
+      "x": 28,
+      "y": 24,
+      "baseAngleDeg": 0,
+      "arcDeg": 210
+    },
+    {
+      "slotId": "WS_CORE_HEAVY",
+      "mountType": "HARDPOINT",
+      "slotSize": "LARGE",
+      "weaponType": "SYNERGY",
+      "x": 52,
+      "y": 0,
+      "baseAngleDeg": 0,
+      "arcDeg": 15
+    }
+  ],
+  "engineSlots": [
+    {
+      "x": -76,
+      "y": -18,
+      "angleDeg": 180,
+      "width": 14,
+      "length": 46,
+      "style": "HIGH_TECH"
+    },
+    {
+      "x": -76,
+      "y": 18,
+      "angleDeg": 180,
+      "width": 14,
+      "length": 46,
+      "style": "HIGH_TECH"
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "PHASE_SURGE_DRIVE",
+      "kind": "SHIP_SYSTEM",
+      "name": "相位冲量推进",
+      "description": "自声明战舰技能：瞬间向舰艏施加定向冲量并开启 1.8x 局部时间膨胀。",
+      "chargeUp": 0.15,
+      "active": 2.0,
+      "chargeDown": 0.25,
+      "cooldown": 7.5,
+      "fluxPerUseFlat": 850,
+      "atomicActions": [
+        { "kind": "APPLY_FORCE", "magnitude": 2400, "angleOffsetDeg": 0 },
+        { "kind": "SET_TIME_SCALE", "magnitude": 1.8, "durationSec": 2.0 }
+      ]
+    }
+  ]
+}

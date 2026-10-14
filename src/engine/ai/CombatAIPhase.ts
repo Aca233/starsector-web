@@ -14,15 +14,17 @@ import type { FleetPlan } from './FleetTactics';
 import { aiDomainWork } from './batch/AIWork';
 
 const effectPrototypes = [CapitalShipAI.prototype, ShipDefenseController.prototype].map(prototype => ({
-  prototype, descriptors: Object.getOwnPropertyDescriptors(prototype)
+  prototype, descriptors: Object.getOwnPropertyDescriptors(prototype),
+  entries: Object.entries(Object.getOwnPropertyDescriptors(prototype)),
 }));
-const nativeEffectMethods = () => effectPrototypes.every(({prototype, descriptors}) =>
-  Object.entries(descriptors).every(([key, d]) => {
+const capitalAIKeys = Object.keys(effectPrototypes[0].descriptors).filter(key => key !== 'constructor');
+const nativeEffectMethods = () => effectPrototypes.every(({prototype, entries}) =>
+  entries.every(([key, d]) => {
     const now = Object.getOwnPropertyDescriptor(prototype, key);
     return now?.value === d.value && now?.get === d.get && now?.set === d.set;
   }));
 const nativeAIInstance = (ai: CapitalShipAI) => Object.getPrototypeOf(ai) === CapitalShipAI.prototype
-  && Object.keys(effectPrototypes[0].descriptors).every(key => key === 'constructor' || !Object.hasOwn(ai, key));
+  && capitalAIKeys.every(key => !Object.hasOwn(ai, key));
 
 /** Synchronous observation span: all native target/navigation/threat plans precede
  * every control write and every stateful system/defense callback. Not an async
@@ -32,19 +34,19 @@ export class CombatAIPhase {
   private readonly systemInputs?:SystemAIInputSpan;
   private readonly attachedMotion?:AttachedModuleMotionSpan;
   private readonly numeric?:AIBatch;
-  constructor(owner?:CombatEngine,ships?:readonly Ship[]) {
-    this.numeric=nativeEffectMethods()?AIBatch.create(owner):undefined;
+  constructor(owner?:CombatEngine,ships?:readonly Ship[],onlyTeam?:number) {
+    this.numeric=nativeEffectMethods()?AIBatch.create(owner,onlyTeam):undefined;
     // Native numeric admission excludes the entire old DecisionScene/read-plane
     // preparation chain, rather than running both worlds and discarding one.
     this.scene=!this.numeric&&owner&&ships?CombatDecisionScene.create(owner,ships):undefined;
-    if(this.scene&&owner&&ships) {
+    if((this.numeric||this.scene)&&owner&&ships) {
       this.systemInputs=SystemAIInputSpan.create(owner,ships);
-      if(nativeEffectMethods())this.attachedMotion=AttachedModuleMotionSpan.create(owner,ships);
+      if(this.scene&&nativeEffectMethods())this.attachedMotion=AttachedModuleMotionSpan.create(owner,ships);
     }
   }
   get numericEnabled():boolean {return !!this.numeric;}
   get numericFleetPlan():FleetPlan|undefined {return this.numeric?.fleetPlan;}
-  closeObservation():void {this.attachedMotion?.close();this.scene?.close();this.numeric?.view.close();}
+  closeObservation():void {this.attachedMotion?.close();this.scene?.close();this.numeric?.bridge.close();}
   private stage: 'plan' | 'controls' | 'effects' | 'closed' = 'plan';
   private readonly entries: { ai: CapitalShipAI; intent: CapitalAIIntent; numeric:boolean; after?: () => void }[] = [];
   private readonly members = new Set<Ship>();
@@ -53,7 +55,8 @@ export class CombatAIPhase {
   plan(ai: CapitalShipAI, dt: number, order: TacticalOrder | null, world: TacticalWorld): void {
     if (this.stage !== 'plan' || this.members.has(ai.ship)) throw new Error('Duplicate or out-of-phase AI plan');
     this.members.add(ai.ship);
-    if(this.numeric&&nativeAIInstance(ai)&&!world.noteNavigationObstacle&&this.numeric.view.rowOf.has(ai.ship)){
+    if(this.numeric&&nativeAIInstance(ai)&&!world.noteNavigationObstacle&&this.numeric.bridge.rowOf.has(ai.ship)){
+      this.systemInputs?.bind(world,world);
       try {this.entries.push({ai,intent:ai.planNumeric(dt,order,world,this.numeric),numeric:true});}
       catch(error){this.numeric.close();throw error;}
       return;

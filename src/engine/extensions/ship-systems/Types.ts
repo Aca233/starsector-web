@@ -76,8 +76,12 @@ export interface SystemVisuals {
   teleportCopy?: boolean;
 }
 export interface ShipSystemDefinition {
+  gravityPolaritySwitch?: boolean;
+  gravityDirectionalPush?: import('../../simulation/GravityPushState').GravityPushSpec;
   /** Capture the live well position on acceptance, before the event phase. */
   gravityRemoteRelease?: boolean;
+  /** Natural field expiry only; explicit interruptions never trigger it. */
+  gravityAutoCollapse?: {chargeUp:number;active:number;fluxCost:number};
   gravityCollapse?: import('../../simulation/GravityFieldState').GravityCollapseSpec;
   /** Optional presentation-only artwork; omitted preserves the existing native UI. */
   gravityField?: import('../../simulation/GravityFieldState').GravityFieldSpec;

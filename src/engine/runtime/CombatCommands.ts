@@ -90,7 +90,12 @@ export function dispatchShipCommand(ship: Ship, command: ShipCommand, aim?: Vect
       setPlayerCombatTarget(ship, target?.id === ship.playerTargetId ? null : target ?? null);
       break;
     }
-    case 'system': accepted = ship.getSystem(command.value ?? 0)!.activate(); break;
+    case 'system': {
+      const system = ship.getSystem(command.value ?? 0)!;
+      accepted = system.activate();
+      if (accepted && system.definition.gravityField?.cursorSpeed) system.gravityControlHeld = true;
+      break;
+    }
     case 'shield': accepted = ship.toggleDefense(); break;
     case 'hullShield': accepted = ship.toggleHullShield(); break;
     case 'vent': accepted = ship.startVenting(); break;

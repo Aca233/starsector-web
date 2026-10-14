@@ -7,7 +7,6 @@ import { combatSkillDefinitions } from '../engine/extensions/CombatSkills';
 import { modManager } from '../engine/modding/ModManager';
 import { runtimeAssetUrl } from '../engine/runtime/RuntimePaths';
 import tree from '../studio/SkillTree';
-import './lan-captain.css';
 
 const definitions = new Map(combatSkillDefinitions.map(skill => [skill.id, skill]));
 const nativeSkills = new Map(tree.skills.map((skill, index) => [skill.id, { ...skill, index }]));

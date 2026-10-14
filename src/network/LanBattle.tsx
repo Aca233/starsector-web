@@ -1,3 +1,4 @@
+import { GRAVITY_HOLD_KEY, GRAVITY_PUSH_KEY, isDirectionalGravitySystem, isCursorGravitySystem } from '../engine/simulation/systems/GravityControlInput';
 import { flushSync } from 'react-dom';
 import { LanPresentationWorkerClient } from './LanPresentationWorkerClient';
 import type { LanWorkerAuxiliary } from './LanPresentationWorkerProtocol';
@@ -12,6 +13,7 @@ import type { FlowSample } from "./SnapshotFlow.mjs";
 import { LanNetworkDiagnostics } from "./LanNetworkDiagnostics";
 import { SteamNetworkDiagnostics } from "./SteamNetworkDiagnostics";
 import { getGraphicsSettings } from '../engine/runtime/GraphicsSettings';
+import { runtimeWorkerAssetQuery } from '../engine/runtime/RuntimePaths';
 import { PresentationSettingsPanel } from '../ui/PresentationSettingsPanel';
 import { readSystemBindings, selectNextSystem } from '../engine/runtime/SystemBindings';
 import { SystemBindingSettings } from '../ui/SystemBindingSettings';
@@ -35,7 +37,7 @@ import { sound } from "../engine/audio/SoundManager";
 import { LanPresentationControls } from "./LanPresentationControls";
 import { readCombatViewport } from "../engine/runtime/CombatViewport";
 import { isCombatTextEntry, hasCombatModal, hasCombatInputFocus } from '../engine/runtime/CombatInputFocus';
-import { flightKey, shipCommandForKey } from "../engine/runtime/CombatCommands";
+import { flightKey, shipCommandForKey, shipCommandForMouse } from "../engine/runtime/CombatCommands";
 import { assetManager } from "../engine/assets/AssetResolver";
 import { contentManifestManager } from "../engine/content/ContentManifest";
 import { NativeButton, NativeFrame } from "../ui/NativeChrome";
@@ -44,9 +46,9 @@ import { Modal } from "../ui/core/UI";
 import { ShipStage } from "../studio/ShipStage";
 import { AuthenticTacticalConsole } from "../ui/hud/AuthenticTacticalConsole";
 import { CombatRadar } from "../ui/hud/CombatRadar";
+import { CombatPerformanceReadout } from '../ui/hud/CombatPerformanceReadout';
 import { CombatContacts } from "../ui/hud/CombatContacts";
 import { getHudDensity } from "../ui/hud/HudLayout";
-import "../ui/combat-pause-menu.css";
 import type { LanPresentationViews } from "./LanPresentationViews";
 import { LanPresentationRuntime } from "./LanPresentationRuntime";
 import type { CombatSnapshot } from "./CombatSnapshot";
@@ -251,6 +253,7 @@ export function LanBattle({
     const sentInputs = new Map<number, number>();
     const inputBudget = new InputSendBudget();
     let finishedResult: {winner:number|"draw";report:BattleReport} | null = null;
+    let workerAuthority: unknown;
     let lastFinish = 0;
     let failureReason = "";
     let keys = 0,
@@ -325,6 +328,7 @@ export function LanBattle({
       }
       if (ready && workerReady && !disposed && connection.ready) {
         setStatus("已就绪，等待其他玩家加载…");
+        if (computesAuthority) send({ type: "host-authority", authority: workerAuthority });
         send({ type: "loaded" });
       }
     };
@@ -566,7 +570,7 @@ export function LanBattle({
       }, controls);
       }
       if (computesAuthority) {
-        worker = new Worker(new URL("./host.worker.ts", import.meta.url), {
+        worker = new Worker(new URL("./host.worker.ts", import.meta.url).href + runtimeWorkerAssetQuery, {
           type: "module",
         });
         worker.onerror = (event) =>
@@ -588,6 +592,7 @@ export function LanBattle({
             }
           }
           if (m.type === "ready") {
+            workerAuthority = m.authority;
             workerReady = true;
             loaded();
           }
@@ -595,7 +600,7 @@ export function LanBattle({
           if (m.type === "recovered") {
             freeze("② 同步战场：房主短暂停顿后恢复，正在重新同步…");
             syncId = "";
-            send({ type: "host-recovered", pauseMs: m.pauseMs });
+            send({ type: "host-recovered", matchId: match.id, pauseMs: m.pauseMs, authority: m.authority });
           }
           if (m.type === "deployment-result") send(m);
           if (m.type === 'combat-state' || m.type === 'projectile-visual') {
@@ -653,7 +658,7 @@ export function LanBattle({
             worker.postMessage({ type: "authority-port", port: channel.port2 }, [channel.port2]);
           } else { channel.port1.close(); channel.port2.close(); }
         }
-        worker.postMessage({ type: "init", match, hidden: document.visibilityState === "hidden", binarySnapshots: connection.canSendBinarySnapshots, motionState: connection.motionState, visualState: connection.canPublishVisual, combatState: connection.canPublishCombat });
+        worker.postMessage({ type: "init", backend: 'rust-wasm', match, hidden: document.visibilityState === "hidden", binarySnapshots: connection.canSendBinarySnapshots, motionState: connection.motionState, visualState: connection.canPublishVisual, combatState: connection.canPublishCombat });
       }
       void (async () => {
         try {
@@ -756,15 +761,17 @@ export function LanBattle({
     };
     actionRef.current = action;
     const heldFlightKeys = new Set<string>();
+    const heldGravityCodes = new Set<string>();
+    const heldPushCodes = new Set<string>();
     const refreshKeys = () => {
       keys = 0;
       for (const code of heldFlightKeys) {
-        const bit = KEY_CODES.indexOf(flightKey(code) as typeof KEY_CODES[number]);
+        const bit = KEY_CODES.indexOf(((code === GRAVITY_HOLD_KEY || code === GRAVITY_PUSH_KEY) ? code : flightKey(code)) as typeof KEY_CODES[number]);
         if (bit >= 0) keys |= 1 << bit;
       }
     };
     const resetInput = () => {
-      heldFlightKeys.clear();
+      heldFlightKeys.clear(); heldGravityCodes.clear(); heldPushCodes.clear();
       keys = 0;
       firing = false;
       controls.pointerActive = false;
@@ -849,8 +856,16 @@ export function LanBattle({
         && (remote ? !!remote.views : !!engine);
       if (!retainFlightKey && !active()) return;
       if (command) {
+        if(command.kind==='shield'&&isDirectionalGravitySystem(player?.defenseSystem?.type??'')){event.preventDefault();
+          if(!event.repeat){heldPushCodes.add(event.code);heldFlightKeys.add(GRAVITY_PUSH_KEY);refreshKeys();sendInput();pushControls();}return;
+        }
         event.preventDefault();
-        if (!event.repeat) action(command.kind, 'value' in command ? command.value : undefined);
+        if (!event.repeat) {
+          if (command.kind === 'system' && isCursorGravitySystem(player?.systems[command.value ?? 0]?.type ?? '')) {
+            heldGravityCodes.add(event.code); heldFlightKeys.add(GRAVITY_HOLD_KEY); refreshKeys();
+          }
+          action(command.kind, 'value' in command ? command.value : undefined);
+        }
         return;
       }
       if (flightKey(event.code)) {
@@ -863,7 +878,9 @@ export function LanBattle({
     };
     const up = (event: KeyboardEvent) => {
       const previousKeys = keys;
-      heldFlightKeys.delete(event.code);
+      heldFlightKeys.delete(event.code); heldGravityCodes.delete(event.code);
+      heldPushCodes.delete(event.code);if(!heldPushCodes.size)heldFlightKeys.delete(GRAVITY_PUSH_KEY);
+      if (!heldGravityCodes.size) heldFlightKeys.delete(GRAVITY_HOLD_KEY);
       refreshKeys();
       if (keys !== previousKeys) { sendInput(); pushControls(); }
     };
@@ -879,15 +896,34 @@ export function LanBattle({
       pointer = [event.clientX, event.clientY];
       controls.samplePointer(event.clientX, event.clientY);
       if (event.button === 0 && !firing) { firing = true; sendInput(); }
-      if (event.button === 2) action(event.shiftKey ? "hullShield" : "shield");
+      if (event.button === 2) {
+        const player=remote?.views?.hud.playerShip??engine?.playerShip;
+        if(!event.shiftKey&&isDirectionalGravitySystem(player?.defenseSystem?.type??'')){
+          heldPushCodes.add('Mouse2');heldFlightKeys.add(GRAVITY_PUSH_KEY);refreshKeys();sendInput();
+        }else action(event.shiftKey ? "hullShield" : "shield");
+      }
+      if (event.button > 2) {
+        const player=remote?.views?.hud.playerShip ?? engine?.playerShip;
+        const command=player && shipCommandForMouse(event,player);
+        if(command){
+          if(command.kind==='system'&&isCursorGravitySystem(player?.systems[command.value??0]?.type??'')){
+            heldGravityCodes.add('Mouse'+event.button);heldFlightKeys.add(GRAVITY_HOLD_KEY);refreshKeys();
+          }
+          action(command.kind,'value' in command?command.value:undefined);
+        }
+      }
       pushControls();
     };
     const mouseUp = (event: MouseEvent) => {
+      if(heldPushCodes.delete('Mouse'+event.button)){if(!heldPushCodes.size)heldFlightKeys.delete(GRAVITY_PUSH_KEY);refreshKeys();sendInput();pushControls();}
+      if(heldGravityCodes.delete('Mouse'+event.button)){
+        if(!heldGravityCodes.size)heldFlightKeys.delete(GRAVITY_HOLD_KEY);refreshKeys();sendInput();pushControls();
+      }
       if (event.button === 0 && firing) { firing = false; sendInput(); pushControls(); }
     };
     const loseFocus = () => { cameraController.suspendPointer(); clear(); };
     const onFocus = (event: FocusEvent) => { if (isCombatTextEntry(event.target) || hasCombatModal()) loseFocus(); };
-    const leaveCanvas = () => { controls.pointerActive = false; cameraController.suspendPointer(); firing = false; pushControls(); if (launched) sendInput(); };
+    const leaveCanvas = () => { heldPushCodes.clear();heldFlightKeys.delete(GRAVITY_PUSH_KEY);heldGravityCodes.clear(); heldFlightKeys.delete(GRAVITY_HOLD_KEY); refreshKeys(); controls.pointerActive = false; cameraController.suspendPointer(); firing = false; pushControls(); if (launched) sendInput(); };
     const context = (event: MouseEvent) => event.preventDefault();
     const wheel = (event: WheelEvent) => {
       if (inputBlockedRef.current || event.ctrlKey || event.altKey || event.metaKey) return;
@@ -1160,7 +1196,7 @@ export function LanBattle({
           {hud && <span className="lan-network-quality" data-quality={!controlsReady || hud.age > 1500 ? "syncing" : (hud.rtt ?? 0) > 180 || (hud.acknowledgementMs ?? 0) > 350 || (hud.fps > 0 && hud.fps < Math.min(40, (getGraphicsSettings().maxFrameRate || 60) * .75)) || (hud.realtimeRatio !== null && hud.realtimeRatio < .9) ? "slow" : "good"}
             title={"服务器往返延迟，不含房主计算；输入确认包含服务器转发、主机处理及权威回执返回（关键或完整状态）。低延迟不代表高帧率；打开菜单中的性能与网络诊断查看详情。"}>
             {!controlsReady ? "同步中" : "网络 " + (hud.rtt === null ? "测量中" : Math.round(hud.rtt) + " ms")}
-            {" · 画面 " + (hud.fps ? Math.round(hud.fps) + " FPS" : "测量中") + (hud.motionHz === null ? "" : " · 关键 " + hud.motionHz.toFixed(0) + " Hz") + " · 完整 " + (hud.hz === null ? "测量中" : hud.hz.toFixed(0)) + " Hz · 战斗 " + (hud.combatRate === null ? "测量中" : hud.combatRate.toFixed(2) + "×")}
+            {' · '}<CombatPerformanceReadout fps={hud.fps || null} motionHz={hud.motionHz} snapshotHz={hud.hz} combatRate={hud.combatRate} />
           </span>}
           <NativeButton shortcut="Tab" disabled={!controlsReady||mapOpen||deploymentOpen||!!menu||finished||!hud?.tick} onClick={()=>openMapRef.current()}>战术地图 / 增援</NativeButton>
           <NativeButton shortcut="Esc" onClick={() => openMenu("menu")}>

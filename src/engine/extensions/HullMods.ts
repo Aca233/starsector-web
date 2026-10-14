@@ -548,11 +548,49 @@ function resolvedHullMods(ship: ShipSpec): readonly HullModDefinition[] {
 }
 /** Only audited local advance callbacks; unknown definitions never gain permission by ID. */
 export function hasOnlyLocalAdvanceHullMods(ship: ShipSpec): boolean {
-  return isImmutableMetadata(ship) && resolvedHullMods(ship).every(mod => localAdvanceDefinitions.has(mod));
+  if (!isImmutableMetadata(ship)) return false;
+  const mods = resolvedHullMods(ship);
+  let cached = localAdvanceClassification.get(mods);
+  if (cached === undefined) {
+    cached = mods.every(mod => localAdvanceDefinitions.has(mod));
+    localAdvanceClassification.set(mods, cached);
+  }
+  return cached;
+}
+const localAdvanceClassification = new WeakMap<readonly HullModDefinition[], boolean>();
+const advanceModsCache = new WeakMap<readonly HullModDefinition[], readonly HullModDefinition[]>();
+export function advanceHullMods(ship: ShipSpec): readonly HullModDefinition[] {
+  const mods = resolvedHullMods(ship);
+  let cached = advanceModsCache.get(mods);
+  if (!cached) {
+    cached = Object.freeze(mods.filter(mod => mod.status === 'implemented' && !!mod.advance));
+    if (isImmutableMetadata(ship)) advanceModsCache.set(mods, cached);
+  }
+  return cached;
 }
 export function installedHullMods(ship: ShipSpec): HullModDefinition[] {
   // Preserve the public API's fresh, caller-owned array.
   return [...resolvedHullMods(ship)];
+}
+const surfaceFeedbackModsCache = new WeakMap<readonly HullModDefinition[], readonly HullModDefinition[]>();
+export function surfaceFeedbackHullMods(ship: ShipSpec): readonly HullModDefinition[] {
+  const mods = resolvedHullMods(ship);
+  let cached = surfaceFeedbackModsCache.get(mods);
+  if (!cached) {
+    cached = Object.freeze(mods.filter(mod => !!mod.surfaceFeedback));
+    if (isImmutableMetadata(ship)) surfaceFeedbackModsCache.set(mods, cached);
+  }
+  return cached;
+}
+const hasAdvanceCombatCache = new WeakMap<readonly HullModDefinition[], boolean>();
+export function hasAdvanceCombatHullMod(ship: ShipSpec): boolean {
+  const mods = resolvedHullMods(ship);
+  let cached = hasAdvanceCombatCache.get(mods);
+  if (cached === undefined) {
+    cached = mods.some(mod => !!mod.advanceCombat);
+    if (isImmutableMetadata(ship)) hasAdvanceCombatCache.set(mods, cached);
+  }
+  return cached;
 }
 // Private resolved lists are stable only for registered immutable ShipSpecs.
 // Cache their CLASSIFICATION, never a range-hook result or mutable ship state.
@@ -619,8 +657,26 @@ export function hullModOPCost(ship: ShipSpec, id: string): number {
   if (cost === undefined || mod.refit?.builtInOnly || mod.status !== 'implemented') throw new Error(id + ': no installable OP cost for hull size');
   return isSMod(ship, id) ? 0 : cost;
 }
+const hasFighterRangeFlatCache = new WeakMap<readonly HullModDefinition[], boolean>();
 export function fighterWeaponRangeFlat(carrier: ShipSpec, weapon: WeaponSpec): number {
-  return installedHullMods(carrier).reduce((total, mod) => total + (mod.fighterRangeFlat?.(carrier, weapon) ?? 0) + (isSMod(carrier, mod.id) ? mod.sMod?.fighterRangeFlat?.(carrier, weapon) ?? 0 : 0), 0);
+  const mods = resolvedHullMods(carrier);
+  let hasAny = hasFighterRangeFlatCache.get(mods);
+  if (hasAny === undefined) {
+    hasAny = false;
+    for (let i = 0; i < mods.length; i++) {
+      const mod = mods[i];
+      if (mod.fighterRangeFlat || mod.sMod?.fighterRangeFlat) { hasAny = true; break; }
+    }
+    hasFighterRangeFlatCache.set(mods, hasAny);
+  }
+  if (!hasAny) return 0;
+  let total = 0;
+  for (let i = 0; i < mods.length; i++) {
+    const mod = mods[i];
+    if (mod.fighterRangeFlat) total += mod.fighterRangeFlat(carrier, weapon);
+    if (mod.sMod?.fighterRangeFlat && isSMod(carrier, mod.id)) total += mod.sMod.fighterRangeFlat(carrier, weapon);
+  }
+  return total;
 }
 export function effectiveWeaponOP(ship: ShipSpec, weapon: WeaponSpec, baseOP: number): number {
   return Math.max(0, baseOP + installedHullMods(ship).reduce((sum, mod) => sum + (mod.weaponOPFlat?.(ship, weapon) ?? 0), 0));

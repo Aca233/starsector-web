@@ -1,0 +1,13 @@
+canonical_math.rs contains a Rust translation of LLVM libc atan2.h,
+atan_utils.h and double_double.h, including their binary64 atan lookup table.
+Copyright LLVM Project contributors.
+Licensed under Apache License 2.0 with LLVM Exceptions; see LLVM-LICENSE.TXT.
+
+Source implementation consulted on 2026-10-09:
+https://github.com/llvm/llvm-project/blob/main/libc/src/__support/math/atan2.h
+https://github.com/llvm/llvm-project/blob/main/libc/src/__support/math/atan_utils.h
+https://github.com/llvm/llvm-project/blob/main/libc/src/__support/FPUtil/double_double.h
+
+The translation uses the non-FMA double-double operations for Wasm and retains
+IEEE signed-zero, finite/subnormal/infinite and NaN branches. The game calls it
+at the existing manual group angle calculation, preserving source roster order.

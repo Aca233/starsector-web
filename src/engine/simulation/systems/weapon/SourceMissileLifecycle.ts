@@ -9,6 +9,14 @@ export function initializeSourceMissile(p: Projectile, random: SimulationRandom)
   if (!hasSourceMissileLifecycle(p)) return;
   p.armedWhileFizzling = random.next() > p.missileLifecycleSpec!.dudProbabilityOnFlameout;
   p.missileRangeOrigin = p.pos.clone();
+  p.prevFadeProgress = 0;
+  p.fadeProgress = 0;
+  p.missileFizzleTime = undefined;
+  p.isDisarmed = false;
+  p.unfadedDamage = p.damage;
+  p.unfadedEmp = p.empDamage ?? 0;
+  p.collisionDisabled = false;
+  p.softFlux = false;
 }
 
 /** Fuel expiry starts a native coasting phase, not a contact explosion. Movement is owned by the caller. */

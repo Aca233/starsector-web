@@ -17,7 +17,6 @@ import { NativeButton } from '../NativeChrome';
 import { NativeBitmapText } from '../NativeBitmapText';
 import { simulationRoster, groupSimulationHulls, prepareSimulationOption, simulationOptionErrors, selectedSimulationDesigns, simulationOptionSourceLabel, type SimulationOption } from './SimulationRoster';
 import { SimulationLoadoutPicker } from './SimulationLoadoutPicker';
-import './simulation-deployment.css';
 
 type Side='ally'|'enemy';
 const PAGE_SIZE=80;

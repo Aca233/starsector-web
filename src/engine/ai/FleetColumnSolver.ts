@@ -102,7 +102,7 @@ const compareId=(a:string,b:string)=>a<b?-1:a>b?1:0;
 
 /** Direct row-index solve over one published epoch. Sequential claims, all
  * contributor order and output materialization remain at their original boundary. */
-export function solveFleetColumns(f:FleetColumns,orders:ReadonlyMap<string,TacticalOrder>,manualIds:ReadonlySet<string>):FleetPlan {
+export function solveFleetColumns(f:FleetColumns,orders:ReadonlyMap<string,TacticalOrder>,manualIds:ReadonlySet<string>,onlyTeam?:number):FleetPlan {
   const n=f.count,epoch=f.epoch;
   const {x:xColumn,y:yColumn,radius:radiusColumn,teamId:teamIdColumn,power:powerColumn,range:rangeColumn,speed:speedColumn,hull:hullColumn,carrierRange:carrierRangeColumn,hullHp:hullHpColumn,maxHullHp:maxHullHpColumn,armor:armorColumn,flux:fluxColumn,overloaded:overloadedColumn,venting:ventingColumn,shieldPhased:shieldPhasedColumn,systemPhased:systemPhasedColumn,collisionless:collisionlessColumn,retreating:retreatingColumn,major:majorColumn,isPlayer:isPlayerColumn,doNotBackOff:doNotBackOffColumn,id:idColumn,role:roleColumn,previousTask:previousTaskColumn,currentTargetId:currentTargetIdColumn,currentTargetRow:currentTargetRowColumn,visible,distances,distanceEpoch,pressures,pressureEpoch}=f;
   const units=Array.from({length:n},(_,i)=>i);
@@ -136,6 +136,7 @@ export function solveFleetColumns(f:FleetColumns,orders:ReadonlyMap<string,Tacti
   const orderFor = (s: number) => orders.get(idColumn[s]) ?? (isPlayerColumn[s] ? orders.get('fleet') : undefined);
   const plans = new Map<string, FleetAssignment>();
   for (const team of new Set(actors.map(u => teamIdColumn[u]))) {
+    if (onlyTeam !== undefined && team !== onlyTeam) continue;
     const visibleTeamIndex=f.visibleTeams.indexOf(team);
     const friends = actors.filter(u => teamIdColumn[u] === team);
     const enemies = units.filter(u => teamIdColumn[u] !== team && (visibleTeamIndex>=0&&visible[visibleTeamIndex*n+u]!==0));

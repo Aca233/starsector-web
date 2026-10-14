@@ -8,7 +8,7 @@ import { CombatFireFrame } from '../ai/CombatFireFrame';
 import type { CombatKinematicsStore } from './CombatKinematicsStore';
 import { hasNativeMotionBoundary, type Ship, type ShipStepState } from './Ship';
 import type { WeaponControlStep, WeaponFirePlan } from './systems/ShipWeaponControlSystem';
-import { beginStage, bindStage, closeStage, type StageView } from '../ai/batch/StageProducer';
+import { beginStage, bindStage, closeStage, numericDecisionCoreEnabled, type StageView } from '../ai/batch/StageProducer';
 
 type UpdateArgs = Parameters<Ship['update']>;
 interface Entry {
@@ -104,23 +104,38 @@ export class ShipStepBatch {
         entry.weapons = entry.ship.weaponControl.advanceState(entry.state.effectiveDt, entry.ship);
       enter('fire-query');
       const contactRoster = [...contacts];
-      numericStage = this.entries.every(entry => ShipWeaponControlSystem.hasNativePlanLoop(entry.ship.weaponControl))
+      const allNativePlanLoop = this.entries.every(entry => ShipWeaponControlSystem.hasNativePlanLoop(entry.ship.weaponControl));
+      numericStage = numericDecisionCoreEnabled
+        && allNativePlanLoop
         ? beginStage(this.owner, 'FIRE_QUERY', {
           ships: contactRoster, projectiles: this.owner?.projectiles, beams: this.owner?.beams
         }) : undefined;
       // The shared stage is the fire producer. Legacy frames/rosters exist only
       // for compatibility, never as an extra world codec before the new solver.
       if (!numericStage) frame = new CombatFireFrame(contactRoster, core ?? this.kinematics, this.owner, this);
-      const sealScopes=frame?.numeric?.rewritesReadonlyPhase&&this.entries.every(entry=>ShipWeaponControlSystem.hasNativePlanLoop(entry.ship.weaponControl));
+      const sealScopes = frame?.numeric?.rewritesReadonlyPhase && allNativePlanLoop;
+      let lastSealedScope: readonly Ship[] | undefined;
+      let lastSource: FireControlWorld | undefined;
+      let lastRoster: FireControlQueryRoster | undefined;
+      let sharedWorld: FireControlWorld | undefined;
       for (const entry of this.entries) {
         if (!entry.state || !entry.weapons || entry.ship.hullHp <= 0 || entry.ship.isDead || entry.ship.isRetreated) continue;
         const source = entry.args[5];
         if (!source) throw new Error('Phased update needs its actual fire world');
-        if(sealScopes)frame?.numeric?.sealScope(source.ships);
+        if (sealScopes && source.ships !== lastSealedScope) {
+          lastSealedScope = source.ships;
+          frame?.numeric?.sealScope(source.ships);
+        }
         let roster = numericStage ? undefined : this.rosters.get(source.ships);
         if (!numericStage && !roster) { roster = FireControlQueryRoster.forStage(source.ships); this.rosters.set(source.ships, roster); }
-        const world: FireControlWorld = { ...source, queryRoster: roster, fireFrame: frame, shipStepBatch: undefined };
-        bindStage(world, numericStage);
+        let world = sharedWorld;
+        if (!world || source !== lastSource || roster !== lastRoster) {
+          world = { ...source, queryRoster: roster, fireFrame: frame, shipStepBatch: undefined };
+          bindStage(world, numericStage);
+          lastSource = source;
+          lastRoster = roster;
+          sharedWorld = world;
+        }
         entry.plan = entry.ship.weaponControl.planFire(entry.weapons, entry.state.aimAngle, entry.state.target, world);
       }
       frame?.close();

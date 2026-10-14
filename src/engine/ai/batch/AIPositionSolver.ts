@@ -2,42 +2,61 @@ import { positionScorer, type PositionBody, type PositionFoeGun, type PositionLa
 import type { CombatProfile } from '../ShipCombatProfile';
 import type { FleetPlan } from '../FleetTactics';
 import { BodyFlag as B, WeaponFlag as W } from './StageProtocol';
-import { length, limit, visible, type AIVelocity, type AIStageView } from './AIInputs';
+import { assertAIStage, length, limit, visible, type AIVelocity, type AIStageView } from './AIInputs';
 import { batteryRows } from './AIProfileSolver';
 import { aiDomainWork } from './AIWork';
+
+let sharedShipDist = new Float64Array(128);
+let sharedRockDist = new Float64Array(128);
 
 export interface AIPositionChoice {
   velocity:AIVelocity;adjusted:boolean;scoreGain:number;clearFire:number;reason:'BASELINE'|'FIRE_LANE'|'COVER';
 }
 export function solveAIPosition(v:AIStageView,r:number,t:number,desired:AIVelocity,profile:CombatProfile,fleet:FleetPlan):AIPositionChoice {
+  assertAIStage(v);
   aiDomainWork.positionSolves++;
   const b=v.bodies,w=v.weapons,a=v.ai;
   const result:AIPositionChoice={velocity:desired,adjusted:false,scoreGain:0,clearFire:0,reason:'BASELINE'};
-  if((b.flags[r]&(B.PHASED|B.VENTING|B.OVERLOADED))||a.systemLocksTurning[r]||!visible(v,t,r)||!(b.maxSpeed[r]>0)
+  const rTeam=b.team[r],rTeamIdx=v.teams.indexOf(rTeam),numTeams=v.teams.length,vis=v.visibility;
+  if((b.flags[r]&(B.PHASED|B.VENTING|B.OVERLOADED))||a.systemLocksTurning[r]||rTeamIdx<0||vis[t*numTeams+rTeamIdx]===0||!(b.maxSpeed[r]>0)
     ||!Number.isFinite(profile.range)||length(b.x[r]-b.x[t],b.y[r]-b.y[t])>profile.range*2.5)return result;
   const battery=(row:number,steady=false)=>batteryRows(v,row,steady).filter(m=>!(w.flags[m]&W.PD)&&w.dps[m]>0&&Number.isFinite(w.dps[m]+w.effectiveRange[m]))
     .sort((m,n)=>w.dps[n]-w.dps[m]||a.slotIds[m].localeCompare(a.slotIds[n])).slice(0,8);
   const guns=battery(r,true),ownPower=guns.reduce((n,m)=>n+w.dps[m],0);if(ownPower<=0)return result;
-  const nearby:number[]=[];
-  for(let i=0;i<v.bodyCount;i++)if(i!==r&&i!==t&&!(b.flags[i]&(B.DEAD|B.PHASED|B.FIGHTER))&&visible(v,i,r))nearby.push(i);
-  nearby.sort((i,j)=>length(b.x[r]-b.x[i],b.y[r]-b.y[i])-length(b.x[r]-b.x[j],b.y[r]-b.y[j])||a.ids[i].localeCompare(a.ids[j]));
+  const nearby:number[]=[],ox=b.x[r],oy=b.y[r];
+  if (sharedShipDist.length < v.bodyCount) sharedShipDist = new Float64Array(Math.max(v.bodyCount, sharedShipDist.length * 2));
+  const shipDist=sharedShipDist;
+  for(let i=0;i<v.bodyCount;i++)if(i!==r&&i!==t&&!(b.flags[i]&(B.DEAD|B.PHASED|B.FIGHTER))&&vis[i*numTeams+rTeamIdx]!==0){
+    shipDist[i]=length(ox-b.x[i],oy-b.y[i]);nearby.push(i);
+  }
+  nearby.sort((i,j)=>shipDist[i]-shipDist[j]||a.ids[i].localeCompare(a.ids[j]));
   // Preserve the existing advisory sample limits; threat/collision/fleet domains
   // retain every entity/mount and are never capped by these local policy limits.
   nearby.length=Math.min(nearby.length,12);
   const predict=(i:number)=>({x:b.x[i]+b.vx[i]*3,y:b.y[i]+b.vy[i]*3});
-  const bodies:PositionBody[]=nearby.map(i=>({...predict(i),radius:Math.max(b.radius[i],a.rawShieldActive[i]&&!(b.shieldVoid[i]&&b.team[i]===b.team[r])?b.shieldRadius[i]:0)+8}));
-  const rocks=Array.from({length:a.asteroidCount},(_,i)=>i).sort((i,j)=>length(b.x[r]-a.obstacleX[i],b.y[r]-a.obstacleY[i])-length(b.x[r]-a.obstacleX[j],b.y[r]-a.obstacleY[j])).slice(0,8);
-  for(const i of rocks)bodies.push({x:a.obstacleX[i]+a.obstacleVx[i]*3,y:a.obstacleY[i]+a.obstacleVy[i]*3,radius:a.obstacleRadius[i]+8});
+  const bodies:PositionBody[]=nearby.map(i=>({...predict(i),radius:Math.max(b.radius[i],a.rawShieldActive[i]&&!(b.shieldVoid[i]&&b.team[i]===rTeam)?b.shieldRadius[i]:0)+8}));
+  const rockCount=a.asteroidCount,rocks:number[]=[];
+  if (sharedRockDist.length < rockCount) sharedRockDist = new Float64Array(Math.max(rockCount, sharedRockDist.length * 2));
+  const rockDist=sharedRockDist;
+  for(let i=0;i<rockCount;i++){rockDist[i]=length(ox-a.obstacleX[i],oy-a.obstacleY[i]);rocks.push(i);}
+  rocks.sort((i,j)=>rockDist[i]-rockDist[j]);
+  for(let k=0,end=Math.min(rocks.length,8);k<end;k++){const i=rocks[k];bodies.push({x:a.obstacleX[i]+a.obstacleVx[i]*3,y:a.obstacleY[i]+a.obstacleVy[i]*3,radius:a.obstacleRadius[i]+8});}
   const foes:PositionFoeGun[]=[];
-  for(const i of nearby.filter(i=>b.team[i]!==b.team[r]&&!(b.flags[i]&(B.VENTING|B.OVERLOADED|B.WEAPONS_BLOCKED))).slice(0,4)){
+  let foeCount = 0;
+  for(let k=0;k<nearby.length && foeCount<4;k++){
+    const i=nearby[k];
+    if(b.team[i]===rTeam||(b.flags[i]&(B.VENTING|B.OVERLOADED|B.WEAPONS_BLOCKED)))continue;
+    foeCount++;
     const p=predict(i),c=Math.cos(b.facing[i]),s=Math.sin(b.facing[i]);
     for(const m of battery(i))foes.push({x:w.relativeX[m]*c-w.relativeY[m]*s+p.x,y:w.relativeX[m]*s+w.relativeY[m]*c+p.y,
       range:w.effectiveRange[m],power:w.dps[m],facing:b.facing[i],base:a.localBaseAngle[m],arc:a.authoredHalfArc[m]+.15});
   }
   const lanes:PositionLane[]=[];
-  for(const i of nearby.filter(i=>b.team[i]===b.team[r])){
+  for(let k=0;k<nearby.length;k++){
+    const i=nearby[k];
+    if(b.team[i]!==rTeam)continue;
     const id=fleet.get(a.ids[i])?.targetId,j=id?v.rowById.get(id):undefined;
-    if(j!==undefined&&!(b.flags[j]&B.DEAD)&&b.team[j]!==b.team[r]&&visible(v,j,r))lanes.push({start:predict(i),end:predict(j)});
+    if(j!==undefined&&!(b.flags[j]&B.DEAD)&&b.team[j]!==rTeam&&vis[j*numTeams+rTeamIdx]!==0)lanes.push({start:predict(i),end:predict(j)});
   }
   const score=positionScorer({x:b.x[r],y:b.y[r],vx:b.vx[r],vy:b.vy[r],facing:b.facing[r],target:predict(t),targetRadius:b.radius[t],
     radius:Math.max(b.radius[r],a.rawShieldActive[r]?b.shieldRadius[r]:0),range:profile.range,relativeBearing:profile.relativeBearing,ownPower,desired,

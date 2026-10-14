@@ -9,6 +9,11 @@ import { tacticalPolicy } from './TacticalWorld';
 import type { SystemModifiers } from '../extensions/ship-systems/Types';
 
 export interface CombatProfile { relativeBearing: number; range: number; firepower: number; weapons: number }
+/** The root pilots the assembly; attached modules still own their fire control and flux. */
+export function combatParts(ship: Ship): Ship[] {
+  return (ship.isAttachedModule ? [ship] : ship.assemblyShips)
+    .filter(part => !part.isDead && !part.isRetreated && !part.isDocked && part.hullHp > 0);
+}
 export function weaponDps(m: WeaponMount): number {
   if (m.spec.damagePerSecond > 0) return m.spec.damagePerSecond;
   const count = Math.max(1, m.spec.burstSize ?? 1);
@@ -23,25 +28,27 @@ export function weaponRange(ship: Ship, m: WeaponMount, modifiers?: Readonly<Sys
  * PD and disposable strike weapons cannot drag sustained main-battery stationkeeping around;
  * missile/PD-only ships fall back to their actual available weapons rather than a fake gun. */
 export function combatProfile(ship: Ship, target: Ship, reads?: CombatQueryReads): CombatProfile {
-  const available = ship.weapons.filter(m => !m.isDisabled && m.ammo >= 1 && weaponDps(m) > 0);
-  const offense = available.filter(m => !isPointDefense(m));
-  const sustained = offense.filter(m => m.spec.weaponType !== 'MISSILE' && m.spec.spawnType !== 'MISSILE' && !m.spec.aiHints?.includes('STRIKE'));
+  const available = combatParts(ship).flatMap(owner => owner.weapons
+    .filter(m => !m.isDisabled && m.ammo >= 1 && weaponDps(m) > 0).map(mount => ({ owner, mount })));
+  const offense = available.filter(({ mount }) => !isPointDefense(mount));
+  const sustained = offense.filter(({ mount: m }) => m.spec.weaponType !== 'MISSILE' && m.spec.spawnType !== 'MISSILE' && !m.spec.aiHints?.includes('STRIKE'));
   const mounts = sustained.length ? sustained : offense.length ? offense : available;
   const radius = target.spec.collisionRadius;
   const distance = Math.max(1, ship.pos.distanceTo(target.pos));
   const targetHeading = target.pos.clone().sub(ship.pos).heading();
   const current = signedAngle(targetHeading - ship.facingRad);
   if (!mounts.length) return { relativeBearing: current, range: ship.spec.collisionRadius + radius + tacticalPolicy.collisionMargin, firepower: 0, weapons: 0 };
-  const modifiers = querySourceModifiers(ship, reads);
-  const arcs = mounts.map(m => {
+  const arcs = mounts.map(({ owner, mount: m }) => {
+    const modifiers = querySourceModifiers(owner, reads);
     const fixed = m.mountType === 'HARDPOINT' || (m.spec.turnRateDegPerSec ?? 1) <= 0;
     // Hull steering must line up the muzzle/intercept, not the ship centres. Start
     // leading on approach; far outside acquisition range, simply face the contact.
-    const intercept = distance <= weaponRange(ship, m, modifiers) * 1.5 + ship.spec.collisionRadius + radius
-      ? predictWeaponIntercept(ship, m, { kind: 'SHIP', entity: target }, undefined, modifiers) : null;
-    const aimHeading = (intercept?.point ?? target.pos).clone().sub(weaponMuzzle(ship, m)).heading();
-    return { mount: m, weight: weaponDps(m),
-      base: signedAngle(m.baseAngleDeg * Math.PI / 180 - signedAngle(aimHeading - targetHeading)),
+    const intercept = distance <= weaponRange(owner, m, modifiers) * 1.5 + ship.spec.collisionRadius + radius
+      ? predictWeaponIntercept(owner, m, { kind: 'SHIP', entity: target }, undefined, modifiers) : null;
+    const aimHeading = (intercept?.point ?? target.pos).clone().sub(weaponMuzzle(owner, m)).heading();
+    const position = owner === ship ? m.relativePos : m.relativePos.clone().rotate(owner.facingRad).add(owner.pos).sub(ship.pos).rotate(-ship.facingRad);
+    return { owner, mount: m, position, modifiers, weight: weaponDps(m),
+      base: signedAngle(m.baseAngleDeg * Math.PI / 180 + (owner.facingRad - ship.facingRad) - signedAngle(aimHeading - targetHeading)),
       // A fixed gun has no traverse. Inflating its arc by collisionRadius let the
       // hull stop turning while the bore missed the actual hull, especially off-centre mounts.
       half: fixed ? 0 : Math.min(Math.PI, m.arcDeg * Math.PI / 360) };
@@ -78,8 +85,8 @@ export function combatProfile(ship: Ship, target: Ship, reads?: CombatQueryReads
     }
   }
   const useful = at(best);
-  const ranges = useful.map(a => ({weight:a.weight, range: weaponRange(ship,a.mount,modifiers)*tacticalPolicy.rangeFraction
-    + a.mount.relativePos.x*Math.cos(best)+a.mount.relativePos.y*Math.sin(best)+radius})).sort((a,b)=>a.range-b.range);
+  const ranges = useful.map(a => ({weight:a.weight, range: weaponRange(a.owner,a.mount,a.modifiers)*tacticalPolicy.rangeFraction
+    + a.position.x*Math.cos(best)+a.position.y*Math.sin(best)+radius})).sort((a,b)=>a.range-b.range);
   let accumulated = 0, range = ranges.at(-1)?.range ?? distance;
   for (const entry of ranges) { accumulated += entry.weight; if (accumulated >= power*.5) {range=entry.range;break;} }
   range = Math.max(ship.spec.collisionRadius+radius+tacticalPolicy.collisionMargin,range);

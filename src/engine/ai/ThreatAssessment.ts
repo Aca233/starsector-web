@@ -23,6 +23,8 @@ export interface ThreatAssessment {
   threats: IncomingThreat[];
   /** Native compact planning: far speculative weapons are held, never live damage. */
   hasDeferredWeaponThreat?: boolean;
+  hasAnyThreat?: boolean;
+  farWeaponEarliest?: number;
   horizon: number;
   imminentDamage: number;
   imminentShieldFlux: number;
@@ -31,6 +33,10 @@ export interface ThreatAssessment {
   facing: number | null;
 }
 const shieldMultiplier = (type: DamageType) => type === 'KINETIC' ? 2 : type === 'HIGH_EXPLOSIVE' ? .5 : type === 'FRAGMENTATION' ? .25 : 1;
+
+let workerOwnedThreatReads = false;
+export function enableWorkerOwnedThreatReads(): void { workerOwnedThreatReads = true; }
+const rangeModifierReaders = ['getWeaponRangePercent'] as const;
 
 function weaponReadiness(m: import('../simulation/Weapon').WeaponMount): number {
   const charge = m.firingState==='CHARGING' ? m.firingStateTimer : m.spec.isBeam ? m.spec.beamSourceChargeupTime ?? 0 : m.spec.chargeTime ?? 0;
@@ -42,7 +48,19 @@ function weaponReadiness(m: import('../simulation/Weapon').WeaponMount): number 
 export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number, defenseWindow: number, weaponHorizon = horizon): ThreatAssessment {
   const threats: IncomingThreat[] = [];
   const decisionScene=world.decisionScene?.matches(world.ships)?world.decisionScene:undefined;
-  const sourceShip=(id:string)=>decisionScene?decisionScene.source(id):world.ships.find(s=>s.id===id);
+  let byId: Map<string, Ship> | undefined;
+  const sourceShip=(id:string)=>{
+    if (decisionScene) return decisionScene.source(id);
+    if (!byId) {
+      byId = new Map<string, Ship>();
+      for (let i = 0; i < world.ships.length; i++) {
+        const s = world.ships[i];
+        byId.set(s.id, s);
+      }
+    }
+    return byId.get(id);
+  };
+  const nativeTargetShield = ship.hasNativeThreatPhaseHooks || ship.hasExactThreatPhaseHooks;
   // Scratch space is assessment-local: no cross-ship/frame cache or stale live state.
   const forecastEnd = new Vector2();
   const forecastDelta = new Vector2();
@@ -134,6 +152,7 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
     // Only audited pure stat hooks may move the range query ahead of muzzle reads.
     // Custom systems/hullmods keep their original callback and mutable-state order.
     let boundWeapons = Number.isFinite(weaponHorizon) && weaponHorizon >= 0 && enemy.system.hasNativeStats && hasOnlyNativeRangeModifiers(enemy.spec);
+    let enemyModifiers: ReturnType<Ship['system']['readModifierTable']> | undefined;
     const distanceFromOrigin = Math.max(Math.abs(center.x-enemy.pos.x), Math.abs(center.y-enemy.pos.y));
     let approachReach = 0, coordinateScale = 0;
     let mountIndex = 0;
@@ -143,24 +162,39 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
       const dps = envelope ? envelope.dps[preparedIndex] : weaponDps(m);
       // Most scenes have no crossing active beams: avoid constructing a key per mount.
       if (dps<=0 || (activeBeams.size>0 && activeBeams.has(enemy.id+'/'+m.slotId))) continue;
+      let earlyReadiness: number | undefined;
+      if (workerOwnedThreatReads && boundWeapons) {
+        earlyReadiness = weaponReadiness(m);
+        if (earlyReadiness > weaponHorizon) continue;
+      }
       if (!motion) {
         motion = envelope?.motion ?? enemy.getMotionStats();
         // L1 relative speed bounds the original radial closing speed, including its
         // near-zero normalization rule. Keep the full weaponHorizon, even while venting.
         if (boundWeapons) {
+          enemyModifiers = import.meta.env?.VITE_COMBAT_STAT_TABLE !== 'false'
+            ? enemy.system.readModifierTable?.(rangeModifierReaders) : undefined;
           approachReach = radius + weaponHorizon*Math.max(1,motion.maxSpeed+Math.abs(enemy.vel.x-ship.vel.x)+Math.abs(enemy.vel.y-ship.vel.y));
           coordinateScale = Math.max(1,Math.abs(center.x),Math.abs(center.y),Math.abs(enemy.pos.x),Math.abs(enemy.pos.y),Math.abs(radius),Math.abs(approachReach));
         }
       }
       let range: number | undefined = envelope?.ranges[preparedIndex];
       if (boundWeapons) {
-        range ??= weaponRange(enemy,m);
+        range ??= weaponRange(enemy,m,enemyModifiers);
         // Cheap near check avoids even reading barrel geometry for close weapons.
         if (distanceFromOrigin > approachReach+range) {
           const extent = envelope?.muzzleExtents[preparedIndex] ?? weaponMuzzleExtent(m), reach = approachReach+range+extent;
           const pad = 1e-7*Math.max(coordinateScale,Math.abs(range),extent,Math.abs(reach));
           // NaN/Infinity fail open. Remaining candidates retain all exact ETA math.
           if (distanceFromOrigin > reach+pad) continue;
+        }
+        if (workerOwnedThreatReads && !m.spec.isBeam) {
+          const maxTravelTime = weaponHorizon - Math.max(recovery, earlyReadiness!);
+          const maxTravelDist = maxTravelTime * Math.max(1, m.spec.maxSpeed ?? m.spec.projSpeed);
+          if (maxTravelDist < range && distanceFromOrigin > radius + maxTravelDist) {
+            const extent = envelope?.muzzleExtents[preparedIndex] ?? weaponMuzzleExtent(m);
+            if (distanceFromOrigin > radius + maxTravelDist * (1 + 1e-11) + extent + 1e-6) continue;
+          }
         }
       }
       // Reuse only inside the audited synchronous phase already owning this envelope.
@@ -171,8 +205,16 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
       if (envelope && cachedMuzzleX === undefined) {
         envelope.muzzleX[preparedIndex] = muzzle.x; envelope.muzzleY[preparedIndex] = muzzle.y;
       }
-      const delta = forecastDelta.set(center.x-muzzle.x,center.y-muzzle.y), distance = delta.length();
-      range ??= weaponRange(enemy,m);
+      const delta = forecastDelta.set(center.x-muzzle.x,center.y-muzzle.y);
+      range ??= weaponRange(enemy,m,boundWeapons ? enemyModifiers : undefined);
+      if (workerOwnedThreatReads && boundWeapons && !m.spec.isBeam) {
+        const minDist = Math.max(Math.abs(delta.x), Math.abs(delta.y)) - radius;
+        if (minDist > 0) {
+          const minTravel = Math.min(range, minDist) / Math.max(1, m.spec.maxSpeed ?? m.spec.projSpeed);
+          if (Math.max(recovery, earlyReadiness!) + minTravel * (1 - 1e-12) > weaponHorizon) continue;
+        }
+      }
+      const distance = delta.length();
       // Outside range is not automatically safe: a hostile can close while this ship vents.
       // Keep Vector2.normalize's near-zero rule and the original arithmetic order.
       const unitX = distance>0.00001 ? delta.x/distance : delta.x;
@@ -184,10 +226,11 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
       // The native envelope keeps weapon state stable within this AI query; unknown hooks retain
       // their original field reads below. Do not query readiness for weapons
       // already excluded by the original distance/approach bounds.
-      const readinessHint = envelope ? weaponReadiness(m) : undefined;
+      const earlyHint = !!envelope || boundWeapons;
+      const readinessHint = earlyReadiness ?? (earlyHint ? weaponReadiness(m) : undefined);
       // Even perfect aim cannot arrive before recovery/readiness/approach plus
       // travel. Equality and uncertain comparisons keep the original calculation.
-      const travelHint = envelope ? (m.spec.isBeam ? 0 : Math.max(0,Math.min(range,distance-radius))/Math.max(1,m.spec.maxSpeed ?? m.spec.projSpeed)) : undefined;
+      const travelHint = earlyHint ? (m.spec.isBeam ? 0 : Math.max(0,Math.min(range,distance-radius))/Math.max(1,m.spec.maxSpeed ?? m.spec.projSpeed)) : undefined;
       if (travelHint !== undefined && Math.max(recovery,readinessHint!,approachTime)+travelHint > weaponHorizon) continue;
       const base = enemy.facingRad+m.baseAngleDeg*Math.PI/180;
       const halfArc = m.mountType==='HARDPOINT' || (m.spec.turnRateDegPerSec ?? 1)<=0 ? 0 : m.arcDeg*Math.PI/360;
@@ -204,7 +247,7 @@ export function assessThreats(ship: Ship, world: TacticalWorld, horizon: number,
       add('WEAPON',enemy.id,eta,damage,m.spec.type,muzzle);
       // add() can invoke arbitrary target-side shield modifiers. Any such callback
       // may move ships/change loadouts: stop using the pre-callback bound thereafter.
-      boundWeapons = false;
+      if (!nativeTargetShield) boundWeapons = false;
     }
   }
   const imminent = threats.filter(t=>t.eta<=defenseWindow);

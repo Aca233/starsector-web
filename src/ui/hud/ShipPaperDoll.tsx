@@ -4,12 +4,12 @@ import { assemblyShipIds } from '../../engine/content/ModuleGeometry';
 import { HullPortraitPainter, pickHullPortraitPart } from './HullPortraitPainter';
 
 export interface ShipPaperDollProps {
-  ship: Ship; isEnemy?: boolean; size?: number;
+  ship: Ship; isEnemy?: boolean; size?: number; cssSized?: boolean;
   selectedModuleId?: string;
   onSelectModule?: (index: number) => void;
 }
 /** Native-style assembly armor portrait. Click-to-control is a user-approved Web extension. */
-export const ShipPaperDoll: React.FC<ShipPaperDollProps> = ({ship,isEnemy=false,size=140,selectedModuleId,onSelectModule}) => {
+export const ShipPaperDoll: React.FC<ShipPaperDollProps> = ({ship,isEnemy=false,size=140,cssSized=false,selectedModuleId,onSelectModule}) => {
   const canvasRef=useRef<HTMLCanvasElement|null>(null);
   const painted=useRef<{parts:Ship['hullPortrait'];facing:number}|null>(null);
   const interactive=!isEnemy&&!!onSelectModule;
@@ -31,7 +31,7 @@ export const ShipPaperDoll: React.FC<ShipPaperDollProps> = ({ship,isEnemy=false,
     const index=assemblyShipIds(ship.id,ship.spec).indexOf(id);
     if(index>=0)onSelectModule?.(index);
   };
-  return <canvas ref={canvasRef} width={size} height={size} style={{width:size,height:size}}
+  return <canvas ref={canvasRef} width={size} height={size} style={cssSized ? undefined : {width:size,height:size}}
     aria-label={isEnemy?'目标装甲状况':'本舰装甲状况'} tabIndex={interactive?0:undefined}
     aria-description={interactive?'点击存活武器模块接管火控；左右方向键切换，Home 返回本体。移动和防御仍控制本体。':undefined}
     title={interactive?'点击模块接管武器 · 点击本体返回 · 左右键切换 / Home 返回本体':undefined}

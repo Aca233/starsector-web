@@ -3,15 +3,9 @@ import type { CapitalShipAI } from '../CapitalShipAI';
 import { OwnershipPool, UnsupportedOwnershipScene } from './OwnershipPool';
 import { LanOwnershipGate, lanPhaseAIs } from './LanEligibility';
 import type { CombatEngine } from '../../simulation/CombatEngine';
-import type { AIPhaseBatch, MulticoreMetrics } from './Types';
-
-export interface AuditedMulticoreStatus {
-    readonly mode: 'serial' | '1-workers' | '2-workers' | '3-workers' | '4-workers';
-    readonly reason: string;
-    readonly metrics: Readonly<MulticoreMetrics> | null;
-    readonly workers: number;
-    readonly tier: 'legacy-native' | 'audited';
-}
+import type { AIPhaseBatch } from './Types';
+import type { AuditedMulticoreStatus } from '../../contracts/CombatTelemetry';
+export type { AuditedMulticoreStatus } from '../../contracts/CombatTelemetry';
 export interface AuditedMulticoreOptions {
     minShips?: number;
     minJobs?: number;

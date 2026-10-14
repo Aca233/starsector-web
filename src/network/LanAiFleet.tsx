@@ -23,7 +23,6 @@ import { DwellScope } from '../studio/DwellTooltip';
 import { FactionFilter } from '../studio/FactionFilter';
 import { factionIndex, matchesFaction } from '../studio/FactionModel';
 import { RefitHint } from '../studio/RefitHint';
-import './lan-ai-fleet.css';
 
 const hullName = (hull: string) => data.ships[hull]?.name ?? hull;
 type Selection = NonNullable<AiEditTarget['returnSelection']>;

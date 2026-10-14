@@ -1,5 +1,5 @@
 import { defineConfig, type Plugin } from 'vite';
-import base from './vite.config';
+import { createAppConfig } from './vite.config.ts';
 const noCampaign: Plugin = {
   name:'dedicated-combat-scope',
   generateBundle(_options, bundle) {
@@ -9,10 +9,13 @@ const noCampaign: Plugin = {
     }
   },
 };
-export default defineConfig({
+export default defineConfig(environment => {
+const base = createAppConfig(environment);
+return {
   ...base,
   define: { ...base.define, 'import.meta.env.VITE_SERVER_AUTHORITY': JSON.stringify('true'), 'import.meta.env.VITE_STATIC_HOST': JSON.stringify('') },
   plugins: [...(base.plugins ?? []), noCampaign],
   build: { ...base.build, outDir:'artifacts/server-authority-20260920/runtime/web',
     rollupOptions: { ...base.build?.rollupOptions, input: {main:'index.html'} } },
+};
 });

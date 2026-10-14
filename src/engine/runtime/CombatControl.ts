@@ -7,6 +7,7 @@ import type { CombatEngine } from '../simulation/CombatEngine';
 import { Vector2 } from '../math/Vector2';
 import { applyPlayerControls } from './PlayerControls';
 import { dispatchShipCommand, type CommandResult, type ShipCommand } from './CombatCommands';
+import { applyGravityControlHold, applyGravityPushHold, GRAVITY_PUSH_KEY, GRAVITY_HOLD_KEY } from '../simulation/systems/GravityControlInput';
 import { lockedCombatTarget } from './CombatTargeting';
 
 /** Data only: a sample belongs to ONE fixed tick, not to a render frame. */
@@ -47,6 +48,8 @@ export function applyCombatControlSample(engine: CombatEngine, playerAI: Capital
   if (engine.isTacticalMap || sample.blocked) { ship.clearInput(); stopModuleFiring(ship); return; }
   applyPlayerControls(ship, sample.keys, new Vector2(...sample.aim), sample.firing, sample.mouseSteering, sample.pointerActive);
   applyModuleWeaponInput(ship, new Vector2(...sample.aim), sample.firing, sample.pointerActive);
+  applyGravityControlHold(ship, sample.pointerActive && !!sample.keys[GRAVITY_HOLD_KEY]);
+  applyGravityPushHold(ship, sample.pointerActive && !!sample.keys[GRAVITY_PUSH_KEY]);
 }
 
 /** Edge commands also run while paused; they never advance simulation time. */

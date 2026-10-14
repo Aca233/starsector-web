@@ -29,11 +29,27 @@ export class FlightDecisionRoster {
   }
   hostile(ship:Ship,targetId?:string):Ship|undefined {
     if(!this.active||!this.members.has(ship))return;flightRewriteWork.hostileQueries++;
-    const rows=this.teams.get(ship.teamId)?.hostiles.filter(s=>!s.isDead&&!s.isRetreated)??[];
-    const ordered=targetId&&rows.find(s=>s.id===targetId);if(ordered)return ordered;
-    if(ship.currentTargetShip&&rows.includes(ship.currentTargetShip))return ship.currentTargetShip;
-    const main=rows.filter(s=>s.spec.hullSize!=='FIGHTER');
-    return (main.length?main:rows).reduce<Ship|undefined>((best,s)=>!best||coordinateLength(ship.pos.x-s.pos.x,ship.pos.y-s.pos.y)<coordinateLength(ship.pos.x-best.pos.x,ship.pos.y-best.pos.y)?s:best,undefined);
+    const hostiles=this.teams.get(ship.teamId)?.hostiles;
+    if(!hostiles||!hostiles.length)return undefined;
+    const current=ship.currentTargetShip;
+    let currentValid=false;
+    let bestMain:Ship|undefined,bestMainDist=Infinity;
+    let bestAny:Ship|undefined,bestAnyDist=Infinity;
+    const sx=ship.pos.x,sy=ship.pos.y;
+    for(let i=0;i<hostiles.length;i++){
+      const s=hostiles[i];
+      if(s.isDead||s.isRetreated)continue;
+      if(targetId&&s.id===targetId)return s;
+      if(s===current)currentValid=true;
+      const dist=coordinateLength(sx-s.pos.x,sy-s.pos.y);
+      if(s.spec.hullSize!=='FIGHTER'){
+        if(!bestMain||dist<bestMainDist){bestMain=s;bestMainDist=dist;}
+      } else if(!bestMain&&(!bestAny||dist<bestAnyDist)){
+        bestAny=s;bestAnyDist=dist;
+      }
+    }
+    if(currentValid)return current!;
+    return bestMain??bestAny;
   }
   fireShips(ship:Ship,target:Ship|null,source:readonly Ship[]):readonly Ship[]|undefined {
     if(!this.active||source!==this.ships||!this.members.has(ship))return;

@@ -22,6 +22,6 @@ try {
     w.onerror = event => { clearTimeout(timer); w.terminate(); reject(Error(event.message)); }; w.postMessage(v8 ? 'v8' : 'run');
   }), v8);
   assert.deepEqual(worker.checks, main.checks); assert.deepEqual(worker.measurements, main.measurements); assert.deepEqual(errors, []);
-  await fs.writeFile(out + (v8 ? '/rules-check-v8.json' : '/rules-check.json'), JSON.stringify({ main, worker, pageErrors: errors }, null, 2));
+  await fs.writeFile(out + (process.argv.includes('--area') ? '/rules-check-area-controls-v14.json' : process.argv.includes('--push') ? '/rules-check-directional-push-v13.json' : process.argv.includes('--self-tow') ? '/rules-check-self-tow-v12.json' : process.argv.includes('--left-click') ? '/rules-check-left-click-v11.json' : v8 ? '/rules-check-support-v10.json' : '/rules-check.json'), JSON.stringify({ main, worker, pageErrors: errors }, null, 2));
   console.log(JSON.stringify({ mainChecks: main.checks.length, workerChecks: worker.checks.length, measurements: main.measurements }, null, 2));
 } finally { await browser?.close(); await server.close(); }

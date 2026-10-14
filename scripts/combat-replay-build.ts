@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
-import type { Plugin } from 'vite';
+import type { Plugin, ResolvedConfig } from 'vite';
 
 /** Conservative same-code guard for durable replay; never a network authentication token. */
 export function combatReplayBuildPlugin(): Plugin {
   const root = process.cwd();
+  let resolved: ResolvedConfig;
   const fingerprint = () => {
     const hash = createHash('sha256');
     const walk = (directory: string) => {
@@ -22,6 +23,15 @@ export function combatReplayBuildPlugin(): Plugin {
   return {
     name:'combat-replay-build',
     config: () => ({define:{__COMBAT_REPLAY_BUILD__:fingerprint()}}),
+    configResolved(config) { resolved = config; },
+    // Vite serves imported modules of a development Worker as ordinary dev
+    // modules, while its entry is transformed in the Worker graph. Inject the
+    // shared value explicitly so both routes use the same conservative guard.
+    transform(code, id) {
+      if (resolved.command !== 'serve' || !id.replaceAll('\\', '/').split('?')[0].endsWith('/CombatReplayCheckpoint.ts')) return;
+      return {code: code.replace(/\b__COMBAT_REPLAY_BUILD__\b/g, String(resolved.define.__COMBAT_REPLAY_BUILD__))
+        .replace(/declare const "[a-f0-9]+": string;/, ''), map: null};
+    },
     handleHotUpdate({file, server}) {
       if (!file.replaceAll('\\','/').startsWith(resolve(root,'src').replaceAll('\\','/')+'/')) return;
       // Even a same-dev-server reload must not accept logs from old logic.

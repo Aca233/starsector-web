@@ -3,11 +3,12 @@ import type { CombatRenderView } from '../../render/CombatRenderView';
 
 // Explicit visual read records. No AI, gameplay callbacks, RNG or authority writes.
 // Every field of these native visual types is retained, including optional values.
-type FieldType = 'n' | 's' | 'b' | 'id' | 'v' | 'c3' | 'c4' | Schema | readonly [Schema];
-interface Schema { fields: readonly (readonly [string, FieldType])[]; keys: ReadonlySet<string> }
+type FieldType = 'n' | 's' | 'b' | 'id' | 'v' | 'va' | 'c3' | 'c4' | Schema | readonly [Schema];
+interface Schema { index: number; fullMask: number; fields: readonly (readonly [string, FieldType])[]; keys: ReadonlySet<string> }
+let nextSchemaIndex = 0;
 const schema = (fields: readonly (readonly [string, FieldType])[]): Schema => {
   if (fields.length > 26) throw new Error('Visual presence mask exceeds exact integer precision');
-  return { fields, keys: new Set(fields.map(([key]) => key)) };
+  return { index: nextSchemaIndex++, fullMask: (4 ** fields.length - 1) / 3, fields, keys: new Set(fields.map(([key]) => key)) };
 };
 const particle = schema([['pos','v'],['vel','v'],['life','n'],['maxLife','n'],['size','n'],['color','c3'],['alpha','n'],['material','s'],['startSize','n'],['endSize','n'],['peakAlpha','n'],['rampUpFraction','n'],['fadeOutFraction','n'],['drag','n'],['rotation','n'],['angularVel','n'],['stretch','n']]);
 const contrail = schema([['pos','v'],['vel','v'],['life','n'],['maxLife','n'],['size','n'],['maxSize','n'],['alpha','n'],['rotation','n'],['color','c3']]);
@@ -19,9 +20,15 @@ const puff = schema([['offset','v'],['velocity','v'],['startSize','n'],['endSize
 const flash = schema([['diameter','n'],['coreDiameter','n'],['color','c3'],['duration','n'],['velocity','v']]);
 const flare = schema([['width','n'],['height','n'],['color','c3'],['velocity','v']]);
 const explosion = schema([['id','n'],['visualKind','s'],['sourceShipId','s'],['sourceAuthored','b'],['puffs',[puff]],['puffDuration','n'],['flash',flash],['flare',flare],['pos','v'],['radius','n'],['maxRadius','n'],['life','n'],['maxLife','n'],['frame','n'],['rotation','n'],['color','c3'],['hasShockwaveRing','b'],['shockwaveRadius','n'],['maxShockwaveRadius','n'],['clusterSeed','n'],['debrisCount','n'],['smokeDensity','n'],['fireballScale','n']]);
+const debris = schema([['pos','v'],['vel','v'],['rotation','n'],['angularVel','n'],['size','n'],['life','n'],['maxLife','n'],['color','c3'],['points','va'],['spriteUrl','s'],['isGlowing','b']]);
+const muzzleFlash = schema([['underHullShipId','s'],['id','n'],['specId','s'],['pos','v'],['angleRad','n'],['size','n'],['color','c3'],['life','n'],['maxLife','n']]);
+const shieldRipple = schema([['pos','v'],['radius','n'],['maxRadius','n'],['life','n'],['maxLife','n'],['color','c3']]);
+const movingRayFade = schema([['id','n'],['headPos','v'],['tailPos','v'],['direction','v'],['moveSpeed','n'],['life','n'],['maxLife','n'],['elapsedTime','n'],['maxPulseLength','n'],['width','n'],['textureType','s'],['textureScrollSpeed','n'],['pixelsPerTexel','n'],['fringeColor','c4'],['coreColor','c4']]);
 const collections = [
   ['particles',particle], ['contrails',contrail], ['muzzleParticles',muzzle], ['hitGlows',glow],
   ['trailStrips',strip], ['explosions',explosion], ['localParticles',particle],
+  ['debris',debris], ['muzzleFlashes',muzzleFlash], ['shieldRipples',shieldRipple],
+  ['localMuzzles',muzzle], ['movingRayFades',movingRayFade],
 ] as const;
 const MAX_VALUES = 8_000_000, MAX_RECORDS = 250_000;
 const integer = (n: number) => Number.isSafeInteger(n) && n >= 0;
@@ -42,12 +49,22 @@ function dataValue(object: object, key: string): unknown {
  * per-field identity lookup, graph edge allocation, or full-record delta comparison.
  * Extended records explicitly fall back to the graph, never lose unknown fields. */
 export class PackedVisualEncoder {
-  private readonly ids = new Map<Schema, WeakMap<object, number>>();
+  private readonly ids: (WeakMap<object, number> | undefined)[] = [];
   private nextId = 1;
-  capture(view: CombatRenderView, recycled?: ArrayBuffer): PackedVisualPacket {
-    let data = new Float64Array(recycled && recycled.byteLength >= 8192 && recycled.byteLength % 8 === 0 && recycled.byteLength <= MAX_VALUES * 8 ? recycled : new ArrayBuffer(8192));
+  private lastCapacity = 8192;
+  capture(view: CombatRenderView, recycled?: ArrayBuffer, fastShapes = false): PackedVisualPacket {
+    let data = new Float64Array(recycled && recycled.byteLength >= 8192 && recycled.byteLength % 8 === 0 && recycled.byteLength <= MAX_VALUES * 8 ? recycled : new ArrayBuffer(this.lastCapacity));
     let cursor = 0, records = 0;
     const strings: string[] = [], stringIds = new Map<string, number>(), fields: number[] = [];
+    const reserve = (count: number) => {
+      const needed = cursor + count;
+      if (needed > MAX_VALUES) throw new Error('Visual buffer budget exceeded');
+      if (needed > data.length) {
+        let cap = data.length;
+        while (cap < needed) cap = Math.min(MAX_VALUES, cap * 2);
+        const grown = new Float64Array(cap); grown.set(data); data = grown;
+      }
+    };
     const write = (n: number) => {
       if (cursor >= MAX_VALUES) throw new Error('Visual buffer budget exceeded');
       if (cursor === data.length) { const grown = new Float64Array(Math.min(MAX_VALUES, data.length * 2)); grown.set(data); data = grown; }
@@ -61,17 +78,75 @@ export class PackedVisualEncoder {
     };
     const number = (v: unknown) => { if (typeof v !== 'number') unsupported(); write(v as number); };
     const record = (v: unknown, layout: Schema): void => {
-      if (!v || typeof v !== 'object' || Object.getPrototypeOf(v) !== Object.prototype) unsupported();
-      const object = v as RecordValue, keys = Object.keys(object);
-      if (keys.some(key => !layout.keys.has(key))) unsupported();
+      if (!v || typeof v !== 'object' || (fastShapes ? (v as object).constructor !== Object : Object.getPrototypeOf(v) !== Object.prototype)) unsupported();
+      const object = v as RecordValue;
+      if (!fastShapes) {
+        for (const key in object) {
+          if (enumerable.call(object, key) && !layout.keys.has(key)) unsupported();
+        }
+      }
       if (++records > MAX_RECORDS) throw new Error('Visual record budget exceeded');
-      let ids = this.ids.get(layout); if (!ids) { ids = new WeakMap(); this.ids.set(layout, ids); }
+      let ids = this.ids[layout.index]; if (!ids) { ids = new WeakMap(); this.ids[layout.index] = ids; }
       let id = ids.get(object); if (id === undefined) { id = this.nextId++; ids.set(object, id); }
+      if (fastShapes) {
+        if (layout === point) {
+          const pt = object as { pos: Vector2; age: number; duration: number; baseWidth: number; currentWidth: number; u: number; alpha: number };
+          const pos = pt.pos;
+          if (pos && pos.constructor === Vector2 && typeof pt.age === 'number' && typeof pt.duration === 'number'
+            && typeof pt.baseWidth === 'number' && typeof pt.currentWidth === 'number' && typeof pt.u === 'number' && typeof pt.alpha === 'number') {
+            reserve(10);
+            data[cursor++] = id; data[cursor++] = point.fullMask;
+            data[cursor++] = pos.x; data[cursor++] = pos.y;
+            data[cursor++] = pt.age; data[cursor++] = pt.duration;
+            data[cursor++] = pt.baseWidth; data[cursor++] = pt.currentWidth;
+            data[cursor++] = pt.u; data[cursor++] = pt.alpha;
+            return;
+          }
+        } else if (layout === puff) {
+          const pf = object as { offset: Vector2; velocity: Vector2; startSize: number; endSize: number; texture: number; rotation: number };
+          const off = pf.offset, vel = pf.velocity;
+          if (off && off.constructor === Vector2 && vel && vel.constructor === Vector2
+            && typeof pf.startSize === 'number' && typeof pf.endSize === 'number' && typeof pf.texture === 'number' && typeof pf.rotation === 'number') {
+            reserve(10);
+            data[cursor++] = id; data[cursor++] = puff.fullMask;
+            data[cursor++] = off.x; data[cursor++] = off.y;
+            data[cursor++] = vel.x; data[cursor++] = vel.y;
+            data[cursor++] = pf.startSize; data[cursor++] = pf.endSize;
+            data[cursor++] = pf.texture; data[cursor++] = pf.rotation;
+            return;
+          }
+        } else if (layout === contrail) {
+          const ct = object as { pos: Vector2; vel: Vector2; life: number; maxLife: number; size: number; maxSize: number; alpha: number; rotation: number; color: number[] };
+          const pos = ct.pos, vel = ct.vel, col = ct.color;
+          if (pos && pos.constructor === Vector2 && vel && vel.constructor === Vector2
+            && typeof ct.life === 'number' && typeof ct.maxLife === 'number' && typeof ct.size === 'number'
+            && typeof ct.maxSize === 'number' && typeof ct.alpha === 'number' && typeof ct.rotation === 'number'
+            && Array.isArray(col) && col.length === 3 && typeof col[0] === 'number' && typeof col[1] === 'number' && typeof col[2] === 'number') {
+            reserve(15);
+            data[cursor++] = id; data[cursor++] = contrail.fullMask;
+            data[cursor++] = pos.x; data[cursor++] = pos.y;
+            data[cursor++] = vel.x; data[cursor++] = vel.y;
+            data[cursor++] = ct.life; data[cursor++] = ct.maxLife;
+            data[cursor++] = ct.size; data[cursor++] = ct.maxSize;
+            data[cursor++] = ct.alpha; data[cursor++] = ct.rotation;
+            data[cursor++] = col[0]; data[cursor++] = col[1]; data[cursor++] = col[2];
+            return;
+          }
+        }
+      }
       write(id); const maskAt = cursor; write(0); let mask = 0, bit = 1;
-      for (const [key, type] of layout.fields) {
-        const present = enumerable.call(object, key);
-        const value = present ? dataValue(object, key) : undefined;
-        const state = !present ? 0 : value === undefined ? 2 : value === null ? 3 : 1;
+      const schemaFields = layout.fields;
+      for (let f = 0; f < schemaFields.length; f++) {
+        const [key, type] = schemaFields[f];
+        let state: number, value: unknown;
+        if (fastShapes) {
+          value = object[key];
+          state = value !== undefined ? (value === null ? 3 : 1) : (Object.hasOwn(object, key) ? 2 : 0);
+        } else {
+          const present = enumerable.call(object, key);
+          value = present ? dataValue(object, key) : undefined;
+          state = !present ? 0 : value === undefined ? 2 : value === null ? 3 : 1;
+        }
         mask += state * bit; bit *= 4;
         if (state !== 1) continue;
         if (type === 'n') number(value);
@@ -79,12 +154,52 @@ export class PackedVisualEncoder {
         else if (type === 'b') { if (typeof value !== 'boolean') unsupported(); write(Number(value)); }
         else if (type === 'id') { write(typeof value === 'number' ? 0 : 1); if (typeof value === 'number') number(value); else text(value); }
         else if (type === 'v') {
-          if (!value || typeof value !== 'object' || Object.getPrototypeOf(value) !== Vector2.prototype || Object.keys(value).length !== 2) unsupported();
-          number(dataValue(value, 'x')); number(dataValue(value, 'y'));
+          if (!value || typeof value !== 'object' || (fastShapes ? (value as object).constructor !== Vector2 : Object.getPrototypeOf(value) !== Vector2.prototype)) unsupported();
+          if (fastShapes) {
+            number((value as Vector2).x); number((value as Vector2).y);
+          } else {
+            if (!enumerable.call(value, 'x') || !enumerable.call(value, 'y')) unsupported();
+            let vKeys = 0;
+            for (const k in value) if (enumerable.call(value, k)) vKeys++;
+            if (vKeys !== 2) unsupported();
+            number(dataValue(value, 'x')); number(dataValue(value, 'y'));
+          }
+        } else if (type === 'va') {
+          if (!Array.isArray(value) || value.length > MAX_RECORDS) unsupported();
+          if (!fastShapes) {
+            let aKeys = 0;
+            for (const k in value) if (enumerable.call(value, k)) aKeys++;
+            if (aKeys !== value.length) unsupported();
+          }
+          write(value.length);
+          for (let i = 0; i < value.length; i++) {
+            const pt = fastShapes ? value[i] : (enumerable.call(value, String(i)) ? dataValue(value, String(i)) : unsupported());
+            if (!pt || typeof pt !== 'object' || (fastShapes ? (pt as object).constructor !== Vector2 : Object.getPrototypeOf(pt) !== Vector2.prototype)) unsupported();
+            if (fastShapes) {
+              number((pt as Vector2).x); number((pt as Vector2).y);
+            } else {
+              if (!enumerable.call(pt, 'x') || !enumerable.call(pt, 'y')) unsupported();
+              let vKeys = 0;
+              for (const k in pt) if (enumerable.call(pt, k)) vKeys++;
+              if (vKeys !== 2) unsupported();
+              number(dataValue(pt, 'x')); number(dataValue(pt, 'y'));
+            }
+          }
         } else if (type === 'c3' || type === 'c4') {
           const length = type === 'c3' ? 3 : 4;
-          if (!Array.isArray(value) || value.length !== length || Object.keys(value).length !== length) unsupported();
-          for (let i = 0; i < length; i++) number(dataValue(value, String(i)));
+          if (!Array.isArray(value) || value.length !== length) unsupported();
+          if (fastShapes) {
+            for (let i = 0; i < length; i++) number(value[i]);
+          } else {
+            let cKeys = 0;
+            for (const k in value) if (enumerable.call(value, k)) cKeys++;
+            if (cKeys !== length) unsupported();
+            for (let i = 0; i < length; i++) {
+              const idx = i === 0 ? '0' : i === 1 ? '1' : i === 2 ? '2' : '3';
+              if (!enumerable.call(value, idx)) unsupported();
+              number(dataValue(value, idx));
+            }
+          }
         } else if (Array.isArray(type)) array(value, type[0]);
         else record(value, type as Schema);
       }
@@ -92,14 +207,17 @@ export class PackedVisualEncoder {
     };
     const array = (value: unknown, layout: Schema) => {
       if (!Array.isArray(value) || value.length > MAX_RECORDS) unsupported();
-      write(value.length); for (const item of value) record(item, layout);
+      write(value.length); for (let i = 0; i < value.length; i++) record(value[i], layout);
     };
     for (let i = 0; i < collections.length; i++) {
-      const [key, layout] = collections[i], value = key === 'trailStrips' ? Array.from(view[key]) : view[key];
+      const [key, layout] = collections[i];
+      const raw = view[key];
+      const value = key === 'trailStrips' && !Array.isArray(raw) ? Array.from(view.trailStrips) : raw;
       const start = cursor, oldRecords = records;
       try { array(value, layout); fields.push(i); }
       catch (error) { if (!(error instanceof UnsupportedVisual)) throw error; cursor = start; records = oldRecords; }
     }
+    this.lastCapacity = data.buffer.byteLength;
     return { buffer: data.buffer as ArrayBuffer, length: cursor, fields, strings };
   }
 }
@@ -138,6 +256,12 @@ export class PackedVisualDecoder {
         else if (type === 'b') { const b = read(); if (b !== 0 && b !== 1) throw new Error('Invalid visual boolean'); }
         else if (type === 'id') { const tag = read(); if (tag === 0) read(); else if (tag === 1) text(); else throw new Error('Invalid visual ID'); }
         else if (type === 'v') { read(); read(); }
+        else if (type === 'va') {
+          const count = read();
+          if (!integer(count) || count > MAX_RECORDS) throw new Error('Invalid visual vector array');
+          cursor += count * 2;
+          if (cursor > data.length) throw new Error('Truncated visual data');
+        }
         else if (type === 'c3' || type === 'c4') { for (let i = 0; i < (type === 'c3' ? 3 : 4); i++) read(); }
         else if (Array.isArray(type)) array(type[0]);
         else record(type as Schema);
@@ -186,6 +310,14 @@ export class PackedVisualDecoder {
         else if (type === 'v') {
           const v = target[key] instanceof Vector2 ? target[key] as Vector2 : new Vector2();
           v.x = data[cursor++]; v.y = data[cursor++]; target[key] = v;
+        } else if (type === 'va') {
+          const arr = Array.isArray(target[key]) ? target[key] as Vector2[] : [];
+          const length = data[cursor++]; arr.length = length;
+          for (let i = 0; i < length; i++) {
+            const v = arr[i] instanceof Vector2 ? arr[i] : new Vector2();
+            v.x = data[cursor++]; v.y = data[cursor++]; arr[i] = v;
+          }
+          target[key] = arr;
         } else if (type === 'c3' || type === 'c4') {
           const v = Array.isArray(target[key]) ? target[key] as number[] : [];
           const length = type === 'c3' ? 3 : 4; v.length = length; for (let i = 0; i < length; i++) v[i] = data[cursor++]; target[key] = v;

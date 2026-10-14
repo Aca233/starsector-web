@@ -11,7 +11,6 @@ import { TacticalCommandDock, type TacticalAction, type TacticalActionGroup } fr
 import { TacticalShipStatus } from './TacticalShipStatus';
 import { NativeBitmapText } from '../NativeBitmapText';
 import { fitTacticalView, mapWorld, pickMapShip, TacticalMapPainter, zoomTacticalView } from './TacticalMapPainter';
-import './tactical-map.css';
 
 export interface TacticalMapProps {
   source: TacticalMapSource;
@@ -336,7 +335,7 @@ function TacticalMapContent(props: TacticalMapProps & { map: TacticalMapView; ge
     </aside>
     <TacticalShipStatus ship={map.playerShip} readShip={() => displayed.current.playerShip} />
     {!props.readOnlyCommands&&groups.length>0&&<TacticalCommandDock groups={groups} onAction={runAction} />}
-    {showInfo&&<aside className="tactical-map-info" aria-label="战术信息"><strong>{inspected?nameOf(inspected):'全舰指令'}</strong><p>{inspected?'结构 '+Math.ceil(inspected.hullHp)+' / '+inspected.maxHullHp+' · 载荷 '+Math.round(inspected.flux.fluxPercent*100)+'%':''}</p><p>左键选择接触；右键空白处移动，右键敌舰集火。A 选择全舰，Del 取消指令。</p><p>拖动或方向键平移；滚轮 / ± 缩放。Home 全览，Tab 返回战斗。</p><p>{map.openBattlefield ? "多队联机为公开战场：显示所有已部署且存活的舰船；队色与大厅一致。后备、入库和已撤退舰不显示。" : "灰蓝色为未探明区域，黑色为己方地图视野；基础传感器半径为 3000，受舰船和系统视野加成影响。"}</p><button onClick={()=>setShowInfo(false)}>关闭 [F2]</button></aside>}
+    {showInfo&&<aside className="tactical-map-info" aria-label="战术信息"><strong>{inspected?nameOf(inspected):'全舰指令'}</strong><p>{inspected?'结构 '+Math.ceil(inspected.hullHp)+' / '+inspected.maxHullHp+' · 载荷 '+Math.round(inspected.flux.fluxPercent*100)+'%':''}</p><p>左键选择接触；右键空白处移动，右键敌舰集火。A 选择全舰，Del 取消指令。</p><p>拖动或方向键平移；滚轮 / ± 缩放。Home 全览，Tab 返回战斗。</p><p>所有战斗均全图可见，无传感器距离限制。显示所有已部署且存活的舰船；后备、入库和已撤退舰不显示。</p><button onClick={()=>setShowInfo(false)}>关闭 [F2]</button></aside>}
     <footer className="tactical-map-help"><div role="status">{message}</div></footer>
   </section>;
 }

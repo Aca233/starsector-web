@@ -13,7 +13,7 @@ import { shipPresentationPose } from "../visual/ShipPresentation";
 import { sameTeam } from "./CombatTeams";
 import { RuntimeCombatModifiers } from '../extensions/RuntimeCombatModifiers';
 import { advanceCombatSkills, polarizedArmorLevel } from '../extensions/CombatSkills';
-import { hasOnlyLocalAdvanceHullMods, hasOnlyNativeRangeModifiers, installedHullMods, effectiveHullStats, hullModLoadoutErrors } from '../extensions/HullMods';
+import { advanceHullMods, hasOnlyLocalAdvanceHullMods, hasOnlyNativeRangeModifiers, installedHullMods, surfaceFeedbackHullMods, effectiveHullStats, hullModLoadoutErrors } from '../extensions/HullMods';
 import { i18n } from '../i18n/LocalizationManager';
 import { applyComponentDamage } from './systems/weapon/ComponentDamage';
 import { advanceShipMotion, advanceAngularVelocity, shipMotionStats } from './systems/ShipMotion';
@@ -119,6 +119,44 @@ function getArmorGridLocalRect(spec: ShipSpec): ArmorGridLocalRect {
   return { minX: -diameter / 2, minY: -diameter / 2, width: diameter, height: diameter };
 }
 
+const assemblyShipsCache = new WeakMap<Ship, { childCount: number; list: Ship[] }>();
+const allSystemsCache = new WeakMap<Ship, { system: ShipSystem; systems: ShipSystem[]; second: ShipSystem | undefined; defense: ShipSystem; list: readonly ShipSystem[] }>();
+const specMeasureJetsCache = new WeakMap<ShipSpec, boolean>();
+const crEffectsCache = new WeakMap<Ship, { cr: number; rangeMult: number; fighter: boolean; wBonus: number; cBonus: number; cMult: number; effects: CombatReadinessEffects }>();
+let sharedEngineAdvanceShip: Ship | null = null;
+const sharedEngineAdvanceOptions = {
+  extendedGlow: false,
+  systemActive: false,
+  accelerating: false,
+  spreading: false,
+  maneuver: undefined as [number, number, number] | undefined,
+  canRepair: false,
+  repairTimeMultiplier: 1,
+  canRepairUnderFire: false,
+  malfunctionChance: 0,
+  criticalMalfunctionChance: 0,
+  onCriticalMalfunction(index: number) {
+    const s = sharedEngineAdvanceShip!;
+    const slot = s.spec.engineSlots[index];
+    s.applyCriticalMalfunctionDamage(new Vector2(slot.x, slot.y));
+  },
+};
+
+export function readShipSystems(ship: Ship): readonly ShipSystem[] {
+  if (Object.getPrototypeOf(ship) !== Ship.prototype || Object.hasOwn(ship, 'allSystems')
+    || Object.hasOwn(ship, 'system') || Object.hasOwn(ship, 'systems') || Object.hasOwn(ship, 'defenseSystem')) {
+    return ship.allSystems;
+  }
+  const sys = ship.system, systems = ship.systems, second = systems[1], def = ship.defenseSystem;
+  let cached = allSystemsCache.get(ship);
+  if (!cached || cached.system !== sys || cached.systems !== systems || cached.second !== second || cached.defense !== def) {
+    const list = systems.length <= 1 ? [sys, def] : [sys, ...systems.slice(1), def];
+    cached = { system: sys, systems, second, defense: def, list };
+    allSystemsCache.set(ship, cached);
+  }
+  return cached.list;
+}
+
 export class Ship {
   public parentShip: Ship | null = null;
   public moduleMount: ShipModuleSpec | null = null;
@@ -130,7 +168,17 @@ export class Ship {
   public get isAttachedModule(): boolean { return this.parentShip !== null; }
   public get hasVastBulk(): boolean { return !!(containsVastBulk(this.spec.builtInHullMods) || containsVastBulk(this.spec.hullMods)); }
   public get isCombatModule(): boolean { return this.spec.moduleCombat ?? (this.weapons.length > 0 || this.hullStats.fighterBays > 0); }
-  public get assemblyShips(): Ship[] { return [this, ...this.childModules.flatMap(child => child.assemblyShips)]; }
+  public get assemblyShips(): Ship[] {
+    let cached = assemblyShipsCache.get(this);
+    if (!cached || cached.childCount !== this.childModules.length) {
+      cached = {
+        childCount: this.childModules.length,
+        list: this.childModules.length === 0 ? [this] : [this, ...this.childModules.flatMap(child => child.assemblyShips)],
+      };
+      assemblyShipsCache.set(this, cached);
+    }
+    return cached.list;
+  }
   public get deploymentRadius(): number {
     return Math.max(this.spec.collisionRadius, ...this.childModules.map(child => {
       const offset = moduleOffset(child.moduleMount!);
@@ -214,8 +262,9 @@ export class Ship {
   /** Cosmetic only: queries current authority state, never caches a display-side timer. */
   public get surfaceFeedback(): ShipSurfaceFeedback | undefined {
     if (this.isDead || this.hullHp <= 0 || this.isDocked || this.isRetreated) return undefined;
-    for (const mod of installedHullMods(this.spec)) {
-      const feedback = mod.surfaceFeedback?.(this);
+    const mods = surfaceFeedbackHullMods(this.spec);
+    for (let i = 0; i < mods.length; i++) {
+      const feedback = mods[i].surfaceFeedback?.(this);
       if (feedback) return feedback;
     }
     return undefined;
@@ -238,7 +287,9 @@ export class Ship {
   /** Compatibility first-slot/stat facade. New lifecycle code iterates systems/allSystems. */
   public system: ShipSystem;
   public systems: ShipSystem[];
-  public get allSystems(): ShipSystem[] { return [this.system, ...this.systems.slice(1), this.defenseSystem]; }
+  public get allSystems(): ShipSystem[] {
+    return [this.system, ...this.systems.slice(1), this.defenseSystem];
+  }
   public getSystem(slot = 0): ShipSystem | undefined { return Number.isInteger(slot) && slot >= 0 ? this.systems[slot] : undefined; }
   public defenseSystem: ShipSystem;
   public readonly weaponControl: ShipWeaponControlSystem;
@@ -290,13 +341,17 @@ export class Ship {
   /** Same damage/range read boundary, but separately audited authored AI may
    * reuse exact statistics. Never use this permission for forecast cadence. */
   public get hasExactThreatPhaseHooks(): boolean {
-    return this.damageTakenModifiers.size === 0 && this.externalPhaseEffects.size === 0
-      && !Object.hasOwn(this, 'externalDamageTakenMultiplier')
-      && this.shield.externalDamageTakenMultiplier === nativeShieldReaders.get(this)
-      && this.shield.damageTakenMultiplierFor === nativeShieldDamageFor
-      && !Object.hasOwn(this.shield, 'damageTakenMultiplier')
-      && this.allSystems.every(system => system.hasExactThreatPhaseAI)
-      && hasOnlyNativeRangeModifiers(this.spec)
+    if (this.damageTakenModifiers.size !== 0 || this.externalPhaseEffects.size !== 0
+      || Object.hasOwn(this, 'externalDamageTakenMultiplier')
+      || this.shield.externalDamageTakenMultiplier !== nativeShieldReaders.get(this)
+      || this.shield.damageTakenMultiplierFor !== nativeShieldDamageFor
+      || Object.hasOwn(this.shield, 'damageTakenMultiplier')) return false;
+    if (!Object.hasOwn(this, 'allSystems') && this.systems.length <= 1 && (!this.systems.length || this.systems[0] === this.system)) {
+      if (!this.system.hasExactThreatPhaseAI || !this.defenseSystem.hasExactThreatPhaseAI) return false;
+    } else if (!this.allSystems.every(system => system.hasExactThreatPhaseAI)) {
+      return false;
+    }
+    return hasOnlyNativeRangeModifiers(this.spec)
       && (!this.sourceCarrier || hasOnlyNativeRangeModifiers(this.sourceCarrier.spec));
   }
   /** Independent write-domain gate for the private data-command Worker. The
@@ -304,14 +359,19 @@ export class Ship {
    * No permission for arbitrary caller-owned Ships or later event dispatch. */
   public get hasOwnedLocalThreatUpdate(): boolean {
     const native = nativeArmorReaders.get(this);
-    return this.update === nativeLocalShipUpdate && this.statusEffects.size === 0
-      && this.hullDamageInterceptors.size === 0 && this.shield.type !== 'PHASE'
-      && this.shield.update === nativeLocalShieldUpdate
-      && this.weaponControl.update === nativeLocalWeaponUpdate
-      && this.engineController.advance === nativeLocalEngineAdvance
-      && this.hasExactThreatPhaseHooks && hasOnlyLocalAdvanceHullMods(this.spec)
-      && this.allSystems.every(system => system.update === nativeLocalSystemUpdate && system.hasNativeStats)
-      && !!native && this.armor.damageTakenModifiers === native.damage
+    if (this.update !== nativeLocalShipUpdate || this.statusEffects.size !== 0
+      || this.hullDamageInterceptors.size !== 0 || this.shield.type === 'PHASE'
+      || this.shield.update !== nativeLocalShieldUpdate
+      || this.weaponControl.update !== nativeLocalWeaponUpdate
+      || this.engineController.advance !== nativeLocalEngineAdvance
+      || !this.hasExactThreatPhaseHooks || !hasOnlyLocalAdvanceHullMods(this.spec)) return false;
+    if (!Object.hasOwn(this, 'allSystems') && this.systems.length <= 1 && (!this.systems.length || this.systems[0] === this.system)) {
+      if (this.system.update !== nativeLocalSystemUpdate || !this.system.hasNativeStats
+        || this.defenseSystem.update !== nativeLocalSystemUpdate || !this.defenseSystem.hasNativeStats) return false;
+    } else if (!this.allSystems.every(system => system.update === nativeLocalSystemUpdate && system.hasNativeStats)) {
+      return false;
+    }
+    return !!native && this.armor.damageTakenModifiers === native.damage
       && this.armor.dynamicEffectiveArmorMultiplier === native.effective
       && this.armor.onCellDamage === native.cell && this.flux.onOverloadStarted === native.overload;
   }
@@ -372,6 +432,7 @@ export class Ship {
   public isDead = false;
   public clearInput(): void {
     this.isFiringMain = false;
+    for (const system of this.allSystems) { system.gravityControlHeld = false; if(system.definition.gravityDirectionalPush) system.deactivate(); }
     this.throttle = 0;
     this.brakeInput = false;
     this.strafeInput = 0;
@@ -532,10 +593,23 @@ export class Ship {
   // 在标准 70% 战备下所有倍率恒为 1.0，因此仅在衰退/超常战备时改变作战性能。
   // --------------------------------------------------------------------------
   public get crEffects(): CombatReadinessEffects {
-    const effects = computeCombatReadinessEffects(this.currentCR, this.crMalfunctionRangeMultiplier, this.flux.hullSize === 'FIGHTER');
-    effects.weaponMalfunctionChance += this.hullStats.weaponMalfunctionChanceBonus;
-    effects.criticalMalfunctionChance = (effects.criticalMalfunctionChance + this.hullStats.criticalMalfunctionChanceBonus) * this.criticalMalfunctionChanceMultiplier;
-    return effects;
+    const cr = this.currentCR;
+    const rangeMult = this.crMalfunctionRangeMultiplier;
+    const fighter = this.flux.hullSize === 'FIGHTER';
+    const wBonus = this.hullStats.weaponMalfunctionChanceBonus;
+    const cBonus = this.hullStats.criticalMalfunctionChanceBonus;
+    const cMult = this.criticalMalfunctionChanceMultiplier;
+    let cached = crEffectsCache.get(this);
+    if (!cached || !Object.is(cached.cr, cr) || !Object.is(cached.rangeMult, rangeMult)
+      || cached.fighter !== fighter || !Object.is(cached.wBonus, wBonus)
+      || !Object.is(cached.cBonus, cBonus) || !Object.is(cached.cMult, cMult)) {
+      const effects = computeCombatReadinessEffects(cr, rangeMult, fighter);
+      effects.weaponMalfunctionChance += wBonus;
+      effects.criticalMalfunctionChance = (effects.criticalMalfunctionChance + cBonus) * cMult;
+      cached = { cr, rangeMult, fighter, wBonus, cBonus, cMult, effects };
+      crEffectsCache.set(this, cached);
+    }
+    return cached.effects;
   }
 
   /** 最高航速/加速度/减速度/转向速率倍率 (±10%)。 */
@@ -695,11 +769,22 @@ export class Ship {
 
   /** Current Web flame-length modifiers; zero-flux boost is a separate mechanism. */
   public get isEngineGlowExtended(): boolean {
-    return (this.allSystems.some(system => system.definition.controls?.suppressZeroFlux && system.effectLevel > 0)) || this.shield.phaseEffectLevel > 0;
+    if (this.shield.phaseEffectLevel > 0) return true;
+    const systems = readShipSystems(this);
+    for (let i = 0; i < systems.length; i++) {
+      const system = systems[i];
+      if (system.definition.controls?.suppressZeroFlux && system.effectLevel > 0) return true;
+    }
+    return false;
   }
 
   private get engineDisableContext() {
-    return { extendedGlow: this.isEngineGlowExtended, systemActive: this.allSystems.some(system => system.isActive) };
+    const systems = readShipSystems(this);
+    let systemActive = false;
+    for (let i = 0; i < systems.length; i++) {
+      if (systems[i].isActive) { systemActive = true; break; }
+    }
+    return { extendedGlow: this.isEngineGlowExtended, systemActive };
   }
 
   public damageEngineComponent(engineIndex: number, damage: number): void {
@@ -873,10 +958,21 @@ export class Ship {
    * 判定视野与战术测距内是否存在重要敌对主力舰 (1:1 com.fs.starfarer.combat.entities.Ship.areSignificantEnemiesInRange)
    */
   public areSignificantEnemiesInRange(range = 2500, enemy?: Ship | null): boolean {
-    const significant = (other: Ship) => other !== this && !sameTeam(other, this) && !other.isDead && !other.isRetreated && !other.isDocked
-      && other.spec.hullSize !== 'FIGHTER' && this.pos.distanceTo(other.pos) <= range;
-    // Enemy presence/PPT is a world query, never contingent on the player's R lock.
-    return !!(enemy && significant(enemy)) || this.combatShips.some(significant);
+    const rangeSq = range * range;
+    const px = this.pos.x, py = this.pos.y;
+    if (enemy && enemy !== this && !sameTeam(enemy, this) && !enemy.isDead && !enemy.isRetreated && !enemy.isDocked && enemy.spec.hullSize !== 'FIGHTER') {
+      const dx = px - enemy.pos.x, dy = py - enemy.pos.y;
+      if (dx * dx + dy * dy <= rangeSq) return true;
+    }
+    const ships = this.combatShips;
+    for (let i = 0; i < ships.length; i++) {
+      const other = ships[i];
+      if (other !== this && !sameTeam(other, this) && !other.isDead && !other.isRetreated && !other.isDocked && other.spec.hullSize !== 'FIGHTER') {
+        const dx = px - other.pos.x, dy = py - other.pos.y;
+        if (dx * dx + dy * dy <= rangeSq) return true;
+      }
+    }
+    return false;
   }
 
   /** Adapt source D flux modifiers without mutating saved ShipSpec or FluxTracker defaults. */
@@ -930,18 +1026,23 @@ export class Ship {
   public prepareStep(dt: number, targetShip: Ship | null, fireControlWorld?: FireControlWorld): ShipStepState | undefined {
     // Ship.advance advances listeners before weapons; use the Web combat step.
     // A notification does not alter the triggering pulse or later beams this tick.
-    if (dt > 0) for (const [id, effect] of this.statusEffects) {
+    if (dt > 0 && this.statusEffects.size > 0) for (const [id, effect] of this.statusEffects) {
       if (!effect.advance(this, dt)) this.statusEffects.delete(id);
     }
-    const measureJets = this.spec.engineSlots.some(slot => slot.maneuver);
+    let measureJets = specMeasureJetsCache.get(this.spec);
+    if (measureJets === undefined || !isImmutableMetadata(this.spec)) {
+      measureJets = this.spec.engineSlots.some(slot => slot.maneuver);
+      if (isImmutableMetadata(this.spec)) specMeasureJetsCache.set(this.spec, measureJets);
+    }
     const jetVelocity = measureJets ? this.vel.clone() : undefined;
     const jetAngularVelocity = this.angularVelRad;
     const jetFacing = this.facingRad;
-    if (dt > 0) for (const mod of installedHullMods(this.spec)) if (mod.status === 'implemented') mod.advance?.(this, dt, this.random);
+    if (dt > 0) for (const mod of advanceHullMods(this.spec)) mod.advance?.(this, dt, this.random);
     // This deployment plugin uses world dt, before phase scales the ship clock.
     this.advanceDeploymentReadiness(dt);
+    const systems = readShipSystems(this);
     if (this.isDead || this.isRetreated || this.hullHp <= 0) {
-      for (const system of this.allSystems) if (system.definition.controls?.cancelOnDeath) system.deactivate();
+      for (let i = 0; i < systems.length; i++) if (systems[i].definition.controls?.cancelOnDeath) systems[i].deactivate();
       return;
     }
 
@@ -964,7 +1065,8 @@ export class Ship {
       }
     }
 
-    for (const eng of this.engineStatuses) {
+    for (let i = 0; i < this.engineStatuses.length; i++) {
+      const eng = this.engineStatuses[i];
       eng.prevThrust = eng.currentThrust;
       eng.prevSpread = eng.spread;
     }
@@ -979,7 +1081,8 @@ export class Ship {
     advanceCombatSkills(this, effectiveDt);
 
     // 1. 更新战术技能与幅能
-    for (const system of this.allSystems) {
+    for (let i = 0; i < systems.length; i++) {
+      const system = systems[i];
       // Navigation cancellation happens before motion reads blockAcceleration.
       // Only opted-in systems release control; other drive contracts are unchanged.
       const controls = system.definition.controls;
@@ -991,7 +1094,9 @@ export class Ship {
     this.applyCombatReadiness(effectiveDt);
 
     // Existing Web system-cancellation rules remain an adapter, not native controller behavior.
-    for (const system of this.allSystems) {
+    const postSystems = readShipSystems(this);
+    for (let i = 0; i < postSystems.length; i++) {
+      const system = postSystems[i];
       if (this.flux.isOverloaded || this.flux.isVenting || (system.isActive && system.definition.controls?.cancelOnFlameout && (this.getFlameoutRatio() >= 1 || this.engineController.isFlamedOut))) system.deactivate();
     }
 
@@ -1029,7 +1134,8 @@ export class Ship {
     }
 
     // 系统激活成本 (ship_systems.csv flux/use)：空雷突袭每次使用消耗 10% 基础幅能容量。
-    for (const system of this.allSystems) {
+    for (let i = 0; i < postSystems.length; i++) {
+      const system = postSystems[i];
       const cost = system.consumePendingActivationFlux();
       if (cost > 0) this.flux.increaseFlux(cost, system.generatesHardFlux);
     }
@@ -1075,17 +1181,30 @@ export class Ship {
     this.updateScorchMarks(dt);
 
     // Native ship order: movement commands, component health, controller, then glow.
-    this.engineController.advance(effectiveDt, {
-      ...this.engineDisableContext, ...engineCommands, maneuver, canRepair: !this.isDead && this.hullHp > 0,
-      repairTimeMultiplier: this.combatEngineRepairTimeMultiplier * this.system.getRepairTimeMultiplier(),
-      canRepairUnderFire: this.canRepairModulesUnderFire,
-      malfunctionChance: this.crEffects.engineMalfunctionChance,
-      criticalMalfunctionChance: this.crEffects.criticalMalfunctionChance,
-      onCriticalMalfunction: index => {
-        const slot = this.spec.engineSlots[index];
-        this.applyCriticalMalfunctionDamage(new Vector2(slot.x, slot.y));
-      }
-    });
+    const systems = readShipSystems(this);
+    let systemActive = false, extendedGlow = this.shield.phaseEffectLevel > 0;
+    for (let i = 0; i < systems.length; i++) {
+      const s = systems[i];
+      if (s.isActive) systemActive = true;
+      if (!extendedGlow && s.definition.controls?.suppressZeroFlux && s.effectLevel > 0) extendedGlow = true;
+    }
+    const cr = this.crEffects;
+    const opts = sharedEngineAdvanceOptions;
+    opts.extendedGlow = extendedGlow;
+    opts.systemActive = systemActive;
+    opts.accelerating = engineCommands.accelerating;
+    opts.spreading = engineCommands.spreading;
+    opts.maneuver = maneuver;
+    opts.canRepair = !this.isDead && this.hullHp > 0;
+    opts.repairTimeMultiplier = this.combatEngineRepairTimeMultiplier * this.system.getRepairTimeMultiplier();
+    opts.canRepairUnderFire = this.canRepairModulesUnderFire;
+    opts.malfunctionChance = cr.engineMalfunctionChance;
+    opts.criticalMalfunctionChance = cr.criticalMalfunctionChance;
+    opts.onCriticalMalfunction = cr.criticalMalfunctionChance > 0 ? (index: number) => {
+      const slot = this.spec.engineSlots[index];
+      this.applyCriticalMalfunctionDamage(new Vector2(slot.x, slot.y));
+    } : undefined;
+    this.engineController.advance(effectiveDt, opts);
 
     // P.java retains seven recent poses for the coil masks, not fading hull copies.
     if (this.shield.isPhaseEngaged) {
@@ -1148,16 +1267,21 @@ const nativeMotionStep = (Ship.prototype as unknown as {updateMotion: unknown}).
 const nativePoseSync = Ship.prototype.syncModulePose;
 const nativeModuleTreeSync = Ship.prototype.syncModuleTree;
 const nativeApplyHullDamage = Ship.prototype.applyHullDamage;
-const numericVectorMethods = (['set','addScaled','scale','length'] as const).map(key=>[key,Vector2.prototype[key]] as const);
+const vecSet = Vector2.prototype.set;
+const vecAddScaled = Vector2.prototype.addScaled;
+const vecScale = Vector2.prototype.scale;
+const vecLength = Vector2.prototype.length;
 /** Modules keep their parent-relative and independent-rotation owner. Unknown
  * whole motion/vector overrides retain their original execution contract. */
 export function hasNativeMotionBoundary(ship: Ship): boolean {
+  const pos = ship.pos, vel = ship.vel;
   return ship.integrateStep === nativeIntegrateStep
     && (ship as unknown as {updateMotion: unknown}).updateMotion === nativeMotionStep
     && ship.syncModulePose === nativePoseSync
     && ship.system.hasNativeStats && ship.defenseSystem.hasNativeStats
-    && Object.getPrototypeOf(ship.pos) === Vector2.prototype && Object.getPrototypeOf(ship.vel) === Vector2.prototype
-    && numericVectorMethods.every(([key,method])=>ship.pos[key]===method && ship.vel[key]===method);
+    && Object.getPrototypeOf(pos) === Vector2.prototype && Object.getPrototypeOf(vel) === Vector2.prototype
+    && pos.set === vecSet && pos.addScaled === vecAddScaled && pos.scale === vecScale && pos.length === vecLength
+    && vel.set === vecSet && vel.addScaled === vecAddScaled && vel.scale === vecScale && vel.length === vecLength;
 }
 export function hasNumericMotionBoundary(ship: Ship): boolean {
   return !ship.isAttachedModule && !ship.isStation && hasNativeMotionBoundary(ship);

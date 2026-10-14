@@ -1,4 +1,6 @@
 import { Vector2 } from '../math/Vector2';
+import type { ContrailStats } from '../contracts/CombatTelemetry';
+export type { ContrailStats } from '../contracts/CombatTelemetry';
 
 export interface ContrailPoint {
   pos: Vector2;
@@ -19,11 +21,6 @@ export interface ContrailStrip {
   minSeg: number;
   isDetached: boolean;
   accumU: number;
-}
-
-export interface ContrailStats {
-  stripCount: number;
-  pointCount: number;
 }
 
 /**

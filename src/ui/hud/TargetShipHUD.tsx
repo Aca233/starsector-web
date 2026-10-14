@@ -8,8 +8,6 @@ import { ShipPaperDoll } from './ShipPaperDoll';
 import { buildWeaponHudGroups } from './WeaponHudModel';
 import { summarizeGroupAmmo, updateHudMeter } from './hudUtils';
 import { contactAnchor } from './ContactLayout';
-import './target-ship-hud.css';
-import './combat-interface.css';
 
 const damageLabels = { KINETIC: '动能', HIGH_EXPLOSIVE: '高爆', ENERGY: '能量', FRAGMENTATION: '破片' };
 interface Props extends Pick<FloatingShipHUDProps, 'cameraPosRef' | 'zoomRef' | 'canvasRef' | 'alphaRef'> { ship: Ship; observer: Ship }
@@ -58,7 +56,7 @@ export function TargetShipHUD({ ship, observer, cameraPosRef, zoomRef, canvasRef
           <div className="hud-target-data"><span>距离</span><b><span ref={distance} /> SU</b></div>
           <div className="hud-target-data"><span>航速</span><b><span ref={speed} /> SU/S</b></div>
         </div>
-        <ShipPaperDoll ship={ship} isEnemy size={86} />
+        <ShipPaperDoll cssSized ship={ship} isEnemy size={86} />
       </div>
       <div className="hud-target-state">{ship.flux.isOverloaded ? '载荷过载' : ship.flux.isVenting ? '排散载荷' : ship.isPhased ? '相位潜航' : ''}</div>
       <section className="hud-target-armament" aria-label="武器详情"><h3 className="hud-detail-heading">武器详情</h3>

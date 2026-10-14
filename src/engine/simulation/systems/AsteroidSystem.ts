@@ -6,8 +6,14 @@ import { Projectile } from '../Weapon';
 import { combatAudio as sound } from '../../audio/CombatAudioEvents';
 import { VisualRandom } from '../../runtime/VisualRandom';
 import { SimulationRandom } from '../SimulationRandom';
+import { BATTLE_HALF_EXTENT } from '../CombatDeployment';
 import { getShieldCircleContact } from '../collision/ShieldCollisionGeometry';
 import { getHullCircleContact } from '../collision/HullGeometry';
+import { knownProjectionKeys } from '../../runtime/local/RenderShipProjection';
+
+const asteroidProjectionKeys = Object.freeze([
+  'id', 'pos', 'vel', 'facingRad', 'angularVel', 'radius', 'mass', 'hp', 'maxHp', 'spriteUrl', 'gravityFixed'
+]);
 
 export interface AsteroidFXCallbacks {
   spawnShieldRipple: (pos: Vector2, maxRadius: number, color: [number, number, number]) => void;
@@ -28,19 +34,39 @@ interface SegmentCircleImpact {
 }
 
 function segmentCircleImpact(start: Vector2, end: Vector2, center: Vector2, radius: number): SegmentCircleImpact | null {
-  const d = end.clone().sub(start);
-  const f = start.clone().sub(center);
-  const a = d.dot(d);
+  // Keep the original dot-product arithmetic and root selection, but allocate
+  // an impact point only on a hit (no temporary vectors for every missed rock).
+  const dx = end.x - start.x, dy = end.y - start.y;
+  const fx = start.x - center.x, fy = start.y - center.y;
+  const a = dx * dx + dy * dy;
   if (a <= 1e-12) return start.distanceTo(center) <= radius ? { t: 0, point: start.clone() } : null;
-  const b = 2 * f.dot(d);
-  const c = f.dot(f) - radius * radius;
+  const b = 2 * (fx * dx + fy * dy);
+  const c = fx * fx + fy * fy - radius * radius;
   const discriminant = b * b - 4 * a * c;
   if (discriminant < 0) return null;
   const sqrt = Math.sqrt(discriminant);
   const t1 = (-b - sqrt) / (2 * a);
   const t2 = (-b + sqrt) / (2 * a);
   const t = t1 >= 0 && t1 <= 1 ? t1 : t2 >= 0 && t2 <= 1 ? t2 : null;
-  return t === null ? null : { t, point: start.clone().addScaled(d, t) };
+  return t === null ? null : { t, point: new Vector2(start.x + dx * t, start.y + dy * t) };
+}
+
+/** Conservative, rotation-independent hull envelope. This is phase-local for
+ * mutable outlines, not a persistent cache of a refittable ship specification. */
+function hullReach(ship: Ship): number {
+  const bounds = ship.spec.bounds;
+  if (!bounds || bounds.length < 3) return Math.max(0, ship.spec.collisionRadius);
+  let reach = 0;
+  for (const [x, y] of bounds) reach = Math.max(reach, Math.abs(x) + Math.abs(y));
+  return reach;
+}
+
+/** Fail open for boundary/extreme numeric inputs; exact contact remains authoritative. */
+function circlesDefinitelySeparated(first: Vector2, second: Vector2, reach: number): boolean {
+  const scale = Math.max(1, Math.abs(first.x), Math.abs(first.y), Math.abs(second.x), Math.abs(second.y), reach);
+  if (!(reach >= 0) || !(scale <= 1e100)) return false;
+  const padded = reach + 1e-7 * scale;
+  return Math.abs(second.x - first.x) > padded || Math.abs(second.y - first.y) > padded;
 }
 
 /** 弹丸本帧与最近小行星的扫掠交点 (供武器仿真在舰船碰撞前做优先级比较)。 */
@@ -69,10 +95,24 @@ export class AsteroidSystem {
       '/game-assets/graphics/asteroids/asteroid_big00.png'
     ];
 
-    const count = 18;
+    // Keep the original center rocks, then populate one sparse rock per outer
+    // battlefield cell. The camera never creates/deletes physical terrain.
+    const centerCount = 18, gridSize = 8;
+    const outerCells: number[] = [];
+    for (let row = 0; row < gridSize; row++) for (let col = 0; col < gridSize; col++) {
+      if ((col === 3 || col === 4) && (row === 3 || row === 4)) continue;
+      outerCells.push(row * gridSize + col);
+    }
+    const cellSize = BATTLE_HALF_EXTENT * 2 / gridSize;
+    const count = centerCount + outerCells.length;
     for (let i = 0; i < count; i++) {
       let x = (random.sample('asteroid-x', i) - 0.5) * 3200;
       let y = (random.sample('asteroid-y', i) - 0.5) * 2200;
+      if (i >= centerCount) {
+        const cell = outerCells[i - centerCount], col = cell % gridSize, row = Math.floor(cell / gridSize);
+        x = -BATTLE_HALF_EXTENT + (col + .15 + random.sample('asteroid-field-x', cell) * .7) * cellSize;
+        y = -BATTLE_HALF_EXTENT + (row + .15 + random.sample('asteroid-field-y', cell) * .7) * cellSize;
+      }
       if (Math.abs(x) < 400 && Math.abs(y) < 300) {
         x += (x >= 0 ? 450 : -450);
       }
@@ -89,7 +129,7 @@ export class AsteroidSystem {
       const speed = 15 + random.sample('asteroid-speed', i) * 28;
       const driftAngle = random.sample('asteroid-drift-angle', i) * Math.PI * 2;
 
-      this.asteroids.push({
+      const ast: Asteroid = {
         id: i + 1,
         pos: new Vector2(x, y),
         vel: new Vector2(Math.cos(driftAngle) * speed, Math.sin(driftAngle) * speed),
@@ -99,8 +139,11 @@ export class AsteroidSystem {
         mass: radius * radius * 0.75,
         hp,
         maxHp: hp,
-        spriteUrl
-      });
+        spriteUrl,
+        gravityFixed: undefined
+      };
+      knownProjectionKeys.set(ast, asteroidProjectionKeys);
+      this.asteroids.push(ast);
     }
   }
 
@@ -111,27 +154,72 @@ export class AsteroidSystem {
       ast.pos.addScaled(ast.vel, dt);
       ast.facingRad += ast.angularVel * dt;
 
-      // 边界循环漂移
-      const boundX = 2200;
-      const boundY = 1600;
-      if (ast.pos.x > boundX) ast.pos.x = -boundX;
-      else if (ast.pos.x < -boundX) ast.pos.x = boundX;
-      if (ast.pos.y > boundY) ast.pos.y = -boundY;
-      else if (ast.pos.y < -boundY) ast.pos.y = boundY;
+      // Drift across the full battlefield; wrap only beyond its entry margin,
+      // retaining overshoot even after a large impulse or a long elapsed slice.
+      const bound = BATTLE_HALF_EXTENT + 500, span = bound * 2;
+      if (ast.pos.x > bound || ast.pos.x < -bound) ast.pos.x = ((ast.pos.x + bound) % span + span) % span - bound;
+      if (ast.pos.y > bound || ast.pos.y < -bound) ast.pos.y = ((ast.pos.y + bound) % span + span) % span - bound;
     }
   }
 
   public resolveShipCollisions(allShips: Ship[], fx: AsteroidFXCallbacks) {
     const playerPos = fx.getPlayerPos();
+    // No cache survives a tick or a collision callback. A callback may refit or
+    // replace mutable bounds; subsequent pairs must observe that new geometry.
+    const hullReaches = new Map<Ship, number>();
+    const shipFast: boolean[] = [];
+    const shipSkip: boolean[] = [];
+    const shipShieldReach: number[] = [];
+    const shipHullReach: number[] = [];
+    const shipMaxReach: number[] = [];
+    let cacheValid = false;
+    const isFastShip = (ship: Ship): boolean => Object.getPrototypeOf(ship) === Ship.prototype
+      && !Object.hasOwn(ship, 'isCollisionless') && !Object.hasOwn(ship, 'isPhased') && !Object.hasOwn(ship, 'getShieldCenter')
+      && ship.getShieldCenter === Ship.prototype.getShieldCenter && Number.isFinite(ship.facingRad)
+      && ship.externalPhaseEffects.size === 0 && ship.system.hasNativeStats && ship.defenseSystem.hasNativeStats
+      && (!ship.parentShip || isFastShip(ship.parentShip));
 
     // 1. 小行星与舰船碰撞
     for (let i = 0; i < this.asteroids.length; i++) {
       const ast = this.asteroids[i];
       if (ast.hp <= 0) continue;
+      const astRadius = Math.max(0, ast.radius);
 
-      for (const ship of allShips) {
-        if (ship.isDead || ship.isCollisionless) continue;
-        const shieldContact = getShieldCircleContact(ship, ast.pos, ast.radius);
+      for (let s = 0; s < allShips.length; s++) {
+        if (!cacheValid) {
+          for (let k = 0; k < allShips.length; k++) {
+            const candidate = allShips[k];
+            const fast = isFastShip(candidate);
+            shipFast[k] = fast;
+            if (fast) {
+              const skip = candidate.isDead || candidate.isCollisionless;
+              shipSkip[k] = skip;
+              if (!skip) {
+                const sr = Math.abs(candidate.spec.shieldCenterX || 0) + Math.abs(candidate.spec.shieldCenterY || 0) + Math.max(0, candidate.shield.radius);
+                const hr = hullReach(candidate);
+                shipShieldReach[k] = sr;
+                shipHullReach[k] = hr;
+                shipMaxReach[k] = Math.max(sr, hr);
+              }
+            }
+          }
+          cacheValid = true;
+        }
+        const ship = allShips[s];
+        let shieldReach: number;
+        if (shipFast[s]) {
+          if (shipSkip[s]) continue;
+          if (circlesDefinitelySeparated(ship.pos, ast.pos, shipMaxReach[s] + astRadius)) continue;
+          shieldReach = shipShieldReach[s];
+        } else {
+          if (ship.isDead || ship.isCollisionless) continue;
+          shieldReach = Math.abs(ship.spec.shieldCenterX || 0) + Math.abs(ship.spec.shieldCenterY || 0) + Math.max(0, ship.shield.radius);
+        }
+        const shieldContact = (ship.getShieldCenter === Ship.prototype.getShieldCenter
+          && Number.isFinite(ship.facingRad)
+          && circlesDefinitelySeparated(ship.pos, ast.pos, shieldReach + astRadius))
+          ? null
+          : getShieldCircleContact(ship, ast.pos, ast.radius);
         if (shieldContact) {
           const relVel = ast.vel.clone().sub(ship.vel);
           const impulse = Math.max(80, relVel.length() * (ast.mass / (ast.mass + ship.spec.mass * 20)));
@@ -145,9 +233,20 @@ export class AsteroidSystem {
           // 护盾作为真实物理表面：沿护盾法线把小行星推出可见弧面。
           if (ast.gravityFixed) ship.assemblyRoot.pos.subScaled(shieldContact.normal, shieldContact.penetration);
           else { ast.vel.addScaled(shieldContact.normal, (impulse / ast.mass) * 80); ast.pos.addScaled(shieldContact.normal, shieldContact.penetration); }
+          hullReaches.clear();
+          cacheValid = false;
           continue;
         }
 
+        let reach: number | undefined;
+        if (shipFast[s]) {
+          reach = shipHullReach[s];
+        } else {
+          reach = hullReaches.get(ship);
+          if (reach === undefined) { reach = hullReach(ship); hullReaches.set(ship, reach); }
+        }
+        if (Number.isFinite(ship.facingRad)
+          && circlesDefinitelySeparated(ship.pos, ast.pos, reach + astRadius)) continue;
         const hullContact = getHullCircleContact(ship, ast.pos, ast.radius);
         if (hullContact) {
           const { point, normal, penetration } = hullContact;
@@ -170,6 +269,8 @@ export class AsteroidSystem {
           if (ast.gravityFixed) ship.assemblyRoot.pos.subScaled(normal, penetration);
           else { ast.vel.addScaled(normal, 60); ast.pos.addScaled(normal, penetration); }
           ast.hp -= impactDmg * 0.5;
+          hullReaches.clear();
+          cacheValid = false;
           if (ast.hp <= 0) {
             this.shatter(i, fx);
             break;
@@ -184,9 +285,10 @@ export class AsteroidSystem {
       for (let j = i + 1; j < this.asteroids.length; j++) {
         const a2 = this.asteroids[j];
         if (a1.gravityFixed && a2.gravityFixed) continue;
+        const minR = a1.radius + a2.radius;
+        if (circlesDefinitelySeparated(a1.pos, a2.pos, minR)) continue;
         const diff = a2.pos.clone().sub(a1.pos);
         const dist = diff.length();
-        const minR = a1.radius + a2.radius;
         if (dist < minR) {
           // Array pair order is stable; do not consume gameplay RNG for overlap.
           const n = dist > 1e-12 ? diff.scale(1 / dist) : new Vector2(1, 0);
@@ -277,7 +379,7 @@ export class AsteroidSystem {
       const newR = ast.radius * 0.55;
       for (let k = 0; k < 2; k++) {
         const angle = this.random.next() * Math.PI * 2;
-        this.asteroids.push({
+        const child: Asteroid = {
           id: this.random.next(),
           pos: ast.pos.clone().add(Vector2.fromAngle(angle, newR)),
           vel: ast.vel.clone().add(Vector2.fromAngle(angle, 40 + this.random.next() * 30)),
@@ -287,8 +389,11 @@ export class AsteroidSystem {
           mass: newR * newR * 0.75,
           hp: 250,
           maxHp: 250,
-          spriteUrl: '/game-assets/graphics/asteroids/asteroid3.png'
-        });
+          spriteUrl: '/game-assets/graphics/asteroids/asteroid3.png',
+          gravityFixed: undefined
+        };
+        knownProjectionKeys.set(child, asteroidProjectionKeys);
+        this.asteroids.push(child);
       }
     }
 

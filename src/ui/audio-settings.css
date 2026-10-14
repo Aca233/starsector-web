@@ -1,36 +1,36 @@
 .audio-settings {
-  color: var(--ui-text);
+  color: var(--ds-menu-text);
   border: 0;
   background: transparent;
   padding: 16px;
   margin: 0 0 20px;
-  font-family: var(--ui-font, sans-serif);
+  font-family: var(--ds-font-body, sans-serif);
 }
 .audio-settings .audio-settings-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-.audio-settings .audio-settings-heading h3 { display: flex; align-items: center; gap: 8px; background: none; color: var(--ui-text); padding: 0; margin: 0; font-size: var(--ds-type-body); }
-.audio-settings-heading > span { font-size: 12px; color: var(--ui-muted); }
+.audio-settings .audio-settings-heading h3 { display: flex; align-items: center; gap: 8px; background: none; color: var(--ds-menu-text); padding: 0; margin: 0; font-size: var(--ds-type-body); }
+.audio-settings-heading > span { font-size: 12px; color: var(--ds-menu-muted); }
 .audio-settings .audio-settings-toggle { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 0; padding: 10px 0; cursor: pointer; }
 .audio-settings-toggle > span { font-size: 12px; }
-.audio-settings small { display: block; color: var(--ui-muted); font-size: 12px; line-height: 1.6; }
-.audio-settings input[type="checkbox"] { flex-shrink: 0; width: 18px; height: 18px; accent-color: var(--ui-accent); cursor: pointer; }
-.audio-settings-sliders { display: grid; gap: 16px; border-block: 1px solid var(--ui-divider); padding: 18px 0; margin: 5px 0; }
-.audio-settings-sliders[data-muted="true"] { --audio-fill: #687986; }
+.audio-settings small { display: block; color: var(--ds-menu-muted); font-size: 12px; line-height: 1.6; }
+.audio-settings input[type="checkbox"] { flex-shrink: 0; width: 18px; height: 18px; accent-color: var(--ds-menu-accent); cursor: pointer; }
+.audio-settings-sliders { display: grid; gap: 16px; border-block: 1px solid var(--ds-menu-divider); padding: 18px 0; margin: 5px 0; }
+.audio-settings-sliders[data-muted="true"] { --audio-fill: var(--ds-palette-steel); }
 .audio-settings-channel-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .audio-settings .audio-settings-channel-heading label { padding: 0; margin: 0; font-size: 12px; cursor: pointer; }
-.audio-settings output { color: var(--ui-text); font: 14px var(--ui-mono, monospace); font-variant-numeric: tabular-nums; }
-.audio-settings output span { color: var(--ui-muted); font-size: 12px; padding-left: 4px; }
-.audio-settings input[type="range"] { appearance: none; display: block; width: 100%; height: 24px; padding: 0; margin: 3px 0 2px; background: transparent; cursor: pointer; accent-color: var(--ui-accent); }
-.audio-settings input[type="range"]::-webkit-slider-runnable-track { height: 5px; border-radius: 3px; background: linear-gradient(to right, var(--audio-fill, var(--ui-accent)) var(--audio-level), var(--ds-surface-track) var(--audio-level)); }
-.audio-settings input[type="range"]::-moz-range-track { height: 5px; border-radius: 3px; background: linear-gradient(to right, var(--audio-fill, var(--ui-accent)) var(--audio-level), var(--ds-surface-track) var(--audio-level)); }
-.audio-settings input[type="range"]::-webkit-slider-thumb { appearance: none; width: 14px; height: 18px; margin-top: -6.5px; background: var(--ui-text); border: 2px solid var(--ui-accent); border-radius: 2px; }
-.audio-settings input[type="range"]::-moz-range-thumb { width: 10px; height: 14px; background: var(--ui-text); border: 2px solid var(--ui-accent); border-radius: 2px; }
+.audio-settings output { color: var(--ds-menu-text); font: 14px var(--ds-font-mono, monospace); font-variant-numeric: tabular-nums; }
+.audio-settings output span { color: var(--ds-menu-muted); font-size: 12px; padding-left: 4px; }
+.audio-settings input[type="range"] { appearance: none; display: block; width: 100%; height: 24px; padding: 0; margin: 3px 0 2px; background: transparent; cursor: pointer; accent-color: var(--ds-menu-accent); }
+.audio-settings input[type="range"]::-webkit-slider-runnable-track { height: 5px; border-radius: 3px; background: linear-gradient(to right, var(--audio-fill, var(--ds-menu-accent)) var(--audio-level), var(--ds-surface-track) var(--audio-level)); }
+.audio-settings input[type="range"]::-moz-range-track { height: 5px; border-radius: 3px; background: linear-gradient(to right, var(--audio-fill, var(--ds-menu-accent)) var(--audio-level), var(--ds-surface-track) var(--audio-level)); }
+.audio-settings input[type="range"]::-webkit-slider-thumb { appearance: none; width: 14px; height: 18px; margin-top: -6.5px; background: var(--ds-menu-text); border: 2px solid var(--ds-menu-accent); border-radius: 2px; }
+.audio-settings input[type="range"]::-moz-range-thumb { width: 10px; height: 14px; background: var(--ds-menu-text); border: 2px solid var(--ds-menu-accent); border-radius: 2px; }
 .audio-settings-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.audio-settings-actions button { border: 1px solid var(--ui-border); padding: 7px 10px; background: var(--ds-surface-input); color: var(--ui-text); font: 12px var(--ui-font, sans-serif); cursor: pointer; }
+.audio-settings-actions button { border: 1px solid var(--ds-border-page); padding: 7px 10px; background: var(--ds-surface-input); color: var(--ds-menu-text); font: 12px var(--ds-font-body, sans-serif); cursor: pointer; }
 .audio-settings-actions button:hover:not(:disabled) { background: var(--ds-control-hover); border-color: var(--ds-control-highlight); }
 .audio-settings-actions button:disabled { opacity: .45; cursor: not-allowed; }
-.audio-settings-actions .audio-settings-reset { margin-left: auto; color: var(--ui-muted); background: transparent; }
+.audio-settings-actions .audio-settings-reset { margin-left: auto; color: var(--ds-menu-muted); background: transparent; }
 .audio-settings :is(input, button):focus-visible { outline: 2px solid var(--ds-control-focus); outline-offset: 3px; }
-.audio-settings .audio-settings-status { margin: 12px 0 0; padding: 0; min-height: 2.8em; color: var(--ui-muted); font-size: 12px; line-height: 1.5; }
+.audio-settings .audio-settings-status { margin: 12px 0 0; padding: 0; min-height: 2.8em; color: var(--ds-menu-muted); font-size: 12px; line-height: 1.5; }
 @media (max-width: 520px) {
   .audio-settings { padding: 12px; }
   .audio-settings .audio-settings-heading { align-items: flex-start; flex-direction: column; gap: 5px; }

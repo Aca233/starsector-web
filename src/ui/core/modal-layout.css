@@ -1,0 +1,57 @@
+/* Modal layout owner. Pages configure --ds-modal-* on the panel; keep paint/title rules separate until their overrides migrate. */
+@layer ds-components {
+.ui-modal-backdrop { position: fixed; inset: 0; z-index: var(--ds-z-dialog); padding: 24px; display: flex; align-items: center; justify-content: center; background: var(--ds-scrim); backdrop-filter: none; color: var(--ds-menu-text); font: 13px/1.5 var(--ds-font-body); -webkit-font-smoothing: antialiased; }
+.ui-modal-backdrop[inert] { pointer-events: none; }
+.ui-modal { display: flex; flex-direction: column; border: 1px solid var(--ds-control-border); border-radius: 0; background: transparent; box-shadow: none; width: var(--ds-modal-panel-width, 100%); max-width: var(--ds-modal-panel-max-width, 880px); height: var(--ds-modal-panel-height, auto); max-height: var(--ds-modal-panel-max-height, calc(100dvh - 48px)); min-height: var(--ds-modal-panel-min-height, 0); overflow-x: var(--ds-modal-panel-overflow-x, hidden); overflow-y: var(--ds-modal-panel-overflow-y, hidden); padding-top: var(--ds-modal-panel-padding-top, 0); padding-right: var(--ds-modal-panel-padding-right, 0); padding-bottom: var(--ds-modal-panel-padding-bottom, 0); padding-left: var(--ds-modal-panel-padding-left, 0); }
+.ui-modal--wide { --ds-modal-panel-max-width: 1120px; }.ui-modal--small { --ds-modal-panel-max-width: 510px; }
+.ui-modal-header { border-bottom: 1px solid var(--ds-menu-divider); display: var(--ds-modal-header-display, flex); position: var(--ds-modal-header-position, static); width: var(--ds-modal-header-width, auto); height: var(--ds-modal-header-height, auto); min-height: var(--ds-modal-header-min-height, auto); overflow-x: var(--ds-modal-header-overflow-x, visible); overflow-y: var(--ds-modal-header-overflow-y, visible); clip-path: var(--ds-modal-header-clip-path, none); flex: var(--ds-modal-header-flex, none); justify-content: var(--ds-modal-header-justify-content, space-between); align-items: var(--ds-modal-header-align-items, flex-start); gap: var(--ds-modal-header-gap, 16px); text-align: var(--ds-modal-header-text-align, start); margin-bottom: var(--ds-modal-header-margin-bottom, 0); padding-top: var(--ds-modal-header-padding-top, 16px); padding-right: var(--ds-modal-header-padding-right, 20px); padding-bottom: var(--ds-modal-header-padding-bottom, 14px); padding-left: var(--ds-modal-header-padding-left, 20px); }
+.ui-modal-body { overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--ds-border-page) transparent; display: var(--ds-modal-body-display, block); height: var(--ds-modal-body-height, auto); min-height: var(--ds-modal-body-min-height, 0); flex: var(--ds-modal-body-flex, 0 1 auto); flex-direction: var(--ds-modal-body-flex-direction, row); overflow-x: var(--ds-modal-body-overflow-x, auto); overflow-y: var(--ds-modal-body-overflow-y, auto); padding-top: var(--ds-modal-body-padding-top, 20px); padding-right: var(--ds-modal-body-padding-right, 20px); padding-bottom: var(--ds-modal-body-padding-bottom, 20px); padding-left: var(--ds-modal-body-padding-left, 20px); }
+.ui-modal-footer { border-top: 1px solid var(--ds-menu-divider); background: transparent; display: var(--ds-modal-footer-display, flex); flex: var(--ds-modal-footer-flex, none); flex-wrap: var(--ds-modal-footer-flex-wrap, wrap); align-items: var(--ds-modal-footer-align-items, center); justify-content: var(--ds-modal-footer-justify-content, flex-end); gap: var(--ds-modal-footer-gap, 8px); margin-top: var(--ds-modal-footer-margin-top, 0); padding-top: var(--ds-modal-footer-padding-top, 12px); padding-right: var(--ds-modal-footer-padding-right, 20px); padding-bottom: var(--ds-modal-footer-padding-bottom, 12px); padding-left: var(--ds-modal-footer-padding-left, 20px); }
+.ui-modal-footer .ui-footer-start { margin-right: auto; }
+@media (max-width:760px) {
+  .ui-modal-backdrop { padding: 12px; }.ui-modal { max-height: var(--ds-modal-panel-max-height, calc(100dvh - 24px)); }.ui-modal-header{
+    padding-top: var(--ds-modal-header-padding-top, 18px);
+    padding-right: var(--ds-modal-header-padding-right, 18px);
+    padding-bottom: var(--ds-modal-header-padding-bottom, 18px);
+    padding-left: var(--ds-modal-header-padding-left, 18px);
+  }.ui-modal-body{
+    padding-top: var(--ds-modal-body-padding-top, 18px);
+    padding-right: var(--ds-modal-body-padding-right, 18px);
+    padding-bottom: var(--ds-modal-body-padding-bottom, 18px);
+    padding-left: var(--ds-modal-body-padding-left, 18px);
+  }.ui-modal-footer { padding-top: var(--ds-modal-footer-padding-top, 12px); padding-right: var(--ds-modal-footer-padding-right, 18px); padding-bottom: var(--ds-modal-footer-padding-bottom, 12px); padding-left: var(--ds-modal-footer-padding-left, 18px); } .ui-modal.ui-modal--console{
+    --ds-modal-panel-width: 100%;
+    --ds-modal-panel-height: calc(100dvh - 24px);
+  }.ui-modal.ui-modal--console{
+    --ds-modal-body-overflow-y: auto;
+  } }
+@media (max-width:420px) {.ui-modal-footer .ui-footer-start { width: 100%; margin-right: 0; } }
+.ui-modal-header { background: transparent; }
+.ui-modal.ui-modal--console{
+  --ds-modal-panel-max-width: 1260px;
+  --ds-modal-panel-width: calc(100vw - 64px);
+  --ds-modal-panel-height: min(800px,calc(100dvh - 64px));
+}
+.ui-modal.ui-modal--console{
+  --ds-modal-header-padding-top: 10px;
+  --ds-modal-header-padding-right: 16px;
+  --ds-modal-header-padding-bottom: 10px;
+  --ds-modal-header-padding-left: 16px;
+  --ds-modal-header-align-items: center;
+}
+.ui-modal.ui-modal--console{
+  --ds-modal-body-padding-top: 0;
+  --ds-modal-body-padding-right: 0;
+  --ds-modal-body-padding-bottom: 0;
+  --ds-modal-body-padding-left: 0;
+  --ds-modal-body-flex: 1;
+  --ds-modal-body-overflow-x: hidden;
+  --ds-modal-body-overflow-y: hidden;
+}
+.ui-modal.ui-modal--console{
+  --ds-modal-footer-padding-top: 8px;
+  --ds-modal-footer-padding-right: 12px;
+  --ds-modal-footer-padding-bottom: 8px;
+  --ds-modal-footer-padding-left: 12px;
+  --ds-modal-footer-gap: 6px;
+} }

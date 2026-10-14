@@ -171,11 +171,35 @@ for (const binary of [true, false]) test('default gateway uses real worker with 
   }
   assert.equal(f.g.snapshotPreparer.diagnostics().accepted, 5); assert.equal(f.p.ackedStates, 5);
 });
-for (const type of ['ended', 'roomClosed', 'match', 'launch']) test('terminal or sync control cancels pending async state: ' + type, async t => {
+for (const type of ['roomClosed', 'match', 'launch']) test('cancel or sync control cancels pending async state: ' + type, async t => {
   const w = new ControlledWorker(), f = gatewayFixture(t, { workerFactory: () => w });
   f.p.sendSnapshot(snapshot(1)); w.emit('message', { op: 'ready' }); await turn();
   f.p.send(JSON.stringify({ type, matchId: 'worker-match' })); w.reply(); while (w.requests.length) w.reply();
   assert.equal(f.p.sentStates, 0); assert.equal(f.messages.filter(m => m.op === 'data').at(-1).data.type, type);
+});
+
+test('terminal drain preserves both active and latest admitted states and FIFO room controls',async t=>{
+  const w=new ControlledWorker(),f=gatewayFixture(t,{workerFactory:()=>w});
+  f.p.sendSnapshot(snapshot(1));w.emit('message',{op:'ready'});await turn();
+  f.p.sendSnapshot(snapshot(2));f.p.send(JSON.stringify({type:'ended',matchId:'worker-match'}));f.p.send(JSON.stringify({type:'room'}));
+  assert.equal(f.p.terminalControls.length,2);
+  assert.equal(f.p.sendSnapshot(snapshot(3)),false);assert.equal(f.p.lastSnapshotSkip,'terminal-drain');
+  w.reply();w.reply();assert.equal(f.p.sentStates,1);await turn();
+  assert.equal(f.messages.filter(m=>m.op==='data').some(m=>m.data?.type==='ended'),false);
+  w.reply();w.reply();while(w.requests.length)w.reply();
+  const stream=f.messages.filter(m=>m.op==='data'),receiver=new SteamBinarySnapshotReceiver();
+  assert.deepEqual(receiver.receive(stream.at(-4).data).data,state(1));assert.deepEqual(receiver.receive(stream.at(-3).data).data,state(2));
+  assert.equal(stream.at(-2).data.type,'ended');assert.equal(stream.at(-1).data.type,'room');assert.equal(f.p.terminalControls,null);
+  assert.equal(f.g.snapshotPreparer.drains.size,0);
+});
+
+test('closing a peer retires its terminal drain and cannot emit delayed controls into a replacement connection',async t=>{
+  const w=new ControlledWorker(),f=gatewayFixture(t,{workerFactory:()=>w});
+  f.p.sendSnapshot(snapshot(1));w.emit('message',{op:'ready'});await turn();
+  f.p.send(JSON.stringify({type:'ended',matchId:'worker-match'}));assert.equal(f.g.snapshotPreparer.drains.size,1);
+  f.p.close();w.reply();while(w.requests.length)w.reply();
+  assert.equal(f.g.snapshotPreparer.drains.size,0);assert.equal(f.p.terminalControls,null);assert.equal(f.p.sentStates,0);
+  assert.equal(f.messages.filter(m=>m.op==='data').some(m=>m.data?.type==='ended'),false);
 });
 test('admission is rechecked after worker preparation; rejected native send never commits', async t => {
   const w = new ControlledWorker(); let refuse = false;

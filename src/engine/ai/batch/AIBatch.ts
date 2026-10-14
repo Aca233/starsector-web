@@ -4,6 +4,8 @@ import type { ThreatAssessment } from '../ThreatAssessment';
 import type { FleetPlan } from '../FleetTactics';
 import { beginStage, stageFor } from './StageProducer';
 import { aiStage, type AIStageView } from './AIInputs';
+import type { StageView } from './StageBridge';
+type AIStageBridge = StageView & AIStageView;
 import { solveAIFleet } from './AIFleetSolver';
 import { solveAIThreat } from './AIThreatSolver';
 import { solveAIForwardPath } from './AINavigationSolver';
@@ -29,39 +31,50 @@ export interface AIEffectReads {
  * produces a fresh CapitalAIIntent; effects reacquire their own current stage. */
 export class AIBatch implements AIEffectReads {
   readonly view:AIStageView;
+  readonly bridge:AIStageBridge;
   readonly fleetPlan:FleetPlan;
-  private effect?:AIStageView;
+  private effect?:AIStageBridge;
+  private readonly dirtyShips=new Set<Ship>();
   private recapturePending=false;
   private stage:'plan'|'effects'|'closed'='plan';
-  constructor(private readonly owner:CombatEngine,view:AIStageView) {
-    this.view=view;
+  constructor(private readonly owner:CombatEngine,view:AIStageBridge,onlyTeam?:number) {
+    this.view=view;this.bridge=view;
     const manual=new Set(owner.externallyControlledShipIds);
     if(owner.playerShip.fireControlMode!=='AI')manual.add(owner.playerShip.id);
     // Stable owner reuses FleetColumns' growing scratch across phase epochs.
-    this.fleetPlan=solveAIFleet(view,owner,owner.orders,manual);
+    this.fleetPlan=solveAIFleet(view,owner,owner.orders,manual,onlyTeam);
     aiDomainWork.phases++;
   }
-  static create(owner:CombatEngine|undefined):AIBatch|undefined {
+  static create(owner:CombatEngine|undefined,onlyTeam?:number):AIBatch|undefined {
     aiDomainWork.phaseAttempts++;
     if(!owner){aiDomainWork.missingStage++;return;}
     const stage=stageFor(owner);
     if(!stage||stage.kind!=='AI_PLAN'){aiDomainWork.missingStage++;return;}
     const view=aiStage(stage);
     if(!view){aiDomainWork.missingAIColumns++;return;}
-    return view?.kind==='AI_PLAN'?new AIBatch(owner,view):undefined;
+    return view?.kind==='AI_PLAN'?new AIBatch(owner,view,onlyTeam):undefined;
   }
   beginEffects():void {
     if(this.stage!=='plan')throw new Error('Numeric AI effects boundary already entered');
-    this.view.close();this.stage='effects';
+    this.bridge.close();this.stage='effects';
   }
-  private current():AIStageView {
+  private current():AIStageBridge {
     if(this.stage!=='effects')throw new Error('AI_EFFECT_READ requested outside ordered effects');
     if(!this.effect?.active){
+      this.dirtyShips.clear();
       this.effect=aiStage(beginStage(this.owner,'AI_EFFECT_READ',{ships:this.owner.ships,
         projectiles:this.owner.projectiles,beams:this.owner.beams,asteroids:this.owner.asteroids,hulkFragments:this.owner.hulkFragments}));
       aiDomainWork.effectCaptures++;
       if(this.recapturePending){aiDomainWork.effectRecaptures++;this.recapturePending=false;}
-    } else if(!this.effect.valid){this.effect.recapture();aiDomainWork.effectRecaptures++;}
+    } else if(!this.effect.valid){
+      this.dirtyShips.clear();
+      this.effect.recapture();aiDomainWork.effectRecaptures++;
+    } else if(this.dirtyShips.size){
+      const pending=[...this.dirtyShips];
+      this.dirtyShips.clear();
+      this.effect.refreshChanged(pending);
+      aiDomainWork.effectRowRefreshes+=pending.length;
+    }
     if(!this.effect)throw new Error('AI_EFFECT_READ producer admission changed during numeric commit');
     return this.effect;
   }
@@ -71,7 +84,7 @@ export class AIBatch implements AIEffectReads {
     if(r===undefined)throw new Error('AI effect ship left current observation');
     const b=v.bodies,phase=b.shieldType[r]===3,window=policy.imminentWindow+(phase?b.phaseUpDuration[r]:0);
     const recovery=2+(phase?b.phaseDownDuration[r]+b.phaseCooldownDuration[r]:b.shieldUnfoldDuration[r]);
-    return solveAIThreat(v,r,Math.max(window,b.ventTime[r]+recovery),window);
+    return solveAIThreat(v,r,Math.max(window,b.ventTime[r]+recovery),window,undefined,false,true);
   }
   forward(ship:Ship,speed:number,horizon:number):boolean {
     aiDomainWork.effectForwardSolves++;
@@ -80,21 +93,20 @@ export class AIBatch implements AIEffectReads {
     return solveAIForwardPath(v,r,speed,horizon);
   }
   changed(ship:Ship,family=false):void {
-    const v=this.effect;if(!v?.active)return;
-    if(!v.valid)return;
+    const v=this.effect;if(!v?.active||!v.valid)return;
     const row=v.rowOf.get(ship);
     if(row===undefined){this.invalidate();return;}
-    if(!family){v.refreshChanged([ship]);aiDomainWork.effectRowRefreshes++;return;}
-    const root=v.bodies.assemblyRootRow[row],members:Ship[]=[];
-    for(let i=0;i<v.bodyCount;i++)if(v.bodies.assemblyRootRow[i]===root)members.push(v.ships[i]);
-    v.refreshChanged(members);
-    aiDomainWork.effectFamilyRefreshes++;aiDomainWork.effectRowRefreshes+=members.length;
+    if(!family){this.dirtyShips.add(ship);return;}
+    const root=v.bodies.assemblyRootRow[row];
+    for(let i=0;i<v.bodyCount;i++)if(v.bodies.assemblyRootRow[i]===root)this.dirtyShips.add(v.ships[i]);
+    aiDomainWork.effectFamilyRefreshes++;
   }
   invalidate():void {
     // Unknown effects can deploy/despawn/reorder entities. Recapture must obtain
     // the current authority roster, not call recapture() with old plan sources.
+    this.dirtyShips.clear();
     this.effect?.invalidate();this.effect?.close();this.effect=undefined;
     this.recapturePending=true;aiDomainWork.effectInvalidations++;
   }
-  close():void {this.view.close();this.effect?.close();this.effect=undefined;this.stage='closed';}
+  close():void {this.dirtyShips.clear();this.bridge.close();this.effect?.close();this.effect=undefined;this.stage='closed';}
 }

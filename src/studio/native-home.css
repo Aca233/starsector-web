@@ -1,9 +1,9 @@
 /* Home-only art direction. All labels and controls stay live HTML, not baked into art. */
 main.native-home.fleet-home {
-  --fleet-paper: var(--ui-text);
-  --fleet-muted: var(--ui-muted);
-  --fleet-accent: var(--ui-accent);
-  --fleet-line: var(--ui-divider);
+  --fleet-paper: var(--ds-menu-text);
+  --fleet-muted: var(--ds-menu-muted);
+  --fleet-accent: var(--ds-menu-accent);
+  --fleet-line: var(--ds-menu-divider);
   position: relative;
   isolation: isolate;
   display: flex;
@@ -12,10 +12,10 @@ main.native-home.fleet-home {
   min-height: 0;
   overflow-x: clip;
   overflow-y: auto;
-  background: #080d13;
+  background: var(--ds-palette-shell);
   padding: 0 clamp(28px, 4.6vw, 88px);
   color: var(--fleet-paper);
-  font-family: var(--ui-font);
+  font-family: var(--ds-font-body);
   font-size: 14px;
 }
 .fleet-home .fleet-home-art,
@@ -25,7 +25,7 @@ main.native-home.fleet-home {
   opacity: .88;
 }
 .fleet-home .fleet-home-shade {
-  background: linear-gradient(90deg, #070d14fa 0%, #070d14e6 22%, #070d1496 42%, #070d1410 72%), linear-gradient(0deg, #080d13f5, transparent 28%, transparent 85%, #080d1380);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--ds-palette-shell) 98.039216%, transparent) 0%, color-mix(in srgb, var(--ds-palette-shell) 90.196078%, transparent) 22%, color-mix(in srgb, var(--ds-palette-shell) 58.823529%, transparent) 42%, color-mix(in srgb, var(--ds-palette-shell) 6.27451%, transparent) 72%), linear-gradient(0deg, color-mix(in srgb, var(--ds-palette-shell) 96.078431%, transparent), transparent 28%, transparent 85%, color-mix(in srgb, var(--ds-palette-shell) 50.196078%, transparent));
 }
 .fleet-home .fleet-masthead {
   min-height: 100px;
@@ -45,28 +45,28 @@ main.native-home.fleet-home {
 .fleet-insignia i:last-child { height: 18px; }
 .fleet-masthead-right { display: flex; align-items: center; gap: 24px; position: relative; }
 
-.fleet-home .fleet-masthead .native-button { background: transparent; border: 1px solid var(--ui-border); border-radius: 0; color: var(--fleet-paper); font-size: 11px; padding: 8px 13px; box-shadow: none; }
+.fleet-home .fleet-masthead .native-button { background: transparent; border: 1px solid var(--ds-border-page); border-radius: 0; color: var(--fleet-paper); font-size: 11px; padding: 8px 13px; box-shadow: none; }
 .fleet-home .fleet-masthead .native-button:hover:not(:disabled) { background: var(--ds-control-hover); border-color: var(--fleet-accent); }
 .fleet-home .fleet-home-body { position: relative; display: flex; align-items: center; flex: 1 0 auto; padding: 42px 0 40px; }
 .fleet-home .fleet-home-command { width: min(390px, 36vw); }
 
-.fleet-home #command-title { margin: 0 0 38px; font-size: clamp(40px, 4.45vw, 74px); font-weight: 600; letter-spacing: .065em; line-height: 1.12; color: var(--fleet-paper); text-shadow: 0 3px 24px #0005; }
+.fleet-home #command-title { margin: 0 0 38px; font-size: clamp(40px, 4.45vw, 74px); font-weight: 600; letter-spacing: .065em; line-height: 1.12; color: var(--fleet-paper); text-shadow: 0 3px 24px color-mix(in srgb, var(--ds-palette-black) 33.333333%, transparent); }
 
 .fleet-home .fleet-menu { display: flex; flex-direction: column; gap: 0; }
 .fleet-home .fleet-launch {
   display: flex; justify-content: space-between; align-items: center; width: 100%;
-  text-align: left; border: 1px solid #e6cfa2; border-left: 3px solid #f6e6c3;
+  text-align: left; border: 1px solid var(--ds-palette-highlight); border-left: 3px solid var(--ds-palette-highlight-ink);
   border-radius: 0; padding: 19px 21px 18px; margin: 0 0 12px;
-  color: var(--ui-text); background: transparent;
+  color: var(--ds-menu-text); background: transparent;
   box-shadow: none; transition: background .18s, box-shadow .18s;
 }
 .fleet-launch-copy { display: flex; flex-direction: column; gap: 7px; }
 
 .fleet-launch-copy > strong { font-weight: 600; font-size: 21px; letter-spacing: .12em; line-height: 1.3; }
 
-.fleet-launch-end { display: flex; flex-direction: column; align-items: center; gap: 20px; padding-left: 12px; flex-direction: row; }
+.fleet-launch-end { display: flex; align-items: center; gap: 20px; padding-left: 12px; flex-direction: row; }
 .fleet-launch-end > span { font: 26px "Segoe UI", sans-serif; line-height: 1; transition: transform .18s; }
-.fleet-home kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; border: 1px solid currentColor; font: 10px var(--ui-mono); opacity: .65; border-radius: 2px; }
+.fleet-home kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; border: 1px solid currentColor; font: 11px var(--ds-font-mono); opacity: .65; border-radius: 2px; }
 .fleet-home .fleet-launch:hover { background: var(--ds-control-hover); box-shadow: none; }
 .fleet-launch:hover .fleet-launch-end > span { transform: none; }
 .fleet-home .fleet-menu-item {
@@ -75,62 +75,82 @@ main.native-home.fleet-home {
   padding: 10px 14px 10px 2px; background: transparent; color: var(--fleet-paper); text-align: left;
   transition: background .18s, padding .18s;
 }
-.fleet-item-number { font: 10px var(--ui-mono); color: #969c9c; }
+.fleet-item-number { font: 11px var(--ds-font-mono); color: var(--ds-palette-dim); }
 .fleet-item-label { flex: 1; font-size: 15px; letter-spacing: .08em; }
 
-.fleet-item-arrow { font: 18px "Segoe UI", sans-serif; color: #b8b8ab; }
-.fleet-home .fleet-menu-item kbd { min-width: 20px; height: 20px; font-size: 9px; color: #b4bdc0; }
+.fleet-item-arrow { font: 18px "Segoe UI", sans-serif; color: var(--ds-palette-brass); }
+.fleet-home .fleet-menu-item kbd { min-width: 20px; height: 20px; font-size: 11px; color: var(--ds-palette-muted); }
 .fleet-home .fleet-menu-item:hover { background: var(--ds-control-hover); }
 .fleet-menu-item:hover .fleet-item-number, .fleet-menu-item:hover .fleet-item-arrow { color: var(--fleet-accent); }
-.fleet-home .fleet-settings-trigger { display: flex; align-items: center; gap: 10px; color: #c1c6c5; font-size: 12px; border: 0; background: transparent; padding: 15px 2px 8px; margin-top: 5px; border-radius: 0; }
+.fleet-home .fleet-settings-trigger { display: flex; align-items: center; gap: 10px; color: var(--ds-palette-accent-muted); font-size: 12px; border: 0; background: transparent; padding: 15px 2px 8px; margin-top: 5px; border-radius: 0; }
 .fleet-settings-trigger > span:first-child { font-size: 18px; color: var(--fleet-accent); }
 
-.fleet-home .fleet-settings-trigger:hover { color: #f2dcba; }
+.fleet-home .fleet-settings-trigger:hover { color: var(--ds-palette-highlight-ink); }
 
 .fleet-home .fleet-home-footer { display: flex; justify-content: space-between; align-items: center; gap: 25px; min-height: 105px; flex-shrink: 0; border-top: 1px solid var(--fleet-line); padding: 20px 0; }
 .fleet-catalog-summary { display: flex; align-items: center; gap: 26px; }
 .fleet-catalog-summary > div { display: flex; align-items: center; gap: 12px; }
-.fleet-catalog-summary strong { font: 300 32px "Segoe UI", sans-serif; color: #dfd9cc; font-variant-numeric: tabular-nums; letter-spacing: -.025em; }
-.fleet-catalog-summary > div > span { font-size: 10px; color: #a5aeaf; letter-spacing: .08em; }
+.fleet-catalog-summary strong { font: 300 32px "Segoe UI", sans-serif; color: var(--ds-palette-gray-ink); font-variant-numeric: tabular-nums; letter-spacing: -.025em; }
+.fleet-catalog-summary > div > span { font-size: 11px; color: var(--ds-palette-muted); letter-spacing: .08em; }
 
 .fleet-footer-divider { height: 27px; width: 1px; background: var(--fleet-line); }
 
-.fleet-home .fleet-static-note { font-size: 11px; line-height: 1.7; color: #aeb5b6; margin: 14px 0 0; }
-.fleet-static-note a { color: #e8c38c; text-underline-offset: 3px; }
-.fleet-home .fleet-entry-error { font-size: 12px; color: #ffb7a5; line-height: 1.6; margin: 14px 0 0; }
+.fleet-home .fleet-static-note { font-size: 11px; line-height: 1.7; color: var(--ds-palette-muted); margin: 14px 0 0; }
+.fleet-static-note a { color: var(--ds-palette-highlight); text-underline-offset: 3px; }
+.fleet-home .fleet-entry-error { font-size: 12px; color: var(--ds-palette-red-muted); line-height: 1.6; margin: 14px 0 0; }
 .fleet-home :is(button, a):focus-visible { outline: 2px solid var(--ds-control-focus); outline-offset: 5px; }
 .fleet-home button:active:not(:disabled) { translate: none; }
 
 /* Settings retain their layout and inherit the common control system. */
+@layer ds-pages {
+  .ui-modal.native-chrome.fleet-settings {
+  --ds-modal-panel-max-height: min(780px, 90dvh);
+  --ds-modal-panel-width: min(740px, calc(100vw - 40px));
+  }
+  .ui-modal.fleet-settings {
+  --ds-modal-header-padding-top: 26px;
+  --ds-modal-header-padding-right: 28px;
+  --ds-modal-header-padding-bottom: 23px;
+  --ds-modal-header-padding-left: 28px;
+  --ds-modal-body-padding-top: 0;
+  --ds-modal-body-padding-right: 28px;
+  --ds-modal-body-padding-bottom: 24px;
+  --ds-modal-body-padding-left: 28px;
+  --ds-modal-footer-display: flex;
+  --ds-modal-footer-align-items: center;
+  --ds-modal-footer-padding-top: 18px;
+  --ds-modal-footer-padding-right: 28px;
+  --ds-modal-footer-padding-bottom: 18px;
+  --ds-modal-footer-padding-left: 28px;
+  }
+}
 .ui-modal.native-chrome.fleet-settings {
   /* Inherit the shared palette; settings do not switch to a separate gold skin. */
   border: 1px solid var(--ds-control-border); border-radius: 0; background: transparent;
 
-  color: var(--ui-text); max-height: min(780px, 90dvh); width: min(740px, calc(100vw - 40px));
+  color: var(--ds-menu-text);
   box-shadow: none;
 }
 .ui-modal.native-chrome.fleet-settings::before { display: none; }
-.fleet-settings > .native-chrome-border::before { width: 54px; left: 28px; background: #dfbd83; }
-.fleet-settings .ui-modal-header { padding: 26px 28px 23px; border-bottom: 1px solid var(--ui-divider); }
+.fleet-settings .ui-modal-header { border-bottom: 1px solid var(--ds-menu-divider); }
 
-.ui-modal.native-chrome.fleet-settings .ui-modal-header h2 { color: var(--ui-text); font-size: 14px; letter-spacing: 0; }
-.fleet-settings .ui-modal-body { padding: 0 28px 24px; }
-.fleet-settings-tabs { display: flex; border-bottom: 1px solid var(--ui-divider); gap: 26px; margin-bottom: 23px; }
-.fleet-settings-tabs > button { border: 0; border-bottom: 2px solid transparent; padding: 8px 0; background: transparent; color: var(--ui-muted); cursor: pointer; font: 12px var(--ui-font); white-space: nowrap; }
+.ui-modal.native-chrome.fleet-settings .ui-modal-header h2 { color: var(--ds-menu-text); font-size: 14px; letter-spacing: 0; }
+.fleet-settings-tabs { display: flex; border-bottom: 1px solid var(--ds-menu-divider); gap: 26px; margin-bottom: 23px; }
+.fleet-settings-tabs > button { border: 0; border-bottom: 2px solid transparent; padding: 8px 0; background: transparent; color: var(--ds-menu-muted); cursor: pointer; font: 12px var(--ds-font-body); white-space: nowrap; }
 .fleet-settings-tabs > button > small { display: none; }
-.fleet-settings-tabs > button[aria-selected="true"] { color: var(--ui-text); border-color: var(--ui-highlight); }
-.fleet-settings-tabs > button:hover { color: var(--ui-text); }
+.fleet-settings-tabs > button[aria-selected="true"] { color: var(--ds-menu-text); border-color: var(--ds-menu-highlight); }
+.fleet-settings-tabs > button:hover { color: var(--ds-menu-text); }
 .fleet-settings-section { min-height: 300px; }
 .fleet-settings-section[hidden] { display: none; }
-.fleet-settings .ui-modal-footer { display: flex; justify-content: space-between; align-items: center; padding: 18px 28px; border-top: 1px solid var(--ui-divider); background: transparent; }
+.fleet-settings .ui-modal-footer { border-top: 1px solid var(--ds-menu-divider); background: transparent; }
 
-.fleet-settings-done { padding: 10px 14px; border: 1px solid var(--ui-border); border-radius: 0; background: transparent; color: var(--ui-text); font: 12px var(--ui-font); cursor: pointer; }
+.fleet-settings-done { padding: 10px 14px; border: 1px solid var(--ds-border-page); border-radius: 0; background: transparent; color: var(--ds-menu-text); font: 12px var(--ds-font-body); cursor: pointer; }
 .fleet-settings-done:hover { background: var(--ds-control-hover); }
-.fleet-settings-done kbd { margin-left: 20px; color: var(--ui-muted); font: 10px var(--ui-mono); }
+.fleet-settings-done kbd { margin-left: 20px; color: var(--ds-menu-muted); font: 11px var(--ds-font-mono); }
 .fleet-settings :is(button, input, select):focus-visible { outline: 2px solid var(--ds-control-focus); outline-offset: 3px; }
-.fleet-settings :is(input[type="range"], input[type="checkbox"]) { accent-color: var(--ui-accent); }
+.fleet-settings :is(input[type="range"], input[type="checkbox"]) { accent-color: var(--ds-menu-accent); }
 .fleet-settings .presentation-settings-tabs { margin-top: 0; }
-.fleet-settings .presentation-settings-tabs button[aria-selected="true"] { color: var(--ui-text); border-color: var(--ui-highlight); background: var(--ds-control-selected); }
+.fleet-settings .presentation-settings-tabs button[aria-selected="true"] { color: var(--ds-menu-text); border-color: var(--ds-menu-highlight); background: var(--ds-control-selected); }
 
 @media (min-width: 1700px) and (min-height: 950px) {
   .fleet-home .fleet-home-command { width: 425px; }
@@ -155,14 +175,14 @@ main.native-home.fleet-home {
 @media (max-width: 760px) {
   main.native-home.fleet-home { min-height: 0; height: 100dvh; padding: 0 26px; }
   .fleet-home .fleet-home-art { background-position: 68% top; background-size: auto 760px; opacity: .65; }
-  .fleet-home .fleet-home-shade { background: linear-gradient(90deg, #070d14de, #070d1460), linear-gradient(0deg, #080d13 1%, #080d13e0 30%, #080d1310 100%); }
+  .fleet-home .fleet-home-shade { background: linear-gradient(90deg, color-mix(in srgb, var(--ds-palette-shell) 87.058824%, transparent), color-mix(in srgb, var(--ds-palette-shell) 37.647059%, transparent)), linear-gradient(0deg, var(--ds-palette-shell) 1%, color-mix(in srgb, var(--ds-palette-shell) 87.843137%, transparent) 30%, color-mix(in srgb, var(--ds-palette-shell) 6.27451%, transparent) 100%); }
   .fleet-home .fleet-masthead { min-height: 86px; gap: 12px; }
   .fleet-home .fleet-wordmark { font-size: 12px; gap: 10px; letter-spacing: .12em; }
-  .fleet-wordmark > div > span { font-size: 8px; margin-left: 3px; }
+  .fleet-wordmark > div > span { font-size: 11px; margin-left: 3px; }
 
   .fleet-home .fleet-insignia { scale: .8; width: 25px; }
 
-  .fleet-home .fleet-masthead .native-button { padding: 7px 9px; font-size: 10px; white-space: nowrap; }
+  .fleet-home .fleet-masthead .native-button { padding: 7px 9px; font-size: 11px; white-space: nowrap; }
   .fleet-home .fleet-home-body { display: block; padding: 37px 0 22px; }
   .fleet-home .fleet-home-command { width: 100%; max-width: 440px; }
   .fleet-home #command-title { font-size: clamp(40px, 10vw, 60px); margin-top: 20px; }
@@ -174,33 +194,132 @@ main.native-home.fleet-home {
   .fleet-catalog-summary { gap: 22px; }
   .fleet-catalog-summary strong { font-size: 27px; }
 
-  .fleet-settings .ui-modal-header { padding: 23px 19px 20px; }
-  .fleet-settings .ui-modal-body { padding: 0 19px 20px; }
+  @layer ds-pages {
+    .ui-modal.fleet-settings {
+    --ds-modal-header-padding-top: 23px;
+    --ds-modal-header-padding-right: 19px;
+    --ds-modal-header-padding-bottom: 20px;
+    --ds-modal-header-padding-left: 19px;
+    --ds-modal-body-padding-top: 0;
+    --ds-modal-body-padding-right: 19px;
+    --ds-modal-body-padding-bottom: 20px;
+    --ds-modal-body-padding-left: 19px;
+    --ds-modal-footer-padding-top: 16px;
+    --ds-modal-footer-padding-right: 19px;
+    --ds-modal-footer-padding-bottom: 16px;
+    --ds-modal-footer-padding-left: 19px;
+    }
+  }
   .fleet-settings-tabs { gap: 20px; }
   .fleet-settings-tabs > button { font-size: 12px; }
   .fleet-settings-tabs > button > small { display: none; }
   .fleet-settings-section { min-height: 240px; }
-  .fleet-settings .ui-modal-footer { padding: 16px 19px; }
 
   .fleet-settings-done { margin-left: auto; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .fleet-home *, .fleet-settings * { animation: none !important; transition: none !important; }
-}
 /* Native text wrappers must not impose legacy pixel-font sizes on this screen. */
 .fleet-home .fleet-masthead .native-bitmap-fallback { font: inherit; }
-.fleet-settings .ui-modal-header h2 .native-bitmap-fallback { font: inherit; }
-.fleet-home .fleet-masthead .fullscreen-error { position: absolute; top: 100%; right: 0; width: 250px; background: #111b24; padding: 10px; border: 1px solid #bfa47b55; font-size: 12px; }
+.fleet-home .fleet-masthead .fullscreen-error { position: absolute; top: 100%; right: 0; width: 250px; background: var(--ds-palette-panel); padding: 10px; border: 1px solid color-mix(in srgb, var(--ds-palette-brass) 33.333333%, transparent); font-size: 12px; }
 .fleet-settings :is(.audio-settings, .graphics-settings, .battle-size-control) { border: 0; background: transparent; padding: 0; }
-.fleet-settings .audio-settings { --audio-fill: var(--ui-accent); }
-.fleet-settings .audio-settings :is(h3, output) { color: var(--ui-text); }
-.fleet-settings .audio-settings-sliders { border-color: var(--ui-divider); }
-.fleet-settings .audio-settings input[type="range"]::-webkit-slider-thumb { background: var(--ui-text); border-color: var(--ui-accent); }
-.fleet-settings .audio-settings input[type="range"]::-moz-range-thumb { background: var(--ui-text); border-color: var(--ui-accent); }
-.fleet-settings .audio-settings-actions button { border-color: var(--ui-border); background: transparent; color: var(--ui-button-text); border-radius: 0; }
-.fleet-settings .audio-settings-actions button:hover:not(:disabled) { background: var(--ds-control-hover); border-color: var(--ui-highlight); }
+.fleet-settings .audio-settings { --audio-fill: var(--ds-menu-accent); }
+.fleet-settings .audio-settings :is(h3, output) { color: var(--ds-menu-text); }
+.fleet-settings .audio-settings-sliders { border-color: var(--ds-menu-divider); }
+.fleet-settings .audio-settings input[type="range"]::-webkit-slider-thumb { background: var(--ds-menu-text); border-color: var(--ds-menu-accent); }
+.fleet-settings .audio-settings input[type="range"]::-moz-range-thumb { background: var(--ds-menu-text); border-color: var(--ds-menu-accent); }
+.fleet-settings .audio-settings-actions button { border-color: var(--ds-border-page); background: transparent; color: var(--ds-menu-button-text); border-radius: 0; }
+.fleet-settings .audio-settings-actions button:hover:not(:disabled) { background: var(--ds-control-hover); border-color: var(--ds-menu-highlight); }
 .fleet-settings .ui-modal-header { background: transparent; }
 
 .fleet-home .fleet-launch { min-height: 78px; }
 .fleet-settings .ui-modal-header .ui-eyebrow:empty { display: none; }
-.fleet-settings .ui-modal-footer { justify-content: flex-end; }
+@layer ds-pages {
+  .ui-modal.fleet-settings {
+  --ds-modal-footer-justify-content: flex-end;
+  }
+}
+/* Page-owned presentation, including its Vanguard skin. Core owns control behavior. */
+main.fleet-home { --fleet-paper: var(--ds-menu-text); --fleet-accent: var(--ds-menu-accent); --fleet-line: var(--ds-menu-divider); }
+main.fleet-home .fleet-masthead { min-height: 76px; }
+main.fleet-home #command-title { font-size: clamp(34px, 3.5vw, 54px); margin-bottom: 28px; font-weight: 500; }
+main.fleet-home .fleet-home-command { width: min(340px, 100%); }
+main.fleet-home .fleet-launch { min-height: 56px; margin: 0; padding: 13px 14px; background: transparent; color: var(--ds-palette-ink-soft); border: 0; border-left: 2px solid var(--ds-palette-accent-muted); border-bottom: 1px solid var(--fleet-line); box-shadow: none; }
+main.fleet-home .fleet-launch:hover { background-color: var(--ds-control-hover); box-shadow: none; }
+main.fleet-home .fleet-launch-copy > strong { font-size: 16px; font-weight: 500; letter-spacing: .06em; }
+main.fleet-home .fleet-menu-item { min-height: 50px; gap: 14px; }
+main.fleet-home .fleet-menu-item:hover { background: var(--ds-control-hover); }
+main.fleet-home :is(.fleet-launch, .fleet-menu-item) { translate: none; transition: background-color var(--ds-motion-feedback) var(--ds-motion-ease), color var(--ds-motion-feedback) var(--ds-motion-ease); }
+main.fleet-home :is(.fleet-launch, .fleet-menu-item):active { background-color: var(--ds-control-pressed); }
+main.fleet-home .fleet-item-label { font-size: 13px; }
+main.fleet-home .fleet-item-number { display: none; }
+main.fleet-home .fleet-menu-item { padding-left: 16px; }
+main.fleet-home .fleet-home-footer { min-height: 80px; padding-block: 14px; }
+main.fleet-home .fleet-catalog-summary strong { font-size: 23px; color: var(--ds-palette-accent-muted); }
+@media (max-width: 500px) {
+  main.fleet-home .fleet-home-footer { gap: 14px; }
+}
+:root[data-ui-theme="vanguard"] main.native-home.fleet-home {
+  --fleet-accent: var(--vg-cyan);
+  --fleet-line: color-mix(in srgb, var(--ds-palette-cyan) 18.039216%, transparent);
+  background: var(--ds-palette-night);
+}
+:root[data-ui-theme="vanguard"] .fleet-home .fleet-home-art { filter: saturate(1.25) contrast(1.08); }
+:root[data-ui-theme="vanguard"] .fleet-home .fleet-home-shade {
+  background:
+    repeating-linear-gradient(0deg, color-mix(in srgb, var(--ds-palette-cyan) 3.137255%, transparent) 0 1px, transparent 1px 4px),
+    linear-gradient(color-mix(in srgb, var(--ds-palette-cyan) 3.921569%, transparent) 1px, transparent 1px) 0 0 / 64px 64px,
+    linear-gradient(90deg, color-mix(in srgb, var(--ds-palette-cyan) 3.921569%, transparent) 1px, transparent 1px) 0 0 / 64px 64px,
+    radial-gradient(ellipse at 72% 45%, color-mix(in srgb, var(--ds-palette-cyan-glow) 10.196078%, transparent), transparent 55%),
+    linear-gradient(90deg, color-mix(in srgb, var(--ds-palette-night) 98.039216%, transparent) 0%, color-mix(in srgb, var(--ds-palette-night) 87.843137%, transparent) 24%, color-mix(in srgb, var(--ds-palette-night) 54.901961%, transparent) 44%, color-mix(in srgb, var(--ds-palette-night) 3.137255%, transparent) 74%),
+    linear-gradient(0deg, color-mix(in srgb, var(--ds-palette-night) 96.078431%, transparent), transparent 28%, transparent 85%, color-mix(in srgb, var(--ds-palette-night) 60%, transparent));
+}
+:root[data-ui-theme="vanguard"] .fleet-home .fleet-masthead { box-shadow: 0 1px 0 color-mix(in srgb, var(--ds-palette-cyan) 7.843137%, transparent), 0 12px 24px -18px color-mix(in srgb, var(--ds-palette-cyan-glow) 33.333333%, transparent); }
+:root[data-ui-theme="vanguard"] .fleet-home .fleet-wordmark { font-family: var(--vg-display); color: var(--vg-ink); text-shadow: 0 0 12px color-mix(in srgb, var(--ds-palette-cyan) 40%, transparent); }
+:root[data-ui-theme="vanguard"] .fleet-insignia i { background: var(--vg-ink); box-shadow: 0 0 8px color-mix(in srgb, var(--ds-palette-cyan) 60%, transparent); }
+:root[data-ui-theme="vanguard"] .fleet-insignia i:nth-child(2) { background: var(--vg-cyan); box-shadow: 0 0 12px var(--vg-cyan); }
+:root[data-ui-theme="vanguard"] .fleet-home #command-title {
+  font-family: var(--vg-display);
+  background: linear-gradient(180deg, var(--ds-palette-white) 0%, var(--ds-palette-cyan-ink) 45%, var(--ds-palette-cyan) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--ds-palette-cyan-glow) 45.098039%, transparent)) drop-shadow(0 3px 2px color-mix(in srgb, var(--ds-palette-black) 80%, transparent));
+}
+:root[data-ui-theme="vanguard"] .fleet-home .fleet-launch {
+  border-color: color-mix(in srgb, var(--ds-palette-amber) 70.196078%, transparent);
+  border-left-color: var(--vg-amber);
+  color: var(--ds-palette-white);
+  background:
+    linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--ds-palette-warning) 20%, transparent) 45%, transparent 60%) -120% 0 / 60% 100% no-repeat,
+    linear-gradient(90deg, color-mix(in srgb, var(--ds-palette-amber) 20%, transparent), color-mix(in srgb, var(--ds-palette-amber) 5.098039%, transparent) 55%, color-mix(in srgb, var(--ds-palette-amber) 12.156863%, transparent));
+  box-shadow: 0 0 22px color-mix(in srgb, var(--ds-palette-orange) 18.039216%, transparent), inset 0 0 18px color-mix(in srgb, var(--ds-palette-amber) 10.196078%, transparent);
+  transition: background-color .18s, box-shadow .18s;
+}
+:root[data-ui-theme="vanguard"] .fleet-home .fleet-launch:hover {
+  background:
+    linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--ds-palette-highlight-ink) 40%, transparent) 45%, transparent 60%) -120% 0 / 60% 100% no-repeat,
+    linear-gradient(90deg, color-mix(in srgb, var(--ds-palette-amber) 34.901961%, transparent), color-mix(in srgb, var(--ds-palette-amber) 10.196078%, transparent) 55%, color-mix(in srgb, var(--ds-palette-amber) 20%, transparent));
+  box-shadow: 0 0 32px color-mix(in srgb, var(--ds-palette-orange) 34.901961%, transparent), inset 0 0 24px color-mix(in srgb, var(--ds-palette-amber) 18.039216%, transparent);
+  animation: vg-sweep 1.4s ease-out infinite;
+}
+:root[data-ui-theme="vanguard"] .fleet-launch-copy > strong { font-family: var(--vg-display); text-shadow: 0 0 12px color-mix(in srgb, var(--ds-palette-amber) 60%, transparent); }
+:root[data-ui-theme="vanguard"] .fleet-launch-end > span { color: var(--vg-amber); text-shadow: 0 0 10px var(--vg-amber); }
+:root[data-ui-theme="vanguard"] .fleet-home .fleet-menu-item:hover {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--ds-palette-cyan) 14.901961%, transparent), color-mix(in srgb, var(--ds-palette-cyan) 1.960784%, transparent) 70%);
+  box-shadow: inset 2px 0 var(--vg-cyan);
+}
+:root[data-ui-theme="vanguard"] .fleet-menu-item:hover .fleet-item-label { color: var(--vg-ink); text-shadow: 0 0 10px color-mix(in srgb, var(--ds-palette-cyan) 65.098039%, transparent); }
+:root[data-ui-theme="vanguard"] .fleet-menu-item:hover .fleet-item-number,
+:root[data-ui-theme="vanguard"] .fleet-menu-item:hover .fleet-item-arrow { text-shadow: 0 0 8px var(--vg-cyan); }
+:root[data-ui-theme="vanguard"] .fleet-item-number { color: var(--ds-palette-muted); }
+:root[data-ui-theme="vanguard"] .fleet-home kbd { color: var(--vg-cyan); box-shadow: 0 0 6px color-mix(in srgb, var(--ds-palette-cyan) 25.098039%, transparent); }
+:root[data-ui-theme="vanguard"] .fleet-catalog-summary strong {
+  font-family: var(--vg-display);
+  color: var(--vg-ink);
+  text-shadow: 0 0 14px color-mix(in srgb, var(--ds-palette-cyan) 50.196078%, transparent);
+}
+:root[data-ui-theme="vanguard"] .fleet-footer-divider { background: linear-gradient(transparent, var(--vg-cyan), transparent); }
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-ui-theme="vanguard"] .fleet-home .fleet-launch:hover { animation: none; }
+}

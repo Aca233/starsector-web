@@ -25,7 +25,7 @@ export const gravityHull:ShipSpec={
   defaultWeaponGroups:[{index:0,weaponSlotIds:['TRACTOR'],mode:'LINKED',isAutofire:false},
     {index:1,weaponSlotIds:['M1','M2','M3','M4'],mode:'ALTERNATING',isAutofire:true},
     {index:2,weaponSlotIds:['S1','S2','S3','S4','S5','S6'],mode:'LINKED',isAutofire:true}],
-  i18n:{zh_CN:{'ship.web_gravity.desc':'实验引力战列舰。主攻击为引力本身：左键捕获/牵引真实实体，对敌舰持续施加潮汐应力；F建立重力井；G消耗井产生潮汐坍缩；右键从本舰全向排斥并松抓。主攻击正常经过盾弧/装甲，不穿盾。未抓住的友舰与普通友军火力免受影响。1内置XL场投射器、4可换M能量自卫、6可换S混合近防；无盾无相位无舰载机。闭合场推进无化学尾焰。'}},
+  i18n:{zh_CN:{'ship.web_gravity.desc':'实验引力战列舰。主攻击为引力本身：左键捕获/牵引真实实体，对敌舰持续施加潮汐应力；点住自己的舰体拖动可牵引本舰，松开保留惯性；按住F移动唯一的区域场，松开最多10秒驻留、总有效20秒，半径1100、布置2400；按住右键时区域排斥、松手恢复吸引；区域自然到期自动潮汐爆，不能手动引爆、沿用原伤害；左键始终按鼠标拖动，不被右键接管或翻转；按住右键定向推送其他未抓住的实体，本舰区域不对抗左键牵引；G独立全向排斥并松抓，不依赖F。主攻击正常经过盾弧/装甲，不穿盾。未抓住的友舰与普通友军火力免受影响。1内置XL场投射器、4可换M能量自卫、6可换S混合近防；无盾无相位无舰载机。闭合场推进无化学尾焰。'}},
 };
 export const gravityHulls:Record<string,ShipSpec>={[GRAVITY_HULL_ID]:gravityHull};
 export function gravityShips():ShipSpec[]{

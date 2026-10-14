@@ -9,9 +9,9 @@ export const CombatResultsModal: React.FC<CombatResultsModalProps> = ({ battleRe
   const { isVictory, combatDuration, playerStats: stats } = battleResult;
   const damage = [
     { label: '动能', value: stats.kineticDamage, color: '#82bbed' },
-    { label: '高爆', value: stats.heDamage, color: 'var(--ui-warning)' },
-    { label: '能量', value: stats.energyDamage, color: 'var(--ui-accent)' },
-    { label: '破片', value: stats.fragDamage, color: 'var(--ui-muted)' }
+    { label: '高爆', value: stats.heDamage, color: 'var(--ds-menu-warning)' },
+    { label: '能量', value: stats.energyDamage, color: 'var(--ds-menu-accent)' },
+    { label: '破片', value: stats.fragDamage, color: 'var(--ds-menu-muted)' }
   ];
   return <Modal title="战斗结算" eyebrow="战术记录" onClose={onClose}
     onShortcut={key => { if (key === 'r' && gameMode !== 'fleet') onRestart(); if (key === 'm') onOpenModManager(); }}

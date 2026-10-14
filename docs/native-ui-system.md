@@ -1,5 +1,7 @@
 # 共用原版 UI 基础层
 
+> 2026-10-01 当前状态：以下原版字体/八片边框验收为历史记录。用户已确认删除 native-menu 字体；当前用系统文字，装饰边框节点只保留兼容且隐藏。实际公共样式 owner 为 core/components.css，最新结果见 uiux-rework-plan-2026-10-01.md 与 ui-component-contracts.md。
+
 > 历史实现说明。2026-09-26 用户已授权原创完整重做 UI；本轮透明紧凑设计以 `ui-design-system-2026-09-26.md` 为准。此文中的原版皮肤、字体和资源要求不再作为原创重做的视觉验收目标，现有业务 API/焦点行为仍应保留。
 
 ## 目的
@@ -11,7 +13,7 @@
 - `src/ui/NativeChrome.tsx`：NativeButton、NativeButtonLabel、NativeFrame、NativeBorder、NativeMaterial。
 - `src/ui/NativeBitmapText.tsx`：按原作 glyph atlas 绘制文字，同时保留可访问 DOM 文本；字体加载失败或自定义名称包含字库外字符时回退真实中文 TTF，不替换用户文字。
 - `src/ui/native-fonts.ts`：字库解析、原作字符 advance/kerning、缓存和按角色预加载。正文 atlas 在使用时加载。
-- `src/ui/native-chrome.css`：唯一的公共字体/边框/按钮/材质定义。不要在业务 CSS 另写重复描边、滤色边框或系统字体替代。
+- `src/ui/core/components.css`：唯一的公共字体/边框/按钮/材质定义。不要在业务 CSS 另写重复描边、滤色边框或系统字体替代。
 - `src/ui/core/UI.tsx`：现有 Button、Modal 和 ConfirmDialog 已接入基础层，保留按钮回调、inert、焦点恢复、Esc 栈和 Tab 导航。
 
 ## 使用

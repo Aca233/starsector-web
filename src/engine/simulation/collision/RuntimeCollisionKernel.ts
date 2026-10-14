@@ -3,6 +3,8 @@ import { Vector2 } from '../../math/Vector2';
 import { runtimeUrl } from '../../runtime/RuntimePaths';
 import type { Ship } from '../Ship';
 import type { Projectile } from '../Weapon';
+import type { RuntimeCollisionBackendState, RuntimeCollisionTelemetry } from '../../contracts/CombatTelemetry';
+export type { RuntimeCollisionBackendState, RuntimeCollisionTelemetry } from '../../contracts/CombatTelemetry';
 
 const SHIP_STRIDE = 13;
 const PROJECTILE_STRIDE = 4;
@@ -31,19 +33,6 @@ export interface RuntimeCollisionBatchStats {
   projectileCount: number;
   candidatePairs: number;
   maxCandidatesPerProjectile: number;
-}
-
-export type RuntimeCollisionBackendState = 'idle' | 'loading' | 'ready' | 'failed';
-
-export interface RuntimeCollisionTelemetry {
-  backendState: RuntimeCollisionBackendState;
-  typescriptBatches: number;
-  wasmBatches: number;
-  wasmFallbacks: number;
-  projectileCount: number;
-  candidatePairs: number;
-  maxCandidatesPerProjectile: number;
-  kernelMs: number;
 }
 
 interface WasmExports {

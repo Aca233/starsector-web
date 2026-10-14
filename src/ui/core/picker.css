@@ -1,0 +1,5 @@
+/* Focus belongs to the collection, independent of a page's hover fill. */
+[data-ui-picker] button[data-picker-item]:focus-visible {
+  outline: var(--ds-focus-width) solid var(--ds-control-focus);
+  outline-offset: -2px;
+}

@@ -14,6 +14,7 @@ export function createAuthorityFactory({ workerFile = new URL('./authority-worke
     const worker = new Worker(workerFile, { workerData: { match, assets }, execArgv: [],
       resourceLimits: { maxOldGenerationSizeMb: memoryMb }, name: 'battle-' + match.id });
     const handle = {
+      authority:null,
       postMessage(message) { if (!closed) worker.postMessage(message); },
       terminate() {
         if (termination) return termination;
@@ -27,7 +28,8 @@ export function createAuthorityFactory({ workerFile = new URL('./authority-worke
     bootTimer.unref(); active.add(handle);
     worker.on('message', message => {
       if (closed) return;
-      if (message.type === 'ready') { ready = true; clearTimeout(bootTimer); }
+      if (message.type === 'ready') { ready = true; handle.authority=message.authority?structuredClone(message.authority):null;clearTimeout(bootTimer); }
+      if(message.type==='recovered'&&message.authority&&JSON.stringify(message.authority)!==JSON.stringify(handle.authority)){fail('服务器恢复使用了不同的战斗后端。');return;}
       try { receive(message); } catch (error) { fail(error.message); }
     });
     worker.on('error', error => fail('服务器计算 Worker 失败：' + error.message));

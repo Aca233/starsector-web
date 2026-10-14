@@ -11,5 +11,16 @@ export function gravityControlSpec(): Pick<ShipSpec, 'systemType' | 'systemTypes
   };
 }
 export function gravityBattleControlSpec(): ReturnType<typeof gravityControlSpec> {
-  return {...gravityControlSpec(),systemType:ID.battleWell,systemTypes:[ID.battleWell,ID.collapse],rightClickSystemType:ID.battleRepulsor};
+  return {...gravityControlSpec(),systemType:ID.battleWell,systemTypes:[ID.battleWell,ID.battleRepulsor],rightClickSystemType:ID.push};
+}
+
+/** Materialized-fit migration only: never rewrites a saved design or custom system choices. */
+export function upgradeGravityControlSpec(spec: ShipSpec): void {
+  if ((spec.sourceHullId ?? spec.id) === 'web_gravity' && spec.systemTypes?.length === 2
+    && spec.systemTypes[0] === ID.battleWell && spec.systemTypes[1] === ID.collapse
+    && spec.rightClickSystemType === ID.battleRepulsor) {
+    spec.systemTypes = [ID.battleWell, ID.battleRepulsor]; spec.rightClickSystemType = ID.push;
+  }
+  if ((spec.sourceHullId ?? spec.id) === 'web_gravity' && spec.systemTypes?.join(',') === [ID.battleWell,ID.battleRepulsor].join(',')
+    && spec.rightClickSystemType === ID.polarity) spec.rightClickSystemType = ID.push;
 }

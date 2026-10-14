@@ -47,6 +47,8 @@ export class FighterSystem {
 
   public playerWings: FlightDeckWing[] = [];
   public enemyWings: FlightDeckWing[] = [];
+  private readonly wingsById = new Map<string, FlightDeckWing>();
+  private readonly aliveCounts = new Map<string, number>();
   private carriers = new Map<string, Ship>();
   private readonly formation = new FlightFormation();
   private readonly reserveDeckUsed = new Set<Ship>();
@@ -66,6 +68,7 @@ export class FighterSystem {
     this.bomberAIModes.clear();
     this.playerWings = [];
     this.enemyWings = [];
+    this.wingsById.clear();
     for (const carrier of this.carriers.values()) { carrier.deployedWingCraft.clear(); carrier.fighterRecall = false; }
     this.carriers.clear();
     this.formation.reset();
@@ -94,6 +97,7 @@ export class FighterSystem {
         maxCrafts: spec.count, crr: 1, rebuildQueue: []
       };
       (carrier.isPlayer ? this.playerWings : this.enemyWings).push(wing);
+      this.wingsById.set(wing.wingId, wing);
       for (let i = 0; i < wing.maxCrafts; i++) this.spawnCraft(carrier, wing, i);
     });
   }
@@ -150,10 +154,10 @@ export class FighterSystem {
   public recoverWingCraft(carrier: Ship, craft: Ship): void {
     if ((carrier.isDead || carrier.isRetreated) || carrier.hullHp <= 0 || craft.isDead || craft.hullHp <= 0 || craft.isDocked
       || craft.sourceCarrier !== carrier || this.carriers.get(carrier.id) !== carrier) return;
-    const wing = [...this.playerWings, ...this.enemyWings].find(w => w.wingId === craft.flightDeckWingId && w.carrierId === carrier.id);
+    const wing = this.wingFor(craft);
     const list = wing?.role === 'BOMBER' ? this.bombers : this.fighters;
     const index = list.indexOf(craft);
-    if (!wing || index < 0) return;
+    if (!wing || wing.carrierId !== carrier.id || index < 0) return;
     craft.isDocked = true;
     craft.clearInput();
     carrier.deployedWingCraft.delete(craft);
@@ -194,7 +198,9 @@ export class FighterSystem {
   }
 
   private wingFor(craft: Ship): FlightDeckWing | undefined {
-    return [...this.playerWings, ...this.enemyWings].find(w => w.wingId === craft.flightDeckWingId);
+    const id = craft.flightDeckWingId;
+    if (!id) return undefined;
+    return this.wingsById.get(id) ?? [...this.playerWings, ...this.enemyWings].find(w => w.wingId === id);
   }
   public detachWingCraft(carrier: Ship, craft: Ship): boolean {
     if (craft.sourceCarrier !== carrier || !craft.flightDeckWingId || craft.isDead || craft.isDocked) return false;
@@ -215,7 +221,7 @@ export class FighterSystem {
     else craft.aimTargetWorld.copy(carrier.pos);
   }
   private carrierFor(craft: Ship, fallback: Ship): Ship {
-    const wing = [...this.playerWings, ...this.enemyWings].find(w => w.wingId === craft.flightDeckWingId);
+    const wing = this.wingFor(craft);
     return (wing?.carrierId && this.carriers.get(wing.carrierId)) || fallback;
   }
 
@@ -271,21 +277,33 @@ export class FighterSystem {
 
     // Observe the threshold before natural recovery can move exactly 40% above it.
     this.applyReserveDecks();
-    for (const wing of [...this.playerWings, ...this.enemyWings]) {
+    const aliveCounts = this.aliveCounts;
+    aliveCounts.clear();
+    for (let i = 0; i < this.fighters.length; i++) {
+      const c = this.fighters[i];
+      if (!c.isDead && c.flightDeckWingId) aliveCounts.set(c.flightDeckWingId, (aliveCounts.get(c.flightDeckWingId) ?? 0) + 1);
+    }
+    for (let i = 0; i < this.bombers.length; i++) {
+      const c = this.bombers[i];
+      if (!c.isDead && c.flightDeckWingId) aliveCounts.set(c.flightDeckWingId, (aliveCounts.get(c.flightDeckWingId) ?? 0) + 1);
+    }
+    const updateWingDeck = (wing: FlightDeckWing) => {
+      this.wingsById.set(wing.wingId, wing);
       const carrier = (wing.carrierId && this.carriers.get(wing.carrierId)) || (wing.isPlayer ? playerShip : enemyShip);
       const recovered = this.recoveredCraft.get(wing.wingId) ?? [];
       if ((carrier.isDead || carrier.isRetreated)) { recovered.length = 0; this.recoveredCraft.delete(wing.wingId); }
       let elapsed = dt;
+      let aliveCount = aliveCounts.get(wing.wingId) ?? 0;
       while (recovered.length && elapsed > 0) {
         const item = recovered[0], used = Math.min(elapsed, item.timer);
         elapsed -= used; item.timer -= used;
         if (item.timer > 1e-9) break;
         recovered.shift();
         const craft = this.spawnCraft(carrier, wing, 0);
+        if (!craft.isDead) aliveCount++;
         if (item.reserveRemaining !== undefined) this.reserveCraft.set(craft, item.reserveRemaining);
       }
-      const aliveList = [...this.fighters, ...this.bombers].filter(c => c.flightDeckWingId === wing.wingId && !c.isDead);
-      const totalCrafts = aliveList.length + wing.rebuildQueue.length + recovered.length;
+      const totalCrafts = aliveCount + wing.rebuildQueue.length + recovered.length;
       let missing = wing.maxCrafts - totalCrafts;
 
       while (missing > 0 && !(carrier.isDead || carrier.isRetreated)) {
@@ -312,12 +330,14 @@ export class FighterSystem {
         item.timer -= dt;
         if (item.timer <= 0 && !(carrier.isDead || carrier.isRetreated)) {
           wing.rebuildQueue.splice(i, 1);
-          this.spawnCraft(carrier, wing, aliveList.length);
+          this.spawnCraft(carrier, wing, aliveCount);
           fx.recordFighterRebuilt(wing.isPlayer);
           sound.playAtPos('fighter_deploy', carrier.pos, fx.getPlayerPos(), 0.6);
         }
       }
-    }
+    };
+    for (let i = 0; i < this.playerWings.length; i++) updateWingDeck(this.playerWings[i]);
+    for (let i = 0; i < this.enemyWings.length; i++) updateWingDeck(this.enemyWings[i]);
     this.applyReserveDecks();
   }
 

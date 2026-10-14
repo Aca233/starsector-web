@@ -4,7 +4,7 @@ import type { SystemWorld } from '../../extensions/ship-systems/Types';
 import type { Projectile } from '../Weapon';
 import { ENGINE_VISUAL_PROFILES } from '../../visual/VisualProfiles';
 import { Vector2 } from '../../math/Vector2';
-import { Ship } from '../Ship';
+import { Ship, readShipSystems } from '../Ship';
 import { combatAudio as sound } from '../../audio/CombatAudioEvents';
 import { i18n } from '../../i18n/LocalizationManager';
 import { CombatFXSystem } from './CombatFXSystem';
@@ -92,14 +92,19 @@ export class CombatShipStatusSystem {
 
 
     }
-    for (const ship of ctx.componentShips ?? ships) {
+    const componentShips = ctx.componentShips ?? ships;
+    const world: SystemWorld = { combatScope: this.combatScope, spawnNativeMine:ctx.spawnNativeMine, spawnShip:ctx.spawnShip, addCombatEffect:ctx.addCombatEffect, ships: componentShips, asteroids: ctx.asteroids, combatRandom: ctx.combatRandom, deployReserveWing: ctx.deployReserveWing, recoverWingCraft: ctx.recoverWingCraft, detachWingCraft:ctx.detachWingCraft, retireCombatCraft:ctx.retireCombatCraft, advanceDroneLauncher: ctx.advanceDroneLauncher, deployMine: ctx.deployMine, projectiles: ctx.projectiles,
+      spawnSystemArc: (from, to, color) => ctx.fx.spawnEmpArc(from, to, { coreColor: [255, 255, 255], glowColor: color ?? [130, 155, 145], thickness: 3, life: .3 }),
+      spawnSystemSmoke: (spec, pos, facing, velocity) => ctx.fx.spawnLauncherSmoke(spec, pos, facing, velocity) };
+    for (const ship of componentShips) {
       if (ship.isDocked) continue;
       if (!ship.isDead && !ship.isRetreated) {
-        const world: SystemWorld = { combatScope: this.combatScope, spawnNativeMine:ctx.spawnNativeMine, spawnShip:ctx.spawnShip, addCombatEffect:ctx.addCombatEffect, ships: ctx.componentShips ?? ships, asteroids: ctx.asteroids, combatRandom: ctx.combatRandom, deployReserveWing: ctx.deployReserveWing, recoverWingCraft: ctx.recoverWingCraft, detachWingCraft:ctx.detachWingCraft, retireCombatCraft:ctx.retireCombatCraft, advanceDroneLauncher: ctx.advanceDroneLauncher, deployMine: ctx.deployMine, projectiles: ctx.projectiles,
-          spawnSystemArc: (from, to, color) => ctx.fx.spawnEmpArc(from, to, { coreColor: [255, 255, 255], glowColor: color ?? [130, 155, 145], thickness: 3, life: .3 }),
-          spawnSystemSmoke: (spec, pos, facing, velocity) => ctx.fx.spawnLauncherSmoke(spec, pos, facing, velocity) };
-        for (const system of ship.allSystems) system.dispatchEvents(ship, world, dt * ship.subjectiveTimeMultiplier);
-        for (const mod of installedHullMods(ship.spec)) mod.advanceCombat?.(ship, dt, world);
+        const systems = readShipSystems(ship);
+        const subDt = dt * ship.subjectiveTimeMultiplier;
+        for (let i = 0; i < systems.length; i++) systems[i].dispatchEvents(ship, world, subDt);
+        if (ship.spec.builtInHullMods?.length || ship.spec.hullMods?.length) {
+          for (const mod of installedHullMods(ship.spec)) mod.advanceCombat?.(ship, dt, world);
+        }
       }
       if (!ship.isDead) {
         if (ship.justShieldMalfunction) {
@@ -113,7 +118,11 @@ export class CombatShipStatusSystem {
         }
         this.updateWeaponStatus(ship, ctx); this.updateEngineStatus(ship, ctx);
       }
-      else { ship.justDisabledMounts = []; ship.justRepairedMounts = []; ship.engineController.clearEvents(); }
+      else {
+        if (ship.justDisabledMounts.length) ship.justDisabledMounts = [];
+        if (ship.justRepairedMounts.length) ship.justRepairedMounts = [];
+        ship.engineController.clearEvents();
+      }
       ship.justCriticalDamage.length = 0;
       ship.justShieldMalfunction = false;
     }
@@ -145,17 +154,19 @@ export class CombatShipStatusSystem {
     const isFighter = ship.spec.hullSize === 'FIGHTER';
     // Deferred health-check events, rather than damage-path guesses. Existing
     // Web radio/floaty presentation remains an adapter, emitted once per transition.
-    for (const mount of ship.justDisabledMounts) {
-      const mountWorldPos = ship.pos.clone().add(mount.relativePos.clone().rotate(ship.facingRad));
-      const size = weaponSizeBaseline(mount.spec.mountSize).toLowerCase();
-      sound.playAtPos(mount.isPermanentlyDisabled ? 'weapon_malfunction_' + size : 'disabled_' + size,
-        ship.pos, ctx.playerShip.pos, .5, 1);
-      if (!isFighter) ctx.fx.addFloatingText(mountWorldPos, (mount.isPermanentlyDisabled ? 'PERMANENTLY DISABLED: ' : 'WEAPON DISABLED: ') + mount.slotId,
-        [255, 140, 40], 14, 2);
-      if (!isFighter && ship.isPlayer) ctx.addRadioMessage('损管警报', 'PLAYER',
-        '武器挂点 [' + mount.slotId + '] 已下线' + (mount.isPermanentlyDisabled ? '，无法战场修复。' : '，正在抢修。'), [255, 120, 60]);
+    if (ship.justDisabledMounts.length > 0) {
+      for (const mount of ship.justDisabledMounts) {
+        const mountWorldPos = ship.pos.clone().add(mount.relativePos.clone().rotate(ship.facingRad));
+        const size = weaponSizeBaseline(mount.spec.mountSize).toLowerCase();
+        sound.playAtPos(mount.isPermanentlyDisabled ? 'weapon_malfunction_' + size : 'disabled_' + size,
+          ship.pos, ctx.playerShip.pos, .5, 1);
+        if (!isFighter) ctx.fx.addFloatingText(mountWorldPos, (mount.isPermanentlyDisabled ? 'PERMANENTLY DISABLED: ' : 'WEAPON DISABLED: ') + mount.slotId,
+          [255, 140, 40], 14, 2);
+        if (!isFighter && ship.isPlayer) ctx.addRadioMessage('损管警报', 'PLAYER',
+          '武器挂点 [' + mount.slotId + '] 已下线' + (mount.isPermanentlyDisabled ? '，无法战场修复。' : '，正在抢修。'), [255, 120, 60]);
+      }
+      ship.justDisabledMounts = [];
     }
-    ship.justDisabledMounts = [];
 
     // 5. 挂点抢修完毕重新上线通知 (Web presentation adapter)
     if (ship.justRepairedMounts && ship.justRepairedMounts.length > 0) {

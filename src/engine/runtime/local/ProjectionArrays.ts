@@ -1,5 +1,6 @@
 const arrayMap: unknown = Array.prototype.map;
 const ownedArrays = new WeakSet<readonly unknown[]>();
+export const knownProjectionKeys = new WeakMap<object, readonly string[]>();
 function hasNativeMap(source: readonly unknown[]): boolean {
   return Object.getPrototypeOf(source) === Array.prototype && !Object.hasOwn(source, 'map')
     && !Object.hasOwn(source, 'constructor') && source.map === arrayMap

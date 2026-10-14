@@ -23,9 +23,10 @@ import { distanceToDeployedShield, isShieldCollisionActive } from '../../collisi
 import { getShipExplosionContact } from '../../collision/ExplosionContact';
 import { distanceToShipHull, mayBeWithinShipHullDistance } from '../../collision/HullGeometry';
 import { ContactKernel, type ContactHit } from '../../../ai/batch/ContactKernel';
-import type { StageView } from '../../../ai/batch/StageProtocol';
+import type { StageView } from '../../../ai/batch/StageBridge';
 import type { CombatEngine } from '../../CombatEngine';
 import { numericDecisionCoreEnabled } from '../../../ai/batch/StageProducer';
+import { knownProjectionKeys } from '../../../runtime/local/ProjectionArrays';
 
 export interface ContactCoverageCounts {
   numericQueries: number;
@@ -551,7 +552,7 @@ export class ProjectileCollisionHandler {
     const impactDamage = p.damage * projectileOutgoingMultiplier(p, ship, impactWorld, ctx);
     p.pos.copy(impactWorld);
     if(!p.voidShieldHitRecorded) ctx.statsTracker?.recordShotHit(p.isPlayer ?? false);
-    if(hit.kind==='SHIELD' && ship.shield.voidShield) p.voidShieldHitRecorded=true;
+    if(hit.kind==='SHIELD' && ship.shield.voidShield) { knownProjectionKeys.delete(p); p.voidShieldHitRecorded=true; }
 
     if (hit.kind === 'SHIELD') {
       const sCenter = ship.getShieldCenter(ship.pos, ship.facingRad);
@@ -586,7 +587,7 @@ export class ProjectileCollisionHandler {
         if(p.empDamage !== undefined) p.empDamage *= absorption.remainingFraction;
         return false;
       }
-      if(ship.shield.voidShield) p.voidShieldBlockedRoot=ship.id;
+      if(ship.shield.voidShield) { knownProjectionKeys.delete(p); p.voidShieldBlockedRoot=ship.id; }
       ctx.fx.spawnMovingRayImpactFade(p, impactWorld);
       if (p.onHitEffect) requireWeaponEffect(p.onHitEffect, 'hit', p.specId).hit!(p, ship, impactWorld, true, ctx.ships?.find(s => s.id === p.sourceShipId), ctx);
       ctx.spawnProjectileExplosion?.(p, impactWorld, ship.id);
@@ -652,6 +653,7 @@ export class ProjectileCollisionHandler {
     ctx.addCameraShake(visual.cameraShake, 0.15);
     if (ship.hullHp <= 0) ctx.handleShipDestruction(ship);
     if (p.passThroughFighters && ship.spec.hullSize === 'FIGHTER' && (!p.passThroughFightersOnlyWhenDestroyed || ship.hullHp <= 0)) {
+      knownProjectionKeys.delete(p);
       (p.damagedTargetIds ??= []).push(ship.id);
       return false;
     }

@@ -11,7 +11,12 @@ import type { Design } from './DesignModel';
 import { EquipmentTooltip } from './EquipmentTooltip';
 import { useDwellHover } from './useDwellHover';
 import { WeaponInformation } from './WeaponInformation';
-import './refit-weapon-tooltip.css';
+
+function mountTargets(anchor: HTMLElement | SVGElement) {
+  return Array.from(anchor.closest('.studio-ship')?.querySelectorAll<HTMLElement>('.studio-mount') ?? [])
+    .filter(element => element.getClientRects().length > 0)
+    .map(element => element.getBoundingClientRect());
+}
 
 /** Inspect installed and empty mounts without opening the replacement picker. */
 export function useRefitWeaponTooltip(draft: Design, spec: ShipSpec, enabled: boolean) {
@@ -46,6 +51,7 @@ export function useRefitWeaponTooltip(draft: Design, spec: ShipSpec, enabled: bo
     bind: (id: string) => enabled && !encyclopedia ? hover.bind(id) : {},
     content: <>
       {slot && !encyclopedia && <EquipmentTooltip key={slot.slotId} hover={hover} preferSide="left"
+        avoidTargets={spec.isModuleHull || spec.modules?.length ? mountTargets : undefined}
         positionAnchor={spec.isModuleHull ? hover.active?.anchor : hover.active?.anchor.closest<HTMLElement>(".studio-ship")}
         className={"source-weapon-details refit-weapon-tooltip" + (spec.isModuleHull || spec.modules?.length ? " refit-weapon-tooltip--assembly" : "")}>
         <NativeBorder />

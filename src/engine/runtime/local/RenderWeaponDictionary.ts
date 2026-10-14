@@ -1,4 +1,4 @@
-import { immutableCopy } from '../../extensions/Immutable';
+import { immutableCopy, isImmutableMetadata } from '../../extensions/Immutable';
 import type { RenderWeaponSpec } from '../../render/ShipRenderState';
 import type { WeaponSpec } from '../../simulation/Weapon';
 
@@ -55,7 +55,8 @@ export class RenderWeaponDictionary {
   private readonly sources = new WeakMap<WeaponSpec, SourceSample>();
   private retained = new Map<string, Interned>();
   private live = new Map<string, Interned>();
-  begin(): void { this.live.clear(); }
+  private workerOwned = false;
+  begin(workerOwned = false): void { this.live.clear(); this.workerOwned = workerOwned; }
   finish(): void {
     const old = this.retained;
     this.retained = this.live;
@@ -65,6 +66,10 @@ export class RenderWeaponDictionary {
   get size(): number { return this.retained.size; }
   project(source: WeaponSpec): RenderWeaponSpec {
     let sample = this.sources.get(source);
+    if (sample?.entry && (this.workerOwned || isImmutableMetadata(source))) {
+      this.live.set(sample.entry.key, sample.entry);
+      return sample.entry.spec;
+    }
     if (!sample) { sample = { values: [], changed: true }; this.sources.set(source, sample); }
     sample.changed = !sample.entry;
     for (let i = 0; i < fields.length; i++) store(sample, i, source[fields[i]]);

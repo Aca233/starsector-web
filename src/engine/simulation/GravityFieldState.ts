@@ -2,6 +2,9 @@
  * Kept on the owning ShipSystem so snapshots preserve wave hit deduplication. */
 export interface GravityFieldState {
   serial?: number;
+  polarity?: 1 | -1;
+  cursorControlled?: boolean;
+  lingerRemaining?: number;
   environmentHits?: string[];
   environmentBudgetRemaining?: number;
   releaseTargets?: import('./GravityTractorState').GravityTarget[];
@@ -19,6 +22,8 @@ export interface GravityFieldState {
 }
 export interface GravityFieldSpec {
   kind: 'WELL' | 'REPULSOR';
+  cursorSpeed?: number;
+  lingerSeconds?: number;
   radius: number;
   /** WELL deployment and maintenance tether, not a cursor-following field. */
   placementRange: number;
@@ -45,6 +50,9 @@ export function validateGravityField(spec?: GravityFieldSpec): void {
   if (spec.kind !== 'WELL' && spec.kind !== 'REPULSOR') throw Error('Invalid gravity field kind');
   for (const key of ['radius','placementRange','duration','shipStrength','projectileStrength','shipBudget','projectileBudget','maxShips','maxProjectiles'] as const) {
     if (!Number.isFinite(spec[key]) || spec[key] <= 0) throw Error('Invalid gravity field ' + key);
+  }
+  for (const key of ['cursorSpeed','lingerSeconds'] as const) {
+    if (spec[key] !== undefined && (!Number.isFinite(spec[key]) || spec[key]! <= 0 || spec.kind !== 'WELL')) throw Error('Invalid cursor gravity '+key);
   }
   if (!Number.isInteger(spec.maxShips) || spec.maxShips > 64 || !Number.isInteger(spec.maxProjectiles) || spec.maxProjectiles > 256) throw Error('Invalid gravity recipient limit');
 }

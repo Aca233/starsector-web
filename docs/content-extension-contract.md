@@ -16,7 +16,10 @@
 - **行为**：extensions/ship-systems、weapon-effects、HullMods.ts 分别拥有系统定义、效果与舰装。规则、时序、AI 策略、音效和控制能力不再散落在舰船身份分支里。
 - **公开代码入口**：extensions/index.ts。可信 TypeScript 模块在应用组合阶段注册行为；JSON 内容包不执行 Java/JS 代码。
 - **内容包入口**：installContentPack(pack) 等待本地资源清单，再原子安装；同步 modManager.loadMod 供已准备好资源的调用者使用。
+- **2026-10-01 单舰安装入口**：上述 API 保留为旧数据注册接口。包含改装、配装及素材的单舰包使用 `.ship-pack` 文件，经设置页预检、IndexedDB 保存和刷新激活；唯一内置描述入口为 `BundledShipPacks`。荣光女王/罗西南特已迁入同一协议，真实 Worker 共用包目录。兼容范围与验收见 [ABI 1 记录](ship-pack-host-2026-10-01.md)。
 - **运行时目录**：ContentRegistry 是唯一权威。默认 ContentManifest 随注册 revision 从它生成。public/content/manifest.json 仅用于显式外部清单校验，不是默认运行时第二份目录。
+- **2026-10-08 内容能力入口**：七个内置包的 13 套配装均由 `ShipPack.variants` 拥有，改装/模拟器只查询包目录。`ShipPackCapabilities` 从可信行为及系统/舰装/效果注册表推导实际要求；可额外声明 `{id, minVersion, scope}`，不能用声明覆盖缺失实现。`DefinitionRegistry.register(definition, capabilityVersion)` 的版本由宿主代码提供，默认 1；包不能修改。当前没有声明战役能力支持。
+- **显式包依赖**：`dependencies` 声明已安装且启用的包 ID 与最低三段版本；包预检只允许该依赖闭包满足外部武器引用，拒绝缺失/循环。烛渊现有近防引用休伯利安，因此显式依赖后者，不再冒充完全自包含。启停/卸载在保存前检查完整目录；多人包协商仍未实现。详见 [本轮依据与验收](foundation-content-capabilities-source-notes-2026-10-08.md)。
 
 ## 新舰船 / 武器
 

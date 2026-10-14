@@ -22,7 +22,7 @@ export const idleWorkerControls = (): LanWorkerControls => ({ viewport:null,poin
   visible:true,launched:false,synced:false,focused:false,blocked:true,syncId:'',minTick:0 });
 export function copyWorkerControls(value: LanWorkerControls): LanWorkerControls {
   if (!value || !Number.isFinite(value.zoom) || value.zoom <= 0 || !Number.isSafeInteger(value.seq) || value.seq < 0
-    || !Number.isInteger(value.keys) || value.keys < 0 || value.keys > 255 || !Number.isSafeInteger(value.minTick) || value.minTick < 0
+    || !Number.isInteger(value.keys) || value.keys < 0 || value.keys > 1023 || !Number.isSafeInteger(value.minTick) || value.minTick < 0
     || typeof value.syncId !== 'string' || value.syncId.length > 128
     || [value.firing,value.visible,value.launched,value.synced,value.focused,value.blocked].some(v=>typeof v!=='boolean')) throw Error('Invalid presentation controls');
   const pointer=value.pointer;
@@ -88,7 +88,7 @@ export function requireSynchronousPresentation(value:unknown):void {
 
 export function copyAcceptedWorkerInput(input:PlayerInput):PlayerInput {
   const point=(value:unknown):value is [number,number]=>Array.isArray(value)&&value.length===2&&value.every(Number.isFinite);
-  if(!input||!Number.isSafeInteger(input.seq)||input.seq<0||!Number.isInteger(input.keys)||input.keys<0||input.keys>255
+  if(!input||!Number.isSafeInteger(input.seq)||input.seq<0||!Number.isInteger(input.keys)||input.keys<0||input.keys>1023
     ||!point(input.aim)||typeof input.firing!=='boolean'||typeof input.pointerActive!=='boolean'||!Array.isArray(input.actions)||input.actions.length>16)throw Error('Invalid accepted presentation input');
   const kinds=['shield','hullShield','vent','system','group','mode','autofire','target','recall','module'];
   const actions=input.actions.map(a=>{

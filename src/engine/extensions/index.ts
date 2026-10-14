@@ -11,3 +11,5 @@ export { effectState, clearEffectState } from './EffectState';
 export { modManager } from '../modding/ModManager';
 export type { ModPackage } from '../modding/ModManager';
 export { installContentPack } from './ContentAPI';
+export type { ShipPack, ShipPackFile, PackFit, PackVariant } from '../modding/ShipPack';
+export { readShipPackFile, preflightShipPackFile, persistShipPackFile } from '../modding/ShipPackInstaller';

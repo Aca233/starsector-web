@@ -56,7 +56,7 @@ export function advanceGravityDamage(dt: number, world: GravityWorld, fx?: Gravi
       const spec = mount.spec.gravityTractor, state = mount.gravityTractor;
       if (!spec?.tidalDamagePerSecond || !state || state.phase !== 'HOLD' || !state.target || mount.isDisabled) continue;
       const body = resolveGravityBody(state.target, world), from = weaponMuzzle(owner, mount);
-      if (!body?.ship || sameTeam(owner, body.ship)) { state.damageClock = 0; continue; }
+      if (!body?.ship || body.ship === owner.assemblyRoot || sameTeam(owner, body.ship)) { state.damageClock = 0; continue; }
       const entry = shipSegmentEntry(body.ship, from, body.pos);
       if (entry === null || from.distanceTo(Vector2.lerp(from, body.pos, entry)) > combatWeaponRange(owner, mount.spec) || !gravityLineClear(owner, body, from, world)) {
         releaseGravityTractor(mount, '潮汐连接中断'); continue;
@@ -70,7 +70,7 @@ export function advanceGravityDamage(dt: number, world: GravityWorld, fx?: Gravi
       if (steps <= 0) continue;
       state.damageClock -= steps * .1;
       const point = applyGravityTidalHit(owner, body.ship, from, spec.tidalDamagePerSecond * steps * .1, spec.tidalDamagePerSecond, true, fx);
-      if (point) { state.contactX = point.x; state.contactY = point.y; state.status = '敌舰 · 潮汐撕扯'; }
+      if (point) { state.contactX = point.x; state.contactY = point.y; state.status = '已抓住 · 敌舰潮汐撕扯'; }
     }
     for (const system of owner.allSystems) {
       const spec = system.definition.gravityCollapse, field = system.gravityField;

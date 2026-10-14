@@ -154,6 +154,7 @@ export function validateWeaponSpec(input: unknown, requireBundledAssets = assetM
     const keys=spec.gravityTractor?['captureTime','projectileCaptureTime','holdTime','recovery','anchorSpeed','strength','damping','fluxPerSecond']:['impulse','budgetPerSecond','fluxPerUse','interval'];
     for (const key of keys) finite(controller[key],id+'.gravityController.'+key,.001,10000);
     if (spec.gravityTractor) finite(controller.holdTime,id+'.gravityTractor.holdTime',.01,10);
+    if (spec.gravityTractor && controller.selfTow !== undefined && typeof controller.selfTow !== 'boolean') throw new Error(id+'.gravityTractor.selfTow must be boolean');
     if (spec.gravityTractor) for (const key of ['tidalDamagePerSecond','tidalFluxPerSecond']) {
       if (controller[key] !== undefined) finite(controller[key],id+'.gravityController.'+key,.001,10000);
     }

@@ -1,0 +1,70 @@
+/* Foundation palette: surfaces, neutral text, interaction accents and semantic status hues.
+ * Page tokens in design-tokens.css and theme-vanguard.css reference these primitives.
+ * Alpha is composed at the use site; asset URLs and bitmap colours stay untouched. */
+@layer ds-tokens {
+:root {
+  --ds-palette-black: #000000;
+  --ds-palette-white: #ffffff;
+  --ds-palette-night: #03070c;
+  --ds-palette-shell: #080f18;
+  --ds-palette-tooltip: #06121c;
+  --ds-palette-panel: #101b25;
+  --ds-palette-inset: #02101a;
+  --ds-palette-teal-depth: #031319;
+  --ds-palette-blue-depth: #04182c;
+  --ds-palette-warm-depth: #18100c;
+  --ds-palette-danger-depth: #281212;
+  --ds-palette-teal-frame: #17444f;
+  --ds-palette-blue-frame: #204458;
+  --ds-palette-blue-raised: #1a5a86;
+  --ds-palette-cyan-glow: #2bc8ff;
+  --ds-palette-cyan: #5ee6ff;
+  --ds-palette-turquoise: #55ddd5;
+  --ds-palette-cyan-ink: #c6f3ff;
+  --ds-palette-ink: #e2f1f7;
+  --ds-palette-ink-soft: #dbe3e7;
+  --ds-palette-accent-muted: #b7cdd5;
+  --ds-palette-muted: #9fb8c4;
+  --ds-palette-dim: #8aa3b0;
+  --ds-palette-steel: #617980;
+  --ds-palette-gray: #888888;
+  --ds-palette-gray-ink: #dddddd;
+  --ds-palette-charcoal: #111111;
+  --ds-palette-gray-frame: #444444;
+  --ds-palette-native-yellow: #ffe000;
+  --ds-palette-lime: #9bff00;
+  --ds-palette-lime-muted: #c8d878;
+  --ds-palette-green-depth: #11383d;
+  --ds-palette-green-frame: #2e664f;
+  --ds-palette-green: #46bf85;
+  --ds-palette-mint: #6ff0c0;
+  --ds-palette-friendly-muted: #95baa8;
+  --ds-palette-orange: #ff9a3e;
+  --ds-palette-amber: #ffb547;
+  --ds-palette-highlight: #d6bf91;
+  --ds-palette-brass: #c3b28a;
+  --ds-palette-brown: #765d3a;
+  --ds-palette-violet: #8e74c6;
+  --ds-palette-purple: #8b5cf6;
+  --ds-palette-lilac: #d0b9ff;
+  --ds-palette-magenta: #ff66d9;
+  --ds-palette-blue: #4a8dcd;
+  --ds-palette-cyan-frame: #5894a7;
+  --ds-palette-coral: #ff7f7a;
+  --ds-palette-red: #ff5a50;
+  --ds-palette-red-muted: #ed998f;
+  --ds-palette-red-frame: #98504c;
+  --ds-palette-green-ink: #c4ebae;
+  --ds-palette-cyan-muted: #7fdcf2;
+  --ds-palette-blue-ink: #aadeff;
+  --ds-palette-warning: #ffc76b;
+  --ds-palette-olive: #6c791f;
+  --ds-palette-warning-muted: #9d912b;
+  --ds-palette-danger-dark: #661e13;
+  --ds-palette-bronze: #b98242;
+  --ds-palette-lime-mid: #8fd600;
+  --ds-palette-brown-depth: #352c0d;
+  --ds-palette-olive-depth: #28380f;
+  --ds-palette-highlight-ink: #f6e6c3;
+}
+}

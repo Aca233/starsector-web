@@ -1,3 +1,5 @@
+import { Picker } from '../ui/core/Picker';
+import { SearchInput } from '../ui/core/ListControls';
 import { RefitHint } from './RefitHint';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { NativeButton } from '../ui/NativeChrome';
@@ -79,10 +81,10 @@ export function SourceWingPicker({ draft, index, onEquip, onClose }: {
   const row = (id: string, wing: RefitWing, installed = false) => {
     const unavailable = builtin || (!installed && wing.op > allowance);
     return <button type="button" className={`native-wing-row${installed ? ' native-wing-installed' : ''}`} key={id}
-      data-wing-choice={installed ? undefined : id} data-preview={details.active?.id === id} aria-disabled={unavailable}
+      data-picker-item={installed ? undefined : true} data-wing-choice={installed ? undefined : id} data-preview={details.active?.id === id} aria-disabled={unavailable}
       aria-label={`${installed ? builtin ? '内置联队' : '卸下' : '安装'}：${wing.name}，${wing.count} 架，${wing.op} OP`}
       {...details.bind(id)}
-      onKeyDown={e => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { const buttons = Array.from(list.current?.querySelectorAll<HTMLButtonElement>('[data-wing-choice]') ?? []); const i = buttons.indexOf(e.currentTarget); if (i >= 0) {e.preventDefault(); buttons[(i + (e.key === 'ArrowDown' ? 1 : buttons.length - 1)) % buttons.length]?.focus();} } }}
+
       onClick={e => { if (!unavailable && !e.ctrlKey && !comparing) onEquip(installed ? null : id); }}>
       <WingFormation id={id} />
       <span className="native-wing-info"><strong><NativeBitmapText font="body" color="currentColor">{`${nameOf(wing)} ${roleOf(wing)}`}</NativeBitmapText></strong>
@@ -105,10 +107,10 @@ export function SourceWingPicker({ draft, index, onEquip, onClose }: {
           <RefitHint text="未接入战役市场，不能购买"><NativeButton font="body" shortcut="5" disabled >合法购买</NativeButton></RefitHint>
           <RefitHint text="未接入黑市，不能购买"><NativeButton font="body" shortcut="6" disabled >非法购买</NativeButton></RefitHint>
         </div>
-        {advanced && <div className="native-wing-search"><div className="refit-search-field"><input ref={search} type="search" autoComplete="off" aria-label="搜索战机联队" placeholder="搜索名称 / ID" value={query} onChange={e => {details.hide(); setQuery(e.target.value);}} onKeyDown={e => {if (e.key === 'ArrowDown') {e.preventDefault(); list.current?.querySelector<HTMLButtonElement>('[data-wing-choice]')?.focus();}}} />{query && <button className="refit-search-clear" type="button" aria-label="清空战机搜索" onClick={() => {details.hide(); setQuery('');}}>×</button>}</div>
+        {advanced && <div className="native-wing-search"><div className="refit-search-field"><SearchInput ref={search} aria-label="搜索战机联队" placeholder="搜索名称 / ID" value={query} onChange={e => {details.hide(); setQuery(e.target.value);}} onKeyDown={e => {if (e.key === 'ArrowDown') {e.preventDefault(); list.current?.querySelector<HTMLButtonElement>('[data-wing-choice]')?.focus();}}} />{query && <button className="refit-search-clear" type="button" aria-label="清空战机搜索" onClick={() => {details.hide(); setQuery('');}}>×</button>}</div>
           <div><label><input type="checkbox" checked={affordableOnly} onChange={e => {details.hide(); setAffordableOnly(e.target.checked);}} />只看 OP 够用</label><button type="button" onClick={reset}>重置筛选</button></div>
         </div>}
-        <div className="native-wing-list" ref={list}>{wings.map(([id, wing]) => row(id, wing))}{!wings.length && <div className="native-wing-no-results"><p>没有匹配的联队。</p><NativeButton font="body" onClick={reset}>重置筛选</NativeButton></div>}</div>
+        <Picker className="native-wing-list" ref={list} aria-label="兼容战机联队">{wings.map(([id, wing]) => row(id, wing))}{!wings.length && <div className="native-wing-no-results"><p>没有匹配的联队。</p><NativeButton font="body" onClick={reset}>重置筛选</NativeButton></div>}</Picker>
         <div className="native-wing-tools"><button type="button" onClick={() => setAdvanced(value => !value)} aria-expanded={advanced}>搜索 / 预算 [F]{filtered ? ' · 已筛选' : ''}</button><span role="status">{wings.length} 种 · 可用 {allowance} OP</span></div>
       </>}
       {builtin && <p className="native-wing-notice">此联队属于舰体内置设备，不能卸下或替换，不占用装配点。</p>}

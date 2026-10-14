@@ -1,6 +1,5 @@
 import type { CombatHudView as CombatEngine } from '../../engine/runtime/CombatHudView';
 import { notificationOpacity } from '../../engine/simulation/CombatNotifications';
-import './combat-notifications.css';
 
 /** Local control feedback shares the top-left feed with authoritative loss events. */
 export function CombatNotifications({ engine, controlNotice }: { engine: CombatEngine; controlNotice?: string }) {

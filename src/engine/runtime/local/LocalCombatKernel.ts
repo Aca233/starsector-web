@@ -1,6 +1,8 @@
-import type { CombatPresentationMode } from './CombatPresentation';
 import { copyDeploymentCommand, prepareDeployment, applyPreparedDeployment, type DeploymentCommand } from '../DeploymentControl';
 import { contentRegistry } from '../../content/ContentRegistry';
+import { setRuntimeShipPacks } from '../../modding/ShipPackCatalog';
+import { validateRuntimeShipPacks } from '../../modding/ShipPackCapabilities';
+import { refreshShipPackStudioCatalog } from '../../../studio/DesignModel';
 import { deploymentCost } from '../../simulation/CombatDeployment';
 import { localCombatContentSignature } from './LocalCombatContent';
 import { CombatEngine } from '../../simulation/CombatEngine';
@@ -9,27 +11,15 @@ import { Vector2 } from '../../math/Vector2';
 import { CombatMulticore } from '../../ai/multicore/CombatMulticore';
 import { CombatTickHost } from '../CombatTickHost';
 import { CombatAuthority } from '../CombatAuthority';
-import { applyCombatControlCommand, applyCombatControlSample, copyControlSample, type CombatControlCommand, type CombatControlSample } from '../CombatControl';
+import { applyCombatControlCommand, applyCombatControlSample, copyControlSample, type CombatControlSample } from '../CombatControl';
 import { CombatHandoff } from '../../game/CombatHandoff';
-import type { CombatRequest, CombatOutcome } from '../../game/GameState';
+import type { CombatOutcome } from '../../game/GameState';
 import type { ShipSpec } from '../../content/ShipSpec';
 import type { CommandResult } from '../CombatCommands';
-
-export interface LocalCombatConfig {
-  playerHull: string; enemyHull: string; seed: number;
-  expectedContent?: string;
-  content?: {ships: ShipSpec[]; weapons: import('../../simulation/Weapon').WeaponSpec[]};
-  multicore?: boolean;
-  /** Display-only render graph, with the complete HUD read set alongside it. */
-  presentation?: CombatPresentationMode;
-  encounter?: CombatRequest;
-  /** Empty simulator, with the same per-side budget as the design-trial entry. */
-  simulationPointLimit?: number;
-  additionalShips?: { hull: string; isPlayer: boolean; position: [number, number]; facing: number }[];
-}
-export type LocalCombatCommand = CombatControlCommand |
-  { kind: 'deployment'; command: DeploymentCommand } |
-  { kind: 'add-ship'; hull: string; isPlayer: boolean; position: [number, number]; facing: number };
+import type { LocalCombatConfig, LocalCombatCommand } from './LocalCombatContracts';
+import type { LocalCombatAIStatus } from '../../contracts/CombatTelemetry';
+// Compatibility for existing external tools; new consumers use the public contract.
+export type { LocalCombatConfig, LocalCombatCommand } from './LocalCombatContracts';
 const point = (p: readonly number[]) => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite);
 
 /** Complete authoritative simulation, shared by inline verification and the module Worker.
@@ -50,7 +40,7 @@ export class LocalCombatKernel {
       p.flux.softFlux, p.flux.hardFlux, enemy.pos.x, enemy.pos.y, enemy.hullHp,
       e.reinforcements.length, e.projectiles.length, e.beams.length];
   }
-  get aiStatus() { return this.multicore.status; }
+  get aiStatus(): LocalCombatAIStatus { return this.multicore.status; }
   get engine(): CombatEngine { return this.authority.engine; }
   get tick(): number { return this.authority.tick; }
   constructor(config: LocalCombatConfig) {
@@ -59,7 +49,14 @@ export class LocalCombatKernel {
       throw new Error('Invalid local combat configuration');
     if (config.simulationPointLimit !== undefined && (!Number.isInteger(config.simulationPointLimit) || config.simulationPointLimit <= 0 || config.simulationPointLimit > 20000 || config.encounter || config.additionalShips?.length))
       throw new Error('Invalid simulator configuration');
-    if (config.content) contentRegistry.installSnapshot(config.content.ships, config.content.weapons);
+    if (config.content) {
+      if (config.content.packs) validateRuntimeShipPacks(config.content.packs);
+      contentRegistry.installSnapshot(config.content.ships, config.content.weapons);
+      if (config.content.packs) {
+        setRuntimeShipPacks(config.content.packs);
+        refreshShipPackStudioCatalog();
+      }
+    }
     if (config.expectedContent !== undefined && config.expectedContent !== localCombatContentSignature())
       throw new Error('Local worker content differs from the display; live mod migration is not supported');
     this.authority = new CombatAuthority(new CombatEngine(config.playerHull, config.enemyHull, config.seed));

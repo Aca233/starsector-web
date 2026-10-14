@@ -8,6 +8,8 @@ export interface GravityTractorSpec {
   strength: number;
   damping: number;
   fluxPerSecond: number;
+  /** Explicit manual-only self propulsion; never selected by autofire/AI. */
+  selfTow?: boolean;
   /** Hostility-only tidal damage; no projectile is emitted by this controller. */
   tidalDamagePerSecond?: number;
   tidalFluxPerSecond?: number;
@@ -15,6 +17,7 @@ export interface GravityTractorSpec {
 /** Data only, owned by a real mount; IDs are resolved against the current roster. */
 export interface GravityTractorState {
   phase: 'IDLE' | 'CAPTURE' | 'HOLD';
+  polarity?: 1 | -1;
   target?: GravityTarget;
   capture: number;
   age: number;

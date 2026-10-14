@@ -11,6 +11,52 @@ const results=[];const test=(name,fn)=>{if(testFilter&&!testFilter.test(name))re
 const design=m.createAdunDesign(),runtime=m.registerPrototype(design),hull=m.modManager.requireShip(runtime);
 const setup=()=>{const e=new m.CombatEngine(runtime,'web_sc2_hyperion',260928);e.openBattlefield=true;e.asteroids.length=0;e.nebulae.length=0;const s=e.playerShip,t=e.enemyShip;s.pos.set(0,0);s.prevPos.copy(s.pos);s.facingRad=s.prevFacingRad=0;s.syncModuleTree(true);s.aimTargetWorld.set(2000,0);t.pos.set(2000,0);t.prevPos.copy(t.pos);t.facingRad=t.prevFacingRad=Math.PI;t.vel.set(0,0);e.externallyControlledShipIds.add(t.id);for(const sys of t.allSystems)sys.disabled=true;for(const w of t.weapons)w.isDisabled=true;return e;};
 const step=(e,n,fire=false)=>{for(let i=0;i<n;i++){m.applyModuleWeaponInput(e.playerShip,e.playerShip.aimTargetWorld,fire,true);e.fixedUpdate(1/60);}};
+const aiFormation=(withAlly=true,mirror=1)=>{
+ const a=new m.CombatEngine('web_sc2_hyperion',runtime,261001);a.openBattlefield=true;a.asteroids.length=0;a.nebulae.length=0;
+ const root=a.enemyShip,target=a.playerShip;root.pos.set(0,0);root.facingRad=0;root.syncModuleTree(true);
+ target.pos.set(3400,0);target.facingRad=Math.PI;target.syncModuleTree(true);
+ a.externallyControlledShipIds.add(target.id);target.fireControlMode='MANUAL';target.clearInput();
+ for(const group of target.weaponGroups)group.isAutofire=false;
+ const ally=withAlly?a.addShip(target.spec,false,new m.Vector2(300,1500*mirror),0):undefined;
+ if(ally){a.externallyControlledShipIds.add(ally.id);ally.fireControlMode='MANUAL';ally.clearInput();for(const group of ally.weaponGroups)group.isAutofire=false;}
+ return {a,root,target,ally};
+};
+test('modular AI counts the armed assembly and advances with or without teammates',()=>{
+ for(const withAlly of [false,true])for(const mirror of [1,-1]){
+  const {a,root}=aiFormation(withAlly,mirror);a.updateShipAI(a.enemyAI,1/60);
+  assert.equal(root.weapons.length,0);assert(root.tacticalAI.availableFirepower>0);
+  assert.notEqual(root.tacticalAI.fleetRole,'UNARMED');assert.notEqual(root.tacticalAI.fleetRole,'CARRIER');
+  assert.equal(root.tacticalAI.mode,'ENGAGE');assert(root.throttle>0);assert.equal(root.brakeInput,false);
+  const plans=a.planFleetAI();for(const part of root.childModules)assert.equal(plans.has(part.id),false);
+ }
+});
+test('modular AI ignores its own parts as cover and firing-lane obstructions',()=>{
+ const {a,root,target}=aiFormation(false);target.pos.x=2600;a.updateShipAI(a.enemyAI,1/60);
+ assert.equal(root.tacticalAI.mode,'ENGAGE');assert.equal(root.tacticalAI.positioning,'BASELINE');
+ assert.equal(root.tacticalAI.yieldingFireLane,false);assert.equal(root.tacticalAI.avoidingCollision,false);
+ assert(root.tacticalAI.clearFireFraction>0);
+});
+test('modular AI still withdraws at high flux and loses armament when modules are destroyed',()=>{
+ for(const state of ['high-flux','destroyed']){
+  const {a,root}=aiFormation();
+  if(state==='high-flux')root.flux.softFlux=root.flux.maxFlux*.95;
+  else for(const part of root.childModules){part.hullHp=0;part.isDead=true;}
+  a.updateShipAI(a.enemyAI,1/60);assert.equal(root.tacticalAI.mode,'WITHDRAW');
+  if(state==='destroyed'){assert.equal(root.tacticalAI.availableFirepower,0);assert.equal(root.tacticalAI.fleetRole,'UNARMED');}
+ }
+});
+test('modular AI physically advances and fires main weapons in a teammate formation',()=>{
+ for(const mirror of [1,-1]){
+  const {a,root,target}=aiFormation(true,mirror);let firstGunSeconds=null,withdrawalTicks=0;
+  for(let i=0;i<45*60;i++){
+   a.fixedUpdate(1/60);
+   if(root.assemblyShips.some(part=>part.weapons.some(w=>!w.spec.aiHints?.includes('PD')&&w.cooldownTimer>0)))firstGunSeconds??=i/60;
+   withdrawalTicks+=root.tacticalAI?.mode==='WITHDRAW';
+  }
+  console.log('  '+JSON.stringify({mirror,forward:root.pos.x,firstGunSeconds,withdrawalSeconds:withdrawalTicks/60,distance:root.pos.distanceTo(target.pos)}));
+  assert(root.pos.x>250);assert.notEqual(firstGunSeconds,null);assert(firstGunSeconds<40);assert.equal(withdrawalTicks,0);assert.equal(root.isDead,false);
+ }
+});
 checkExtensionBallistics(m,test,setup,out);
 test('five real combat modules, 13 calibrated weapons and 4 mixed removable decks',()=>{assert.equal(hull.sourceHullId,m.ADUN_ARK_ID);assert.equal(hull.modules.length,4);assert.equal(hull.modules.reduce((n,p)=>n+p.spec.weaponSlots.length,0),13);assert.equal(hull.modules.reduce((n,p)=>n+(p.spec.fighterBays??0),0),4);assert.equal(hull.weaponSlots.length,0);for(const size of m.WEAPON_SIZES)for(const other of m.WEAPON_SIZES)assert.equal(m.weaponFitsSlotSize(size,other),size===other);const fore=hull.modules.find(p=>p.slotId==='FORE').spec;assert.equal(fore.weaponSlots.find(s=>s.slotId==='FORE_PROJECTOR').mountType,'HARDPOINT');assert(m.isBuiltIn(fore.sourceHullId,'FORE_PROJECTOR'));assert.equal(m.modManager.getShip('web_spear_of_adun'),undefined);assert.equal(m.baseHull('web_spear_of_adun'),undefined);assert.equal(m.nativeHull('web_spear_of_adun'),undefined);assert.deepEqual(m.extensionVariantsForHull('web_spear_of_adun'),[]);assert.equal(m.shipSystemDefinitions.get('WEB_ADUN_SOLAR_FORGE'),undefined);assert.equal(m.createAdunDesign().hullId,m.ADUN_ARK_ID);});
 

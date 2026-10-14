@@ -19,6 +19,20 @@ const meshes=new WeakMap<object,AcquisitionMesh>();
 const finiteGeometry=new WeakSet<object>();
 export const firePlaneWork={compiledFrames:0,geometryChecks:0,geometryHits:0,contactPlanes:0,shooterPlans:0,classBuilds:0,classHits:0};
 const vectorMethods=(['clone','sub','add','addScaled','rotate','distanceTo','length','heading'] as const).map(key=>[key,Vector2.prototype[key]] as const);
+const lookupGetter=(Object.prototype as {__lookupGetter__?:(key:string)=>unknown}).__lookupGetter__!;
+const lookupSetter=(Object.prototype as {__lookupSetter__?:(key:string)=>unknown}).__lookupSetter__!;
+export function isOwnData(obj:object,key:string):boolean {
+  return Object.hasOwn(obj,key)&&lookupGetter.call(obj,key)===undefined&&lookupSetter.call(obj,key)===undefined;
+}
+function isOptionalOwnData(obj:object,key:string):boolean {
+  return !(key in obj)||isOwnData(obj,key);
+}
+function finiteInput(x:number,y:number,speed:number,delay:number,range:number,facing:number,arc:number,base:number):boolean {
+  return Number.isFinite(x)&&Number.isFinite(y)&&Number.isFinite(speed)&&Number.isFinite(delay)
+    &&Number.isFinite(range)&&Number.isFinite(facing)&&Number.isFinite(arc)&&Number.isFinite(base);
+}
+interface MountClassification { spec:WeaponMount['spec'];finiteAmmo:boolean;roles:number;beam:boolean;guided:boolean;alwaysAim:boolean }
+const immutableMountClasses=new WeakMap<WeaponMount,MountClassification>();
 export const numericAcquisitionMetrics={frames:0,preAim:0,aimScans:0,singleSolves:0,segments:0,scopeFallbacks:0};
 interface Scope { source:readonly Ship[]; rows:Uint32Array; members:Uint8Array; orders:Int32Array }
 export interface AcquisitionQuery { origin:Vector2;delay:number;speed:number;range:number }
@@ -32,9 +46,8 @@ function meshFor(ship:Ship):AcquisitionMesh|undefined {
   meshes.set(bounds,mesh);return mesh;
 }
 function nativeVector(vector:Vector2):boolean {
-  return Object.getPrototypeOf(vector)===Vector2.prototype && ['x','y'].every(key=> {
-    const d=Object.getOwnPropertyDescriptor(vector,key);return !!d&&'value'in d&&typeof d.value==='number';
-  })&&vectorMethods.every(([key,method])=>vector[key]===method);
+  return Object.getPrototypeOf(vector)===Vector2.prototype&&isOwnData(vector,'x')&&isOwnData(vector,'y')
+    &&typeof vector.x==='number'&&typeof vector.y==='number'&&vectorMethods.every(([key,method])=>vector[key]===method);
 }
 /** Same API as the generic frame, but source/own-row/team resolved for one
  * actual native shooter plan. It is never a cross-step or firing permission. */
@@ -56,12 +69,10 @@ function finiteNativeGeometry(ship:Ship):boolean {
  * method overrides are still checked for EACH current vector, without invoking
  * unknown methods/getters. No vector gets a persistent certificate. */
 function compiledNativeVector(vector:Vector2):boolean {
-  if(Object.getPrototypeOf(vector)!==Vector2.prototype)return false;
-  const x=Object.getOwnPropertyDescriptor(vector,'x'),y=Object.getOwnPropertyDescriptor(vector,'y');
-  if(!x||!y||!('value'in x)||!('value'in y)||typeof x.value!=='number'||typeof y.value!=='number')return false;
+  if(Object.getPrototypeOf(vector)!==Vector2.prototype||!isOwnData(vector,'x')||!isOwnData(vector,'y')
+    ||typeof vector.x!=='number'||typeof vector.y!=='number')return false;
   for(const [key,value] of vectorMethods){
-    const d=Object.getOwnPropertyDescriptor(vector,key);
-    if(d&&(!('value'in d)||d.value!==value))return false;
+    if(Object.hasOwn(vector,key)&&(!isOwnData(vector,key)||vector[key]!==value))return false;
   }
   return true;
 }
@@ -69,10 +80,9 @@ function nativeCompiledContact(ship:Ship):boolean {
   // Reusing phase/relationships must never bypass an instance reader override.
   for(const key of ['isCollisionless','isPhased','isVisibleTo','hasVastBulk','assemblyRoot','getShieldCenter'])
     if(Object.hasOwn(ship,key))return false;
-  const dead=Object.getOwnPropertyDescriptor(ship,'isDead');
-  if(!dead||!('value'in dead)||typeof dead.value!=='boolean')return false;
-  const reader=Object.getOwnPropertyDescriptor(ship,'hasNativePreAimRangeReads');
-  if(reader&&(!('value'in reader)||reader.value!==Ship.prototype.hasNativePreAimRangeReads))return false;
+  if(!isOwnData(ship,'isDead')||typeof ship.isDead!=='boolean')return false;
+  if(Object.hasOwn(ship,'hasNativePreAimRangeReads')
+    &&(!isOwnData(ship,'hasNativePreAimRangeReads')||ship.hasNativePreAimRangeReads!==Ship.prototype.hasNativePreAimRangeReads))return false;
   return finiteNativeGeometry(ship)&&ship.hasNativePreAimRangeReads()
     &&compiledNativeVector(ship.pos)&&compiledNativeVector(ship.vel)
     &&Number.isFinite(ship.pos.x)&&Number.isFinite(ship.pos.y)&&Number.isFinite(ship.vel.x)&&Number.isFinite(ship.vel.y)
@@ -91,35 +101,65 @@ export class NumericAcquisitionFrame {
   private readonly trees=new Map<number,NumericAcquisitionTree>();
   private readonly sealedScopes=new WeakSet<readonly Ship[]>();
   private sealedInputs=false;
-  private readonly classes=new WeakMap<WeaponMount,{spec:WeaponMount['spec'];roles:number;beam:boolean;guided:boolean;alwaysAim:boolean}>();
+  private readonly classes=new WeakMap<WeaponMount,MountClassification>();
   private fusedBlockers?: { roots:Uint32Array; through:Uint8Array; voidShields:Uint8Array; extents:Float64Array; trees:Map<number,NumericAcquisitionTree> };
   private fusedBlockersRejected=false;
-  private readonly phase=new Map<Ship,boolean>();
-  private readonly blockers=new Map<Ship,{team:number;dead:boolean;root:Ship;through:boolean}>();
+  private readonly phaseFlags:Uint8Array;
+  private readonly blockerTeams:Float64Array;
+  private readonly blockerDead:Uint8Array;
+  private readonly blockerThrough:Uint8Array;
+  private readonly blockerRoots:Ship[];
+  private readonly scratchInput:AcquisitionInput={x:0,y:0,speed:0,range:0,delay:0,base:0,arc:0,beam:false,guided:false,alwaysAim:false,roles:0};
   private constructor(private readonly ships:readonly Ship[],private readonly rewrite=false,private readonly compiledPlane=false) {
-    this.a=new Float64Array(ships.length*ACQUISITION_WIDTH);this.hulls=ships.map(meshFor);
-    ships.forEach((ship,row)=> {
-      this.rows.set(ship,row);const b=row*ACQUISITION_WIDTH,center=ship.getShieldCenter();
+    const n=ships.length;
+    this.a=new Float64Array(n*ACQUISITION_WIDTH);this.hulls=new Array(n);
+    this.phaseFlags=new Uint8Array(compiledPlane||rewrite?n:0);
+    this.blockerTeams=new Float64Array(rewrite?n:0);
+    this.blockerDead=new Uint8Array(rewrite?n:0);
+    this.blockerThrough=new Uint8Array(rewrite?n:0);
+    this.blockerRoots=rewrite?new Array(n):[];
+    const a=this.a,teams:number[]=[];
+    for(let row=0;row<n;row++){
+      const ship=ships[row];
+      this.hulls[row]=meshFor(ship);
+      this.rows.set(ship,row);const b=row*ACQUISITION_WIDTH;
+      const sx=ship.spec.shieldCenterX||0,sy=ship.spec.shieldCenterY||0;
+      const sc=sx===0&&sy===0?undefined:(compiledPlane?undefined:ship.getShieldCenter());
+      const fCos=sx===0&&sy===0||sc?0:Math.cos(ship.facingRad),fSin=sx===0&&sy===0||sc?0:Math.sin(ship.facingRad);
       const active=ship.shield.isActive&&ship.shield.type!=='NONE'&&ship.shield.type!=='PHASE';
-      this.a.set([ship.pos.x,ship.pos.y,ship.vel.x,ship.vel.y,ship.facingRad,Math.cos(-ship.facingRad),Math.sin(-ship.facingRad),
-        ship.spec.collisionRadius,Math.max(ship.spec.collisionRadius,active?ship.shield.radius+shieldCenterOffset(ship):0),
-        center.x,center.y,ship.shield.radius,active?ship.shield.currentArcDeg:0,
-        ship.shield.type==='FRONT'?ship.facingRad:ship.shield.facingAngleRad,ship.teamId,
-        ship.spec.hullSize==='FIGHTER'?1:ship.spec.hullSize==='FRIGATE'?2:0],b);
-    });
+      a[b]=ship.pos.x;a[b+1]=ship.pos.y;a[b+2]=ship.vel.x;a[b+3]=ship.vel.y;
+      a[b+4]=ship.facingRad;a[b+5]=Math.cos(-ship.facingRad);a[b+6]=Math.sin(-ship.facingRad);
+      a[b+7]=ship.spec.collisionRadius;
+      a[b+8]=Math.max(ship.spec.collisionRadius,active?ship.shield.radius+shieldCenterOffset(ship):0);
+      a[b+9]=sc?sc.x:sx===0&&sy===0?ship.pos.x:(sx*fCos-sy*fSin)+ship.pos.x;
+      a[b+10]=sc?sc.y:sx===0&&sy===0?ship.pos.y:(sx*fSin+sy*fCos)+ship.pos.y;
+      a[b+11]=ship.shield.radius;
+      a[b+12]=active?ship.shield.currentArcDeg:0;
+      a[b+13]=ship.shield.type==='FRONT'?ship.facingRad:ship.shield.facingAngleRad;
+      const team=ship.teamId;
+      a[b+14]=team;
+      a[b+15]=ship.spec.hullSize==='FIGHTER'?1:ship.spec.hullSize==='FRIGATE'?2:0;
+      if(!teams.includes(team))teams.push(team);
+      if(compiledPlane||rewrite)this.phaseFlags[row]=Number(ship.isPhased);
+      if(rewrite){
+        this.blockerTeams[row]=team;
+        this.blockerDead[row]=Number(ship.isDead);
+        this.blockerRoots[row]=ship.assemblyRoot;
+        this.blockerThrough[row]=Number(!!ship.spec.sourceHullTraits?.includes('do_not_fire_through'));
+      }
+    }
     if(compiledPlane) {
       firePlaneWork.compiledFrames++;
-      // Admission excludes external phase callbacks/runtime collision modifiers.
-      // Read dynamic phase once in this span, never reuse it in another stage.
-      for(const ship of ships)this.phase.set(ship,ship.isPhased);
     }
-    for(const team of new Set(ships.map(ship=>ship.teamId))) {
-      const eligible=new Uint8Array(ships.length);
-      ships.forEach((ship,row)=>{eligible[row]=Number(ship.teamId!==team&&!ship.hasVastBulk&&!ship.isDead&&ship.isVisibleTo(team)&&!(compiledPlane?this.phase.get(ship):ship.isCollisionless));});
+    for(let t=0;t<teams.length;t++) {
+      const team=teams[t],eligible=new Uint8Array(n);
+      for(let row=0;row<n;row++){
+        const ship=ships[row];
+        eligible[row]=Number(ship.teamId!==team&&!ship.hasVastBulk&&!ship.isDead&&ship.isVisibleTo(team)&&!(compiledPlane?this.phaseFlags[row]:ship.isCollisionless));
+      }
       this.eligibility.set(team,eligible);
       if(rewrite)this.trees.set(team,new NumericAcquisitionTree(this.a,eligible));
     }
-    if(rewrite)for(const ship of ships){if(!compiledPlane)this.phase.set(ship,ship.isPhased);this.blockers.set(ship,{team:ship.teamId,dead:ship.isDead,root:ship.assemblyRoot,through:!!ship.spec.sourceHullTraits?.includes('do_not_fire_through')});}
     numericAcquisitionMetrics.frames++;
   }
   static create(ships:readonly Ship[],owner?:CombatEngine,batch?:ShipStepBatch):NumericAcquisitionFrame|undefined {
@@ -140,7 +180,7 @@ export class NumericAcquisitionFrame {
     if(!owned&&!ships.every(hasNativeStateCoreReaders))return;
     const compiled=owned&&import.meta.env?.VITE_COMBAT_FIRE_FLIGHT_REWRITE!=='false'&&import.meta.env?.VITE_COMBAT_FIRE_PLANE!=='false';
     if(compiled) {
-      if(!vectorMethods.every(([key,method])=>Object.getOwnPropertyDescriptor(Vector2.prototype,key)?.value===method))return;
+      if(!vectorMethods.every(([key,method])=>isOwnData(Vector2.prototype,key)&&Vector2.prototype[key]===method))return;
       for(const ship of ships)if(!nativeCompiledContact(ship))return;
       return new NumericAcquisitionFrame(ships,true,true);
     }
@@ -167,40 +207,54 @@ export class NumericAcquisitionFrame {
    * with no callbacks/membership writes until close. Direct callers stay audited. */
   hasSealedScope(source:readonly Ship[]):boolean {return this.active&&this.rewrite&&this.sealedScopes.has(source);}
   get rewritesReadonlyPhase():boolean {return this.active&&this.rewrite;}
-  sealScope(source:readonly Ship[]):void {if(this.rewrite&&this.scope(source)){this.sealedScopes.add(source);this.sealedInputs=true;}}
+  sealScope(source:readonly Ship[]):void {
+    if(!this.rewrite)return;
+    if(this.sealedScopes.has(source)){this.sealedInputs=true;return;}
+    if(this.scope(source)){this.sealedScopes.add(source);this.sealedInputs=true;}
+  }
   private input(ship:Ship,mount:WeaponMount,query:AcquisitionQuery):AcquisitionInput|undefined {
-    const compiled=this.sealedInputs?this.classes.get(mount):undefined;
-    if(compiled&&compiled.spec===mount.spec) {
-      if(![query.origin.x,query.origin.y,query.speed,query.delay,query.range,ship.facingRad,mount.arcDeg,mount.baseAngleDeg].every(Number.isFinite)||!(query.speed>0&&query.range>=0&&query.delay>=0))return;
+    const compiled=this.sealedInputs?(this.compiledPlane?(immutableMountClasses.get(mount)??this.classes.get(mount)):this.classes.get(mount)):undefined;
+    if(compiled&&compiled.spec===mount.spec&&compiled.finiteAmmo===Number.isFinite(mount.ammo)) {
+      if(!finiteInput(query.origin.x,query.origin.y,query.speed,query.delay,query.range,ship.facingRad,mount.arcDeg,mount.baseAngleDeg)||!(query.speed>0&&query.range>=0&&query.delay>=0))return;
       if(this.compiledPlane)firePlaneWork.classHits++;
-      return {x:query.origin.x,y:query.origin.y,speed:query.speed,range:query.range,delay:query.delay,base:ship.facingRad+mount.baseAngleDeg*Math.PI/180,arc:mount.arcDeg,beam:compiled.beam,guided:compiled.guided,alwaysAim:compiled.alwaysAim,roles:compiled.roles};
+      const out=this.scratchInput;
+      out.x=query.origin.x;out.y=query.origin.y;out.speed=query.speed;out.range=query.range;out.delay=query.delay;
+      out.base=ship.facingRad+mount.baseAngleDeg*Math.PI/180;out.arc=mount.arcDeg;
+      out.beam=compiled.beam;out.guided=compiled.guided;out.alwaysAim=compiled.alwaysAim;out.roles=compiled.roles;
+      return out;
     }
-    const specDescriptor=Object.getOwnPropertyDescriptor(mount,'spec'),ammo=Object.getOwnPropertyDescriptor(mount,'ammo');
-    if(!specDescriptor||!('value'in specDescriptor)||!specDescriptor.value||Object.getPrototypeOf(specDescriptor.value)!==Object.prototype||!ammo||!('value'in ammo))return;
-    // Runtime weapon specs intentionally have mutable scalar refit fields.
-    // Validate only the kernel's live inputs; never freeze those specs.
-    for(const key of ['isBeam','isGuided','alwaysFire','isPointDefense','weaponType','passThroughFighters','passThroughFightersOnlyWhenDestroyed','aiHints']) {
-      const d=Object.getOwnPropertyDescriptor(specDescriptor.value,key);
-      if(!d&&key in specDescriptor.value || d&&(!('value'in d)||typeof d.value==='function'))return;
-      if(key==='aiHints'&&d?.value&&!isImmutableMetadata(d.value))return;
+    if(!isOwnData(mount,'spec')||!mount.spec||Object.getPrototypeOf(mount.spec)!==Object.prototype||!isOwnData(mount,'ammo')
+      ||!isOwnData(mount,'baseAngleDeg')||!isOwnData(mount,'arcDeg')||typeof mount.baseAngleDeg!=='number'||typeof mount.arcDeg!=='number')return;
+    const spec=mount.spec,finiteAmmo=Number.isFinite(mount.ammo);
+    let classification=(isImmutableMetadata(spec)||this.compiledPlane)?immutableMountClasses.get(mount):undefined;
+    if(!classification||classification.spec!==spec||classification.finiteAmmo!==finiteAmmo) {
+      // Runtime weapon specs intentionally have mutable scalar refit fields.
+      // Validate only the kernel's live inputs; never freeze those specs.
+      for(const key of ['isBeam','isGuided','alwaysFire','isPointDefense','weaponType','passThroughFighters','passThroughFightersOnlyWhenDestroyed','aiHints'] as const) {
+        if(!isOptionalOwnData(spec,key)||typeof spec[key]==='function')return;
+        if(key==='aiHints'&&spec.aiHints&&!isImmutableMetadata(spec.aiHints))return;
+      }
+      const hints=spec.aiHints,has=(name:string)=>hints?.includes(name)??false;
+      let roles=0;
+      if(has('PD_ONLY'))roles|=R.PDOnly;if(has('ANTI_FTR'))roles|=R.AntiFighter;
+      if(spec.passThroughFighters&&!spec.passThroughFightersOnlyWhenDestroyed)roles|=R.PassFighters;
+      if(has('STRIKE'))roles|=R.Strike;
+      if(spec.weaponType==='MISSILE'&&finiteAmmo&&!has('DO_NOT_AIM'))roles|=R.LimitedMissile;
+      if(has('USE_VS_FRIGATES'))roles|=R.UseFrigates;if(spec.isPointDefense||has('PD')||has('PD_ONLY'))roles|=R.PD;
+      classification={spec,finiteAmmo,roles,beam:!!spec.isBeam,guided:!!spec.isGuided,alwaysAim:!!spec.isGuided&&!!(spec.alwaysFire||has('DO_NOT_AIM')||has('GUIDED_POOR'))};
+      if(isImmutableMetadata(spec)||(this.compiledPlane&&this.sealedInputs))immutableMountClasses.set(mount,classification);
     }
-    for(const key of ['baseAngleDeg','arcDeg'] as const) {
-      const d=Object.getOwnPropertyDescriptor(mount,key);if(!d||!('value'in d)||typeof d.value!=='number')return;
-    }
-    const spec=mount.spec,hints=spec.aiHints,has=(name:string)=>hints?.includes(name)??false;
-    if(![query.origin.x,query.origin.y,query.speed,query.delay,query.range,ship.facingRad,mount.arcDeg,mount.baseAngleDeg].every(Number.isFinite)
+    if(!finiteInput(query.origin.x,query.origin.y,query.speed,query.delay,query.range,ship.facingRad,mount.arcDeg,mount.baseAngleDeg)
       ||!(query.speed>0&&query.range>=0&&query.delay>=0))return;
-    let roles=0;
-    if(has('PD_ONLY'))roles|=R.PDOnly;if(has('ANTI_FTR'))roles|=R.AntiFighter;
-    if(spec.passThroughFighters&&!spec.passThroughFightersOnlyWhenDestroyed)roles|=R.PassFighters;
-    if(has('STRIKE'))roles|=R.Strike;
-    if(spec.weaponType==='MISSILE'&&Number.isFinite(mount.ammo)&&!has('DO_NOT_AIM'))roles|=R.LimitedMissile;
-    if(has('USE_VS_FRIGATES'))roles|=R.UseFrigates;if(spec.isPointDefense||has('PD')||has('PD_ONLY'))roles|=R.PD;
-    const classification={spec,roles,beam:!!spec.isBeam,guided:!!spec.isGuided,alwaysAim:!!spec.isGuided&&!!(spec.alwaysFire||has('DO_NOT_AIM')||has('GUIDED_POOR'))};
-    if(this.sealedInputs){this.classes.set(mount,classification);if(this.compiledPlane)firePlaneWork.classBuilds++;}
-    return {x:query.origin.x,y:query.origin.y,speed:query.speed,range:query.range,delay:query.delay,
-      base:ship.facingRad+mount.baseAngleDeg*Math.PI/180,arc:mount.arcDeg,beam:classification.beam,guided:classification.guided,
-      alwaysAim:classification.alwaysAim,roles};
+    if(this.sealedInputs){
+      if(!this.compiledPlane)this.classes.set(mount,classification);
+      else firePlaneWork.classBuilds++;
+    }
+    const out=this.scratchInput;
+    out.x=query.origin.x;out.y=query.origin.y;out.speed=query.speed;out.range=query.range;out.delay=query.delay;
+    out.base=ship.facingRad+mount.baseAngleDeg*Math.PI/180;out.arc=mount.arcDeg;
+    out.beam=classification.beam;out.guided=classification.guided;out.alwaysAim=classification.alwaysAim;out.roles=classification.roles;
+    return out;
   }
   get sharesContactPlane():boolean {return this.active&&this.compiledPlane;}
   kinematicRow(ship:Ship):number|undefined {this.check();const row=this.rows.get(ship);return row===undefined?undefined:row*ACQUISITION_WIDTH;}
@@ -214,12 +268,12 @@ export class NumericAcquisitionFrame {
       const roots=new Uint32Array(this.ships.length),through=new Uint8Array(this.ships.length),voidShields=new Uint8Array(this.ships.length),extents=new Float64Array(this.ships.length);
       const groups=new Map<Ship,number>();
       for(let row=0;row<this.ships.length;row++) {
-        const ship=this.ships[row],contact=this.blockers.get(ship)!;
-        const d=Object.getOwnPropertyDescriptor(ship.shield,'voidShield');
+        const ship=this.ships[row],root=this.blockerRoots[row];
         // An unknown shield accessor must retain the old live narrow-phase order.
-        if(d&&!('value'in d)||!d&&'voidShield'in ship.shield){this.fusedBlockersRejected=true;return;}
-        if(!groups.has(contact.root))groups.set(contact.root,groups.size);
-        roots[row]=groups.get(contact.root)!;through[row]=Number(contact.through);voidShields[row]=Number(!!d?.value);
+        if(!isOptionalOwnData(ship.shield,'voidShield')){this.fusedBlockersRejected=true;return;}
+        let group=groups.get(root);
+        if(group===undefined){group=groups.size;groups.set(root,group);}
+        roots[row]=group;through[row]=this.blockerThrough[row];voidShields[row]=Number(!!ship.shield.voidShield);
         const b=row*ACQUISITION_WIDTH;
         extents[row]=Math.max(this.hulls[row]?.extent??Math.abs(this.a[b+F.Radius]),this.a[b+F.ShieldArc]>5
           ?Math.abs(this.a[b+F.ShieldRadius])+Math.abs(this.a[b+F.ShieldX]-this.a[b+F.X])+Math.abs(this.a[b+F.ShieldY]-this.a[b+F.Y]):0);
@@ -228,8 +282,8 @@ export class NumericAcquisitionFrame {
     }
     let tree=this.fusedBlockers.trees.get(team);
     if(!tree) {
-      const eligible=new Uint8Array(this.ships.length);
-      this.ships.forEach((ship,row)=>{const c=this.blockers.get(ship)!;eligible[row]=Number(c.team===team&&!c.dead&&!this.phase.get(ship));});
+      const n=this.ships.length,eligible=new Uint8Array(n);
+      for(let row=0;row<n;row++){eligible[row]=Number(this.blockerTeams[row]===team&&!this.blockerDead[row]&&!this.phaseFlags[row]);}
       tree=new NumericAcquisitionTree(this.a,eligible,this.fusedBlockers.extents);this.fusedBlockers.trees.set(team,tree);numericBlockerWork.trees++;
     }
     return tree;
@@ -267,16 +321,24 @@ export class NumericAcquisitionFrame {
       },
       blocks:(s,m,x,y,tx,ty,delay,time)=>{
         if(!allowed(s))return;
-        const spec=Object.getOwnPropertyDescriptor(m,'spec');
-        if(!spec||!('value'in spec)||!spec.value||Object.getPrototypeOf(spec.value)!==Object.prototype)return;
-        for(const key of ['passThroughFighters','passThroughFightersOnlyWhenDestroyed']) {
-          const d=Object.getOwnPropertyDescriptor(spec.value,key);
-          if(d&&(!('value'in d)||typeof d.value==='function')||!d&&key in spec.value)return;
+        const compiled=this.sealedInputs?immutableMountClasses.get(m):undefined;
+        let passFighters:boolean;
+        if(compiled&&compiled.spec===m.spec) {
+          passFighters=(compiled.roles&R.PassFighters)!==0;
+        } else {
+          if(!isOwnData(m,'spec')||!m.spec||Object.getPrototypeOf(m.spec)!==Object.prototype)return;
+          const spec=m.spec;
+          if(!isImmutableMetadata(spec)){
+            for(const key of ['passThroughFighters','passThroughFightersOnlyWhenDestroyed'] as const) {
+              if(!isOptionalOwnData(spec,key)||typeof spec[key]==='function')return;
+            }
+          }
+          passFighters=!!spec.passThroughFighters&&!spec.passThroughFightersOnlyWhenDestroyed;
         }
         const blockers=this.blockerTree(team);if(!blockers){numericBlockerWork.fallbacks++;return;}
         const plane=this.fusedBlockers!;
         return blockers.blocked(own,scope.members,plane.roots,plane.through,plane.voidShields,this.hulls,
-          !!spec.value.passThroughFighters&&!spec.value.passThroughFightersOnlyWhenDestroyed,x,y,tx,ty,delay,time);
+          passFighters,x,y,tx,ty,delay,time);
       }
     };
   }
@@ -303,22 +365,27 @@ export class NumericAcquisitionFrame {
     return acquireNumericShip(this.a,this.hulls,own,other,input,eligible,false);
   }
   segment(ship:Ship,sx:number,sy:number,ex:number,ey:number,ignoreShield=false):number|null|undefined {
-    this.check();const row=this.rows.get(ship);if(row===undefined||![sx,sy,ex,ey].every(Number.isFinite))return;
+    this.check();const row=this.rows.get(ship);if(row===undefined||!(Number.isFinite(sx)&&Number.isFinite(sy)&&Number.isFinite(ex)&&Number.isFinite(ey)))return;
     numericAcquisitionMetrics.segments++;
     return acquisitionSegmentEntry(this.a,row,this.hulls[row],sx,sy,ex,ey,ignoreShield);
   }
-  phaseStatus(ship:Ship):boolean|undefined {if(!this.active||!this.rewrite)return;fireRewriteWork.phaseReads++;return this.phase.get(ship);}
+  phaseStatus(ship:Ship):boolean|undefined {
+    if(!this.active||!this.rewrite)return;
+    const row=this.rows.get(ship);if(row===undefined)return;
+    fireRewriteWork.phaseReads++;return !!this.phaseFlags[row];
+  }
   targetAllowed(ship:Ship,other:Ship):boolean|undefined {
     if(!this.active||!this.rewrite)return;const row=this.rows.get(other),eligible=this.eligibility.get(ship.teamId);
     if(row===undefined||!eligible)return;fireRewriteWork.relationshipReads++;return !!eligible[row];
   }
   friendlyBlocker(ship:Ship,other:Ship):boolean|undefined {
-    if(!this.active||!this.rewrite)return;const own=this.blockers.get(ship),row=this.blockers.get(other);
-    if(!own||!row)return;fireRewriteWork.relationshipReads++;
-    return other!==ship&&row.team===own.team&&!row.dead&&!this.phase.get(other)&&(row.root!==own.root||row.through);
+    if(!this.active||!this.rewrite)return;const own=this.rows.get(ship),row=this.rows.get(other);
+    if(own===undefined||row===undefined)return;fireRewriteWork.relationshipReads++;
+    return other!==ship&&this.blockerTeams[row]===this.blockerTeams[own]&&!this.blockerDead[row]&&!this.phaseFlags[row]
+      &&(this.blockerRoots[row]!==this.blockerRoots[own]||!!this.blockerThrough[row]);
   }
   entity(row:number):Ship {this.check();return this.ships[row];}
-  close():void {this.active=false;this.rows.clear();this.eligibility.clear();this.phase.clear();this.blockers.clear();this.trees.clear();this.fusedBlockers=undefined;}
+  close():void {this.active=false;this.rows.clear();this.eligibility.clear();this.blockerRoots.length=0;this.trees.clear();this.fusedBlockers=undefined;}
 }
 
 /** Identity captured after class initialization; used only at run-time binding. */

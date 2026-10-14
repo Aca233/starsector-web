@@ -1,4 +1,5 @@
-import { CombatReplayJournal, copyReplayCheckpoint, type CombatReplayCheckpoint } from './CombatReplayCheckpoint';
+import { CombatReplayJournal, copyReplayCheckpoint, copyBackendIdentity, sameBackendIdentity, resolveStartupBackend, type CombatReplayCheckpoint } from './CombatReplayCheckpoint';
+import type { CombatStartupFallback } from '../../contracts/LocalCombatWire';
 import { copyTacticalMapSnapshot, type TacticalMapSource, type TacticalMapSnapshot } from '../TacticalMapView';
 import { copyDeploymentView, type DeploymentView, type DeploymentViewSource } from '../DeploymentView';
 import type { DeploymentCommand } from '../DeploymentControl';
@@ -8,8 +9,9 @@ import { localCombatContentSignature } from './LocalCombatContent';
 import { copyControlSample, type CombatControlSample } from '../CombatControl';
 import { CombatPresentationDecoder } from './CombatPresentationDecoder';
 import type { DetachedCombatPresentation } from './CombatPresentationWire';
-import type { LocalCombatConfig, LocalCombatCommand } from './LocalCombatKernel';
+import type { LocalCombatConfig, LocalCombatCommand } from './LocalCombatContracts';
 import { LOCAL_COMBAT_PROTOCOL, type LocalCombatAck, type LocalCombatRequest, type LocalCombatResponse } from './LocalCombatProtocol';
+import { runtimeWorkerAssetQuery } from '../RuntimePaths';
 
 export interface LocalCombatFrame extends Omit<LocalCombatAck, 'frame'> {
   tick: number; revision: number; packetBytes: number; presentation: DetachedCombatPresentation; decodeMs: number;
@@ -53,6 +55,8 @@ export class LocalWorkerHost {
   private _latest: LocalCombatFrame | null = null;
   private mapSnapshot?: TacticalMapSnapshot;
   private deploymentSnapshot?: DeploymentView;
+  private _startupFallback?: Readonly<CombatStartupFallback>;
+  get startupFallback(): Readonly<CombatStartupFallback> | undefined { return this._startupFallback; }
   get latest(): LocalCombatFrame | null { return this._latest; }
   get pendingTransactions(): number { return this.queue.length + Number(!!this.inFlight); }
   get status(): 'starting' | 'ready' | 'failed' | 'disposed' { return this.disposed ? 'disposed' : this.terminal ? 'failed' : this._latest ? 'ready' : 'starting'; }
@@ -67,7 +71,7 @@ export class LocalWorkerHost {
       throw new Error('Content changed since the combat checkpoint; recovery refused');
     const accepted = { ...cloned, expectedContent: this.contentSignature };
     this.journal = new CombatReplayJournal(accepted, LOCAL_COMBAT_PROTOCOL);
-    this.worker = new Worker(new URL('./local-combat.worker.ts', import.meta.url), { type: 'module' });
+    this.worker = new Worker(new URL('./local-combat.worker.ts', import.meta.url).href + runtimeWorkerAssetQuery, { type: 'module' });
     this.worker.onerror = event => this.fail(new Error(event.message || 'Local combat worker failed'));
     this.worker.onmessageerror = () => this.fail(new Error('Local combat worker message could not be decoded'));
     this.worker.onmessage = (event: MessageEvent<LocalCombatResponse>) => this.receive(event.data);
@@ -149,6 +153,11 @@ export class LocalWorkerHost {
       if (!Array.isArray(message.witness) || message.witness.length !== 22 || message.witness[0] !== message.frame.tick || !message.witness.every(Number.isFinite))
         throw new Error('Invalid authority replay witness');
       const operation = pending.operation;
+      if (operation.kind !== 'init' && message.startupFallback !== undefined) throw Error('Combat backend fallback after initialization');
+      if (operation.kind === 'init') resolveStartupBackend(operation.config, message.authority, message.startupFallback);
+      else if (operation.kind === 'restore') {
+        if (!sameBackendIdentity(copyBackendIdentity(message.authority, operation.checkpoint.config), operation.checkpoint.authority)) throw Error('Recovered combat authority differs from checkpoint');
+      } else this.journal.verifyAuthority(message.authority);
       const start = performance.now();
       const presentation = this.decoder.apply(message.frame);
       this.mapSnapshot = copyTacticalMapSnapshot(presentation.hud.map, this.mapSnapshot);
@@ -157,7 +166,10 @@ export class LocalWorkerHost {
       const { frame, ...metadata } = message;
       this.recycled = frame.buffer; this.recycledVisuals = frame.visuals.buffer;
       const accepted = this._latest = { ...metadata, presentation, tick: frame.tick, revision: frame.revision, packetBytes: (frame.length + frame.visuals.length) * 8, decodeMs: performance.now() - start };
-      if (operation.kind === 'init') this.journal.initialize(message.witness);
+      if (operation.kind === 'init') {
+        this.journal.initialize(message.witness, message.authority, message.startupFallback);
+        this._startupFallback = message.startupFallback && Object.freeze({ ...message.startupFallback });
+      }
       else if (operation.kind === 'restore') this.journal.seed(operation.checkpoint);
       else this.journal.record(operation, message.results, message.witness);
       clearTimeout(this.timer); this.inFlight = undefined;

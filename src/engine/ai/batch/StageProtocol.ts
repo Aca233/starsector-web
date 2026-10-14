@@ -1,7 +1,4 @@
-import type { Ship } from '../../simulation/Ship';
-import type { Projectile, Beam, WeaponMount } from '../../simulation/Weapon';
-import type { Asteroid, HulkFragment } from '../../simulation/CombatTypes';
-import type { AIStageData } from './AIInputs';
+import type { AIStageReadData } from './StageAIData';
 
 /** ABI v1. Rows are semantic roster order, not handles. Handles never recycle
  * within an owner; generation is explicit so consumers cannot retain a row as
@@ -80,52 +77,38 @@ export interface StageGeometry {
   maxX: Float64Array;
   maxY: Float64Array;
 }
-export interface StageInputs {
-  ships: readonly Ship[];
-  projectiles?: readonly Projectile[];
-  beams?: readonly Beam[];
-  asteroids?: readonly Asteroid[];
-  hulkFragments?: readonly HulkFragment[];
-}
-export interface StageView {
+/** No mutators or writable numeric indices are exposed to pure solvers. The
+ * producer owns these same arrays; this is a synchronous lease, not a copy. */
+export type ReadColumns<K extends readonly string[]> = { readonly [P in K[number]]: Readonly<ArrayLike<number>> };
+export type StageReadGeometry = { readonly [K in keyof StageGeometry]: Readonly<ArrayLike<number>> };
+export interface StageReadView {
   readonly abi: 1;
-  active: boolean;
-  valid: boolean;
-  epoch: number;
-  revision: number;
-  kind: StageKind;
-  /** Cold references: producer, output/commit and explicit callbacks ONLY. */
-  readonly ships: Ship[];
-  readonly mounts: WeaponMount[];
-  readonly projectileRefs: Projectile[];
-  readonly beamRefs: Beam[];
-  readonly rowOf: Map<Ship, number>;
-  readonly rowById: Map<string, number>;
-  readonly mountRowOf: Map<WeaponMount, number>;
-  readonly projectileRowOf: Map<Projectile, number>;
-  readonly projectileRowById: Map<number, number>;
-  readonly beamRowOf: Map<Beam, number>;
-  bodyCount: number;
-  weaponCount: number;
-  projectileCount: number;
-  beamCount: number;
-  bodies: BodyColumns;
-  weapons: WeaponColumns;
-  projectiles: ProjectileColumns;
-  beams: BeamColumns;
-  geometry: StageGeometry;
-  /** A's extension uses this same capture/refresh lease, never a second world codec. */
-  ai?: AIStageData;
-  /** Visibility overflow strings and weapon hint/spec identity are cold metadata.
-   * Numeric hot consumers use the precompiled per-team visibility and hint bits. */
-  teams: number[];
-  visibility: Float64Array;
-  /** Per-projectile exclusions compiled at the ordered query boundary. */
-  readonly damagedRows: Map<number, Set<number>>;
-  /** Recapture is synchronous and increments epoch; never reuses old observation. */
-  recapture(): void;
-  refreshChanged(ships: Iterable<Ship>): void;
-  refreshProjectile(projectile: Projectile): number;
-  invalidate(): void;
-  close(): void;
+  readonly active: boolean;
+  readonly valid: boolean;
+  readonly epoch: number;
+  readonly revision: number;
+  readonly kind: StageKind;
+  readonly rowById: ReadonlyMap<string, number>;
+  readonly projectileRowById: ReadonlyMap<number, number>;
+  readonly bodyCount: number;
+  readonly weaponCount: number;
+  readonly projectileCount: number;
+  readonly beamCount: number;
+  readonly bodies: ReadColumns<typeof bodyKeys>;
+  readonly weapons: ReadColumns<typeof weaponKeys>;
+  readonly projectiles: ReadColumns<typeof projectileKeys>;
+  readonly beams: ReadColumns<typeof beamKeys>;
+  readonly geometry: StageReadGeometry;
+  readonly ai?: AIStageReadData;
+  readonly teams: readonly number[];
+  readonly visibility: Readonly<ArrayLike<number>>;
+  readonly damagedRows: ReadonlyMap<number, ReadonlySet<number>>;
+}
+
+/** A closed or invalid lease must be reacquired by its bridge. Solvers never
+ * recapture from a stale source roster or silently consume another phase. */
+export function assertStageReadable(view: StageReadView, kind?: StageKind): void {
+  if (!view.active || !view.valid) throw new Error('Numeric query requires a live valid stage');
+  if (kind !== undefined && view.kind !== kind)
+    throw new Error('Numeric query requires ' + kind + ', received ' + view.kind);
 }

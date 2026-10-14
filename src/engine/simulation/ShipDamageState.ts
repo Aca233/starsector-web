@@ -1,8 +1,14 @@
 import type { ArmorGrid } from './ArmorGrid';
 import type { SimulationRandom } from './SimulationRandom';
 import type { Vector2 } from '../math/Vector2';
+import { knownProjectionKeys } from '../runtime/local/ProjectionArrays';
 
 export type DamageDecalKind = 'cracks' | 'burns' | 'holes';
+
+const scorchMarkProjectionKeys: readonly string[] = [
+  'cellIndex', 'localPos', 'opacity', 'intensity', 'heat', 'justHit', 'flash',
+  'flashElapsed', 'phase', 'pulsePeriod', 'size', 'rotationRad', 'kind', 'variant',
+];
 
 /** Native UV rows run bottom-up: burns .25, cracks .5625, holes .1875. */
 export function selectDamageDecalKind(firstRoll: number, secondRoll: number): DamageDecalKind {
@@ -35,10 +41,18 @@ export class ShipDamageState {
   private readonly cells = new Map<number, ScorchMark>();
   private armorRevision = -1;
 
-  constructor(private readonly armor: ArmorGrid, private readonly random: SimulationRandom) {}
+  constructor(private readonly armor: ArmorGrid, private readonly random: SimulationRandom) {
+    if (this.armor.dirtyVersion === 0 && this.armor.cellMutationRevision === 0) {
+      this.armorRevision = 0;
+    }
+  }
 
-  public onCellDamage(c: number, r: number, damage: number): void {
-    if (this.suppressed || c < 2 || r < 2 || c >= this.armor.cols - 2 || r >= this.armor.rows - 2) return;
+  public onCellDamage(c: number, r: number, damage: number, dirtyDelta = 0): void {
+    if (this.suppressed) return;
+    if (dirtyDelta > 0 && this.armorRevision === this.armor.dirtyVersion - dirtyDelta) {
+      this.armorRevision = this.armor.dirtyVersion;
+    }
+    if (c < 2 || r < 2 || c >= this.armor.cols - 2 || r >= this.armor.rows - 2) return;
     const fraction = Math.max(0, Math.min(1, this.armor.getCell(c, r) / this.armor.maxCellArmor));
     const cellIndex = r * this.armor.cols + c;
     let mark = this.cells.get(cellIndex);
@@ -50,6 +64,7 @@ export class ShipDamageState {
       mark = { cellIndex, localPos: this.armor.getCellCenterLocal(c, r), opacity: 0, intensity: 0,
         heat: 0, justHit: false, flash: 0, flashElapsed: 0, phase: 0,
         pulsePeriod: 0.25 + 0.75 * this.random.next(), size, rotationRad, kind, variant };
+      knownProjectionKeys.set(mark, scorchMarkProjectionKeys);
       this.cells.set(cellIndex, mark);
       this.marks.push(mark);
       this.revision++;
@@ -84,13 +99,14 @@ export class ShipDamageState {
       if (mark.flashElapsed >= interval) {
         mark.flashElapsed -= interval;
         if (this.random.next() < 0.03) mark.flash = Math.min(255, mark.flash + 100 + 155 * this.random.next() * (1 - factor));
-      } else {
+      } else if (mark.flash > 0) {
         mark.flash = Math.max(0, mark.flash - 1000 * dt);
       }
-      if (!mark.justHit) mark.heat = Math.max(0, mark.heat - 20 * dt);
+      if (!mark.justHit && mark.heat > 0) mark.heat = Math.max(0, mark.heat - 20 * dt);
       mark.phase = (mark.phase + dt * (2 - health) / mark.pulsePeriod) % (Math.PI * 2);
-      mark.justHit = false;
-      this.updateIntensity(mark);
+      if (mark.justHit) mark.justHit = false;
+      if (mark.heat > 0 || mark.flash > 0) this.updateIntensity(mark);
+      else if (mark.intensity !== 0) mark.intensity = 0;
     }
   }
 

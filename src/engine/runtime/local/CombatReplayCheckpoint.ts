@@ -1,11 +1,12 @@
 import { copyControlSample, type CombatControlSample } from '../CombatControl';
 import type { CommandResult } from '../CombatCommands';
-import type { LocalCombatCommand, LocalCombatConfig } from './LocalCombatKernel';
+import type { LocalCombatCommand, LocalCombatConfig } from './LocalCombatContracts';
+import type { CombatBackendIdentity, CombatStartupFallback } from '../../contracts/LocalCombatWire';
 
 // A seed + complete committed history, not a render snapshot or an O(1) world dump.
 declare const __COMBAT_REPLAY_BUILD__: string;
 export const COMBAT_REPLAY_BUILD = typeof __COMBAT_REPLAY_BUILD__ === 'string' ? __COMBAT_REPLAY_BUILD__ : 'in-memory-only';
-export const COMBAT_REPLAY_FORMAT = 2;
+export const COMBAT_REPLAY_FORMAT = 3;
 export const MAX_REPLAY_TICKS = 216_000;
 const MAX_ENTRIES = 131_072;
 const MAX_JOURNAL_BYTES = 32 * 1024 * 1024;
@@ -19,6 +20,7 @@ export interface CombatReplayCheckpoint {
   build: string;
   protocol: number;
   config: LocalCombatConfig;
+  authority: CombatBackendIdentity;
   tick: number;
   entries: CombatReplayEntry[];
   /** Small authority witness; does not replace the replay of hidden AI/effect state. */
@@ -26,6 +28,25 @@ export interface CombatReplayCheckpoint {
 }
 export function sameReplayWitness(a: readonly number[], b: readonly number[]): boolean {
   return a.length === b.length && a.every((value, i) => Object.is(value, b[i]));
+}
+export function copyBackendIdentity(source: CombatBackendIdentity, config: LocalCombatConfig): CombatBackendIdentity {
+  if (!source || source.kind !== (config.backend ?? 'typescript') || source.kind === 'rust-wasm' && !/^[a-f0-9]{64}$/.test(source.sha256))
+    throw Error('Invalid combat authority identity');
+  return source.kind === 'rust-wasm' ? { kind: source.kind, sha256: source.sha256 } : { kind: source.kind };
+}
+export function sameBackendIdentity(a: CombatBackendIdentity, b: CombatBackendIdentity): boolean {
+  return a.kind === b.kind && (a.kind !== 'rust-wasm' || b.kind === 'rust-wasm' && a.sha256 === b.sha256);
+}
+/** Only the first, unadvanced init ACK may select TS after a Rust cold failure. */
+export function resolveStartupBackend(config: LocalCombatConfig, authority: CombatBackendIdentity,
+  fallback?: CombatStartupFallback): LocalCombatConfig {
+  if (fallback === undefined) { copyBackendIdentity(authority, config); return { ...config, backend: authority.kind }; }
+  if (!fallback || fallback.requested !== 'rust-wasm' || fallback.selected !== 'typescript'
+    || typeof fallback.reason !== 'string' || !fallback.reason.length || fallback.reason.length > 4096
+    || config.backend !== 'rust-wasm' || authority?.kind !== 'typescript') throw Error('Invalid cold combat backend fallback');
+  const selected = { ...config, backend: 'typescript' as const };
+  copyBackendIdentity(authority, selected);
+  return selected;
 }
 export function copyReplayCheckpoint(source: CombatReplayCheckpoint, protocol: number): CombatReplayCheckpoint {
   if (!source || source.format !== COMBAT_REPLAY_FORMAT || source.build !== COMBAT_REPLAY_BUILD || source.protocol !== protocol
@@ -49,6 +70,7 @@ export function copyReplayCheckpoint(source: CombatReplayCheckpoint, protocol: n
     if (bytes > MAX_JOURNAL_BYTES) throw new Error('Combat replay journal budget exceeded');
   }
   if (ticks !== source.tick) throw new Error('Combat replay tick count differs from checkpoint');
+  copyBackendIdentity(source.authority, source.config);
   return structuredClone(source);
 }
 
@@ -61,12 +83,20 @@ export class CombatReplayJournal {
   private lastSampleKey = '';
   private disabled?: string;
   private tick = 0;
-  constructor(private readonly config: LocalCombatConfig, private readonly protocol: number) {}
+  private authority?: CombatBackendIdentity;
+  constructor(private config: LocalCombatConfig, private readonly protocol: number) {}
   get unavailableReason(): string | undefined { return this.disabled ?? (!this.witness.length ? '尚无已确认的战斗进度。' : undefined); }
-  initialize(witness: number[]): void { this.witness = witness.slice(); }
+  initialize(witness: number[], authority: CombatBackendIdentity = { kind: 'typescript' }, fallback?: CombatStartupFallback): void {
+    this.config = resolveStartupBackend(this.config, authority, fallback);
+    this.authority = copyBackendIdentity(authority, this.config); this.witness = witness.slice();
+  }
+  verifyAuthority(authority: CombatBackendIdentity): void {
+    const current = copyBackendIdentity(authority, this.config);
+    if (!this.authority || !sameBackendIdentity(current, this.authority)) throw Error('Combat authority changed inside a replay epoch');
+  }
   seed(checkpoint: CombatReplayCheckpoint): void {
     const copy = copyReplayCheckpoint(checkpoint, this.protocol);
-    this.entries = copy.entries; this.witness = copy.witness; this.tick = copy.tick;
+    this.entries = copy.entries; this.witness = copy.witness; this.tick = copy.tick; this.authority = copy.authority;
     this.bytes = this.entries.reduce((sum, entry) => sum + JSON.stringify(entry).length * 2, 0);
     this.lastSampleKey = '';
   }
@@ -97,6 +127,6 @@ export class CombatReplayJournal {
   checkpoint(): CombatReplayCheckpoint {
     if (this.unavailableReason) throw new Error(this.unavailableReason);
     return copyReplayCheckpoint({format:COMBAT_REPLAY_FORMAT, build:COMBAT_REPLAY_BUILD, protocol:this.protocol, config:this.config,
-      tick:this.tick, entries:this.entries, witness:this.witness}, this.protocol);
+      tick:this.tick, entries:this.entries, witness:this.witness, authority:this.authority!}, this.protocol);
   }
 }

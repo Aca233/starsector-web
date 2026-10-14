@@ -149,3 +149,41 @@ for (const oldGuest of [false, true]) test('direct authority I/O uses real Steam
   assert.equal(f.peer.consumption.pending.size,0);
   assert.ok(f.gateway.snapshotPreparer.diagnostics().accepted>=3);
 });
+
+test('Steam browser-host relay binds actual backend and rejects forged, stale or switched recovery',async t=>{
+  const f=await fixture(t), identity={kind:'rust-wasm',sha256:'6'.repeat(64)},matchId=f.room.match.id;
+  f.guest({type:'host-authority',matchId,authority:identity});assert.equal(f.room.authorityBackend,null);
+  f.host.message({type:'host-authority',matchId:'stale',authority:identity});assert.equal(f.room.authorityBackend,null);
+  f.host.message({type:'host-authority',matchId,authority:{...identity,sha256:42}});assert.equal(f.room.authorityBackend,null);
+  f.host.message({type:'host-authority',matchId,authority:identity});assert.deepEqual(f.room.authorityBackend,identity);
+  for(const authority of [undefined,{kind:'typescript'}, {...identity,sha256:'7'.repeat(64)}]) {
+    f.host.message({type:'host-recovered',matchId,pauseMs:15,authority});assert.equal(f.room.authorityRecovery,null);
+  }
+  f.host.message({type:'host-authority',matchId,authority:{kind:'typescript',fallbackReason:'loader failed'}});assert.deepEqual(f.room.authorityBackend,identity);
+  f.host.message({type:'host-recovered',matchId,pauseMs:15,authority:identity});assert.deepEqual(f.room.authorityRecovery,{pauseMs:15,authority:identity});
+});
+
+test('Steam browser-host relay records cold whole-TypeScript fallback identity',async t=>{
+  const f=await fixture(t),identity={kind:'typescript',fallbackReason:'Wasm asset unavailable'},matchId=f.room.match.id;
+  f.host.message({type:'host-authority',matchId,authority:identity});assert.deepEqual(f.room.authorityBackend,identity);
+  f.host.message({type:'host-recovered',matchId,pauseMs:20,authority:identity});assert.deepEqual(f.room.authorityRecovery,{pauseMs:20,authority:identity});
+});
+
+for(const oldGuest of [false,true])test('Steam real preparation Worker sends admitted terminal full frame before ended and room ('+(oldGuest?'legacy':'binary')+')',async t=>{
+  const f=await fixture(t,{production:true,oldGuest}),final=f.state(7);
+  final.frame.ships.forEach((ship,i)=>ship.state.teamId=f.room.match.players[i].team);
+  f.host.binary(f.bytes(final));
+  // The actual encoding Worker is not ready yet. The same event-loop task then
+  // submits the legitimate relay finish; ended/room must wait, not cancel it.
+  assert.equal(f.peer.sentStates,0);
+  const report={tick:7,seconds:7/60,ships:f.room.match.players.map((p,i)=>({id:i?'b':'a',team:p.team,seat:p.seat,name:'test',cost:1,status:'deployed',hull:1,hullMax:1,cr:.7}))};
+  f.host.message({type:'finish',matchId:f.room.match.id,winner:0,report});assert.equal(f.room.status,'ended',JSON.stringify(f.host.rows.at(-1)));
+  assert.ok(f.peer.terminalControls?.length>=2);
+  for(let i=0;i<500&&!f.messages.some(m=>m.op==='data'&&m.data.type==='ended');i++)await new Promise(resolve=>setTimeout(resolve,5));
+  const stream=f.messages.filter(m=>m.op==='data'),ended=stream.findIndex(m=>m.data.type==='ended');
+  assert.ok(ended>0);assert.equal(stream[ended+1].data.type,'room');
+  const receiver=oldGuest?new SteamSnapshotReceiver():new SteamBinarySnapshotReceiver();
+  assert.deepEqual(receiver.receive(stream[ended-1].data).data,final);
+  assert.equal(f.peer.sentStates,1);assert.equal(f.gateway.snapshotPreparer.diagnostics().accepted,1);
+  assert.equal(f.peer.terminalControls,null);assert.equal(f.gateway.snapshotPreparer.drains.size,0);
+});

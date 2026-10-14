@@ -4,8 +4,8 @@ import { advanceTurretAim } from '../../simulation/systems/weapon/WeaponAim';
 import { SimulationRandom } from '../../simulation/SimulationRandom';
 import type { SystemAutofirePolicy } from '../../extensions/ship-systems/Types';
 import type { FireDecision } from '../AutofireController';
-import { BodyFlag as B, WeaponFlag as W, ProjectileFlag as P, type StageView } from './StageProtocol';
-import { FireHint as H, fireAvailable, type FireInputs } from './FireInputs';
+import { BodyFlag as B, WeaponFlag as W, ProjectileFlag as P, type StageReadView } from './StageProtocol';
+import { FireHint as H, fireAvailable, assertFireInputs, type FireReadInputs } from './FireProtocol';
 import { fireCircle, fireSegment, fireShieldCovered } from './FireGeometry';
 import { FireBudget, fireBudgetFor } from './FireBudget';
 import { coordinateLength } from '../../math/Vector2';
@@ -44,8 +44,8 @@ export type CustomFirePenalty = (row: number, arrival: number) => number;
  * final target row and perform tracker/turret writes and original ordered fire.
  */
 export class FireProgram {
-  private v!: StageView;
-  private f!: FireInputs;
+  private v!: StageReadView;
+  private f!: FireReadInputs;
   private scope!: Uint8Array;
   private missileScope!: Uint8Array;
   private own = -1;
@@ -69,18 +69,66 @@ export class FireProgram {
   private priorities: number[] = []; private threats: number[] = [];
   private utilities: number[] = []; private retained: number[] = []; private traverses: number[] = [];
   private order: number[] = [];
+  private friendlyBlockers: readonly number[] = [];
+  private friendlyNonFighterBlockers: readonly number[] = [];
+  private hostileBodies: readonly number[] = [];
+  private scopedMissileRows: readonly number[] = [];
+  private fallbackFriendlyBlockers: number[] = [];
+  private fallbackFriendlyNonFighterBlockers: number[] = [];
+  private fallbackHostileBodies: number[] = [];
+  private fallbackScopedMissileRows: number[] = [];
+  private ownRoot = -1;
+  private ownCos = 1;
+  private ownSin = 0;
   targetKind: FireTargetKind = 0;
   targetRow = -1;
   pointX = 0; pointY = 0; hasPoint = false;
   steerX = 0; steerY = 0; hasSteer = false;
   angle = 0; idle = 0;
 
-  bind(v: StageView, f: FireInputs, scope: Uint8Array, missileScope: Uint8Array, own: number,
-    budgetPresent: boolean, nativeBudget: boolean, coverage: FireCoverage, penalty?: CustomFirePenalty): void {
+  bind(v: StageReadView, f: FireReadInputs, scope: Uint8Array, missileScope: Uint8Array, own: number,
+    budgetPresent: boolean, nativeBudget: boolean, coverage: FireCoverage, penalty?: CustomFirePenalty,
+    teamScope?: { readonly hostileBodies: readonly number[]; readonly friendlyBlockers: readonly number[]; readonly friendlyNonFighterBlockers: readonly number[] },
+    missileRows?: readonly number[]): void {
+    assertFireInputs(v, f);
     this.v = v; this.f = f; this.scope = scope; this.missileScope = missileScope; this.own = own;
-    this.teamIndex = v.teams.indexOf(v.bodies.team[own]);
+    const b = v.bodies, ownTeam = b.team[own], ownRoot = b.assemblyRootRow[own];
+    this.ownRoot = ownRoot;
+    this.ownCos = Math.cos(b.facing[own]); this.ownSin = Math.sin(b.facing[own]);
+    this.teamIndex = v.teams.indexOf(ownTeam);
     this.budgetPresent = budgetPresent; this.nativeBudget = nativeBudget; this.penalty = penalty;
     this.coverage = coverage; this.budget = fireBudgetFor(v, f);
+    if (teamScope) {
+      this.hostileBodies = teamScope.hostileBodies;
+      this.friendlyBlockers = teamScope.friendlyBlockers;
+      this.friendlyNonFighterBlockers = teamScope.friendlyNonFighterBlockers;
+    } else {
+      const fb = this.fallbackFriendlyBlockers; fb.length = 0;
+      const fnf = this.fallbackFriendlyNonFighterBlockers; fnf.length = 0;
+      const hb = this.fallbackHostileBodies; hb.length = 0;
+      for (let row = 0; row < v.bodyCount; row++) {
+        if (!scope[row]) continue;
+        if (b.team[row] !== ownTeam) {
+          hb.push(row);
+        } else if (row !== own && !(b.flags[row] & (B.DEAD | B.PHASED))
+          && (b.assemblyRootRow[row] !== ownRoot || f.noFireThrough[row])) {
+          fb.push(row);
+          if (!(b.flags[row] & B.FIGHTER)) fnf.push(row);
+        }
+      }
+      this.hostileBodies = hb;
+      this.friendlyBlockers = fb;
+      this.friendlyNonFighterBlockers = fnf;
+    }
+    if (missileRows) {
+      this.scopedMissileRows = missileRows;
+    } else {
+      const mr = this.fallbackScopedMissileRows; mr.length = 0;
+      for (let p = 0, n = Math.min(v.projectileCount, missileScope.length); p < n; p++) {
+        if (missileScope[p]) mr.push(p);
+      }
+      this.scopedMissileRows = mr;
+    }
   }
   setMount(m: number, state: FireMemory, kind: FireTargetKind, row: number, dt: number): void {
     this.configureMount(m, dt);
@@ -88,9 +136,10 @@ export class FireProgram {
   }
   /** Manual/inactive/force mounts need turret state, not an allocated AI tracker. */
   configureMount(m: number, dt: number): void {
+    assertFireInputs(this.v, this.f);
     this.m = m; this.dt = dt;
     const b = this.v.bodies, w = this.v.weapons, c = this.f.weapons[m];
-    const cos = Math.cos(b.facing[this.own]), sin = Math.sin(b.facing[this.own]);
+    const cos = this.ownCos, sin = this.ownSin;
     this.pivotX = c.relativeX * cos - c.relativeY * sin + b.x[this.own];
     this.pivotY = c.relativeX * sin + c.relativeY * cos + b.y[this.own];
     this.angle = w.angle[m]; this.idle = c.idle;
@@ -99,8 +148,8 @@ export class FireProgram {
     this.speed = w.speed[m]; this.range = w.effectiveRange[m];
     this.targetKind = 0; this.targetRow = -1;
     this.hasPoint = this.hasSteer = false;
-    this.refreshBore(this.angle);
     this.finalBore = false;
+    this.refreshBore(this.angle);
   }
   setMemory(state: FireMemory, kind: FireTargetKind, row: number): void {
     this.memory = state; this.targetKind = kind; this.targetRow = row;
@@ -109,11 +158,17 @@ export class FireProgram {
    * the new angle; all other body transforms remain the shared FIRE_QUERY view.
    * No stale snapshot angle/muzzle can reach decide/shotObstruction. */
   refreshBore(actualAngle: number): void {
+    if (this.finalBore && this.angle === actualAngle) return;
     const c = this.f.weapons[this.m];
     this.angle = actualAngle;
-    const cos = Math.cos(actualAngle), sin = Math.sin(actualAngle);
-    this.ox = c.hasMuzzleOffset ? this.pivotX + (c.offsetX * cos - c.offsetY * sin) : this.pivotX;
-    this.oy = c.hasMuzzleOffset ? this.pivotY + (c.offsetX * sin + c.offsetY * cos) : this.pivotY;
+    if (c.hasMuzzleOffset && (c.offsetX !== 0 || c.offsetY !== 0)) {
+      const cos = Math.cos(actualAngle), sin = Math.sin(actualAngle);
+      this.ox = this.pivotX + (c.offsetX * cos - c.offsetY * sin);
+      this.oy = this.pivotY + (c.offsetX * sin + c.offsetY * cos);
+    } else {
+      this.ox = this.pivotX;
+      this.oy = this.pivotY;
+    }
   }
   /** Explicit D inspection only; never allocated in the gameplay/candidate loop. */
   readBoreInput(): Readonly<{ mountRow: number; angle: number; x: number; y: number; postTurn: boolean }> {
@@ -191,24 +246,31 @@ export class FireProgram {
     if (distance > this.range + this.radius(kind, row)) return false;
     const c = this.f.weapons[this.m];
     const free = this.guided() && (w.flags[this.m] & W.ALWAYS_FIRE || c.hints & (H.DO_NOT_AIM | H.GUIDED_POOR));
-    if (!free && c.arc < 360 && Math.abs(signedAngle(Math.atan2(dy, dx) - w.baseAngle[this.m]))
+    const aim = (!free && c.arc < 360) || !this.guided() ? Math.atan2(dy, dx) : 0;
+    if (!free && c.arc < 360 && Math.abs(signedAngle(aim - w.baseAngle[this.m]))
       > w.arc[this.m] / 2 + Math.asin(Math.min(1, this.radius(kind, row) / Math.max(1, distance)))) return false;
-    if (!this.guided() && (!this.trace(kind, row, Math.atan2(dy, dx))
+    if (!this.guided() && (!this.trace(kind, row, aim)
       || kind === 2 && this.delay + this.contactTime > this.f.flightLife[row])) return false;
     return true;
   }
   private obstruction(angle: number): 'FRIENDLY_BLOCKED' | 'OBSTACLE_BLOCKED' | null {
     const v = this.v, b = v.bodies, f = this.f, c = f.weapons[this.m];
     const travelX = Math.cos(angle) * this.contactDistance, travelY = Math.sin(angle) * this.contactDistance;
-    for (let other = 0; other < v.bodyCount; other++) {
-      if (!this.scope[other] || other === this.own || b.flags[other] & (B.DEAD | B.PHASED)
-        || b.team[other] !== b.team[this.own]
-        || b.assemblyRootRow[other] === b.assemblyRootRow[this.own] && !f.noFireThrough[other]
-        || b.flags[other] & B.FIGHTER && c.passFighters) continue;
-      const vx = b.vx[this.own] - b.vx[other], vy = b.vy[this.own] - b.vy[other];
-      const sx = this.ox + vx * this.delay, sy = this.oy + vy * this.delay;
-      if (fireSegment(v, f.shieldOn, other, sx, sy,
-        sx + travelX + vx * this.contactTime, sy + travelY + vy * this.contactTime, !!b.shieldVoid[other]) !== null)
+    const blockers = c.passFighters ? this.friendlyNonFighterBlockers : this.friendlyBlockers;
+    const own = this.own, ownRoot = this.ownRoot;
+    const ownVx = b.vx[own], ownVy = b.vy[own];
+    const delay = this.delay, contactTime = this.contactTime, ox = this.ox, oy = this.oy;
+    for (let i = 0; i < blockers.length; i++) {
+      const other = blockers[i];
+      if (other === own || (b.assemblyRootRow[other] === ownRoot && !f.noFireThrough[other])) continue;
+      const vx = ownVx - b.vx[other], vy = ownVy - b.vy[other];
+      const sx = ox + vx * delay, sy = oy + vy * delay;
+      const ex = sx + travelX + vx * contactTime, ey = sy + travelY + vy * contactTime;
+      const reach = f.targetRadius[other] + b.hullReach[other] + 1;
+      const bx = b.x[other], by = b.y[other];
+      if ((sx < bx - reach && ex < bx - reach) || (sx > bx + reach && ex > bx + reach)
+        || (sy < by - reach && ey < by - reach) || (sy > by + reach && ey > by + reach)) continue;
+      if (fireSegment(v, f.shieldOn, other, sx, sy, ex, ey, !!b.shieldVoid[other]) !== null)
         return 'FRIENDLY_BLOCKED';
     }
     for (let rock = 0; rock < f.asteroidHp.length; rock++) {
@@ -261,8 +323,12 @@ export class FireProgram {
       this.xs[count] = this.solveX; this.ys[count] = this.solveY;
       this.order.push(count++); if (kind === 1) hulls++;
     };
-    for (let p = 0; p < v.projectileCount; p++) if (this.missileScope[p] && (this.pd() || f.decoy[p])) add(2, p);
-    for (let row = 0; row < v.bodyCount; row++) if (this.scope[row] && v.bodies.team[row] !== v.bodies.team[this.own]) add(1, row);
+    const isPd = this.pd();
+    for (let i = 0; i < this.scopedMissileRows.length; i++) {
+      const p = this.scopedMissileRows[i];
+      if (isPd || f.decoy[p]) add(2, p);
+    }
+    for (let i = 0; i < this.hostileBodies.length; i++) add(1, this.hostileBodies[i]);
     const autonomous = !!f.autonomous[this.own];
     const omit = adaptiveBudget && autonomous && hulls < 2 && this.nativeBudget;
     for (let i = 0; i < count; i++) {
@@ -333,9 +399,11 @@ export class FireProgram {
     };
     const selected = this.f.currentTarget[this.own];
     if (track(selected)) found = true;
-    else for (let row = 0; row < v.bodyCount; row++) {
-      if (!this.scope[row] || v.bodies.team[row] === v.bodies.team[this.own]) continue;
-      const distance = coordinateLength(v.bodies.x[row] - this.ox, v.bodies.y[row] - this.oy);
+    else for (let i = 0; i < this.hostileBodies.length; i++) {
+      const row = this.hostileBodies[i];
+      const dx = v.bodies.x[row] - this.ox, dy = v.bodies.y[row] - this.oy;
+      if (Math.abs(dx) >= nearest || Math.abs(dy) >= nearest) continue;
+      const distance = coordinateLength(dx, dy);
       if (distance < nearest && track(row)) { found = true; nearest = distance; }
     }
     this.range = savedRange; return found;
@@ -360,6 +428,7 @@ export class FireProgram {
     if (this.trace(kind, row, Math.atan2(ny - this.oy, nx - this.ox))) { this.pointX = nx; this.pointY = ny; }
   }
   aim(policy: SystemAutofirePolicy | undefined, cadenceMode?: 'multirate' | '20hz', salt = 0): void {
+    assertFireInputs(this.v, this.f);
     this.coverage.numericAimCalls = (this.coverage.numericAimCalls ?? 0) + 1;
     const state = this.memory, w = this.v.weapons, c = this.f.weapons[this.m];
     this.cadenceMode = cadenceMode;
@@ -431,6 +500,7 @@ export class FireProgram {
     }
   }
   turn(hasPoint = this.hasSteer, x = this.steerX, y = this.steerY): number {
+    assertFireInputs(this.v, this.f);
     const w = this.v.weapons, b = this.v.bodies, m = this.m, base = w.baseAngle[m];
     const c = this.f.weapons[m];
     if (w.flags[m] & W.HARDPOINT || w.turnRate[m] <= 0) this.angle = base;
@@ -453,6 +523,7 @@ export class FireProgram {
   /** Every physical tick, including held 10/20/30Hz steering intent. Flux check
    * deliberately lives in the ordered resource consumer, not this observation. */
   decide(canFireWeapon: boolean, suspended: boolean): FireDecision {
+    assertFireInputs(this.v, this.f);
     if (!this.finalBore) throw new Error('FireProgram.decide requires the post-turn bore input');
     this.coverage.postTurnBoreChecks = (this.coverage.postTurnBoreChecks ?? 0) + 1;
     const v = this.v, w = v.weapons, m = this.m, f = this.f, c = f.weapons[m], state = this.memory;

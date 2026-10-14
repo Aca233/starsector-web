@@ -72,9 +72,9 @@ export function LanRefit({initial,disabledReason,onApply,onCancel,room,suspended
   };
   const discard=()=>setConfirm({title:'放弃未应用的修改？',text:'恢复本页最近一次已确认的配装，房间内其他玩家和已保存方案不受影响。',run:()=>{setDraft(structuredClone(baseline));setHistory([]);setSyncError('');setActionError('');setPhase('idle');room?.onDirtyChange(!confirmed);}});
   const attempt=(run:()=>void)=>{try{run();}catch(e){setError(e instanceof Error?e.message:'操作失败');}};
-  const chooseHull=(id:string,empty=false)=>attempt(()=>{
+  const chooseHull=(id:string)=>attempt(()=>{
     const reason=lanHullUnavailable(modManager.requireShip(id));if(reason)throw Error(reason);
-    change(withDesignCaptain(createDesign(id,empty?'empty':'standard'),draft));
+    change(withDesignCaptain(createDesign(id),draft));
     setPickingHull(false);
     setNotice('已选择'+(data.ships[id]?.name??id)+'；可继续改装或直接应用，切换前的配装可撤消。');
   });
@@ -159,7 +159,7 @@ export function LanRefit({initial,disabledReason,onApply,onCancel,room,suspended
       canUndo={!!history.length} onUndo={undo} onChange={change} onHull={chooseHull} onOpen={change} onSave={save}
       onRename={(design,name)=>{try{const text=name.trim();if(!text||text.length>48)throw Error('名称需为 1–48 字');updateLibrary(items=>items.map(d=>d.id===design.id?{...d,name:text,updatedAt:Date.now()}:d));return true;}catch(e){setError(e instanceof Error?e.message:'重命名失败');return false;}}}
       onDelete={design=>setConfirm({title:'删除本机方案？',text:'只删除已保存的「'+design.name+'」，不会删除房间配装或当前草稿。',run:()=>attempt(()=>updateLibrary(items=>items.filter(d=>d.id!==design.id)))})}
-      onCopy={()=>change({...draft,id:randomId(),name:draft.name.slice(0,43)+' · 副本'})} onNew={()=>chooseHull(draft.hullId,true)}
+      onCopy={()=>change({...draft,id:randomId(),name:draft.name.slice(0,43)+' · 副本'})} onNew={()=>chooseHull(draft.hullId)}
       onClear={()=>setConfirm({title:'清空装配？',text:'清空本地改装草稿的外装装备，原房间配装不变，可撤消恢复。',run:()=>change({...withDesignCaptain(createDesign(draft.hullId,'empty'),draft),id:draft.id,name:draft.name})})}
       onExport={exportDesign} onImport={()=>file.current?.click()} onLaunch={()=>void primary()} onHome={cancel} onSkills={()=>setSkills(true)}
       hullFilter={filter} onHullFilter={setFilter} readHullScroll={readScroll} writeHullScroll={writeScroll} />}

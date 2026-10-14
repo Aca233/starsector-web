@@ -1,7 +1,7 @@
 import { originalInterfacePlugin } from './scripts/original-interface-guard.mjs'
 import { componentWriteVitePlugin } from './scripts/component-write-transform.mjs'
 import { combatReplayBuildPlugin } from './scripts/combat-replay-build.ts'
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig, loadEnv, type ConfigEnv, type UserConfig } from 'vite'
 import { webBuildIntegrityPlugin } from './scripts/web-build-integrity-plugin.ts'
 import { webpAssetsPlugin } from './scripts/webp-assets-plugin.ts'
 import react from '@vitejs/plugin-react'
@@ -12,7 +12,7 @@ import { lanLaunchPlugin } from './scripts/lan-launch-plugin.ts'
 
 const lanBuildId = new Date().toISOString();
 
-export default defineConfig(({ mode }) => {
+export function createAppConfig({ mode }: ConfigEnv): UserConfig {
   // Performance-gated prototype: no write instrumentation in ordinary builds.
   const components = loadEnv(mode, process.cwd(), 'VITE_').VITE_LAN_COMPONENTS === 'true';
   return {
@@ -52,4 +52,5 @@ export default defineConfig(({ mode }) => {
     },
   },
   };
-})
+}
+export default defineConfig(createAppConfig)

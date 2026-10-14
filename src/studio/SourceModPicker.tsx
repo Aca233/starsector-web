@@ -1,3 +1,5 @@
+import { Picker } from '../ui/core/Picker';
+import { SearchInput } from '../ui/core/ListControls';
 import { NativeButton } from "../ui/NativeChrome";
 import { useEffect, useRef, useState } from "react";
 import { runtimeAssetUrl } from "../engine/runtime/RuntimePaths";
@@ -136,7 +138,7 @@ export function SourceModPicker({
       ref={root}
     >
       <div className="refit-mod-search">
-        <div className="refit-search-field"><input type="search" aria-label="搜索舰船插件" placeholder="搜索插件名称 / 效果 / ID" value={query} onChange={e => {setQuery(e.target.value); details.hide();}} />
+        <div className="refit-search-field"><SearchInput aria-label="搜索舰船插件" placeholder="搜索插件名称 / 效果 / ID" value={query} onChange={e => {setQuery(e.target.value); details.hide();}} />
           {query && <button type="button" className="refit-search-clear" aria-label="清空插件搜索" onClick={() => setQuery("")}>×</button>}
         </div>
         <span role="status">{rows.length} / {editableMods.length} 项</span>
@@ -176,7 +178,7 @@ export function SourceModPicker({
             </div>
           ))}
         </div>
-        <div
+        <Picker
           role="rowgroup"
           className="source-mod-scroll"
           onScroll={() => details.hide()}
@@ -205,6 +207,7 @@ export function SourceModPicker({
                 <div role="cell">
                   <button
                     className="source-mod-select"
+                    data-picker-item
                     data-inspect-mod={id}
                     aria-describedby={details.active?.id === id ? details.tooltipId : undefined}
                     type="button"
@@ -244,7 +247,7 @@ export function SourceModPicker({
           {!rows.length && (
             <p className="source-mod-empty">当前没有符合筛选条件的可用插件。</p>
           )}
-        </div>
+        </Picker>
       </div>
       <div className="source-mod-filters" aria-label="插件筛选">
         <div className="source-mod-design-filters" aria-label="设计类型筛选">

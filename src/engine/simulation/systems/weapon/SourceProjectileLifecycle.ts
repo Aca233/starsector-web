@@ -16,6 +16,8 @@ export function initializeSourceProjectile(p: Projectile, speed: number, inherit
   p.fadeProgress = p.prevFadeProgress = 0;
   p.unfadedDamage = p.damage;
   p.unfadedEmp = p.empDamage ?? 0;
+  p.didDamage = false;
+  p.softFlux = false;
 }
 
 /** True after complete fade; a range-fading shot can still hit at reduced damage/soft flux. */

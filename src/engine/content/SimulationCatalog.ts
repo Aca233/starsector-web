@@ -20,7 +20,7 @@ export interface SimulationOption {
   design?: Design;
 }
 export const simulationOptionSourceLabel = (option: SimulationOption): string => ({
-  native: '原版装配', default: '空白舰体', extension: 'Web扩展装配', saved: '已保存装配',
+  native: '原版装配', default: '默认装配', extension: 'Web扩展装配', saved: '已保存装配',
 })[option.origin];
 const prepare = new WeakMap<SimulationOption, () => SimulationOption>();
 const prepared = new WeakMap<SimulationOption, SimulationOption>();
@@ -54,8 +54,8 @@ export function simulationRoster(savedDesigns: readonly Design[] = []): Simulati
   };
   for (const hull of hulls) {
     const nativeFits = nativeVariantsForHull(hull.id);
-    add(hull, 'default-' + hull.id, '空白舰体（保留内置）', 'default', false,
-      () => ({ design: createDesign(hull.id), warnings: ['新舰体不预装可换装备；可手动选择预设或自己的保存方案。'] }));
+    add(hull, 'default-' + hull.id, '默认装配（首个模板）', 'default', false,
+      () => ({ design: createDesign(hull.id), warnings: [] }));
     for (const choice of nativeFits) add(hull, choice.id, choice.name, 'native', presets.has(String(choice.raw.variantId)),
       () => importNativeVariant(choice.raw));
     for (const choice of extensionVariantsForHull(hull.id)) add(hull, choice.id, choice.name, 'extension', false,
@@ -67,7 +67,8 @@ export function simulationRoster(savedDesigns: readonly Design[] = []): Simulati
     }
   }
   return roster.sort((a,b)=>Number(a.civilian)-Number(b.civilian)
-    ||(ranks[b.spec.hullSize??'']??0)-(ranks[a.spec.hullSize??'']??0)||b.cost-a.cost||a.name.localeCompare(b.name,'zh-CN')||a.variantName.localeCompare(b.variantName,'zh-CN'));
+    ||(ranks[b.spec.hullSize??'']??0)-(ranks[a.spec.hullSize??'']??0)||b.cost-a.cost||a.name.localeCompare(b.name,'zh-CN')
+    ||Number(b.origin==='default')-Number(a.origin==='default')||a.variantName.localeCompare(b.variantName,'zh-CN'));
 }
 export function prepareSimulationOption(option: SimulationOption): SimulationOption {
   let result = prepared.get(option);

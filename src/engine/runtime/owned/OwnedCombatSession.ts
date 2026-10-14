@@ -1,5 +1,6 @@
 import { contentRegistry } from '../../content/ContentRegistry';
-import { LocalCombatKernel, type LocalCombatConfig, type LocalCombatCommand } from '../local/LocalCombatKernel';
+import { LocalCombatKernel } from '../local/LocalCombatKernel';
+import type { LocalCombatConfig, LocalCombatCommand } from '../local/LocalCombatContracts';
 import { CombatPresentationEncoder } from '../local/CombatPresentationEncoder';
 import type { CombatControlSample } from '../CombatControl';
 import type { ShipSystem } from '../../simulation/ShipSystem';

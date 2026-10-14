@@ -16,7 +16,7 @@ export function AssemblyThumbnail({spec, className = '', style, label, silhouett
     style={...style,width:layout.width*scale,height:layout.height*scale};
   }
   if (layout.parts.length===1 && !silhouette) return <img className={'ship-assembly-thumbnail '+className} style={style}
-    src={runtimeAssetUrl(spec.spriteUrl)} alt={label??''} draggable={false} loading="lazy" />;
+    src={runtimeAssetUrl(spec.spriteUrl)} alt={label??''} draggable={false} />;
   const arkDraws=arkStaticDraws(spec);
   const art = arkDraws ? arkDraws.map((d,i)=><image key={i} href={runtimeAssetUrl(ADUN_ARK_ART+d.file)} x={(d.box[0]-arkArt.parts.CORE.anchor[0])*arkArt.scale} y={(d.box[1]-arkArt.parts.CORE.anchor[1])*arkArt.scale} width={d.size[0]*arkArt.scale} height={d.size[1]*arkArt.scale} />) : layout.parts.map(part => <image key={part.key} data-assembly-part={part.key}
     href={runtimeAssetUrl(part.spec.spriteUrl)} x={-part.spec.pivotX} y={-part.spec.pivotY}

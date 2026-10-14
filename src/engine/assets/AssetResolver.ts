@@ -70,7 +70,10 @@ export class AssetResolver {
   }
 
   public url(resource: string): string {
-    return `${this.baseUrl}/${runtimeAssetPath(this.normalize(resource))}`;
+    if (/^(blob:|data:)/.test(resource)) return resource;
+    const normalized = this.normalize(resource);
+    const resolved = runtimeAssetUrl(normalized);
+    return resolved.startsWith('blob:') || resolved.startsWith('data:') ? resolved : `${this.baseUrl}/${runtimeAssetPath(normalized)}`;
   }
 }
 
@@ -81,6 +84,12 @@ export class AssetManager {
   private manifestByPath = new Map<string, AssetManifestEntry>();
   private loadPromise: Promise<void> | null = null;
   private loaded = false;
+  private mountedEntries = new Map<string, AssetManifestEntry>();
+  public mountEntries(entries: readonly AssetManifestEntry[]): () => void {
+    const previous = entries.map(entry => [entry.path, this.mountedEntries.get(entry.path)] as const);
+    for (const entry of entries) this.mountedEntries.set(entry.path, entry);
+    return () => { for (const [path, entry] of previous) if (entry) this.mountedEntries.set(path, entry); else this.mountedEntries.delete(path); };
+  }
 
   public async loadManifest(url = assetResolver.url('asset-manifest.json')): Promise<void> {
     if (this.loaded) return;
@@ -131,7 +140,8 @@ export class AssetManager {
   public get isLoaded(): boolean { return this.loaded; }
 
   public getByPath(path: string): AssetManifestEntry | undefined {
-    return this.manifestByPath.get(runtimeAssetPath(assetResolver.normalize(path)));
+    const normalized = assetResolver.normalize(path);
+    return this.mountedEntries.get(normalized) ?? this.manifestByPath.get(runtimeAssetPath(normalized));
   }
 
   public hasPath(path: string): boolean {

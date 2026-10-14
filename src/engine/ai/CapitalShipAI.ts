@@ -1,6 +1,6 @@
 import { attachedModuleMotion, attachedModuleControls } from './AttachedModuleMotion';
 import { withSystemForwardInput } from './SystemAIInputs';
-import { queryMotionStats } from './CombatQueryReads';
+import { CombatQueryReads, queryMotionStats } from './CombatQueryReads';
 import { chooseCombatVelocity, type CombatPositionChoice } from './TacticalPositioning';
 import { planFleetTactics, type FleetAssignment } from './FleetTactics';
 import { fleetApproachVelocity, fleetEngagementRange, regroupVelocity } from './FleetNavigation';
@@ -79,6 +79,9 @@ const FORECAST_INTERVAL = import.meta.env?.VITE_AI_THREAT_FORECAST_20HZ === 'fal
 
 /** Composition of Web tactical policies. Not a full native BasicShipAI port.
  * No hull-ID branches; movement, defense and system activation have separate owners. */
+const jStr = (v: string | null | undefined) => v == null ? 'null' : v.includes('"') || v.includes('\\') ? JSON.stringify(v) : `"${v}"`;
+const jNum = (v: number | null | undefined) => typeof v === 'number' && Number.isFinite(v) ? `${v}` : 'null';
+
 export class CapitalShipAI {
   private readonly defense=new ShipDefenseController();
   private withdrawing=false;
@@ -135,8 +138,8 @@ export class CapitalShipAI {
       this.decisionRemaining = -1; this.decisionElapsed = 0;
       return dt;
     }
-    const orderKey = order ? JSON.stringify([order.id, order.type, order.targetShipId, order.targetPos?.x, order.targetPos?.y, order.issuedTime]) : '';
-    const stateKey = JSON.stringify([ship.system.tacticalMode, ship.flux.isVenting, ship.flux.isOverloaded]);
+    const orderKey = order ? `[${jStr(order.id)},${jStr(order.type)},${jStr(order.targetShipId)},${jNum(order.targetPos?.x)},${jNum(order.targetPos?.y)},${jNum(order.issuedTime)}]` : '';
+    const stateKey = `[${jStr(ship.system.tacticalMode)},${!!ship.flux.isVenting},${!!ship.flux.isOverloaded}]`;
     const target = ship.currentTargetShip;
     const invalidTarget = !!target && (target.isDead || target.isRetreated || target.isDocked
       || target.hasVastBulk || !target.isVisibleTo(ship.teamId) || sameTeam(ship, target) || !ships.includes(target));
@@ -167,7 +170,7 @@ export class CapitalShipAI {
    * intent, not the legacy decide() with numerically repackaged outputs. Controller
    * clocks/primitive memory remain the same fields used by publisher/owner codecs. */
   public planNumeric(dt:number,order:TacticalOrder|null,scene:TacticalWorld,batch:AIBatch):CapitalAIIntent {
-    const v:AIStageView=batch.view,b=v.bodies,a=v.ai,r=v.rowOf.get(this.ship);
+    const v:AIStageView=batch.view,b=v.bodies,a=v.ai,r=batch.bridge.rowOf.get(this.ship);
     if(r===undefined||!v.active||!v.valid)throw new Error('Invalid numeric AI planning lease');
     aiDomainWork.plans++;
     const multirate=scene.multiratePlanning===true;
@@ -191,7 +194,7 @@ export class CapitalShipAI {
     // tactical clock, even when the selected fleet assignment had no target.
     // Keep that memory edge without asking Engine to rescan authority objects.
     const hostilePreselection=solveAIHostile(v,r,order?.type==='ENGAGE'||order?.type==='AVOID'?order.targetShipId:undefined);
-    if(hostilePreselection>=0)this.targetShip=v.ships[hostilePreselection];
+    if(hostilePreselection>=0)this.targetShip=batch.bridge.ships[hostilePreselection];
     const assignment=batch.fleetPlan.get(a.ids[r]);
     const valid=(i:number)=>i>=0&&!a.vastBulk[i]&&!(b.flags[i]&(B.DEAD|B.RETREATED|B.DOCKED))&&visible(v,i,r)&&b.team[i]!==b.team[r];
     const row=(id:string|null|undefined)=>id?v.rowById.get(id)??-1:-1;
@@ -205,17 +208,16 @@ export class CapitalShipAI {
       if(scheduled)this.tacticalRemaining=TACTICAL_INTERVAL===0?0:first?(this.tacticalPhase+1)*TACTICAL_INTERVAL/3
         :TACTICAL_INTERVAL+Math.min(0,this.tacticalRemaining%TACTICAL_INTERVAL);
     }
-    const orderKey=order?JSON.stringify([order.id,order.type,order.targetShipId,order.targetPos?.x,order.targetPos?.y,order.issuedTime]):'';
+    const orderKey=order?`[${jStr(order.id)},${jStr(order.type)},${jStr(order.targetShipId)},${jNum(order.targetPos?.x)},${jNum(order.targetPos?.y)},${jNum(order.issuedTime)}]`:'';
     let t=row(a.currentTargetId[r]);
     let decide=scheduled||orderKey!==this.tacticalOrderKey||a.currentTargetId[r]!==this.tacticalTargetId||!!a.currentTargetId[r]&&!valid(t);
     this.tacticalOrderKey=orderKey;
     if(multirate){
-      const key=JSON.stringify([assignment?.role,assignment?.task,assignment?.targetId,assignment?.anchorId,assignment?.approachBearing==null]);
+      const key=`[${jStr(assignment?.role)},${jStr(assignment?.task)},${jStr(assignment?.targetId)},${jStr(assignment?.anchorId)},${assignment?.approachBearing==null}]`;
       // attachmentKey is the producer's JSON of the original first five fields.
       // Join the two arrays without nesting/quoting that JSON or coercing the
       // raw doNotBackOff stat to boolean; preserve the legacy memory key exactly.
-      const stateKey=a.attachmentKey[r].slice(0,-1)+','+JSON.stringify([b.team[r],a.doNotBackOff[r],a.systemMode[r],!!a.systemActive[r],
-        !!(b.flags[r]&B.VENTING),!!(b.flags[r]&B.OVERLOADED),a.engineState[r]]).slice(1);
+      const stateKey=`${a.attachmentKey[r].slice(0,-1)},${jNum(b.team[r])},${jNum(a.doNotBackOff[r])},${jStr(a.systemMode[r])},${!!a.systemActive[r]},${!!(b.flags[r]&B.VENTING)},${!!(b.flags[r]&B.OVERLOADED)},${jStr(a.engineState[r])}]`;
       decide ||=motionChanged||key!==this.multirateAssignmentKey||stateKey!==this.multirateStateKey;
       this.multirateAssignmentKey=key;this.multirateStateKey=stateKey;
     }
@@ -224,7 +226,7 @@ export class CapitalShipAI {
       if(!valid(t))t=row(assignment?.targetId);
       if(!valid(t))t=-1;
       if(t<0&&!assignment){
-        const preferred=hostilePreselection>=0?hostilePreselection:v.rowOf.get(this.targetShip)??-1;if(valid(preferred))t=preferred;
+        const preferred=hostilePreselection>=0?hostilePreselection:batch.bridge.rowOf.get(this.targetShip)??-1;if(valid(preferred))t=preferred;
       }
       this.tacticalTargetId=t>=0?a.ids[t]:undefined;
     }
@@ -237,10 +239,18 @@ export class CapitalShipAI {
       firstForecast=this.forecastRemaining<0;
     this.forecastRemaining-=Math.max(0,dt);
     const refreshForecast=!compact||firstForecast||this.forecastRemaining<=1e-9||this.forecastDefenseWindow!==window||this.forecastRosterSize!==v.bodyCount;
-    const threat=solveAIThreat(v,r,horizon,window,refreshForecast?horizon:Math.min(horizon,window),scene.weaponThreatFrameEligible===true);
+    const needsThreatList = (!!this.ship.system.definition.advanceAI && !hasNativeThreatPhaseAI(this.ship.system.definition) && !hasExactThreatPhaseAI(this.ship.system.definition))
+      || (!!this.ship.systems[1]?.definition.advanceAI && !hasNativeThreatPhaseAI(this.ship.systems[1].definition) && !hasExactThreatPhaseAI(this.ship.systems[1].definition))
+      || (!!this.ship.defenseSystem.definition.advanceAI && !hasNativeThreatPhaseAI(this.ship.defenseSystem.definition) && !hasExactThreatPhaseAI(this.ship.defenseSystem.definition));
+    const threat=solveAIThreat(v,r,horizon,window,refreshForecast?horizon:Math.min(horizon,window),scene.weaponThreatFrameEligible===true,!needsThreatList);
     if(refreshForecast){
-      this.forecastFarThreat=false;this.forecastEarliest=Infinity;
-      for(const incoming of threat.threats)if(incoming.kind==='WEAPON'&&incoming.eta>window){this.forecastFarThreat=true;this.forecastEarliest=Math.min(this.forecastEarliest,incoming.eta);}
+      if (threat.farWeaponEarliest !== undefined) {
+        this.forecastFarThreat = Number.isFinite(threat.farWeaponEarliest);
+        this.forecastEarliest = threat.farWeaponEarliest;
+      } else {
+        this.forecastFarThreat=false;this.forecastEarliest=Infinity;
+        for(const incoming of threat.threats)if(incoming.kind==='WEAPON'&&incoming.eta>window){this.forecastFarThreat=true;this.forecastEarliest=Math.min(this.forecastEarliest,incoming.eta);}
+      }
       this.forecastRemaining=!compact?-1:firstForecast?(this.tacticalPhase+1)*FORECAST_INTERVAL/3:FORECAST_INTERVAL+Math.min(0,this.forecastRemaining%FORECAST_INTERVAL);
       this.forecastDefenseWindow=window;this.forecastRosterSize=v.bodyCount;
     } else {threat.hasDeferredWeaponThreat=this.forecastFarThreat;threat.earliest=Math.min(threat.earliest,this.forecastEarliest);}
@@ -264,8 +274,7 @@ export class CapitalShipAI {
     let escort=order?.type==='ESCORT'?row(order.targetShipId):-1;
     if(escort>=0&&(escort===r||(b.flags[escort]&B.DEAD)||b.team[escort]!==b.team[r]))escort=-1;
     const defending=order?.type==='DEFEND',avoiding=order?.type==='AVOID',waypoint=order?.type==='WAYPOINT'||defending?order.targetPos:undefined;
-    const key=()=>JSON.stringify([assignment?.role,regroup>=0,regroup>=0?a.ids[regroup]:undefined,withdrawing,escort>=0?a.ids[escort]:undefined,
-      avoiding,waypoint?.x,waypoint?.y,a.systemMode[r],!!a.systemActive[r],!!(b.flags[r]&B.VENTING),!!(b.flags[r]&B.OVERLOADED),a.engineState[r]]);
+    const key=()=>`[${jStr(assignment?.role)},${regroup>=0},${jStr(regroup>=0?a.ids[regroup]:undefined)},${withdrawing},${jStr(escort>=0?a.ids[escort]:undefined)},${avoiding},${jNum(waypoint?.x)},${jNum(waypoint?.y)},${jStr(a.systemMode[r])},${!!a.systemActive[r]},${!!(b.flags[r]&B.VENTING)},${!!(b.flags[r]&B.OVERLOADED)},${jStr(a.engineState[r])}]`;
     let intentKey=key();const intentChanged=intentKey!==this.tacticalIntentKey;
     if(multirate&&intentChanged&&!decide){profile=refreshProfile();withdraw();withdrawing=this.withdrawing||disengaging;hold=this.withdrawing&&b.fluxPercent[r]>policy.resumeAt&&!a.forcesAutofire[r];intentKey=key();}
     decide ||=intentChanged;this.tacticalIntentKey=intentKey;
@@ -300,7 +309,7 @@ export class CapitalShipAI {
     }
     const avoidance=attached?{velocity:desired,avoiding:false}:solveAIAvoidance(v,r,desired);
     const movement=attached?attachedModuleControls:solveAISteering(v,r,avoidance.velocity,facing);
-    const target=t>=0?v.ships[t]:undefined;
+    const target=t>=0?batch.bridge.ships[t]:undefined;
     const effects:CapitalAIPlanEffects={numeric:batch,scene,target,threat,profile,assignment,facing,
       allowOffensiveManeuver:regroup<0&&!withdrawing&&escort<0&&!avoiding&&!waypoint,
       regroup:regroup>=0,disengaging,withdrawing,escort:escort>=0,avoiding,defending,waypoint:!!waypoint,
@@ -383,7 +392,11 @@ export class CapitalShipAI {
       return this.intent({ stopped: true, target: null, aimX: ship.aimTargetWorld.x, aimY: ship.aimTargetWorld.y,
         holdOffensiveFire: false, movement: {turnInput:0,throttle:0,strafeInput:0,brakeInput:false}, ships: world?.ships ?? [] });
     }
-    const scene=world??{ships:[ship,this.targetShip],projectiles:[],beams:[],asteroids:[]};
+    const rawScene=world??{ships:[ship,this.targetShip],projectiles:[],beams:[],asteroids:[]};
+    const ownReads=!deferred&&!rawScene.queryReads&&!rawScene.noteNavigationObstacle&&import.meta.env?.VITE_COMBAT_QUERY_READS!=='false'
+      ?new CombatQueryReads():undefined;
+    const scene=ownReads?{...rawScene,queryReads:ownReads}:rawScene;
+    try {
     const attachedMotion = deferred && attachedModuleMotion(ship, scene);
     const motionChanged = attachedMotion !== this.attachedMotionLast;
     this.attachedMotionLast = attachedMotion;
@@ -409,7 +422,7 @@ export class CapitalShipAI {
         : TACTICAL_INTERVAL + Math.min(0, this.tacticalRemaining % TACTICAL_INTERVAL);
     }
     // Orders may be edited in place; compare their values, not their object identity.
-    const orderKey = order ? JSON.stringify([order.id, order.type, order.targetShipId, order.targetPos?.x, order.targetPos?.y, order.issuedTime]) : '';
+    const orderKey = order ? `[${jStr(order.id)},${jStr(order.type)},${jStr(order.targetShipId)},${jNum(order.targetPos?.x)},${jNum(order.targetPos?.y)},${jNum(order.issuedTime)}]` : '';
     let target = ship.currentTargetShip ?? undefined;
     let decide = scheduled || orderKey !== this.tacticalOrderKey || target?.id !== this.tacticalTargetId
       || !!target && (!validTarget(target) || !scene.ships.includes(target));
@@ -417,14 +430,11 @@ export class CapitalShipAI {
     if (multiratePlanning) {
       // IDs/roles/tasks are discrete assignment edges. Score, pressure, assigned
       // power and the continuously moving approach bearing are NOT invalidators.
-      const assignmentKey = JSON.stringify([assignment?.role,assignment?.task,assignment?.targetId,assignment?.anchorId,
-        assignment?.approachBearing == null]);
+      const assignmentKey = `[${jStr(assignment?.role)},${jStr(assignment?.task)},${jStr(assignment?.targetId)},${jStr(assignment?.anchorId)},${assignment?.approachBearing == null}]`;
       // Track the physical attachment even when the native attached-motion
       // capability is absent; switching that capability also needs a fresh plan.
       const mount = ship.moduleMount;
-      const stateKey = JSON.stringify([ship.parentShip?.id,mount?.slotId,mount?.x,mount?.y,mount?.angleDeg,ship.teamId,
-        ship.hullStats.doNotBackOff,ship.system.tacticalMode,ship.system.isActive,
-        ship.flux.isVenting,ship.flux.isOverloaded,ship.engineController.state]);
+      const stateKey = `[${jStr(ship.parentShip?.id)},${jStr(mount?.slotId)},${jNum(mount?.x)},${jNum(mount?.y)},${jNum(mount?.angleDeg)},${jNum(ship.teamId)},${jNum(ship.hullStats.doNotBackOff as unknown as number)},${jStr(ship.system.tacticalMode)},${!!ship.system.isActive},${!!ship.flux.isVenting},${!!ship.flux.isOverloaded},${jStr(ship.engineController.state)}]`;
       decide ||= motionChanged || assignmentKey !== this.multirateAssignmentKey || stateKey !== this.multirateStateKey;
       this.multirateAssignmentKey=assignmentKey;this.multirateStateKey=stateKey;
     }
@@ -443,7 +453,7 @@ export class CapitalShipAI {
     // Native vent module accounts for the WHOLE vent plus defense recovery, not only its target.
     const recovery=2+(phase?ship.shield.phaseChargeDownDuration+ship.shield.phaseCooldownDuration:ship.shield.unfoldDuration);
     const horizon=Math.max(defenseWindow,ship.flux.getTimeToVent()+recovery);
-    const compactForecast = FORECAST_INTERVAL > 0 && !!scene.weaponThreatEnvelope && ship.hasNativeThreatPhaseHooks;
+    const compactForecast = FORECAST_INTERVAL > 0 && (scene.compactThreatForecastEligible ?? !!scene.weaponThreatEnvelope) && ship.hasNativeThreatPhaseHooks;
     const forecastFirst = this.forecastRemaining < 0;
     this.forecastRemaining -= Math.max(0, dt);
     const refreshForecast = !compactForecast || forecastFirst || this.forecastRemaining <= 1e-9
@@ -481,8 +491,8 @@ export class CapitalShipAI {
     const defending=order?.type==='DEFEND';
     const avoiding=order?.type==='AVOID';
     const waypoint=order?.type==='WAYPOINT'||defending?order.targetPos:undefined;
-    let intentKey = JSON.stringify([assignment?.role, !!regroup, regroup?.id, withdrawing, escort?.id, avoiding, waypoint?.x, waypoint?.y,
-      ship.system.tacticalMode, ship.system.isActive, ship.flux.isVenting, ship.flux.isOverloaded, ship.engineController.state]);
+    const formatIntentKey = () => `[${jStr(assignment?.role)},${!!regroup},${jStr(regroup?.id)},${withdrawing},${jStr(escort?.id)},${avoiding},${jNum(waypoint?.x)},${jNum(waypoint?.y)},${jStr(ship.system.tacticalMode)},${!!ship.system.isActive},${!!ship.flux.isVenting},${!!ship.flux.isOverloaded},${jStr(ship.engineController.state)}]`;
+    let intentKey = formatIntentKey();
     const intentChanged = intentKey !== this.tacticalIntentKey;
     if (multiratePlanning && intentChanged && !decide) {
       // Withdrawal and lost escort/cover can invalidate after profile selection.
@@ -493,8 +503,7 @@ export class CapitalShipAI {
       withdrawing=this.withdrawing||disengaging;
       holdOffensiveFire=this.withdrawing && ship.flux.fluxPercent>policy.resumeAt && !ship.system.forcesAutofire;
       if (!deferred) ship.aiHoldOffensiveFire = holdOffensiveFire;
-      intentKey=JSON.stringify([assignment?.role, !!regroup, regroup?.id, withdrawing, escort?.id, avoiding, waypoint?.x, waypoint?.y,
-        ship.system.tacticalMode, ship.system.isActive, ship.flux.isVenting, ship.flux.isOverloaded, ship.engineController.state]);
+      intentKey=formatIntentKey();
     }
     decide ||= intentChanged;
     this.tacticalIntentKey = intentKey;
@@ -551,16 +560,18 @@ export class CapitalShipAI {
     if (!deferred) Object.assign(ship, movement);
     const allowOffensiveManeuver = !regroup && !withdrawing && !escort && !avoiding && !waypoint;
     const effects: CapitalAIPlanEffects = {
-      scene, target, threat, profile, assignment, facing, allowOffensiveManeuver,
+      scene: rawScene, target, threat, profile, assignment, facing, allowOffensiveManeuver,
       regroup: !!regroup, disengaging, withdrawing, escort: !!escort, avoiding,
       defending, waypoint: !!waypoint, avoidingCollision: avoidance.avoiding,
       yielding: cooperation.yielding, attachedMotion, deferred, compactForecast,
     };
+    ownReads?.close();
     // The legacy comparison must not pay for unused plan ownership/validation.
     if (!deferred) { this.executePlanEffects(effects); return; }
     return this.intent({ stopped: false, target: target ?? null,
       aimX: target?.pos.x ?? ship.aimTargetWorld.x, aimY: target?.pos.y ?? ship.aimTargetWorld.y,
       holdOffensiveFire, movement: Object.freeze(movement), ships: scene.ships }, effects);
+    } finally { ownReads?.close(); }
   }
 
   /** All native world writes stay here, AFTER controls and in original AI order.
@@ -584,21 +595,24 @@ export class CapitalShipAI {
     let threat = program.threat;
     if(target&&!ship.flux.isVenting&&!ship.flux.isOverloaded){
       // System callbacks decide activation only; they no longer rewrite stationkeeping or shield orders.
-      const tacticalSystems = ship.spec.rightClickSystemType === undefined ? ship.systems : [...ship.systems, ship.defenseSystem];
-      for (const system of tacticalSystems) {
+      const runSystemAI = (system: typeof ship.system) => {
+        if (!system.definition.advanceAI) return;
         const modifiers=system.definition.modifiers?.({...system,state:'ACTIVE',effectLevel:1} as typeof system,ship.flux.maxFlux);
         const boostSpeed=ship.spec.maxSpeed+(modifiers?.speedFlat??0);
-        system.definition.advanceAI?.({ship,system,world:scene,target,distance:ship.pos.distanceTo(target.pos),angleDiff:signedAngle(facing-ship.facingRad),
+        system.definition.advanceAI({ship,system,world:scene,target,distance:ship.pos.distanceTo(target.pos),angleDiff:signedAngle(facing-ship.facingRad),
           tactical:Object.assign(withSystemForwardInput(
             {allowOffensiveManeuver,desiredRange:profile.range,withdrawing:withdrawing||!!regroup,waypoint:!!waypoint,avoidingCollision:avoidingCollision||yielding},
             system,scene,() => numeric?numeric.forward(ship,Math.max(boostSpeed,ship.vel.length()),Math.max(policy.avoidanceLookahead,system.chargeUpDuration+system.chargeDownDuration))
               :forwardPathClear(ship,scene,Math.max(boostSpeed,ship.vel.length()),Math.max(policy.avoidanceLookahead,system.chargeUpDuration+system.chargeDownDuration))),
             {quietFor:this.defense.quietFor,threat})});
         changedSystem(system);
-      }
+      };
+      runSystemAI(ship.system);
+      if (ship.systems[1]) runSystemAI(ship.systems[1]);
+      if (ship.spec.rightClickSystemType !== undefined) runSystemAI(ship.defenseSystem);
     }
-    if (target && ship.spec.rightClickSystemType === undefined) {
-      ship.defenseSystem.definition.advanceAI?.({ ship, system: ship.defenseSystem, target, distance: ship.pos.distanceTo(target.pos), angleDiff: signedAngle(facing-ship.facingRad),
+    if (target && ship.spec.rightClickSystemType === undefined && ship.defenseSystem.definition.advanceAI) {
+      ship.defenseSystem.definition.advanceAI({ ship, system: ship.defenseSystem, target, distance: ship.pos.distanceTo(target.pos), angleDiff: signedAngle(facing-ship.facingRad),
         tactical: { allowOffensiveManeuver, desiredRange: profile.range, withdrawing: withdrawing||!!regroup, waypoint: !!waypoint, avoidingCollision: avoidingCollision, forwardClear: true, quietFor: this.defense.quietFor, threat } });
       changedSystem(ship.defenseSystem);
     }

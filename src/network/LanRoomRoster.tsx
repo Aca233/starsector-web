@@ -11,7 +11,6 @@ import { LanLoadoutDetails } from './LanLoadoutDetails';
 import { LanTeamRoster } from './LanTeamRoster';
 import { LanAiInspection } from './LanAiInspection';
 import { useInspectionCodex, type OpenWeaponCodex } from '../studio/useInspectionCodex';
-import './lan-room-roster.css';
 
 type QuantityChange = (group: AiFleetGroup, delta: 1 | -1, revision: number) => Promise<void>;
 

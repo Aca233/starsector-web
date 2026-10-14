@@ -43,16 +43,34 @@ export function disableWeaponComponent(mount: WeaponMount, random: SimulationRan
   return newlyDisabled;
 }
 
+const noWeaponHealthEvent = Object.freeze({ disabled: false, repaired: false });
+let activeWeaponMount: WeaponMount | undefined;
+let activeWeaponRandom: SimulationRandom | undefined;
+const sharedWeaponHealthOptions = {
+  canRepair: false,
+  repairTimeMultiplier: 1,
+  canRepairUnderFire: false,
+  malfunction: undefined as ComponentMalfunctionPolicy | undefined,
+  disable: () => disableWeaponComponent(activeWeaponMount!, activeWeaponRandom!),
+};
+
 export function advanceWeaponComponent(mount: WeaponMount, amount: number, random: SimulationRandom,
   canRepair: boolean, repairTimeMultiplier = 1, canRepairUnderFire = false, malfunction?: ComponentMalfunctionPolicy): { disabled: boolean; repaired: boolean } {
-  if (mount.isPermanentlyDisabled) return { disabled: false, repaired: false };
+  if (mount.isPermanentlyDisabled) return noWeaponHealthEvent;
   const tracker = trackerFor(mount, random);
-  const event = advanceComponentHealth(mount, tracker, amount, random, {
-    canRepair, repairTimeMultiplier, canRepairUnderFire, malfunction,
-    disable: () => disableWeaponComponent(mount, random)
-  });
+  activeWeaponMount = mount;
+  activeWeaponRandom = random;
+  sharedWeaponHealthOptions.canRepair = canRepair;
+  sharedWeaponHealthOptions.repairTimeMultiplier = repairTimeMultiplier;
+  sharedWeaponHealthOptions.canRepairUnderFire = canRepairUnderFire;
+  sharedWeaponHealthOptions.malfunction = malfunction;
+  const event = advanceComponentHealth(mount, tracker, amount, random, sharedWeaponHealthOptions);
+  activeWeaponMount = undefined;
+  activeWeaponRandom = undefined;
+  sharedWeaponHealthOptions.malfunction = undefined;
   mount.disabledDuration = tracker.repairDuration;
   // This base-time getter matches the source health tracker's remaining-time API.
   mount.disabledTimer = mount.isPermanentlyDisabled ? Number.POSITIVE_INFINITY : mount.isDisabled ? (mount.maxHealth - mount.health) / mount.maxHealth * tracker.repairDuration : 0;
   return event;
 }
+

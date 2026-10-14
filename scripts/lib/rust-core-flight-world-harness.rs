@@ -1,0 +1,10 @@
+#[path="../../native/combat-core/src/flight_world.rs"]mod flight_world;
+#[path="../../native/combat-core/src/navigation_ai.rs"]mod navigation_ai;
+#[path="../../native/combat-core/src/tactical_ai.rs"]mod tactical_ai;
+#[path="../../native/combat-core/src/defense_ai.rs"]mod defense_ai;
+#[path="../../native/combat-core/src/fire_control.rs"]mod fire_control;
+#[path="../../native/combat-core/src/random.rs"]mod random;
+#[path="../../native/combat-core/src/motion.rs"]mod motion;
+#[path="../../native/combat-core/src/flux.rs"]mod flux;
+#[path="../../native/combat-core/src/shield.rs"]mod shield;
+#[path="rust-core-flight-fixture.rs"]mod fixture;

@@ -1,12 +1,16 @@
 import type { WeaponGroup } from '../../simulation/Weapon';
 import { signedAngle } from '../../math/Angles';
-import { WeaponFlag as W, type StageView } from './StageProtocol';
-import type { FireInputs } from './FireInputs';
+import { WeaponFlag as W, type StageReadView } from './StageProtocol';
+import type { FireReadInputs } from './FireProtocol';
 
 interface GroupInput {
   rows: number[]; linked: boolean; automatic: boolean; index: number;
   elapsed: number; wasFiring: boolean; switched: boolean;
 }
+let sharedActive = new Uint8Array(512);
+let sharedAutomatic = new Uint8Array(512);
+let sharedManual = new Uint8Array(512);
+const sharedGroupPool: GroupInput[] = [];
 /** One group publication, numeric scheduling, one group writeback. No .find()
  * on live mounts in group selection or per-request scheduling. */
 export class FireGroups {
@@ -14,25 +18,61 @@ export class FireGroups {
   readonly automatic: Uint8Array;
   readonly manual: Uint8Array;
   readonly starts = new Map<number, number>();
-  private readonly groups: GroupInput[];
+  private readonly groups: GroupInput[] = [];
   private alternating = -1;
-  constructor(private readonly v: StageView, private readonly f: FireInputs,
+  constructor(private readonly v: StageReadView, private readonly f: FireReadInputs,
     groups: readonly WeaponGroup[], readonly selected: number,
     slots: ReadonlyMap<string, number>, private readonly own: number, private readonly dt: number,
-    private readonly manualControl: boolean, private readonly canFire: boolean) {
-    this.active = new Uint8Array(v.weaponCount);
-    this.automatic = new Uint8Array(v.weaponCount);
-    this.manual = new Uint8Array(v.weaponCount);
-    this.groups = groups.map(g => ({
-      rows: g.weaponSlotIds.map(id => slots.get(id) ?? -1), linked: g.mode === 'LINKED', automatic: g.isAutofire,
-      index: g.alternatingIndex, elapsed: g.alternatingElapsed ?? 0,
-      wasFiring: !!g.alternatingWasFiring, switched: !!g.alternatingJustSwitched,
-    }));
-    for (let i = 0; i < this.groups.length; i++) for (const row of this.groups[i].rows) if (row >= 0) {
-      if (i === selected) this.active[row] = 1;
-      if (this.groups[i].automatic) this.automatic[row] = 1;
+    private readonly manualControl: boolean, private readonly canFire: boolean,
+    ownMountRows?: readonly number[]) {
+    const wc = v.weaponCount;
+    if (sharedActive.length < wc) {
+      const cap = Math.max(wc, sharedActive.length * 2, 512);
+      sharedActive = new Uint8Array(cap);
+      sharedAutomatic = new Uint8Array(cap);
+      sharedManual = new Uint8Array(cap);
+    } else if (ownMountRows) {
+      for (let i = 0; i < ownMountRows.length; i++) {
+        const r = ownMountRows[i];
+        sharedActive[r] = 0;
+        sharedAutomatic[r] = 0;
+        if (manualControl) sharedManual[r] = 0;
+      }
+    } else {
+      sharedActive.fill(0, 0, wc);
+      sharedAutomatic.fill(0, 0, wc);
+      if (manualControl) sharedManual.fill(0, 0, wc);
     }
-    this.prepareManual();
+    this.active = sharedActive;
+    this.automatic = sharedAutomatic;
+    this.manual = sharedManual;
+    for (let i = 0; i < groups.length; i++) {
+      const g = groups[i];
+      let gi = sharedGroupPool[i];
+      if (!gi) {
+        gi = { rows: [], linked: false, automatic: false, index: 0, elapsed: 0, wasFiring: false, switched: false };
+        sharedGroupPool[i] = gi;
+      }
+      const rows = gi.rows;
+      const slotIds = g.weaponSlotIds;
+      rows.length = slotIds.length;
+      for (let j = 0; j < slotIds.length; j++) {
+        const row = slots.get(slotIds[j]) ?? -1;
+        rows[j] = row;
+        if (row >= 0) {
+          if (i === selected) this.active[row] = 1;
+          if (g.isAutofire) this.automatic[row] = 1;
+        }
+      }
+      gi.linked = g.mode === 'LINKED';
+      gi.automatic = g.isAutofire;
+      gi.index = g.alternatingIndex;
+      gi.elapsed = g.alternatingElapsed ?? 0;
+      gi.wasFiring = !!g.alternatingWasFiring;
+      gi.switched = !!g.alternatingJustSwitched;
+      this.groups.push(gi);
+    }
+    if (manualControl) this.prepareManual();
   }
   private index(g: GroupInput): number {
     return g.rows.length ? ((g.index % g.rows.length) + g.rows.length) % g.rows.length : -1;
@@ -75,8 +115,8 @@ export class FireGroups {
   }
   private prepareManual(): void {
     const g = this.groups[this.selected], w = this.v.weapons, f = this.f, b = this.v.bodies;
-    if (!g) return;
-    if (this.manualControl && !g.linked) {
+    if (!this.manualControl || !g) return;
+    if (!g.linked) {
       if (f.mainTrigger[this.own] && this.canFire) this.advance(g);
       else {
         if (g.wasFiring && !g.switched) { const n = this.next(g, this.index(g)); if (n >= 0) g.index = n; }

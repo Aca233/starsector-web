@@ -1,18 +1,22 @@
 import { steamRequest } from "./network/SteamApi";
 import { lazy, Suspense, useState } from "react";
 import { NativeHome } from "./studio/NativeHome";
+import { hasCustomShipPackSelection } from './engine/modding/ShipPackSelection';
 import { pushStudioLocation, type StudioPage } from "./studio/StudioNavigation";
 import "./studio/studio.css";
 const StudioApp = lazy(() => import("./studio/StudioApp").then(module => ({ default: module.StudioApp })));
 const LanApp = lazy(() => import("./network/LanApp"));
 const WorkerLab = lazy(() => import("./worker-lab/WorkerLab"));
 const CombatView = lazy(() => import("./CombatView"));
+const VisualLabEntry = lazy(() => import("./visual-lab/VisualLabEntry"));
 const dedicatedWeb = import.meta.env.VITE_SERVER_AUTHORITY === "true";
 const staticHosted = import.meta.env.VITE_STATIC_HOST === "github-pages";
 export function App() {
   const [view] = useState(() => new URLSearchParams(window.location.search).get("view"));
   const [studioRequested, setStudioRequested] = useState(view === "catalog" || view === "skills" || view === "design");
   const [entryError, setEntryError] = useState("");
+  const customPacks = hasCustomShipPackSelection();
+  if (customPacks && (view === 'lan' || view === 'steam')) return <main className="native-loading" role="alert"><p>当前使用自选舰船包。联机包版本协商尚未接入，请先在游戏设置中恢复内置内容，再进入联机。</p><a href="?">返回指挥中心</a></main>;
   const enterLan = async () => {
     // The desktop host prepares the service when it sees this navigation.
     // Do not probe a missing Steam endpoint or ask a browser launcher to start another server.
@@ -35,7 +39,8 @@ export function App() {
   if (!dedicatedWeb && !staticHosted && view === "steam") return <Suspense fallback={<div className="native-loading">正在准备 Steam 联机…</div>}><LanApp transport="steam" /></Suspense>;
   if (!staticHosted && view === "lan") return <Suspense fallback={<div className="native-loading">正在准备局域网联机…</div>}><LanApp /></Suspense>;
   // Explicit existing developer entry points remain available; normal visits never start combat.
-  if (view === "visual-lab" || view === "combat")
+  if (view === "visual-lab") return <Suspense fallback={<div className="native-loading" role="status">正在检查视觉实验场景…</div>}><VisualLabEntry /></Suspense>;
+  if (view === "combat")
     return (
       <Suspense
         fallback={<div className="native-loading">正在准备战斗环境…</div>}
@@ -45,9 +50,9 @@ export function App() {
     );
   // Both the initial menu and the studio's return menu use the same host policy and launchers.
   const homeNavigation = {
-    entryError,
-    onLan: staticHosted ? undefined : () => void enterLan(),
-    onSteam: staticHosted || dedicatedWeb ? undefined : () => window.location.assign("?view=steam"),
+    entryError: entryError || (customPacks ? '自选舰船包用于本地设计与模拟；联机包版本协商尚未接入。' : ''),
+    onLan: staticHosted || customPacks ? undefined : () => void enterLan(),
+    onSteam: staticHosted || dedicatedWeb || customPacks ? undefined : () => window.location.assign("?view=steam"),
     staticHosted,
     lanLabel: dedicatedWeb ? "服务器联机" : undefined,
   };

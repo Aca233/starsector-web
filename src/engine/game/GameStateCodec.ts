@@ -1,6 +1,7 @@
 import { combatSkillErrors } from '../extensions/CombatSkills';
 import type { CombatSkillLoadout } from '../extensions/CombatSkills';
 import type { CombatOutcome, CombatRequest, FleetMember, GameState } from './GameState';
+import { createVersionedMigration } from '../../shared/VersionedMigration.mjs';
 
 const fail = (label: string): never => { throw new Error(`存档数据无效：${label}`); };
 const object = (value: unknown, label: string): Record<string, unknown> =>
@@ -100,10 +101,21 @@ export function decodeCombatOutcome(value: unknown): CombatOutcome {
   };
 }
 
+/** No earlier game-save schema is supported. Add a real, adjacent step only when
+ * a new schema and its historical fixture exist; never infer missing data. */
+const gameStateMigrations = createVersionedMigration({
+  family: 'fleet-game-save', currentVersion: 1,
+  copy: (value: unknown) => structuredClone(object(value, '根节点')),
+  version: (raw: Record<string, unknown>) => {
+    if (raw.schemaVersion !== 1) throw new Error(`不支持存档版本 ${String(raw.schemaVersion)}，原存档已保留。`);
+    return raw.schemaVersion;
+  },
+  steps: [],
+});
+
 /** Version dispatch belongs here. Never guess how to read a future schema or silently reset it. */
 export function decodeGameState(value: unknown): GameState {
-  const raw = object(value, '根节点');
-  if (raw.schemaVersion !== 1) throw new Error(`不支持存档版本 ${String(raw.schemaVersion)}，原存档已保留。`);
+  const raw = gameStateMigrations.migrate(value);
   const inventory = object(raw.inventory, '库存');
   const state: GameState = {
     schemaVersion: 1, gameId: text(raw.gameId, '游戏 ID'), revision: integer(raw.revision, '修订号'),

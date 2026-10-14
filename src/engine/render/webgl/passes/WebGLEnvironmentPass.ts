@@ -1,5 +1,5 @@
 import type { CombatRenderView } from '../../CombatRenderView';
-import { NEBULA_SPRITE_SIZE } from '../../../simulation/systems/NebulaSystem';
+import { nebulaAppearance } from '../../NebulaAppearance';
 import { Vector2 } from '../../../math/Vector2';
 import { VisualRandom } from '../../../runtime/VisualRandom';
 import { WebGLPassContext } from '../WebGLPassContext';
@@ -13,7 +13,7 @@ interface StarParticle {
 }
 
 /**
- * Screen-space combat background and the source's single, below-ship cloud layer.
+ * Screen-space combat background and independently authored, below-ship clouds.
  * Extra stars are still an optional sandbox overlay, disabled by default.
  */
 export class WebGLEnvironmentPass {
@@ -67,17 +67,15 @@ export class WebGLEnvironmentPass {
 
   public renderNebulae(engine: CombatRenderView, ctx: WebGLPassContext): void {
     const { batcher, textures } = ctx;
-    // terrain/A.renderBelow: white modulation, SRC_ALPHA/ONE_MINUS_SRC_ALPHA.
-    // Cloud.render: one unrotated 4x4 atlas tile, 312.5 world units at smallClouds.
+    // Standalone cloud art is submitted once with its complete image UVs.
     batcher.setBlendMode('NORMAL');
     for (const neb of engine.nebulae) {
-      if (!this.circleVisible(ctx, neb.pos, NEBULA_SPRITE_SIZE / 2)) continue;
-      const u = neb.atlasColumn / 4;
-      const v = neb.atlasRow / 4;
+      const appearance = nebulaAppearance(neb);
+      if (!this.circleVisible(ctx, neb.pos, appearance.renderRadius)) continue;
       const opacity = Math.floor(255 * Math.max(0, Math.min(1, neb.thickness))) / 255;
       batcher.drawSprite(textures.getTexture(neb.spriteUrl), neb.pos.x, neb.pos.y,
-        NEBULA_SPRITE_SIZE, NEBULA_SPRITE_SIZE, 0, 0, 0, 1, 1, 1, opacity,
-        u, v, u + 0.25, v + 0.25);
+        appearance.width, appearance.height, appearance.rotationRad, 0, 0, 1, 1, 1, opacity * appearance.opacityMult,
+        appearance.u, appearance.v, appearance.u2, appearance.v2);
     }
   }
 

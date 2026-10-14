@@ -1,0 +1,578 @@
+/* Shared UI owner. Import once from the application style entry.
+ * The sections preserve the former theme → motion → context → Vanguard → native order.
+ * Page geometry belongs to page styles; modal layout lives in modal-layout.css. */
+@import "./design-tokens.css";
+@import "./modal-layout.css";
+
+/* ===== Aliases and shared base ===== */
+/* Shared transparent UI. Native class names are compatibility hooks, not skins. */
+:root {
+  color-scheme: dark;
+  --ui-font: var(--ds-font-body); --ui-mono: var(--ds-font-mono);
+  --native-font-body: var(--ui-font); --native-font-heading: var(--ui-font);
+  --ui-bg: var(--ds-palette-shell); --ui-panel: var(--ds-surface-dialog);
+  --ui-raised: var(--ds-surface-input); --ui-hover: var(--ds-control-hover);
+  --ui-border: var(--ds-control-border); --ui-divider: var(--ds-menu-divider);
+  --ui-text: var(--ds-menu-text); --ui-muted: var(--ds-menu-muted); --ui-dim: var(--ds-menu-dim);
+  --ui-accent: var(--ds-menu-accent); --ui-accent-bg: var(--ds-control-selected);
+  --ui-button-text: var(--ds-menu-button-text); --ui-highlight: var(--ds-menu-highlight);
+  --ui-friendly: var(--ds-menu-success); --ui-success: var(--ds-menu-success);
+  --ui-warning: var(--ds-menu-warning); --ui-danger: var(--ds-menu-danger);
+  --native-button-text: var(--ui-button-text); --native-noise-color: transparent;
+  --ui-radius: var(--ds-radius-overlay); --ui-radius-sm: var(--ds-radius-control);
+  --ui-shadow: var(--ds-shadow-floating);
+  --ui-space-1: var(--ds-space-1); --ui-space-2: var(--ds-space-2); --ui-space-3: var(--ds-space-3);
+  --ui-space-4: var(--ds-space-4); --ui-space-6: var(--ds-space-6);
+  --ui-z-dialog: var(--ds-z-dialog); --ui-z-toast: var(--ds-z-toast);
+}
+body, button, input, textarea, select { font-family: var(--ds-font-body); }
+button, input, textarea, select { font-variant-numeric: tabular-nums; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+:focus-visible { outline: 2px solid var(--ds-menu-accent); outline-offset: 3px; }
+.ui-muted { color: var(--ds-menu-muted); font-size: 13px; line-height: 1.65; }
+.ui-caption { color: var(--ds-menu-dim); font-size: 12px; line-height: 1.65; }
+.ui-eyebrow { font-weight: 600; margin-bottom: 5px; }
+.ui-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 32px; padding: 6px 12px; border: 1px solid var(--ds-border-page); border-radius: var(--ds-radius-control); background: var(--ds-surface-input); color: var(--ds-menu-button-text); box-shadow: none; font: 500 13px/1.35 var(--ds-font-body); text-decoration: none; white-space: nowrap; transition: background 120ms, border-color 120ms, color 120ms; }
+.ui-button:hover:not(:disabled) { background: var(--ds-control-hover); border-color: var(--ds-control-highlight); }
+.ui-button:active:not(:disabled) { background: var(--ds-control-pressed); }
+.ui-button:disabled { opacity: .42; }
+.ui-button--primary { background: var(--ds-control-selected); border-color: var(--ds-control-highlight); color: var(--ds-menu-button-text); }
+.ui-button--primary:hover:not(:disabled) { background: var(--ds-control-hover); border-color: var(--ds-menu-accent); }
+.ui-button--ghost { background: transparent; border-color: transparent; box-shadow: none; color: var(--ds-menu-button-text); }
+.ui-button--danger { color: var(--ds-menu-danger); background: transparent; border-color: var(--ds-menu-danger); }
+.ui-button--danger:hover:not(:disabled) { background: var(--ds-control-hover); border-color: var(--ds-menu-danger); }
+.ui-button--sm { min-height: 30px; padding: 4px 8px; font-size: 12px; }
+.ui-button svg { width: 16px; height: 16px; flex: none; }
+.ui-button[aria-pressed="true"] { border-color: var(--ds-control-highlight); background: var(--ds-control-selected); color: var(--ds-menu-accent); }
+.ui-keycap { display: inline-flex; justify-content: center; align-items: center; min-width: 20px; padding: 1px 5px; border: 1px solid var(--ds-border-page); border-radius: 0; background: transparent; color: var(--ds-menu-highlight); font: 11px/18px var(--ds-font-body); white-space: nowrap; }
+.ui-badge { display: inline-flex; gap: 6px; align-items: center; padding: 2px 0; border: 0; border-radius: 0; font-size: 11px; white-space: nowrap; background: transparent; }
+.ui-tone--neutral { color: var(--ds-menu-text); }.ui-tone--info { color: var(--ds-menu-accent); }.ui-tone--success { color: var(--ds-menu-success); }.ui-tone--warning { color: var(--ds-menu-warning); }.ui-tone--danger { color: var(--ds-menu-danger); }
+.ui-modal-header h2 { color: var(--ds-menu-text); font-size: 14px; font-weight: var(--ds-weight-emphasis); line-height: 1.4; margin: 0; }
+.ui-modal-header p { margin-top: 5px; max-width: 65ch; }
+.ui-stack { display: flex; flex-direction: column; gap: 16px; }
+.ui-section { min-width: 0; }.ui-section + .ui-section { margin-top: 22px; }
+.ui-section-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.ui-section-heading h3 { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; color: var(--ds-menu-text); }
+.ui-section-heading svg { color: var(--ds-menu-accent); width: 16px; height: 16px; }
+.ui-notice { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; font: 13px/1.6 var(--ds-font-body); border: 1px solid color-mix(in srgb, currentColor 27%, transparent); border-radius: var(--ds-radius-control); background: color-mix(in srgb, currentColor 4%, transparent); }
+.ui-notice > svg { flex: none; margin-top: 2px; }.ui-notice > div { flex: 1; min-width: 0; }.ui-notice > button { margin: -3px -5px -3px 0; }
+.ui-damage-bar { display: flex; height: 7px; overflow: hidden; border-radius: 0; background: var(--ds-surface-input); margin: 14px 0; }.ui-damage-bar span { min-width: 0; }
+.ui-help-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 24px; }.ui-help-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--ds-menu-divider); font-size: 13px; }.ui-help-row span { color: var(--ds-menu-muted); }
+.ui-toast { position: fixed; top: 62px; left: 50%; transform: translateX(-50%); z-index: var(--ds-z-toast); width: min(620px,calc(100vw - 24px)); box-shadow: var(--ds-shadow-floating); }
+@media(max-width:760px) {.ui-modal-header h2 { font-size: 14px; }.ui-help-grid { grid-template-columns: minmax(0,1fr); }
+}
+@media(prefers-reduced-motion:reduce) { .ui-button { transition: none; } }
+
+.ui-font { font-family: var(--ds-font-body); }
+.ui-badge::before { content: '['; opacity: .65; margin-right: -3px; }.ui-badge::after { content: ']'; opacity: .65; margin-left: -3px; }
+.ui-eyebrow { color: var(--ds-menu-dim); letter-spacing: .06em; font-size: 11px; }
+.ui-section-heading { border-bottom: 1px solid var(--ds-menu-divider); padding-bottom: 6px; }
+/* Tactical tools inherit the same control palette; gameplay meters retain semantic colors. */.ui-tactical-chrome .ui-button:hover:not(:disabled) { border-color: var(--ds-control-highlight); }
+.ui-workbench { color: var(--ds-menu-text); background: var(--ds-surface-dialog); border: 1px solid var(--ds-border-page); font: 12px/1.5 var(--ds-font-body); padding: 12px; }
+.ui-workbench :is(select,input[type="number"]) { background: var(--ds-surface-app); color: var(--ds-menu-text); border: 1px solid var(--ds-border-page); padding: 3px; }.ui-workbench input { accent-color: var(--ds-menu-accent); }
+.ui-workbench summary { color: var(--ds-menu-button-text); cursor: pointer; }.ui-workbench .text-cyan-300 { color: var(--ds-menu-button-text); }
+.ui-workbench .text-slate-400 { color: var(--ds-menu-muted); }
+
+.ui-stack > .ui-section + .ui-section { margin-top: 0; }
+/* Layout reference: https://starsector.wiki.gg/wiki/File:FS_screenshot_refit.jpg
+   The console uses a ship roster, central blueprint and right-hand readouts; not stacked web cards. */
+.ui-modal--console { background: var(--ds-surface-dialog); border: 1px solid var(--ds-border-page); }
+.ui-modal--console .ui-modal-header { background: transparent; border-bottom: 2px solid var(--ds-menu-divider); }
+.ui-modal--console .ui-modal-header .ui-eyebrow { display: none; }
+.ui-modal--console .ui-modal-header h2 { font-size: 16px; color: var(--ds-menu-text); font-weight: 500; }
+.ui-modal--console .ui-modal-header p { display: none; }
+.ui-modal--console .ui-modal-footer { background: transparent; }
+.native-console { height: 100%; display: grid; grid-template-columns: 185px minmax(240px,1fr) 280px; min-height: 0; }
+.native-roster { border-right: 2px solid var(--ds-menu-divider); background: transparent; overflow: auto; padding: 9px 8px; scrollbar-width: thin; }
+.native-roster-heading { color: var(--ds-menu-muted); padding: 2px 7px 10px; font-size: 12px; }
+.native-roster-item { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; min-height: 84px; background: transparent; border: 1px solid transparent; padding: 9px 5px; color: var(--ds-menu-muted); }
+.native-roster-item :is(img, .ship-assembly-thumbnail) { width: 54px; height: 64px; object-fit: contain; opacity: .72; }
+.native-roster-item strong { font-size: 12px; line-height: 1.4; font-weight: 400; display: block; }.native-roster-item small { display: block; font-size: 11px; color: var(--ds-menu-dim); margin-top: 4px; }
+.native-roster-item:hover,.native-roster-item[aria-pressed="true"] { background: var(--ds-control-selected); border-color: var(--ds-control-highlight); color: var(--ds-menu-text); }.native-roster-item[aria-pressed="true"] :is(img, .ship-assembly-thumbnail) { opacity: 1; }
+.native-ship-stage { container-type: size; position: relative; min-width: 0; min-height: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; padding: 58px 26px 52px;
+  background: transparent; }
+.native-stage-caption { position: absolute; left: 16px; top: 12px; color: var(--ds-menu-text); font-size: 13px; font-weight: 500; }.native-stage-caption small { display: block; font-size: 11px; font-weight: 400; color: var(--ds-menu-muted); margin-top: 4px; }
+.native-ship-art { position: relative; width: min(82%,380px,calc(100cqh * var(--ship-aspect))); flex: none; }
+.native-ship-art > :is(img, .ship-assembly-thumbnail) { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 6px 9px color-mix(in srgb, var(--ds-palette-black) 73.333333%, transparent)); }
+.native-mount { position: absolute; transform: translate(-50%,-50%); width: 13px; height: 13px; padding: 0; border: 1px solid color-mix(in srgb, var(--ds-palette-white) 74.117647%, transparent); background: var(--ds-surface-floating); cursor: pointer; }.native-mount--medium { width: 18px; height: 18px; }.native-mount--large { width: 24px; height: 24px; }.native-mount:hover,.native-mount[aria-pressed="true"] { border: 2px solid var(--ds-menu-highlight); background: var(--ds-control-selected); box-shadow: none; }
+.native-stage-footer { position: absolute; bottom: 0; left: 0; right: 0; padding: 9px 12px; display: flex; justify-content: space-between; color: var(--ds-menu-muted); font-size: 11px; background: transparent; border-top: 1px solid var(--ds-menu-divider); }
+.native-side { border-left: 2px solid var(--ds-menu-divider); background: transparent; padding: 12px 12px 16px; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--ds-border-page) transparent; }
+.native-side h3 { font-size: 12px; color: var(--ds-menu-text); background: transparent; padding: 4px 7px; margin: 14px -4px 9px; font-weight: 400; }.native-side h3:first-child { margin-top: 0; }
+.native-readout { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 7px 0; font-size: 12px; line-height: 1.45; }.native-readout > span { color: var(--ds-menu-muted); }.native-readout > strong { font-weight: 400; color: var(--ds-menu-highlight); text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; min-width: 0; }
+.native-condition { margin: 8px 0 13px; }.native-condition-track { height: 8px; border: 1px solid var(--ds-border-page); background: var(--ds-surface-track); padding: 1px; }.native-condition-track span { height: 100%; display: block; background: var(--ds-hud-flux); }.native-condition--cr span { background: var(--ds-menu-success); }
+.native-side .ui-caption { font-size: 11px; color: var(--ds-menu-muted); }.native-side .ui-button { width: 100%; margin-top: 8px; }
+.native-side .ui-notice { border: 0; background: transparent; padding: 8px 0; font-size: 11px; }.native-side .ui-notice > svg { width: 13px; }
+.native-history { color: var(--ds-menu-muted); font-size: 11px; }.native-history > div { padding: 8px 0; border-bottom: 1px solid var(--ds-menu-divider); }.native-history strong { color: var(--ds-menu-success); font-weight: 400; }.native-history .loss { color: var(--ds-menu-danger); }
+.native-brief { color: var(--ds-menu-muted); font-size: 12px; line-height: 1.7; margin: 10px 0; }
+.native-statusline { font-size: 11px; color: var(--ds-menu-muted); margin-right: auto; max-width: 45%; }.native-statusline .ui-tone--success { color: var(--ds-menu-success); }
+@media(max-width:1050px) { .native-console { grid-template-columns: 155px minmax(190px,1fr) 245px; }.native-roster-item { flex-direction: column; align-items: flex-start; gap: 4px; }.native-roster-item :is(img, .ship-assembly-thumbnail) { align-self: center; }.native-ship-stage { padding-left: 10px; padding-right: 10px; } }
+@media(max-width:760px) {.native-console { height: auto; display: grid; grid-template-columns: minmax(0,1fr); }.native-roster { display: flex; overflow-x: auto; border: 0; border-bottom: 1px solid var(--ds-menu-divider); }.native-roster-heading { display: none; }.native-roster-item { width: 130px; min-width: 130px; min-height: 72px; flex-direction: row; padding: 5px; }.native-roster-item :is(img, .ship-assembly-thumbnail) { width: 40px; height: 48px; }.native-ship-stage { min-height: 320px; height: 360px; }.native-ship-art { width: min(175px,calc(100cqh * var(--ship-aspect))); }.native-side { border: 0; overflow: visible; }.native-statusline { display: none; } }
+
+/* Compact records share the console readouts, not standalone statistic cards. */
+.native-report { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px 32px; }
+.native-report > .ui-section + .ui-section { margin-top: 0; }
+.native-report .ui-section-heading { margin-bottom: 10px; }
+.native-report-summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 18px; padding-bottom: 16px; margin-bottom: 20px; border-bottom: 1px solid var(--ds-menu-divider); font-size: 12px; color: var(--ds-menu-muted); }
+.native-report-summary > strong { font-size: var(--ds-type-heading); font-weight: 500; }
+.native-report-summary > .ui-caption { margin-right: auto; }
+.native-report-summary b { color: var(--ds-menu-highlight); font-size: 17px; font-weight: 500; }
+@media(max-width:600px) { .native-report { grid-template-columns: minmax(0,1fr); gap: 20px; } }
+
+/* Native renderers/M: colors encode compatible weapon types, never slot size. */
+.native-mount-type--ballistic { border-color:var(--ds-palette-native-yellow); }.native-mount-type--energy { border-color:var(--ds-palette-cyan-glow); }.native-mount-type--missile { border-color:var(--ds-menu-success); }.native-mount-type--hybrid { border-color:var(--ds-palette-amber); }.native-mount-type--synergy { border-color:var(--ds-palette-mint); }.native-mount-type--composite { border-color:var(--ds-palette-lime); }
+
+/* Web fourth weapon size; existing native sizes unchanged. */
+.native-mount--extra_large { width: 32px; height: 32px; }
+
+.ui-eyebrow:empty { display: none; }
+.ui-modal .native-bitmap-text, .ui-modal .native-bitmap-fallback { font: inherit; }
+.ui-modal :is(input:not([type="range"]):not([type="checkbox"]):not([type="radio"]), select, textarea) { color: var(--ds-menu-text); background-color: var(--ds-surface-input); border-color: var(--ds-border-page); border-radius: var(--ds-radius-control); }
+.ui-modal option { color: var(--ds-menu-text); background: var(--ds-palette-panel); }
+
+.ui-modal .ui-modal-header h2 .native-bitmap-text, .ui-modal .ui-modal-header h2 .native-bitmap-fallback { font: inherit; }
+
+/* ===== Motion and reduced-motion policy ===== */
+/* UI-only motion. No global * rules, combat canvas transforms, idle particles,
+ * permanent will-change layers, or transitions of layout dimensions.
+ * Modal/picker ancestors MUST NOT transform: their fixed tooltips use the viewport.
+ */
+:root {
+  --ds-motion-screen: 300ms;
+  --ds-motion-ease: cubic-bezier(.2, .75, .25, 1);
+}
+
+@keyframes ui-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ui-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes ui-menu-in {
+  from { opacity: 0; translate: 0 10px; }
+  to { opacity: 1; translate: 0 0; }
+}
+@keyframes ui-notice-in {
+  from { opacity: 0; translate: 0 5px; }
+  to { opacity: 1; translate: 0 0; }
+}
+@keyframes ui-loading-sweep {
+  from { transform: scaleX(.2); opacity: .4; }
+  to { transform: scaleX(1); opacity: 1; }
+}
+
+/* Accessibility override: the only sanctioned !important exception for motion, so
+ * page skins of any specificity cannot re-enable animation under reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  :is(.native-refit-app, .native-home, .fleet-settings, .hud-overlay .combat-console) * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* The indicator remains a static line when the user requests reduced motion. */
+.native-loading::after {
+  content: "";
+  display: block;
+  justify-self: center;
+  width: 112px;
+  height: 2px;
+  background: var(--ds-palette-blue-ink);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :is(.native-home, .native-refit-app, .captain-skills-screen, .native-catalog) {
+    animation: ui-fade-in var(--ds-motion-screen) var(--ds-motion-ease);
+  }
+
+  .ui-modal-backdrop[data-motion-state="present"] {
+    animation: ui-fade-in 180ms var(--ds-motion-ease);
+  }
+  .ui-modal-backdrop[data-motion-state="exiting"] {
+    animation: ui-fade-out var(--ds-motion-exit-duration) ease-in both;
+    pointer-events: none;
+  }
+  /* Opacity only: retain pixel-snapped native fonts and anchored picker geometry. */
+  .ui-modal-backdrop[data-motion-state="present"] > .ui-modal {
+    animation: ui-fade-in var(--ds-motion-panel) var(--ds-motion-ease);
+  }
+
+  :is(.native-button.native-action, .ui-button.native-action) {
+    transition: background-color var(--ds-motion-feedback) ease-out,
+      color var(--ds-motion-feedback) ease-out,
+      box-shadow var(--ds-motion-feedback) ease-out,
+      translate 90ms var(--ds-motion-ease);
+  }
+  :is(.native-button.native-action, .ui-button.native-action):hover:not(:disabled),
+  :is(.native-button.native-action, .ui-button.native-action):focus-visible:not(:disabled) {
+    box-shadow: inset 0 1px color-mix(in srgb, var(--ds-palette-blue-ink) 33.333333%, transparent), inset 0 -1px color-mix(in srgb, var(--ds-palette-blue-ink) 13.333333%, transparent);
+  }
+  :is(.native-button.native-action, .ui-button.native-action):active:not(:disabled) {
+    translate: 0 1px;
+    transition-duration: 55ms;
+    box-shadow: inset 0 2px 5px color-mix(in srgb, var(--ds-palette-black) 53.333333%, transparent);
+  }
+  .native-action > .native-bitmap-text { transition: filter var(--ds-motion-feedback) ease-out; }
+
+  /* Selection responds to the existing hover/pressed classes; no DOM reordering
+   * or list staggering that would make a large catalog slower to use. */
+  :is(.native-refit-app, .captain-skills-screen, .native-catalog, .ui-modal) :is(button:not(.native-action), input, select, summary) {
+    transition: background-color var(--ds-motion-feedback) ease-out,
+      border-color var(--ds-motion-feedback) ease-out,
+      color var(--ds-motion-feedback) ease-out,
+      box-shadow var(--ds-motion-feedback) ease-out;
+  }
+  :is(.refit-roster-thumbnail, .captain-skill-icon > img) {
+    transition: opacity var(--ds-motion-feedback) ease-out, filter var(--ds-motion-feedback) ease-out;
+  }
+  :is(.lan-team-member, .lan-ai-roster-row) {
+    animation: ui-fade-in var(--ds-motion-panel) var(--ds-motion-ease);
+    transition: border-color var(--ds-motion-panel), background-color var(--ds-motion-panel);
+  }
+  :is(.equipment-tooltip, .source-weapon-details, .sim-loadout-picker, .source-mod-picker) {
+    animation: ui-fade-in 160ms var(--ds-motion-ease);
+  }
+  :is(.native-error-toast, .ui-notice, .lan-error, .lan-ai-remove-note) {
+    animation: ui-notice-in 180ms var(--ds-motion-ease);
+  }
+  .refit-vessel .studio-ship {
+    animation: ui-fade-in 240ms var(--ds-motion-ease);
+    transition: transform var(--ds-motion-feedback) var(--ds-motion-ease);
+  }
+  .native-loading::after {
+    animation: ui-loading-sweep 850ms ease-in-out infinite alternate;
+  }
+}
+
+/* ===== Workbench compatibility context ===== */
+/* Shared compatibility context for out-of-combat controls and readers.
+ * Page geometry and page-specific skins live in their owning stylesheets.
+ * Uiverse-adapted outline, underline and glass treatments; attribution and MIT
+ * license: public/licenses/uiverse-ui.txt. Layout dimensions remain unchanged. */
+:is(.native-refit-app, .captain-skills-screen, .fleet-home) {
+  --ds-border-page: var(--ds-menu-border);
+  color: var(--ds-menu-text);
+  font-family: var(--ds-font-body);
+}
+:is(.native-refit-app, .captain-skills-screen, .fleet-home) .native-frame.native-chrome[data-native-surface] {
+  background: transparent; border: 0; border-radius: 0; outline: 0; box-shadow: none;
+}
+:is(.native-refit-app, .captain-skills-screen, .fleet-home) .native-chrome::before { display: none; }
+:is(.native-refit-app, .captain-skills-screen, .fleet-home) .native-bitmap-text,
+:is(.native-refit-app, .captain-skills-screen, .fleet-home) .native-bitmap-text .native-bitmap-fallback { font: inherit; }
+:is(.native-refit-app, .captain-skills-screen, .fleet-home) .native-action {
+  min-height: 28px; padding: 4px 9px; border: 1px solid var(--ds-control-border); border-radius: var(--ds-radius-control);
+  background: var(--ds-control-sheen); box-shadow: none; font-size: var(--ds-type-caption); color: var(--ds-menu-text);
+  translate: none;
+  transition: background-color var(--ds-motion-feedback) var(--ds-motion-ease), border-color var(--ds-motion-feedback) var(--ds-motion-ease), color var(--ds-motion-feedback) var(--ds-motion-ease), box-shadow var(--ds-motion-feedback) var(--ds-motion-ease);
+}
+:is(.native-refit-app, .captain-skills-screen, .fleet-home) .native-action:hover:not(:disabled) {
+  background-color: var(--ds-control-hover); border-color: var(--ds-control-highlight); box-shadow: none;
+}
+:is(.native-refit-app, .captain-skills-screen, .fleet-home) .native-action:active:not(:disabled) {
+  background-color: var(--ds-control-pressed); translate: none; box-shadow: none;
+}
+:is(.native-refit-app, .captain-skills-screen) .native-action[aria-pressed="true"] {
+  color: var(--ds-control-focus); background-color: var(--ds-control-selected); border-color: var(--ds-control-highlight); box-shadow: inset 0 -2px var(--ds-menu-accent);
+}
+:is(.native-refit-app, .captain-skills-screen, .fleet-home) :focus-visible { outline: var(--ds-focus-width) solid var(--ds-control-focus); outline-offset: var(--ds-focus-offset); }
+:is(.native-refit-app, .captain-skills-screen) .native-shortcut { font-size: 11px; }
+/* Repeated class outranks picker, disabled-action and vanguard stat colours. */
+:root :is(.native-refit-app, .captain-skills-screen) .native-shortcut.native-shortcut { color: var(--ds-palette-muted); }
+:root :is(.native-refit-app, .captain-skills-screen) .native-green.native-green { color: var(--ds-workbench-success); }
+:is(.native-refit-app, .captain-skills-screen) :is(input:not([type="range"]):not([type="checkbox"]), select, textarea) {
+  background-color: color-mix(in srgb, var(--ds-palette-panel) 25.098039%, transparent); border-color: var(--ds-border-page); border-radius: 2px; color: var(--ds-workbench-text); font-size: 12px; color-scheme: dark;
+}
+:is(.native-refit-app, .captain-skills-screen) select option { background: var(--ds-palette-panel); color: var(--ds-workbench-text); }
+
+/* Refit: narrow rails; the ship remains the visual centre, not the controls. */
+/* Retain native input/clear handlers and dimensions. The focus underline is
+ * decorative, never the sole keyboard-focus indication. */
+
+/* Skills: named compact choices rather than an icon wall. */
+.captain-lore summary { cursor: pointer; padding: 5px 0; }
+
+/* Entry and room chrome share the same transparent surface. */
+
+/* Homepage: retain the existing generated vista, remove the solid launch slab. */
+
+/* Picker and tooltip adaptations apply equally inside and outside combat. */
+:root .ui-modal .refit-search-field input[type="search"] { background: transparent; border-color: transparent; border-bottom-color: var(--ds-control-border); border-radius: 0; transition: background-color var(--ds-motion-feedback) var(--ds-motion-ease); }
+:root .ui-modal .refit-search-field input[type="search"]:hover:not(:disabled) { background-color: var(--ds-surface-hover); }
+:root .ui-modal .refit-search-field input[type="search"]:focus-visible { outline: var(--ds-focus-width) solid var(--ds-control-focus); outline-offset: var(--ds-focus-offset); }
+:root .ui-modal .refit-search-field::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; pointer-events: none; background: var(--ds-control-focus); transform: scaleX(0); transform-origin: left; transition: transform var(--ds-motion-feedback) var(--ds-motion-ease); }
+:root .ui-modal .refit-search-field:focus-within::after { transform: scaleX(1); }
+:root .dwell-popover.native-dwell.native-frame[data-native-surface], .equipment-tooltip { background: var(--ds-surface-tooltip); border: 1px solid var(--ds-control-border); border-radius: var(--ds-radius-overlay); color: var(--ds-palette-gray-ink); font-size: var(--ds-type-body); line-height: var(--ds-line-body); box-shadow: var(--ds-shadow-floating); }
+:root .native-dwell::before { display: none; }
+:root .native-dwell .native-dwell-content h4 { background: transparent; border-bottom: 1px solid var(--ds-workbench-track); font-size: 13px; }
+:root .native-dwell .native-dwell-content h3 { color: var(--ds-palette-accent-muted); font-size: 14px; }
+
+/* Compact controls must still fit their complete functional labels. */
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.native-refit-app, .captain-skills-screen, .fleet-home) :is(.native-action, .fleet-launch, .fleet-menu-item, .refit-search-field input[type="search"]),
+  .native-refit-app .refit-search-field::after { transition: none; }
+  .ui-modal .native-action { transition: none; }
+  .ui-modal .refit-search-field input[type="search"],
+  .ui-modal .refit-search-field::after { transition: none; }
+}
+
+/* ===== Vanguard control and dialog skin ===== */
+/* Vanguard visual theme. Paint-only overlay: colours, glows, gradients, motion.
+ * Must not change padding, borders widths, sizes or positions, so layout geometry
+ * stays identical to the classic theme (`?ui=classic`). */
+:root[data-ui-theme="vanguard"] {
+  --vg-cyan: var(--ds-palette-cyan);
+  --vg-cyan-soft: color-mix(in srgb, var(--ds-palette-cyan) 40%, transparent);
+  --vg-cyan-faint: color-mix(in srgb, var(--ds-palette-cyan) 12.156863%, transparent);
+  --vg-amber: var(--ds-palette-amber);
+  --vg-amber-soft: color-mix(in srgb, var(--ds-palette-amber) 40%, transparent);
+  --vg-ink: var(--ds-palette-ink);
+  --vg-glass: linear-gradient(160deg, color-mix(in srgb, var(--ds-palette-panel) 80%, transparent), color-mix(in srgb, var(--ds-palette-shell) 70.196078%, transparent) 60%, color-mix(in srgb, var(--ds-palette-tooltip) 80%, transparent));
+  --vg-glow: 0 0 0 1px color-mix(in srgb, var(--ds-palette-cyan) 7.843137%, transparent), 0 0 18px color-mix(in srgb, var(--ds-palette-cyan-glow) 18.039216%, transparent), inset 0 0 22px color-mix(in srgb, var(--ds-palette-cyan-glow) 7.058824%, transparent);
+  --vg-display: Bahnschrift, "DIN Alternate", "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  --vg-corners:
+    linear-gradient(var(--vg-cyan) 0 0) 0 0 / 14px 2px no-repeat,
+    linear-gradient(var(--vg-cyan) 0 0) 0 0 / 2px 14px no-repeat,
+    linear-gradient(var(--vg-cyan) 0 0) 100% 0 / 14px 2px no-repeat,
+    linear-gradient(var(--vg-cyan) 0 0) 100% 0 / 2px 14px no-repeat,
+    linear-gradient(var(--vg-cyan) 0 0) 0 100% / 14px 2px no-repeat,
+    linear-gradient(var(--vg-cyan) 0 0) 0 100% / 2px 14px no-repeat,
+    linear-gradient(var(--vg-cyan) 0 0) 100% 100% / 14px 2px no-repeat,
+    linear-gradient(var(--vg-cyan) 0 0) 100% 100% / 2px 14px no-repeat;
+
+  --ds-control-border: color-mix(in srgb, var(--ds-palette-cyan) 30.196078%, transparent);
+  --ds-control-hover: color-mix(in srgb, var(--ds-palette-cyan) 10.980392%, transparent);
+  --ds-control-pressed: color-mix(in srgb, var(--ds-palette-cyan) 20%, transparent);
+  --ds-control-selected: color-mix(in srgb, var(--ds-palette-cyan) 14.117647%, transparent);
+  --ds-control-focus: var(--vg-cyan);
+  --ds-control-highlight: color-mix(in srgb, var(--ds-palette-cyan) 70.196078%, transparent);
+  --ds-surface-tooltip: color-mix(in srgb, var(--ds-palette-tooltip) 94.901961%, transparent);
+  --ds-surface-floating: color-mix(in srgb, var(--ds-palette-tooltip) 92.156863%, transparent);
+  --ds-surface-input: color-mix(in srgb, var(--ds-palette-cyan) 3.921569%, transparent);
+  --ds-surface-track: color-mix(in srgb, var(--ds-palette-cyan) 14.901961%, transparent);
+  --ds-shadow-floating: 0 10px 34px color-mix(in srgb, var(--ds-palette-black) 66.666667%, transparent), 0 0 22px color-mix(in srgb, var(--ds-palette-cyan-glow) 14.117647%, transparent);
+  --ds-scrim: radial-gradient(ellipse at 50% 40%, color-mix(in srgb, var(--ds-palette-panel) 80%, transparent), color-mix(in srgb, var(--ds-palette-night) 94.117647%, transparent) 75%);
+  --ds-menu-text: var(--ds-palette-ink);
+  --ds-menu-muted: var(--ds-palette-muted);
+  --ds-menu-dim: var(--ds-palette-dim);
+  --ds-menu-accent: var(--ds-palette-cyan-muted);
+  --ds-menu-highlight: var(--vg-amber);
+  --ds-menu-success: var(--ds-palette-mint);
+  --ds-menu-warning: var(--ds-palette-warning);
+  --ds-menu-danger: var(--ds-palette-coral);
+  --ds-menu-border: color-mix(in srgb, var(--ds-palette-cyan) 20%, transparent);
+  --ds-menu-divider: color-mix(in srgb, var(--ds-palette-cyan) 14.117647%, transparent);
+  --ds-hud-divider: color-mix(in srgb, var(--ds-palette-cyan) 20%, transparent);
+  --ds-hud-flux: var(--ds-palette-cyan-muted);
+  --ds-hud-hull: var(--ds-palette-mint);
+  --ds-hud-danger: var(--ds-palette-coral);
+}
+
+@keyframes vg-sweep { from { background-position: -120% 0, 0 0; } to { background-position: 220% 0, 0 0; } }
+@keyframes vg-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+
+/* ---------- Shared controls ---------- */
+:root[data-ui-theme="vanguard"] :is(.native-button.native-action, .ui-button.native-action) {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ds-palette-cyan) 5.098039%, transparent), color-mix(in srgb, var(--ds-palette-cyan) 1.176471%, transparent) 60%, color-mix(in srgb, var(--ds-palette-cyan) 6.27451%, transparent));
+  letter-spacing: .04em;
+  transition: border-color var(--ds-motion-feedback), background-color var(--ds-motion-feedback), color var(--ds-motion-feedback), box-shadow var(--ds-motion-feedback);
+}
+:root[data-ui-theme="vanguard"] :is(.native-button.native-action, .ui-button.native-action):hover:not(:disabled) {
+  color: var(--vg-ink);
+  background: var(--vg-corners), linear-gradient(180deg, color-mix(in srgb, var(--ds-palette-cyan) 14.901961%, transparent), color-mix(in srgb, var(--ds-palette-cyan) 3.921569%, transparent) 55%, color-mix(in srgb, var(--ds-palette-cyan) 18.039216%, transparent));
+  box-shadow: 0 0 14px color-mix(in srgb, var(--ds-palette-cyan-glow) 25.098039%, transparent), inset 0 0 12px color-mix(in srgb, var(--ds-palette-cyan) 12.156863%, transparent);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--ds-palette-cyan) 60%, transparent);
+}
+:root[data-ui-theme="vanguard"] .native-action[aria-pressed="true"],
+:root[data-ui-theme="vanguard"] .ui-button.native-action.ui-button--primary {
+  color: var(--vg-ink);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ds-palette-cyan) 18.039216%, transparent), color-mix(in srgb, var(--ds-palette-cyan) 7.058824%, transparent));
+  box-shadow: inset 0 -2px var(--vg-cyan), 0 0 12px color-mix(in srgb, var(--ds-palette-cyan-glow) 20%, transparent);
+}
+:root[data-ui-theme="vanguard"] .ui-button.native-action.ui-button--danger:hover:not(:disabled) {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ds-palette-coral) 14.901961%, transparent), color-mix(in srgb, var(--ds-palette-coral) 3.921569%, transparent));
+  box-shadow: 0 0 14px color-mix(in srgb, var(--ds-palette-red) 25.098039%, transparent);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--ds-palette-coral) 60%, transparent);
+}
+
+/* ---------- Dialogs ---------- */
+/* Repeated class outranks page skins such as `.ui-modal.native-chrome.fleet-settings`, which load later. */
+:root[data-ui-theme="vanguard"] .ui-modal-backdrop { backdrop-filter: blur(6px) saturate(1.2); }
+:root[data-ui-theme="vanguard"] .ui-modal.ui-modal.ui-modal {
+  border-color: color-mix(in srgb, var(--ds-palette-cyan) 34.901961%, transparent);
+  background: var(--vg-corners), var(--vg-glass);
+  box-shadow: 0 24px 60px color-mix(in srgb, var(--ds-palette-black) 80%, transparent), var(--vg-glow);
+}
+:root[data-ui-theme="vanguard"] .ui-modal .ui-modal-header {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--ds-palette-cyan) 12.156863%, transparent), transparent 60%);
+  box-shadow: inset 3px 0 var(--vg-cyan), inset 0 -1px color-mix(in srgb, var(--ds-palette-cyan) 20%, transparent);
+}
+:root[data-ui-theme="vanguard"] .ui-modal .ui-modal-header h2 {
+  font-family: var(--vg-display);
+  letter-spacing: .08em;
+  color: var(--vg-ink);
+  text-shadow: 0 0 14px color-mix(in srgb, var(--ds-palette-cyan) 50.196078%, transparent);
+}
+
+/* ---------- Home ---------- */
+
+/* ---------- Refit ---------- */
+
+/* ---------- Combat HUD ---------- */
+
+/* ===== Original compatibility presentation ===== */
+/* Compatibility selectors for the shared transparent UI, not a second theme.
+ * Keep only the existing scene artwork and semantic legacy hooks. */
+:root :is(.native-refit-app, .captain-skills-screen, .campaign-login, .native-loading) {
+  background-image: linear-gradient(110deg,color-mix(in srgb, var(--ds-palette-shell) 90.196078%, transparent),color-mix(in srgb, var(--ds-palette-shell) 72.156863%, transparent)),url('/game-assets/graphics/original-ui/observatory.png');
+}
+.native-refit-app, .captain-skills-screen, .campaign-login, .native-loading { background-position: center; background-size: cover; }
+.native-screen-tab { color: var(--ds-menu-text); letter-spacing: 0; }
+.native-shortcut { color: var(--ds-menu-highlight); }
+.native-green { color: var(--ds-menu-success); }
+.native-numeric { color: var(--ds-menu-highlight); }
+.native-refit-app :is(input,select,textarea), .campaign-login :is(input,select,textarea) {
+  color: var(--ds-menu-text); background-color: var(--ds-surface-input); border-color: var(--ds-border-page); border-radius: var(--ds-radius-control);
+}
+:where(.native-cargo-panel,.native-inventory-screen,.native-colony-panel,.campaign-inventory,.campaign-fleet-panel,.native-loot-panel) {
+  background-color: var(--ds-surface-floating); border-color: var(--ds-border-page);
+}
+
+/* ===== Native controls and frames ===== */
+/* Native control compatibility hooks. Their rules remain at the historical position
+ * within this single owner; page geometry and tokens are configured separately. */
+.native-chrome { position: relative; isolation: isolate; }
+.native-frame.native-chrome[data-native-surface] {
+  border: 1px solid var(--ds-border-page); border-radius: var(--ds-radius-overlay);
+  outline: 0; box-shadow: none; background: var(--ds-surface-floating);
+}
+.ui-modal.native-chrome[data-native-surface] {
+  border: 1px solid var(--ds-control-border); border-radius: 0;
+  outline: 0; box-shadow: none; background: transparent;
+}
+.native-chrome::before, .native-chrome-border, .native-chrome-tile, .native-chrome-material { display: none; }
+.native-button.native-action, .ui-button.native-action {
+  display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; gap: 6px;
+  min-height: 28px; padding: 4px 11px; white-space: nowrap; cursor: pointer;
+  border: 1px solid var(--ds-control-border); border-radius: var(--ds-radius-control); clip-path: none;
+  box-shadow: none; text-shadow: none; transform: none; translate: none;
+  color: var(--ds-menu-button-text); font: var(--ds-weight-emphasis) var(--ds-type-caption)/1.4 var(--ds-font-body);
+  background: transparent;
+  transition: border-color var(--ds-motion-feedback), background-color var(--ds-motion-feedback), color var(--ds-motion-feedback);
+}
+.native-action[data-native-align="right"] { justify-content: flex-end; }
+.native-action[data-native-align="left"] { justify-content: flex-start; }
+.native-button.native-action:hover:not(:disabled), .ui-button.native-action:hover:not(:disabled) {
+  border-color: var(--ds-control-highlight); background-color: var(--ds-control-hover); box-shadow: none;
+}
+.native-button.native-action:focus-visible, .ui-button.native-action:focus-visible { outline: 2px solid var(--ds-control-focus); outline-offset: 3px; }
+.native-action:active:not(:disabled) { transform: none; translate: none; background-color: var(--ds-control-pressed); }
+.native-button.native-action:disabled, .ui-button.native-action:disabled { opacity: .42; cursor: not-allowed; }
+.native-action[aria-pressed="true"] { background: var(--ds-control-selected); border-color: var(--ds-control-highlight); color: var(--ds-menu-text); }
+.ui-button.native-action.ui-button--primary { border-color: var(--ds-control-highlight); color: var(--ds-menu-text); }
+.ui-button.native-action.ui-button--danger { border-color: var(--ds-menu-danger); color: var(--ds-menu-danger); }
+.native-action .native-bitmap-text, .native-action .native-bitmap-fallback { font: inherit; white-space: inherit; }
+.native-bitmap-text { display:inline; position:relative; vertical-align:middle; max-width:100%; white-space:pre; line-height:1.3; }
+.native-bitmap-fallback { font:500 14px/20px var(--ds-font-body); }
+.native-bitmap-text[data-font="button"] .native-bitmap-fallback { font-size:12px; line-height:18px; }
+.native-bitmap-text[data-font="caption"] .native-bitmap-fallback { font-size:12px; line-height:18px; }
+.native-bitmap-text[data-font="body"] .native-bitmap-fallback { font-size:13px; line-height:20px; font-weight:400; }
+.native-bitmap-text[data-font="tiny"] .native-bitmap-fallback { font-size:11px; line-height:14px; }
+.native-bitmap-text[data-font="credits"] .native-bitmap-fallback { font-size:18px; line-height:24px; }
+.native-bitmap-text[data-font="burn"] .native-bitmap-fallback { font-size:20px; line-height:26px; }
+.ui-modal.native-chrome .ui-modal-header h2 { font-family:var(--ds-font-body); font-weight:500; }
+.ui-modal.native-chrome .ui-modal-footer { background:transparent; }
+.native-action:disabled .native-shortcut { color:inherit; }
+
+.native-action .native-bitmap-text .native-bitmap-fallback { font: inherit; }
+@media (prefers-reduced-motion: reduce) { .native-action { transition: none; } }
+
+/* ===== dwell-tooltip ===== */
+/* B: original full card, delayed appearance and dwell-to-lock. No moving inline panels. */
+/* Progress controls nested inspection readiness, not hit testing: transparent previews
+   let the pointer fall through onto unrelated grid items and destroy the current card. */
+[data-dwell-id] { pointer-events: auto; }
+.dwell-status { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; margin: 0 0 7px; padding: 2px 0 5px; border-bottom: 1px solid var(--ds-palette-blue-frame); color: var(--ds-palette-muted); font: 12px/16px var(--ds-font-body); }
+.dwell-status button { border: 0; padding: 2px 3px; background: transparent; color: var(--ds-palette-ink-soft); font: inherit; white-space: nowrap; cursor: pointer; }
+.dwell-status button:hover { color: var(--ds-palette-native-yellow); }
+.dwell-progress { flex: none; width: 80px; height: 3px; background: var(--ds-palette-green-depth); }
+.dwell-progress i { display: block; height: 100%; width: 0; background: var(--ds-palette-lime-muted); animation: dwell-lock 650ms linear forwards; }
+@keyframes dwell-lock { to { width: 100%; } }
+.dwell-popover { position: fixed; box-sizing: border-box; width: min(300px, calc(100dvw - 16px)); max-height: calc(100dvh - 16px); overflow: auto; overscroll-behavior: contain; padding: 9px 11px; border: 1px solid var(--ds-palette-cyan-frame); background: var(--ds-palette-shell); box-shadow: 0 4px 15px color-mix(in srgb, var(--ds-palette-black) 60%, transparent); color: var(--ds-palette-ink-soft); font: 14px/1.5 var(--ds-font-body); text-align: left; overflow-wrap: anywhere; scrollbar-width: thin; }
+.dwell-popover h3 { margin: 0 0 7px; color: var(--ds-palette-cyan-ink); font: 15px/1.4 var(--ds-font-body); }
+.dwell-popover p { margin: 7px 0; }
+.dwell-current { color: var(--ds-palette-muted); }
+.dwell-current strong { color: var(--ds-palette-native-yellow); font-weight: normal; }
+.dwell-related { display: flex; flex-wrap: wrap; gap: 7px 12px; padding-top: 6px; border-top: 1px solid var(--ds-palette-blue-frame); }
+.refit-hover-term { display: inline; max-width: 100%; padding: 0; border: 0; border-bottom: 1px dotted var(--ds-palette-dim); border-radius: 0; background: transparent; color: inherit; font: inherit; text-align: inherit; cursor: help; }
+.refit-hover-term:disabled { opacity: 1; color: inherit; cursor: default; }
+.refit-hover-term:not(:disabled):hover { color: var(--ds-palette-green-ink); }
+.refit-stat-hover { display: flex; flex-direction: column; align-items: flex-end; gap: 0; padding: 0; min-width: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: inherit; cursor: help; }
+.refit-stat-hover:hover small, .refit-stat-hover:focus-visible small { text-decoration: underline dotted; text-underline-offset: 3px; }
+/* Opaque background avoids unrelated text shining through once the reader is locked. */
+.source-weapon-details[data-dwell-locked="true"] { background: var(--ds-palette-shell); }
+@media (prefers-reduced-motion: reduce) { .dwell-progress i { animation: none; width: 100%; } }/* Keep information triggers in the original cells and disclosure footprints. */
+.refit-info-trigger { display: block; width: 100%; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: inherit; cursor: help; }
+.refit-info-trigger:hover, .refit-info-trigger:focus-visible { text-decoration: underline dotted; text-underline-offset: 3px; }
+.equipment-tooltip[data-dwell-locked="true"] { background: var(--ds-palette-shell); }
+.dwell-popover ul { margin: 7px 0; padding-left: 18px; }
+
+/* Opt-in native readers: the same shipped eight-slice frame as the refit UI.
+ * Scroll only the contents so the original frame and dismiss hint stay in place. */
+.dwell-popover.native-dwell.native-frame[data-native-surface] {
+  display: flex; flex-direction: column; gap: 0; padding: 8px; overflow: hidden;
+  border: 0; border-radius: 0; box-shadow: none; background: transparent;
+  color: var(--ds-palette-gray-ink); font: 15px/17px var(--ds-font-body); isolation: isolate;
+}
+.native-dwell > .native-dwell-content { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 4px 5px; scrollbar-width: thin; scrollbar-color: var(--ds-palette-steel) var(--ds-palette-black); }
+.native-dwell .native-dwell-content h3 { color: var(--ds-palette-blue-ink); font: 15px/19px var(--ds-font-body); margin: 0 0 7px; }
+.native-dwell .native-dwell-content h4 { background: var(--ds-palette-teal-frame); color: var(--ds-palette-blue-ink); padding: 2px 4px; height: auto; margin: 9px 0 5px; font: 15px/17px var(--ds-font-body); }
+.native-dwell .native-dwell-content p { margin: 6px 0; }
+.native-dwell .equipment-state { color: var(--ds-palette-gray); font-size: 12px; line-height: 16px; }
+.native-dwell .refit-hover-term, .native-dwell .refit-inspection-item > span { border-bottom: 0; }
+.native-dwell .refit-hover-term:hover, .native-dwell .refit-inspection-item:hover > span { color: var(--ds-palette-native-yellow); }
+.native-dwell .refit-inspection-budget strong { color: var(--ds-palette-native-yellow); }
+.native-dwell > .native-dwell-status { flex: none; margin: 3px 4px 0; padding: 4px 0 0; min-height: 20px; border-top: 1px solid var(--ds-palette-teal-frame); border-bottom: 0; color: var(--ds-palette-gray); font: 12px/16px var(--ds-font-body); }
+.native-dwell-status .native-button { min-height: 19px; padding: 0 7px; }
+.native-dwell .refit-inspection-note { border-color: var(--ds-palette-teal-frame); color: var(--ds-palette-gray); }
+/* Weapon picker styles normally omit top/bottom tiles; native readers use all eight. */
+
+/* ===== equipment-tooltip ===== */
+.equipment-tooltip { position: fixed; z-index: 220; width: min(390px, calc(100vw - 16px)); max-height: calc(100dvh - 16px); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 7px 9px; border: 1px solid var(--ds-palette-cyan-frame); border-left: 3px double var(--ds-palette-muted); border-right: 3px double var(--ds-palette-muted); background: color-mix(in srgb, var(--ds-palette-night) 92.941176%, transparent); box-shadow: 0 0 0 1px var(--ds-palette-teal-depth), 0 5px 16px color-mix(in srgb, var(--ds-palette-black) 46.666667%, transparent); color: var(--ds-palette-gray-ink); text-align: left; font: 14px/1.35 var(--ds-font-body); pointer-events: auto; scrollbar-width: thin; scrollbar-color: var(--ds-palette-steel) var(--ds-palette-shell); }
+.equipment-tooltip h3 { margin: 0 0 7px; color: var(--ds-palette-cyan-ink); font-size: 15px; font-weight: normal; }
+.equipment-tooltip p { margin: 6px 0; }
+.equipment-tooltip mark, .hullmod-encyclopedia mark { color: var(--ds-palette-native-yellow); background: none; }
+.equipment-tooltip .equipment-design { color: var(--ds-palette-muted); }
+.equipment-tooltip .equipment-state { color: var(--ds-palette-dim); font-size: 12px; }
+.equipment-tooltip .equipment-smod h4, .hullmod-encyclopedia .equipment-smod h4 { margin: 8px -8px 6px; background: color-mix(in srgb, var(--ds-palette-danger-dark) 78.823529%, transparent); text-align: center; color: var(--ds-palette-orange); font-size: 14px; font-weight: normal; }
+.equipment-tooltip .equipment-smod small { display: block; color: var(--ds-palette-muted); }
+.equipment-tooltip .equipment-encyclopedia { display: block; padding: 2px 0 0; background: none; border: 0; color: var(--ds-palette-gray); font: inherit; cursor: pointer; text-align: left; }
+.equipment-tooltip .equipment-encyclopedia:hover { color: var(--ds-palette-cyan-ink); }
+.equipment-tooltip kbd { color: var(--ds-palette-native-yellow); font: inherit; }
+.refit-mod-row { pointer-events: auto; }
+.refit-mod-row:focus-visible { outline: 1px solid var(--ds-palette-cyan-muted); outline-offset: 2px; }
+.hullmod-encyclopedia { font: 15px/1.6 var(--ds-font-body); color: var(--ds-palette-gray-ink); }
+.hullmod-encyclopedia > img { float: right; width: 64px; height: 64px; }
+.hullmod-encyclopedia code { color: var(--ds-palette-muted); }
+.equipment-tooltip table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.equipment-tooltip th { text-align: left; font-weight: normal; }
+.equipment-tooltip th, .equipment-tooltip td { padding: 4px 2px; border-bottom: 1px solid var(--ds-palette-green-depth); }
+.equipment-tooltip td { text-align: right; color: var(--ds-palette-native-yellow); font-family: var(--ds-font-mono); }
+.equipment-tooltip td[data-changed="true"] { color: var(--ds-palette-lime); }
+
+/* ===== Recoverable page states ===== */
+.ui-page-state { min-height: 100dvh; display: grid; place-items: center; padding: 24px; background: var(--ds-palette-shell); color: var(--ds-menu-text); }
+.ui-page-state-panel { width: min(640px, 100%); border: 1px solid var(--ds-control-border); background: var(--ds-surface-floating); padding: 24px; }
+.ui-page-state-panel h1 { margin: 0 0 16px; font: 500 var(--ds-type-title)/1.4 var(--ds-font-body); }
+.ui-page-state-panel p { font: var(--ds-type-body)/1.6 var(--ds-font-body); color: var(--ds-menu-muted); margin: 8px 0; }
+.ui-page-state-panel code { color: var(--ds-menu-highlight); overflow-wrap: anywhere; }
+.ui-page-state-panel nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+.ui-page-state-panel nav .native-action { min-height: var(--ds-control-touch); }
+
+/* Phones use the same controls with larger hit targets. Desktop geometry stays unchanged.
+ * Panels already own scrolling; growing these controls does not change their region order. */
+@media (pointer: coarse) and (max-width: 600px) {
+  html:root[data-ui-theme] :is(.ui-modal, .fleet-home, .captain-skills-screen, .native-catalog, .native-refit-app) :is(button:not(.studio-mount), select, input:not([type="checkbox"]):not([type="radio"]), a[href], summary) {
+    min-width: var(--ds-control-touch); min-height: var(--ds-control-touch);
+  }
+  html:root[data-ui-theme] :is(.ui-modal, .fleet-home, .captain-skills-screen, .native-catalog, .native-refit-app) label:has(input:is([type="checkbox"], [type="radio"], [type="range"])) {
+    min-height: var(--ds-control-touch);
+  }
+}

@@ -91,13 +91,13 @@ export function CaptainSkillsScreen(props: Props) {
   }, [query, filter, value]);
   const visibleIds = new Set(visibleSkills.map(skill => skill.id));
   const effectiveSelectedId = visibleIds.has(selectedId) ? selectedId : visibleSkills[0]?.id ?? selectedId;
-  const active = tree.skills.find(skill => skill.id === effectiveSelectedId) ?? tree.skills[0];
-  const definition = definitions.get(active.id);
-  const activeLevel = value[active.id] ?? 0;
+  const active: NativeSkill | undefined = tree.skills.find(skill => skill.id === effectiveSelectedId) ?? tree.skills[0];
+  const definition = active && definitions.get(active.id);
+  const activeLevel = active ? value[active.id] ?? 0 : 0;
   const supported = !!definition;
   const levelLabel = (id: string) => !definitions.has(id) ? "未接入，仅可查看" : value[id] === 2 ? "精英" : value[id] === 1 ? "普通" : "未配置";
   useEffect(() => { heading.current?.focus(); }, []);
-  useEffect(() => { details.current?.scrollTo({ top: 0 }); }, [active.id]);
+  useEffect(() => { details.current?.scrollTo({ top: 0 }); }, [active?.id]);
   useEffect(() => {
     const key = (event: globalThis.KeyboardEvent) => {
       if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
@@ -109,7 +109,7 @@ export function CaptainSkillsScreen(props: Props) {
         t: () => { if (chosenCount) setClearOpen(true); },
         g: () => { if (!launchDisabledReason) onLaunch(); },
         u: () => { if (canUndo) onUndo(); },
-        f2: () => { setEncyclopedia(hoverSkill ?? active); hideSkill(); },
+        f2: () => { setEncyclopedia(hoverSkill ?? active ?? null); hideSkill(); },
         "/": () => search.current?.focus(),
       };
       const action = actions[event.key.toLowerCase()];
@@ -163,7 +163,7 @@ export function CaptainSkillsScreen(props: Props) {
             <button type="button" className="captain-portrait-button" aria-label="编辑舰长头像" onClick={() => setProfileOpen(true)}><img src={portraitUrl(profile.portrait)} alt="舰长头像" /></button>
             <dl className="captain-points"><div><dt>技能点</dt><dd className="captain-yellow">∞</dd><small>自由配置</small></div><div><dt>故事点</dt><dd className="captain-muted">—</dd><small>未启用</small></div></dl>
           </div>
-          <div className="captain-progress" role="progressbar" aria-label="已配置技能" aria-valuemin={0} aria-valuemax={combatSkillDefinitions.length} aria-valuenow={chosenCount}><i style={{ width: `${chosenCount / combatSkillDefinitions.length * 100}%` }} /></div>
+          <div className="captain-progress" role="progressbar" aria-label="已配置技能" aria-valuemin={0} aria-valuemax={combatSkillDefinitions.length} aria-valuenow={chosenCount}><i style={{ width: `${combatSkillDefinitions.length ? chosenCount / combatSkillDefinitions.length * 100 : 0}%` }} /></div>
           <div className="captain-loadout-count" aria-live="polite"><span>已配置 <b>{chosenCount}/{combatSkillDefinitions.length}</b></span><span>精英 <b>{eliteCount}</b></span></div>
           <RefitHint text={`${props.designName} · ${props.hullName}-级`}><p className="captain-current-design" >{props.designName} · {props.hullName}-级</p></RefitHint>
           <div className="captain-character-actions">
@@ -171,7 +171,9 @@ export function CaptainSkillsScreen(props: Props) {
             <RefitHint text={props.launchDisabledReason ?? props.launchLabel ?? "使用当前方案和技能进入模拟战斗"}><NativeButton shortcut="G" disabled={!!props.launchDisabledReason}  onClick={props.onLaunch}>{props.launchLabel ?? "开始模拟"}</NativeButton></RefitHint>
           </div>
         </aside>
-        <section className="captain-skill-detail" style={aptitudeStyle(active.aptitude)} aria-label="技能详情" ref={details} tabIndex={0}>
+        {!active ? <section className="captain-skill-detail" aria-label="技能详情" ref={details} tabIndex={0}>
+          <div className="captain-unimplemented"><p>尚未收录角色技能。</p></div>
+        </section> : <section className="captain-skill-detail" style={aptitudeStyle(active.aptitude)} aria-label="技能详情" ref={details} tabIndex={0}>
           <DwellReader><header className="captain-detail-title"><h2>{active.name}</h2><span>{supported ? activeLevel === 2 ? "精英已配置" : activeLevel === 1 ? "普通已配置" : "可配置" : "未接入 · 仅可查看"}</span></header>
           <details className="captain-lore"><summary>背景资料</summary><blockquote><p>{active.quote}</p><cite>－ {active.author}</cite></blockquote></details>
           <p className="captain-detail-scope">影响：<strong>{nativeScope(active)}</strong>{active.id === "point_defense" && <span>（含所属战机）</span>}</p>
@@ -183,7 +185,7 @@ export function CaptainSkillsScreen(props: Props) {
           <div className="captain-detail-controls">
             <button type="button" className="captain-codex-button" onClick={() => setEncyclopedia(active)}>按 <b>F2</b> 打开数据百科</button>
           </div></DwellReader>
-        </section>
+        </section>}
       </div>
       <section className="captain-aptitude-tree" aria-label="四系技能树">
         {tree.aptitudes.map(aptitude => {
@@ -228,7 +230,7 @@ export function CaptainSkillsScreen(props: Props) {
     <footer className="captain-web-tools" aria-label="Web 配置工具">
       <div className="captain-web-toolbar">
         <div className="captain-search"><input ref={search} aria-label="搜索技能" placeholder="搜索技能 /" value={query} onChange={event => { hideSkill(); setQuery(event.target.value); }} />{query && <button type="button" onClick={() => { setQuery(""); search.current?.focus(); }} aria-label="清除搜索">×</button>}</div>
-        <select aria-label="筛选技能" value={filter} onChange={event => { hideSkill(); setFilter(event.target.value as SkillFilter); }}><option value="all">全部技能 · 40</option><option value="supported">可配置 · {combatSkillDefinitions.length}</option><option value="configured">已配置 · {chosenCount}</option></select>
+        <select aria-label="筛选技能" value={filter} onChange={event => { hideSkill(); setFilter(event.target.value as SkillFilter); }}><option value="all">全部技能 · {tree.skills.length}</option><option value="supported">可配置 · {combatSkillDefinitions.length}</option><option value="configured">已配置 · {chosenCount}</option></select>
         <span className="captain-search-result" role="status">{visibleSkills.length} 项 · 暗色仅供查看</span>
         <div className="captain-web-actions">
           <RefitHint text="撤消最近一次技能、档案或装配修改"><NativeButton onClick={props.onUndo} disabled={!props.canUndo} >撤消</NativeButton></RefitHint>

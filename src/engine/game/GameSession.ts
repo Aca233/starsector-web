@@ -4,7 +4,7 @@ import { LOCAL_COMBAT_PROTOCOL } from '../runtime/local/LocalCombatProtocol';
 import { readBattleSize } from '../runtime/BattleSizeSettings';
 import { battleTeamLimit } from '../../shared/battle-size.mjs';
 import { randomId } from "../../shared/RandomId";
-import { DEFAULT_PLAYER_HULL, defaultOpponent } from '../data/SandboxDefaults';
+import { defaultPlayerHull, defaultOpponent } from '../data/SandboxDefaults';
 import { CombatSession } from '../runtime/CombatSession';
 import { CombatHandoff, createFleetMember, validateMemberContent } from './CombatHandoff';
 import { beginCombat, createGameState, freezeGameState, settleCombat, type CombatRequest, type GameState } from './GameState';
@@ -34,7 +34,7 @@ export class GameSession {
 
   constructor(
     private readonly store: GameSaveStore | null,
-    initialHullId = DEFAULT_PLAYER_HULL,
+    initialHullId = defaultPlayerHull(),
     private readonly ephemeral = false,
     opponentId?: string
   ) {

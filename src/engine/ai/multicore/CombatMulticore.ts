@@ -3,6 +3,7 @@ import { AuditedCombatMulticore } from './AuditedCombatMulticore';
 import type { CombatEngine } from '../../simulation/CombatEngine';
 import type { CapitalShipAI } from '../CapitalShipAI';
 import type { AIPhaseBatch } from './Types';
+import type { LocalCombatAIStatus } from '../../contracts/CombatTelemetry';
 
 /** Single-player adapter: player controls/AI have already executed before prepare.
  * Only the engine's later native AI phase is predicted, exactly as on a LAN host.
@@ -18,7 +19,7 @@ export class CombatMulticore {
     // repeating hitch. Local battles use a longer hysteresis; LAN keeps its policy.
     private readonly budget = new CombatWorkerBudget(60000, true);
     enabled = true;
-    get status() {
+    get status(): LocalCombatAIStatus {
         const status = this.owners.status;
         return { ...status, budget: this.budget.status,
             reason: !status.workers && status.reason === 'not-started' ? this.budget.status.reason : status.reason };

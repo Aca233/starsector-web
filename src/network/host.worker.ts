@@ -1,3 +1,4 @@
+import { applyGravityControlHold, applyGravityPushHold, GRAVITY_PUSH_KEY, GRAVITY_HOLD_KEY } from '../engine/simulation/systems/GravityControlInput';
 import { enableWorkerOwnedMotionReads } from '../engine/simulation/systems/ShipMotion';
 import {attachAuthorityAdmission, isAuthoritySnapshotBlocked} from './AuthorityIoAdmission.mjs';
 import { summarizeNetworkFailure } from '../../desktop/network-diagnostic-record.mjs';
@@ -39,6 +40,7 @@ import { captureLanDisplayCombat, configureHostCosmetics } from "./HostSnapshot"
 import { encodeProjectedBinaryFrame, ProjectionEncodingCache } from "./BinarySnapshot.mjs";
 import { blankInput, KEY_CODES } from "./protocol";
 import type { Match, PlayerInput, Seat, Action } from "./protocol";
+import { RustLanKernel, type RustLanTickInput } from './RustLanKernel';
 
 // One authority step at a time, even while AI owners are running off-thread.
 // Experimental AI owners are opt-in: default builds never construct a pool,
@@ -68,11 +70,11 @@ const deploymentReplies = new Map<string, Record<string, unknown>>();
 let captureMs = 0, encodeMs = 0;
 // At most one completed tick, retained only for the other display/network lane.
 // Not a payload queue or a baseline: every recipient still gets a full frame.
-let capturedFrame: { engine: CombatEngine; tick: number; frame: ReturnType<typeof captureLanDisplayCombat>; encoding: ProjectionEncodingCache | null } | null = null;
+let capturedFrame: { engine: CombatEngine | RustLanKernel; tick: number; frame: ReturnType<typeof captureLanDisplayCombat>; encoding: ProjectionEncodingCache | null } | null = null;
 let captures = 0, captureReuses = 0, encodedFragmentReuses = 0;
 let snapshotInFlight: number | null = null;
 let snapshotEncoderWorker: SnapshotEncoderBroker | null = null;
-let pendingEncoding: {id:number;tick:number;lifecycle:number;engine:CombatEngine;port:MessagePort|null;display:boolean;network:boolean;displaySound:number;networkSound:number} | null = null;
+let pendingEncoding: {id:number;tick:number;lifecycle:number;engine:CombatEngine|RustLanKernel;port:MessagePort|null;display:boolean;network:boolean;displaySound:number;networkSound:number} | null = null;
 let serializerStartupFailed = false;
 function serializerDiagnostics() {
   if (snapshotEncoderWorker) return snapshotEncoderWorker.stats;
@@ -107,7 +109,7 @@ function flushSnapshotEncoding() {
   const result = snapshotEncoderWorker?.poll();
   if (!result) return;
   const job = pendingEncoding; pendingEncoding = null;
-  if (!job || result.id !== job.id || result.fallback || job.lifecycle !== lifecycle || job.engine !== engine || job.port !== directIo) return;
+  if (!job || result.id !== job.id || result.fallback || job.lifecycle !== lifecycle || job.engine !== (engine ?? rustAuthority) || job.port !== directIo) return;
   encodeMs = encodeMs * .7 + result.workerMs * .3;
   // Publishing an immutable completed tick is safe during a yielded physics
   // batch. Capture/physics are never invoked here, and sounds retire only now.
@@ -132,6 +134,8 @@ let muzzleEvents: HostMuzzleEvents | null = null;
 const snapshotEncoder = new TextEncoder();
 const recoveryBudget = new HostRecoveryBudget();
 let authorityRuntime: CombatAuthority | null = null;
+let rustAuthority: RustLanKernel | null = null;
+let startupFallbackReason:string|undefined;
 let engine: CombatEngine | null = null,
   tick = 0,
   running = false,
@@ -248,16 +252,17 @@ function acknowledgeSnapshot(consumedTick: number, discardSounds = false) {
 }
 function measureClock(now: number) {
   const elapsed = now - clockAt;
-  if (!running || !engine || elapsed < 2000) return;
+  const authority = engine ?? rustAuthority;
+  if (!running || !authority || elapsed < 2000) return;
   realtimeRatio = (tick - clockTick) * 1000 / 60 / elapsed;
-  combatRate = (engine.combatTime - clockCombat) * 1000 / elapsed;
-  clockAt = now; clockTick = tick; clockCombat = engine.combatTime;
+  combatRate = (authority.combatTime - clockCombat) * 1000 / elapsed;
+  clockAt = now; clockTick = tick; clockCombat = authority.combatTime;
 }
-function diagnostics(): HostPerformance & { weaponThreats: WeaponThreatWorkerStatus; io: { enabled: boolean; sharedCredit: boolean; sharedAdmission: boolean; preflightSkips: number; sharedCompletions: number; sent: number; skipped: number; inputs: number; inflight: number; displaySounds: number; flow: import("./SnapshotFlow.mjs").FlowSample }; multicore: LanCombatMulticore["status"] & { budget: HostAiBudget["status"] } } {
+function diagnostics(): HostPerformance & { rustTiming?:RustLanKernel['lastTiming']; weaponThreats: WeaponThreatWorkerStatus; io: { enabled: boolean; sharedCredit: boolean; sharedAdmission: boolean; preflightSkips: number; sharedCompletions: number; sent: number; skipped: number; inputs: number; inflight: number; displaySounds: number; flow: import("./SnapshotFlow.mjs").FlowSample }; multicore: LanCombatMulticore["status"] & { budget: HostAiBudget["status"] } } {
   const owners: LanCombatMulticore["status"] = multicore?.status ?? {
     mode: 'serial', tier: 'audited', reason: 'ai-workers-disabled', workers: 0, metrics: null,
   };
-  return { weaponThreats: { ...threatWorkers.status }, capturePlans: capturePlanDiagnostics(), captureReuse: { produced: captures, reused: captureReuses, encodedFragments: encodedFragmentReuses, retained: capturedFrame !== null }, serializer: serializerDiagnostics(), io: { enabled: !!directIo && directReady, sharedCredit: directCompletion !== null, sharedAdmission: directAdmission !== null, ...ioStats, inflight: Number(directInFlight !== null), displaySounds: sounds.length, flow: ioFlow.sample() }, flow: snapshotFlow.sample(), tick, callbackGapMs, lastStepMs, maxStepMs, backlogMs: accumulator,
+  return { rustTiming:rustAuthority?.lastTiming,weaponThreats: { ...threatWorkers.status }, capturePlans: capturePlanDiagnostics(), captureReuse: { produced: captures, reused: captureReuses, encodedFragments: encodedFragmentReuses, retained: capturedFrame !== null }, serializer: serializerDiagnostics(), io: { enabled: !!directIo && directReady, sharedCredit: directCompletion !== null, sharedAdmission: directAdmission !== null, ...ioStats, inflight: Number(directInFlight !== null), displaySounds: sounds.length, flow: ioFlow.sample() }, flow: snapshotFlow.sample(), tick, callbackGapMs, lastStepMs, maxStepMs, backlogMs: accumulator,
     simulationMs: samples ? elapsedCost / samples : lastStepMs, captureMs, encodeMs, realtimeRatio, combatRate, multicore: { ...owners, reason: owners.workers || owners.reason !== "not-started" ? owners.reason : aiBudget.status.reason, budget: aiBudget.status } };
 }
 function snapshot(final = false) {
@@ -273,7 +278,8 @@ function snapshot(final = false) {
   const network = networkEligible && !networkBlocked;
   if (networkEligible && networkBlocked) ioStats.preflightSkips++;
   if (!display && !network) { if (tick !== lastSnapshotTick) snapshotFlow.count('blocked'); return; }
-  if (engine) {
+  const authority = engine ?? rustAuthority;
+  if (authority) {
     const cacheable = !!directIo && directReady && directLaunched;
     const simulationMs = samples ? elapsedCost / samples : 0;
     // Consume retention before encoding/sending: a thrown publication cannot
@@ -281,12 +287,12 @@ function snapshot(final = false) {
     const previous = capturedFrame;
     capturedFrame = null;
     let captured: ReturnType<typeof captureLanDisplayCombat>;
-    if (cacheable && previous?.engine === engine && previous.tick === tick) {
+    if (cacheable && previous?.engine === authority && previous.tick === tick) {
       captured = previous.frame;
       captureReuses++;
     } else {
       const started = performance.now();
-      captured = captureLanDisplayCombat(engine, tick,
+      captured = rustAuthority ? rustAuthority.capture(Object.fromEntries([...controls].map(([seat, state]) => [seat, state.acknowledged])), simulationMs) : captureLanDisplayCombat(engine!, tick,
         Object.fromEntries([...controls].map(([seat, state]) => [seat, state.acknowledged])),
         simulationMs, muzzleEvents, compactParticles, binarySnapshots);
       captures++;
@@ -319,9 +325,9 @@ function snapshot(final = false) {
     if (asynchronous && snapshotEncoderWorker) {
       const id = snapshotEncoderWorker.submit(frame, encodeDisplay, encodeNetwork, networkFrame?.sounds ?? []);
       if (id !== null) {
-        pendingEncoding = {id,tick,lifecycle,engine,port:directIo,display:encodeDisplay,network:encodeNetwork,
+        pendingEncoding = {id,tick,lifecycle,engine:authority,port:directIo,display:encodeDisplay,network:encodeNetwork,
           displaySound:frame.sounds.at(-1)?.id ?? -1,networkSound:networkFrame?.sounds.at(-1)?.id ?? -1};
-        capturedFrame = cacheable && display !== network ? {engine,tick,frame:captured,encoding:null} : null;
+        capturedFrame = cacheable && display !== network ? {engine:authority,tick,frame:captured,encoding:null} : null;
         elapsedCost = 0; samples = 0; return;
       }
     }
@@ -337,7 +343,7 @@ function snapshot(final = false) {
     const binary = display && binarySnapshots ? encodeProjectedBinaryFrame(frame, true, encodingCache) : null;
     const networkBinary = networkFrame && binarySnapshots ? sameSounds && binary ? binary.slice() : encodeProjectedBinaryFrame(networkFrame, true, encodingCache) : null;
     // Only the dedicated IPC consumer currently accepts the stripped variant.
-    const visualBinary = binary && authoritySummaryShips !== null && visualEnabled && engine.projectiles.length > 0 ? encodeProjectedBinaryFrame(withoutBulkProjectiles(frame), true) : null;
+    const visualBinary = binary && engine && authoritySummaryShips !== null && visualEnabled && engine.projectiles.length > 0 ? encodeProjectedBinaryFrame(withoutBulkProjectiles(frame), true) : null;
     const json = !display || binary ? undefined : JSON.stringify(frame);
     const bytes = !display ? 0 : binary?.byteLength ?? snapshotEncoder.encode(json!).byteLength;
     encodedFragmentReuses += (encodingCache?.hits ?? 0) - priorFragmentHits;
@@ -357,7 +363,7 @@ function snapshot(final = false) {
     }
     if (network || (!directIo && display)) snapshotFlow.count("produced");
     capturedFrame = cacheable && (lastSnapshotTick !== tick || directLastTick !== tick)
-      ? { engine, tick, frame: captured, encoding: encodingCache } : null;
+      ? { engine:authority, tick, frame: captured, encoding: encodingCache } : null;
   }
   elapsedCost = 0;
   samples = 0;
@@ -390,6 +396,35 @@ function clearControls(state: Controls, ship: Ship) {
     applyPlayerControls(ship, {}, new Vector2(...state.input.aim), false, DEFAULT_MOUSE_STEERING, false);
   } else engine?.externallyControlledShipIds.delete(ship.id);
 }
+function clearSeat(seat:Seat,state:Controls):void {
+  if(!rustAuthority){const ship=controlled.get(seat);if(ship)clearControls(state,ship);return;}
+  capturedFrame=null;state.lastAction=Math.max(state.lastAction,...state.queued.map(a=>a.id));
+  state.input={...state.input,keys:0,firing:false,pointerActive:false,actions:[]};state.queued=[];state.received=0;
+  rustAuthority.presence(seat,state.connected);
+}
+function collectRustAudio():void {
+  if(!rustAuthority)return;
+  for(const event of rustAuthority.drainAudio())if(event.kind==='play')queueSound(event.key,event.volume,event.rate,event.position?[...event.position]:undefined);
+}
+function authorityIdentity(){return rustAuthority?{kind:'rust-wasm',sha256:rustAuthority.wasmSha256}:{kind:'typescript',...(startupFallbackReason?{fallbackReason:startupFallbackReason}:{})};}
+function initializeTypescript(match:Match):void {
+  const world=createLanWorld(match);engine=world.engine;
+  FireControlQueryRoster.ownForWorker(engine);
+  if(import.meta.env.VITE_LAN_OWNED_PHASE_READS!=='false')enableWorkerOwnedPhaseReads();
+  if(import.meta.env.VITE_LAN_OWNED_MOTION_READS==='true')enableWorkerOwnedMotionReads();
+  if(import.meta.env.VITE_LAN_EARLY_PREAIM_RANGE==='true')enableWorkerOwnedPreAimRange();
+  authorityRuntime=new CombatAuthority(engine);muzzleEvents=configureHostCosmetics(engine,true,compactParticles,localParticles);controlled=world.controlled;
+  controls.clear();deploymentReplies.clear();
+  for(const[seat,ship]of controlled){engine.externallyControlledShipIds.add(ship.id);applyPlayerControls(ship,{},new Vector2(),false,DEFAULT_MOUSE_STEERING,false);
+    controls.set(seat,{input:blankInput(),received:performance.now(),acknowledged:0,lastAction:-1,queued:[],connected:true,online:false});}
+  completeInitialization();
+}
+function completeInitialization():void {
+  tick=0;snapshotFlow.reset();lastSnapshotTick=-1;snapshotInFlight=null;captureMs=encodeMs=0;
+  captures=captureReuses=encodedFragmentReuses=0;realtimeRatio=combatRate=undefined;
+  telemetryAt=callbackGapMs=lastStepMs=maxStepMs=0;collectRustAudio();snapshot();
+  send({type:'ready',authority:authorityIdentity()});
+}
 function recover(now: number, pauseMs: number, backgroundPause = false) {
   cancelSnapshotEncoding();
   capturedFrame = null;
@@ -400,15 +435,14 @@ function recover(now: number, pauseMs: number, backgroundPause = false) {
   sounds.length = 0; networkSounds.length = 0;
   for (const [seat, state] of controls) {
     state.online = false;
-    const ship = controlled.get(seat);
-    if (ship) clearControls(state, ship);
+    clearSeat(seat,state);
   }
-  send({ type: "recovered", pauseMs: Math.round(pauseMs), diagnostics: diagnostics() });
+  send({ type: "recovered", pauseMs: Math.round(pauseMs), authority:authorityIdentity(),diagnostics: diagnostics() });
 }
 async function step() {
-  if (!running || !engine || steppingLifecycle === lifecycle) return;
+  if (!running || !(engine ?? rustAuthority) || steppingLifecycle === lifecycle) return;
   try { flushSnapshotEncoding(); } catch (error) { fail(error); return; }
-  const generation = lifecycle, authority = engine;
+  const generation = lifecycle, authority = engine ?? rustAuthority!;
   steppingLifecycle = generation;
   const now = performance.now(),
     elapsed = now - last;
@@ -442,6 +476,16 @@ async function step() {
     while (accumulator >= 1000 / 60 && steps < 6) {
       capturedFrame = null; // Before controls, commands or physics can mutate the world.
       const start = performance.now();
+      let usedOwners=false;
+      if(rustAuthority){
+        const inputs:RustLanTickInput[]=[];
+        for(const [seat] of rustAuthority.controlled){const state=controls.get(seat)!;if(!state.connected)continue;
+          const fresh=state.online&&performance.now()-state.received<500,actions:Action[]=[];
+          for(const action of state.queued.splice(0)){if(action.id<=state.lastAction)continue;state.lastAction=action.id;if(fresh)actions.push(action);}
+          inputs.push({seat,input:state.input,fresh,actions});if(state.online)state.acknowledged=state.input.seq;
+        }
+        rustAuthority.step(inputs);collectRustAudio();
+      } else {
       for (const [seat, ship] of controlled) {
         const state = controls.get(seat)!;
         if (!state.connected) continue;
@@ -467,43 +511,45 @@ async function step() {
           if (!fresh) continue; // Expired edge commands must not fire after recovery.
           if (action.kind === 'group' || action.kind === 'mode' || action.kind === 'autofire' || action.kind === 'module') {
             dispatchShipCommand(ship, { kind: action.kind, value: action.value ?? 0 }, action.aim ? new Vector2(...action.aim) : undefined);
-          } else dispatchShipCommand(ship, { kind: action.kind, ...(action.kind === 'system' ? {value: action.value ?? 0} : {}) }, action.aim ? new Vector2(...action.aim) : undefined, engine.ships);
+          } else dispatchShipCommand(ship, { kind: action.kind, ...(action.kind === 'system' ? {value: action.value ?? 0} : {}) }, action.aim ? new Vector2(...action.aim) : undefined, engine!.ships);
         }
+        applyGravityControlHold(ship, fresh && input.pointerActive && !!keys[GRAVITY_HOLD_KEY]);
+        applyGravityPushHold(ship, fresh && input.pointerActive && !!keys[GRAVITY_PUSH_KEY]);
         if (state.online) state.acknowledged = input.seq;
       }
       let aiBatch: AIPhaseBatch | undefined;
-      let usedOwners = false;
       try {
         // Legacy whole-AI proposals are used only with the old live query path.
         // The new path offloads its numerical observation stage separately.
         const allowOwners = import.meta.env.VITE_COMBAT_THREAT_PHASE === 'false'
-          && !authority.usesPhasedWorld
-          && multicore !== null && aiBudget.allow(authority.capitalShips.length, performance.now());
+          && !engine!.usesPhasedWorld
+          && multicore !== null && aiBudget.allow(engine!.capitalShips.length, performance.now());
         if (!allowOwners && multicore && multicore.status.workers > 0
           && ['small-fleet-serial', 'low-cost-serial'].includes(aiBudget.status.reason)) multicore?.reset();
-        const pending = allowOwners && multicore ? multicore.prepare(authority, 1 / 60) : null;
+        const pending = allowOwners && multicore ? multicore.prepare(engine!, 1 / 60) : null;
         if (pending) { usedOwners = true; aiBatch = await pending; }
       } catch {
         // Owner failure/timeout is a serial fallback, not a dropped physics step.
       }
-      if (generation !== lifecycle || !running || engine !== authority) {
+      if (generation !== lifecycle || !running || (engine ?? rustAuthority) !== authority) {
         aiBatch?.finish();
         return;
       }
       try {
-        if (!authorityRuntime || authorityRuntime.engine !== authority) throw new Error('Combat authority epoch mismatch');
+        if (!authorityRuntime || authorityRuntime.engine !== engine) throw new Error('Combat authority epoch mismatch');
         if (import.meta.env.VITE_COMBAT_THREAT_PHASE !== 'false' && import.meta.env.VITE_COMBAT_THREAT_WORKERS === 'true') {
           const completed = await authorityRuntime.advanceAsync(1 / 60, frame => threatWorkers.compute(frame),
-            () => generation === lifecycle && running && engine === authority);
+            () => generation === lifecycle && running && (engine ?? rustAuthority) === authority);
           if (!completed) return;
         } else authorityRuntime.advance(1 / 60, true, aiBatch);
       }
       finally { aiBatch?.finish(); }
+      }
       tick++;
       // Presence/deployment may arrive while the numeric stage is off-thread.
       // Apply world writes only after the complete tick, before publication.
       for (const message of deferredWorldMessages.splice(0)) handleMessage(message, true);
-      if (generation !== lifecycle || !running || engine !== authority) return;
+      if (generation !== lifecycle || !running || (engine ?? rustAuthority) !== authority) return;
       snapshotFlow.count('simulated');
       accumulator -= 1000 / 60;
       steps++;
@@ -512,9 +558,9 @@ async function step() {
       maxStepMs = Math.max(maxStepMs, lastStepMs);
       elapsedCost += lastStepMs;
       samples++;
-      if (engine.isBattleResultReady) {
+      if (authority.isBattleResultReady) {
         snapshot(true);
-        const finished = { type: "finished", winner: engine.winningTeam ?? "draw", report: captureBattleReport(engine, controlled, tick) };
+        const finished = { type: "finished", winner: authority.winningTeam ?? "draw", report: rustAuthority ? rustAuthority.report() : captureBattleReport(engine!, controlled, tick) };
         // Same port FIFO: publication is locally handled BEFORE main can send
         // finish/stop. This is an ordering barrier, not a remote delivery ACK.
         if (directIo && directReady) { directFinish = finished; directIo.postMessage({ type: "barrier", id: tick }); }
@@ -537,7 +583,7 @@ async function step() {
       // add captures, lower the 60 Hz target, or discard simulation debt.
       if (accumulator >= 1000 / 60 && steps < 6 && performance.now() - sliceStartedAt >= 8) {
         await yieldHostTask();
-        if (generation !== lifecycle || !running || engine !== authority) return;
+        if (generation !== lifecycle || !running || (engine ?? rustAuthority) !== authority) return;
         flushSnapshotEncoding();
         sliceStartedAt = performance.now();
       }
@@ -614,6 +660,7 @@ function handleMessage(m: any, afterStep = false) {
       cancelSnapshotEncoding(true);
       // Invalidates an outstanding plan before replacing any authoritative world.
       lifecycle++;
+      rustAuthority?.dispose();rustAuthority=null;engine=null;authorityRuntime=null;startupFallbackReason=undefined;controlled.clear();controls.clear();deploymentReplies.clear();
       running = false;
       if (timer) clearInterval(timer);
       timer = undefined;
@@ -632,62 +679,43 @@ function handleMessage(m: any, afterStep = false) {
       const match = m.match as Match;
       authoritySummaryShips = binarySnapshots && m.authoritySummaries === true
         ? match.players.length + match.options.aiHulls.reduce((n, rows) => n + rows.length, 0) : null;
-      const world = createLanWorld(match);
-      engine = world.engine;
-      // This authority accepts cloned data only; no mutable ship or executable plugin escapes.
-      // Register each new epoch, while retaining live per-ship hook/effect fallback checks.
-      FireControlQueryRoster.ownForWorker(engine);
-      // Same closed cloned-data realm as local-combat.worker; no Ship escapes.
-      // Existing single-slot phase reads keep live callbacks and member snapshots.
-      if (import.meta.env.VITE_LAN_OWNED_PHASE_READS !== 'false') enableWorkerOwnedPhaseReads();
-      // Experimental same-call stat composition, never a cross-step motion cache.
-      if (import.meta.env.VITE_LAN_OWNED_MOTION_READS === 'true') enableWorkerOwnedMotionReads();
-      if (import.meta.env.VITE_LAN_EARLY_PREAIM_RANGE === 'true') enableWorkerOwnedPreAimRange();
-      authorityRuntime = new CombatAuthority(engine);
-      muzzleEvents = configureHostCosmetics(engine, true, compactParticles, localParticles);
-      controlled = world.controlled;
-      controls.clear();
-      deploymentReplies.clear();
-      for (const [seat, ship] of controlled) {
-        // Match start requires all peers connected. Keep human ships neutral
-        // until the relay grants controls; presence reconciles later departures.
-        engine.externallyControlledShipIds.add(ship.id);
-        applyPlayerControls(ship, {}, new Vector2(), false, DEFAULT_MOUSE_STEERING, false);
-        controls.set(seat, {
-          input: blankInput(),
-          received: performance.now(),
-          acknowledged: 0,
-          lastAction: -1,
-          queued: [],
-          connected: true,
-          online: false,
-        });
+      if(m.backend==='rust-wasm'){
+        const generation=lifecycle;
+        void RustLanKernel.create(match,generation,m.rustModule).then(authority=>{
+          if(generation!==lifecycle){authority.dispose();return;}
+          rustAuthority=authority;muzzleEvents=null;
+          for(const [seat]of authority.controlled)controls.set(seat,{input:blankInput(),received:performance.now(),acknowledged:0,lastAction:-1,queued:[],connected:true,online:false});
+          completeInitialization();
+        },error=>{
+          if(generation!==lifecycle)return;
+          if(running||rustAuthority||engine)throw error;
+          startupFallbackReason=(error instanceof Error?error.message:String(error)).slice(0,500);
+          sounds.length=0;networkSounds.length=0;capturedFrame=null;
+          initializeTypescript(match);
+        }).catch(error=>{if(generation===lifecycle)fail(error);});
+        return;
       }
-      tick = 0;
-      snapshotFlow.reset();
-      lastSnapshotTick = -1;
-      snapshotInFlight = null;
-      captureMs = encodeMs = 0;
-      captures = captureReuses = encodedFragmentReuses = 0;
-      realtimeRatio = combatRate = undefined;
-      telemetryAt = callbackGapMs = lastStepMs = maxStepMs = 0;
-      snapshot();
-      send({ type: "ready" });
+      if(m.backend!==undefined&&m.backend!=='typescript')throw Error('Unknown LAN authority backend');
+      initializeTypescript(match);
     } else if (m.type === "visibility") {
       if (background && !m.hidden) foregroundPending = true;
       background = m.hidden === true;
-    } else if (m.type === "deployment" && engine) {
+    } else if (m.type === "deployment" && (engine ?? rustAuthority)) {
       const key=m.seat+":"+m.requestId, cached=deploymentReplies.get(key);
       if(cached){if(directIo)directIo.postMessage(cached);else send(cached);return;}
       const response:Record<string,unknown>={type:"deployment-result",seat:m.seat,requestId:m.requestId,ok:false};
       try{
-        const ship=controlled.get(m.seat), control=controls.get(m.seat);
+        const ship=controlled.get(m.seat)??rustAuthority?.controlled.get(m.seat), control=controls.get(m.seat);
         if(!running||!ship||!control?.online)throw Error("当前玩家不能部署。");
         if(!Array.isArray(m.ids)||m.ids.length>128||m.ids.some((id:unknown)=>typeof id!=="string"))throw Error("无效舰船名单。");
-        if(m.operation==='deploy')engine.deployment.deploy(m.ids,ship.teamId);
+        if(rustAuthority){
+          if(m.operation!=='deploy'&&m.operation!=='retreat'&&m.operation!=='withdraw')throw Error('未知舰队操作。');
+          if(m.operation!=='deploy'&&m.ids.some((id:string)=>[...rustAuthority!.controlled].some(([seat,other])=>seat!==m.seat&&other.stableId===id)))throw Error('不能替其他真人玩家下达撤退。');
+          const result=rustAuthority.deployment(m.seat,m.operation,m.ids);collectRustAudio();if(!result.accepted)throw Error(result.reason);
+        }else if(m.operation==='deploy')engine!.deployment.deploy(m.ids,ship.teamId);
         else if(m.operation==='retreat'||m.operation==='withdraw'){
           if(m.ids.some((id:string)=>[...controlled].some(([seat,other])=>seat!==m.seat&&other.id===id)))throw Error("不能替其他真人玩家下达撤退。");
-          engine.deployment.requestRetreat(m.ids,ship.teamId,m.operation==='withdraw');
+          engine!.deployment.requestRetreat(m.ids,ship.teamId,m.operation==='withdraw');
         } else throw Error("未知舰队操作。");
         response.ok=true;
       }catch(error){response.message=error instanceof Error?error.message:String(error);}
@@ -708,9 +736,9 @@ function handleMessage(m: any, afterStep = false) {
       if (m.tick === motionInFlight) motionInFlight = null;
     } else if (m.type === "snapshot-consumed") {
       acknowledgeSnapshot(m.tick, m.discardSounds === true);
-    } else if (m.type === "presence" && engine) {
+    } else if (m.type === "presence" && (engine ?? rustAuthority)) {
       const state = controls.get(m.seat),
-        ship = controlled.get(m.seat);
+        ship = controlled.get(m.seat)??rustAuthority?.controlled.get(m.seat);
       if (!state || !ship) return;
       // Sync requests still need a fresh snapshot, but only real disconnection
       // releases the ship to AI. Connected/syncing peers keep neutral manual input.
@@ -718,7 +746,7 @@ function handleMessage(m: any, afterStep = false) {
       if (state.online === online && state.connected === connected) return;
       state.connected = connected;
       state.online = online;
-      clearControls(state, ship);
+      clearSeat(m.seat,state);
     } else if (m.type === "input") {
       const state = controls.get(m.seat);
       if (!state || !state.online) return;
@@ -729,7 +757,7 @@ function handleMessage(m: any, afterStep = false) {
       state.input = input;
       state.received = performance.now();
       state.queued.push(...input.actions);
-    } else if (m.type === "start" && engine) {
+    } else if (m.type === "start" && (engine ?? rustAuthority)) {
       directLaunched = true;
       // Initial launch and host resync both need a newly simulated frame; the
       // preload tick-0 snapshot may never have been sent to the relay.
@@ -738,7 +766,7 @@ function handleMessage(m: any, afterStep = false) {
       ensureSnapshotEncoder();
       snapshotFlow.reset();
       last = lastCallbackFinishedAt = performance.now();
-      clockAt = last; clockTick = tick; clockCombat = engine.combatTime;
+      clockAt = last; clockTick = tick; clockCombat = (engine ?? rustAuthority)!.combatTime;
       accumulator = 0;
       timer = setInterval(() => { void step(); }, 4);
     } else if (m.type === "stop") {

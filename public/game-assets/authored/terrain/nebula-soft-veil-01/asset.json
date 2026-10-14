@@ -1,0 +1,58 @@
+{
+  "id": "soft-veil-01",
+  "image": "nebula.png",
+  "sourceRecord": {
+    "path": "authored/terrain/nebula-soft-veil-01/nebula.png",
+    "sha256": "f5756814e9dd0935ffcf4c597e8e997f15c494042ec64cf53203201e9115aa56",
+    "source": "built-in/image_gen:text-to-image",
+    "createdAt": "2026-10-01T03:30:52.439773+00:00",
+    "master": "output/imagegen/nebula-standalone-01-topdown-20261001/generated.png",
+    "masterSha256": "6e4eefb3ffb3195a667dc875b892a261fd5699562b5ec6929decf2803c1518f3",
+    "actualMaster": {
+      "format": "PNG",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA"
+    },
+    "prompt": "output/imagegen/nebula-standalone-01-topdown-20261001/prompt.txt",
+    "promptSha256": "8fd4c8b4db6c885c80c3ea6590623dc4d060333140e4c48a52299635841d53cc",
+    "referenceImagesSent": false,
+    "width": 1024,
+    "height": 1024,
+    "mode": "RGBA",
+    "atlasGrid": null,
+    "processing": "entire generated orthographic overhead image fitted in premultiplied alpha to 896x896 and centered in 1024x1024 with 64px transparent margins; no painted pixels, noise or reconstructed perspective",
+    "viewpoint": "orthographic top-down",
+    "review": "top-down art visually inspected; game verification recorded separately",
+    "previousSha256": "231c2e0b68db8cca3c267e787c6d6130fe486f0c31562b3d32387d221cb971bc",
+    "supersedes": {
+      "path": "authored/terrain/nebula-soft-veil-01/nebula.png",
+      "sha256": "231c2e0b68db8cca3c267e787c6d6130fe486f0c31562b3d32387d221cb971bc",
+      "source": "built-in/image_gen:text-to-image",
+      "createdAt": "2026-10-01T03:20:08.153216+00:00",
+      "master": "output/imagegen/nebula-standalone-01-20261001/generated.png",
+      "masterSha256": "cfa653b62426f168cdd052064ec500376ab082d673f9a15e74582a5da9918cd1",
+      "actualMaster": {
+        "format": "PNG",
+        "width": 1254,
+        "height": 1254,
+        "mode": "RGBA"
+      },
+      "prompt": "output/imagegen/nebula-standalone-01-20261001/prompt.txt",
+      "promptSha256": "5af2565ad193be0acd6ec755f699e23f02afa02d1d86af017e368f2ca3863317",
+      "referenceImagesSent": false,
+      "width": 1024,
+      "height": 1024,
+      "mode": "RGBA",
+      "atlasGrid": null,
+      "processing": "whole-image premultiplied-alpha fit to 896x896, centered in 1024x1024 with 64px transparent margins; no cuts, noise, original pixels or synthesized cloud shapes",
+      "review": "generated whole-cloud art visually inspected; runtime validation recorded separately"
+    }
+  },
+  "worldWidth": 2200,
+  "worldHeight": 2200,
+  "opacity": 0.24,
+  "rendering": "one whole-image sprite",
+  "runtimeDefinition": "src/engine/data/terrain/StandaloneNebulae.ts",
+  "viewpoint": "orthographic top-down"
+}

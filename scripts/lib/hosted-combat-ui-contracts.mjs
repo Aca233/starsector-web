@@ -5,7 +5,7 @@ import fs from 'node:fs';
 export async function checkHostedCombatUI(page) {
   await page.goto(new URL('/__multiteam_map_check.html',page.url()).href);
   await page.evaluate(async()=>{
-    await import('/src/index.css');await import('/src/ui/core/motion.css');await import('/src/ui/native-chrome.css');
+    await import('/src/index.css');await import('/src/ui/core/motion.css');await import('/src/ui/core/components.css');
     const React=(await import('/node_modules/.vite/deps/react.js')).default;
     const {createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js')).default;
     const {CombatView}=await import('/src/CombatView.tsx');
@@ -174,7 +174,7 @@ export async function checkHostedCombatUI(page) {
 export async function checkPersistentCombatUI(page) {
   const mount=async(checkStartup=false)=>{
     await page.evaluate(async checkStartup=>{
-      await import('/src/index.css');await import('/src/ui/core/motion.css');await import('/src/ui/native-chrome.css');
+      await import('/src/index.css');await import('/src/ui/core/motion.css');await import('/src/ui/core/components.css');
       const React=(await import('/node_modules/.vite/deps/react.js')).default;
       const {createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js')).default;
       const {CombatView}=await import('/src/CombatView.tsx');

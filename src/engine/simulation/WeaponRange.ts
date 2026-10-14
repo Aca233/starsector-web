@@ -9,7 +9,7 @@ interface RangeEntry {
   range: number; weaponType: WeaponSpec['weaponType']; mountSize: WeaponSpec['mountSize'];
   mountTypeOverride: WeaponSpec['mountTypeOverride']; isPointDefense: WeaponSpec['isPointDefense'];
   missileBody: boolean;
-  isBeam: WeaponSpec['isBeam']; rangefinderPD: boolean | undefined;
+  isBeam: WeaponSpec['isBeam']; aiHints: WeaponSpec['aiHints']; rangefinderPD: boolean | undefined;
   baseRange: number; percent: number; multiplier: number; flat: number;
   rangeThreshold: number; rangePastThresholdMultiplier: number;
   /** Only the neutral-runtime result is memoized; dynamic inputs stay live. */
@@ -43,29 +43,29 @@ function resolveWeaponRange(ship: ShipSpec, weapon: WeaponSpec, runtimeMultiplie
     cache = hasOnlyNativeRangeModifiers(ship) ? new WeakMap<WeaponSpec, RangeEntry>() : null;
     rangeCaches.set(ship, cache);
   }
-  // Mount specs remain mutable. Compare every weapon input read by the audited native
-  // range hooks (including in-place PD hint edits); never memoize arbitrary mod behavior.
-  const missileBody = !!weapon.isRocket || weapon.spawnType === 'MISSILE';
-  const rangefinderPD = weapon.aiHints ? weapon.aiHints.includes('PD') : weapon.isPointDefense;
   let entry = cache?.get(weapon);
   if (cache) {
-    if (!entry || entry.range !== weapon.range || entry.weaponType !== weapon.weaponType
-      || entry.mountSize !== weapon.mountSize || entry.mountTypeOverride !== weapon.mountTypeOverride
-      || entry.isPointDefense !== weapon.isPointDefense || entry.isBeam !== weapon.isBeam
-      || entry.missileBody !== missileBody || entry.rangefinderPD !== rangefinderPD) {
-      // Only native hooks over recursively immutable ship metadata reach here.
-      // Save invariant contributions, NOT the ECM/system/carrier inputs. Keep
-      // source hook order and the final floating-point expression unchanged.
-      const baseRange = weapon.range + hullModRangeBaseFlat(ship, weapon);
-      const percent = hullModRangePercent(ship, weapon);
-      const multiplier = hullModRangeMultiplier(ship, weapon);
-      const flat = hullModRangeFlat(ship, weapon);
-      const stats = hullModRangeThresholdStats(ship);
-      entry = { range: weapon.range, weaponType: weapon.weaponType,
-        mountSize: weapon.mountSize, mountTypeOverride: weapon.mountTypeOverride,
-        isPointDefense: weapon.isPointDefense, isBeam: weapon.isBeam, missileBody, rangefinderPD,
-        baseRange, percent, multiplier, flat, ...stats };
-      cache.set(weapon, entry);
+    if (!entry || !isImmutableMetadata(weapon)) {
+      const missileBody = !!weapon.isRocket || weapon.spawnType === 'MISSILE';
+      const hints = weapon.aiHints;
+      const rangefinderPD = entry && hints && entry.aiHints === hints && (isImmutableMetadata(hints) || Object.isFrozen(hints))
+        ? entry.rangefinderPD
+        : hints ? hints.includes('PD') : weapon.isPointDefense;
+      if (!entry || entry.range !== weapon.range || entry.weaponType !== weapon.weaponType
+        || entry.mountSize !== weapon.mountSize || entry.mountTypeOverride !== weapon.mountTypeOverride
+        || entry.isPointDefense !== weapon.isPointDefense || entry.isBeam !== weapon.isBeam
+        || entry.missileBody !== missileBody || entry.rangefinderPD !== rangefinderPD) {
+        const baseRange = weapon.range + hullModRangeBaseFlat(ship, weapon);
+        const percent = hullModRangePercent(ship, weapon);
+        const multiplier = hullModRangeMultiplier(ship, weapon);
+        const flat = hullModRangeFlat(ship, weapon);
+        const stats = hullModRangeThresholdStats(ship);
+        entry = { range: weapon.range, weaponType: weapon.weaponType,
+          mountSize: weapon.mountSize, mountTypeOverride: weapon.mountTypeOverride,
+          isPointDefense: weapon.isPointDefense, isBeam: weapon.isBeam, missileBody, aiHints: hints, rangefinderPD,
+          baseRange, percent, multiplier, flat, ...stats };
+        cache.set(weapon, entry);
+      }
     }
     if (!dynamic && entry.value !== undefined) return entry.value;
     const range = (entry.baseRange * (1 + (entry.percent + runtimePercent) / 100) * entry.multiplier * runtimeMultiplier

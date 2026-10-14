@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {"tsBuildInfoFile": "./node_modules/.tmp/tsconfig.combat.tsbuildinfo"},
+  "include": [],
+  "files": ["src/main.tsx", "src/network/host.worker.ts", "src/engine/runtime/local/local-combat.worker.ts", "src/network/globals.d.ts", "src/studio/catalog-data.d.ts", "src/studio/content-summary.d.ts"]
+}

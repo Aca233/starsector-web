@@ -1,10 +1,11 @@
 import { hasNativeAcquisitionWorld } from './FireControlQueryBatch';
-import { NumericAcquisitionFrame, nativeNumericQueryBinder, type NativeAcquisitionQueries } from './NumericAcquisitionFrame';
+import { NumericAcquisitionFrame, nativeNumericQueryBinder, isOwnData, type NativeAcquisitionQueries } from './NumericAcquisitionFrame';
 import { qualifiedFireTargets, type FireTargetQualification } from './QualifiedFireTargets';
 import type { FireControlQueryBatch, FireControlQueryRoster } from './FireControlQueryBatch';
 import type { CombatFireFrame } from './CombatFireFrame';
 import type { ShipStepBatch } from '../simulation/ShipStepBatch';
 import { isImmutableMetadata } from '../extensions/Immutable';
+import { hasOnlyNativeRangeModifiers } from '../extensions/HullMods';
 import type { InFlightFireBudget } from './InFlightFireBudget';
 import { fireTargetUtility } from './FireTargetUtility';
 import { shipPolicyAction } from './learning/CombatPolicy';
@@ -23,11 +24,27 @@ import type { Asteroid } from '../simulation/CombatTypes';
 import { interceptTimeComponents, shipSegmentEntry, weaponMuzzle } from './FireControlGeometry';
 import type { FireMemory } from './batch/FireProgram';
 
+let workerOwnedAimQueries = false;
+/** Acquisition-local only, enabled by the private local data-command Worker. */
+export function enableWorkerOwnedAimQueries(): void { workerOwnedAimQueries = true; }
+
 let workerOwnedPreAimRange = false;
 /** Enable only after constructing a private data-command Worker engine. */
 export function enableWorkerOwnedPreAimRange(): void { workerOwnedPreAimRange = true; }
 
 const ADAPTIVE_FIRE_BUDGET = import.meta.env?.VITE_AI_FIRE_BUDGET_ADAPTIVE !== 'false';
+const decideMuzzleScratch = new Vector2();
+let sampledSolutionScratch: AimSolution | undefined;
+function setFireControl(mount: WeaponMount, reason: FireDecision, targetId?: string | number, targetKind?: 'SHIP' | 'MISSILE'): void {
+  const fc = mount.fireControl;
+  if (fc && !Object.isFrozen(fc)) {
+    fc.targetId = targetId;
+    fc.targetKind = targetKind;
+    fc.reason = reason;
+  } else {
+    mount.fireControl = { targetId, targetKind, reason };
+  }
+}
 
 /** One world view per combat step; no renderer/UI or single-opponent dependency. */
 export interface FireControlWorld {
@@ -81,8 +98,57 @@ export interface Tracker extends FireMemory {
 interface Contact { time: number; distance: number }
 export type FireDecision = 'FIRE' | 'NO_TARGET' | 'ALIGNING' | 'FRIENDLY_BLOCKED' | 'OBSTACLE_BLOCKED' | 'CONSERVING_AMMO' | 'FLUX_BUDGET' | 'UNAVAILABLE' | 'DEFENSIVE_HOLD' | 'REASSIGNING';
 
-const hint = (mount: WeaponMount, name: string) => mount.spec.aiHints?.includes(name) ?? false;
-export const isPointDefense = (mount: WeaponMount) => !!mount.spec.isPointDefense || hint(mount, 'PD') || hint(mount, 'PD_ONLY');
+const autofireHintCache = new WeakMap<readonly string[], number>();
+function getAutofireHintMask(hints: readonly string[]): number {
+  let mask = autofireHintCache.get(hints);
+  if (mask !== undefined) return mask;
+  mask = 0;
+  for (let i = 0; i < hints.length; i++) {
+    switch (hints[i]) {
+      case 'PD': mask |= 1; break;
+      case 'PD_ONLY': mask |= 2; break;
+      case 'PD_ALSO': mask |= 4; break;
+      case 'ANTI_FTR': mask |= 8; break;
+      case 'STRIKE': mask |= 16; break;
+      case 'DO_NOT_AIM': mask |= 32; break;
+      case 'GUIDED_POOR': mask |= 64; break;
+      case 'USE_VS_FRIGATES': mask |= 128; break;
+      case 'IGNORES_FLARES': mask |= 256; break;
+      case 'USE_LESS_VS_SHIELDS': mask |= 512; break;
+      case 'DO_NOT_CONSERVE': mask |= 1024; break;
+    }
+  }
+  autofireHintCache.set(hints, mask);
+  return mask;
+}
+function hintBit(name: string): number {
+  switch (name) {
+    case 'PD': return 1;
+    case 'PD_ONLY': return 2;
+    case 'PD_ALSO': return 4;
+    case 'ANTI_FTR': return 8;
+    case 'STRIKE': return 16;
+    case 'DO_NOT_AIM': return 32;
+    case 'GUIDED_POOR': return 64;
+    case 'USE_VS_FRIGATES': return 128;
+    case 'IGNORES_FLARES': return 256;
+    case 'USE_LESS_VS_SHIELDS': return 512;
+    case 'DO_NOT_CONSERVE': return 1024;
+    default: return 0;
+  }
+}
+const hint = (mount: WeaponMount, name: string): boolean => {
+  const hints = mount.spec.aiHints;
+  if (!hints) return false;
+  const bit = isImmutableMetadata(hints) ? hintBit(name) : 0;
+  return bit ? (getAutofireHintMask(hints) & bit) !== 0 : hints.includes(name);
+};
+export const isPointDefense = (mount: WeaponMount): boolean => {
+  if (mount.spec.isPointDefense) return true;
+  const hints = mount.spec.aiHints;
+  if (!hints) return false;
+  return isImmutableMetadata(hints) ? (getAutofireHintMask(hints) & 3) !== 0 : (hints.includes('PD') || hints.includes('PD_ONLY'));
+};
 const guided = (mount: WeaponMount) => !!mount.spec.isGuided;
 const fighter = (ship: Ship) => ship.spec.hullSize === 'FIGHTER';
 const sameTarget = (a: FireControlTarget | undefined, b: FireControlTarget | undefined) => a?.kind === b?.kind && a?.entity.id === b?.entity.id;
@@ -132,6 +198,22 @@ function canTarget(ship: Ship, mount: WeaponMount, target: FireControlTarget, wo
   return true;
 }
 
+/** Closed-Worker plain fields plus existing pure stat identities, not fleet-wide
+ * AI admission. A target can dispatch phase/parent/auxiliary callbacks during
+ * canTarget; unknown readers must invalidate BEFORE even a rejected candidate. */
+function hasPureAimTargetReads(ship: Ship): boolean {
+  if (!ship.hasNativePreAimRangeReads() || !ship.system.hasNativeAimQueryStats
+    || !ship.defenseSystem.hasNativeAimQueryStats) return false;
+  for (let i = 1; i < ship.systems.length; i++) {
+    if (!ship.systems[i].hasNativeAimQueryStats) return false;
+  }
+  return true;
+}
+function hasPureAimSourceReads(ship: Ship): boolean {
+  return hasPureAimTargetReads(ship) && hasOnlyNativeRangeModifiers(ship.spec)
+    && (!ship.sourceCarrier || isImmutableMetadata(ship.sourceCarrier.spec) && hasOnlyNativeRangeModifiers(ship.sourceCarrier.spec));
+}
+
 /** Disabled/generic paths do not pay native admission. Accepted frames are phase-local;
  * blocker loops cannot invoke custom readers after this native-only check. */
 const nativeFireQueries=new WeakMap<FireControlWorld,{ship:Ship;frame:CombatFireFrame;source:readonly Ship[];batch:FireControlQueryBatch;budget:InFlightFireBudget|undefined;queries?:NativeAcquisitionQueries}>();
@@ -139,23 +221,22 @@ const nativeFireQueries=new WeakMap<FireControlWorld,{ship:Ship;frame:CombatFire
  * Certify the actual restricted world once, not for every mount/contact. This
  * is neither serialized permission nor certification of generic/custom callers. */
 export function bindNativeFireQueries(ship:Ship,world:FireControlWorld):(()=>void)|undefined {
-  const fd=Object.getOwnPropertyDescriptor(world,'fireFrame'),bd=Object.getOwnPropertyDescriptor(world,'queryBatch'),sd=Object.getOwnPropertyDescriptor(world,'ships');
-  if(!fd||!bd||!sd||!('value'in fd)||!('value'in bd)||!('value'in sd))return;
-  const frame=fd.value as CombatFireFrame,batch=bd.value as FireControlQueryBatch,numeric=Object.getOwnPropertyDescriptor(frame??{},'numeric')?.value;
+  if(!isOwnData(world,'fireFrame')||!isOwnData(world,'queryBatch')||!isOwnData(world,'ships'))return;
+  const frame=world.fireFrame,batch=world.queryBatch,ships=world.ships;
+  const numeric=frame&&isOwnData(frame,'numeric')?frame.numeric:undefined;
   // Generic custom getters/fake numerics are not invoked during admission.
   if(!(numeric instanceof NumericAcquisitionFrame)||Object.getPrototypeOf(numeric)!==NumericAcquisitionFrame.prototype||Object.hasOwn(numeric,'hasSealedScope')
     ||Object.hasOwn(numeric,'bindQueries')||NumericAcquisitionFrame.prototype.bindQueries!==nativeNumericQueryBinder
-    ||!numeric.hasSealedScope(sd.value)||!batch||!hasNativeAcquisitionWorld(world,ship))return;
-  nativeFireQueries.set(world,{ship,frame,source:sd.value,batch,budget:world.fireBudget,queries:numeric.bindQueries(ship,sd.value)});
+    ||!numeric.hasSealedScope(ships)||!batch||!hasNativeAcquisitionWorld(world,ship))return;
+  nativeFireQueries.set(world,{ship,frame:frame!,source:ships,batch,budget:world.fireBudget,queries:numeric.bindQueries(ship,ships)});
   return ()=>nativeFireQueries.delete(world);
 }
 function nativeAcquisitionFrame(world:FireControlWorld,ship:Ship):CombatFireFrame|undefined {
   const bound=nativeFireQueries.get(world);
   if(bound&&bound.ship===ship&&world.ships===bound.source&&world.fireFrame===bound.frame&&world.queryBatch===bound.batch
     &&world.fireBudget===bound.budget&&bound.frame.numeric?.hasSealedScope(bound.source)&&bound.batch.forShip(ship,bound.source))return bound.frame;
-  const descriptor=Object.getOwnPropertyDescriptor(world,'fireFrame');
-  const frame=descriptor&&'value'in descriptor?descriptor.value as CombatFireFrame|undefined:undefined;
-  return Object.getOwnPropertyDescriptor(frame??{},'numeric')?.value&&hasNativeAcquisitionWorld(world,ship)?frame:undefined;
+  const frame=isOwnData(world,'fireFrame')?world.fireFrame:undefined;
+  return frame&&isOwnData(frame,'numeric')&&frame.numeric&&hasNativeAcquisitionWorld(world,ship)?frame:undefined;
 }
 function boundAcquisitionQueries(world:FireControlWorld,ship:Ship):NativeAcquisitionQueries|undefined {
   const b=nativeFireQueries.get(world);
@@ -264,13 +345,13 @@ function traceTarget(ship: Ship, mount: WeaponMount, solution: AimSolution, orig
  * Guided turning, future rotation, scatter and splash are deliberately not claimed exact. */
 export function shotObstruction(ship: Ship, mount: WeaponMount, solution: AimSolution, world: FireControlWorld,
   origin: Vector2, angle: number, contact: Contact, frame?:CombatFireFrame): 'FRIENDLY_BLOCKED' | 'OBSTACLE_BLOCKED' | null {
-  const travel = Vector2.fromAngle(angle, contact.distance);
+  const tx = Math.cos(angle) * contact.distance, ty = Math.sin(angle) * contact.distance;
   const numeric=(frame??nativeAcquisitionFrame(world,ship))?.numeric;
   let start:Vector2|undefined,end:Vector2|undefined;
   const batch = world.queryBatch?.forShip(ship, world.ships);
-  const fused=boundAcquisitionQueries(world,ship)?.blocks(ship,mount,origin.x,origin.y,travel.x,travel.y,solution.delay,contact.time);
+  const fused=boundAcquisitionQueries(world,ship)?.blocks(ship,mount,origin.x,origin.y,tx,ty,solution.delay,contact.time);
   if(fused===true)return 'FRIENDLY_BLOCKED';
-  for (const other of fused===false?[]:batch?.queryBlockers(origin, travel, solution.delay, contact.time) ?? world.ships) {
+  for (const other of fused===false?[]:batch?.queryBlockers(origin, new Vector2(tx, ty), solution.delay, contact.time) ?? world.ships) {
     if (!batch) {
       if (other === ship || other.isDead || other.isPhased || !sameTeam(other, ship)) continue;
       if (other.assemblyRoot === ship.assemblyRoot && !other.spec.sourceHullTraits?.includes('do_not_fire_through')) continue;
@@ -278,19 +359,29 @@ export function shotObstruction(ship: Ship, mount: WeaponMount, solution: AimSol
     if (fighter(other) && mount.spec.passThroughFighters && !mount.spec.passThroughFightersOnlyWhenDestroyed) continue;
     const vx = ship.vel.x - other.vel.x, vy = ship.vel.y - other.vel.y;
     const sx=origin.x+vx*solution.delay,sy=origin.y+vy*solution.delay;
-    const ex=sx+travel.x+vx*contact.time,ey=sy+travel.y+vy*contact.time;
+    const ex=sx+tx+vx*contact.time,ey=sy+ty+vy*contact.time;
     const numerical=numeric?.segment(other,sx,sy,ex,ey,!!other.shield.voidShield);
     if(numerical!==undefined) {if(numerical!==null)return 'FRIENDLY_BLOCKED';continue;}
     start??=new Vector2();end??=new Vector2();start.set(sx,sy);end.set(ex,ey);
     if(shipSegmentEntry(other,start,end,!!other.shield.voidShield)!==null)return 'FRIENDLY_BLOCKED';
   }
-  for (const asteroid of world.asteroids) {
+  const asteroids = world.asteroids, projRadius = mount.spec.projRadius;
+  const shipVx = ship.vel.x, shipVy = ship.vel.y, ox = origin.x, oy = origin.y, delay = solution.delay, cTime = contact.time;
+  for (let i = 0; i < asteroids.length; i++) {
+    const asteroid = asteroids[i];
     if (asteroid.hp <= 0) continue;
-    const vx = ship.vel.x - asteroid.vel.x, vy = ship.vel.y - asteroid.vel.y;
-    start??=new Vector2();end??=new Vector2();
-    start.set(origin.x + vx * solution.delay, origin.y + vy * solution.delay);
-    end.set(start.x + travel.x + vx * contact.time, start.y + travel.y + vy * contact.time);
-    if (segmentCircleEntry(start, end, asteroid.pos, asteroid.radius + mount.spec.projRadius) !== null) return 'OBSTACLE_BLOCKED';
+    const vx = shipVx - asteroid.vel.x, vy = shipVy - asteroid.vel.y;
+    const sx = ox + vx * delay, sy = oy + vy * delay;
+    const ex = sx + tx + vx * cTime, ey = sy + ty + vy * cTime;
+    const cx = asteroid.pos.x, cy = asteroid.pos.y, rad = asteroid.radius + projRadius;
+    const fx = sx - cx, fy = sy - cy, c = fx * fx + fy * fy - rad * rad;
+    if (c <= 0) return 'OBSTACLE_BLOCKED';
+    const dx = ex - sx, dy = ey - sy, a = dx * dx + dy * dy;
+    if (a <= 1e-12) continue;
+    const b = 2 * (fx * dx + fy * dy), disc = b * b - 4 * a * c;
+    if (disc < 0) continue;
+    const t = (-b - Math.sqrt(disc)) / (2 * a);
+    if (t >= 0 && t <= 1) return 'OBSTACLE_BLOCKED';
   }
   return null;
 }
@@ -412,7 +503,7 @@ export class AutofireController {
     const target = previous.intent?.target;
     mount.fireControlTargetShipId = target?.kind === 'SHIP' ? target.entity.id : undefined;
     mount.fireControlTargetProjectileId = target?.kind === 'MISSILE' ? target.entity.id : undefined;
-    mount.fireControl = { targetId: target?.entity.id, targetKind: target?.kind, reason: target ? 'ALIGNING' : 'NO_TARGET' };
+    setFireControl(mount, target ? 'ALIGNING' : 'NO_TARGET', target?.entity.id, target?.kind);
     return previous;
   }
 
@@ -479,7 +570,7 @@ export class AutofireController {
     const target = previous.intent?.target;
     mount.fireControlTargetShipId = target?.kind === 'SHIP' ? target.entity.id : undefined;
     mount.fireControlTargetProjectileId = target?.kind === 'MISSILE' ? target.entity.id : undefined;
-    mount.fireControl = { targetId: target?.entity.id, targetKind: target?.kind, reason: target ? 'ALIGNING' : 'NO_TARGET' };
+    setFireControl(mount, target ? 'ALIGNING' : 'NO_TARGET', target?.entity.id, target?.kind);
     return previous;
   }
 
@@ -489,23 +580,30 @@ export class AutofireController {
     this.legacyCalls.decideSampled++;
     if (!intent || !canTarget(ship, mount, intent.target, world)) {
       mount.fireControlTargetShipId = mount.fireControlTargetProjectileId = undefined;
-      mount.fireControl = { reason: 'NO_TARGET' };
+      setFireControl(mount, 'NO_TARGET');
       return this.decide(ship, mount, null, world, dt);
     }
     // Defense in depth if a caller invokes this outside the eligible native loop.
     if (guided(mount) || mount.spec.isRocket || mount.spec.weaponType === 'MISSILE' || mount.spec.spawnType === 'MISSILE') {
       mount.fireControl = { reason: 'UNAVAILABLE' }; return 'UNAVAILABLE';
     }
-    const query = prepareAimQuery(ship, mount, world.queryBatch?.forShip(ship, world.ships)?.sourceModifiers(), world.fireFrame,!!nativeAcquisitionFrame(world,ship),boundAcquisitionQueries(world,ship));
-    if (![query.range, query.speed, query.delay, mount.currentAngleRad, mount.baseAngleDeg, mount.arcDeg].every(Number.isFinite)
-      || query.range < 0 || query.speed < 0 || (!mount.spec.isBeam && query.speed === 0) || query.delay < 0) {
+    const modifiers = world.queryBatch?.forShip(ship, world.ships)?.sourceModifiers();
+    const delay = mount.firingState === 'CHARGING' ? Math.max(0, mount.firingStateTimer)
+      : mount.firingState === 'IDLE' && mount.burstRemaining <= 0 ? (mount.spec.isBeam ? mount.spec.beamSourceChargeupTime ?? 0 : mount.spec.chargeTime ?? 0) : 0;
+    const speed = guided(mount) ? mount.spec.maxSpeed ?? mount.spec.projSpeed : combatProjectileSpeed(ship, mount.spec, modifiers);
+    const range = combatWeaponRange(ship, mount.spec, modifiers);
+    if (!(Number.isFinite(range) && Number.isFinite(speed) && Number.isFinite(delay)
+      && Number.isFinite(mount.currentAngleRad) && Number.isFinite(mount.baseAngleDeg) && Number.isFinite(mount.arcDeg))
+      || range < 0 || speed < 0 || (!mount.spec.isBeam && speed === 0) || delay < 0) {
       mount.fireControl = { reason: 'UNAVAILABLE' }; return 'UNAVAILABLE';
     }
     const base = ship.facingRad + mount.baseAngleDeg * Math.PI / 180;
     if (mount.arcDeg < 360 && Math.abs(signedAngle(mount.currentAngleRad - base)) > mount.arcDeg * Math.PI / 360 + 1e-9) {
-      mount.fireControl = { reason: 'ALIGNING' }; return 'ALIGNING';
+      setFireControl(mount, 'ALIGNING', mount.fireControl?.targetId, mount.fireControl?.targetKind); return 'ALIGNING';
     }
-    const solution: AimSolution = { ...intent, delay: query.delay, speed: query.speed, range: query.range };
+    const solution: AimSolution = world.queryBatch?.stageObservation
+      ? (sampledSolutionScratch ? (sampledSolutionScratch.target = intent.target, sampledSolutionScratch.point = intent.point, sampledSolutionScratch.delay = delay, sampledSolutionScratch.speed = speed, sampledSolutionScratch.range = range, sampledSolutionScratch) : (sampledSolutionScratch = { target: intent.target, point: intent.point, delay, speed, range }))
+      : { target: intent.target, point: intent.point, delay, speed, range };
     return this.decide(ship, mount, solution, world, dt, true);
   }
 
@@ -575,18 +673,34 @@ export class AutofireController {
     const previousTarget = state.target;
     // Unknown callbacks keep their original per-target stat reads.
     let prepared: AimQuery | undefined;
+    let ownedSourceReads: boolean | undefined;
     const batch = world.queryBatch?.forShip(ship, world.ships);
     const nativeBatch = world.queryBatch?.stageObservation || world.ships.length >= 20 && ship.hasNativeThreatPhaseHooks;
-    const query = () => prepared ??= prepareAimQuery(ship, mount, batch?.sourceModifiers(), world.fireFrame,!!nativeAcquisitionFrame(world,ship),boundAcquisitionQueries(world,ship));
-    const solve = (target: FireControlTarget) => solveWeaponAim(ship, mount, target,
-      nativeBatch ? query() : undefined);
-    let current = state.target && canTarget(ship, mount, state.target, world) ? solve(state.target) : null;
+    const query = () => prepared ??= prepareAimQuery(ship, mount, batch?.sourceModifiers(), world.fireFrame, !!nativeAcquisitionFrame(world, ship), boundAcquisitionQueries(world, ship));
+    const ownedQueries = !nativeBatch && workerOwnedAimQueries && world.ships.length >= 20;
+    const acquire = (target: FireControlTarget, knownPresent = false, qualification?: FireTargetQualification): AimSolution | null => {
+      let borrow = false;
+      if (ownedQueries) {
+        if (target.kind === 'SHIP' && !hasPureAimTargetReads(target.entity)) {
+          // Even a rejected unknown target may mutate the shooter, its system,
+          // mount or a later candidate. Do not carry an old query through it.
+          prepared = undefined; ownedSourceReads = undefined;
+        } else borrow = ownedSourceReads ??= hasPureAimSourceReads(ship);
+      }
+      if (!canTarget(ship, mount, target, world, knownPresent, qualification)) return null;
+      if (nativeBatch) return solveWeaponAim(ship, mount, target, query());
+      // Reuse only preparation, NOT the native acquisition coarse predicate.
+      // All candidates retain the exact original interception/arc/trace math.
+      return borrow ? solveAcquiredWeaponAim(ship, mount, target, prepared ??= prepareAimQuery(ship, mount))
+        : solveWeaponAim(ship, mount, target);
+    };
+    let current = state.target ? acquire(state.target) : null;
     if (!current && state.target) { state.target = undefined; state.scanIn = 0; }
+    let muzzleOrigin: Vector2 | undefined;
     if ((acquisition ? state.scanIn <= 1e-9 : state.scanIn <= 0) && (!acquisition || acquisition.remaining <= 1e-9)) {
       const candidates: AimSolution[] = [];
       const add = (target: FireControlTarget, qualification?: FireTargetQualification): boolean => {
-        if (!canTarget(ship, mount, target, world, true, qualification)) return false;
-        const solution = solve(target);
+        const solution = acquire(target, true, qualification);
         if (!solution) return false;
         candidates.push(solution);
         return true;
@@ -595,10 +709,10 @@ export class AutofireController {
       // Refit specs and the live PD flag remain mutable. Read the flag and hints
       // in the original short-circuit order, even if a callback replaces a spec
       // or installs an accessor during this scan; never cache across scans.
-      const scanSpec = nativeBatch && world.missiles.length > 1
-        ? Object.getOwnPropertyDescriptor(mount, 'spec')?.value as WeaponSpec | undefined : undefined;
-      const scanHints = scanSpec
-        ? Object.getOwnPropertyDescriptor(scanSpec, 'aiHints')?.value as string[] | undefined : undefined;
+      const scanSpec = nativeBatch && world.missiles.length > 1 && isOwnData(mount, 'spec')
+        ? mount.spec : undefined;
+      const scanHints = scanSpec && isOwnData(scanSpec, 'aiHints')
+        ? scanSpec.aiHints : undefined;
       const trustedHints = scanHints && isImmutableMetadata(scanHints) ? scanHints : undefined;
       const hasPD = trustedHints?.includes('PD') ?? false;
       const hasPDOnly = trustedHints?.includes('PD_ONLY') ?? false;
@@ -636,7 +750,7 @@ export class AutofireController {
         else shipTarget = { kind: 'SHIP', entity: other };
         if (add(shipTarget, qualification)) shipTarget = undefined;
       }
-      const origin = weaponMuzzle(ship, mount);
+      const origin = muzzleOrigin = (nativeBatch && prepared) ? prepared.origin : weaponMuzzle(ship, mount);
       const autonomous = ship.fireControlMode === 'AI';
       const policyAction = shipPolicyAction(ship);
       const priority = (s: AimSolution): number => {
@@ -662,7 +776,7 @@ export class AutofireController {
         && world.fireBudget?.canOmitUncontestedPenalty === true;
       const rank = (s: AimSolution) => {
         const retained = sameTarget(state.target, s.target);
-        const traverse = Math.abs(signedAngle(s.point.clone().sub(origin).heading() - mount.currentAngleRad));
+        const traverse = Math.abs(signedAngle(Math.atan2(s.point.y - origin.y, s.point.x - origin.x) - mount.currentAngleRad));
         const arrival = s.delay + (mount.spec.isBeam ? 0 : origin.distanceTo(s.point) / Math.max(1, s.speed));
         const scoreBudget = !omitBudget && autonomous && !isPointDefense(mount) && s.target.kind === 'SHIP'
           && (!ADAPTIVE_FIRE_BUDGET || !world.fireBudget || typeof world.fireBudget.needsDetailedPenalty !== 'function' || world.fireBudget.needsDetailedPenalty(ship, s.target.entity));
@@ -687,7 +801,7 @@ export class AutofireController {
       current = ranked[0]?.solution ?? null;
       for (const candidate of ranked) {
         const solution = candidate.solution;
-        const angle = solution.point.clone().sub(origin).heading();
+        const angle = Math.atan2(solution.point.y - origin.y, solution.point.x - origin.x);
         const contact = guided(mount) ? { time: origin.distanceTo(solution.point) / Math.max(1, solution.speed), distance: origin.distanceTo(solution.point) }
           : traceTarget(ship, mount, solution, origin, angle,nativeAcquisitionFrame(world,ship));
         if (contact && !shotObstruction(ship, mount, solution, world, origin, angle, contact)) { current = solution; break; }
@@ -703,32 +817,36 @@ export class AutofireController {
     if (!sameTarget(previousTarget, current?.target)) { state.firingTime = 0; state.idleFireTime = 0; }
     if (current && !mount.spec.isBeam && !guided(mount)) {
       const point = nativeAutofireAim(ship, mount, current, state.firingTime);
-      const origin = weaponMuzzle(ship, mount);
+      const origin = muzzleOrigin ?? ((nativeBatch && prepared) ? prepared.origin : weaponMuzzle(ship, mount));
       // Native approximate lead can miss the entire swept hull even at perfect traverse.
       // Our strict bore gate would then wait forever (accuracy only grew AFTER firing).
       // Keep native aim when viable; otherwise track the already-solved intercept.
-      if (traceTarget(ship, mount, current, origin, point.clone().sub(origin).heading(),nativeAcquisitionFrame(world,ship))) {
+      if (traceTarget(ship, mount, current, origin, Math.atan2(point.y - origin.y, point.x - origin.x),nativeAcquisitionFrame(world,ship))) {
         current = { ...current, point };
       }
     }
     mount.fireControlTargetShipId = current?.target.kind === 'SHIP' ? current.target.entity.id : undefined;
     mount.fireControlTargetProjectileId = current?.target.kind === 'MISSILE' ? current.target.entity.id : undefined;
-    mount.fireControl = { targetId: current?.target.entity.id, targetKind: current?.target.kind, reason: current ? 'ALIGNING' : 'NO_TARGET' };
+    setFireControl(mount, current ? 'ALIGNING' : 'NO_TARGET', current?.target.entity.id, current?.target.kind);
     return current;
   }
 
   public decide(ship: Ship, mount: WeaponMount, solution: AimSolution | null, world: FireControlWorld, dt: number, enforceFlightLifetime = false): FireDecision {
     this.legacyCalls.decide++;
-    const done = (reason: FireDecision) => { mount.fireControl = { ...mount.fireControl, reason }; return reason; };
+    const done = (reason: FireDecision): FireDecision => {
+      if (mount.fireControl && !Object.isFrozen(mount.fireControl)) mount.fireControl.reason = reason;
+      else mount.fireControl = { ...mount.fireControl, reason };
+      return reason;
+    };
     if (ship.system.autofirePolicy(mount)?.suspended) return done('REASSIGNING');
     if (!solution) return done('NO_TARGET');
     const frame=nativeAcquisitionFrame(world,ship);
     if (mount.isDisabled || ship.isDead || (frame?.numeric?.phaseStatus(ship)??ship.isPhased) || ship.flux.isOverloaded || ship.flux.isVenting || !ship.system.canFireWeapon(mount)) return done('UNAVAILABLE');
-    const origin = weaponMuzzle(ship, mount);
+    const origin = frame ? weaponMuzzle(ship, mount, decideMuzzleScratch) : weaponMuzzle(ship, mount);
     const angle = mount.currentAngleRad;
     let contact: Contact | null;
     if (guided(mount)) {
-      const error = Math.abs(signedAngle(solution.point.clone().sub(origin).heading() - angle));
+      const error = Math.abs(signedAngle(Math.atan2(solution.point.y - origin.y, solution.point.x - origin.x) - angle));
       const freeLaunch = mount.spec.alwaysFire || hint(mount, 'DO_NOT_AIM') || hint(mount, 'GUIDED_POOR');
       const tolerance = Math.asin(Math.min(1, targetRadius(solution.target) / Math.max(1, origin.distanceTo(solution.point))));
       if (!freeLaunch && error > tolerance) return done('ALIGNING');

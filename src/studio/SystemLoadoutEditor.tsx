@@ -1,3 +1,5 @@
+import { Picker } from '../ui/core/Picker';
+import { SearchInput } from '../ui/core/ListControls';
 import { SystemIcon } from '../ui/SystemIcon';
 import { useId, useRef, useState } from 'react';
 import { NativeButton } from '../ui/NativeChrome';
@@ -140,15 +142,15 @@ export function SystemLoadoutEditor({ draft, spec, disabled, onChange }: { draft
           </section>
           <section className="system-library" aria-label="技能库">
             <header className="system-pane-heading"><h3><NativeBitmapText font="body">可用技能</NativeBitmapText></h3><span>{results.length} / {skills.length}</span></header>
-            <div className="system-search"><input ref={searchRef} aria-label="搜索舰船技能" placeholder="搜索名称或 ID" value={filter} onChange={e => setFilter(e.target.value)}/>{filter && <button type="button" aria-label="清除技能搜索" onClick={() => setFilter('')}>×</button>}</div>
+            <div className="system-search"><SearchInput ref={searchRef} aria-label="搜索舰船技能" placeholder="搜索名称或 ID" value={filter} onChange={e => setFilter(e.target.value)}/>{filter && <button type="button" aria-label="清除技能搜索" onClick={() => setFilter('')}>×</button>}</div>
             <div className="system-library-filters" aria-label="技能筛选">{([['compatible', '可装配'], ['all', '全部'], ['equipped', '已装配']] as const).map(([value, label]) => <NativeButton font="body" key={value} aria-pressed={scope === value} onClick={() => setScope(value)}>{label}</NativeButton>)}</div>
-            <div className="system-library-list">{results.map(definition => {
+            <Picker className="system-library-list" aria-label="可用技能">{results.map(definition => {
               const installed = ids.includes(definition.id) || defenseId === definition.id, requirement = reasonFor(definition);
-              return <button type="button" key={definition.id} className="system-library-item" data-system-id={definition.id} aria-label={`查看技能：${definition.name}`} aria-pressed={selectedId === definition.id} onClick={() => setSelectedId(definition.id)}>
+              return <button type="button" key={definition.id} className="system-library-item" data-picker-item data-system-id={definition.id} aria-label={`查看技能：${definition.name}`} aria-pressed={selectedId === definition.id} onClick={() => setSelectedId(definition.id)}>
                 <span className={`system-fit-icon ${installed ? 'is-installed' : requirement ? 'is-locked' : ''}`}>{installed ? '●' : requirement ? '×' : '·'}</span>
                 <span><strong><SystemIcon systemId={definition.id} /><NativeBitmapText font="body">{definition.name}</NativeBitmapText></strong><small>{installed ? defenseId === definition.id ? '已装配 · 右键' : '已装配 · 技能槽' : requirement ? '需要配套设备' : duration(definition)}</small></span><span className="system-row-arrow" aria-hidden="true">›</span>
               </button>;
-            })}{!results.length && <div className="system-library-empty"><p>没有匹配的技能</p><button type="button" className="system-reset" onClick={() => { setFilter(''); setScope('all'); }}>清除筛选，查看全部</button></div>}</div>
+            })}{!results.length && <div className="system-library-empty"><p>没有匹配的技能</p><button type="button" className="system-reset" onClick={() => { setFilter(''); setScope('all'); }}>清除筛选，查看全部</button></div>}</Picker>
           </section>
           <section className="system-detail" aria-label="技能详情">
             {selection ? <>

@@ -16,7 +16,7 @@ import type { Match, Seat, Team } from "./protocol";
 /** One roster path for every arrangement. Seat/host ownership is independent of team. */
 export function createLanWorld(match: Match) {
   if (!validAIDecisionProfile(match.options.aiDecisionProfile)) throw Error('未知 AI 决策规则');
-  const players = match.players.map(player => ({...player, hull: player.design ? registerLanDesign(player.design, player.seat) : player.hull}));
+  const players = match.players.map(player => ({...player, hull: registerLanDesign(player.design ?? createDesign(player.hull), player.seat)}));
   // Compile each actual loadout once; equal hulls with different equipment must never share a spec.
   const aiTemplates = new Map<string,string>();
   const aiHull = (hull: string) => {

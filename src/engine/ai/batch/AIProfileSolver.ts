@@ -5,15 +5,23 @@ import { fleetPolicy, type FleetAssignment } from '../FleetTactics';
 import { policyAction, POLICY_ACTIONS, POLICY_TUNING, validateCombatPolicy } from '../learning/CombatPolicy';
 import bundledPolicy from '../learning/combat-policy.json';
 import { BodyFlag as B, WeaponFlag as W } from './StageProtocol';
-import { clamp, length, visible, type AIStageView } from './AIInputs';
+import { assertAIStage, clamp, length, visible, type AIStageView } from './AIInputs';
 import { aiDomainWork } from './AIWork';
 
 export function batteryRows(v:AIStageView,r:number,sustained=true):number[] {
-  const b=v.bodies,w=v.weapons,available:number[]=[];
-  for(let m=b.weaponFirst[r],end=m+b.weaponCount[r];m<end;m++)if(!w.disabled[m]&&w.ammo[m]>=1&&w.dps[m]>0)available.push(m);
-  const offense=available.filter(m=>!(w.flags[m]&W.PD));
-  const steady=sustained?offense.filter(m=>!(w.flags[m]&W.MISSILE)&&!(w.hintMask[m]&8)):[];
-  return steady.length?steady:offense.length?offense:available;
+  const b=v.bodies,w=v.weapons,start=b.weaponFirst[r],end=start+b.weaponCount[r];
+  let hasOffense=false,hasSteady=false;
+  for(let m=start;m<end;m++)if(!w.disabled[m]&&w.ammo[m]>=1&&w.dps[m]>0&&!(w.flags[m]&W.PD)){
+    hasOffense=true;if(sustained&&!(w.flags[m]&W.MISSILE)&&!(w.hintMask[m]&8)){hasSteady=true;break;}
+  }
+  const rows:number[]=[];
+  for(let m=start;m<end;m++){
+    if(w.disabled[m]||!(w.ammo[m]>=1)||!(w.dps[m]>0))continue;
+    if(hasOffense&&(w.flags[m]&W.PD))continue;
+    if(hasSteady&&((w.flags[m]&W.MISSILE)||(w.hintMask[m]&8)))continue;
+    rows.push(m);
+  }
+  return rows;
 }
 export function attackOpportunity(v:AIStageView,r:number,t:number,pressure=1):boolean {
   const b=v.bodies;
@@ -25,7 +33,7 @@ function learningRange(v:AIStageView,r:number,t:number):number {
   const b=v.bodies,a=v.ai,override=a.trainingAction[r];
   if(b.flags[r]&B.MANUAL)return 1;
   if(override>=0)return POLICY_TUNING[POLICY_ACTIONS[override]??'BALANCED'].range;
-  if(!validateCombatPolicy(bundledPolicy)||!bundledPolicy.enabled)return 1;
+  if(!bundledPolicy.enabled||!validateCombatPolicy(bundledPolicy))return 1;
   if(![b.fluxPercent[r],b.hp[r],b.maxHp[r],b.fluxPercent[t],a.specSpeed[r],a.specSpeed[t],b.hp[t],b.maxHp[t]].every(Number.isFinite)
     ||b.maxHp[r]<=0||b.maxHp[t]<=0)return 1;
   let friends=0,enemies=0;
@@ -51,38 +59,57 @@ export function engagementRange(v:AIStageView,r:number,t:number,gunRange:number,
   return clearance+Math.max(0,gunRange-clearance)*Math.min(1.12,fraction*residual);
 }
 export function solveAIProfile(v:AIStageView,r:number,t:number,assignment?:FleetAssignment):CombatProfile {
+  assertAIStage(v);
   aiDomainWork.profileSolves++;
   if(t<0)return {range:0,relativeBearing:0,firepower:0,weapons:0};
   const b=v.bodies,w=v.weapons,mounts=batteryRows(v,r),radius=b.radius[t];
   const distance=Math.max(1,length(b.x[r]-b.x[t],b.y[r]-b.y[t]));
   const heading=Math.atan2(b.y[t]-b.y[r],b.x[t]-b.x[r]),current=signedAngle(heading-b.facing[r]);
-  if(!mounts.length)return {relativeBearing:current,range:engagementRange(v,r,t,b.radius[r]+radius+8,assignment),firepower:0,weapons:0};
-  const arcs=mounts.map(m=>{
-    let x=b.x[t],y=b.y[t];
-    if(distance<=w.effectiveRange[m]*1.5+b.radius[r]+radius){
-      const vx=b.vx[t]-b.vx[r],vy=b.vy[t]-b.vy[r],px=x-w.muzzleX[m]+vx*v.ai.profileDelay[m],py=y-w.muzzleY[m]+vy*v.ai.profileDelay[m];
+  const n=mounts.length;
+  if(!n)return {relativeBearing:current,range:engagementRange(v,r,t,b.radius[r]+radius+8,assignment),firepower:0,weapons:0};
+  const boundaries=new Float64Array(n*2);
+  const bearings:number[]=[current,0];
+  const arcs=new Array<{m:number;weight:number;base:number;half:number}>(n);
+  const tx=b.x[t],ty=b.y[t],vx=b.vx[t]-b.vx[r],vy=b.vy[t]-b.vy[r],rPlusT=b.radius[r]+radius;
+  for(let i=0;i<n;i++){
+    const m=mounts[i];
+    let x=tx,y=ty;
+    if(distance<=w.effectiveRange[m]*1.5+rPlusT){
+      const px=x-w.muzzleX[m]+vx*v.ai.profileDelay[m],py=y-w.muzzleY[m]+vy*v.ai.profileDelay[m];
       const time=w.flags[m]&W.BEAM?0:interceptTimeComponents(px,py,vx,vy,w.speed[m]);
       if(time!==null){const ix=w.muzzleX[m]+px+vx*time,iy=w.muzzleY[m]+py+vy*time;if(Number.isFinite(ix)&&Number.isFinite(iy)){x=ix;y=iy;}}
     }
-    return {m,weight:w.dps[m],base:signedAngle(v.ai.localBaseAngle[m]-signedAngle(Math.atan2(y-w.muzzleY[m],x-w.muzzleX[m])-heading)),
-      half:v.ai.fixedMount[m]?0:Math.min(Math.PI,v.ai.authoredHalfArc[m])};
-  });
-  const boundaries=arcs.flatMap(a=>[signedAngle(a.base-a.half),signedAngle(a.base+a.half)]).sort((a,b)=>a-b);
-  const bearings=[current,0,...arcs.map(a=>a.base),...boundaries];
+    const base=signedAngle(v.ai.localBaseAngle[m]-signedAngle(Math.atan2(y-w.muzzleY[m],x-w.muzzleX[m])-heading));
+    const half=v.ai.fixedMount[m]?0:Math.min(Math.PI,v.ai.authoredHalfArc[m]);
+    arcs[i]={m,weight:w.dps[m],base,half};
+    bearings.push(base);
+    boundaries[i*2]=signedAngle(base-half);
+    boundaries[i*2+1]=signedAngle(base+half);
+  }
+  boundaries.sort();
+  for(let i=0;i<boundaries.length;i++)bearings.push(boundaries[i]);
   for(let i=0;i<boundaries.length;i++)bearings.push(signedAngle((boundaries[i]+(i+1<boundaries.length?boundaries[i+1]:boundaries[0]+Math.PI*2))/2));
   let best=current,power=-1,alignment=Infinity,previous:number|undefined;
-  for(const bearing of bearings){
+  for(let k=0;k<bearings.length;k++){
+    const bearing=bearings[k];
     if(Object.is(bearing,previous))continue;previous=bearing;
     let score=0,offset=0;
-    for(const a of arcs){const error=Math.abs(signedAngle(bearing-a.base));if(error<=a.half+1e-8){score+=a.weight;offset+=a.weight*error;}}
+    for(let i=0;i<n;i++){const a=arcs[i],error=Math.abs(signedAngle(bearing-a.base));if(error<=a.half+1e-8){score+=a.weight;offset+=a.weight*error;}}
     if(score>power+1e-6||Math.abs(score-power)<1e-6&&(offset<alignment-1e-6||Math.abs(offset-alignment)<1e-6&&Math.abs(signedAngle(bearing-current))<Math.abs(signedAngle(best-current)))){
       best=bearing;power=score;alignment=offset;
     }
   }
-  const useful=arcs.filter(a=>Math.abs(signedAngle(best-a.base))<=a.half+1e-8);
-  const ranges=useful.map(a=>({weight:a.weight,range:w.effectiveRange[a.m]*.9+w.relativeX[a.m]*Math.cos(best)+w.relativeY[a.m]*Math.sin(best)+radius})).sort((a,b)=>a.range-b.range);
-  let accumulated=0,range=ranges.at(-1)?.range??distance;
-  for(const entry of ranges){accumulated+=entry.weight;if(accumulated>=power*.5){range=entry.range;break;}}
-  range=Math.max(b.radius[r]+radius+8,range);
-  return {relativeBearing:signedAngle(best),range:engagementRange(v,r,t,range,assignment),firepower:power,weapons:useful.length};
+  const cosBest=Math.cos(best),sinBest=Math.sin(best);
+  const ranges:{weight:number;range:number}[]=[];
+  for(let i=0;i<n;i++){
+    const a=arcs[i];
+    if(Math.abs(signedAngle(best-a.base))<=a.half+1e-8){
+      ranges.push({weight:a.weight,range:w.effectiveRange[a.m]*.9+w.relativeX[a.m]*cosBest+w.relativeY[a.m]*sinBest+radius});
+    }
+  }
+  ranges.sort((a,b)=>a.range-b.range);
+  let accumulated=0,range=ranges.length?ranges[ranges.length-1].range:distance;
+  for(let i=0;i<ranges.length;i++){const entry=ranges[i];accumulated+=entry.weight;if(accumulated>=power*.5){range=entry.range;break;}}
+  range=Math.max(rPlusT+8,range);
+  return {relativeBearing:signedAngle(best),range:engagementRange(v,r,t,range,assignment),firepower:power,weapons:ranges.length};
 }

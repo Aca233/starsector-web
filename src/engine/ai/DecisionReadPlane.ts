@@ -7,7 +7,7 @@ import type { Asteroid } from '../simulation/CombatTypes';
 import type { TacticalWorld } from './TacticalWorld';
 import { Vector2 } from '../math/Vector2';
 
-export interface PositionGun { mount: WeaponMount; range: number; power: number }
+export interface PositionGun { mount: WeaponMount; range: number; power: number; position: Vector2; facingOffset: number }
 export const stageKernelWork = { planes: 0, sharedPlans: 0, batteries: 0, batteryHits: 0, rootScores: 0, moduleScores: 0,
   bodyLists: 0, bodyListHits: 0, predictions: 0, predictionHits: 0, capturedFireFrames: 0 };
 const methods = (['clone','sub','add','addScaled','rotate','distanceTo','length','heading','dot','normalize'] as const)

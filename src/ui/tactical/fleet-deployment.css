@@ -1,4 +1,2 @@
-.fleet-deployment-team { align-items: center; gap: 18px; padding-bottom: 5px; }
-.fleet-deployment-team > span:last-child { margin-left: auto; color: #7f9aa4; font-size: 11px; }
-.fleet-deployment-budget { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; padding: 8px 0 0; border-top: 1px solid #345260; flex-shrink: 0; font-size: 13px; }
-.fleet-deployment .sim-deployment-ship:disabled { cursor: wait; }
+/* Compatibility entry for the combat presentation owner. */
+@import "../combat-presentation.css";

@@ -49,31 +49,45 @@ function intersectRayCircleEntry(
   return null;
 }
 
-function getBeamTargetIntersectionDistance(origin: Vector2, end: Vector2, ship: Ship): number {
-  const beamDir = end.clone().sub(origin);
-  const beamLen = beamDir.length();
+function getBeamTargetIntersectionDistance(
+  origin: Vector2,
+  end: Vector2,
+  ship: Ship,
+  beamLen: number,
+  beamUnit: Vector2,
+  minX: number,
+  maxX: number,
+  minY: number,
+  maxY: number,
+): number {
   if (beamLen <= 0.001) return Number.POSITIVE_INFINITY;
-  const beamUnit = beamDir.clone().scale(1 / beamLen);
+  const shieldActive = ship.shield.isActive && ship.shield.currentArcDeg > 0 && ship.shield.type !== 'NONE' && ship.shield.type !== 'PHASE';
+  const hullRadius = ship.spec.collisionRadius;
+  const boundRadius = Math.max(hullRadius, shieldActive ? ship.shield.radius + Math.hypot(ship.spec.shieldCenterX ?? 0, ship.spec.shieldCenterY ?? 0) : 0);
+  const spx = ship.pos.x, spy = ship.pos.y;
+  if (spx + boundRadius < minX || spx - boundRadius > maxX || spy + boundRadius < minY || spy - boundRadius > maxY) {
+    return Number.POSITIVE_INFINITY;
+  }
   let nearestT = Number.POSITIVE_INFINITY;
 
-  if (ship.shield.isActive && ship.shield.currentArcDeg > 0 && ship.shield.type !== 'NONE' && ship.shield.type !== 'PHASE') {
+  if (shieldActive) {
     const shieldCenter = ship.getShieldCenter(ship.pos, ship.facingRad);
     const shieldEntry = intersectRayCircleEntry(origin, beamUnit, shieldCenter, ship.shield.radius);
     if (shieldEntry && shieldEntry.t <= beamLen && ship.isShieldPointBlocked(shieldEntry.point)) {
       nearestT = Math.min(nearestT, shieldEntry.t);
     } else {
       const distFromShieldCenter = origin.distanceTo(shieldCenter);
-      if (distFromShieldCenter <= ship.shield.radius && distFromShieldCenter > ship.spec.collisionRadius * 0.3) {
-        const toTarget = shieldCenter.clone().sub(origin);
-        if (beamUnit.dot(toTarget) > 0 && ship.isShieldPointBlocked(origin)) {
+      if (distFromShieldCenter <= ship.shield.radius && distFromShieldCenter > hullRadius * 0.3) {
+        const toTargetX = shieldCenter.x - origin.x, toTargetY = shieldCenter.y - origin.y;
+        if (beamUnit.x * toTargetX + beamUnit.y * toTargetY > 0 && ship.isShieldPointBlocked(origin)) {
           nearestT = 0;
         }
       }
     }
   }
 
-  const hullCircleEntry = intersectRayCircleEntry(origin, beamUnit, ship.pos, ship.spec.collisionRadius);
-  const isOriginInsideHull = origin.distanceTo(ship.pos) <= ship.spec.collisionRadius;
+  const hullCircleEntry = intersectRayCircleEntry(origin, beamUnit, ship.pos, hullRadius);
+  const isOriginInsideHull = origin.distanceTo(ship.pos) <= hullRadius;
   if (isOriginInsideHull || (hullCircleEntry && hullCircleEntry.t <= beamLen)) {
     if (ship.spec.bounds && ship.spec.bounds.length >= 3) {
       const localStart = origin.clone().sub(ship.pos).rotate(-ship.facingRad);
@@ -102,6 +116,8 @@ function getBeamTargetIntersectionDistance(origin: Vector2, end: Vector2, ship: 
  * 7. 原版速子 EMP 电弧与舰船摧毁判定
  */
 export class BeamSimulationHandler {
+  private readonly targetHits: { ship: Ship; hitT: number }[] = [];
+
   public update(dt: number, ctx: WeaponSimContext, beams: Beam[]) {
     const ships = ctx.ships ?? [ctx.playerShip, ctx.enemyShip, ...(ctx.fighters || [])];
     const worldDt = dt;
@@ -177,9 +193,9 @@ export class BeamSimulationHandler {
           const fireDir = Vector2.fromAngle(mount.currentAngleRad, 1);
           b.startPos.copy(mountWorldPos.add(barrelOffsetWorld));
           const maxRange = combatWeaponRange(srcShip, mount.spec);
-          b.rayEndPrevFrame = b.startPos.clone().addScaled(fireDir, previousLength);
+          (b.rayEndPrevFrame ??= new Vector2()).copy(b.startPos).addScaled(fireDir, previousLength);
           const frontLength = Math.min(maxRange, previousLength + dt * (mount.spec.beamSpeed ?? 1400));
-          b.endPos = b.startPos.clone().addScaled(fireDir, frontLength);
+          b.endPos.copy(b.startPos).addScaled(fireDir, frontLength);
           mount.glowAlpha = b.brightness;
         }
       }
@@ -190,16 +206,25 @@ export class BeamSimulationHandler {
       const sample = advanceBeamDamage(b, dt, ctx.random, sourceMount);
 
       // 2. 光束射线与目标物理相交检测 (优先按发射距离由近至远测试障碍物)
-      const targetShips = ships
-        .filter((s) => s.id !== b.sourceShipId && (b.isPlayer === undefined || !sameTeam(s, b)) && !s.isDead && !s.isCollisionless)
-        .map((ship) => ({ ship, hitT: getBeamTargetIntersectionDistance(b.startPos, b.endPos, ship) }))
-        .filter(({ hitT }) => Number.isFinite(hitT))
-        .sort((a, bTarget) => a.hitT - bTarget.hitT)
-        .map(({ ship }) => ship);
+      const rayDir = b.endPos.clone().sub(b.startPos);
+      const rayLength = rayDir.length();
+      const rayUnit = rayLength > 0.001 ? rayDir.clone().scale(1 / rayLength) : rayDir;
+      const minX = Math.min(b.startPos.x, b.endPos.x), maxX = Math.max(b.startPos.x, b.endPos.x);
+      const minY = Math.min(b.startPos.y, b.endPos.y), maxY = Math.max(b.startPos.y, b.endPos.y);
+      const targetHits = this.targetHits;
+      targetHits.length = 0;
+      if (rayLength > 0.001) {
+        for (let sIdx = 0; sIdx < ships.length; sIdx++) {
+          const s = ships[sIdx];
+          if (s.id === b.sourceShipId || (b.isPlayer !== undefined && sameTeam(s, b)) || s.isDead || s.isCollisionless) continue;
+          const hitT = getBeamTargetIntersectionDistance(b.startPos, b.endPos, s, rayLength, rayUnit, minX, maxX, minY, maxY);
+          if (Number.isFinite(hitT)) targetHits.push({ ship: s, hitT });
+        }
+        if (targetHits.length > 1) targetHits.sort((a, bTarget) => a.hitT - bTarget.hitT);
+      }
 
       let missileContact = false;
-      const rayLength = b.startPos.distanceTo(b.endPos);
-      const shipDistance = targetShips.length ? getBeamTargetIntersectionDistance(b.startPos, b.endPos, targetShips[0]) : Infinity;
+      const shipDistance = targetHits.length ? targetHits[0].hitT : Infinity;
       let missileIndex = -1, missileT = Infinity;
       for (let index = 0; index < (ctx.projectiles?.length ?? 0); index++) {
         const candidate = ctx.projectiles![index];
@@ -229,8 +254,8 @@ export class BeamSimulationHandler {
         }
       }
 
-      for (let targetIndex = 0; !missileContact && targetIndex < targetShips.length; targetIndex++) {
-        const ship = targetShips[targetIndex];
+      for (let targetIndex = 0; !missileContact && targetIndex < targetHits.length; targetIndex++) {
+        const ship = targetHits[targetIndex].ship;
         const beamDir = b.endPos.clone().sub(b.startPos);
         const beamLen = beamDir.length();
         if (beamLen <= 0.001) break;
@@ -297,7 +322,15 @@ export class BeamSimulationHandler {
                 b.endPos.copy(unobstructedEnd);
                 // Re-sort with the fallen screen removed: a nearer gun deck may
                 // lie in front of the root hull. Do not charge that root twice.
-                targetShips.sort((a,c)=>getBeamTargetIntersectionDistance(b.startPos,b.endPos,a)-getBeamTargetIntersectionDistance(b.startPos,b.endPos,c));
+                const rDir = b.endPos.clone().sub(b.startPos);
+                const rLen = rDir.length();
+                const rUnit = rLen > 0.001 ? rDir.clone().scale(1 / rLen) : rDir;
+                const rMinX = Math.min(b.startPos.x, b.endPos.x), rMaxX = Math.max(b.startPos.x, b.endPos.x);
+                const rMinY = Math.min(b.startPos.y, b.endPos.y), rMaxY = Math.max(b.startPos.y, b.endPos.y);
+                for (let k = 0; k < targetHits.length; k++) {
+                  targetHits[k].hitT = getBeamTargetIntersectionDistance(b.startPos, b.endPos, targetHits[k].ship, rLen, rUnit, rMinX, rMaxX, rMinY, rMaxY);
+                }
+                targetHits.sort((a, c) => a.hitT - c.hitT);
                 targetIndex = -1; continue;
               }
             // Contact audio remains an independent per-frame ACTIVE adapter.

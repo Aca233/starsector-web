@@ -18,6 +18,38 @@ export function strafeAccelerationMultiplier(size: HullSize | undefined): number
   return size === 'CAPITAL_SHIP' ? .25 : size === 'CRUISER' ? .5 : size === 'DESTROYER' || size === 'FIGHTER' ? .75 : 1;
 }
 
+const sharedStageMotionStats = {
+  acceleration: 1,
+  deceleration: 1,
+  maxSpeed: 1,
+  maxTurnRate: 1,
+  turnAcceleration: 1,
+  turnDeceleration: 0.5,
+  strafeMultiplier: 1,
+};
+
+export function shipStageMotionStats(ship: Ship, sampledModifiers?: Readonly<SystemModifiers>) {
+  const propulsion = modulePropulsionState(ship);
+  const mult = ship.engineController.movementMultiplier * ship.terrainSpeedMult * ship.crMovementMultiplier;
+  const boost = ship.flux.isEngineBoostActive;
+  const table = sampledModifiers ?? (import.meta.env?.VITE_COMBAT_STAT_TABLE !== 'false' ? ship.system.readModifierTable?.(motionReaders) : undefined);
+  const modifiers = table ?? (workerOwnedMotionReads ? ship.system.readNativeMotionModifiers() : undefined);
+  let maxSpeed = (ship.spec.maxSpeed + ship.hullStats.speedBonus + (modifiers ? modifiers.speedFlat ?? 0 : ship.system.getSpeedFlatBonus()) + (boost ? 50 + ship.hullStats.zeroFluxSpeedBonus : 0)) * (1 + (ship.hullStats.speedPercent + ship.fleetSpeedBonusPercent + (modifiers ? modifiers.speedPercent ?? 0 : ship.system.getSpeedPercentBonus())) / 100) * ship.hullStats.speedMultiplier * mult * (propulsion?.speed ?? 1);
+  if (ship.shield.type === 'PHASE' && ship.shield.isPhaseEngaged) {
+    maxSpeed *= ship.shield.getPhaseSpeedMultiplier(ship.flux.maxFlux > 0 ? ship.flux.hardFlux / ship.flux.maxFlux : 0);
+  }
+  const disabled = ship.engineController.state === 'DISABLED';
+  const turnAcceleration = (disabled ? 1 : Math.max(1, (ship.spec.turnAccelerationDeg + (modifiers ? modifiers.turnAccelerationFlat ?? 0 : ship.system.getTurnAccelerationFlatBonus())) * (1 + (ship.hullStats.turnAccelerationPercent + (modifiers ? modifiers.turnAccelerationPercent ?? 0 : ship.system.getTurnAccelerationPercentBonus())) / 100) * ship.hullStats.turnAccelerationMultiplier * mult) * (propulsion?.turn ?? 1)) * Math.PI / 180;
+  sharedStageMotionStats.acceleration = disabled ? 1 : Math.max(1, (ship.spec.acceleration + ship.hullStats.accelerationBonus + (modifiers ? modifiers.accelerationFlat ?? 0 : ship.system.getAccelerationFlatBonus())) * (1 + (ship.hullStats.accelerationPercent + (modifiers ? modifiers.accelerationPercent ?? 0 : ship.system.getAccelerationPercentBonus())) / 100) * ship.hullStats.accelerationMultiplier * mult * (propulsion?.acceleration ?? 1));
+  sharedStageMotionStats.deceleration = disabled ? 1 : Math.max(1, (ship.spec.deceleration + ship.hullStats.decelerationBonus + (modifiers ? modifiers.decelerationFlat ?? 0 : ship.system.getDecelerationFlatBonus())) * (1 + (ship.hullStats.decelerationPercent + (modifiers ? modifiers.decelerationPercent ?? 0 : ship.system.getDecelerationPercentBonus())) / 100) * ship.hullStats.decelerationMultiplier * mult);
+  sharedStageMotionStats.maxSpeed = disabled ? 1 : Math.max(1, maxSpeed);
+  sharedStageMotionStats.maxTurnRate = (disabled ? 1 : Math.max(1, (ship.spec.maxTurnRateDeg + (modifiers ? modifiers.turnRateFlat ?? 0 : ship.system.getTurnRateFlatBonus()) + (boost ? 10 * ship.hullStats.zeroFluxTurnMultiplier : 0)) * (1 + (ship.hullStats.turnRatePercent + (modifiers ? modifiers.turnRatePercent ?? 0 : ship.system.getTurnRatePercentBonus())) / 100) * ship.hullStats.turnRateMultiplier * mult * (propulsion?.turn ?? 1))) * Math.PI / 180;
+  sharedStageMotionStats.turnAcceleration = turnAcceleration;
+  sharedStageMotionStats.turnDeceleration = turnAcceleration * .5;
+  sharedStageMotionStats.strafeMultiplier = strafeAccelerationMultiplier(ship.spec.hullSize);
+  return sharedStageMotionStats;
+}
+
 export function shipMotionStats(ship: Ship, excludedSystemSpeedFlat = 0, sampledModifiers?: Readonly<SystemModifiers>) {
   const propulsion = modulePropulsionState(ship);
   const mult = ship.engineController.movementMultiplier * ship.terrainSpeedMult * ship.crMovementMultiplier;

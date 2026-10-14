@@ -83,3 +83,16 @@
 ## 原版皮肤改为全站共用
 
 暂停菜单与设计页不再各写一套皮肤。NativeChrome 统一原版八片边框、按钮和扫描线/噪点材质；NativeBitmapText 使用原作中文动态字图，根字体不再优先使用雅黑。武器/插件筛选、武器编组、装配方案和通用弹窗均已接入；窗口大小、数据和原有操作保留。实现规范与实测结果见 [共用原版 UI 基础层](native-ui-system.md)。
+
+## 切换舰船界面闪烁问题修正（2026-10-12）
+
+- **问题现象与根因**：在舰船改装界面（`?view=design`）点击左侧舰船列表或按 `X` 切换舰船时，整屏与中央舰体舞台会明显闪烁一下。排查定位到三处叠加原因：
+  1. `StudioApp.tsx` 给 `<NativeRefit key={editorKey}>` 传 `key`、`NativeRefit.tsx` 给 `<RefitEditor key={identity}>` 传 `key`，导致每次切船或载入方案都整树销毁并重建 `<main className="native-refit-app">`、左侧 `HullRoster`（含全部缩略图与滚动容器）和右侧参数面板；
+  2. `ShipStage.tsx` 的 `.studio-ship` 节点绑定了 `key={spec.id}`，且 `InstalledWeaponArt.tsx` 对未显式声明 `spriteWidth`/`spriteHeight` 的原版武器在 `onLoad` 触发前以 `width: undefined, height: undefined`（配合 `.studio-weapon-image { max-width: none; height: auto }`）渲染，导致每次切船重建 `<img>` 时武器贴图先以原始像素尺寸闪现一帧，且若复用节点而不缓存自然尺寸则会在舞台宽高变化时残留旧舰体的百分比尺寸；
+  3. `EngineExhaustPreview.tsx` 的 WebGL2 尾焰预览 `useEffect` 依赖 `[engineParts, parts, ...]`，每次切船（乃至同舰修改配装）都会销毁并重建 `SpriteBatcher`、`RibbonBatcher`、`WebGLTextureManager` 并异步重新 `preload`，造成尾焰断帧闪烁与反复创建 WebGL 上下文。
+- **修正方式**：
+  1. 移除 `<NativeRefit>` 与 `<RefitEditor>` 上的强制重挂载 `key`，改为通过 `openRevision` / `identity` 在 `RefitEditor` 内部原位重置单舰瞬态 UI 状态（当前弹窗面板、选中槽位、甲板索引、缩放与平移、编组高亮、提示与悬停浮层），保持外层框架与左侧舰船列表 DOM 常驻；去掉 `AssemblyThumbnail` 的 `loading="lazy"` 避免列表缩略图重解码闪烁；
+  2. 移除 `ShipStage.tsx` 中 `.studio-ship` 的 `key={spec.id}`；在 `InstalledWeaponArt.tsx` 中按贴图 URL 缓存自然宽高（`naturalWidth`/`naturalHeight`），已缓存或已知尺寸时直接在 React `style` 中计算当前舞台百分比宽高，首次未测量完成的武器贴图在 `onLoad` 写入尺寸前保持 `visibility: hidden`，彻底消除未缩放武器贴图闪现；
+  3. 将 `EngineExhaustPreview.tsx` 拆分为常驻 WebGL2 上下文/批处理器初始化与场景参数更新：复用同一个 `WebGLTextureManager` 与上下文，贴图已命中 `textureCache` 时同步重绘，首次加载新舰体贴图时先清屏再异步 `preload` 完成后绘制。
+- **验收方法**：运行类型检查与改动文件 `oxlint`；使用无头浏览器在 `?view=design` 连续切换多艘舰船，核验 `.native-refit-app`、`.refit-roster-results`、`.studio-ship` DOM 引用在切船前后保持同一节点不销毁，且无未缩放武器贴图闪现与控制台错误。
+

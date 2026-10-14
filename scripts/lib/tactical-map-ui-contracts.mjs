@@ -5,7 +5,7 @@ import fs from 'node:fs';
 export async function checkTacticalMapUI(page) {
   await page.evaluate(async () => {
     const url=new URL(location.href);url.searchParams.set("combat","inline");history.replaceState(null,"",url);
-    await import('/src/index.css'); await import('/src/ui/core/motion.css');await import('/src/ui/native-chrome.css');
+    await import('/src/index.css'); await import('/src/ui/core/motion.css');await import('/src/ui/core/components.css');
     const React = (await import('/node_modules/.vite/deps/react.js')).default;
     const {createRoot} = (await import('/node_modules/.vite/deps/react-dom_client.js')).default;
     const {CombatView} = await import('/src/CombatView.tsx');
@@ -37,7 +37,7 @@ export async function checkTacticalMapUI(page) {
   // start in a clean document with the same content, never bypass its signature guard.
   await page.reload({waitUntil:'domcontentloaded'});
   await page.evaluate(async()=>{
-    await import('/src/index.css');await import('/src/ui/core/motion.css');await import('/src/ui/native-chrome.css');
+    await import('/src/index.css');await import('/src/ui/core/motion.css');await import('/src/ui/core/components.css');
     const {loadNativeFont}=await import('/src/ui/native-fonts.ts');await Promise.all(['action','button','caption'].map(loadNativeFont));
     const element=document.createElement('div');element.id='map-ui';Object.assign(element.style,{position:'fixed',inset:'0',zIndex:'100',background:'#030712'});document.body.append(element);
     const {LocalWorkerHost}=await import('/src/engine/runtime/local/LocalWorkerHost.ts');

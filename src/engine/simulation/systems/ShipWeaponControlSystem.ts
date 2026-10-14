@@ -21,11 +21,36 @@ import type { Ship } from '../Ship';
 import { contentRegistry } from '../../content/ContentRegistry';
 import { SimulationRandom } from '../SimulationRandom';
 import { stageFor, type StageView } from '../../ai/batch/StageProducer';
-import { publishFireInputs, fireScope, fireMissileScope } from '../../ai/batch/FireInputs';
+import { publishFireInputs, fireScope, fireTeamScope, fireMissileScope, fireMissileRows } from '../../ai/batch/FireInputs';
 import { FireProgram, type FireCoverage, type FireTargetKind } from '../../ai/batch/FireProgram';
 import { FireGroups } from '../../ai/batch/FireGroups';
 import { InFlightFireBudget } from '../../ai/InFlightFireBudget';
 import { WeaponFlag } from '../../ai/batch/StageProtocol';
+import { knownProjectionKeys } from '../../runtime/local/ProjectionArrays';
+import { HYPERION_HIT_EFFECT } from '../../content/HyperionIds';
+import { GLORIANA_SIEGE_HIT_EFFECT } from '../../extensions/weapon-effects/GlorianaSiegeHit';
+import type { SystemModifiers } from '../../extensions/ship-systems/Types';
+
+const barrelOffsetProjectionKeys = ['x', 'y'];
+let beamProjectionKeys: string[] | undefined;
+let missileProjectileKeys: string[] | undefined;
+let ballisticProjectileKeys: string[] | undefined;
+const mountSaltCache = new WeakMap<WeaponMount, { shipId: string; slotId: string; salt: number }>();
+const weaponControlModifierReaders = [
+  'getWeaponRateOfFireMultiplier',
+  'getAmmoRegenMultiplier',
+  'getRecoilMultiplier',
+  'getRepairTimeMultiplier',
+  'getWeaponFluxCostMultiplier',
+] as const;
+const nativePresentationEffects = new Set<string>([
+  'com.fs.starfarer.api.impl.combat.TachyonLanceEffect',
+  'com.fs.starfarer.api.impl.combat.GravitonBeamEffect',
+  'com.fs.starfarer.api.impl.combat.SabotOnHitEffect',
+  'com.fs.starfarer.api.impl.combat.MoteOnHitEffect',
+  HYPERION_HIT_EFFECT,
+  GLORIANA_SIEGE_HIT_EFFECT,
+]);
 
 /**
  * 战舰武器挂点、火控散布、交替射击与弹道发射控制子系统 (ShipWeaponControlSystem)
@@ -49,6 +74,39 @@ const numericalFirePlans = new WeakSet<WeaponFirePlan>();
 // Transient scratch/diagnostics must not become enumerable authority fields.
 const firePrograms = new WeakMap<ShipWeaponControlSystem, FireProgram>();
 const fireCoverages = new WeakMap<ShipWeaponControlSystem, FireCoverage>();
+
+function aimMountTurret(
+  mount: WeaponMount,
+  targetPoint: Vector2 | null,
+  mountX: number,
+  mountY: number,
+  mountBaseWorldAngle: number,
+  halfArcRad: number,
+  isHardpoint: boolean,
+  turretTurnRateRad: number,
+  shipAngularVel: number,
+  dt: number
+): void {
+  if (isHardpoint || turretTurnRateRad <= 0) {
+    mount.currentAngleRad = mountBaseWorldAngle;
+    return;
+  }
+  if (!targetPoint) {
+    mount.aimIdleSeconds = (mount.aimIdleSeconds ?? 15.1) + dt;
+    if (mount.aimIdleSeconds > 15) mount.currentAngleRad = advanceTurretAim(mount.currentAngleRad, mountBaseWorldAngle, mountBaseWorldAngle, mount.arcDeg, turretTurnRateRad, shipAngularVel, dt);
+    return;
+  }
+  mount.aimIdleSeconds = 0;
+  const dx = targetPoint.x - mountX;
+  const dy = targetPoint.y - mountY;
+  const targetAngle = Math.atan2(dy, dx);
+  let diffFromBase = targetAngle - mountBaseWorldAngle;
+  while (diffFromBase > Math.PI) diffFromBase -= Math.PI * 2;
+  while (diffFromBase < -Math.PI) diffFromBase += Math.PI * 2;
+  const isWithinArc = mount.arcDeg >= 360 || Math.abs(diffFromBase) <= halfArcRad;
+  const desiredAngle = isWithinArc ? targetAngle : mountBaseWorldAngle + Math.sign(diffFromBase) * halfArcRad;
+  mount.currentAngleRad = advanceTurretAim(mount.currentAngleRad, mountBaseWorldAngle, desiredAngle, mount.arcDeg, turretTurnRateRad, shipAngularVel, dt);
+}
 
 export class ShipWeaponControlSystem {
   private readonly autofire = new AutofireController();
@@ -93,10 +151,11 @@ export class ShipWeaponControlSystem {
    * Generic callers still require the full mutable-metadata audit above. */
   public static hasNativePlanLoop(control:ShipWeaponControlSystem):boolean {
     const ai=control.autofire;
-    return control.planFire===nativePlanFire&&Object.getPrototypeOf(ai)===AutofireController.prototype
-      && control.planNumericFire === nativeNumericPlanFire && control.programFluxBudget === nativeProgramFluxBudget
-      &&nativeAutofireReaders.every(([key,value])=>ai[key]===value)
-      &&nativeSampledAutofireReaders.every(([key,value])=>ai[key]===value);
+    if(control.planFire!==nativePlanFire||Object.getPrototypeOf(ai)!==AutofireController.prototype
+      ||control.planNumericFire!==nativeNumericPlanFire||control.programFluxBudget!==nativeProgramFluxBudget)return false;
+    for(let i=0;i<nativeAutofireReaders.length;i++){const r=nativeAutofireReaders[i];if(ai[r[0]]!==r[1])return false;}
+    for(let i=0;i<nativeSampledAutofireReaders.length;i++){const r=nativeSampledAutofireReaders[i];if(ai[r[0]]!==r[1])return false;}
+    return true;
   }
   private previousHullFacingRad = 0;
   public weapons: WeaponMount[] = [];
@@ -169,7 +228,10 @@ export class ShipWeaponControlSystem {
         mode: g.mode,
         isAutofire: g.isAutofire,
         weaponSlotIds: [...g.weaponSlotIds],
-        alternatingIndex: 0
+        alternatingIndex: 0,
+        alternatingElapsed: 0,
+        alternatingWasFiring: false,
+        alternatingJustSwitched: false
       }));
     } else {
       this.weaponGroups = [
@@ -178,7 +240,10 @@ export class ShipWeaponControlSystem {
           mode: 'LINKED',
           isAutofire: false,
           weaponSlotIds: this.weapons.map((w) => w.slotId),
-          alternatingIndex: 0
+          alternatingIndex: 0,
+          alternatingElapsed: 0,
+          alternatingWasFiring: false,
+          alternatingJustSwitched: false
         }
       ];
     }
@@ -270,10 +335,15 @@ export class ShipWeaponControlSystem {
 
     // 冷却计时器、后坐力回位与弹道散布收束 (严格对齐 MultiBarrelRecoilTracker.java 与 weapon_data.csv)
     const cr = ship.crEffects;
+    const sysMods = ship.system.hasNativeStats ? ship.system.readModifierTable?.(weaponControlModifierReaders) : undefined;
+    const recoilMult = sysMods ? (sysMods.recoilMultiplier ?? 1) : undefined;
+    const repairMult = sysMods ? ship.combatWeaponRepairTimeMultiplier * (sysMods.repairTimeMultiplier ?? 1) : undefined;
+    const canRepair = !ship.isDead;
+    const canRepairUnderFire = ship.canRepairModulesUnderFire;
     for (const mount of this.weapons) {
       // Timers remain in source weapon seconds. Apply transient RoF to their clock,
       // never to shared specs, ammo regeneration, repair, turret aim or projectile speed.
-      const rate = this.weaponClockRate(mount, ship);
+      const rate = this.weaponClockRate(mount, ship, sysMods);
       const reloadDelay = mount.reloadDelayRemaining ?? 0;
       mount.reloadDelayRemaining = Math.max(0, reloadDelay - dt * rate);
       const weaponDt = Math.max(0, dt * rate - reloadDelay);
@@ -285,14 +355,17 @@ export class ShipWeaponControlSystem {
         if (mount.cooldownTimer < 1e-9) mount.cooldownTimer = 0;
       }
       if (Number.isFinite(mount.ammo) && mount.spec.maxAmmo !== undefined && mount.spec.ammoRegenPerSec) {
-        mount.ammoRechargeProgress += mount.spec.ammoRegenPerSec * ship.system.getAmmoRegenMultiplier(mount.spec.weaponType) * dt;
+        const ammoRegenMult = sysMods
+          ? (mount.spec.weaponType ? sysMods.weapons?.[mount.spec.weaponType]?.ammoRegenMultiplier ?? 1 : 1)
+          : ship.system.getAmmoRegenMultiplier(mount.spec.weaponType);
+        mount.ammoRechargeProgress += mount.spec.ammoRegenPerSec * ammoRegenMult * dt;
         while (mount.ammoRechargeProgress >= 1 && mount.ammo < mount.spec.maxAmmo) {
           mount.ammo++;
           mount.ammoRechargeProgress -= 1;
         }
         if (mount.ammo >= mount.spec.maxAmmo) mount.ammoRechargeProgress = 0;
       }
-      advanceGlorianaTorpedoLoad(mount, !ship.isDead);
+      advanceGlorianaTorpedoLoad(mount, canRepair);
       // 官方真实后坐力恢复时间: refireDelay * 0.8
       if (mount.recoil > 0) {
         const recoveryTime = Math.max(0.12, mount.spec.refireDelay * 0.8);
@@ -304,10 +377,12 @@ export class ShipWeaponControlSystem {
       // 真实弹道散布自然恢复 (spread decay)
       const minSpr = mount.spec.minSpread || 0;
       if (mount.currentSpreadDeg > minSpr) {
-        mount.currentSpreadDeg = Math.max(minSpr, mount.currentSpreadDeg - (mount.spec.spreadDecay || 5) * ship.system.getRecoilMultiplier() * dt);
+        const effRecoilMult = recoilMult ?? ship.system.getRecoilMultiplier();
+        mount.currentSpreadDeg = Math.max(minSpr, mount.currentSpreadDeg - (mount.spec.spreadDecay || 5) * effRecoilMult * dt);
       }
-      const healthEvent = advanceWeaponComponent(mount, dt, this.random, !ship.isDead,
-        ship.combatWeaponRepairTimeMultiplier * ship.system.getRepairTimeMultiplier(), ship.canRepairModulesUnderFire,
+      const effRepairMult = repairMult ?? ship.combatWeaponRepairTimeMultiplier * ship.system.getRepairTimeMultiplier();
+      const healthEvent = advanceWeaponComponent(mount, dt, this.random, canRepair,
+        effRepairMult, canRepairUnderFire,
         cr.weaponMalfunctionChance > 0 && weaponIsInFiringCycle(mount) ? {
           chance: cr.weaponMalfunctionChance, criticalChance: cr.criticalMalfunctionChance,
           canPermanentlyDisable: () => canPermanentlyDisableWeapon(ship, mount),
@@ -348,21 +423,25 @@ export class ShipWeaponControlSystem {
       && !Object.hasOwn(budget, 'canOmitUncontestedPenalty');
     let incompleteBudget = false;
     if (nativeLoop && nativeSystem && nativeBudget && numerical?.kind === 'FIRE_QUERY' && numerical.rowOf.has(ship)) {
-      incompleteBudget = !publishFireInputs(numerical, world).budgetComplete;
-      if (!incompleteBudget) return this.planNumericFire(state, world, numerical);
+      const published = publishFireInputs(numerical, world);
+      incompleteBudget = !published.budgetComplete;
+      if (!incompleteBudget) return this.planNumericFire(state, world, numerical, published);
     }
     this.actualFireCoverage = { numericMounts: 0, genericMounts: this.weapons.length,
       specialForceMounts: 0, customBudgetCalls: 0, stageEpoch: numerical?.epoch ?? -1,
       fallbackReason: !nativeLoop ? 'custom-controller' : !numerical || numerical.kind !== 'FIRE_QUERY'
         ? 'unbound-stage' : !nativeSystem ? 'custom-system' : !nativeBudget ? 'custom-budget'
           : incompleteBudget ? 'incomplete-budget-stage' : 'missing-owner' };
-    const activeGroup = this.weaponGroups[this.selectedGroupIndex];
-    const activeSlotSet = new Set(activeGroup ? activeGroup.weaponSlotIds : []);
-    const autofireGroupMap = new Map<string, WeaponGroup>();
-    for (const g of this.weaponGroups) {
-      if (g.isAutofire) {
-        for (const slotId of g.weaponSlotIds) {
-          autofireGroupMap.set(slotId, g);
+    const activeGroup = manualControl ? this.weaponGroups[this.selectedGroupIndex] : undefined;
+    const activeSlotSet = activeGroup ? new Set(activeGroup.weaponSlotIds) : undefined;
+    let autofireSlotSet: Set<string> | undefined;
+    if (manualControl) {
+      autofireSlotSet = new Set<string>();
+      for (const g of this.weaponGroups) {
+        if (g.isAutofire) {
+          for (const slotId of g.weaponSlotIds) {
+            autofireSlotSet.add(slotId);
+          }
         }
       }
     }
@@ -388,13 +467,13 @@ export class ShipWeaponControlSystem {
       ? activeGroup.weaponSlotIds[((activeGroup.alternatingIndex % activeGroup.weaponSlotIds.length) + activeGroup.weaponSlotIds.length) % activeGroup.weaponSlotIds.length]
       : undefined;
 
-    const manualSlots = manualFireSlots(ship, this.weapons, activeSlotSet, alternatingSlotId);
+    const manualSlots = activeSlotSet ? manualFireSlots(ship, this.weapons, activeSlotSet, alternatingSlotId) : undefined;
     const fireRequests = new Set<string>();
     const suspendedAutofire = new Set<string>();
     const tractorRequests: { mount: WeaponMount; world: FireControlWorld; trigger: boolean }[] = [];
     const queryBatch = FireControlQueryBatch.create(ship, world);
     const aimWorld = queryBatch ? { ...world, queryBatch } : world;
-    const nativePlanLoop = ShipWeaponControlSystem.hasNativePlanLoop(this);
+    const nativePlanLoop = nativeLoop;
     const closeNativeQueries = nativePlanLoop ? bindNativeFireQueries(ship, aimWorld) : undefined;
     const sampleRule = world.sampledAutofire;
     const root = sampleRule ? ship.assemblyRoot : undefined;
@@ -407,9 +486,11 @@ export class ShipWeaponControlSystem {
       // A successful binding earned this exact sealed native stage, not a
       // permanent spec certificate. hasNativePlanLoop also excludes replaced
       // aim/decision callbacks. Unbound and legacy callers keep the full audit.
-      && ((multirate && nativePlanLoop && closeNativeQueries !== undefined)
+      && ((nativePlanLoop && closeNativeQueries !== undefined)
         || (ShipWeaponControlSystem.hasNativeQueryLoop(this)
           && nativeSampledAutofireReaders.every(([key, value]) => this.autofire[key] === value)));
+    const shipCos = Math.cos(ship.facingRad), shipSin = Math.sin(ship.facingRad);
+    const shipX = ship.pos.x, shipY = ship.pos.y, shipFacing = ship.facingRad, shipAngularVel = ship.angularVelRad;
     try {
       for (const mount of this.weapons) {
         mount.triggerHeld = false;
@@ -424,58 +505,24 @@ export class ShipWeaponControlSystem {
           continue;
         }
 
-        const isInActiveGroup = activeSlotSet.has(mount.slotId);
-        const isAutofireSlot = autofireGroupMap.has(mount.slotId);
+        const isInActiveGroup = activeSlotSet ? activeSlotSet.has(mount.slotId) : false;
+        const isAutofireSlot = autofireSlotSet ? autofireSlotSet.has(mount.slotId) : false;
 
-        const mountOffset = new Vector2(mount.relativePos.x, mount.relativePos.y).rotate(ship.facingRad);
-        const mountX = ship.pos.x + mountOffset.x;
-        const mountY = ship.pos.y + mountOffset.y;
-        const mountBaseWorldAngle = ship.facingRad + (mount.baseAngleDeg * Math.PI) / 180;
+        const relX = mount.relativePos.x, relY = mount.relativePos.y;
+        const mountX = shipX + relX * shipCos - relY * shipSin;
+        const mountY = shipY + relX * shipSin + relY * shipCos;
+        const mountBaseWorldAngle = shipFacing + (mount.baseAngleDeg * Math.PI) / 180;
         const halfArcRad = (mount.arcDeg * Math.PI) / 360;
 
         // 硬挂点或固定主炮不可独立转动 (对齐 Starsector: if.java:781)
         const isHardpoint = mount.mountType === 'HARDPOINT' || (mount.spec.turnRateDegPerSec !== undefined && mount.spec.turnRateDegPerSec <= 0);
         const turretTurnRateRad = isHardpoint ? 0 : (((mount.spec.turnRateDegPerSec ?? 30) * Math.PI) / 180);
 
-        // 官方炮塔瞄准算法 (com.fs.starfarer.combat.entities.ship.trackers.oooo_0.java:106-171)
-        const aimTurret = (targetPoint: Vector2 | null): void => {
-          if (isHardpoint || turretTurnRateRad <= 0) {
-            mount.currentAngleRad = mountBaseWorldAngle;
-            return;
-          }
-
-          if (!targetPoint) {
-            mount.aimIdleSeconds = (mount.aimIdleSeconds ?? 15.1) + dt;
-            if (mount.aimIdleSeconds > 15) mount.currentAngleRad = advanceTurretAim(mount.currentAngleRad,mountBaseWorldAngle,mountBaseWorldAngle,mount.arcDeg,turretTurnRateRad,ship.angularVelRad,dt);
-            return;
-          }
-
-          mount.aimIdleSeconds = 0;
-          // 1. 各挂点独立计算朝向目标的世界角度 (从该挂点实际世界坐标计算，避免舰体视差)
-          const dx = targetPoint.x - mountX;
-          const dy = targetPoint.y - mountY;
-          const targetAngle = Math.atan2(dy, dx);
-
-          // 2. 官方射界判定与边界吸附 (Starsector: trackers/oooo_0.java:162-171)
-          let diffFromBase = targetAngle - mountBaseWorldAngle;
-          while (diffFromBase > Math.PI) diffFromBase -= Math.PI * 2;
-          while (diffFromBase < -Math.PI) diffFromBase += Math.PI * 2;
-
-          const isWithinArc = mount.arcDeg >= 360 || Math.abs(diffFromBase) <= halfArcRad;
-          let desiredAngle = targetAngle;
-          if (!isWithinArc) {
-            // 原版机制：光标超出射界时，炮塔紧贴射界边缘指向光标，绝不倒转回中！
-            desiredAngle = mountBaseWorldAngle + Math.sign(diffFromBase) * halfArcRad;
-          }
-
-          mount.currentAngleRad = advanceTurretAim(mount.currentAngleRad,mountBaseWorldAngle,desiredAngle,mount.arcDeg,turretTurnRateRad,ship.angularVelRad,dt);
-
-        };
-
         if (mount.spec.gravityTractor) {
           const tractorAim = !manualControl && ship.currentTargetShip ? ship.currentTargetShip.pos : ship.aimTargetWorld;
           const held = mount.gravityTractor;
-          aimTurret(held?.phase === 'HOLD' ? new Vector2(held.contactX, held.contactY) : tractorAim);
+          aimMountTurret(mount, held?.phase === 'HOLD' ? new Vector2(held.contactX, held.contactY) : tractorAim,
+            mountX, mountY, mountBaseWorldAngle, halfArcRad, isHardpoint, turretTurnRateRad, shipAngularVel, dt);
           const trigger = canShipFire && (manualControl
             ? isInActiveGroup && ship.isFiringMain
             : !!ship.currentTargetShip && ship.flux.fluxPercent < .65);
@@ -489,12 +536,12 @@ export class ShipWeaponControlSystem {
         }
 
         // 1. 当前选中的主力武器编组 (Active Group - 玩家手动瞄准与击发，绝对优先级)
-        if (manualControl && isInActiveGroup) {
+        if (manualControl && isInActiveGroup && activeGroup && manualSlots) {
           this.autofire.clear(mount);
           if (isHardpoint) {
             mount.currentAngleRad = mountBaseWorldAngle;
           } else {
-            aimTurret(ship.aimTargetWorld);
+            aimMountTurret(mount, ship.aimTargetWorld, mountX, mountY, mountBaseWorldAngle, halfArcRad, isHardpoint, turretTurnRateRad, shipAngularVel, dt);
           }
 
           // Manual fire follows the group selection rule, not an invented alignment tolerance.
@@ -529,10 +576,11 @@ export class ShipWeaponControlSystem {
           const solution = sample ? null : this.autofire.aim(dt, ship, mount, aimWorld);
           if (ship.system.autofirePolicy(mount)?.suspended) {
             suspendedAutofire.add(mount.slotId);
-            aimTurret(null);
+            aimMountTurret(mount, null, mountX, mountY, mountBaseWorldAngle, halfArcRad, isHardpoint, turretTurnRateRad, shipAngularVel, dt);
             continue;
           }
-          aimTurret(sample ? sample.point : solution?.point ?? this.autofire.preAim(ship, mount, aimWorld));
+          aimMountTurret(mount, sample ? sample.point : solution?.point ?? this.autofire.preAim(ship, mount, aimWorld),
+            mountX, mountY, mountBaseWorldAngle, halfArcRad, isHardpoint, turretTurnRateRad, shipAngularVel, dt);
           const decision = sample ? this.autofire.decideSampled(ship, mount, sample.intent, aimWorld, dt)
             : this.autofire.decide(ship, mount, solution, aimWorld, dt);
           if (decision === 'FIRE' && canShipFire && mount.cooldownTimer <= 0) {
@@ -546,9 +594,9 @@ export class ShipWeaponControlSystem {
           const cursorNearArc = Math.abs(signedAngle(idleTargetAngle-mountBaseWorldAngle)) <= (mount.arcDeg+30)*Math.PI/360;
           // Native inactive manual turrets receive the cursor only near their arc.
           if (ship.isPlayer && !isHardpoint && (cursorNearArc || mount.spec.alwaysFire)) {
-            aimTurret(ship.aimTargetWorld);
+            aimMountTurret(mount, ship.aimTargetWorld, mountX, mountY, mountBaseWorldAngle, halfArcRad, isHardpoint, turretTurnRateRad, shipAngularVel, dt);
           } else {
-            aimTurret(null);
+            aimMountTurret(mount, null, mountX, mountY, mountBaseWorldAngle, halfArcRad, isHardpoint, turretTurnRateRad, shipAngularVel, dt);
           }
         }
 
@@ -575,35 +623,60 @@ export class ShipWeaponControlSystem {
     return { ...state, activeSlotSet, fireRequests, suspendedAutofire, automaticStarts, tractorRequests };
   }
 
+  private readonly numericSlotsScratch = new Map<string, number>();
+  private readonly numericMountRowsScratch: number[] = [];
+  private numericRequestsScratch = new Uint8Array(512);
+
   /** Complete stage consumer. Only publication, per-mount controller memory,
    * explicit system callbacks and ordered output touch the old object model. */
-  private planNumericFire(state: WeaponControlStep, world: FireControlWorld, v: StageView): WeaponFirePlan {
+  private planNumericFire(state: WeaponControlStep, world: FireControlWorld, v: StageView, prePublished?: ReturnType<typeof publishFireInputs>): WeaponFirePlan {
     const { ship, dt, manualControl, canShipFire } = state;
     const own = v.rowOf.get(ship)!;
-    const input = publishFireInputs(v, world), scope = fireScope(v, input, world);
+    const input = prePublished ?? publishFireInputs(v, world), scope = fireScope(v, input, world);
     const missileScope = fireMissileScope(v, input, world);
+    const ownTeam = v.bodies.team[own];
+    const teamIndex = v.teams.indexOf(ownTeam);
+    const teamScope = fireTeamScope(v, input, world, ownTeam, teamIndex);
+    const missileRows = fireMissileRows(v, input, world, missileScope);
     const coverage: FireCoverage = this.actualFireCoverage = { numericMounts: 0, genericMounts: 0,
       specialForceMounts: 0, customBudgetCalls: 0, stageEpoch: v.epoch, unsupportedMechanisms: [],
       postTurnBoreChecks: 0, orderedFluxRechecks: 0, numericAimCalls: 0, numericAcquisitionScans: 0 };
-    const slots = new Map<string, number>();
+    const slots = this.numericSlotsScratch;
+    slots.clear();
+    const mountRows = this.numericMountRowsScratch;
+    mountRows.length = this.weapons.length;
+    const weaponFirst = v.bodies.weaponFirst[own];
+    const sysMods = ship.system.readModifierTable?.(weaponControlModifierReaders);
+    const hasPolicy = ship.system.hasAutofirePolicy;
+    const hasWeaponGate = ship.system.hasPerMountWeaponGate;
+    const systemAllowsWeapons = !ship.system.blocksWeapons;
+    if (this.numericRequestsScratch.length < v.weaponCount) {
+      this.numericRequestsScratch = new Uint8Array(Math.max(v.weaponCount, this.numericRequestsScratch.length * 2, 512));
+    }
+    const requests = this.numericRequestsScratch;
     // Mount/slot binding and clocks are input publication, never hot target reads.
-    for (const mount of this.weapons) {
-      const row = v.mountRowOf.get(mount);
+    for (let i = 0; i < this.weapons.length; i++) {
+      const mount = this.weapons[i];
+      const row = v.mounts[weaponFirst + i] === mount ? weaponFirst + i : v.mountRowOf.get(mount);
       if (row === undefined) throw new Error('FIRE_QUERY did not publish a firing mount');
       slots.set(mount.slotId, row);
-      const c = input.weapons[row], rate = this.weaponClockRate(mount, ship), spec = mount.spec;
+      mountRows[i] = row;
+      requests[row] = 0;
+      const c = input.weapons[row], rate = this.weaponClockRate(mount, ship, sysMods);
       c.cooldownRate = rate;
-      let cycle = spec.isBeam
-        ? (spec.beamDuration ?? 0) + (spec.beamBurstDelay ?? 0) + (spec.beamSourceChargeupTime ?? 0) + (spec.beamSourceChargedownTime ?? 0)
-        : (spec.burstSize ?? 1) > 50 ? 3
-          : Math.max(0, (spec.burstSize ?? 1) - 1) * (spec.burstDelay ?? 0) + spec.refireDelay + (spec.chargeTime ?? 0);
-      if (spec.isBeam) { if (!(cycle > 0)) cycle = 3; cycle -= (spec.beamBurstDelay ?? 0) * (1 - 1 / rate); }
-      else cycle /= rate;
-      c.cycle = cycle;
+      if (rate !== 1) {
+        const spec = mount.spec;
+        let cycle = spec.isBeam
+          ? (spec.beamDuration ?? 0) + (spec.beamBurstDelay ?? 0) + (spec.beamSourceChargeupTime ?? 0) + (spec.beamSourceChargedownTime ?? 0)
+          : (spec.burstSize ?? 1) > 50 ? 3
+            : Math.max(0, (spec.burstSize ?? 1) - 1) * (spec.burstDelay ?? 0) + spec.refireDelay + (spec.chargeTime ?? 0);
+        if (spec.isBeam) { if (!(cycle > 0)) cycle = 3; cycle -= (spec.beamBurstDelay ?? 0) * (1 - 1 / rate); }
+        else cycle /= rate;
+        c.cycle = cycle;
+      }
     }
-    const groups = new FireGroups(v, input, this.weaponGroups, this.selectedGroupIndex, slots, own, dt, manualControl, canShipFire);
+    const groups = new FireGroups(v, input, this.weaponGroups, this.selectedGroupIndex, slots, own, dt, manualControl, canShipFire, mountRows);
     groups.writebackManual(this.weaponGroups);
-    const requests = new Uint8Array(v.weaponCount);
     const activeSlotSet = new Set<string>(), fireRequests = new Set<string>(), suspendedAutofire = new Set<string>();
     const automaticStarts = new Map<string, WeaponGroup>();
     const tractorRequests: { mount: WeaponMount; world: FireControlWorld; trigger: boolean }[] = [];
@@ -612,15 +685,17 @@ export class ShipWeaponControlSystem {
       && budget.estimate === nativeBudgetEstimate && budget.penalty === nativeBudgetPenalty
       && !Object.hasOwn(budget, 'canOmitUncontestedPenalty');
     this.fireProgram.bind(v, input, scope, missileScope, own, !!budget, nativeBudget, coverage,
-      budget ? (row, arrival) => budget.penalty(ship, v.ships[row], arrival) : undefined);
+      budget ? (row, arrival) => budget.penalty(ship, v.ships[row], arrival) : undefined,
+      teamScope, missileRows);
     const program = this.fireProgram, w = v.weapons, sample = world.sampledAutofire;
     const root = sample ? ship.assemblyRoot : undefined;
     const sampleShip = sample && dt > 0 && Number.isFinite(dt) && !manualControl && input.autonomous[own]
       && root !== sample.playerShip.assemblyRoot && root!.fireControlMode === 'AI'
       && !sample.fullRateShipIds.has(root!.id) && !sample.fullRateShipIds.has(ship.id)
       && ship.spec.hullSize !== 'FIGHTER';
-    for (const mount of this.weapons) {
-      const row = slots.get(mount.slotId)!;
+    for (let mIdx = 0; mIdx < this.weapons.length; mIdx++) {
+      const mount = this.weapons[mIdx];
+      const row = mountRows[mIdx];
       const c = input.weapons[row], flags = w.flags[row];
       if (groups.active[row]) activeSlotSet.add(mount.slotId);
       mount.triggerHeld = false;
@@ -690,7 +765,7 @@ export class ShipWeaponControlSystem {
       const sampleAdmission = sampleShip && !c.missileBody && !(flags & (WeaponFlag.GUIDED | WeaponFlag.MISSILE))
         && (sample!.cadence === 'multirate' || mount.mountType === 'TURRET'
           && (mount.spec.mountSize === 'SMALL' || mount.spec.mountSize === 'MEDIUM'));
-      const sampled = sampleAdmission && !ship.system.autofirePolicy(mount);
+      const sampled = sampleAdmission && !(hasPolicy && ship.system.autofirePolicy(mount));
       if ((!sampled && (memory.sampledAim || memory.numericCadence))
         || sampled && memory.sampledAim && memory.sampledAim.cadence !== (sample!.cadence === 'multirate' ? 'multirate' : undefined)) {
         this.autofire.dropAimSample(mount);
@@ -704,18 +779,44 @@ export class ShipWeaponControlSystem {
       }
       const tracker = memory;
       let salt = 2166136261;
-      for (const char of ship.id + '/' + mount.slotId) salt = Math.imul(salt ^ char.charCodeAt(0), 16777619);
-      const policy = ship.system.autofirePolicy(mount);
+      if (sampled) {
+        const shipId = ship.id, slotId = mount.slotId;
+        let cachedSalt = mountSaltCache.get(mount);
+        if (!cachedSalt || cachedSalt.shipId !== shipId || cachedSalt.slotId !== slotId) {
+          for (let i = 0; i < shipId.length; i++) salt = Math.imul(salt ^ shipId.charCodeAt(i), 16777619);
+          salt = Math.imul(salt ^ 47, 16777619);
+          for (let i = 0; i < slotId.length; i++) salt = Math.imul(salt ^ slotId.charCodeAt(i), 16777619);
+          cachedSalt = { shipId, slotId, salt };
+          mountSaltCache.set(mount, cachedSalt);
+        } else {
+          salt = cachedSalt.salt;
+        }
+      }
+      const policy = hasPolicy ? ship.system.autofirePolicy(mount) : undefined;
       program.aim(policy, sampled ? sample!.cadence === 'multirate' ? 'multirate' : '20hz' : undefined, salt);
       tracker.sampledAim = undefined; tracker.acquisitionCadence = undefined;
-      const target = program.targetKind === 1 ? { kind: 'SHIP' as const, entity: v.ships[program.targetRow] }
-        : program.targetKind === 2 ? { kind: 'MISSILE' as const, entity: v.projectileRefs[program.targetRow] } : undefined;
+      let target = tracker.target;
+      if (program.targetKind === 1) {
+        const entity = v.ships[program.targetRow];
+        if (!target || target.kind !== 'SHIP' || target.entity !== entity) target = { kind: 'SHIP', entity };
+      } else if (program.targetKind === 2) {
+        const entity = v.projectileRefs[program.targetRow];
+        if (!target || target.kind !== 'MISSILE' || target.entity !== entity) target = { kind: 'MISSILE', entity };
+      } else {
+        target = undefined;
+      }
       tracker.target = target;
       mount.fireControlTargetShipId = target?.kind === 'SHIP' ? target.entity.id : undefined;
       mount.fireControlTargetProjectileId = target?.kind === 'MISSILE' ? target.entity.id : undefined;
-      mount.fireControl = { targetId: target?.entity.id, targetKind: target?.kind,
-        reason: policy?.suspended ? 'REASSIGNING' : program.hasTarget() ? 'ALIGNING' : 'NO_TARGET' };
-      if (ship.system.autofirePolicy(mount)?.suspended) {
+      const initialReason = policy?.suspended ? 'REASSIGNING' : program.hasTarget() ? 'ALIGNING' : 'NO_TARGET';
+      if (mount.fireControl) {
+        mount.fireControl.targetId = target?.entity.id;
+        mount.fireControl.targetKind = target?.kind;
+        mount.fireControl.reason = initialReason;
+      } else {
+        mount.fireControl = { targetId: target?.entity.id, targetKind: target?.kind, reason: initialReason };
+      }
+      if (hasPolicy && ship.system.autofirePolicy(mount)?.suspended) {
         suspendedAutofire.add(mount.slotId);
         program.turn(false);
         mount.currentAngleRad = program.angle; mount.aimIdleSeconds = program.idle;
@@ -726,21 +827,25 @@ export class ShipWeaponControlSystem {
       mount.currentAngleRad = program.turn();
       mount.aimIdleSeconds = program.idle;
       program.refreshBore(mount.currentAngleRad);
-      const decidePolicy = ship.system.autofirePolicy(mount);
+      const decidePolicy = hasPolicy ? ship.system.autofirePolicy(mount) : undefined;
       const canWeaponFire = !decidePolicy?.suspended && program.hasTarget() && program.available()
-        ? ship.system.canFireWeapon(mount) : false;
+        ? (hasWeaponGate ? ship.system.canFireWeapon(mount) : systemAllowsWeapons) : false;
       let decision = program.decide(canWeaponFire, !!decidePolicy?.suspended);
-      if (decision === 'FIRE' && !this.programFluxBudget(ship, mount, dt)) decision = 'FLUX_BUDGET';
+      if (decision === 'FIRE' && !this.programFluxBudget(ship, mount, dt, sysMods)) decision = 'FLUX_BUDGET';
       mount.fireControl.reason = decision;
       if (decision === 'FIRE' && canShipFire && w.cooldown[row] <= 0) requests[row] = 1;
       coverage.numericMounts++;
     }
     groups.scheduleAutomatic(requests);
     groups.writeback(this.weaponGroups);
-    for (const [slot, row] of slots) {
-      if (requests[row]) fireRequests.add(slot);
-      const group = groups.starts.get(row);
-      if (group !== undefined) automaticStarts.set(slot, this.weaponGroups[group]);
+    const hasStarts = groups.starts.size > 0;
+    for (let i = 0; i < this.weapons.length; i++) {
+      const row = mountRows[i];
+      if (requests[row]) fireRequests.add(this.weapons[i].slotId);
+      if (hasStarts) {
+        const group = groups.starts.get(row);
+        if (group !== undefined) automaticStarts.set(this.weapons[i].slotId, this.weaponGroups[group]);
+      }
     }
     const plan: WeaponFirePlan = { ...state, activeSlotSet, fireRequests, suspendedAutofire, automaticStarts, tractorRequests, numericFire: true };
     numericalFirePlans.add(plan);
@@ -749,7 +854,7 @@ export class ShipWeaponControlSystem {
 
   /** Ordered resource boundary, not a second aim/decide. No pre-deduction:
    * every mount sees current flux and its current committed-cycle/ammo state. */
-  private programFluxBudget(ship: Ship, mount: WeaponMount, dt: number): boolean {
+  private programFluxBudget(ship: Ship, mount: WeaponMount, dt: number, sysMods?: Readonly<SystemModifiers>): boolean {
     const spec = mount.spec;
     const active = mount.burstRemaining > 0 || mount.firingState === 'CHARGING' || mount.firingState === 'ACTIVE';
     const cost = spec.isBeam ? (spec.fluxPerSecond ?? 0) * Math.max(dt, !active && spec.beamVisualMode === 'BURST'
@@ -757,7 +862,11 @@ export class ShipWeaponControlSystem {
       : mount.burstFluxReserved || active ? 0 : spec.fluxPerShot * (spec.interruptibleBurst ? 1 : Math.max(1, spec.burstSize ?? 1));
     const pd = spec.isPointDefense || spec.aiHints?.includes('PD') || spec.aiHints?.includes('PD_ONLY');
     const ceiling = ship.fireControlMode === 'AI' && !pd && !active ? .95 : 1;
-    return !(cost > 0 && ship.flux.totalFlux + cost * ship.system.getWeaponFluxCostMultiplier(spec.weaponType) > ship.flux.maxFlux * ceiling);
+    if (!(cost > 0)) return true;
+    const fluxMult = sysMods
+      ? (spec.weaponType ? sysMods.weapons?.[spec.weaponType]?.fluxCostMultiplier ?? 1 : 1)
+      : ship.system.getWeaponFluxCostMultiplier(spec.weaponType);
+    return !(ship.flux.totalFlux + cost * fluxMult > ship.flux.maxFlux * ceiling);
   }
 
   /** Ordered resource/lifecycle submission; intent is consumed exactly once. */
@@ -773,15 +882,25 @@ export class ShipWeaponControlSystem {
     const liveCanShipFire = canShipFire && !ship.flux.isOverloaded && !ship.flux.isVenting && !ship.system.blocksWeapons && !ship.isPhased;
     for (const request of plan.tractorRequests)
       updateGravityTractorInput(dt, ship, request.mount, request.world, request.trigger && liveCanShipFire);
+    const hasWeaponGate = ship.system.hasPerMountWeaponGate;
+    let sysMods: Readonly<SystemModifiers> | undefined;
+    let sysModsRead = false;
     // Keep emission/lifecycle in authored mount order for flux and deterministic replays.
     for (const mount of this.weapons) {
       if (mount.isDisabled) continue;
       if (mount.spec.gravityTractor || mount.spec.gravityDeflector) continue;
       if (fireRequests.has(mount.slotId) && (!manualControl || !activeSlotSet.has(mount.slotId))) {
-        if (numericPlan) this.actualFireCoverage.orderedFluxRechecks = (this.actualFireCoverage.orderedFluxRechecks ?? 0) + 1;
-        if (!(numericPlan ? this.programFluxBudget(ship, mount, dt) : this.autofire.hasFluxBudget(ship, mount, dt))) {
+        if (numericPlan) {
+          this.actualFireCoverage.orderedFluxRechecks = (this.actualFireCoverage.orderedFluxRechecks ?? 0) + 1;
+          if (!sysModsRead) {
+            sysModsRead = true;
+            sysMods = ship.system.hasNativeStats ? ship.system.readModifierTable?.(weaponControlModifierReaders) : undefined;
+          }
+        }
+        if (!(numericPlan ? this.programFluxBudget(ship, mount, dt, sysMods) : this.autofire.hasFluxBudget(ship, mount, dt))) {
           fireRequests.delete(mount.slotId);
-          mount.fireControl = { ...mount.fireControl, reason: 'FLUX_BUDGET' };
+          if (mount.fireControl) mount.fireControl.reason = 'FLUX_BUDGET';
+          else mount.fireControl = { reason: 'FLUX_BUDGET' };
         }
       }
       if (liveCanShipFire && fireRequests.has(mount.slotId) && this.requestWeaponFire(mount, ship, spawnProjectile, spawnBeam, spawnMuzzleFlash)) {
@@ -795,8 +914,9 @@ export class ShipWeaponControlSystem {
       }
       // Reassignment holds an in-flight firing cycle, not its cooldown/ammo clock.
       // Only opted-in ordinary PDCs use this path; no new round or refund is emitted.
-      if (suspendedAutofire.has(mount.slotId) && liveCanShipFire && ship.system.canFireWeapon(mount)) continue;
-      this.advanceWeaponLifecycle(mount.lifecycleDt ?? dt, mount, ship, liveCanShipFire && ship.system.canFireWeapon(mount), spawnProjectile, spawnBeam, spawnMuzzleFlash);
+      const mountCanFire = liveCanShipFire && (hasWeaponGate ? ship.system.canFireWeapon(mount) : true);
+      if (suspendedAutofire.has(mount.slotId) && mountCanFire) continue;
+      this.advanceWeaponLifecycle(mount.lifecycleDt ?? dt, mount, ship, mountCanFire, spawnProjectile, spawnBeam, spawnMuzzleFlash);
     }
   }
 
@@ -950,8 +1070,11 @@ export class ShipWeaponControlSystem {
    * Burst beams use RoF only for cooldown; their charge/ACTIVE/chargedown and flux
    * stay on real time (ship/A/oooo_1.java). Continuous beams are not accelerated.
    */
-  private weaponClockRate(mount: WeaponMount, ship: Ship): number {
-    const rate = Math.max(.001, ship.system.getWeaponRateOfFireMultiplier(mount.spec.weaponType));
+  private weaponClockRate(mount: WeaponMount, ship: Ship, sysMods?: Readonly<SystemModifiers>): number {
+    const rofMult = sysMods
+      ? (mount.spec.weaponType ? sysMods.weapons?.[mount.spec.weaponType]?.rateOfFireMultiplier ?? 1 : 1)
+      : ship.system.getWeaponRateOfFireMultiplier(mount.spec.weaponType);
+    const rate = Math.max(.001, rofMult);
     if (mount.spec.isBeam) return mount.spec.beamVisualMode === 'BURST' ? rate : 1;
     if (rate <= 1) return rate;
     const sourceDelay = mount.burstRemaining > 0
@@ -1319,7 +1442,9 @@ export class ShipWeaponControlSystem {
         ? Number.MAX_SAFE_INTEGER
         : Math.max(0.001, mount.spec.beamDuration ?? 0.001);
       mount.glowAlpha = 1.0;
-      spawnBeam({
+      const barrelOffset = { x: offX, y: offY };
+      knownProjectionKeys.set(barrelOffset, barrelOffsetProjectionKeys);
+      const beam: Beam = {
         id: this.random.next(),
         sourceShipId: ship.id,
         slotId: mount.slotId,
@@ -1327,7 +1452,7 @@ export class ShipWeaponControlSystem {
         specId: mount.spec.id,
         startPos: firePos,
         endPos: endPos,
-        barrelOffset: { x: offX, y: offY },
+        barrelOffset,
         // 武器输出伤害按母舰战备值修正 (CRPluginImpl.getDamageChangePercent)
         damagePerSec: mount.spec.damagePerSecond * ship.crDamageDealtMultiplier * ship.getWeaponDamageMultiplier(mount.spec.weaponType) * ship.system.getBeamDamageMultiplier(),
         baseDamagePerSec: mount.spec.damagePerSecond,
@@ -1357,15 +1482,41 @@ export class ShipWeaponControlSystem {
         coreWidthMult: mount.spec.coreWidthMult,
         darkCore: mount.spec.darkCore,
         darkFringeIter: mount.spec.darkFringeIter,
-        darkCoreIter: mount.spec.darkCoreIter
-      });
+        darkCoreIter: mount.spec.darkCoreIter,
+        isHitting: undefined,
+        brightness: undefined,
+        rayEndPrevFrame: undefined,
+        elapsedSinceDamage: undefined,
+        accumulatedBrightness: undefined,
+        dpsDuration: undefined,
+        damageMultiplier: undefined,
+        hitGlowBrightness: undefined,
+        hitGlowSizeMult: undefined,
+        wasShortened: undefined,
+        scaleGlowBasedOnDamageEffectiveness: undefined,
+        contactSurface: undefined,
+        contactFxCooldown: undefined,
+        contactSoundCooldown: undefined,
+      };
+      if ((!mount.spec.beamEffect || nativePresentationEffects.has(mount.spec.beamEffect))
+        && (!mount.spec.everyFrameEffect || nativePresentationEffects.has(mount.spec.everyFrameEffect))) {
+        beamProjectionKeys ??= Object.keys(beam);
+        knownProjectionKeys.set(beam, beamProjectionKeys);
+      }
+      spawnBeam(beam);
     } else {
       // 实体弹药使用弹速；导弹则严格区分发射初速与发动机额定极速。
-      const projectileLaunchSpeed = (mount.spec.isRocket || mount.spec.spawnType === 'MISSILE')
+      const isRocket = !!(mount.spec.isRocket || mount.spec.spawnType === 'MISSILE');
+      const isMissileLike = !!(isRocket || mount.spec.isGuided || mount.spec.flightTime !== undefined || mount.spec.missileHp);
+      const baseProjSpeed = isRocket ? mount.spec.projSpeed : combatProjectileSpeed(ship, mount.spec);
+      const projectileLaunchSpeed = isRocket
         ? (mount.spec.launchSpeed ?? mount.spec.projSpeed)
-        : combatProjectileSpeed(ship, mount.spec);
+        : baseProjSpeed;
       const projVel = Vector2.fromAngle(fireAngleRad, projectileLaunchSpeed).add(ship.vel);
-      const projectile: Projectile = {
+      const barrelOffset = { x: offX, y: offY };
+      knownProjectionKeys.set(barrelOffset, barrelOffsetProjectionKeys);
+      const sourceDamageMultiplier = ship.crDamageDealtMultiplier * ship.getWeaponDamageMultiplier(mount.spec.weaponType);
+      const projectile: Projectile = isMissileLike ? {
         id: this.random.next(),
         sourceShipId: ship.id,
         slotId: mount.slotId,
@@ -1376,14 +1527,13 @@ export class ShipWeaponControlSystem {
         ballisticTail: mount.spec.spawnType === 'BALLISTIC' ? firePos.clone() : undefined,
         prevBallisticTail: mount.spec.spawnType === 'BALLISTIC' ? firePos.clone() : undefined,
         vel: projVel,
-        // 武器输出伤害按母舰战备值修正 (CRPluginImpl.getDamageChangePercent)
         baseDamage: mount.spec.damagePerShot,
-        sourceDamageMultiplier: ship.crDamageDealtMultiplier * ship.getWeaponDamageMultiplier(mount.spec.weaponType),
+        sourceDamageMultiplier,
         sourceWeaponType: mount.spec.weaponType,
-        ...(mount.spec.gravityCoupling ? { gravityCoupling: mount.spec.gravityCoupling } : {}),
+        gravityCoupling: mount.spec.gravityCoupling,
         spawnLocation: firePos.clone(),
         empDamage: mount.spec.empPerShot ?? 0,
-        damage: mount.spec.damagePerShot * ship.crDamageDealtMultiplier * ship.getWeaponDamageMultiplier(mount.spec.weaponType),
+        damage: mount.spec.damagePerShot * sourceDamageMultiplier,
         damageType: mount.spec.type,
         onHitEffect: mount.spec.onHitEffect,
         passThroughMissiles: mount.spec.passThroughMissiles,
@@ -1407,12 +1557,12 @@ export class ShipWeaponControlSystem {
         hitGlowRadius: mount.spec.hitGlowRadius,
         glowRadius: mount.spec.glowRadius,
         coreWidthMult: mount.spec.coreWidthMult,
-        movingRayMoveSpeed: mount.spec.spawnType === 'BALLISTIC_AS_BEAM' ? combatProjectileSpeed(ship, mount.spec) : undefined,
+        movingRayMoveSpeed: mount.spec.spawnType === 'BALLISTIC_AS_BEAM' ? baseProjSpeed : undefined,
         projSpriteUrl: mount.spec.projSpriteUrl,
         projLength: mount.spec.projLength,
         projWidth: mount.spec.projWidth,
-        barrelOffset: { x: offX, y: offY },
-        isRocket: mount.spec.isRocket || mount.spec.spawnType === 'MISSILE',
+        barrelOffset,
+        isRocket,
         isGuided: mount.spec.isGuided,
         eccmChance: mount.spec.eccmChanceBonus,
         guidanceBonus: mount.spec.missileGuidanceBonus,
@@ -1426,7 +1576,7 @@ export class ShipWeaponControlSystem {
         turnVelocityRad: 0,
         engineAcceleration: mount.spec.engineAcceleration,
         missileDeceleration: mount.spec.missileDeceleration,
-        maxSpeed: mount.spec.maxSpeed ?? (mount.spec.isRocket || mount.spec.spawnType === 'MISSILE' ? mount.spec.projSpeed : undefined),
+        maxSpeed: mount.spec.maxSpeed ?? (isRocket ? mount.spec.projSpeed : undefined),
         maxTurnRate: mount.spec.maxTurnRate,
         maxTurnAcceleration: mount.spec.maxTurnAcceleration,
         engineFlameColor: mount.spec.engineFlameColor,
@@ -1437,11 +1587,108 @@ export class ShipWeaponControlSystem {
         isTwoStage: mount.spec.isTwoStage,
         mirv: mount.spec.mirv,
         proximityFuse: mount.spec.proximityFuse,
-        hitpoints: mount.spec.missileHp || (mount.spec.isRocket || mount.spec.spawnType === 'MISSILE' ? 100 : undefined),
-        maxHitpoints: mount.spec.missileHp || (mount.spec.isRocket || mount.spec.spawnType === 'MISSILE' ? 100 : undefined)
+        hitpoints: mount.spec.missileHp || (isRocket ? 100 : undefined),
+        maxHitpoints: mount.spec.missileHp || (isRocket ? 100 : undefined),
+        didDamage: false,
+        softFlux: false,
+        stageTriggered: undefined,
+        mirvSplitDistance: undefined,
+        sourceMoveSpeed: undefined,
+        sourceVelocity: undefined,
+        fadeProgress: undefined,
+        prevFadeProgress: undefined,
+        unfadedDamage: undefined,
+        unfadedEmp: undefined,
+        armedWhileFizzling: undefined,
+        missileRangeOrigin: undefined,
+        missileFizzleTime: undefined,
+        isDisarmed: undefined,
+        collisionDisabled: undefined,
+        damagedTargetIds: undefined,
+        voidShieldBlockedRoot: undefined,
+        voidShieldHitRecorded: undefined,
+        gravityOriginalSourceShipId: undefined,
+        gravityCapturedBy: undefined,
+        gravityWellBinding: undefined,
+        gravityDeflected: undefined,
+      } : {
+        id: this.random.next(),
+        sourceShipId: ship.id,
+        slotId: mount.slotId,
+        isPlayer: ship.isPlayer, teamId: ship.teamId,
+        specId: mount.spec.id,
+        pos: firePos.clone(),
+        prevPos: firePos.clone(),
+        ballisticTail: mount.spec.spawnType === 'BALLISTIC' ? firePos.clone() : undefined,
+        prevBallisticTail: mount.spec.spawnType === 'BALLISTIC' ? firePos.clone() : undefined,
+        vel: projVel,
+        baseDamage: mount.spec.damagePerShot,
+        sourceDamageMultiplier,
+        sourceWeaponType: mount.spec.weaponType,
+        gravityCoupling: mount.spec.gravityCoupling,
+        spawnLocation: firePos.clone(),
+        empDamage: mount.spec.empPerShot ?? 0,
+        damage: mount.spec.damagePerShot * sourceDamageMultiplier,
+        damageType: mount.spec.type,
+        onHitEffect: mount.spec.onHitEffect,
+        passThroughMissiles: mount.spec.passThroughMissiles,
+        passThroughFighters: mount.spec.passThroughFighters,
+        passThroughFightersOnlyWhenDestroyed: mount.spec.passThroughFightersOnlyWhenDestroyed,
+        radius: mount.spec.projRadius,
+        rangeRemaining: effectiveRange,
+        totalRange: effectiveRange,
+        elapsedTime: 0,
+        color: mount.spec.color,
+        spawnType: mount.spec.spawnType,
+        renderTargetIndicator: mount.spec.renderTargetIndicator,
+        visualSpawnType: mount.spec.visualSpawnType,
+        textureType: mount.spec.textureType,
+        textureScrollSpeed: mount.spec.textureScrollSpeed,
+        fadeTime: mount.spec.fadeTime,
+        pixelsPerTexel: mount.spec.pixelsPerTexel,
+        fringeColor: mount.spec.fringeColor,
+        coreColor: mount.spec.coreColor,
+        glowColor: mount.spec.glowColor,
+        hitGlowRadius: mount.spec.hitGlowRadius,
+        glowRadius: mount.spec.glowRadius,
+        coreWidthMult: mount.spec.coreWidthMult,
+        movingRayMoveSpeed: mount.spec.spawnType === 'BALLISTIC_AS_BEAM' ? baseProjSpeed : undefined,
+        projSpriteUrl: mount.spec.projSpriteUrl,
+        projLength: mount.spec.projLength,
+        projWidth: mount.spec.projWidth,
+        barrelOffset,
+        isRocket: false,
+        targetShipId: mount.cycleTargetShipId,
+        facingRad: fireAngleRad,
+        projectileExplosionSpec: mount.spec.projectileExplosionSpec,
+        proximityFuse: mount.spec.proximityFuse,
+        didDamage: false,
+        softFlux: false,
+        sourceMoveSpeed: undefined,
+        sourceVelocity: undefined,
+        fadeProgress: undefined,
+        prevFadeProgress: undefined,
+        unfadedDamage: undefined,
+        unfadedEmp: undefined,
+        isDisarmed: undefined,
+        collisionDisabled: undefined,
+        damagedTargetIds: undefined,
+        voidShieldBlockedRoot: undefined,
+        voidShieldHitRecorded: undefined,
+        gravityOriginalSourceShipId: undefined,
+        gravityCapturedBy: undefined,
+        gravityWellBinding: undefined,
+        gravityDeflected: undefined,
       };
-      initializeSourceProjectile(projectile, combatProjectileSpeed(ship, mount.spec), ship.vel);
+      initializeSourceProjectile(projectile, isRocket ? combatProjectileSpeed(ship, mount.spec) : baseProjSpeed, ship.vel);
       initializeSourceMissile(projectile, this.random);
+      if ((!mount.spec.onHitEffect || nativePresentationEffects.has(mount.spec.onHitEffect))
+        && (!mount.spec.everyFrameEffect || nativePresentationEffects.has(mount.spec.everyFrameEffect))) {
+        const projKeys = isMissileLike
+          ? (missileProjectileKeys ??= Object.keys(projectile))
+          : (ballisticProjectileKeys ??= Object.keys(projectile));
+        knownProjectionKeys.set(projectile, projKeys);
+      }
       spawnProjectile(bindProjectileSource(projectile, ship));
       // A successful shot, not a trigger/charge animation, owns physical recoil.
       // The projectile and muzzle effects already inherited the pre-shot velocity.

@@ -1,3 +1,4 @@
+import { validateGravityPush } from '../../simulation/GravityPushState';
 import { gravitySystems } from './GravitySystems';
 import { validateGravityField, validateGravityCollapse } from '../../simulation/GravityFieldState';
 import { validateGravityManeuver } from '../../simulation/GravityManeuverState';
@@ -17,7 +18,12 @@ export const shipSystemDefinitions = new DefinitionRegistry<ShipSystemDefinition
   for (const value of [d.description, d.implementationDetails]) if (value !== undefined && typeof value !== 'string') throw new Error(d.id + ': invalid description');
   if (d.iconUrl !== undefined && (typeof d.iconUrl !== 'string' || !d.iconUrl.trim() || !d.resources?.textures?.includes(d.iconUrl))) throw new Error(d.id + ': icon must declare a texture resource');
   validateGravityField(d.gravityField);
+  validateGravityPush(d.gravityDirectionalPush);
   validateGravityCollapse(d.gravityCollapse);
+  if(d.gravityAutoCollapse){
+    if(!d.gravityCollapse||!d.gravityField?.cursorSpeed)throw Error(d.id+': auto collapse needs cursor field and damage spec');
+    for(const [key,value]of Object.entries(d.gravityAutoCollapse))if(!Number.isFinite(value)||value<0||key!=='fluxCost'&&value===0)throw Error(d.id+': invalid auto collapse '+key);
+  }
   validateGravityManeuver(d.gravityManeuver);
   validateSystemVisuals(d.visuals);
   validateResources(d.resources); validateHooks(d, ['activationReason','targetFailureReason','installReason','statusText','passiveStatusText','passiveModifiers','weaponEnabled','defenseEnabled','modifiers','moduleModifiers','onActivate','onActive','onAdvance','advanceAI','canActivate','initialize','onReset','onInterrupt','selectTarget','isExecuting','onEnergyLash','canVent','preventAIVenting','motionControl','autofirePolicy','deactivationReason']);
@@ -58,12 +64,21 @@ const rocinanteStatDefinitions = new WeakSet(rocinanteSystems.map(d => shipSyste
 // OwnedNativeSystemModifiers also keeps its separate lifecycle-only allowlist:
 // Eclipse depends on live flux and MUST NOT be cached solely by effectLevel.
 const originalStatDefinitions = new WeakSet([shipSystemDefinitions.require(eclipseProtocol.id), shipSystemDefinitions.require(glorianaEdict.id), shipSystemDefinitions.require(hyperionYamato.id), shipSystemDefinitions.require(hyperionJump.id), ...adunArkSystems.map(d=>shipSystemDefinitions.require(d.id))]);
+const allNativeStatDefinitions = new WeakSet(shipSystemDefinitions.all());
 // Consumer dependencies are certified ONLY for these registered immutable definitions.
 // A replacement/copy/external registration never inherits this permission. Propulsion
 // callbacks (offensiveManeuverAllowed/advanceJetsAI) remain on the complete input path.
 const nativeAIInputDependencies = new WeakMap<ShipSystemDefinition, Readonly<{ forwardClear: false }>>(
-  [eclipseProtocol.id, glorianaEdict.id, hyperionYamato.id, hyperionJump.id]
-    .map(id => [shipSystemDefinitions.require(id), Object.freeze({ forwardClear: false as const })])
+  [
+    eclipseProtocol.id,
+    glorianaEdict.id,
+    hyperionYamato.id,
+    hyperionJump.id,
+    ...adunArkSystems.map(d => d.id),
+    ...rocinanteSystems.map(d => d.id),
+    zhefengSystem.id,
+    ...gravitySystems.map(d => d.id),
+  ].map(id => [shipSystemDefinitions.require(id), Object.freeze({ forwardClear: false as const })])
 );
 export function nativeSystemAIInputDependencies(definition: ShipSystemDefinition): Readonly<{ forwardClear: false }> | undefined {
   return nativeAIInputDependencies.get(definition);
@@ -78,10 +93,10 @@ export function hasNativeThreatPhaseAI(definition: ShipSystemDefinition): boolea
  * These authored AI callbacks only queue owner activations and restore temporary
  * aim writes; parent/module/carrier statistics require family invalidation. */
 export function hasExactThreatPhaseAI(definition: ShipSystemDefinition): boolean {
-  return nativeStatDefinitions.has(definition) || originalStatDefinitions.has(definition);
+  return allNativeStatDefinitions.has(definition);
 }
 export function hasNativeSystemStats(definition: ShipSystemDefinition): boolean {
-  return gravityStatDefinitions.has(definition) || nativeStatDefinitions.has(definition) || originalStatDefinitions.has(definition) || rocinanteStatDefinitions.has(definition) || definition === zhefengStatDefinition;
+  return allNativeStatDefinitions.has(definition);
 }
 export function systemFromSource(id: string, owner: string): string {
   if (!id) return 'NONE';

@@ -73,6 +73,9 @@ def main():
     parser.add_argument('--target', required=True, help='Relative to public/game-assets')
     parser.add_argument('--master', required=True)
     parser.add_argument('--prompt', required=True)
+    parser.add_argument('--generation-source', choices=['local-proxy/gpt-image-2.5:text-to-image', 'built-in/image_gen:text-to-image', 'built-in/image_gen:image-edit'], default='local-proxy/gpt-image-2.5:text-to-image')
+    parser.add_argument('--reference-image', help='Workspace image supplied to the image-edit service')
+    parser.add_argument('--preparation-report', help='Optional JSON documenting prepared master and original generated image')
     parser.add_argument('--source-sheet', help='Generated parent sheet for an exact unedited cell crop')
     parser.add_argument('--source-crop', type=int, nargs=4, metavar=('LEFT', 'TOP', 'RIGHT', 'BOTTOM'))
     parser.add_argument('--kind', choices=['background', 'emission', 'sprite', 'atlas', 'material', 'tile', 'strip', 'uv', 'mask'], required=True)
@@ -89,6 +92,8 @@ def main():
     parser.add_argument('--uv-grid', type=int, nargs=2, metavar=('COLUMNS', 'ROWS'))
     parser.add_argument('--uv-repeat-axis', choices=['x', 'y'])
     args = parser.parse_args()
+    if bool(args.reference_image) != (args.generation_source == 'built-in/image_gen:image-edit'):
+        raise ValueError('Image-edit source requires its reference image; text-to-image forbids one')
     if (args.kind == 'uv') != bool(args.uv_grid and args.uv_repeat_axis) or (args.kind != 'uv' and (args.uv_grid or args.uv_repeat_axis)):
         raise ValueError('UV export requires explicit grid and repeat axis; other kinds forbid them')
     if args.tile_repeat != 1 and (args.kind != 'tile' or args.repeat_axes != 'xy'):
@@ -122,7 +127,7 @@ def main():
         previous_record = next((row for row in prior['records'] if row['path'] == args.target), None)
         if (previous_record is None or current_sha != args.replace_authored_sha256
                 or previous_record['sha256'] != current_sha
-                or previous_record.get('source') != 'local-proxy/gpt-image-2.5:text-to-image'):
+                or previous_record.get('source') not in {'local-proxy/gpt-image-2.5:text-to-image', 'built-in/image_gen:text-to-image', 'built-in/image_gen:image-edit'}):
             raise ValueError('Revision requires matching current hash and our existing AI provenance; refusing overwrite')
         original_sha = previous_record['originalSha256']
     else:
@@ -130,6 +135,23 @@ def main():
             raise ValueError('Target is not the unchanged original from the inventory; refusing overwrite')
         original_sha = planned['sha256']
     input_bytes, prompt_bytes = master.read_bytes(), prompt.read_bytes()
+    reference_info = None
+    if args.reference_image:
+        reference_file = contained(ROOT, args.reference_image)
+        reference_bytes = reference_file.read_bytes()
+        with Image.open(BytesIO(reference_bytes)) as reference:
+            reference.load()
+            reference_info = {'path': args.reference_image.replace('\\', '/'), 'sha256': sha(reference_bytes),
+                              'actualSize': list(reference.size), 'mode': reference.mode}
+    preparation = None
+    if args.preparation_report:
+        report_file = contained(ROOT, args.preparation_report)
+        report_bytes = report_file.read_bytes()
+        report = json.loads(report_bytes.decode('utf-8-sig'))
+        generated_file = contained(ROOT, report['generatedImage'])
+        if report['preparedSha256'] != sha(input_bytes) or report['generatedSha256'] != sha(generated_file.read_bytes()):
+            raise ValueError('Preparation report image hashes disagree')
+        preparation = {'path': args.preparation_report.replace('\\', '/'), 'sha256': sha(report_bytes), **report}
     if sha(input_bytes) in {original_sha, current_sha}:
         raise ValueError('Generated input matches original bytes')
     with Image.open(BytesIO(original_bytes)) as original, Image.open(BytesIO(input_bytes)) as generated:
@@ -331,14 +353,14 @@ def main():
         if saved != previous_record or not authored or authored['sha256'] != current_sha or entry['hash'] != current_sha:
             raise ValueError('Revision indexes changed or disagree with current target; refusing overwrite')
     entry.update({'bytes': len(replacement), 'hash': sha(replacement)})
-    record = {'path': args.target, 'sha256': sha(replacement), 'source': 'local-proxy/gpt-image-2.5:text-to-image',
+    record = {'path': args.target, 'sha256': sha(replacement), 'source': args.generation_source,
               'createdAt': datetime.now(timezone.utc).isoformat(), 'originalSha256': original_sha,
               'master': args.master.replace('\\', '/'), 'masterSha256': sha(input_bytes), 'actualMaster': actual, 'alphaNoiseFloor': args.alpha_floor,
               'prompt': args.prompt.replace('\\', '/'), 'promptSha256': sha(prompt_bytes),
               'width': final_size[0], 'height': final_size[1], 'mode': final_mode, 'processing': processing,
               'preservedAlphaCeiling': preserved_ceiling,
               'atlasGrid': [args.atlas_columns, args.atlas_rows] if args.kind == 'atlas' else None,
-              'referenceImagesSent': False, 'review': 'master visually inspected; runtime validation recorded separately',
+              'referenceImagesSent': bool(reference_info), 'review': 'master visually inspected; runtime validation recorded separately',
               'rightsNote': 'Generated replacement is not a legal clearance or a cure for other EULA issues.'}
     if preserved_ceiling is not None:
         record['processing'] += f'; original alpha maximum {preserved_ceiling}/255 retained as multiplier'
@@ -354,6 +376,10 @@ def main():
         record['periodicUV'] = uv_info
     if sheet_info:
         record['sourceSheet'] = sheet_info
+    if preparation:
+        record['preparation'] = preparation
+    if reference_info:
+        record['referenceImage'] = reference_info
     if previous_record:
         record['supersedes'] = previous_record
         record['previousSha256'] = current_sha

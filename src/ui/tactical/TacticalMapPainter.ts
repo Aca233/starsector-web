@@ -1,9 +1,9 @@
+import { nebulaAppearance } from '../../engine/render/NebulaAppearance';
 import { hullSpriteBounds } from '../../engine/runtime/HullPortraitView';
 import { sameTeam, combatTeamColor } from '../../engine/simulation/CombatTeams';
 import type { TacticalMapView, MapContact, MapPoint } from '../../engine/runtime/TacticalMapView';
 import { Vector2 } from '../../engine/math/Vector2';
 import { runtimeAssetUrl } from '../../engine/runtime/RuntimePaths';
-import { NEBULA_SPRITE_SIZE } from '../../engine/simulation/systems/NebulaSystem';
 
 export interface MapView { center: Vector2; span: number }
 export interface MapCamera { pos: MapPoint; width: number; height: number; zoom: number }
@@ -45,9 +45,8 @@ export function pickMapShip(map: TacticalMapView, point: Vector2, view: MapView,
 }
 
 /** Canvas is only an instrument surface; the combat scene remains WebGL2.
- * Every contact/terrain mark comes from the live map. Chart sight uses the shared native-base visibility policy; no decorative RNG. */
+ * Every contact/terrain mark comes from the live map. Chart contacts use the shared public visibility policy; no decorative RNG. */
 export class TacticalMapPainter {
-  private fog = document.createElement("canvas");
   private images = new Map<string, HTMLImageElement>();
   private image(path: string): HTMLImageElement | undefined {
     let image = this.images.get(path);
@@ -61,16 +60,21 @@ export class TacticalMapPainter {
     ctx.fillStyle = 'rgba(0, 3, 6, .86)'; ctx.fillRect(0, 0, size, height);
     const bg = map.environment.backgroundUrl && this.image(map.environment.backgroundUrl);
     if (bg) { ctx.globalAlpha = .15; ctx.drawImage(bg, 0, 0, size, height); ctx.globalAlpha = 1; }
-    // Real nebula tiles, using the same 4x4 atlas as combat.
+    // Each standalone cloud uses the full image, with the same dimensions as combat.
     for (const cloud of map.nebulae) {
-      const p = mapPoint(cloud.pos, view, size, height), width = NEBULA_SPRITE_SIZE * scale;
-      if (p.x < -width || p.y < -width || p.x > size + width || p.y > height + width) continue;
+      const appearance = nebulaAppearance(cloud);
+      const p = mapPoint(cloud.pos, view, size, height);
+      const width = appearance.width * scale, cloudHeight = appearance.height * scale;
+      const margin = Math.hypot(width, cloudHeight) / 2;
+      if (p.x < -margin || p.y < -margin || p.x > size + margin || p.y > height + margin) continue;
       const image = this.image(cloud.spriteUrl);
       if (!image) continue;
-      ctx.globalAlpha = Math.max(0, Math.min(1, cloud.thickness)) * .28;
-      ctx.save(); ctx.translate(p.x, p.y);
-      ctx.drawImage(image, cloud.atlasColumn * image.naturalWidth / 4, cloud.atlasRow * image.naturalHeight / 4,
-        image.naturalWidth / 4, image.naturalHeight / 4, -width / 2, -width / 2, width, width); ctx.restore();
+      ctx.globalAlpha = Math.floor(255 * Math.max(0, Math.min(1, cloud.thickness))) / 255 * appearance.opacityMult * .28;
+      // Battle and map both use +Y down, so their rotation signs match.
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(appearance.rotationRad);
+      ctx.drawImage(image, appearance.u * image.naturalWidth, appearance.v * image.naturalHeight,
+        (appearance.u2 - appearance.u) * image.naturalWidth, (appearance.v2 - appearance.v) * image.naturalHeight,
+        -width / 2, -cloudHeight / 2, width, cloudHeight); ctx.restore();
     }
     ctx.globalAlpha = 1;
     ctx.fillStyle = '#a19489';
@@ -79,20 +83,7 @@ export class TacticalMapPainter {
       ctx.globalAlpha = .7; ctx.fillRect(p.x - radius, p.y - radius, radius * 2, radius * 2);
     }
     ctx.globalAlpha = 1;
-    if (this.fog.width !== Math.round(size) || this.fog.height !== Math.round(height)) { this.fog.width = Math.round(size); this.fog.height = Math.round(height); }
-    const fog = map.openBattlefield ? null : this.fog.getContext('2d');
-    if (fog) {
-      fog.clearRect(0, 0, size, height); fog.globalCompositeOperation = 'source-over';
-      fog.fillStyle = 'rgba(70, 92, 114, .39)'; fog.fillRect(0, 0, size, height);
-      fog.globalCompositeOperation = 'destination-out';
-      const mask = this.image('graphics/fx/fog_circle2.png');
-      for (const observer of map.observers) {
-        const p = mapPoint(observer.pos, view, size, height), radius = (observer.sightRadius + 250) * 1.05 * scale;
-        if (mask) fog.drawImage(mask, p.x - radius, p.y - radius, radius * 2, radius * 2);
-        else { const gradient = fog.createRadialGradient(p.x, p.y, radius * .87, p.x, p.y, radius); gradient.addColorStop(0, '#000'); gradient.addColorStop(1, 'transparent'); fog.fillStyle = gradient; fog.beginPath(); fog.arc(p.x, p.y, radius, 0, Math.PI * 2); fog.fill(); }
-      }
-      fog.globalCompositeOperation = 'source-over'; ctx.drawImage(this.fog, 0, 0, size, height);
-    }
+    // Public Web combat has no sensor-range fog overlay, including old map snapshots.
     // World-anchored grid. Major lines every four cells, like the original chart.
     const ideal = view.span / 20, step = 250 * Math.pow(2, Math.round(Math.log2(ideal / 250)));
     const visibleHeight = height / scale;

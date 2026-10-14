@@ -8,7 +8,7 @@ export class ShipDefenseController {
   public reset():void {this.quietFor=0;this.safeVentFor=0;}
   public observe(dt:number,threat:ThreatAssessment):void {
     this.quietFor=threat.imminentDamage>0?0:this.quietFor+dt;
-    this.safeVentFor=threat.threats.length||threat.hasDeferredWeaponThreat?0:this.safeVentFor+dt;
+    this.safeVentFor=(threat.hasAnyThreat??threat.threats.length>0)||threat.hasDeferredWeaponThreat?0:this.safeVentFor+dt;
   }
   public update(ship:Ship,threat:ThreatAssessment,refreshBeforeVent?:()=>ThreatAssessment):{ventSafe:boolean;state:'UP'|'DOWN'|'PHASE'|'VENTING'} {
     ship.defenseFacingRad=threat.facing??undefined;

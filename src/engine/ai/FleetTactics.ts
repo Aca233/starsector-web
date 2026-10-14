@@ -1,12 +1,13 @@
 import { fleetColumnsFor, solveFleetColumns, type FleetColumns } from './FleetColumnSolver';
 import { planNumericalFleet, type FleetUnit } from './NumericalFleetPlanner';
+import type { FleetTask } from './FleetTask';
 import type { Ship } from '../simulation/Ship';
 import type { TacticalOrder } from '../simulation/CombatTypes';
 import { isPointDefense } from './AutofireController';
-import { weaponDps, weaponRange } from './ShipCombatProfile';
+import { combatParts, weaponDps, weaponRange } from './ShipCombatProfile';
 
 export type FleetRole = 'LINE' | 'BRAWLER' | 'ARTILLERY' | 'SKIRMISHER' | 'CARRIER' | 'UNARMED';
-export type FleetTask = 'PRESSURE' | 'FINISH' | 'SCREEN' | 'SUPPORT' | 'REGROUP' | 'DISENGAGE' | 'SEARCH';
+export type { FleetTask } from './FleetTask';
 /** Frame-local advice, not a player order. Scalars/IDs only so owners can share the same plan. */
 export interface FleetAssignment {
   targetId: string | null;
@@ -47,71 +48,217 @@ const clamp = (n: number, low: number, high: number) => Math.max(low, Math.min(h
 const distance = (a: Ship, b: Ship) => a.pos.distanceTo(b.pos);
 const compareId = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 
+const rangeModifierReaders = ['getWeaponRangePercent'] as const;
+
+const readinessScratchRanges: number[] = [];
+const readinessScratchPowers: number[] = [];
+const readinessScratchOwners: Ship[] = [];
+const readinessScratchMounts: Ship['weapons'][number][] = [];
+const readinessScratchDps: number[] = [];
+const readinessScratchTier: number[] = [];
+
 function readiness(ship: Ship): Readiness {
-  const available = ship.weapons.filter(m => !m.isDisabled && m.ammo >= 1 && weaponDps(m) > 0);
-  const offensive = available.filter(m => !isPointDefense(m));
-  const sustained = offensive.filter(m => m.spec.weaponType !== 'MISSILE' && m.spec.spawnType !== 'MISSILE' && !m.spec.aiHints?.includes('STRIKE'));
-  const battery = sustained.length ? sustained : offensive.length ? offensive : available;
-  const modifiers = battery.length && import.meta.env?.VITE_COMBAT_STAT_TABLE !== 'false'
-    ? ship.system.readModifierTable?.(['getWeaponRangePercent']) : undefined;
-  const ranges = battery.map(m => ({ range: weaponRange(ship, m, modifiers || undefined), power: weaponDps(m) })).sort((a, b) => a.range - b.range);
-  const batteryPower = ranges.reduce((sum, m) => sum + m.power, 0);
-  let cumulative = 0, range = 0;
-  for (const m of ranges) { cumulative += m.power; range = m.range; if (cumulative >= batteryPower / 2) break; }
-  const wings = ship.fighterRecall || ship.hullStats.fighterWingRangeMultiplier <= 0 ? []
-    : (ship.spec.fighterWings ?? []).slice(0, Math.max(0, ship.hullStats.fighterBays)).filter(w => w.count > 0 && (w.range ?? Infinity) > 0);
-  const wingPower = wings.reduce((sum, w) => sum + w.count * 80, 0);
-  const carrierRange = wings.length ? Math.min(...wings.map(w => Number.isFinite(w.range)
-    ? w.range! : fleetPolicy.carrierRangeFallback)) * ship.hullStats.fighterWingRangeMultiplier * .75 : 0;
-  const offensePower = offensive.reduce((sum, m) => sum + weaponDps(m), 0);
+  const parts = combatParts(ship);
+  let availableCount = 0, offensiveCount = 0, sustainedCount = 0;
+  let offensePower = 0;
+  for (let p = 0; p < parts.length; p++) {
+    const owner = parts[p], weapons = owner.weapons;
+    for (let w = 0; w < weapons.length; w++) {
+      const m = weapons[w];
+      if (m.isDisabled || !(m.ammo >= 1)) continue;
+      const dps = weaponDps(m);
+      if (!(dps > 0)) continue;
+      const idx = availableCount++;
+      readinessScratchOwners[idx] = owner;
+      readinessScratchMounts[idx] = m;
+      readinessScratchDps[idx] = dps;
+      if (!isPointDefense(m)) {
+        offensiveCount++;
+        offensePower += dps;
+        if (m.spec.weaponType !== 'MISSILE' && m.spec.spawnType !== 'MISSILE' && !m.spec.aiHints?.includes('STRIKE')) {
+          sustainedCount++;
+          readinessScratchTier[idx] = 2;
+        } else {
+          readinessScratchTier[idx] = 1;
+        }
+      } else {
+        readinessScratchTier[idx] = 0;
+      }
+    }
+  }
+  const batteryCount = sustainedCount || offensiveCount || availableCount;
+  const requiredTier = sustainedCount ? 2 : offensiveCount ? 1 : 0;
+  // Each module owns its range modifiers; never apply the root table to its weapons.
+  const useStatTable = import.meta.env?.VITE_COMBAT_STAT_TABLE !== 'false';
+  let batteryPower = 0, range = 0;
+  if (batteryCount === 1) {
+    for (let i = 0; i < availableCount; i++) {
+      if (readinessScratchTier[i] < requiredTier) continue;
+      const owner = readinessScratchOwners[i], m = readinessScratchMounts[i];
+      const modifiers = useStatTable ? owner.system.readModifierTable?.(rangeModifierReaders) : undefined;
+      batteryPower = readinessScratchDps[i];
+      range = weaponRange(owner, m, modifiers);
+      break;
+    }
+  } else if (batteryCount > 1) {
+    let count = 0;
+    let lastOwner: Ship | undefined;
+    let ownerModifiers: ReturnType<Ship['system']['readModifierTable']> | undefined;
+    for (let i = 0; i < availableCount; i++) {
+      if (readinessScratchTier[i] < requiredTier) continue;
+      const owner = readinessScratchOwners[i], m = readinessScratchMounts[i], power = readinessScratchDps[i];
+      if (owner !== lastOwner) {
+        lastOwner = owner;
+        ownerModifiers = useStatTable ? owner.system.readModifierTable?.(rangeModifierReaders) : undefined;
+      }
+      batteryPower += power;
+      const r = weaponRange(owner, m, ownerModifiers);
+      let ins = count++;
+      while (ins > 0 && readinessScratchRanges[ins - 1] > r) {
+        readinessScratchRanges[ins] = readinessScratchRanges[ins - 1];
+        readinessScratchPowers[ins] = readinessScratchPowers[ins - 1];
+        ins--;
+      }
+      readinessScratchRanges[ins] = r;
+      readinessScratchPowers[ins] = power;
+    }
+    let cumulative = 0;
+    for (let i = 0; i < count; i++) {
+      cumulative += readinessScratchPowers[i]; range = readinessScratchRanges[i]; if (cumulative >= batteryPower / 2) break;
+    }
+  }
+  let wingPower = 0, minWingEffectiveRange = Infinity, hasWings = false;
+  for (let p = 0; p < parts.length; p++) {
+    const owner = parts[p];
+    if (owner.fighterRecall || owner.hullStats.fighterWingRangeMultiplier <= 0 || !owner.spec.fighterWings) continue;
+    const limit = Math.min(owner.spec.fighterWings.length, Math.max(0, owner.hullStats.fighterBays));
+    const mult = owner.hullStats.fighterWingRangeMultiplier;
+    for (let i = 0; i < limit; i++) {
+      const wing = owner.spec.fighterWings[i];
+      if (wing.count > 0 && (wing.range ?? Infinity) > 0) {
+        hasWings = true;
+        wingPower += wing.count * 80;
+        const wr = (Number.isFinite(wing.range) ? wing.range! : fleetPolicy.carrierRangeFallback) * mult;
+        if (wr < minWingEffectiveRange) minWingEffectiveRange = wr;
+      }
+    }
+  }
+  const carrierRange = hasWings ? minWingEffectiveRange * .75 : 0;
   const speed = ship.getMotionStats().maxSpeed;
   const role: FleetRole = carrierRange > 0 && offensePower < wingPower * 1.25 ? 'CARRIER'
-    : !battery.length ? 'UNARMED' : range >= fleetPolicy.artilleryRange ? 'ARTILLERY'
+    : !batteryCount ? 'UNARMED' : range >= fleetPolicy.artilleryRange ? 'ARTILLERY'
     : speed >= fleetPolicy.skirmisherSpeed ? 'SKIRMISHER' : range <= fleetPolicy.closeRange ? 'BRAWLER' : 'LINE';
   const availability = ship.retreating || ship.flux.isOverloaded || ship.flux.isVenting ? .15
     : 1 - clamp(ship.flux.fluxPercent, 0, 1) * .6;
   return { ship, role, range: role === 'CARRIER' ? carrierRange : range, carrierRange, speed,
     hull: clamp(ship.hullHp / Math.max(1, ship.maxHullHp), 0, 1),
-    power: (offensePower + (offensive.length ? 0 : batteryPower * .3) + wingPower) * availability };
+    power: (offensePower + (offensiveCount ? 0 : batteryPower * .3) + wingPower) * availability };
 }
 
 function publishReadiness(ship: Ship, f: FleetColumns, row: number): void {
-  const available = ship.weapons.filter(m => !m.isDisabled && m.ammo >= 1 && weaponDps(m) > 0);
-  const offensive = available.filter(m => !isPointDefense(m));
-  const sustained = offensive.filter(m => m.spec.weaponType !== 'MISSILE' && m.spec.spawnType !== 'MISSILE' && !m.spec.aiHints?.includes('STRIKE'));
-  const battery = sustained.length ? sustained : offensive.length ? offensive : available;
-  const modifiers = battery.length && import.meta.env?.VITE_COMBAT_STAT_TABLE !== 'false'
-    ? ship.system.readModifierTable?.(['getWeaponRangePercent']) : undefined;
-  const ranges = battery.map(m => ({ range: weaponRange(ship, m, modifiers || undefined), power: weaponDps(m) })).sort((a, b) => a.range - b.range);
-  const batteryPower = ranges.reduce((sum, m) => sum + m.power, 0);
-  let cumulative = 0, range = 0;
-  for (const m of ranges) { cumulative += m.power; range = m.range; if (cumulative >= batteryPower / 2) break; }
-  const wings = ship.fighterRecall || ship.hullStats.fighterWingRangeMultiplier <= 0 ? []
-    : (ship.spec.fighterWings ?? []).slice(0, Math.max(0, ship.hullStats.fighterBays)).filter(w => w.count > 0 && (w.range ?? Infinity) > 0);
-  const wingPower = wings.reduce((sum, w) => sum + w.count * 80, 0);
-  const carrierRange = wings.length ? Math.min(...wings.map(w => Number.isFinite(w.range)
-    ? w.range! : fleetPolicy.carrierRangeFallback)) * ship.hullStats.fighterWingRangeMultiplier * .75 : 0;
-  const offensePower = offensive.reduce((sum, m) => sum + weaponDps(m), 0);
+  // The column path must preserve the same assembly contribution as the object path.
+  if (ship.childModules.length && !ship.isAttachedModule) {
+    const unit = readiness(ship);
+    f.role[row] = unit.role; f.range[row] = unit.range; f.carrierRange[row] = unit.carrierRange;
+    f.speed[row] = unit.speed; f.hull[row] = unit.hull; f.power[row] = unit.power;
+    return;
+  }
+  const weapons = ship.weapons;
+  let availableCount = 0, offensiveCount = 0, sustainedCount = 0;
+  let offensePower = 0;
+  for (let i = 0; i < weapons.length; i++) {
+    const m = weapons[i];
+    if (m.isDisabled || !(m.ammo >= 1)) continue;
+    const dps = weaponDps(m);
+    if (!(dps > 0)) continue;
+    const idx = availableCount++;
+    readinessScratchMounts[idx] = m;
+    readinessScratchDps[idx] = dps;
+    if (!isPointDefense(m)) {
+      offensiveCount++;
+      offensePower += dps;
+      if (m.spec.weaponType !== 'MISSILE' && m.spec.spawnType !== 'MISSILE' && !m.spec.aiHints?.includes('STRIKE')) {
+        sustainedCount++;
+        readinessScratchTier[idx] = 2;
+      } else {
+        readinessScratchTier[idx] = 1;
+      }
+    } else {
+      readinessScratchTier[idx] = 0;
+    }
+  }
+  const batteryCount = sustainedCount || offensiveCount || availableCount;
+  const requiredTier = sustainedCount ? 2 : offensiveCount ? 1 : 0;
+  const modifiers = batteryCount && import.meta.env?.VITE_COMBAT_STAT_TABLE !== 'false'
+    ? ship.system.readModifierTable?.(rangeModifierReaders) : undefined;
+  let batteryPower = 0, range = 0;
+  if (batteryCount === 1) {
+    for (let i = 0; i < availableCount; i++) {
+      if (readinessScratchTier[i] < requiredTier) continue;
+      batteryPower = readinessScratchDps[i];
+      range = weaponRange(ship, readinessScratchMounts[i], modifiers || undefined);
+      break;
+    }
+  } else if (batteryCount > 1) {
+    let count = 0;
+    for (let i = 0; i < availableCount; i++) {
+      if (readinessScratchTier[i] < requiredTier) continue;
+      const dps = readinessScratchDps[i];
+      batteryPower += dps;
+      const r = weaponRange(ship, readinessScratchMounts[i], modifiers || undefined);
+      let ins = count++;
+      while (ins > 0 && readinessScratchRanges[ins - 1] > r) {
+        readinessScratchRanges[ins] = readinessScratchRanges[ins - 1];
+        readinessScratchPowers[ins] = readinessScratchPowers[ins - 1];
+        ins--;
+      }
+      readinessScratchRanges[ins] = r;
+      readinessScratchPowers[ins] = dps;
+    }
+    let cumulative = 0;
+    for (let i = 0; i < count; i++) {
+      cumulative += readinessScratchPowers[i]; range = readinessScratchRanges[i]; if (cumulative >= batteryPower / 2) break;
+    }
+  }
+  let wingPower = 0, minWingRange = Infinity, hasWings = false;
+  if (!ship.fighterRecall && ship.hullStats.fighterWingRangeMultiplier > 0 && ship.spec.fighterWings) {
+    const limit = Math.min(ship.spec.fighterWings.length, Math.max(0, ship.hullStats.fighterBays));
+    for (let i = 0; i < limit; i++) {
+      const w = ship.spec.fighterWings[i];
+      if (w.count > 0 && (w.range ?? Infinity) > 0) {
+        hasWings = true;
+        wingPower += w.count * 80;
+        const wr = Number.isFinite(w.range) ? w.range! : fleetPolicy.carrierRangeFallback;
+        if (wr < minWingRange) minWingRange = wr;
+      }
+    }
+  }
+  const carrierRange = hasWings ? minWingRange * ship.hullStats.fighterWingRangeMultiplier * .75 : 0;
   const speed = ship.getMotionStats().maxSpeed;
   const role: FleetRole = carrierRange > 0 && offensePower < wingPower * 1.25 ? 'CARRIER'
-    : !battery.length ? 'UNARMED' : range >= fleetPolicy.artilleryRange ? 'ARTILLERY'
+    : !batteryCount ? 'UNARMED' : range >= fleetPolicy.artilleryRange ? 'ARTILLERY'
     : speed >= fleetPolicy.skirmisherSpeed ? 'SKIRMISHER' : range <= fleetPolicy.closeRange ? 'BRAWLER' : 'LINE';
   const availability = ship.retreating || ship.flux.isOverloaded || ship.flux.isVenting ? .15
     : 1 - clamp(ship.flux.fluxPercent, 0, 1) * .6;
   f.role[row]=role;f.range[row]=role==='CARRIER'?carrierRange:range;f.carrierRange[row]=carrierRange;f.speed[row]=speed;
   f.hull[row]=clamp(ship.hullHp/Math.max(1,ship.maxHullHp),0,1);
-  f.power[row]=(offensePower+(offensive.length?0:batteryPower*.3)+wingPower)*availability;
+  f.power[row]=(offensePower+(offensiveCount?0:batteryPower*.3)+wingPower)*availability;
 }
 
 /** No per-unit hydration: one writer publishes scalars directly to the columns.
  * Existing Ship readers remain at this input boundary, in their original order. */
-function planPublishedFleet(ships:readonly Ship[],orders:ReadonlyMap<string,TacticalOrder>,manualIds:ReadonlySet<string>,f:FleetColumns):FleetPlan|undefined {
-  const members=ships.filter(s=>alive(s)&&!s.hasVastBulk);
+function planPublishedFleet(ships:readonly Ship[],orders:ReadonlyMap<string,TacticalOrder>,manualIds:ReadonlySet<string>,f:FleetColumns,onlyTeam?:number):FleetPlan|undefined {
+  const members:Ship[]=[];
+  for(let i=0;i<ships.length;i++){const s=ships[i];if(alive(s)&&!s.hasVastBulk&&!s.isAttachedModule)members.push(s);}
   if(!f.begin(members.length))return planFleetTacticsNumerically(ships,orders,manualIds);
   try {
     for(let row=0;row<members.length;row++)publishReadiness(members[row],f,row);
-    f.visibleTeams.push(...new Set(members.filter(s=>capital(s)&&!s.retreating).map(s=>s.teamId)));
-    const rows=new Map(members.map((s,row)=>[s,row]));
+    for(let row=0;row<members.length;row++){
+      const s=members[row];
+      if(capital(s)&&!s.retreating&&(onlyTeam===undefined||s.teamId===onlyTeam)&&!f.visibleTeams.includes(s.teamId))f.visibleTeams.push(s.teamId);
+    }
+    const rows=new Map<Ship,number>();
+    for(let row=0;row<members.length;row++)rows.set(members[row],row);
     let finite=true;
     for(let row=0;row<members.length;row++) {
       const ship=members[row];
@@ -133,19 +280,21 @@ function planPublishedFleet(ships:readonly Ship[],orders:ReadonlyMap<string,Tact
       f.currentTargetRow[row]=ship.currentTargetShip?(rows.get(ship.currentTargetShip)??-1):-1;
       // Inspect original values too: TypedArray coercion must not admit strings,
       // callbacks or other values previously rejected by Number.isFinite.
-      if(![x,y,radius,teamId,hullHp,maxHullHp,armor,flux,f.power[row],f.range[row],f.speed[row],f.hull[row],f.carrierRange[row]].every(Number.isFinite))finite=false;
+      if(!(Number.isFinite(x)&&Number.isFinite(y)&&Number.isFinite(radius)&&Number.isFinite(teamId)&&Number.isFinite(hullHp)&&Number.isFinite(maxHullHp)
+        &&Number.isFinite(armor)&&Number.isFinite(flux)&&Number.isFinite(f.power[row])&&Number.isFinite(f.range[row])&&Number.isFinite(f.speed[row])
+        &&Number.isFinite(f.hull[row])&&Number.isFinite(f.carrierRange[row])))finite=false;
     }
     if(!finite)return;
-    return solveFleetColumns(f,orders,manualIds);
+    return solveFleetColumns(f,orders,manualIds,onlyTeam);
   } finally {f.end();}
 }
 
 /** Called only by the existing closed-authority deferred decision phase.
  * Native adapters run once here; the numerical solver receives no Ship readers. */
-export function planFleetTacticsNumerically(ships:readonly Ship[],orders:ReadonlyMap<string,TacticalOrder>=new Map(),manualIds:ReadonlySet<string>=new Set(),owner?:object):FleetPlan|undefined {
+export function planFleetTacticsNumerically(ships:readonly Ship[],orders:ReadonlyMap<string,TacticalOrder>=new Map(),manualIds:ReadonlySet<string>=new Set(),owner?:object,onlyTeam?:number):FleetPlan|undefined {
   if(owner&&import.meta.env?.VITE_COMBAT_STAGE_KERNEL!=='false'&&import.meta.env?.VITE_COMBAT_FLEET_COLUMNS!=='false')
-    return planPublishedFleet(ships,orders,manualIds,fleetColumnsFor(owner));
-  const units=ships.filter(s=>alive(s)&&!s.hasVastBulk).map(readiness);
+    return planPublishedFleet(ships,orders,manualIds,fleetColumnsFor(owner),onlyTeam);
+  const units=ships.filter(s=>alive(s)&&!s.hasVastBulk&&!s.isAttachedModule).map(readiness);
   const teams=[...new Set(units.filter(u=>capital(u.ship)&&!u.ship.retreating).map(u=>u.ship.teamId))];
   const unitRows=new Map(units.map((u,row)=>[u.ship,row]));
   const numeric:FleetUnit[]=units.map((u,row)=> {
@@ -165,13 +314,15 @@ export function planFleetTacticsNumerically(ships:readonly Ship[],orders:Readonl
  * Weapon summaries are O(mounts); support/scoring are O(teams * ships²), never per-candidate arc scans.
  * Only team-visible enemies participate, including support estimates and approach lanes. */
 export function planFleetTactics(ships: readonly Ship[], orders: ReadonlyMap<string, TacticalOrder> = new Map(),
-  manualIds: ReadonlySet<string> = new Set()): FleetPlan {
-  const units = ships.filter(s => alive(s) && !s.hasVastBulk).map(readiness);
+  manualIds: ReadonlySet<string> = new Set(), onlyTeam?: number): FleetPlan {
+  // Modules contribute through their root, never as independent cover/approach actors.
+  const units = ships.filter(s => alive(s) && !s.hasVastBulk && !s.isAttachedModule).map(readiness);
   const byId = new Map(units.map(u => [u.ship.id, u]));
   const actors = units.filter(u => capital(u.ship) && !u.ship.retreating);
   const orderFor = (s: Ship) => orders.get(s.id) ?? (s.isPlayer ? orders.get('fleet') : undefined);
   const plans = new Map<string, FleetAssignment>();
   for (const team of new Set(actors.map(u => u.ship.teamId))) {
+    if (onlyTeam !== undefined && team !== onlyTeam) continue;
     const friends = actors.filter(u => u.ship.teamId === team);
     const enemies = units.filter(u => u.ship.teamId !== team && u.ship.isVisibleTo(team));
     const major = enemies.filter(u => capital(u.ship));

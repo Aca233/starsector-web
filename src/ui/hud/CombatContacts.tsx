@@ -8,6 +8,7 @@ import { clientToCombatWorld } from '../../engine/runtime/PlayerControls';
 import { pickCombatContact } from '../../engine/runtime/CombatTargeting';
 import { FloatingShipHUD } from './FloatingShipHUD';
 import { TargetShipHUD } from './TargetShipHUD';
+import { GravityTractorHUD } from './GravityTractorHUD';
 
 interface Props {
   engine: CombatEngine;
@@ -70,6 +71,7 @@ export function CombatContacts({ engine, cameraPosRef, zoomRef, canvasRef, sched
   if (blocked || engine.isTacticalMap) return null;
   const shared = { cameraPosRef, zoomRef, canvasRef, alphaRef };
   return <>
+    <GravityTractorHUD engine={engine} {...shared} />
     {contacts.hover && <FloatingShipHUD key={'hover:' + contacts.hover.id} ship={contacts.hover}
       isEnemy={contacts.hover.teamId !== engine.playerShip.teamId} observerTeamId={engine.playerShip.teamId} {...shared} />}
     {contacts.target && <TargetShipHUD key={'target:' + contacts.target.id} ship={contacts.target} observer={engine.playerShip} {...shared} />}
